@@ -25,29 +25,29 @@ class HardenedVisionTests(unittest.TestCase):
             actor_variant_ids=("orchestrator-v1", "builder-v1"),
             verifier_variant_ids=("curator-v1",),
             rollback_evidence_ref="artifact:rollback-plan",
+            court_case_refs=("CASE-001", "CASE-003"),
+            source_docket_audit_ref="artifact:source-docket-audit",
+            source_inventory_complete=True,
         )
 
     def test_complete_autonomous_lifecycle_is_compliant(self) -> None:
         decision = self.gate.evaluate(self.evidence)
         self.assertTrue(decision.compliant, decision.reasons)
 
-    def test_original_sources_are_part_of_immutable_contract(self) -> None:
-        self.assertIn(
+    def test_original_and_expanded_sources_are_part_of_immutable_contract(self) -> None:
+        expected = {
             "https://www.youtube.com/watch?v=mazBhCg3urw",
-            self.contract.source_references,
-        )
-        self.assertIn(
             "https://www.youtube.com/watch?v=Gw_hnD7m00M",
-            self.contract.source_references,
-        )
-        self.assertIn(
             "https://github.com/rangerrick337/operator-os/tree/main",
-            self.contract.source_references,
-        )
-        self.assertIn(
             "https://github.com/nousresearch/hermes-agent",
-            self.contract.source_references,
-        )
+            "https://github.com/agiresearch/AIOS",
+            "https://arxiv.org/abs/2407.16741",
+            "https://github.com/rivet-dev/agent-os",
+            "https://github.com/microsoft/agent-framework",
+            "https://arxiv.org/abs/2505.21577",
+            "user-supplied:mission-control-video",
+        }
+        self.assertTrue(expected.issubset(set(self.contract.source_references)))
 
     def test_missing_role_and_capability_fail_closed(self) -> None:
         evidence = replace(
@@ -99,6 +99,33 @@ class HardenedVisionTests(unittest.TestCase):
         decision = self.gate.evaluate(evidence)
         self.assertFalse(decision.compliant)
         self.assertIn("vision contract changed", decision.reasons)
+
+    def test_missing_court_and_source_docket_fail_closed(self) -> None:
+        evidence = replace(
+            self.evidence,
+            court_case_refs=(),
+            source_docket_audit_ref=None,
+            source_inventory_complete=False,
+            unresolved_source_ids=("SRC-005",),
+        )
+        decision = self.gate.evaluate(evidence)
+        self.assertFalse(decision.compliant)
+        self.assertIn("courtroom review evidence is missing", decision.reasons)
+        self.assertIn("source docket audit is missing", decision.reasons)
+        self.assertIn("source idea inventory is incomplete", decision.reasons)
+        self.assertTrue(any("SRC-005" in reason for reason in decision.reasons))
+
+    def test_superiority_claim_requires_comparative_benchmark(self) -> None:
+        evidence = replace(self.evidence, superiority_claimed=True)
+        decision = self.gate.evaluate(evidence)
+        self.assertFalse(decision.compliant)
+        self.assertIn("superiority claim lacks comparative benchmark evidence", decision.reasons)
+
+        benchmarked = replace(
+            evidence,
+            comparative_benchmark_ref="artifact:comparator-court-result",
+        )
+        self.assertTrue(self.gate.evaluate(benchmarked).compliant)
 
 
 if __name__ == "__main__":
