@@ -213,3 +213,32 @@ paths (bad fix, policy, budget) fail closed with recorded state.
 - Do not special-case the fixture inside mission code (fixture knowledge lives only in
   the scripted backend and test fixtures; `RepositoryMission` must be repository-agnostic).
 - Do not weaken kernel result validation to fit mission wiring.
+
+---
+## Completion record
+- Date (UTC): 2026-07-27
+- Executor (model/agent identity): Codex (GPT-5)
+- Branch and implementation commit SHA: `phase/P05-vertical-slice` at
+  `dc41483384b7654f450fbc413aa17f51ef31a4fa`
+- Gates: P05 tests 10 passed; full pytest 196 passed, 2 skipped, 1,718 subtests;
+  Ruff passed; Pyright passed with 0 errors; offline CLI golden path passed twice
+- Audit artifact: `evidence/audits/P05-post.json`
+  (digest: `sha256:96bf4b4fac5b3c56af53abda62851fca53a0f72dfa1bb5f7e95bc6dde4c1a8b4`;
+  complete: true; failures: none)
+- Real-model path: not exercised against a network provider because neither a model ID nor
+  provider credential was configured. The actual `ModelBackend` path was exercised offline
+  with a deterministic fake provider through the same capability executor.
+- Deviations from the phase spec:
+  - Added ADR-009 and the narrow policy change permitting sandbox-level Explorer command
+    execution while retaining every Explorer mutation denial. This was required to make
+    the specified read-only failing-test reproduction reachable.
+  - Extended `verify_delivery` with optional Curator identity, allowance, evidence-root,
+    and receipt-sink parameters so all internal verification commands remain reachable
+    from `MissionReport`; existing P04 callers retain their prior defaults.
+  - Used `fixture_repo.fixture_fix()` and scripted-backend fixture bytes instead of a
+    standalone patch file.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing P07,
+  P08, P09, P12, and B-OPS-06 obligations remain open and are not reclassified here.
+- Capability boundary: this closes the P05 local/offline vertical-slice exit criteria only.
+  It does not establish production readiness, hostile-code isolation, external delivery,
+  authenticated identity, resolved source licensing, or superiority.
