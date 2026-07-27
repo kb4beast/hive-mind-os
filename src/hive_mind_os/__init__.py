@@ -24,6 +24,13 @@ from .courtroom import (
     SourceDocketAuditor,
     SourceRecord,
 )
+from .current_state_audit import (
+    AUDITED_BASELINE,
+    collect_current_state_audit,
+    create_audit_artifact,
+    verify_audit_artifact,
+    write_audit_artifact,
+)
 from .models import AutonomyLevel, Objective, RiskTier, Role
 from .recursive_improvement import (
     ExperimentCandidate,
@@ -48,6 +55,7 @@ __all__ = [
     "AutonomyBudget",
     "AutonomyLevel",
     "AutonomousMissionLoop",
+    "AUDITED_BASELINE",
     "BurdenOfProof",
     "ClassicGptSimulationGate",
     "ClassicGptSourcePack",
@@ -81,7 +89,11 @@ __all__ = [
     "SourceDocketAuditor",
     "SourceRecord",
     "VisionComplianceGate",
+    "collect_current_state_audit",
+    "create_audit_artifact",
     "load_default_source_docket",
     "load_source_docket",
+    "verify_audit_artifact",
+    "write_audit_artifact",
 ]
 __version__ = "0.5.0"

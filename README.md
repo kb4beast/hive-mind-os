@@ -100,6 +100,20 @@ hive-mind "Improve repository reliability" --repository owner/repo \
 
 The included deterministic backend exercises the role lifecycle offline. Real model, Git, sandbox, web/source-ingestion, durable scheduler, repository-graph, mission-control, and enforced resource-lease adapters are the next implementation slices.
 
+## Audit the current state
+
+The Stage 0 audit command records the Git history and worktree, docket counts and blockers,
+broken code/test/benchmark references, tool versions, exact command outputs, baseline
+discrepancies, and a test receipt in a canonical SHA-256 envelope:
+
+```bash
+hive-mind audit --output evidence/audits/current-state.json
+```
+
+Pass `--signing-key-file` and `--signing-key-id` to add a local HMAC signature. Without an
+external signing authority, the artifact remains explicitly unsigned but is always digested
+and independently integrity-checkable.
+
 ## Core guarantees
 
 1. Evidence before authority.
