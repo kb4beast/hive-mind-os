@@ -60,6 +60,15 @@ PROHIBITED_ACTIONS = frozenset(
     }
 )
 
+EXTERNAL_GRANT_ACTIONS = frozenset(
+    {
+        Action.MERGE_PULL_REQUEST,
+        Action.DEPLOY,
+        Action.MANAGE_SECRETS,
+        Action.SPEND_MONEY,
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class PolicyDecision:
@@ -71,21 +80,24 @@ class PolicyEngine:
     """Fail-closed authority checks for every side effect."""
 
     def __init__(self, autonomy: AutonomyLevel = AutonomyLevel.SANDBOX) -> None:
+        if not isinstance(autonomy, AutonomyLevel):
+            raise ValueError("autonomy must be an AutonomyLevel")
         self.autonomy = autonomy
 
     def decide(self, role: Role, action: Action, risk: RiskTier) -> PolicyDecision:
+        if not isinstance(role, Role):
+            return PolicyDecision(False, "invalid role identity")
+        if not isinstance(action, Action):
+            return PolicyDecision(False, "invalid action")
+        if not isinstance(risk, RiskTier):
+            return PolicyDecision(False, "invalid risk tier")
         if action in PROHIBITED_ACTIONS:
             return PolicyDecision(False, f"{action} violates a non-delegable autonomy invariant")
         required = ACTION_LEVEL[action]
         if self.autonomy < required:
             return PolicyDecision(False, f"{action} requires autonomy level {int(required)}")
-        if risk is RiskTier.CRITICAL and action in {
-            Action.MERGE_PULL_REQUEST,
-            Action.DEPLOY,
-            Action.MANAGE_SECRETS,
-            Action.SPEND_MONEY,
-        }:
-            return PolicyDecision(False, "critical-risk irreversible actions require an external policy grant")
+        if action in EXTERNAL_GRANT_ACTIONS:
+            return PolicyDecision(False, f"{action} requires an external policy grant")
         if role is Role.EXPLORER and action not in {Action.READ_REPOSITORY, Action.SEARCH_WEB}:
             return PolicyDecision(False, "explorer is read-only by role contract")
         return PolicyDecision(True, "allowed by autonomy level and role contract")

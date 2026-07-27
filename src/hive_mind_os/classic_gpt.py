@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 from hashlib import sha256
 from typing import Mapping
 
 from .models import Role
+from .receipts import FileReceiptValidator, ReceiptReference
 
 
 class SimulationPhase(StrEnum):
@@ -190,11 +192,30 @@ class SimulatedAction:
     id: str
     kind: ActionKind
     description: str
-    receipt_ref: str | None = None
+    actor_id: str
+    receipt_ref: ReceiptReference | None = None
 
     def __post_init__(self) -> None:
-        if not self.id.strip() or not self.description.strip():
-            raise ValueError("simulated actions require identity and description")
+        if not self.id.strip() or not self.description.strip() or not self.actor_id.strip():
+            raise ValueError("simulated actions require action, actor, and description identity")
+        if self.receipt_ref is not None and not isinstance(self.receipt_ref, ReceiptReference):
+            raise TypeError("receipt_ref must be a ReceiptReference, not an unverified label")
+
+    @property
+    def digest(self) -> str:
+        payload = json.dumps(
+            {
+                "schema_version": 1,
+                "id": self.id,
+                "kind": self.kind.value,
+                "description": self.description,
+                "actor_id": self.actor_id,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return f"sha256:{sha256(payload).hexdigest()}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,11 +251,19 @@ class SimulationDecision:
 class ClassicGptSimulationGate:
     """Fail-closed checks for simulating Hive Mind OS in a single classic GPT session."""
 
-    def __init__(self, source_pack: ClassicGptSourcePack | None = None) -> None:
+    def __init__(
+        self,
+        source_pack: ClassicGptSourcePack | None = None,
+        receipt_validator: FileReceiptValidator | None = None,
+    ) -> None:
         self.source_pack = source_pack or ClassicGptSourcePack()
+        self.receipt_validator = receipt_validator
 
     def evaluate(self, turn: ClassicGptTurn) -> SimulationDecision:
         reasons: list[str] = []
+        receipt_results: dict[str, bool] = {}
+        used_receipt_references: set[tuple[str, str]] = set()
+        used_receipt_ids: set[str] = set()
         if turn.source_pack_fingerprint != self.source_pack.fingerprint:
             reasons.append("classic GPT source pack changed or was not loaded")
 
@@ -242,10 +271,48 @@ class ClassicGptSimulationGate:
             reasons.append("turn has no evidence references")
 
         for action in turn.actions:
-            if action.kind in SIDE_EFFECTING_ACTIONS and not action.receipt_ref:
+            if action.kind not in SIDE_EFFECTING_ACTIONS:
+                continue
+            if turn.phase is not SimulationPhase.COMPLETE and action.actor_id != turn.actor_id:
+                reasons.append(
+                    f"side-effecting action {action.id} actor does not match the active turn"
+                )
+            if action.receipt_ref is None:
                 reasons.append(
                     f"side-effecting action {action.id} lacks an external tool receipt"
                 )
+                continue
+            if self.receipt_validator is None:
+                reasons.append(
+                    f"side-effecting action {action.id} receipt has no independent validator"
+                )
+                continue
+
+            reference_identity = (action.receipt_ref.path, action.receipt_ref.digest)
+            if reference_identity in used_receipt_references:
+                reasons.append(f"side-effecting action {action.id} reuses another action receipt")
+                continue
+            used_receipt_references.add(reference_identity)
+
+            validation = self.receipt_validator.validate(
+                action.receipt_ref,
+                mission_id=turn.mission_id,
+                state_ref=turn.state_ref,
+                actor_id=action.actor_id,
+                action_id=action.id,
+                action_kind=action.kind.value,
+                action_digest=action.digest,
+            )
+            if not validation.valid:
+                for issue in validation.issues:
+                    reasons.append(f"side-effecting action {action.id}: {issue}")
+                continue
+            if validation.receipt_id in used_receipt_ids:
+                reasons.append(f"side-effecting action {action.id} reuses another receipt id")
+                continue
+            if validation.receipt_id:
+                used_receipt_ids.add(validation.receipt_id)
+            receipt_results[action.id] = validation.succeeded
 
         actor_ids = {turn.actor_id}
         verifier_ids = {item for item in turn.verifier_ids if item}
@@ -263,11 +330,11 @@ class ClassicGptSimulationGate:
                 reasons.append("completion lacks independent verification")
             if turn.blockers:
                 reasons.append("completion declared while blockers remain")
-            if any(
-                action.kind in SIDE_EFFECTING_ACTIONS and not action.receipt_ref
-                for action in turn.actions
-            ):
-                reasons.append("completion contains unverified side effects")
+            for action in turn.actions:
+                if action.kind in SIDE_EFFECTING_ACTIONS and not receipt_results.get(action.id, False):
+                    reasons.append(
+                        f"completion lacks a successful receipt for side-effecting action {action.id}"
+                    )
 
         if turn.phase is SimulationPhase.QUARANTINED and not turn.blockers:
             reasons.append("quarantined turn must preserve quarantine reasons")

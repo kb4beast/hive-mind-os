@@ -1,4 +1,5 @@
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,12 +12,19 @@ from hive_mind_os.classic_gpt import (
     SimulationPhase,
 )
 from hive_mind_os.models import Role
+from hive_mind_os.receipts import FileReceiptValidator, ReceiptReference, sha256_digest
 
 
 class ClassicGptSimulationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.pack = ClassicGptSourcePack()
-        self.gate = ClassicGptSimulationGate(self.pack)
+        self.directory = tempfile.TemporaryDirectory()
+        self.receipt_root = Path(self.directory.name)
+        self.validator = FileReceiptValidator(self.receipt_root)
+        self.gate = ClassicGptSimulationGate(self.pack, self.validator)
+
+    def tearDown(self) -> None:
+        self.directory.cleanup()
 
     def turn(self, **overrides) -> ClassicGptTurn:
         values = dict(
@@ -32,6 +40,51 @@ class ClassicGptSimulationTests(unittest.TestCase):
         )
         values.update(overrides)
         return ClassicGptTurn(**values)
+
+    def receipt_for(
+        self,
+        action: SimulatedAction,
+        *,
+        result: str = "succeeded",
+        receipt_id: str = "receipt-1",
+        **overrides,
+    ) -> ReceiptReference:
+        artifact_path = self.receipt_root / f"{action.id}.artifact"
+        artifact_path.write_text("observed external state", encoding="utf-8")
+        document = {
+            "schema_version": 1,
+            "receipt_id": receipt_id,
+            "provider": "test-enforcement-point",
+            "execution_id": f"execution-{action.id}",
+            "mission_id": "mission-1",
+            "state_ref": "MISSION_STATE:v1",
+            "actor_id": action.actor_id,
+            "policy_decision_ref": "policy:allow:test",
+            "lease_id": "lease:test",
+            "action_id": action.id,
+            "action_kind": action.kind.value,
+            "action_digest": action.digest,
+            "executed": True,
+            "result": result,
+            "observed_at": "2026-07-27T12:00:00Z",
+            "verified_by": "curator-pass-1",
+            "artifacts": [
+                {
+                    "path": artifact_path.name,
+                    "digest": sha256_digest(artifact_path.read_bytes()),
+                }
+            ],
+        }
+        document.update(overrides)
+        receipt_path = self.receipt_root / f"{receipt_id}.json"
+        receipt_path.write_text(
+            json.dumps(document, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        return ReceiptReference(
+            receipt_path.name,
+            sha256_digest(receipt_path.read_bytes()),
+        )
 
     def test_source_pack_files_exist_and_pass_marker_audit(self) -> None:
         documents = {
@@ -65,6 +118,7 @@ class ClassicGptSimulationTests(unittest.TestCase):
                     "action-1",
                     ActionKind.GIT,
                     "Commit and push the generated patch.",
+                    "builder-pass-1",
                 ),
             ),
         )
@@ -73,20 +127,130 @@ class ClassicGptSimulationTests(unittest.TestCase):
         self.assertTrue(any("lacks an external tool receipt" in reason for reason in decision.reasons))
 
     def test_receipted_side_effect_is_allowed(self) -> None:
+        proposed = SimulatedAction(
+            "action-1",
+            ActionKind.GIT,
+            "Commit and push the generated patch.",
+            "builder-pass-1",
+        )
+        receipted = SimulatedAction(
+            proposed.id,
+            proposed.kind,
+            proposed.description,
+            proposed.actor_id,
+            receipt_ref=self.receipt_for(proposed),
+        )
+        turn = self.turn(
+            phase=SimulationPhase.BUILD,
+            active_role=Role.BUILDER,
+            actor_id="builder-pass-1",
+            actions=(receipted,),
+        )
+        self.assertTrue(self.gate.evaluate(turn).compliant)
+
+    def test_legacy_receipt_string_is_rejected(self) -> None:
+        with self.assertRaises(TypeError):
+            SimulatedAction(
+                "action-1",
+                ActionKind.GIT,
+                "Commit and push the generated patch.",
+                "builder-pass-1",
+                receipt_ref="github:commit:not-real",  # type: ignore[arg-type]
+            )
+
+    def test_receipt_cannot_be_reused_for_another_action(self) -> None:
+        first = SimulatedAction(
+            "action-1",
+            ActionKind.WRITE,
+            "Write the artifact.",
+            "builder-pass-1",
+        )
+        reference = self.receipt_for(first)
         turn = self.turn(
             phase=SimulationPhase.BUILD,
             active_role=Role.BUILDER,
             actor_id="builder-pass-1",
             actions=(
                 SimulatedAction(
-                    "action-1",
-                    ActionKind.GIT,
-                    "Commit and push the generated patch.",
-                    receipt_ref="github:commit:abc123",
+                    first.id,
+                    first.kind,
+                    first.description,
+                    first.actor_id,
+                    reference,
+                ),
+                SimulatedAction(
+                    "action-2",
+                    ActionKind.WRITE,
+                    "Write it again.",
+                    "builder-pass-1",
+                    reference,
                 ),
             ),
         )
-        self.assertTrue(self.gate.evaluate(turn).compliant)
+        decision = self.gate.evaluate(turn)
+        self.assertFalse(decision.compliant)
+        self.assertTrue(any("reuses another action receipt" in reason for reason in decision.reasons))
+
+    def test_failed_receipt_cannot_support_completion(self) -> None:
+        proposed = SimulatedAction(
+            "action-1",
+            ActionKind.COMMAND,
+            "Run a command.",
+            "builder-pass-1",
+        )
+        action = SimulatedAction(
+            proposed.id,
+            proposed.kind,
+            proposed.description,
+            proposed.actor_id,
+            self.receipt_for(proposed, result="failed"),
+        )
+        build_decision = self.gate.evaluate(
+            self.turn(
+                phase=SimulationPhase.BUILD,
+                active_role=Role.BUILDER,
+                actor_id="builder-pass-1",
+                actions=(action,),
+            )
+        )
+        self.assertTrue(build_decision.compliant, build_decision.reasons)
+
+        complete_decision = self.gate.evaluate(
+            self.turn(
+                phase=SimulationPhase.COMPLETE,
+                active_role=Role.ORCHESTRATOR,
+                actor_id="orchestrator-pass-2",
+                actions=(action,),
+                completed_roles=tuple(Role),
+                verifier_ids=("curator-independent-1",),
+                blockers=(),
+                next_action="Archive the handoff.",
+            )
+        )
+        self.assertFalse(complete_decision.compliant)
+        self.assertTrue(
+            any("lacks a successful receipt" in reason for reason in complete_decision.reasons)
+        )
+
+    def test_side_effect_receipt_fails_closed_without_validator(self) -> None:
+        proposed = SimulatedAction(
+            "action-1",
+            ActionKind.WRITE,
+            "Write the artifact.",
+            "builder-pass-1",
+        )
+        action = SimulatedAction(
+            proposed.id,
+            proposed.kind,
+            proposed.description,
+            proposed.actor_id,
+            self.receipt_for(proposed),
+        )
+        decision = ClassicGptSimulationGate(self.pack).evaluate(
+            self.turn(actions=(action,))
+        )
+        self.assertFalse(decision.compliant)
+        self.assertTrue(any("no independent validator" in reason for reason in decision.reasons))
 
     def test_actor_cannot_verify_its_own_work(self) -> None:
         decision = self.gate.evaluate(self.turn(verifier_ids=("architect-pass-1",)))

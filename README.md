@@ -55,6 +55,12 @@ For a single classic GPT or custom GPT, load the files in `gpt_sources/manifest.
 
 The Python gate in `src/hive_mind_os/classic_gpt.py` validates source-pack integrity, evidence, identity separation, receipted side effects, and completion. A text-only simulation cannot claim persistent memory, distributed independence, sandbox execution, Git changes, messages, deployments, or other side effects without external evidence.
 
+Side-effect receipts are content-addressed files under an explicitly trusted root. The gate
+rejects provider-style labels by themselves and validates the receipt bytes, artifact bytes,
+mission/state/action/actor binding, policy decision, lease, execution result, timestamp, and
+independent verifier. This is a local structural verifier; authenticated provider identities
+and the non-bypassable enforcement gateway remain later kernel stages.
+
 ## What is implemented
 
 The foundation includes:
@@ -104,7 +110,9 @@ The included deterministic backend exercises the role lifecycle offline. Real mo
 
 The Stage 0 audit command records the Git history and worktree, docket counts and blockers,
 broken code/test/benchmark references, tool versions, exact command outputs, baseline
-discrepancies, and a test receipt in a canonical SHA-256 envelope:
+discrepancies, and content-digested reference receipts in a canonical SHA-256 envelope. Each
+cited test file is executed explicitly, and a dirty worktree or an unrecognized test command
+keeps the audit incomplete:
 
 ```bash
 hive-mind audit --output evidence/audits/current-state.json

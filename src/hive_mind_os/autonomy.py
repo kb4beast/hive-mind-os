@@ -172,7 +172,7 @@ class FitnessEvaluator:
         forbidden = set(outcome.attempted_capabilities) & set(charter.forbidden_capabilities)
         if forbidden:
             reasons.append(f"forbidden capability attempted: {', '.join(sorted(forbidden))}")
-        if outcome.charter_fingerprint and outcome.charter_fingerprint != charter.fingerprint:
+        if outcome.charter_fingerprint != charter.fingerprint:
             reasons.append("mission charter changed")
         if outcome.evidence_count < self.minimum_evidence:
             reasons.append("insufficient evidence")

@@ -110,6 +110,26 @@ def _load_repository_docket(repository: Path) -> Any:
                 del sys.modules[module_name]
 
 
+def _resolve_reference(
+    repository: Path,
+    reference: str,
+) -> tuple[Path | None, str | None]:
+    local_path = _local_reference(reference)
+    if not local_path or "://" in local_path:
+        return None, "reference is not a repository-local path"
+    candidate = Path(local_path)
+    if candidate.is_absolute():
+        return None, "absolute paths are not repository receipts"
+    resolved = (repository / candidate).resolve()
+    try:
+        resolved.relative_to(repository.resolve())
+    except ValueError:
+        return None, "referenced path escapes the repository"
+    if not resolved.is_file():
+        return None, "referenced file does not exist"
+    return resolved, None
+
+
 def _broken_references(docket: Any, repository: Path) -> list[dict[str, str]]:
     broken: list[dict[str, str]] = []
     reference_groups = (
@@ -121,22 +141,36 @@ def _broken_references(docket: Any, repository: Path) -> list[dict[str, str]]:
     for claim in docket.claims:
         for kind, attribute in reference_groups:
             for reference in getattr(claim, attribute):
-                local_path = _local_reference(reference)
-                if not local_path or "://" in local_path:
-                    continue
-                if not (repository / local_path).is_file():
+                _, reason = _resolve_reference(repository, reference)
+                if reason:
                     broken.append(
                         {
                             "claim_id": claim.id,
                             "kind": kind,
                             "reference": reference,
-                            "reason": "referenced file does not exist",
+                            "reason": reason,
                         }
                     )
     return sorted(broken, key=lambda item: (item["claim_id"], item["kind"], item["reference"]))
 
 
-def _parse_test_result(observation: CommandObservation | None) -> dict[str, object]:
+def _trusted_pytest_command(command: Sequence[str], expected: Sequence[str]) -> bool:
+    if tuple(command) != tuple(expected):
+        return False
+    if len(command) < 4:
+        return False
+    try:
+        executable_matches = Path(command[0]).resolve() == Path(sys.executable).resolve()
+    except OSError:
+        return False
+    return executable_matches and tuple(command[1:4]) == ("-m", "pytest", "-q")
+
+
+def _parse_test_result(
+    observation: CommandObservation | None,
+    *,
+    expected_command: Sequence[str] | None = None,
+) -> dict[str, object]:
     if observation is None:
         return {
             "status": "not_run",
@@ -145,17 +179,94 @@ def _parse_test_result(observation: CommandObservation | None) -> dict[str, obje
             "errors": None,
             "command_observation_index": None,
         }
+    expected = tuple(expected_command or (sys.executable, "-m", "pytest", "-q"))
+    if not _trusted_pytest_command(observation.command, expected):
+        return {
+            "status": "unverified",
+            "passed": None,
+            "failed": None,
+            "errors": None,
+            "command_observation_index": None,
+            "reason": "test command is not the expected Python pytest runner",
+        }
     combined = f"{observation.stdout}\n{observation.stderr}"
     counts = {
         name: int(match.group(1)) if (match := re.search(rf"(\d+)\s+{name}", combined)) else 0
         for name in ("passed", "failed", "error")
     }
+    has_recognized_result = any(counts.values())
     return {
-        "status": "passed" if observation.succeeded else "failed",
+        "status": "passed" if observation.succeeded and has_recognized_result else "failed",
         "passed": counts["passed"],
         "failed": counts["failed"],
         "errors": counts["error"],
     }
+
+
+def _reference_receipts(
+    docket: Any,
+    repository: Path,
+    *,
+    run_tests: bool,
+    observe: Callable[..., CommandObservation],
+    observations: list[CommandObservation],
+    failures: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], bool]:
+    reference_groups = (
+        ("architecture", "architecture_refs"),
+        ("code", "code_refs"),
+        ("test", "test_refs"),
+        ("benchmark", "benchmark_refs"),
+    )
+    resolved: dict[tuple[str, str], dict[str, object]] = {}
+    for kind, attribute in reference_groups:
+        references = sorted({ref for claim in docket.claims for ref in getattr(claim, attribute)})
+        for reference in references:
+            path, reason = _resolve_reference(repository, reference)
+            entry: dict[str, object] = {
+                "kind": kind,
+                "reference": reference,
+                "path_valid": path is not None,
+                "digest": _sha256(path.read_bytes()) if path is not None else None,
+                "execution": {"status": "not_applicable"},
+                "valid": path is not None,
+                "issues": [reason] if reason else [],
+            }
+            if kind == "test":
+                if not run_tests:
+                    entry["execution"] = {"status": "not_run"}
+                    entry["valid"] = False
+                    entry["issues"].append("test receipt was not executed")
+                elif path is not None:
+                    local_path = path.relative_to(repository).as_posix()
+                    command = (sys.executable, "-m", "pytest", "-q", "--", local_path)
+                    observation = observe(command, required=False)
+                    result = _parse_test_result(observation, expected_command=command)
+                    result["command_observation_index"] = len(observations) - 1
+                    entry["execution"] = result
+                    entry["valid"] = result["status"] == "passed"
+                    if not entry["valid"]:
+                        entry["issues"].append("test receipt execution did not pass")
+                        failures.append(
+                            {
+                                "kind": "test_receipt_failure",
+                                "reference": reference,
+                                "command": list(command),
+                                "return_code": observation.return_code,
+                                "stderr": observation.stderr.strip(),
+                            }
+                        )
+            resolved[(kind, reference)] = entry
+
+    receipts: list[dict[str, object]] = []
+    for claim in docket.claims:
+        for kind, attribute in reference_groups:
+            for reference in getattr(claim, attribute):
+                receipt = dict(resolved[(kind, reference)])
+                receipt["claim_id"] = claim.id
+                receipts.append(receipt)
+    receipts.sort(key=lambda item: (str(item["claim_id"]), str(item["kind"]), str(item["reference"])))
+    return receipts, all(bool(item["valid"]) for item in receipts)
 
 
 def _baseline_discrepancies(current: Mapping[str, object]) -> list[dict[str, object]]:
@@ -233,6 +344,15 @@ def collect_current_state_audit(
         ("git", "log", "--all", "--diff-filter=R", "--format=", "--name-only", "-z")
     )
     git_version = observe(("git", "--version"))
+    working_tree_entries = _split_nul(status.stdout)
+    if working_tree_entries:
+        failures.append(
+            {
+                "kind": "dirty_worktree",
+                "message": "test results cannot be bound to HEAD while tracked or untracked inputs differ",
+                "entries": working_tree_entries,
+            }
+        )
 
     try:
         docket = _load_repository_docket(requested_repository)
@@ -286,9 +406,10 @@ def collect_current_state_audit(
         release_ready = False
 
     test_observation: CommandObservation | None = None
+    expected_test_command = tuple(test_command or (sys.executable, "-m", "pytest", "-q"))
     if run_tests:
         test_observation = observe(
-            tuple(test_command or (sys.executable, "-m", "pytest", "-q")),
+            expected_test_command,
             required=False,
         )
         if not test_observation.succeeded:
@@ -300,7 +421,31 @@ def collect_current_state_audit(
                     "kind": "test_failure",
                 }
             )
-    test_result = _parse_test_result(test_observation)
+    test_result = _parse_test_result(
+        test_observation,
+        expected_command=(sys.executable, "-m", "pytest", "-q"),
+    )
+    if run_tests and test_result["status"] == "unverified":
+        failures.append(
+            {
+                "kind": "unverified_test_command",
+                "command": list(expected_test_command),
+                "message": test_result["reason"],
+            }
+        )
+
+    if docket is not None:
+        reference_receipts, receipts_valid = _reference_receipts(
+            docket,
+            requested_repository,
+            run_tests=run_tests,
+            observe=observe,
+            observations=observations,
+            failures=failures,
+        )
+    else:
+        reference_receipts = []
+        receipts_valid = False
 
     ref_rows = []
     for line in refs.stdout.splitlines():
@@ -331,8 +476,8 @@ def collect_current_state_audit(
         "repository": {
             "root": str(requested_repository),
             "head": current_counts["repository_sha"],
-            "working_tree_clean": not bool(_split_nul(status.stdout)),
-            "working_tree_entries": _split_nul(status.stdout),
+            "working_tree_clean": not bool(working_tree_entries),
+            "working_tree_entries": working_tree_entries,
             "tracked_file_count": current_counts["tracked_file_count"],
             "tracked_tree_digest": _sha256(tracked_index.stdout.encode("utf-8")),
             "full_ref_commit_count": current_counts["full_ref_commit_count"],
@@ -357,6 +502,8 @@ def collect_current_state_audit(
             "source_blockers": source_blockers,
             "issues": docket_issues,
             "broken_references": broken_references,
+            "reference_receipts": reference_receipts,
+            "receipts_valid": receipts_valid,
         },
         "tests": test_result,
         "tools": {
@@ -371,7 +518,7 @@ def collect_current_state_audit(
         },
         "commands": [asdict(observation) for observation in observations],
         "failures": failures,
-        "complete": run_tests and not failures,
+        "complete": run_tests and receipts_valid and not failures,
     }
     return audit
 
@@ -418,6 +565,19 @@ def verify_audit_artifact(
 
     if audit.get("schema_version") != 1:
         issues.append("unsupported CurrentStateAudit schema version")
+    if audit.get("artifact_type") != "CurrentStateAudit":
+        issues.append("artifact type must be CurrentStateAudit")
+    for field_name, expected_type in (
+        ("repository", Mapping),
+        ("docket", Mapping),
+        ("tests", Mapping),
+        ("commands", list),
+        ("failures", list),
+    ):
+        if not isinstance(audit.get(field_name), expected_type):
+            issues.append(f"audit {field_name} has an invalid shape")
+    if not isinstance(audit.get("complete"), bool):
+        issues.append("audit complete flag is required")
     if integrity.get("canonicalization") != "json-sort-keys-utf8-v1":
         issues.append("unsupported canonicalization")
 

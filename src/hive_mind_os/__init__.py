@@ -45,6 +45,13 @@ from .recursive_improvement import (
     RecursiveImprovementGate,
 )
 from .repository_learning import RepositoryLearningCurriculum, RepositoryScout
+from .receipts import (
+    FileReceiptValidator,
+    ReceiptReference,
+    ReceiptResult,
+    ReceiptValidation,
+    sha256_digest,
+)
 from .runtime import HiveKernel
 from .source_docket import FoundingSourceDocket, load_default_source_docket, load_source_docket
 from .vision import HardenedVisionContract, VisionComplianceGate
@@ -70,6 +77,7 @@ __all__ = [
     "ExperimentEvidence",
     "ExperimentVerdict",
     "FoundingSourceDocket",
+    "FileReceiptValidator",
     "HardenedVisionContract",
     "HiveKernel",
     "MetricDirection",
@@ -82,6 +90,9 @@ __all__ = [
     "RecursiveImprovementGate",
     "RepositoryLearningCurriculum",
     "RepositoryScout",
+    "ReceiptReference",
+    "ReceiptResult",
+    "ReceiptValidation",
     "RiskTier",
     "Role",
     "SimulatedAction",
@@ -93,6 +104,7 @@ __all__ = [
     "create_audit_artifact",
     "load_default_source_docket",
     "load_source_docket",
+    "sha256_digest",
     "verify_audit_artifact",
     "write_audit_artifact",
 ]
