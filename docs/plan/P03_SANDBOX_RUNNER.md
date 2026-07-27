@@ -236,15 +236,17 @@ rlimits.
 - Branch and audited implementation commit: `phase/P03-sandbox-runner`;
   `d6988b260cefc19a7588dec61e2c5de3e209be75` includes the reviewed timeout, concurrency,
   denial-evidence, non-object-input, and process-creation-exception repairs on the current
-  P02-bearing `main`.
+  P02-bearing `main`; the audit was collected from clean completion candidate
+  `c0c777917c79fbcbcf69208effc59a757515bb75`.
 - Gates before the final replacement audit: 19 targeted sandbox tests ran on Windows (18
   passed, the POSIX-only symlink case skipped; 3 subtests passed); constitutional discovery
   ran 169 tests (167 passed, 2 skipped); 1,698 subtests passed; Ruff 0.16.0, Pyright
   1.1.411, and the schema catalog passed.
 - Concrete runner/validator smoke: passed; ephemeral receipt digest
   `sha256:5c2ad2b87a5d8b3fd6d544467beb199132a006f9e4bda0701ca80e10af841cb0`.
-- Audit artifact: pending clean replacement at `evidence/audits/P03-post.json`; the final
-  evidence commit will record its digest and cannot contain its own SHA.
+- Audit artifact: `evidence/audits/P03-post.json` (digest:
+  `sha256:131e4e4bff190e755607f49322d66120e58babf1a9985f89d841f2afb7060051`);
+  the final evidence commit cannot contain its own SHA.
 - Constitutional schema delta: `tool-intent.command` and `tool-receipt.execution` were
   added under proposed ADR-007 with catalog, golden-fixture, mutation, and validator
   regressions. Historical non-command documents remain compatible; untyped command intents
