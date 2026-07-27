@@ -66,6 +66,31 @@ class CommandObservation:
 CommandExecutor = Callable[[Sequence[str], Path], CommandObservation]
 
 
+def _json_escaped_utf8_size(value: str) -> int:
+    size = 0
+    short_escapes = {'"', "\\", "\b", "\f", "\n", "\r", "\t"}
+    for character in value:
+        if character in short_escapes:
+            size += 2
+        elif ord(character) < 0x20:
+            size += 6
+        else:
+            size += len(character.encode("utf-8"))
+    return size
+
+
+def _retain_json_escaped_utf8(value: str, remaining: int) -> tuple[str, bool]:
+    retained: list[str] = []
+    used = 0
+    for character in value:
+        character_size = _json_escaped_utf8_size(character)
+        if used + character_size > remaining:
+            return "".join(retained), True
+        retained.append(character)
+        used += character_size
+    return value, False
+
+
 class _WindowsJob:
     """Owns a kill-on-close Windows process tree independently of its leader."""
 
@@ -283,37 +308,14 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
     stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace")
     stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace")
 
-    def json_escaped_utf8_size(value: str) -> int:
-        size = 0
-        short_escapes = {'"', "\\", "\b", "\f", "\n", "\r", "\t"}
-        for character in value:
-            if character in short_escapes:
-                size += 2
-            elif ord(character) < 0x20:
-                size += 6
-            else:
-                size += len(character.encode("utf-8"))
-        return size
-
-    def retain_json_escaped_utf8(value: str, remaining: int) -> tuple[str, bool]:
-        retained: list[str] = []
-        used = 0
-        for character in value:
-            character_size = json_escaped_utf8_size(character)
-            if used + character_size > remaining:
-                return "".join(retained), True
-            retained.append(character)
-            used += character_size
-        return value, False
-
-    stdout, stdout_truncated = retain_json_escaped_utf8(
+    stdout, stdout_truncated = _retain_json_escaped_utf8(
         stdout,
         MAX_COMMAND_OUTPUT_BYTES,
     )
     remaining_serialized_bytes = (
-        MAX_COMMAND_OUTPUT_BYTES - json_escaped_utf8_size(stdout)
+        MAX_COMMAND_OUTPUT_BYTES - _json_escaped_utf8_size(stdout)
     )
-    stderr, stderr_truncated = retain_json_escaped_utf8(
+    stderr, stderr_truncated = _retain_json_escaped_utf8(
         stderr,
         remaining_serialized_bytes,
     )
@@ -1058,6 +1060,15 @@ def verify_audit_artifact(
                     or not isinstance(command.get("drain_incomplete"), bool)
                 ):
                     issues.append(f"audit command observation {index} is invalid")
+                    continue
+                if (
+                    _json_escaped_utf8_size(command["stdout"])
+                    + _json_escaped_utf8_size(command["stderr"])
+                    > MAX_COMMAND_OUTPUT_BYTES
+                ):
+                    issues.append(
+                        f"audit command observation {index} exceeds the output budget"
+                    )
         if audit.get("complete") is True:
             if not isinstance(repository, Mapping) or not (
                 repository.get("working_tree_clean") is True

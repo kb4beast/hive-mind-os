@@ -464,6 +464,17 @@ class CurrentStateAuditTests(unittest.TestCase):
             issues,
         )
 
+        oversized_output = self.valid_audit()
+        oversized_output["commands"][0]["stdout"] = "\0" * 166_667
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(oversized_output)
+        )
+        self.assertFalse(valid)
+        self.assertIn(
+            "audit command observation 0 exceeds the output budget",
+            issues,
+        )
+
         deep_contradiction = self.valid_audit()
         receipt = deep_contradiction["docket"]["reference_receipts"][0]
         receipt["path_valid"] = False

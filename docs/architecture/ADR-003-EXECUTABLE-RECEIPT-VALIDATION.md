@@ -139,7 +139,9 @@ Harden the current-state audit:
   incomplete pipe draining, or retained descendants cannot succeed;
 - evidence publication uses a fully flushed temporary file plus atomic exclusive link;
 - integrity verification rejects underspecified payloads while continuing to distinguish
-  digest integrity from external authenticity.
+  digest integrity from external authenticity;
+- artifact verification independently recomputes the JSON-escaped output-content size, so a
+  self-digested payload cannot bypass the live collector's byte budget.
 
 Harden policy invariants:
 
@@ -181,6 +183,7 @@ Harden policy invariants:
 | Boolean/float schema or string enum confusion | Require exact runtime types |
 | Partial artifact blocks retry | Publish a flushed temporary file through an exclusive atomic link |
 | Hung or excessively verbose command | Bound command time and accepted output |
+| Self-digested command claims oversized untruncated output | Recompute the shared JSON-escaped output budget during artifact verification |
 | Descendant retains evidence pipes after parent timeout or exit | Retain a process-tree handle through drain and terminate descendants; bound reader joins |
 | Windows ADS/device path accepted on one host | Apply one cross-platform segment grammar before native resolution |
 | Receipt `valid` contradicts path/execution/issues | Derive and reconcile validity during artifact verification |
