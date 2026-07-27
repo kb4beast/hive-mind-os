@@ -252,3 +252,22 @@ through `MissionStore` without inventing new state.
 - The challenged block remains preserved rather than overwritten. Delivery still
   requires green exact-head GitHub checks and a fresh sequential Curator, Judge, and
   Orchestrator disposition on the complete repaired candidate.
+
+#### Secret-scan event-path correction
+
+- Candidate `4cd8d64c5c176c09af20189c41b96eb791426654` passed the push-triggered
+  secret scan but failed the concurrent pull-request-triggered scan
+  (`30312848557/90132054922`). The failing log showed that the action searched for
+  `.gitleaks.toml`, did not load `gitleaks.toml`, and rediscovered the historical
+  synthetic fixture. ADR-011 preserves the contradiction and why the narrower push
+  range was not sufficient evidence.
+- Corrected implementation/configuration commit:
+  `c1498fda3113902ad2075ce3a2d042bacd4767e4`. The governance test and repository
+  configuration now use the observed `.gitleaks.toml` contract.
+- Corrected repair audit: `evidence/audits/P06-repair2-post.json`
+  (canonical digest:
+  `sha256:5bed4b828b78193837a6e8bef5946628cfeed9b508071dc470ce7be0f4da8768`;
+  complete: true; failures: none; audited implementation commit:
+  `c1498fda3113902ad2075ce3a2d042bacd4767e4`; audit pytest: 265 passed).
+- Both exact-head push and pull-request event paths must be green before consolidated
+  independent review begins.
