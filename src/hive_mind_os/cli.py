@@ -12,6 +12,9 @@ from .current_state_audit import (
     create_audit_artifact,
     write_audit_artifact,
 )
+from .ledger import EvidenceLedger
+from .model_backend import ModelBackend
+from .model_provider import ModelProviderError, provider_from_env
 from .models import Objective
 from .runtime import HiveKernel
 
@@ -21,6 +24,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("goal", help="Outcome for the specialist agent team")
     parser.add_argument("--repository", help="Optional owner/repository target")
     parser.add_argument("--criterion", action="append", default=[], help="Acceptance criterion; repeatable")
+    parser.add_argument(
+        "--backend",
+        choices=("deterministic", "model"),
+        default="deterministic",
+        help="Agent backend (default: deterministic offline backend)",
+    )
     return parser
 
 
@@ -60,7 +69,14 @@ async def _run(args: argparse.Namespace) -> int:
         repository=args.repository,
         acceptance_criteria=tuple(args.criterion),
     )
-    report = await HiveKernel().run_objective(objective)
+    ledger = EvidenceLedger()
+    backend = None
+    if args.backend == "model":
+        try:
+            backend = ModelBackend(provider_from_env(), ledger=ledger)
+        except (ModelProviderError, ValueError) as error:
+            raise SystemExit(f"model backend configuration failed: {error}") from None
+    report = await HiveKernel(backend=backend, ledger=ledger).run_objective(objective)
     print(
         json.dumps(
             {

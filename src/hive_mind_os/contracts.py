@@ -20,6 +20,7 @@ SCHEMA_NAMES = (
     "handoff",
     "identity",
     "mission-state",
+    "model-turn",
     "policy-decision",
     "source",
     "tool-intent",
