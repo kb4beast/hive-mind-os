@@ -323,3 +323,40 @@ paths (bad fix, policy, budget) fail closed with recorded state.
 - Existing P06, P07, P08, P09, P11, P12, and B-OPS-06 obligations remain open. This
   appeal makes no production-readiness, source-completeness, hostile-isolation,
   external-delivery, or superiority claim.
+
+---
+## Consolidated-review appeal record 3
+
+- Date (UTC): 2026-07-27
+- Challenged budget-repair candidate:
+  `983e2380d5487b6311e897754968c84ae42ca392`
+- Independent dispositions:
+  - Curator: `permit`
+  - Judge: `adapt`
+  - Orchestrator: `permit`
+- Preserved dissent: the Curator and Orchestrator reproduced the explicit mission-budget
+  repair and would have delivered. The Judge additionally exercised an omitted
+  mission-budget construction that they did not reproduce, and the fail-closed rule
+  controlled.
+- Reproduced counterexample: a `ModelBackend` explicitly configured with a zero-call
+  budget was passed to `RepositoryMission` without a mission budget. The constructor
+  replaced the restrictive backend envelope with its 500-call default, executed eight
+  model calls and 53 total calls, and published successfully. Capability construction
+  therefore expanded pre-existing authority.
+- Repair implementation: `b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9`.
+  When the mission budget is omitted, `RepositoryMission` now adopts an existing backend
+  budget. When a mission budget is explicit, that envelope binds both mission and backend.
+  The zero-call regression proves zero provider calls, zero reported consumption, failed
+  status, and no publication.
+- Gates on the authority repair implementation: P05 tests 14 passed; full pytest 200
+  passed, 2 skipped, 1,718 subtests; Ruff passed; Pyright passed with 0 errors.
+- Additive audit artifact: `evidence/audits/P05-authority-repair-post.json`
+  (canonical digest:
+  `sha256:ffa0580a358d5cbfa1924ef59ebefa133a92ffc917d3c4ddb4070096c471faef`;
+  complete: true; failures: none; audited implementation commit:
+  `b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9`).
+- Delivery remains pending exact-head CI and one final consolidated independent review of
+  this complete challenger. No earlier permit is carried forward.
+- Existing P06, P07, P08, P09, P11, P12, and B-OPS-06 obligations remain open. This
+  appeal makes no production-readiness, source-completeness, hostile-isolation,
+  external-delivery, or superiority claim.
