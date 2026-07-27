@@ -40,6 +40,9 @@ class SystemCapability(StrEnum):
     TEACH_PEERS = "teach_peers"
     RECOVER_AND_RESUME = "recover_and_resume"
     BENCHMARK_COMPARATORS = "benchmark_comparators"
+    RUN_RECURSIVE_EXPERIMENTS = "run_recursive_experiments"
+    DETECT_METRIC_GAMING = "detect_metric_gaming"
+    STOP_DIMINISHING_RETURNS = "stop_diminishing_returns"
 
 
 REQUIRED_ROLES: tuple[Role, ...] = (
@@ -77,6 +80,12 @@ class HardenedVisionContract:
         "unbounded_self_replication",
         "goal_or_policy_mutation",
         "marketing_only_superiority_claim",
+        "live_champion_mutation",
+        "single_metric_optimization_without_guardrails",
+        "promotion_below_measured_noise",
+        "protected_holdout_access",
+        "unbounded_recursive_improvement",
+        "self_weight_modification",
     )
     source_references: tuple[str, ...] = (
         "user-supplied:founding-prompt",
@@ -90,6 +99,8 @@ class HardenedVisionContract:
         "https://www.youtube.com/watch?v=IbFaY3xFpZM",
         "https://www.youtube.com/watch?v=eA9Zf2-qYYM",
         "https://www.youtube.com/watch?v=kIWMLL0S8X8",
+        "https://www.youtube.com/watch?v=t7_ZXgfJVG8",
+        "https://github.com/karpathy/autoresearch",
         "https://arxiv.org/abs/2303.16200",
         "https://github.com/agiresearch/AIOS",
         "https://arxiv.org/abs/2407.16741",
