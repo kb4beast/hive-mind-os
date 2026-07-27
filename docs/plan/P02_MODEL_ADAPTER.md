@@ -208,3 +208,31 @@ fail closed before spend.
 - No fabricated `AgentResult` on model failure — fail closed.
 - Do not modify `HiveKernel._validate_result` to accommodate loose model output; the
   backend conforms to the kernel, not the reverse.
+
+---
+## Completion record
+- Date (UTC): 2026-07-27T16:47:33Z
+- Executor (model/agent identity): Codex primary Builder/Integrator; independent review is
+  required on the complete pull-request candidate.
+- Branch and final commit SHA: `phase/P02-model-adapter`; audited implementation commit
+  `7ee787db0c73f5d04f3c4b656efadb431928da68`; the audit was collected from clean commit
+  `b616c2479458438b9f5414682527e4fab351be91`. The pull-request head records the final
+  evidence/metadata commit because a commit cannot contain its own SHA.
+- Gates: 16 targeted model-provider/backend tests passed under stdlib `unittest`
+  discovery; full suite ran 150 tests (149 passed, 1 skipped; 1,695 subtests passed);
+  Ruff 0.16.0 passed; Pyright 1.1.411
+  passed with zero errors; schema catalog and deterministic-default CLI smokes passed.
+- Audit artifact: `evidence/audits/P02-post.json` (digest:
+  `sha256:6fa096f8acff57cc4cc15c01604cc37b6e196cbf13d9101d6b2d229384351839`)
+- Manual model smoke: not run — neither `OPENAI_API_KEY` nor `ANTHROPIC_API_KEY` was
+  available. No credential-dependent claim is made.
+- Deviations from the phase spec: none.
+- Preserved dissent: the first consolidated review issued `adapt` because CI could not
+  discover the original pytest-style tests and because retry-budget, corrective-message
+  accounting, response-digest, secret-path, and truncation claims were not yet adequately
+  implemented or exercised. A later Curator re-review reproduced one additional gap:
+  non-2xx HTTP response bodies were discarded before receipt digesting, despite being
+  available from `HTTPError`. The audited implementation commit above preserves and
+  digests those bodies without storing them; final independent re-review remains a
+  delivery gate.
+- New blockers discovered (mirrored into docs/plan/BLOCKERS.md): none.
