@@ -41,7 +41,12 @@ from .models import (
     utc_now,
 )
 from .policy import Action, PolicyEngine
-from .receipts import FileReceiptValidator, ReceiptReference, sha256_digest
+from .receipts import (
+    FileReceiptValidator,
+    ReceiptReference,
+    portable_path_parts,
+    sha256_digest,
+)
 from .roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS, RoleContract
 from .runtime import AgentBackend, HiveKernel
 
@@ -537,6 +542,7 @@ class RepositoryMission:
         self._step_index = 0
         self._missing_workspaces = set(_missing_workspaces or ())
         self._replaying_workspaces: set[str] = set()
+        self._recovery_claimed_receipts: set[tuple[str, str]] = set()
         if self.mission_store is not None:
             if not isinstance(self.backend, ScriptedRepositoryBackend):
                 raise ValueError(
@@ -1333,6 +1339,8 @@ class RepositoryMission:
             self._record_workspace_receipts(workspace)
             return workspace
 
+        recovered_records = self._unclaimed_receipt_records()
+        self._account_recovered_records(recovered_records)
         if (missing or checkpoint.state != "completed") and root.exists():
             _remove_workspace_tree(root)
         if checkpoint.state != "completed":
@@ -1349,18 +1357,29 @@ class RepositoryMission:
             role.value,
             workspace.container_root,
         )
+        combined_records = (
+            *recovered_records,
+            *tuple(dict(record) for record in workspace.receipt_records),
+        )
         if checkpoint.state != "completed":
+            self._checkpoint_hook(step_index, "after_capability_effect")
+            outcome["records"] = [dict(record) for record in combined_records]
             reference = self.mission_store.write_effect_receipt(
                 checkpoint,
                 outcome,
-                workspace.receipt_records,
+                combined_records,
             )
             self._checkpoint_hook(step_index, "after_effect")
-            self.mission_store.complete_step(checkpoint, reference, outcome)
+            self.mission_store.complete_step(
+                checkpoint,
+                reference,
+                outcome,
+                budget=self.budget,
+            )
         else:
             self._replaying_workspaces.add(role.value)
+            self._claim_recovery_receipts(workspace.receipt_records)
         self._record_workspace_receipts(workspace)
-        self.mission_store.update_budget(self.run_id, self.budget)
         return workspace
 
     def _durable_workspace_call(
@@ -1390,6 +1409,34 @@ class RepositoryMission:
             records = tuple(dict(record) for record in adopted["records"])
             self._append_workspace_records(workspace, records)
             return self._decode_durable_value(adopted["value"]), records
+        recovered_records = self._unclaimed_receipt_records()
+        self._account_recovered_records(recovered_records)
+        recovered, recovered_value = self._recover_workspace_effect(
+            workspace,
+            expected_calls,
+            description,
+            details,
+            recovered_records,
+        )
+        if checkpoint.state != "completed" and recovered:
+            outcome = {
+                "value": self._encode_durable_value(recovered_value),
+                "records": [dict(record) for record in recovered_records],
+            }
+            reference = self.mission_store.write_effect_receipt(
+                checkpoint,
+                outcome,
+                recovered_records,
+            )
+            self.mission_store.complete_step(
+                checkpoint,
+                reference,
+                outcome,
+                budget=self.budget,
+            )
+            records = tuple(dict(record) for record in recovered_records)
+            self._append_workspace_records(workspace, records)
+            return recovered_value, records
         if checkpoint.state != "completed":
             self._replaying_workspaces.discard(workspace_key)
             self.mission_store.begin_effect(self.run_id, step_index)
@@ -1398,9 +1445,13 @@ class RepositoryMission:
             expected_calls,
             operation,
         )
+        combined_records = (
+            *recovered_records,
+            *tuple(dict(record) for record in records),
+        )
         outcome = {
             "value": self._encode_durable_value(value),
-            "records": [dict(record) for record in records],
+            "records": [dict(record) for record in combined_records],
         }
         self.mission_store.update_workspace(
             self.run_id,
@@ -1408,15 +1459,22 @@ class RepositoryMission:
             workspace.container_root,
         )
         if checkpoint.state != "completed":
+            self._checkpoint_hook(step_index, "after_capability_effect")
             reference = self.mission_store.write_effect_receipt(
                 checkpoint,
                 outcome,
-                records,
+                combined_records,
             )
             self._checkpoint_hook(step_index, "after_effect")
-            self.mission_store.complete_step(checkpoint, reference, outcome)
-        self.mission_store.update_budget(self.run_id, self.budget)
-        return value, records
+            self.mission_store.complete_step(
+                checkpoint,
+                reference,
+                outcome,
+                budget=self.budget,
+            )
+        else:
+            self._claim_recovery_receipts(records)
+        return value, tuple(dict(record) for record in combined_records)
 
     def _durable_value_step(
         self,
@@ -1437,20 +1495,46 @@ class RepositoryMission:
         if checkpoint.state == "completed":
             adopted = self._adopt_checkpoint(checkpoint)
             return self._decode_durable_value(adopted["value"])
+        recovered, recovered_value = self._recover_value_effect(
+            description,
+            details,
+        )
+        if recovered:
+            outcome = {
+                "value": self._encode_durable_value(recovered_value),
+                "records": [],
+            }
+            reference = self.mission_store.write_effect_receipt(
+                checkpoint,
+                outcome,
+                (),
+            )
+            self.mission_store.complete_step(
+                checkpoint,
+                reference,
+                outcome,
+                budget=self.budget,
+            )
+            return recovered_value
         self.mission_store.begin_effect(self.run_id, step_index)
         value = operation()
         outcome = {
             "value": self._encode_durable_value(value),
             "records": [],
         }
+        self._checkpoint_hook(step_index, "after_capability_effect")
         reference = self.mission_store.write_effect_receipt(
             checkpoint,
             outcome,
             (),
         )
         self._checkpoint_hook(step_index, "after_effect")
-        self.mission_store.complete_step(checkpoint, reference, outcome)
-        self.mission_store.update_budget(self.run_id, self.budget)
+        self.mission_store.complete_step(
+            checkpoint,
+            reference,
+            outcome,
+            budget=self.budget,
+        )
         return value
 
     def _next_durable_intent(
@@ -1518,10 +1602,15 @@ class RepositoryMission:
             found = self.mission_store.find_effect_receipt(checkpoint)
             if found is not None:
                 reference, wrapper = found
+                records = tuple(
+                    dict(record) for record in wrapper["records"]
+                )
+                self._account_recovered_records(records)
                 self.mission_store.complete_step(
                     checkpoint,
                     reference,
                     wrapper["outcome"],
+                    budget=self.budget,
                 )
                 checkpoint = self.mission_store.checkpoint(
                     self.run_id,
@@ -1552,9 +1641,188 @@ class RepositoryMission:
         if self.crash_hook is None:
             return
         assert self.mission_store is not None
-        self.mission_store.update_budget(self.run_id, self.budget)
         self.mission_store.mark_status(self.run_id, "interrupted")
         self.crash_hook(step_index, boundary)
+
+    def _unclaimed_receipt_records(self) -> tuple[dict[str, Any], ...]:
+        assert self.mission_store is not None
+        assert self._evidence_root is not None
+        claimed = set(self._recovery_claimed_receipts)
+        for checkpoint in self.mission_store.checkpoints(self.run_id):
+            found = self.mission_store.find_effect_receipt(checkpoint)
+            if found is None:
+                continue
+            _, wrapper = found
+            claimed.update(
+                (str(record["path"]), str(record["digest"]))
+                for record in wrapper["records"]
+            )
+
+        validator = FileReceiptValidator(self._evidence_root)
+        recovered: list[dict[str, Any]] = []
+        for path in sorted(
+            (self._evidence_root / "receipts").glob("*.json"),
+            key=lambda item: item.name,
+        ):
+            content = path.read_bytes()
+            document = json.loads(content.decode("utf-8"))
+            if not isinstance(document, Mapping):
+                raise MissionFailed("raw capability receipt is not an object")
+            relative = path.relative_to(self._evidence_root).as_posix()
+            record = {
+                "path": relative,
+                "digest": sha256_digest(content),
+                "mission_id": _required_string(document, "mission_id"),
+                "state_ref": _required_string(document, "state_ref"),
+                "actor_id": _required_string(document, "actor_id"),
+                "action_id": _required_string(document, "action_id"),
+                "action_kind": _required_string(document, "action_kind"),
+                "action_digest": _required_string(document, "action_digest"),
+                "result": _required_string(document, "result"),
+            }
+            key = (record["path"], record["digest"])
+            if key in claimed:
+                continue
+            validation = validator.validate(
+                ReceiptReference(record["path"], record["digest"]),
+                mission_id=record["mission_id"],
+                state_ref=record["state_ref"],
+                actor_id=record["actor_id"],
+                action_id=record["action_id"],
+                action_kind=record["action_kind"],
+                action_digest=record["action_digest"],
+            )
+            if not validation.valid:
+                raise MissionFailed(
+                    "unclaimed capability receipt failed validation: "
+                    + "; ".join(validation.issues)
+                )
+            recovered.append(record)
+        return tuple(recovered)
+
+    def _account_recovered_records(
+        self,
+        records: Sequence[Mapping[str, Any]],
+    ) -> None:
+        if not records:
+            return
+        allowance = self._reserve(len(records))
+        self._consume(allowance, len(records))
+        self._record_receipts(records)
+        self._claim_recovery_receipts(records)
+
+    def _claim_recovery_receipts(
+        self,
+        records: Sequence[Mapping[str, Any]],
+    ) -> None:
+        self._recovery_claimed_receipts.update(
+            (str(record["path"]), str(record["digest"]))
+            for record in records
+        )
+
+    def _receipt_document(
+        self,
+        record: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        assert self._evidence_root is not None
+        path = self._evidence_root / Path(
+            *portable_path_parts(str(record["path"]))
+        )
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(document, dict):
+            raise MissionFailed("capability receipt is not a JSON object")
+        return document
+
+    def _receipt_stdout(self, record: Mapping[str, Any]) -> str:
+        assert self._evidence_root is not None
+        receipt = self._receipt_document(record)
+        artifacts = receipt.get("artifacts")
+        if not isinstance(artifacts, list) or not artifacts:
+            raise MissionFailed("capability receipt lacks stdout evidence")
+        stdout = artifacts[0]
+        if not isinstance(stdout, Mapping):
+            raise MissionFailed("capability stdout evidence is malformed")
+        path = self._evidence_root / Path(
+            *portable_path_parts(_required_string(stdout, "path"))
+        )
+        return path.read_text(encoding="utf-8").strip()
+
+    def _recover_workspace_effect(
+        self,
+        workspace: GitWorkspace,
+        expected_calls: int,
+        description: str,
+        details: Mapping[str, Any],
+        records: Sequence[Mapping[str, Any]],
+    ) -> tuple[bool, Any]:
+        from .mission_store import workspace_snapshot
+
+        if expected_calls == 1 and records:
+            if description == "read Builder delivery tree":
+                return True, self._receipt_stdout(records[0])
+            if description.startswith("run "):
+                return True, self._receipt_document(records[0])
+        if description == "write Builder workspace file":
+            relative = details.get("path")
+            expected = details.get("content_digest")
+            if isinstance(relative, str) and isinstance(expected, str):
+                path = workspace.root / Path(*portable_path_parts(relative))
+                if path.is_file() and sha256_digest(path.read_bytes()) == expected:
+                    return True, None
+        if description == "stage candidate bundle for Curator":
+            expected = details.get("bundle_digest")
+            path = workspace.root / "candidate.bundle"
+            if (
+                isinstance(expected, str)
+                and path.is_file()
+                and sha256_digest(path.read_bytes()) == expected
+            ):
+                return True, None
+        if description == "create isolated Builder branch":
+            name = details.get("name")
+            if isinstance(name, str) and workspace.branch_name == name:
+                return True, None
+        if description == "commit Builder candidate":
+            snapshot = workspace_snapshot(workspace.container_root)
+            if snapshot["head_sha"] != workspace.base_sha:
+                return True, snapshot["head_sha"]
+        if description == "export reversible delivery candidate":
+            candidate = details.get("candidate")
+            if isinstance(candidate, str) and (
+                Path(candidate) / "delivery.json"
+            ).is_file():
+                return True, None
+        if description == "materialize candidate head for Curator":
+            expected = details.get("head_sha")
+            if (
+                isinstance(expected, str)
+                and workspace_snapshot(workspace.container_root)["head_sha"]
+                == expected
+            ):
+                return True, None
+        return False, None
+
+    def _recover_value_effect(
+        self,
+        description: str,
+        details: Mapping[str, Any],
+    ) -> tuple[bool, Any]:
+        if description == "bind mission evidence into candidate":
+            candidate = details.get("candidate")
+            if isinstance(candidate, str):
+                evidence = Path(candidate) / "mission-evidence"
+                if evidence.is_dir():
+                    self._validate_mission_evidence(evidence)
+                    return True, None
+        if description == "publish verified delivery artifact":
+            output = details.get("output")
+            if isinstance(output, str) and Path(output).is_dir():
+                return True, output
+        if description == "persist mission report":
+            path = details.get("path")
+            if isinstance(path, str) and Path(path).is_file():
+                return True, len(Path(path).read_text(encoding="utf-8"))
+        return False, None
 
     def _append_workspace_records(
         self,
@@ -1708,21 +1976,32 @@ class RepositoryMission:
                 bool(adopted["value"]),
                 tuple(dict(record) for record in adopted["records"]),
             )
+        recovered_records = self._unclaimed_receipt_records()
+        self._account_recovered_records(recovered_records)
         self.mission_store.begin_effect(self.run_id, step_index)
         verified, records = self._verify_candidate_once(candidate)
+        combined_records = (
+            *recovered_records,
+            *tuple(dict(record) for record in records),
+        )
         outcome = {
             "value": verified,
-            "records": [dict(record) for record in records],
+            "records": [dict(record) for record in combined_records],
         }
+        self._checkpoint_hook(step_index, "after_capability_effect")
         reference = self.mission_store.write_effect_receipt(
             checkpoint,
             outcome,
-            records,
+            combined_records,
         )
         self._checkpoint_hook(step_index, "after_effect")
-        self.mission_store.complete_step(checkpoint, reference, outcome)
-        self.mission_store.update_budget(self.run_id, self.budget)
-        return verified, records
+        self.mission_store.complete_step(
+            checkpoint,
+            reference,
+            outcome,
+            budget=self.budget,
+        )
+        return verified, tuple(dict(record) for record in combined_records)
 
     def _record_workspace_receipts(self, workspace: GitWorkspace) -> None:
         self._record_receipts(workspace.receipt_records)
@@ -1751,7 +2030,10 @@ class RepositoryMission:
         if destination.exists():
             shutil.rmtree(destination)
         shutil.copytree(self._evidence_root, destination)
-        validator = FileReceiptValidator(destination)
+        self._validate_mission_evidence(destination)
+
+    def _validate_mission_evidence(self, evidence_root: Path) -> None:
+        validator = FileReceiptValidator(evidence_root)
         for record in self._receipt_records:
             validation = validator.validate(
                 ReceiptReference(

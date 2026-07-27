@@ -468,11 +468,23 @@ class MissionStore:
 
     def begin_effect(self, mission_id: str, step_index: int) -> None:
         with self._lock, self._connection:
+            row = self._connection.execute(
+                """
+                SELECT state,execution_count FROM checkpoints
+                WHERE mission_id=? AND step_index=?
+                """,
+                (mission_id, step_index),
+            ).fetchone()
+            if row is None or row["state"] != "intent":
+                raise StoreIntegrityError("effect began outside an intent checkpoint")
+            if int(row["execution_count"]) > 0:
+                return
             cursor = self._connection.execute(
                 """
                 UPDATE checkpoints
                 SET execution_count=execution_count+1
                 WHERE mission_id=? AND step_index=? AND state='intent'
+                    AND execution_count=0
                 """,
                 (mission_id, step_index),
             )
@@ -563,6 +575,8 @@ class MissionStore:
         checkpoint: StepCheckpoint,
         reference: Mapping[str, str],
         outcome: Mapping[str, Any],
+        *,
+        budget: AutonomyBudget | None = None,
     ) -> None:
         encoded_reference = _canonical_json(dict(reference))
         encoded_outcome = _canonical_json(dict(outcome))
@@ -605,6 +619,14 @@ class MissionStore:
                     checkpoint.intent_digest,
                 ),
             )
+            if budget is not None:
+                self._connection.execute(
+                    "UPDATE missions SET budget_json=? WHERE mission_id=?",
+                    (
+                        _canonical_json(self._budget_payload(budget)),
+                        checkpoint.mission_id,
+                    ),
+                )
         self.refresh_state(checkpoint.mission_id)
 
     def idempotency_count(self, mission_id: str) -> int:

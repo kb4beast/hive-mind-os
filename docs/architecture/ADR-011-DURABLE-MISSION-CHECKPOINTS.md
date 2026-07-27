@@ -124,3 +124,54 @@ misrepresent them as delivered artifacts.
 
 This decision does not establish production readiness, distributed correctness, hostile
 code isolation, external delivery, complete source coverage, or superiority.
+
+---
+## Consolidated-review appeal
+
+- **Challenged candidate:** `51d749f323a8bca1721c92d6a0a650afb8fa6e10`
+- **Independent Curator disposition:** `block`
+- **Date:** 2026-07-27
+
+The Curator reproduced a hard-stop window after a sandbox enforcement receipt existed but
+before the P06 synthetic checkpoint receipt was written. Step 1 re-executed, its logical
+execution count became two, one physical receipt and budget call disappeared from the
+report, and the original 54-case hook sweep did not reach that window. The Curator also
+found the exact-head PR checks unstable: `unittest discover` could not import the
+pytest-only P06 test module, and Gitleaks classified a synthetic idempotency fixture as a
+secret.
+
+The repaired challenger makes these decisions:
+
+1. Scan the mission's trusted receipt store for validated physical capability receipts
+   not claimed by a completed checkpoint. A complete single-call effect is adopted
+   directly from that receipt; deterministic zero-call file effects are adopted only
+   after their expected bytes or validated evidence are present.
+2. When an incomplete composite local operation must retry, retain and account every
+   physical receipt. The checkpoint execution count denotes one logical intent attempt;
+   exactly-once physical process execution remains explicitly unclaimed.
+3. Commit checkpoint completion, idempotency mapping, and the updated budget in one SQLite
+   transaction. A stop before that transaction restores the prior budget and accounts
+   recovered receipts; a stop after it observes both completion and consumption.
+4. Add an `after_capability_effect` regression before the checkpoint-receipt write. The
+   Explorer test effect must be adopted without re-execution and finish with 45 physical
+   receipts, 45 reported receipts, and 45 budget calls.
+5. Express P06 tests through stdlib `unittest` discovery so the repository's exact CI
+   command and pytest both execute the same 63 cases without a pytest runtime dependency.
+6. Remove the secret-like fixture value from the current tree. Because the false-positive
+   value remains in the append-only PR history, add one line-targeted Gitleaks allowlist
+   while extending every default rule. A governance regression forbids commit-, path-, or
+   broad-rule exclusions.
+
+### Operational source receipt
+
+The existing pinned `gitleaks/gitleaks-action` at
+`e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e` documents automatic discovery of a root
+`gitleaks.toml`. The README and `LICENSE.txt` were retrieved from that exact commit on
+2026-07-27. The action is governed by the Gitleaks Action EULA (not an SPDX open-source
+license); this repair copies no action code and changes no existing use right. The narrow
+configuration mechanism is adapted only to preserve default scanning while excluding the
+one reproduced synthetic line. P12 retains all unresolved source and licensing
+obligations.
+
+The challenged Curator block remains controlling until the repaired exact candidate has
+green GitHub checks and a fresh sequential Curator, Judge, and Orchestrator review.

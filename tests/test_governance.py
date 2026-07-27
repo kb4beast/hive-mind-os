@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -68,6 +69,19 @@ class RepositoryGovernanceTests(unittest.TestCase):
     def test_build_backend_is_exactly_pinned(self) -> None:
         project = (ROOT / "pyproject.toml").read_text()
         self.assertIn('requires = ["setuptools==80.9.0"]', project)
+
+    def test_secret_scan_allowlist_is_narrow_and_extends_defaults(self) -> None:
+        config = tomllib.loads((ROOT / "gitleaks.toml").read_text())
+        self.assertEqual(config["extend"], {"useDefault": True})
+        self.assertEqual(len(config["allowlists"]), 1)
+        allowlist = config["allowlists"][0]
+        self.assertEqual(allowlist["regexTarget"], "line")
+        self.assertEqual(
+            allowlist["regexes"],
+            ["IDEMPOTENCY" + "-P06-test"],
+        )
+        self.assertNotIn("commits", allowlist)
+        self.assertNotIn("paths", allowlist)
 
 
 if __name__ == "__main__":
