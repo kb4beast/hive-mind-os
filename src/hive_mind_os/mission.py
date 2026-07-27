@@ -448,8 +448,10 @@ class RepositoryMission:
             raise ValueError("repository must be a local Git worktree")
         if not objective.strip():
             raise ValueError("objective is required")
+        self.run_id = str(uuid4())
         self.objective = Objective(
             objective,
+            id=self.run_id,
             repository=str(self.repository),
             acceptance_criteria=tuple(acceptance_criteria),
         )
@@ -464,8 +466,13 @@ class RepositoryMission:
             max_tool_calls_per_episode=100,
             max_compute_units_per_episode=100.0,
         )
-        self.ledger = ledger or EvidenceLedger()
-        self.run_id = str(uuid4())
+        backend_ledger = getattr(self.backend, "ledger", None)
+        if ledger is None and isinstance(backend_ledger, EvidenceLedger):
+            self.ledger = backend_ledger
+        else:
+            self.ledger = ledger or EvidenceLedger()
+            if isinstance(backend_ledger, EvidenceLedger):
+                setattr(self.backend, "ledger", self.ledger)
         self._seen_receipts: set[tuple[str, str]] = set()
         self._receipt_records: list[dict[str, Any]] = []
         self._context_manifests: list[dict[str, Any]] = []
@@ -487,6 +494,7 @@ class RepositoryMission:
         staging_parent: Path | None = None
         published = False
         final_output = self._validated_output()
+        explorer_test_argv: tuple[str, ...] | None = None
         self.ledger.append_event(
             self.run_id,
             "mission.started",
@@ -516,7 +524,7 @@ class RepositoryMission:
             candidate = staging_parent / "candidate"
             with tempfile.TemporaryDirectory(prefix="hive-mind-p05-") as temporary:
                 work_root = Path(temporary)
-                evidence_root = work_root / "evidence"
+                evidence_root = staging_parent / "evidence"
                 evidence_root.mkdir()
                 self._evidence_root = evidence_root
                 explorer: ExplorerCapabilities | None = None
@@ -572,14 +580,21 @@ class RepositoryMission:
                         for action in self._actions(result):
                             if action["action"] != "run_tests":
                                 raise MissionFailed("Explorer proposed an unsupported action")
-                            receipt, records = explorer.run_tests(
-                                _string_argv(action.get("argv"))
-                            )
+                            if explorer_test_argv is not None:
+                                raise MissionFailed(
+                                    "Explorer must propose exactly one test command"
+                                )
+                            explorer_test_argv = _string_argv(action.get("argv"))
+                            receipt, records = explorer.run_tests(explorer_test_argv)
                             action_receipts.extend(records)
                             if receipt["result"] != "failed":
                                 raise MissionFailed(
                                     "Explorer did not reproduce a failing repository test"
                                 )
+                        if explorer_test_argv is None:
+                            raise MissionFailed(
+                                "Explorer omitted the failure-reproducing test command"
+                            )
                     elif role is Role.ARCHITECT:
                         ArchitectCapabilities(results[-1].evidence)
                         if result.proposed_actions:
@@ -620,8 +635,13 @@ class RepositoryMission:
                                 )
                                 action_receipts.extend(records)
                             elif name == "run_tests":
+                                test_argv = self._bound_test_argv(
+                                    action,
+                                    explorer_test_argv,
+                                    Role.BUILDER,
+                                )
                                 receipt, records = builder.run_tests(
-                                    _string_argv(action.get("argv"))
+                                    test_argv
                                 )
                                 action_receipts.extend(records)
                                 builder_test_passed = receipt["result"] == "succeeded"
@@ -677,16 +697,24 @@ class RepositoryMission:
                         )
                         for action in self._actions(result):
                             name = action["action"]
-                            if name in {"run_tests", "run_criterion"}:
+                            if name == "run_tests":
+                                test_argv = self._bound_test_argv(
+                                    action,
+                                    explorer_test_argv,
+                                    Role.CURATOR,
+                                )
+                                receipt, records = curator.run_tests(
+                                    test_argv
+                                )
+                                action_receipts.extend(records)
+                                passed = receipt["result"] == "succeeded"
+                                curator_test_passed = passed
+                            elif name == "run_criterion":
                                 receipt, records = curator.run_tests(
                                     _string_argv(action.get("argv"))
                                 )
                                 action_receipts.extend(records)
-                                passed = receipt["result"] == "succeeded"
-                                if name == "run_tests":
-                                    curator_test_passed = passed
-                                else:
-                                    criterion_passed = passed
+                                criterion_passed = receipt["result"] == "succeeded"
                             elif name == "verify_delivery":
                                 delivery_verified, records = curator.verify_delivery()
                                 action_receipts.extend(records)
@@ -827,7 +855,8 @@ class RepositoryMission:
             )
             if published and final_output.exists():
                 shutil.rmtree(final_output)
-            return self._report(
+            failure_receipt_root = self._preserve_failure_evidence(final_output)
+            report = self._report(
                 results,
                 WorkStatus.FAILED,
                 started_at,
@@ -836,12 +865,24 @@ class RepositoryMission:
                 head_sha,
                 tree_digest,
                 None,
-                None,
+                failure_receipt_root,
                 curator_verdict,
                 builder_workspace_path,
                 curator_workspace_path,
                 failure,
             )
+            if failure_receipt_root is not None:
+                (Path(failure_receipt_root) / "mission-report.json").write_text(
+                    json.dumps(
+                        report.to_dict(),
+                        ensure_ascii=False,
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            return report
         finally:
             if staging_parent is not None and staging_parent.exists():
                 shutil.rmtree(staging_parent)
@@ -1002,13 +1043,68 @@ class RepositoryMission:
     ) -> tuple[_T, tuple[dict[str, Any], ...]]:
         allowance = self._reserve(expected_calls)
         before = len(workspace.receipt_records)
-        value = operation()
+        try:
+            value = operation()
+        except Exception as operation_error:
+            records = tuple(
+                dict(record) for record in workspace.receipt_records[before:]
+            )
+            accounting_errors: list[str] = []
+            try:
+                self._consume(allowance, len(records))
+            except Exception as accounting_error:
+                accounting_errors.append(
+                    f"budget accounting failed: {type(accounting_error).__name__}: "
+                    f"{accounting_error}"
+                )
+            try:
+                self._record_workspace_receipts(workspace)
+            except Exception as accounting_error:
+                accounting_errors.append(
+                    f"receipt recording failed: {type(accounting_error).__name__}: "
+                    f"{accounting_error}"
+                )
+            if accounting_errors:
+                operation_error.add_note("; ".join(accounting_errors))
+            raise
         records = tuple(
             dict(record) for record in workspace.receipt_records[before:]
         )
         self._consume(allowance, len(records))
         self._record_workspace_receipts(workspace)
         return value, records
+
+    def _preserve_failure_evidence(self, final_output: Path) -> str | None:
+        if not self._receipt_records:
+            return None
+        if self._evidence_root is None or not self._evidence_root.is_dir():
+            raise MissionFailed("failed-run receipt evidence is unavailable")
+        destination = final_output.with_name(
+            f".{final_output.name}-failed-evidence-{self.run_id}"
+        )
+        if destination.exists() or destination.is_symlink():
+            raise MissionFailed("failed-run evidence destination already exists")
+        os.replace(self._evidence_root, destination)
+        validator = FileReceiptValidator(destination)
+        for record in self._receipt_records:
+            validation = validator.validate(
+                ReceiptReference(
+                    str(record["path"]),
+                    str(record["digest"]),
+                ),
+                mission_id=str(record["mission_id"]),
+                state_ref=str(record["state_ref"]),
+                actor_id=str(record["actor_id"]),
+                action_id=str(record["action_id"]),
+                action_kind=str(record["action_kind"]),
+                action_digest=str(record["action_digest"]),
+            )
+            if not validation.valid:
+                raise MissionFailed(
+                    "failed-run receipt failed validation: "
+                    + "; ".join(validation.issues)
+                )
+        return str(destination)
 
     def _verify_candidate(
         self,
@@ -1093,6 +1189,22 @@ class RepositoryMission:
                 raise MissionFailed("proposed action lacks a typed action name")
             actions.append(action)
         return tuple(actions)
+
+    @staticmethod
+    def _bound_test_argv(
+        action: Mapping[str, Any],
+        explorer_test_argv: tuple[str, ...] | None,
+        role: Role,
+    ) -> tuple[str, ...]:
+        if explorer_test_argv is None:
+            raise MissionFailed("failure-reproducing test command is not sealed")
+        proposed = _string_argv(action.get("argv"))
+        if proposed != explorer_test_argv:
+            raise MissionFailed(
+                f"{role.value} test command differs from the "
+                "Explorer failure-reproducing command"
+            )
+        return explorer_test_argv
 
     @staticmethod
     def _with_receipt_evidence(
