@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "mission": {
     "id": "MISSION-REQUIRED",
     "state_version": 1,
@@ -66,22 +66,43 @@
       "id": "ACT-000",
       "kind": "reasoning",
       "description": "",
+      "actor_id": "orchestrator-pass-1",
+      "action_digest": "sha256:64-lowercase-hex-required",
       "authority_required": "reasoning_only",
       "risk": "low",
       "idempotency_key": null,
       "rollback_ref": null,
+      "receipt_ref": null,
       "status": "PROPOSED_ACTION"
     }
   ],
   "tool_receipts": [
     {
-      "receipt_ref": "provider:receipt-id",
+      "receipt_ref": {
+        "path": "receipts/REC-000.json",
+        "digest": "sha256:64-lowercase-hex-required"
+      },
+      "receipt_id": "REC-000",
       "action_id": "ACT-000",
       "provider": "",
-      "result": "",
-      "observed_at": "",
-      "artifact_refs": [],
-      "verified_by": ""
+      "execution_id": "EXEC-000",
+      "mission_id": "MISSION-REQUIRED",
+      "state_ref": "MISSION_STATE:MISSION-REQUIRED:1",
+      "actor_id": "orchestrator-pass-1",
+      "policy_decision_ref": "POLICY-REQUIRED",
+      "lease_id": "LEASE-REQUIRED",
+      "action_kind": "reasoning",
+      "action_digest": "sha256:64-lowercase-hex-required",
+      "executed": true,
+      "result": "succeeded",
+      "observed_at": "2026-07-27T00:00:00Z",
+      "artifacts": [
+        {
+          "path": "artifacts/ART-000.bin",
+          "digest": "sha256:64-lowercase-hex-required"
+        }
+      ],
+      "verified_by": "curator-pass-1"
     }
   ],
   "decisions": [

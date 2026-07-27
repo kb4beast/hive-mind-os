@@ -79,12 +79,7 @@ class FileReceiptValidatorTests(unittest.TestCase):
 
     def test_missing_directory_and_escape_paths_fail_closed(self) -> None:
         missing = ReceiptReference("missing.json", f"sha256:{'0' * 64}")
-        absolute = ReceiptReference(str((self.root / "receipt.json").resolve()), f"sha256:{'0' * 64}")
-        escape = ReceiptReference("../outside.json", f"sha256:{'0' * 64}")
-        directory = ReceiptReference(".", f"sha256:{'0' * 64}")
-        for reference in (missing, absolute, escape, directory):
-            with self.subTest(path=reference.path):
-                self.assertFalse(self.validate(reference).valid)
+        self.assertFalse(self.validate(missing).valid)
 
     def test_symlink_escape_fails_closed_when_supported(self) -> None:
         outside_directory = tempfile.TemporaryDirectory()
@@ -112,6 +107,15 @@ class FileReceiptValidatorTests(unittest.TestCase):
         validation = self.validate(self.reference(self.document(schema_version=2)))
         self.assertFalse(validation.valid)
         self.assertIn("unsupported receipt schema version", validation.issues)
+        for invalid_version in (True, 1.0):
+            with self.subTest(schema_version=invalid_version):
+                validation = self.validate(
+                    self.reference(
+                        self.document(schema_version=invalid_version),
+                        f"schema-{invalid_version}.json",
+                    )
+                )
+                self.assertFalse(validation.valid)
 
     def test_foreign_or_incomplete_binding_fails(self) -> None:
         mutations = {
@@ -135,6 +139,15 @@ class FileReceiptValidatorTests(unittest.TestCase):
                 )
                 self.assertFalse(validation.valid)
 
+        invalid_offset = self.validate(
+            self.reference(
+                self.document(observed_at="2026-07-27T12:00:00+00:00:30"),
+                "invalid-offset.json",
+            )
+        )
+        self.assertFalse(invalid_offset.valid)
+        self.assertIn("receipt observed_at must be RFC 3339", invalid_offset.issues)
+
     def test_artifact_substitution_fails(self) -> None:
         reference = self.reference(self.document())
         self.artifact.write_text("substituted", encoding="utf-8")
@@ -147,6 +160,16 @@ class FileReceiptValidatorTests(unittest.TestCase):
             ReceiptReference(" ", f"sha256:{'0' * 64}")
         with self.assertRaises(ValueError):
             ReceiptReference("receipt.json", "abc123")
+        for path in (
+            "/absolute/receipt.json",
+            r"C:\receipts\receipt.json",
+            r"nested\receipt.json",
+            "nested/../receipt.json",
+            "nested//receipt.json",
+        ):
+            with self.subTest(path=path):
+                with self.assertRaises(ValueError):
+                    ReceiptReference(path, f"sha256:{'0' * 64}")
 
 
 if __name__ == "__main__":

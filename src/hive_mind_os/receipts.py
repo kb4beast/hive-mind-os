@@ -6,11 +6,31 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
-from typing import Mapping
+from pathlib import Path, PurePosixPath
+from typing import Mapping, Protocol
 
 
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
+_RFC3339_PATTERN = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\Z"
+)
+
+
+def _portable_path_parts(value: str) -> tuple[str, ...]:
+    if (
+        not value
+        or value.startswith("/")
+        or "\\" in value
+        or re.match(r"^[A-Za-z]:", value)
+    ):
+        raise ValueError("path must use portable relative POSIX syntax")
+    raw_parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in raw_parts):
+        raise ValueError("path must not contain empty, current, or parent segments")
+    normalized = PurePosixPath(*raw_parts).as_posix()
+    if normalized != value:
+        raise ValueError("path must use canonical portable relative POSIX syntax")
+    return tuple(raw_parts)
 
 
 class ReceiptResult(StrEnum):
@@ -28,6 +48,7 @@ class ReceiptReference:
     def __post_init__(self) -> None:
         if not self.path.strip():
             raise ValueError("receipt path is required")
+        _portable_path_parts(self.path)
         if not _SHA256_PATTERN.fullmatch(self.digest):
             raise ValueError("receipt digest must be lowercase sha256:<64 hex>")
 
@@ -42,6 +63,20 @@ class ReceiptValidation:
 
 def sha256_digest(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+class ReceiptValidator(Protocol):
+    def validate(
+        self,
+        reference: ReceiptReference,
+        *,
+        mission_id: str,
+        state_ref: str,
+        actor_id: str,
+        action_id: str,
+        action_kind: str,
+        action_digest: str,
+    ) -> ReceiptValidation: ...
 
 
 class FileReceiptValidator:
@@ -66,9 +101,11 @@ class FileReceiptValidator:
         if not isinstance(expected_digest, str) or not _SHA256_PATTERN.fullmatch(expected_digest):
             return None, [f"{label} digest must be lowercase sha256:<64 hex>"]
 
-        candidate = Path(relative_path)
-        if candidate.is_absolute():
-            return None, [f"{label} path must be relative to the trusted root"]
+        try:
+            path_parts = _portable_path_parts(relative_path)
+        except ValueError as error:
+            return None, [f"{label} {error}"]
+        candidate = Path(*path_parts)
         resolved = (self.trusted_root / candidate).resolve()
         try:
             resolved.relative_to(self.trusted_root)
@@ -112,7 +149,7 @@ class FileReceiptValidator:
         if not isinstance(document, Mapping):
             return ReceiptValidation(False, False, ("receipt must be a JSON object",))
 
-        if document.get("schema_version") != 1:
+        if type(document.get("schema_version")) is not int or document.get("schema_version") != 1:
             issues.append("unsupported receipt schema version")
 
         receipt_id = document.get("receipt_id")
@@ -146,6 +183,8 @@ class FileReceiptValidator:
 
         observed_at = document.get("observed_at")
         if isinstance(observed_at, str) and observed_at.strip():
+            if not _RFC3339_PATTERN.fullmatch(observed_at):
+                issues.append("receipt observed_at must be RFC 3339")
             try:
                 parsed_time = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
             except ValueError:

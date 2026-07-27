@@ -95,11 +95,33 @@ class ClassicGptSimulationTests(unittest.TestCase):
         self.assertTrue(audit.valid, audit.issues)
 
         manifest = json.loads(documents["gpt_sources/manifest.json"])
-        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(manifest["schema_version"], 2)
+        self.assertEqual(manifest["pack_id"], "hive-mind-os-classic-gpt-simulation-v2")
         self.assertEqual(
             manifest["load_order"],
             [item.path for item in self.pack.files if item.path != "gpt_sources/manifest.json"],
         )
+        runtime_state = json.loads(documents["gpt_sources/01_RUNTIME_STATE_SCHEMA.json"])
+        self.assertEqual(runtime_state["schema_version"], 2)
+        action = runtime_state["proposed_actions"][0]
+        self.assertIn("actor_id", action)
+        self.assertIn("action_digest", action)
+        receipt = runtime_state["tool_receipts"][0]
+        self.assertEqual(set(receipt["receipt_ref"]), {"path", "digest"})
+        for field in (
+            "execution_id",
+            "mission_id",
+            "state_ref",
+            "actor_id",
+            "policy_decision_ref",
+            "lease_id",
+            "action_digest",
+            "executed",
+            "result",
+            "artifacts",
+            "verified_by",
+        ):
+            self.assertIn(field, receipt)
 
     def test_missing_source_or_required_marker_fails_closed(self) -> None:
         documents = {item.path: "placeholder" for item in self.pack.files[:-1]}
@@ -115,10 +137,10 @@ class ClassicGptSimulationTests(unittest.TestCase):
             actor_id="builder-pass-1",
             actions=(
                 SimulatedAction(
-                    "action-1",
-                    ActionKind.GIT,
-                    "Commit and push the generated patch.",
-                    "builder-pass-1",
+                    id="action-1",
+                    kind=ActionKind.GIT,
+                    description="Commit and push the generated patch.",
+                    actor_id="builder-pass-1",
                 ),
             ),
         )
@@ -128,16 +150,16 @@ class ClassicGptSimulationTests(unittest.TestCase):
 
     def test_receipted_side_effect_is_allowed(self) -> None:
         proposed = SimulatedAction(
-            "action-1",
-            ActionKind.GIT,
-            "Commit and push the generated patch.",
-            "builder-pass-1",
+            id="action-1",
+            kind=ActionKind.GIT,
+            description="Commit and push the generated patch.",
+            actor_id="builder-pass-1",
         )
         receipted = SimulatedAction(
-            proposed.id,
-            proposed.kind,
-            proposed.description,
-            proposed.actor_id,
+            id=proposed.id,
+            kind=proposed.kind,
+            description=proposed.description,
+            actor_id=proposed.actor_id,
             receipt_ref=self.receipt_for(proposed),
         )
         turn = self.turn(
@@ -151,19 +173,26 @@ class ClassicGptSimulationTests(unittest.TestCase):
     def test_legacy_receipt_string_is_rejected(self) -> None:
         with self.assertRaises(TypeError):
             SimulatedAction(
+                id="action-1",
+                kind=ActionKind.GIT,
+                description="Commit and push the generated patch.",
+                actor_id="builder-pass-1",
+                receipt_ref="github:commit:not-real",  # type: ignore[arg-type]
+            )
+        with self.assertRaises(TypeError):
+            SimulatedAction(  # type: ignore[misc]
                 "action-1",
                 ActionKind.GIT,
                 "Commit and push the generated patch.",
-                "builder-pass-1",
-                receipt_ref="github:commit:not-real",  # type: ignore[arg-type]
+                "github:commit:not-real",
             )
 
     def test_receipt_cannot_be_reused_for_another_action(self) -> None:
         first = SimulatedAction(
-            "action-1",
-            ActionKind.WRITE,
-            "Write the artifact.",
-            "builder-pass-1",
+            id="action-1",
+            kind=ActionKind.WRITE,
+            description="Write the artifact.",
+            actor_id="builder-pass-1",
         )
         reference = self.receipt_for(first)
         turn = self.turn(
@@ -172,18 +201,18 @@ class ClassicGptSimulationTests(unittest.TestCase):
             actor_id="builder-pass-1",
             actions=(
                 SimulatedAction(
-                    first.id,
-                    first.kind,
-                    first.description,
-                    first.actor_id,
-                    reference,
+                    id=first.id,
+                    kind=first.kind,
+                    description=first.description,
+                    actor_id=first.actor_id,
+                    receipt_ref=reference,
                 ),
                 SimulatedAction(
-                    "action-2",
-                    ActionKind.WRITE,
-                    "Write it again.",
-                    "builder-pass-1",
-                    reference,
+                    id="action-2",
+                    kind=ActionKind.WRITE,
+                    description="Write it again.",
+                    actor_id="builder-pass-1",
+                    receipt_ref=reference,
                 ),
             ),
         )
@@ -191,19 +220,72 @@ class ClassicGptSimulationTests(unittest.TestCase):
         self.assertFalse(decision.compliant)
         self.assertTrue(any("reuses another action receipt" in reason for reason in decision.reasons))
 
+    def test_duplicate_action_ids_cannot_mask_a_failed_side_effect(self) -> None:
+        failed = SimulatedAction(
+            id="action-1",
+            kind=ActionKind.COMMAND,
+            description="First execution fails.",
+            actor_id="builder-pass-1",
+        )
+        succeeded = SimulatedAction(
+            id="action-1",
+            kind=ActionKind.WRITE,
+            description="Different execution succeeds.",
+            actor_id="builder-pass-1",
+        )
+        actions = (
+            SimulatedAction(
+                id=failed.id,
+                kind=failed.kind,
+                description=failed.description,
+                actor_id=failed.actor_id,
+                receipt_ref=self.receipt_for(
+                    failed,
+                    result="failed",
+                    receipt_id="receipt-failed",
+                ),
+            ),
+            SimulatedAction(
+                id=succeeded.id,
+                kind=succeeded.kind,
+                description=succeeded.description,
+                actor_id=succeeded.actor_id,
+                receipt_ref=self.receipt_for(
+                    succeeded,
+                    result="succeeded",
+                    receipt_id="receipt-succeeded",
+                ),
+            ),
+        )
+        decision = self.gate.evaluate(
+            self.turn(
+                phase=SimulationPhase.COMPLETE,
+                active_role=Role.ORCHESTRATOR,
+                actor_id="orchestrator-pass-2",
+                actions=actions,
+                completed_roles=tuple(Role),
+                verifier_ids=("curator-independent-1",),
+                blockers=(),
+                next_action="Archive the handoff.",
+            )
+        )
+        self.assertFalse(decision.compliant)
+        self.assertIn("turn contains duplicate action ids: action-1", decision.reasons)
+        self.assertTrue(any("lacks a successful receipt" in reason for reason in decision.reasons))
+
     def test_failed_receipt_cannot_support_completion(self) -> None:
         proposed = SimulatedAction(
-            "action-1",
-            ActionKind.COMMAND,
-            "Run a command.",
-            "builder-pass-1",
+            id="action-1",
+            kind=ActionKind.COMMAND,
+            description="Run a command.",
+            actor_id="builder-pass-1",
         )
         action = SimulatedAction(
-            proposed.id,
-            proposed.kind,
-            proposed.description,
-            proposed.actor_id,
-            self.receipt_for(proposed, result="failed"),
+            id=proposed.id,
+            kind=proposed.kind,
+            description=proposed.description,
+            actor_id=proposed.actor_id,
+            receipt_ref=self.receipt_for(proposed, result="failed"),
         )
         build_decision = self.gate.evaluate(
             self.turn(
@@ -234,17 +316,17 @@ class ClassicGptSimulationTests(unittest.TestCase):
 
     def test_side_effect_receipt_fails_closed_without_validator(self) -> None:
         proposed = SimulatedAction(
-            "action-1",
-            ActionKind.WRITE,
-            "Write the artifact.",
-            "builder-pass-1",
+            id="action-1",
+            kind=ActionKind.WRITE,
+            description="Write the artifact.",
+            actor_id="builder-pass-1",
         )
         action = SimulatedAction(
-            proposed.id,
-            proposed.kind,
-            proposed.description,
-            proposed.actor_id,
-            self.receipt_for(proposed),
+            id=proposed.id,
+            kind=proposed.kind,
+            description=proposed.description,
+            actor_id=proposed.actor_id,
+            receipt_ref=self.receipt_for(proposed),
         )
         decision = ClassicGptSimulationGate(self.pack).evaluate(
             self.turn(actions=(action,))
@@ -287,6 +369,21 @@ class ClassicGptSimulationTests(unittest.TestCase):
             self.turn(state_ref="")
         with self.assertRaises(ValueError):
             self.turn(next_action="")
+
+    def test_runtime_enum_type_confusion_is_rejected(self) -> None:
+        with self.assertRaises(TypeError):
+            self.turn(phase="complete")  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            self.turn(active_role="architect")  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            self.turn(completed_roles=("builder",))  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            SimulatedAction(
+                id="action-1",
+                kind="git",  # type: ignore[arg-type]
+                description="Do work.",
+                actor_id="builder-pass-1",
+            )
 
 
 if __name__ == "__main__":

@@ -143,6 +143,34 @@ class PolicyInvariantTests(unittest.TestCase):
                 arena.record(outcome)
                 self.assertTrue(arena.state(variant.id).quarantined)
 
+    def test_every_charter_forbidden_capability_is_a_hard_disqualifier(self) -> None:
+        charter = MissionCharter("Improve safely", ("owner/repo",))
+        for capability in charter.forbidden_capabilities:
+            variant = AgentVariant(Role.BUILDER, f"candidate-{capability}")
+            outcome = EpisodeOutcome(
+                variant_id=variant.id,
+                task_id=f"task-{capability}",
+                success=True,
+                customer_value=1.0,
+                quality=1.0,
+                trust=1.0,
+                cooperation=1.0,
+                cost_efficiency=1.0,
+                evidence_count=10,
+                attempted_capabilities=(capability,),
+                charter_fingerprint=charter.fingerprint,
+            )
+            with self.subTest(capability=capability):
+                score = FitnessEvaluator().evaluate(outcome, charter)
+                self.assertFalse(score.eligible)
+                self.assertTrue(
+                    any("forbidden capability attempted" in reason for reason in score.reasons)
+                )
+                arena = EvolutionArena(charter)
+                arena.register(variant)
+                arena.record(outcome)
+                self.assertTrue(arena.state(variant.id).quarantined)
+
 
 if __name__ == "__main__":
     unittest.main()

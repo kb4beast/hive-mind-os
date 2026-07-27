@@ -13,7 +13,7 @@ CLASSIC_GPT_SOURCES: tuple[SourceRecord, ...] = (
         status=SourceStatus.VERIFIED,
         version_ref="conversation:2026-07-27",
         license_spdx=None,
-        content_digest="classic-gpt-simulation-v1",
+        content_digest="classic-gpt-simulation-v2",
     ),
 )
 

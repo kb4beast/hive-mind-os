@@ -61,6 +61,10 @@ mission/state/action/actor binding, policy decision, lease, execution result, ti
 independent verifier. This is a local structural verifier; authenticated provider identities
 and the non-bypassable enforcement gateway remain later kernel stages.
 
+The portable classic-GPT state/protocol is version 2. Actions use explicit keyword fields and
+content-addressed receipt references; the source protocol documents migration from legacy
+`provider:receipt-id` strings.
+
 ## What is implemented
 
 The foundation includes:

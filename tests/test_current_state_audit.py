@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import copy
+import subprocess
 import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from hive_mind_os.current_state_audit import (
+    COMMAND_TIMEOUT_SECONDS,
     CommandObservation,
     _broken_references,
     _parse_test_result,
     collect_current_state_audit,
     create_audit_artifact,
+    execute_command,
     verify_audit_artifact,
     write_audit_artifact,
 )
@@ -23,13 +27,50 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.repository = Path(__file__).resolve().parents[1]
 
     def valid_audit(self, **overrides) -> dict[str, object]:
+        head = "a" * 40
         audit: dict[str, object] = {
-            "schema_version": 1,
+            "schema_version": 2,
             "artifact_type": "CurrentStateAudit",
-            "repository": {"head": "abc123"},
-            "docket": {},
-            "tests": {"status": "passed"},
-            "commands": [],
+            "repository": {
+                "root": str(self.repository),
+                "head": head,
+                "working_tree_clean": True,
+                "working_tree_entries": [],
+                "post_test_head": head,
+                "post_test_working_tree_clean": True,
+                "post_test_working_tree_entries": [],
+                "tracked_tree_digest": f"sha256:{'b' * 64}",
+            },
+            "docket": {
+                "source_count": 1,
+                "claim_count": 1,
+                "broken_references": [],
+                "receipts_valid": True,
+                "reference_receipts": [
+                    {
+                        "claim_id": "CLM-1",
+                        "kind": "test",
+                        "reference": "tests/test_example.py",
+                        "path_valid": True,
+                        "digest": f"sha256:{'c' * 64}",
+                        "execution": {"status": "passed"},
+                        "valid": True,
+                        "issues": [],
+                    }
+                ],
+            },
+            "tests": {"status": "passed", "passed": 1, "failed": 0, "errors": 0},
+            "commands": [
+                {
+                    "command": ["python", "-m", "pytest", "-q"],
+                    "cwd": str(self.repository),
+                    "return_code": 0,
+                    "stdout": "1 passed",
+                    "stderr": "",
+                    "timed_out": False,
+                    "output_truncated": False,
+                }
+            ],
             "failures": [],
             "complete": True,
         }
@@ -95,6 +136,47 @@ class CurrentStateAuditTests(unittest.TestCase):
         result = _parse_test_result(observation)
         self.assertEqual(result["status"], "unverified")
 
+    def test_test_time_worktree_mutation_is_reported(self) -> None:
+        status_calls = 0
+
+        def executor(command, cwd):
+            nonlocal status_calls
+            command_tuple = tuple(command)
+            if command_tuple[:4] == ("git", "status", "--porcelain=v1", "--untracked-files=all"):
+                status_calls += 1
+                return CommandObservation(
+                    command_tuple,
+                    str(cwd),
+                    0,
+                    "" if status_calls == 1 else " M README.md\0",
+                    "",
+                )
+            if len(command_tuple) >= 4 and command_tuple[1:4] == ("-m", "pytest", "-q"):
+                return CommandObservation(command_tuple, str(cwd), 0, "1 passed\n", "")
+            return execute_command(command_tuple, cwd)
+
+        audit = collect_current_state_audit(
+            self.repository,
+            run_tests=True,
+            generated_at=datetime(2026, 7, 27, tzinfo=UTC),
+            executor=executor,
+        )
+        self.assertFalse(audit["complete"])
+        self.assertFalse(audit["repository"]["post_test_working_tree_clean"])
+        self.assertIn(
+            "worktree_changed_during_audit",
+            {failure.get("kind") for failure in audit["failures"]},
+        )
+
+    def test_command_timeout_is_a_visible_failed_observation(self) -> None:
+        timeout = subprocess.TimeoutExpired(("test",), COMMAND_TIMEOUT_SECONDS)
+        with patch("hive_mind_os.current_state_audit.subprocess.run", side_effect=timeout):
+            observation = execute_command(("test",), self.repository)
+        self.assertFalse(observation.succeeded)
+        self.assertTrue(observation.timed_out)
+        self.assertEqual(observation.return_code, 124)
+        self.assertIn("timed out", observation.stderr)
+
     def test_digest_detects_mutation(self) -> None:
         artifact = create_audit_artifact(self.valid_audit(value="original"))
         valid, issues = verify_audit_artifact(artifact)
@@ -120,16 +202,51 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("audit signature mismatch", issues)
 
     def test_unknown_schema_is_not_verified(self) -> None:
-        artifact = create_audit_artifact(self.valid_audit(schema_version=2))
+        artifact = create_audit_artifact(self.valid_audit(schema_version=3))
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("unsupported CurrentStateAudit schema version", issues)
 
     def test_minimal_self_digested_payload_is_not_a_verified_audit(self) -> None:
-        artifact = create_audit_artifact({"schema_version": 1})
+        artifact = create_audit_artifact({"schema_version": 2})
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("artifact type must be CurrentStateAudit", issues)
+
+        underspecified = {
+            "schema_version": 2,
+            "artifact_type": "CurrentStateAudit",
+            "repository": {},
+            "docket": {},
+            "tests": {},
+            "commands": [],
+            "failures": [],
+            "complete": True,
+        }
+        valid, issues = verify_audit_artifact(create_audit_artifact(underspecified))
+        self.assertFalse(valid)
+        self.assertIn("audit repository head is invalid", issues)
+        self.assertIn("audit contains no command observations", issues)
+        self.assertIn("complete audit requires passing tests", issues)
+
+    def test_boolean_schema_and_contradictory_complete_audit_are_rejected(self) -> None:
+        boolean_schema = create_audit_artifact(self.valid_audit(schema_version=True))
+        valid, issues = verify_audit_artifact(boolean_schema)
+        self.assertFalse(valid)
+        self.assertIn("unsupported CurrentStateAudit schema version", issues)
+
+        contradictory = self.valid_audit()
+        contradictory["repository"]["working_tree_clean"] = False
+        contradictory["repository"]["working_tree_entries"] = [" M file.py"]
+        contradictory["tests"]["status"] = "failed"
+        contradictory["docket"]["receipts_valid"] = False
+        contradictory["failures"] = [{"kind": "test_failure"}]
+        valid, issues = verify_audit_artifact(create_audit_artifact(contradictory))
+        self.assertFalse(valid)
+        self.assertIn("complete audit requires a clean repository", issues)
+        self.assertIn("complete audit requires passing tests", issues)
+        self.assertIn("complete audit requires valid reference receipts", issues)
+        self.assertIn("complete audit cannot contain failures", issues)
 
     def test_written_artifact_is_newline_terminated(self) -> None:
         artifact = create_audit_artifact(self.valid_audit())
@@ -139,6 +256,21 @@ class CurrentStateAuditTests(unittest.TestCase):
             self.assertTrue(output.read_bytes().endswith(b"\n"))
             with self.assertRaises(FileExistsError):
                 write_audit_artifact(artifact, output)
+
+    def test_interrupted_atomic_publish_leaves_destination_retryable(self) -> None:
+        artifact = create_audit_artifact(self.valid_audit())
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "audit.json"
+            with patch(
+                "hive_mind_os.current_state_audit.os.link",
+                side_effect=OSError("simulated publish interruption"),
+            ):
+                with self.assertRaises(OSError):
+                    write_audit_artifact(artifact, output)
+            self.assertFalse(output.exists())
+            self.assertEqual(list(Path(directory).glob("*.tmp")), [])
+            write_audit_artifact(artifact, output)
+            self.assertTrue(output.is_file())
 
 
 if __name__ == "__main__":

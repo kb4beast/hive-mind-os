@@ -49,6 +49,7 @@ from .receipts import (
     FileReceiptValidator,
     ReceiptReference,
     ReceiptResult,
+    ReceiptValidator,
     ReceiptValidation,
     sha256_digest,
 )
@@ -92,6 +93,7 @@ __all__ = [
     "RepositoryScout",
     "ReceiptReference",
     "ReceiptResult",
+    "ReceiptValidator",
     "ReceiptValidation",
     "RiskTier",
     "Role",

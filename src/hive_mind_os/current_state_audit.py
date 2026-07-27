@@ -4,15 +4,17 @@ import hashlib
 import hmac
 import importlib
 import json
+import os
 import platform
 import re
 import subprocess
 import sys
+import tempfile
 import types
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping, Sequence
 
 
@@ -28,6 +30,10 @@ AUDITED_BASELINE: Mapping[str, object] = {
     "disposition_counts": {"adopt": 25, "adapt": 52, "defer": 3},
     "test_passed_count": 56,
 }
+COMMAND_TIMEOUT_SECONDS = 300
+MAX_COMMAND_OUTPUT_CHARACTERS = 1_000_000
+_SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
+_GIT_OBJECT_PATTERN = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,31 +43,58 @@ class CommandObservation:
     return_code: int
     stdout: str
     stderr: str
+    timed_out: bool = False
+    output_truncated: bool = False
 
     @property
     def succeeded(self) -> bool:
-        return self.return_code == 0
+        return self.return_code == 0 and not self.timed_out and not self.output_truncated
 
 
 CommandExecutor = Callable[[Sequence[str], Path], CommandObservation]
 
 
 def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
-    completed = subprocess.run(
-        list(command),
-        cwd=cwd,
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+    timed_out = False
+    try:
+        completed = subprocess.run(
+            list(command),
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+        return_code = completed.returncode
+        stdout = completed.stdout
+        stderr = completed.stderr
+    except subprocess.TimeoutExpired as error:
+        timed_out = True
+        return_code = 124
+        stdout = error.stdout or ""
+        stderr = error.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        stderr = f"{stderr}\ncommand timed out after {COMMAND_TIMEOUT_SECONDS} seconds".strip()
+
+    output_truncated = (
+        len(stdout) > MAX_COMMAND_OUTPUT_CHARACTERS
+        or len(stderr) > MAX_COMMAND_OUTPUT_CHARACTERS
     )
+    stdout = stdout[:MAX_COMMAND_OUTPUT_CHARACTERS]
+    stderr = stderr[:MAX_COMMAND_OUTPUT_CHARACTERS]
     return CommandObservation(
         command=tuple(command),
         cwd=str(cwd),
-        return_code=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
+        return_code=return_code,
+        stdout=stdout,
+        stderr=stderr,
+        timed_out=timed_out,
+        output_truncated=output_truncated,
     )
 
 
@@ -117,9 +150,14 @@ def _resolve_reference(
     local_path = _local_reference(reference)
     if not local_path or "://" in local_path:
         return None, "reference is not a repository-local path"
-    candidate = Path(local_path)
-    if candidate.is_absolute():
-        return None, "absolute paths are not repository receipts"
+    if local_path.startswith("/") or "\\" in local_path or re.match(r"^[A-Za-z]:", local_path):
+        return None, "reference must use portable relative POSIX syntax"
+    raw_parts = local_path.split("/")
+    if any(part in {"", ".", ".."} for part in raw_parts):
+        return None, "referenced path escapes the repository"
+    if PurePosixPath(*raw_parts).as_posix() != local_path:
+        return None, "reference must use canonical portable relative POSIX syntax"
+    candidate = Path(*raw_parts)
     resolved = (repository / candidate).resolve()
     try:
         resolved.relative_to(repository.resolve())
@@ -447,6 +485,62 @@ def collect_current_state_audit(
         reference_receipts = []
         receipts_valid = False
 
+    post_test_head = observe(("git", "rev-parse", "HEAD"))
+    post_test_status = observe(
+        ("git", "status", "--porcelain=v1", "--untracked-files=all", "-z")
+    )
+
+    post_reference_failures: set[tuple[str, str]] = set()
+    for receipt in reference_receipts:
+        reference = str(receipt["reference"])
+        path, reason = _resolve_reference(requested_repository, reference)
+        observed_digest = _sha256(path.read_bytes()) if path is not None else None
+        if reason or observed_digest != receipt["digest"]:
+            receipt["valid"] = False
+            issue = reason or "referenced bytes changed during audit"
+            issues = receipt.get("issues")
+            if isinstance(issues, list) and issue not in issues:
+                issues.append(issue)
+            post_reference_failures.add((str(receipt["kind"]), reference))
+    for kind, reference in sorted(post_reference_failures):
+        failures.append(
+            {
+                "kind": "reference_changed_during_audit",
+                "reference_kind": kind,
+                "reference": reference,
+            }
+        )
+    receipts_valid = bool(reference_receipts) and all(
+        bool(receipt["valid"]) for receipt in reference_receipts
+    )
+    final_head = observe(("git", "rev-parse", "HEAD"))
+    final_status = observe(
+        ("git", "status", "--porcelain=v1", "--untracked-files=all", "-z")
+    )
+    final_entries = _split_nul(final_status.stdout)
+    if (
+        post_test_head.stdout.strip() != head.stdout.strip()
+        or final_head.stdout.strip() != head.stdout.strip()
+    ):
+        failures.append(
+            {
+                "kind": "head_changed_during_audit",
+                "before": head.stdout.strip(),
+                "after_tests": post_test_head.stdout.strip(),
+                "after_receipt_validation": final_head.stdout.strip(),
+            }
+        )
+    if final_entries != working_tree_entries:
+        failures.append(
+            {
+                "kind": "worktree_changed_during_audit",
+                "message": "test or receipt validation changed repository status entries",
+                "before": working_tree_entries,
+                "after_tests": _split_nul(post_test_status.stdout),
+                "after_receipt_validation": final_entries,
+            }
+        )
+
     ref_rows = []
     for line in refs.stdout.splitlines():
         if not line:
@@ -469,7 +563,7 @@ def collect_current_state_audit(
 
     timestamp = (generated_at or datetime.now(UTC)).astimezone(UTC).isoformat()
     audit: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "artifact_type": "CurrentStateAudit",
         "generated_at": timestamp,
         "invocation": list(invocation),
@@ -478,6 +572,9 @@ def collect_current_state_audit(
             "head": current_counts["repository_sha"],
             "working_tree_clean": not bool(working_tree_entries),
             "working_tree_entries": working_tree_entries,
+            "post_test_head": final_head.stdout.strip() or None,
+            "post_test_working_tree_clean": not bool(final_entries),
+            "post_test_working_tree_entries": final_entries,
             "tracked_file_count": current_counts["tracked_file_count"],
             "tracked_tree_digest": _sha256(tracked_index.stdout.encode("utf-8")),
             "full_ref_commit_count": current_counts["full_ref_commit_count"],
@@ -563,7 +660,7 @@ def verify_audit_artifact(
     if not isinstance(audit, Mapping) or not isinstance(integrity, Mapping):
         return False, ("artifact must contain audit and integrity objects",)
 
-    if audit.get("schema_version") != 1:
+    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 2:
         issues.append("unsupported CurrentStateAudit schema version")
     if audit.get("artifact_type") != "CurrentStateAudit":
         issues.append("artifact type must be CurrentStateAudit")
@@ -578,6 +675,111 @@ def verify_audit_artifact(
             issues.append(f"audit {field_name} has an invalid shape")
     if not isinstance(audit.get("complete"), bool):
         issues.append("audit complete flag is required")
+    else:
+        repository = audit.get("repository")
+        docket = audit.get("docket")
+        tests = audit.get("tests")
+        commands = audit.get("commands")
+        failures = audit.get("failures")
+        if isinstance(repository, Mapping):
+            if not isinstance(repository.get("root"), str) or not repository.get("root"):
+                issues.append("audit repository root is required")
+            head = repository.get("head")
+            if not isinstance(head, str) or not _GIT_OBJECT_PATTERN.fullmatch(head):
+                issues.append("audit repository head is invalid")
+            if not isinstance(repository.get("working_tree_clean"), bool):
+                issues.append("audit repository cleanliness is required")
+            if not isinstance(repository.get("working_tree_entries"), list):
+                issues.append("audit repository entries are invalid")
+            if repository.get("post_test_head") != head:
+                issues.append("audit repository head changed during tests")
+            if not isinstance(repository.get("post_test_working_tree_clean"), bool):
+                issues.append("audit post-test cleanliness is required")
+            if not isinstance(repository.get("post_test_working_tree_entries"), list):
+                issues.append("audit post-test repository entries are invalid")
+            if not isinstance(repository.get("tracked_tree_digest"), str) or not _SHA256_PATTERN.fullmatch(
+                repository.get("tracked_tree_digest")
+            ):
+                issues.append("audit tracked tree digest is invalid")
+        if isinstance(docket, Mapping):
+            if type(docket.get("source_count")) is not int or docket.get("source_count", 0) < 0:
+                issues.append("audit source count is invalid")
+            if type(docket.get("claim_count")) is not int or docket.get("claim_count", 0) < 0:
+                issues.append("audit claim count is invalid")
+            if not isinstance(docket.get("broken_references"), list):
+                issues.append("audit broken references are invalid")
+            if not isinstance(docket.get("reference_receipts"), list):
+                issues.append("audit reference receipts are invalid")
+            if not isinstance(docket.get("receipts_valid"), bool):
+                issues.append("audit receipt-valid flag is required")
+            receipts = docket.get("reference_receipts")
+            if isinstance(receipts, list):
+                if not receipts:
+                    issues.append("audit contains no reference receipts")
+                for index, receipt in enumerate(receipts):
+                    if not isinstance(receipt, Mapping):
+                        issues.append(f"audit reference receipt {index} is not an object")
+                        continue
+                    if not all(
+                        isinstance(receipt.get(field), str) and receipt.get(field)
+                        for field in ("claim_id", "kind", "reference")
+                    ):
+                        issues.append(f"audit reference receipt {index} lacks identity")
+                    if not isinstance(receipt.get("path_valid"), bool) or not isinstance(
+                        receipt.get("valid"), bool
+                    ):
+                        issues.append(f"audit reference receipt {index} lacks validity")
+                    digest = receipt.get("digest")
+                    if receipt.get("path_valid") and (
+                        not isinstance(digest, str) or not _SHA256_PATTERN.fullmatch(digest)
+                    ):
+                        issues.append(f"audit reference receipt {index} digest is invalid")
+                    if not isinstance(receipt.get("execution"), Mapping):
+                        issues.append(f"audit reference receipt {index} execution is invalid")
+                    if not isinstance(receipt.get("issues"), list):
+                        issues.append(f"audit reference receipt {index} issues are invalid")
+        if isinstance(tests, Mapping):
+            if tests.get("status") not in {"passed", "failed", "not_run", "unverified"}:
+                issues.append("audit test status is invalid")
+            if tests.get("status") == "passed" and (
+                type(tests.get("passed")) is not int or tests.get("passed", 0) <= 0
+            ):
+                issues.append("audit passed-test count is invalid")
+        if isinstance(commands, list):
+            if not commands:
+                issues.append("audit contains no command observations")
+            for index, command in enumerate(commands):
+                if not isinstance(command, Mapping):
+                    issues.append(f"audit command observation {index} is not an object")
+                    continue
+                if (
+                    not isinstance(command.get("command"), (list, tuple))
+                    or not command.get("command")
+                    or type(command.get("return_code")) is not int
+                    or not isinstance(command.get("cwd"), str)
+                    or not isinstance(command.get("stdout"), str)
+                    or not isinstance(command.get("stderr"), str)
+                    or not isinstance(command.get("timed_out"), bool)
+                    or not isinstance(command.get("output_truncated"), bool)
+                ):
+                    issues.append(f"audit command observation {index} is invalid")
+        if audit.get("complete") is True:
+            if not isinstance(repository, Mapping) or not (
+                repository.get("working_tree_clean") is True
+                and repository.get("post_test_working_tree_clean") is True
+            ):
+                issues.append("complete audit requires a clean repository")
+            if not isinstance(tests, Mapping) or tests.get("status") != "passed":
+                issues.append("complete audit requires passing tests")
+            if not isinstance(docket, Mapping) or docket.get("receipts_valid") is not True:
+                issues.append("complete audit requires valid reference receipts")
+            if isinstance(docket, Mapping) and docket.get("broken_references") != []:
+                issues.append("complete audit cannot contain broken references")
+            if isinstance(docket, Mapping) and isinstance(docket.get("reference_receipts"), list):
+                if any(receipt.get("valid") is not True for receipt in docket["reference_receipts"] if isinstance(receipt, Mapping)):
+                    issues.append("complete audit contains an invalid reference receipt")
+            if failures != []:
+                issues.append("complete audit cannot contain failures")
     if integrity.get("canonicalization") != "json-sort-keys-utf8-v1":
         issues.append("unsupported canonicalization")
 
@@ -611,6 +813,20 @@ def verify_audit_artifact(
 def write_audit_artifact(artifact: Mapping[str, object], output: str | Path) -> None:
     path = Path(output)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8", newline="\n") as stream:
-        stream.write(json.dumps(artifact, indent=2, ensure_ascii=False, sort_keys=True))
-        stream.write("\n")
+    content = (
+        json.dumps(artifact, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)

@@ -7,7 +7,7 @@ from hashlib import sha256
 from typing import Mapping
 
 from .models import Role
-from .receipts import FileReceiptValidator, ReceiptReference
+from .receipts import ReceiptReference, ReceiptValidator
 
 
 class SimulationPhase(StrEnum):
@@ -138,11 +138,11 @@ DEFAULT_CLASSIC_GPT_FILES: tuple[ClassicGptSourceFile, ...] = (
 
 @dataclass(frozen=True, slots=True)
 class ClassicGptSourcePack:
-    schema_version: int = 1
+    schema_version: int = 2
     files: tuple[ClassicGptSourceFile, ...] = DEFAULT_CLASSIC_GPT_FILES
 
     def __post_init__(self) -> None:
-        if self.schema_version != 1:
+        if type(self.schema_version) is not int or self.schema_version != 2:
             raise ValueError(f"unsupported classic GPT source-pack schema: {self.schema_version}")
         paths = [item.path for item in self.files]
         priorities = [item.priority for item in self.files]
@@ -187,7 +187,7 @@ class ClassicGptSourcePack:
         return SourcePackAudit(not issues, tuple(issues))
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SimulatedAction:
     id: str
     kind: ActionKind
@@ -196,6 +196,8 @@ class SimulatedAction:
     receipt_ref: ReceiptReference | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.kind, ActionKind):
+            raise TypeError("simulated action kind must be an ActionKind")
         if not self.id.strip() or not self.description.strip() or not self.actor_id.strip():
             raise ValueError("simulated actions require action, actor, and description identity")
         if self.receipt_ref is not None and not isinstance(self.receipt_ref, ReceiptReference):
@@ -235,6 +237,14 @@ class ClassicGptTurn:
     source_pack_fingerprint: str = ""
 
     def __post_init__(self) -> None:
+        if not isinstance(self.phase, SimulationPhase):
+            raise TypeError("phase must be a SimulationPhase")
+        if not isinstance(self.active_role, Role):
+            raise TypeError("active_role must be a Role")
+        if any(not isinstance(role, Role) for role in self.completed_roles):
+            raise TypeError("completed_roles must contain only Role values")
+        if any(not isinstance(action, SimulatedAction) for action in self.actions):
+            raise TypeError("actions must contain only SimulatedAction values")
         required = (self.mission_id, self.actor_id, self.state_ref, self.next_action)
         if any(not value.strip() for value in required):
             raise ValueError("mission, actor, state, and next action are required")
@@ -254,7 +264,7 @@ class ClassicGptSimulationGate:
     def __init__(
         self,
         source_pack: ClassicGptSourcePack | None = None,
-        receipt_validator: FileReceiptValidator | None = None,
+        receipt_validator: ReceiptValidator | None = None,
     ) -> None:
         self.source_pack = source_pack or ClassicGptSourcePack()
         self.receipt_validator = receipt_validator
@@ -269,6 +279,16 @@ class ClassicGptSimulationGate:
 
         if not turn.evidence_refs:
             reasons.append("turn has no evidence references")
+
+        action_ids = [action.id for action in turn.actions]
+        duplicate_action_ids = {
+            action_id for action_id in action_ids if action_ids.count(action_id) > 1
+        }
+        if duplicate_action_ids:
+            reasons.append(
+                "turn contains duplicate action ids: "
+                + ", ".join(sorted(duplicate_action_ids))
+            )
 
         for action in turn.actions:
             if action.kind not in SIDE_EFFECTING_ACTIONS:
@@ -312,7 +332,7 @@ class ClassicGptSimulationGate:
                 continue
             if validation.receipt_id:
                 used_receipt_ids.add(validation.receipt_id)
-            receipt_results[action.id] = validation.succeeded
+            receipt_results[action.digest] = validation.succeeded
 
         actor_ids = {turn.actor_id}
         verifier_ids = {item for item in turn.verifier_ids if item}
@@ -331,7 +351,7 @@ class ClassicGptSimulationGate:
             if turn.blockers:
                 reasons.append("completion declared while blockers remain")
             for action in turn.actions:
-                if action.kind in SIDE_EFFECTING_ACTIONS and not receipt_results.get(action.id, False):
+                if action.kind in SIDE_EFFECTING_ACTIONS and not receipt_results.get(action.digest, False):
                     reasons.append(
                         f"completion lacks a successful receipt for side-effecting action {action.id}"
                     )

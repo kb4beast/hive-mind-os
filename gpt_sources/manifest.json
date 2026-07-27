@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "pack_id": "hive-mind-os-classic-gpt-simulation-v1",
+  "schema_version": 2,
+  "pack_id": "hive-mind-os-classic-gpt-simulation-v2",
   "purpose": "Simulate the governed reasoning, role, court, state, evidence, and handoff semantics of Hive Mind OS in a classic GPT session without fabricating autonomy or tool execution.",
   "load_order": [
     "gpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md",
@@ -21,6 +21,9 @@
     "missing source pack file",
     "source pack fingerprint mismatch",
     "unreceipted side effect",
+    "receipt path or digest mismatch",
+    "receipt action or mission-state mismatch",
+    "failed receipt used for completion",
     "self-verification",
     "missing state reference",
     "missing next action",
