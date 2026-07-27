@@ -76,13 +76,16 @@ Later appeal passes also preserved and closed: immediate mutation that was resto
 final validation; zero-exit pytest output without a recognized result; schema-v2 shape drift;
 separate stdout/stderr budgets; descendant processes retaining evidence pipes after timeout;
 contradictory per-reference receipt flags; Windows alternate-data-stream/reserved paths; and
-the missing receipt schema version in the portable migration example. Audit evidence now uses
-schema version 3, while the classic-GPT protocol remains version 2.
+the missing receipt schema version in the portable migration example. Audit evidence first
+advanced to schema version 3, while the classic-GPT protocol remains version 2.
 
 The final containment appeal additionally closed successful audit-parent exit with a
 pipe-retaining descendant, zero-exit pytest summaries that still report failures or errors,
 and invalid UTF-8 replacement expansion beyond the serialized evidence budget. Windows uses
 a kill-on-close Job Object assigned before process resume; POSIX retains a process group.
+Because the new drain state changes command-observation semantics, the final audit contract
+advances to schema version 4 and preserves version 3 as a historical fixture. JSON escaping
+cost is included in the combined output-content byte budget.
 
 ## Considered alternatives
 
@@ -132,8 +135,8 @@ Harden the current-state audit:
 - both the immediate post-test snapshot and the final post-validation snapshot are retained;
 - commands run in a contained process tree; Windows assigns a kill-on-close Job Object before
   process resume and POSIX uses a process group;
-- stdout and stderr share one hard serialized UTF-8 byte budget; timeout, overflow, incomplete
-  pipe draining, or retained descendants cannot succeed;
+- stdout and stderr share one hard JSON-escaped UTF-8 content byte budget; timeout, overflow,
+  incomplete pipe draining, or retained descendants cannot succeed;
 - evidence publication uses a fully flushed temporary file plus atomic exclusive link;
 - integrity verification rejects underspecified payloads while continuing to distinguish
   digest integrity from external authenticity.
@@ -217,12 +220,14 @@ The portable classic-GPT pack and runtime-state example advance to version 2. Th
 the exact action, receipt-reference, binding, execution, result, and artifact fields. The tool
 protocol includes the explicit migration from `provider:receipt-id` labels.
 
-The audit artifact advances to schema version 3 because post-test and final reconciliation,
-hard-bounded command metadata, receipt observations, and semantic consistency are a breaking
-verification contract. Committed version-1 and version-2 artifacts and a version-2
-compatibility fixture remain historical evidence, but the version-3 verifier intentionally
-refuses to call them current executable receipts. This versioned Python contract does not
-replace the formal schema set scheduled for backlog item 3.
+The audit artifact advanced to schema version 3 for post-test and final reconciliation,
+hard-bounded command metadata, receipt observations, and semantic consistency. It advances
+again to schema version 4 because `drain_incomplete` strengthens the command-observation shape
+and JSON escape expansion is now part of the accepted output budget. Committed version-1 and
+version-2 artifacts plus version-2 and version-3 compatibility fixtures remain historical
+evidence, but the version-4 verifier intentionally refuses to call them current executable
+receipts. This versioned Python contract does not replace the formal schema set scheduled for
+backlog item 3.
 
 There is no persistent database migration.
 

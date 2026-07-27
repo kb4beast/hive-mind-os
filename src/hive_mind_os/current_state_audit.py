@@ -283,24 +283,37 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
     stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace")
     stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace")
 
-    def retain_serialized_utf8(value: str, remaining: int) -> tuple[str, bool]:
-        encoded = value.encode("utf-8")
-        if len(encoded) <= remaining:
-            return value, False
-        prefix = encoded[:remaining]
-        while prefix:
-            try:
-                return prefix.decode("utf-8"), True
-            except UnicodeDecodeError as error:
-                prefix = prefix[: error.start]
-        return "", True
+    def json_escaped_utf8_size(value: str) -> int:
+        size = 0
+        short_escapes = {'"', "\\", "\b", "\f", "\n", "\r", "\t"}
+        for character in value:
+            if character in short_escapes:
+                size += 2
+            elif ord(character) < 0x20:
+                size += 6
+            else:
+                size += len(character.encode("utf-8"))
+        return size
 
-    stdout, stdout_truncated = retain_serialized_utf8(
+    def retain_json_escaped_utf8(value: str, remaining: int) -> tuple[str, bool]:
+        retained: list[str] = []
+        used = 0
+        for character in value:
+            character_size = json_escaped_utf8_size(character)
+            if used + character_size > remaining:
+                return "".join(retained), True
+            retained.append(character)
+            used += character_size
+        return value, False
+
+    stdout, stdout_truncated = retain_json_escaped_utf8(
         stdout,
         MAX_COMMAND_OUTPUT_BYTES,
     )
-    remaining_serialized_bytes = MAX_COMMAND_OUTPUT_BYTES - len(stdout.encode("utf-8"))
-    stderr, stderr_truncated = retain_serialized_utf8(
+    remaining_serialized_bytes = (
+        MAX_COMMAND_OUTPUT_BYTES - json_escaped_utf8_size(stdout)
+    )
+    stderr, stderr_truncated = retain_json_escaped_utf8(
         stderr,
         remaining_serialized_bytes,
     )
@@ -793,7 +806,7 @@ def collect_current_state_audit(
 
     timestamp = (generated_at or datetime.now(UTC)).astimezone(UTC).isoformat()
     audit: dict[str, object] = {
-        "schema_version": 3,
+        "schema_version": 4,
         "artifact_type": "CurrentStateAudit",
         "generated_at": timestamp,
         "invocation": list(invocation),
@@ -898,7 +911,7 @@ def verify_audit_artifact(
     if not isinstance(audit, Mapping) or not isinstance(integrity, Mapping):
         return False, ("artifact must contain audit and integrity objects",)
 
-    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 3:
+    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 4:
         issues.append("unsupported CurrentStateAudit schema version")
     if audit.get("artifact_type") != "CurrentStateAudit":
         issues.append("artifact type must be CurrentStateAudit")

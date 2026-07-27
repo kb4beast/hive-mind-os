@@ -30,7 +30,7 @@ class CurrentStateAuditTests(unittest.TestCase):
     def valid_audit(self, **overrides) -> dict[str, object]:
         head = "a" * 40
         audit: dict[str, object] = {
-            "schema_version": 3,
+            "schema_version": 4,
             "artifact_type": "CurrentStateAudit",
             "repository": {
                 "root": str(self.repository),
@@ -247,10 +247,38 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertFalse(observation.succeeded)
         self.assertTrue(observation.output_truncated)
         self.assertLessEqual(
-            len(observation.stdout.encode("utf-8"))
-            + len(observation.stderr.encode("utf-8")),
+            len(json.dumps(observation.stdout, ensure_ascii=False)[1:-1].encode("utf-8"))
+            + len(json.dumps(observation.stderr, ensure_ascii=False)[1:-1].encode("utf-8")),
             32,
         )
+
+    def test_command_output_limit_counts_json_escape_expansion(self) -> None:
+        for byte_value in (0, 1, 8, 9, 10, 13, 34, 92):
+            with self.subTest(byte_value=byte_value), patch(
+                "hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_BYTES",
+                32,
+            ):
+                observation = execute_command(
+                    (
+                        sys.executable,
+                        "-c",
+                        (
+                            "import sys;"
+                            f"data=bytes([{byte_value}])*16;"
+                            "sys.stdout.buffer.write(data);sys.stdout.flush();"
+                            "sys.stderr.buffer.write(data)"
+                        ),
+                    ),
+                    self.repository,
+                )
+            serialized_size = len(
+                json.dumps(observation.stdout, ensure_ascii=False)[1:-1].encode("utf-8")
+            ) + len(
+                json.dumps(observation.stderr, ensure_ascii=False)[1:-1].encode("utf-8")
+            )
+            self.assertFalse(observation.succeeded)
+            self.assertTrue(observation.output_truncated)
+            self.assertLessEqual(serialized_size, 32)
 
     def test_timeout_terminates_descendants_that_inherit_output_pipes(self) -> None:
         command = (
@@ -363,19 +391,19 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("audit signature mismatch", issues)
 
     def test_unknown_schema_is_not_verified(self) -> None:
-        artifact = create_audit_artifact(self.valid_audit(schema_version=4))
+        artifact = create_audit_artifact(self.valid_audit(schema_version=5))
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("unsupported CurrentStateAudit schema version", issues)
 
     def test_minimal_self_digested_payload_is_not_a_verified_audit(self) -> None:
-        artifact = create_audit_artifact({"schema_version": 3})
+        artifact = create_audit_artifact({"schema_version": 4})
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("artifact type must be CurrentStateAudit", issues)
 
         underspecified = {
-            "schema_version": 3,
+            "schema_version": 4,
             "artifact_type": "CurrentStateAudit",
             "repository": {},
             "docket": {},
@@ -392,6 +420,13 @@ class CurrentStateAuditTests(unittest.TestCase):
 
     def test_version_two_shape_is_preserved_but_not_currently_verified(self) -> None:
         fixture = self.repository / "tests" / "fixtures" / "current_state_audit_v2_payload.json"
+        payload = json.loads(fixture.read_text(encoding="utf-8"))
+        valid, issues = verify_audit_artifact(create_audit_artifact(payload))
+        self.assertFalse(valid)
+        self.assertIn("unsupported CurrentStateAudit schema version", issues)
+
+    def test_version_three_shape_is_preserved_but_not_currently_verified(self) -> None:
+        fixture = self.repository / "tests" / "fixtures" / "current_state_audit_v3_payload.json"
         payload = json.loads(fixture.read_text(encoding="utf-8"))
         valid, issues = verify_audit_artifact(create_audit_artifact(payload))
         self.assertFalse(valid)
