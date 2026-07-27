@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from .courtroom import BurdenOfProof, Disposition, ImplementationState, SourceRecord, SourceStatus
+from .courtroom import (
+    BurdenOfProof,
+    Disposition,
+    ImplementationState,
+    SourceRecord,
+    SourceStatus,
+)
 from .founding_docket import ClaimSpec
-
 
 ADDITIONAL_SOURCES: tuple[SourceRecord, ...] = (
     SourceRecord(
@@ -14,6 +19,7 @@ ADDITIONAL_SOURCES: tuple[SourceRecord, ...] = (
         version_ref="youtube:eaNA2oOXoUg",
         license_spdx=None,
         content_digest=None,
+        object_type="video_id",
     ),
     SourceRecord(
         id="SRC-017",
@@ -24,6 +30,7 @@ ADDITIONAL_SOURCES: tuple[SourceRecord, ...] = (
         version_ref="youtube:IbFaY3xFpZM",
         license_spdx=None,
         content_digest=None,
+        object_type="video_id",
     ),
     SourceRecord(
         id="SRC-018",
@@ -34,6 +41,7 @@ ADDITIONAL_SOURCES: tuple[SourceRecord, ...] = (
         version_ref="youtube:eA9Zf2-qYYM",
         license_spdx=None,
         content_digest=None,
+        object_type="video_id",
     ),
     SourceRecord(
         id="SRC-019",
@@ -44,6 +52,7 @@ ADDITIONAL_SOURCES: tuple[SourceRecord, ...] = (
         version_ref="youtube:kIWMLL0S8X8",
         license_spdx=None,
         content_digest=None,
+        object_type="video_id",
     ),
 )
 

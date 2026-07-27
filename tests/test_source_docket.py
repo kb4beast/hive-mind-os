@@ -11,9 +11,17 @@ class SourceDocketTests(unittest.TestCase):
     def test_every_source_has_claims_and_every_claim_has_a_verdict(self):
         audit = self.docket.audit()
         self.assertTrue(audit.inventory_complete)
-        self.assertEqual(self.docket.source_count, 22)
-        self.assertEqual(self.docket.claim_count, 80)
+        self.assertEqual(self.docket.source_count, 23)
+        self.assertEqual(self.docket.claim_count, 84)
         self.assertEqual(len(self.docket.decisions), self.docket.claim_count)
+        self.assertRegex(
+            self.docket.inventory_digest,
+            r"^sha256:[0-9a-f]{64}$",
+        )
+        self.assertEqual(
+            self.docket.inventory_digest,
+            load_default_source_docket().inventory_digest,
+        )
 
     def test_unverified_videos_remain_explicit_blocking_evidence_obligations(self):
         audit = self.docket.audit()
@@ -29,6 +37,63 @@ class SourceDocketTests(unittest.TestCase):
         }
         self.assertTrue(expected_video_blockers.issubset(blockers))
         self.assertFalse(audit.release_ready)
+        self.assertTrue(expected_video_blockers.issubset({
+            source_id
+            for issue in audit.issues
+            for source_id in (issue.source_id or "").split(",")
+        }))
+
+    def test_every_incomplete_source_machine_blocks_dependent_claims(self):
+        audit = self.docket.audit()
+        incomplete = {
+            source.id
+            for source in self.docket.sources
+            if not source.provenance_complete
+            or (
+                source.requires_complete_ingestion
+                and source.status.value != "verified"
+            )
+        }
+        blocked = set(audit.machine_blocked_claim_ids)
+        for claim in self.docket.claims:
+            if set(claim.source_ids) & incomplete:
+                self.assertIn(claim.id, blocked)
+
+    def test_license_and_composite_repository_gaps_machine_block_claims(self):
+        audit = self.docket.audit()
+        blocked = set(audit.machine_blocked_claim_ids)
+        self.assertTrue(
+            {
+                "CLM-028",
+                "CLM-029",
+                "CLM-030",
+                "CLM-031",
+                "CLM-032",
+                "CLM-034",
+                "CLM-035",
+                "CLM-044",
+                "CLM-045",
+                "CLM-046",
+            }.issubset(blocked)
+        )
+
+    def test_sibling_pack_is_separate_and_overlap_is_deferred(self):
+        sources = {source.id: source for source in self.docket.sources}
+        self.assertIn("SRC-023", sources)
+        self.assertEqual(
+            sources["SRC-023"].snapshot_ref,
+            "evidence/sources/SRC-023-classic-gpt-pack/manifest.json",
+        )
+        decisions = {decision.claim_id: decision for decision in self.docket.decisions}
+        for claim_id in ("CLM-081", "CLM-082", "CLM-083", "CLM-084"):
+            self.assertEqual(decisions[claim_id].disposition, Disposition.DEFER)
+
+    def test_capability_maturity_never_exceeds_structural_prototype(self):
+        maturity = {claim.capability_maturity.value for claim in self.docket.claims}
+        self.assertLessEqual(
+            maturity,
+            {"specified", "structurally_prototyped"},
+        )
 
     def test_unknown_video_content_is_not_invented(self):
         for claim_id in ("CLM-023", "CLM-060"):

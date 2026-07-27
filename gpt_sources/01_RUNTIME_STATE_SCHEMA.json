@@ -1,129 +1,97 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "mission": {
-    "id": "MISSION-REQUIRED",
+    "id": "MISSION-EXAMPLE-001",
     "state_version": 1,
-    "objective": "REQUIRED",
-    "acceptance_criteria": [],
-    "constraints": [],
-    "risk": "moderate",
-    "authority_level": "reasoning_only",
-    "active_phase": "intake",
-    "active_role": "orchestrator",
+    "objective": "Demonstrate a portable truth-bound mission state.",
+    "active_phase": "build",
+    "active_role": "builder",
     "status": "active",
-    "source_pack_fingerprint": "REQUIRED",
-    "created_at": "RFC3339-REQUIRED",
-    "updated_at": "RFC3339-REQUIRED"
-  },
-  "budgets": {
-    "turns_remaining": null,
-    "tool_calls_remaining": null,
-    "token_budget_remaining": null,
-    "time_budget_seconds": null,
-    "money_budget_usd": null
+    "source_pack_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
   },
   "role_runs": [
     {
-      "role": "orchestrator",
-      "actor_id": "orchestrator-pass-1",
-      "status": "pending",
-      "input_refs": [],
-      "output_refs": [],
-      "evidence_refs": [],
-      "confidence": 0.0,
-      "completed_at": null
+      "role": "builder",
+      "actor_id": "builder-example-1",
+      "status": "running",
+      "evidence_refs": [
+        "source:SRC-022"
+      ]
     }
   ],
-  "court_cases": [
-    {
-      "case_id": "CASE-REQUIRED-WHEN-DISPUTED",
-      "claim": "",
-      "burden": "design",
-      "advocate_id": "",
-      "cross_examiner_id": "",
-      "judge_ids": [],
-      "supporting_evidence": [],
-      "opposing_evidence": [],
-      "expert_findings": [],
-      "verdict": "defer",
-      "obligations": [],
-      "dissent": []
-    }
-  ],
+  "court_cases": [],
   "evidence": [
     {
-      "ref": "source:SRC-000",
+      "ref": "source:SRC-022",
       "kind": "source",
-      "summary": "",
-      "provenance": "",
-      "digest": "",
-      "freshness": "",
-      "verified": false
+      "summary": "Classic GPT simulation truth boundary."
     }
   ],
   "proposed_actions": [
     {
-      "id": "ACT-000",
-      "kind": "reasoning",
-      "description": "",
-      "authority_required": "reasoning_only",
-      "risk": "low",
-      "idempotency_key": null,
-      "rollback_ref": null,
-      "status": "PROPOSED_ACTION"
+      "schema_version": 1,
+      "action_id": "ACT-000",
+      "mission_id": "MISSION-EXAMPLE-001",
+      "state_ref": "MISSION_STATE:MISSION-EXAMPLE-001:1",
+      "actor_id": "builder-example-1",
+      "kind": "write",
+      "description": "Write the observed example artifact.",
+      "action_digest": "sha256:5dc6d162eef74818b642779aea485948f23f4dcba8755dac4110d2de936542cb",
+      "policy_decision_ref": "POLICY-EXAMPLE-001",
+      "lease_id": "LEASE-EXAMPLE-001",
+      "idempotency_key": "MISSION-EXAMPLE-001:ACT-000",
+      "rollback_ref": "rollback:ACT-000",
+      "status": "proposed"
     }
   ],
   "tool_receipts": [
     {
-      "receipt_ref": "provider:receipt-id",
+      "schema_version": 1,
+      "receipt_id": "REC-000",
       "action_id": "ACT-000",
-      "provider": "",
-      "result": "",
-      "observed_at": "",
-      "artifact_refs": [],
-      "verified_by": ""
-    }
-  ],
-  "decisions": [
-    {
-      "id": "DEC-000",
-      "decision": "",
-      "rationale": "",
-      "evidence_refs": [],
-      "rollback_ref": null,
-      "decided_by": []
+      "provider": "example-provider",
+      "execution_id": "EXEC-000",
+      "mission_id": "MISSION-EXAMPLE-001",
+      "state_ref": "MISSION_STATE:MISSION-EXAMPLE-001:1",
+      "actor_id": "builder-example-1",
+      "policy_decision_ref": "POLICY-EXAMPLE-001",
+      "lease_id": "LEASE-EXAMPLE-001",
+      "action_kind": "write",
+      "action_digest": "sha256:5dc6d162eef74818b642779aea485948f23f4dcba8755dac4110d2de936542cb",
+      "executed": true,
+      "result": "succeeded",
+      "observed_at": "2026-07-27T00:00:00Z",
+      "artifacts": [
+        {
+          "path": "artifacts/ART-000.bin",
+          "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "verified_by": "curator-example-1"
     }
   ],
   "blockers": [
-    {
-      "id": "BLK-000",
-      "description": "",
-      "owner_role": "orchestrator",
-      "required_input": "",
-      "status": "open",
-      "quarantine_reason": null
-    }
+    "This example is not evidence that an external effect occurred."
   ],
-  "artifacts": [
-    {
-      "ref": "artifact:000",
-      "kind": "",
-      "digest": "",
-      "location": "",
-      "verified": false,
-      "rollback_ref": null
-    }
-  ],
+  "independent_verification": [],
   "next_action": {
-    "owner_role": "orchestrator",
-    "description": "REQUIRED",
-    "required_inputs": [],
-    "success_condition": "REQUIRED"
+    "owner_role": "curator",
+    "description": "Replace example values with independently observed receipts.",
+    "success_condition": "All referenced bytes and bindings validate."
   },
   "handoff": {
-    "state_ref": "MISSION_STATE:MISSION-REQUIRED:1",
-    "unresolved_items": [],
+    "schema_version": 1,
+    "handoff_id": "HANDOFF-EXAMPLE-001",
+    "mission_id": "MISSION-EXAMPLE-001",
+    "state_ref": "MISSION_STATE:MISSION-EXAMPLE-001:1",
+    "from_actor_id": "builder-example-1",
+    "to_role": "curator",
+    "unresolved_items": [
+      "External execution is not proven by this example."
+    ],
     "verified_artifacts": [],
-    "resume_instruction": "Load the source pack in manifest order, validate this state and its receipts, then execute only next_action."
+    "next_action": "Validate observed receipt bytes.",
+    "resume_instruction": "Load the byte-validated source pack and formal schemas, then perform only the next action.",
+    "created_at": "2026-07-27T00:00:00Z"
   }
 }

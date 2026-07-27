@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/source.schema.json",
+  "title": "Hive Mind OS Source Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "title", "uri", "kind", "status", "provenance_complete", "requires_complete_ingestion"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^SRC-[0-9]{3,}$"},
+    "title": {"type": "string", "minLength": 1},
+    "uri": {"type": "string", "minLength": 1},
+    "kind": {"type": "string", "minLength": 1},
+    "status": {"enum": ["verified", "partial", "pending_ingestion"]},
+    "version_ref": {"type": ["string", "null"], "minLength": 1},
+    "object_type": {"type": ["string", "null"], "enum": ["commit", "tree", "blob", "tag", "branch", "paper_version", "video_id", "content_snapshot", "conversation", null]},
+    "retrieved_at": {"type": ["string", "null"], "format": "date-time"},
+    "license_spdx": {"type": ["string", "null"], "minLength": 1},
+    "content_digest": {"type": ["string", "null"], "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
+    "unverified_digest_label": {"type": ["string", "null"], "minLength": 1},
+    "provenance_complete": {"type": "boolean"},
+    "requires_complete_ingestion": {"type": "boolean"},
+    "snapshot_ref": {"type": ["string", "null"], "minLength": 1},
+    "supersedes": {"type": "array", "items": {"type": "string", "pattern": "^SRC-[0-9]{3,}$"}, "uniqueItems": true}
+  }
+}

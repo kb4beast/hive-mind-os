@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "ruleset_name": "constitutional-code",
+  "target": "branch",
+  "include_refs": [
+    "refs/heads/main"
+  ],
+  "required_host_enforcement": "active",
+  "rules": {
+    "deletion": "blocked",
+    "force_push": "blocked",
+    "required_linear_history": true,
+    "required_signed_commits": true,
+    "pull_request": {
+      "required_approving_review_count": 2,
+      "require_code_owner_review": true,
+      "dismiss_stale_reviews_on_push": true,
+      "require_last_push_approval": true,
+      "required_review_thread_resolution": true
+    },
+    "required_status_checks": [
+      "unit-tests (Python 3.11)",
+      "unit-tests (Python 3.12)",
+      "unit-tests (Python 3.14)",
+      "static-and-type-checks",
+      "codeql-security",
+      "secret-scan",
+      "dependency-and-license-review",
+      "sbom-and-build-provenance"
+    ]
+  },
+  "separation_requirement": "At least one approval must come from an identity that did not author, push, build, or judge the change.",
+  "verification_status": "not_verified_on_remote",
+  "blocking_obligation": "A repository administrator must apply and independently verify equivalent GitHub rules before protected-governance completion can be claimed."
+}

@@ -25,7 +25,8 @@ class CourtroomTests(unittest.TestCase):
             uri="https://example.test/source",
             kind="repository",
             status=SourceStatus.VERIFIED,
-            version_ref="abc123",
+            version_ref="a" * 40,
+            object_type="commit",
             license_spdx="MIT",
         )
         self.participants = CaseParticipants("advocate", "cross", ("judge-a", "judge-b"))

@@ -1,0 +1,277 @@
+# ADR-003: Executable Receipt Validation and Policy Invariants
+
+- **Status:** Accepted for bounded Stage 0 backlog item 2 at `e105ea4`; not a Stage 0
+  exit or release verdict
+- **Date:** 2026-07-27
+- **Originating work order:** `docs/architecture/MASTER_IMPLEMENTATION_PROMPT.md`,
+  Stage 0 and first implementation backlog item 2
+- **Source claims:** `CLM-026`, `CLM-074`, `CLM-077`, `CLM-079`
+- **Capability maturity:** structurally prototyped
+
+## Court record
+
+**Case:** `CASE-IMPL-002-RECEIPT-VALIDATION`
+
+**Question:** What is the smallest change that prevents nonexistent references, arbitrary
+receipt labels, fabricated test output, and authority/type confusion from satisfying an
+implementation or completion gate?
+
+**Advocate:** `architect-advocate-receipts-pass-1` argued for a provider-neutral,
+content-addressed receipt reference resolved under an injected trusted root. The verifier
+binds exact bytes to mission state and the exact action without introducing the formal
+cross-system schemas or single enforcement gateway assigned to later backlog items.
+
+**Cross-Examiner:** `cross-examiner-receipts-pass-1` reproduced acceptance of blank and
+fabricated receipt strings, out-of-repository docket paths, free-form `999 passed` output,
+dirty-worktree completion, low-risk spending and secret access at full autonomy, malformed
+role/risk bypasses, and blank charter binding.
+
+**Expert testimony:**
+
+- `explorer-clerk-receipts-pass-1`: the work order conjunctively requires path, digest,
+  execution, and result validation; a nonempty tuple or label is not a receipt.
+- `security-receipts-pass-1`: receipt bytes must be resolved beneath a trusted root, hashed
+  before parsing, bound to one action/state/actor/policy/lease, and rejected on replay or
+  foreign binding.
+- `sre-receipts-pass-1`: each cited test file needs an exact runner observation and successful
+  result; dirty working bytes cannot be attributed to `HEAD`.
+- `product-receipts-pass-1`: reducing false completion is necessary infrastructure, but it
+  is not yet customer-outcome or production-enforcement evidence.
+
+**Judge:** `judge-final-verdict-e105ea4`, independent of all specialist and court actors,
+issued `adapt` for exact commit `e105ea49164953e97f69634dd3e03c1e71a51fea`.
+
+**Independence disclosure:** Explorer, Architect/Advocate, and Cross-Examiner were separately
+identified read-only agents. A disjoint Curator reproduced the final commit under Python 3.14
+and a fresh Python 3.12 environment; separate Integrator, Steward, Optimizer, Orchestrator,
+and Judge identities also reviewed the exact commit. Source-ingestion blockers remain
+independent of this decision.
+
+**Verdict:** `adapt`
+
+Adopt exact local validation and adapt it to an injected file-backed verifier. Do not claim
+authenticated provider receipts, a universal receipt schema, immutable evidence storage, or
+a non-bypassable enforcement gateway in this slice.
+
+### First implementation appeal
+
+The disjoint Curator, Integrator, and Steward rejected commit `f335b19` rather than allowing
+its passing tests to override reproduced counterexamples. Their adverse evidence is
+preserved:
+
+- duplicate action IDs allowed one successful receipt to mask a failed side effect;
+- receipt and audit schema versions accepted booleans/floats through Python equality;
+- string-valued phases bypassed completion checks;
+- a self-digested audit with empty nested objects, or contradictory `complete=true` state,
+  verified;
+- tests could mutate repository inputs after the initial clean check;
+- the portable GPT state/protocol still documented the rejected string-receipt API;
+- action construction had a positional migration ambiguity;
+- receipt path grammar varied by host.
+
+The corrected challenger uses unique keyword-only actions, exact enum/schema types, strict
+RFC 3339 timestamps, portable POSIX-relative paths, deep audit consistency validation,
+post-test HEAD/worktree/digest reconciliation, bounded command observations, atomic artifact
+publication, and version 2 of the portable GPT contract. The appeal chain was independently
+reproduced and judged at `e105ea4`; that verdict applies only to this bounded item.
+
+Later appeal passes also preserved and closed: immediate mutation that was restored before
+final validation; zero-exit pytest output without a recognized result; schema-v2 shape drift;
+separate stdout/stderr budgets; descendant processes retaining evidence pipes after timeout;
+contradictory per-reference receipt flags; Windows alternate-data-stream/reserved paths; and
+the missing receipt schema version in the portable migration example. Audit evidence first
+advanced to schema version 3, while the classic-GPT protocol remains version 2.
+
+The final containment appeal additionally closed successful audit-parent exit with a
+pipe-retaining descendant, zero-exit pytest summaries that still report failures or errors,
+and invalid UTF-8 replacement expansion beyond the serialized evidence budget. Windows uses
+a kill-on-close Job Object assigned before process resume; POSIX retains a process group.
+Because the new drain state changes command-observation semantics, the final audit contract
+advances to schema version 4 and preserves version 3 as a historical fixture. JSON escaping
+cost is included in the combined output-content byte budget.
+
+## Considered alternatives
+
+1. **Keep accepting provider-style strings:** rejected because syntax or truthiness cannot
+   prove existence, execution, binding, or result.
+2. **Check only that a path exists:** rejected because substitution, traversal, failed
+   execution, and replay remain undetected.
+3. **Make the source docket embed every mutable repository digest:** rejected for this slice
+   because code/test edits would require a manually synchronized second source of truth.
+   The audit instead records exact observed digests and explicit executions against a clean
+   commit.
+4. **Implement formal schemas and the single enforcement gateway now:** deferred to backlog
+   items 3 and 6 to keep this change dependency-ordered.
+5. **Treat a failed receipt as no evidence:** adapted. A well-bound failed receipt proves an
+   attempted execution, but it can never satisfy successful completion.
+
+## Decision
+
+Add `FileReceiptValidator` and `ReceiptReference`:
+
+- references use repository-independent relative paths and strict lowercase SHA-256 digests;
+- paths use one canonical POSIX-relative grammar on every host;
+- Windows reserved device names, alternate-data-stream colons, wildcard/control characters,
+  and trailing spaces/dots are nonportable and rejected on every host;
+- receipt and artifact paths must resolve to regular files beneath an explicitly trusted root;
+- the verifier reads and hashes exact bytes before accepting their JSON claims;
+- version, provider, execution, policy, lease, timestamp, result, artifact, and verifier
+  fields are mandatory;
+- mission, state, actor, action ID, action kind, and canonical action digest must match;
+- acting and verifying identities must differ;
+- missing, malformed, foreign, substituted, unknown-result, or unexecuted receipts fail;
+- the simulation gate rejects legacy strings and reuse across actions;
+- action construction is keyword-only, action IDs must be unique per turn, and runtime enum
+  values must have exact types;
+- completion requires a successfully executed receipt for every side effect.
+
+Harden the current-state audit:
+
+- local architecture/code/test/benchmark references must remain beneath the repository and
+  have observed SHA-256 digests;
+- every unique cited test file runs through the exact Python/pytest runner and retains its
+  command, output, return code, and parsed result;
+- arbitrary commands or free-form success text are unverified;
+- a dirty worktree makes the audit incomplete because its test bytes are not attributable to
+  the recorded `HEAD`;
+- HEAD, worktree status, and every cited file digest are checked again after tests;
+- both the immediate post-test snapshot and the final post-validation snapshot are retained;
+- commands run in a contained process tree; Windows assigns a kill-on-close Job Object before
+  process resume and POSIX uses a process group;
+- stdout and stderr share one hard JSON-escaped UTF-8 content byte budget; timeout, overflow,
+  incomplete pipe draining, or retained descendants cannot succeed;
+- evidence publication uses a fully flushed temporary file plus atomic exclusive link;
+- integrity verification rejects underspecified payloads while continuing to distinguish
+  digest integrity from external authenticity;
+- artifact verification independently recomputes the JSON-escaped output-content size, so a
+  self-digested payload cannot bypass the live collector's byte budget;
+- untrusted artifacts containing lone Unicode surrogates reject before canonicalization or
+  output measurement rather than raising during verification;
+- non-finite, non-serializable, cyclic, excessively nested, or non-object envelopes reject as
+  non-canonical JSON rather than raising from the verifier; the preflight covers audit,
+  integrity, and extension fields, with a maximum nesting depth of 128 containers.
+
+Harden policy invariants:
+
+- all action enum values have an explicit authority mapping;
+- non-delegable actions remain denied across every role, risk, and autonomy level;
+- merge, deploy, money, and secret actions remain denied until a real external-grant model
+  exists;
+- malformed autonomy, role, action, and risk inputs fail closed;
+- Explorer remains read-only;
+- blank or mismatched charter binding quarantines an otherwise high-value outcome.
+
+## Invariants
+
+1. A reference label is never execution evidence.
+2. Receipt validation is conjunctive: path, digest, structure, binding, execution, artifacts,
+   and result all matter.
+3. One receipt proves at most one exact action in one mission-state version.
+4. Validation observes evidence; it does not execute or repeat the side effect.
+5. A failure receipt may prove an attempt but never successful completion.
+6. Capability and higher autonomy never expand constitutional authority.
+7. Test results bind only to clean repository inputs and recognized runner observations.
+8. Unknown versions, values, paths, and runtime identities fail closed.
+
+## Threats and controls
+
+| Threat | Control |
+|---|---|
+| Fabricated or whitespace receipt label | Reject strings; require a typed content-addressed reference |
+| Receipt or artifact substitution | Recompute SHA-256 over exact bytes |
+| Absolute path, traversal, or symlink escape | Resolve and require containment under the trusted root/repository |
+| Foreign or replayed receipt | Bind mission, state, actor, action fields, action digest, and receipt uniqueness |
+| Self-verification | Require receipt verifier identity to differ from action actor |
+| Unexecuted or failed work called complete | Require `executed=true`; completion additionally requires `result=succeeded` |
+| Fabricated test summary | Accept only the exact Python/pytest command, zero exit, positive passes, and zero failures/errors |
+| Dirty implementation attributed to a commit | Mark a dirty-worktree audit incomplete |
+| Tests mutate inputs after the clean check | Reconcile HEAD, status, and receipt digests after execution |
+| Tests mutate then restore inputs before final validation | Preserve and gate on the immediate post-test snapshot as well as the final snapshot |
+| Duplicate action identity masks a failure | Reject duplicate IDs and key results by canonical action digest |
+| Boolean/float schema or string enum confusion | Require exact runtime types |
+| Partial artifact blocks retry | Publish a flushed temporary file through an exclusive atomic link |
+| Hung or excessively verbose command | Bound command time and accepted output |
+| Self-digested command claims oversized untruncated output | Recompute the shared JSON-escaped output budget during artifact verification |
+| Malformed Unicode crashes untrusted artifact verification | Reject lone surrogate code points before canonicalization |
+| Descendant retains evidence pipes after parent timeout or exit | Retain a process-tree handle through drain and terminate descendants; bound reader joins |
+| Windows ADS/device path accepted on one host | Apply one cross-platform segment grammar before native resolution |
+| Receipt `valid` contradicts path/execution/issues | Derive and reconcile validity during artifact verification |
+| New policy action silently bypasses checks | Exhaustively assert `set(ACTION_LEVEL) == set(Action)` |
+| String/int role or risk bypass | Runtime type checks produce explicit denial |
+| Full autonomy grants A4/A5 effects | Deny grant-required effects until a separate verified grant model exists |
+| Local JSON mistaken for provider authenticity | Keep maturity at structural prototype and preserve the authenticity obligation |
+
+## Acceptance tests
+
+- A correctly bound, digested success receipt passes.
+- Missing, malformed, out-of-root, substituted, foreign, self-verified, unexecuted, unknown,
+  or reused receipts fail.
+- A valid failed receipt cannot support a complete mission.
+- Legacy `receipt_ref="provider:anything"` is rejected.
+- All docket-local references resolve and carry observed digests.
+- Each cited test file has an explicit passing execution receipt when tests are enabled.
+- A made-up command printing `999 passed` is unverified.
+- A dirty worktree cannot produce a complete audit.
+- Test-induced HEAD, worktree, or referenced-byte mutation cannot produce a complete audit.
+- Underspecified or contradictory self-digested audits fail semantic verification.
+- Policy matrices cover every action, role, risk, and autonomy level, including A4/A5
+  defaults and malformed runtime inputs.
+- Blank charter binding quarantines.
+- The legacy objective CLI and audit CLI remain compatible apart from intentional rejection
+  of insecure receipt-string callers.
+
+## Migration and compatibility
+
+`SimulatedAction` is now keyword-only, carries its actor identity, and changes
+`receipt_ref` from `str | None` to `ReceiptReference | None`. Every caller, including
+reasoning-only and read-only callers, must name `id`, `kind`, `description`, and `actor_id`.
+Side-effect callers must persist a receipt JSON artifact and referenced artifact bytes under
+their configured trusted root, then supply their SHA-256 digest.
+
+The portable classic-GPT pack and runtime-state example advance to version 2. They include
+the exact action, receipt-reference, binding, execution, result, and artifact fields. The tool
+protocol includes the explicit migration from `provider:receipt-id` labels.
+
+The audit artifact advanced to schema version 3 for post-test and final reconciliation,
+hard-bounded command metadata, receipt observations, and semantic consistency. It advances
+again to schema version 4 because `drain_incomplete` strengthens the command-observation shape
+and JSON escape expansion is now part of the accepted output budget. Committed version-1 and
+version-2 artifacts plus version-2 and version-3 compatibility fixtures remain historical
+evidence, but the version-4 verifier intentionally refuses to call them current executable
+receipts. This versioned Python contract does not replace the formal schema set scheduled for
+backlog item 3.
+
+There is no persistent database migration.
+
+## Rollback
+
+Revert the verifier wiring, policy hardening, and tests only through an additive superseding
+ADR. Preserve emitted receipt/audit artifacts and this adverse evidence. Do not restore
+arbitrary strings or non-existent paths as accepted receipts. Existing receipt JSON is
+read-only evidence and requires no destructive rollback.
+
+## Metrics and ownership
+
+- fabricated-receipt acceptance rate (target zero);
+- foreign/replayed receipt acceptance rate (target zero);
+- broken-reference acceptance rate (target zero);
+- cited-test execution coverage;
+- false-complete audit rate (target zero);
+- policy-invariant bypass rate (target zero);
+- receipt verification latency and failure reasons.
+
+The Integrator owns reference and compatibility behavior. The Steward owns deterministic
+verification and failure visibility. The Curator owns disjoint reproduction. The Optimizer
+may propose measurement changes but cannot promote its own verifier.
+
+## Open obligations
+
+- `SRC-005`, `SRC-006`, and `SRC-016`–`SRC-020` remain incomplete source blockers.
+- `SRC-022` has a label-like content digest rather than a preserved raw-byte digest.
+- The classic-GPT fingerprint still does not hash actual source-pack bytes; byte inventory and
+  manifest enforcement are deliberately backlog item 4 and remain blocking.
+- Local receipt files do not prove provider authenticity or append-only retention.
+- Formal schemas, signed identities, provider reconciliation, the non-bypassable enforcement
+  gateway, and durable hash-chained evidence remain later work.
+- Stage 0 exit and release readiness remain blocked despite the completed independent
+  Curator and Judge verdict for backlog item 2.

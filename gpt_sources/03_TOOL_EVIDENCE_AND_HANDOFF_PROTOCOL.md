@@ -6,7 +6,9 @@
 A model-generated intention, command, patch, message, query, or plan. It has not occurred.
 
 ### TOOL_RECEIPT
-External evidence that a named action occurred. A receipt must identify the provider, action ID, result, time, artifacts, and verifier.
+External evidence that a named action occurred. A receipt must be a content-addressed file
+under a configured trusted root and identify the provider, execution, mission/state, actor,
+policy decision, lease, exact action digest, result, time, artifacts, and verifier.
 
 ### UNVERIFIED
 An asserted result that lacks enough evidence. Keep it visible and do not use it as a completion dependency.
@@ -42,19 +44,43 @@ PROPOSED_ACTION:
   id: ACT-12
   kind: git
   description: Push branch feat/example
+  actor_id: builder-pass-1
+  action_digest: sha256:<digest-of-canonical-action>
   authority: repository
   idempotency_key: git-push:repo:branch:sha
   rollback_ref: git:prior-sha
+  receipt_ref: null
 
 TOOL_RECEIPT:
-  receipt_ref: github:commit:abc123
+  schema_version: 1
+  receipt_ref:
+    path: receipts/REC-12.json
+    digest: sha256:<digest-of-receipt-json-bytes>
+  receipt_id: REC-12
   action_id: ACT-12
   provider: github
-  result: branch updated
-  artifacts: [git:abc123]
+  execution_id: github-request-456
+  mission_id: MISSION-1
+  state_ref: MISSION_STATE:MISSION-1:3
+  actor_id: builder-pass-1
+  policy_decision_ref: POLICY-12
+  lease_id: LEASE-12
+  action_kind: git
+  action_digest: sha256:<digest-of-canonical-action>
+  executed: true
+  result: succeeded
   observed_at: 2026-07-27T00:00:00Z
+  artifacts:
+    - path: artifacts/github-commit-abc123.json
+      digest: sha256:<digest-of-observed-artifact-bytes>
   verified_by: curator-pass-2
 ```
+
+`receipt_ref: github:commit:abc123` is a label, not a receipt. Migrate it by preserving the
+provider observation as an artifact file, writing the bound receipt JSON shown above, hashing
+the exact bytes of both files, and supplying the receipt `path` and `digest`. Paths use
+canonical relative POSIX syntax even on Windows; absolute paths, backslashes, empty segments,
+`.` segments, and `..` segments are invalid.
 
 ## Completion gate
 

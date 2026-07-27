@@ -260,14 +260,19 @@ A comparator may win individual categories. Hive Mind claims overall superiority
 
 ### Slice 1 — courtroom and source constitution
 
-Implemented in this PR:
+The original courtroom slice implemented in PR #1 contained:
 
 - courtroom domain model and evidence burdens;
 - source/claim/decision docket audit;
-- 15-source, 57-claim founding docket;
+- a 15-source, 57-claim founding docket;
 - explicit blocking obligations for un-ingested videos;
 - conglomerated architecture and acceptance mappings;
 - tests for independent adjudication, quarantine, deferral, adaptation, source completeness, and benchmark receipts.
+
+That historical count is preserved rather than rewritten. Subsequent additive dockets now
+contain 23 sources and 84 claims, including the separately governed sibling classic-GPT pack.
+The current Stage 0 audit is authoritative for live counts, incomplete-source blockers, and
+capability maturity.
 
 ### Slice 2 — enforced execution
 

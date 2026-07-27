@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .courtroom import BurdenOfProof, Disposition, ImplementationState, SourceRecord, SourceStatus
+from .courtroom import (
+    BurdenOfProof,
+    Disposition,
+    ImplementationState,
+    SourceRecord,
+    SourceStatus,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,91 +34,91 @@ SOURCES: tuple[SourceRecord, ...] = (
         id='SRC-001', title='Founding autonomous-SDLC prompt',
         uri='user-supplied:founding-prompt', kind='user_requirement',
         status=SourceStatus.VERIFIED, version_ref='conversation:2026-07-27',
-        license_spdx=None, content_digest='prompt-v1',
+        license_spdx=None, content_digest=None, unverified_digest_label='prompt-v1', object_type='conversation',
     ),
     SourceRecord(
         id='SRC-002', title='New Team Model and Product & Engineering slides',
         uri='user-supplied:new-team-model-images', kind='image_deck',
         status=SourceStatus.VERIFIED, version_ref='files:927059b1+1f461893',
-        license_spdx=None, content_digest='image-deck-v1',
+        license_spdx=None, content_digest=None, unverified_digest_label='image-deck-v1', object_type='content_snapshot',
     ),
     SourceRecord(
         id='SRC-003', title='Operator OS',
         uri='https://github.com/rangerrick337/operator-os', kind='repository',
         status=SourceStatus.VERIFIED, version_ref='e05d6c866181979015c82ce0163ad5383c2ca438',
-        license_spdx='MIT', content_digest=None,
+        license_spdx='MIT', content_digest=None, object_type='commit',
     ),
     SourceRecord(
         id='SRC-004', title='Hermes Agent',
         uri='https://github.com/NousResearch/hermes-agent', kind='repository',
         status=SourceStatus.VERIFIED, version_ref='d78d6d57f04563f85c4b545703317bed77b6b9b5',
-        license_spdx='MIT', content_digest=None,
+        license_spdx='MIT', content_digest=None, object_type='commit',
     ),
     SourceRecord(
         id='SRC-005', title='Autonomous operating-system reference video',
         uri='https://www.youtube.com/watch?v=mazBhCg3urw', kind='video',
         status=SourceStatus.PENDING_INGESTION, version_ref='youtube:mazBhCg3urw',
-        license_spdx=None, content_digest=None,
+        license_spdx=None, content_digest=None, object_type='video_id',
     ),
     SourceRecord(
         id='SRC-006', title='What Happens When Millions of AIs Must Profit or Die',
         uri='https://www.youtube.com/watch?v=Gw_hnD7m00M', kind='video',
         status=SourceStatus.PARTIAL, version_ref='youtube:Gw_hnD7m00M',
-        license_spdx=None, content_digest=None,
+        license_spdx=None, content_digest=None, object_type='video_id',
     ),
     SourceRecord(
         id='SRC-007', title='Natural Selection Favors AIs over Humans',
         uri='https://arxiv.org/abs/2303.16200', kind='research_paper',
         status=SourceStatus.VERIFIED, version_ref='arXiv:2303.16200',
-        license_spdx=None, content_digest=None,
+        license_spdx=None, content_digest=None, object_type='paper_version',
     ),
     SourceRecord(
         id='SRC-008', title='AIOS: AI Agent Operating System',
         uri='https://github.com/agiresearch/AIOS', kind='repository',
         status=SourceStatus.VERIFIED, version_ref='5354f64f7975f03a99a305285702194d6f72bfa9',
-        license_spdx=None, content_digest=None,
+        license_spdx=None, content_digest=None, object_type='commit',
     ),
     SourceRecord(
         id='SRC-009', title='OpenHands generalist software-agent platform',
         uri='https://arxiv.org/abs/2407.16741', kind='research_and_repository',
         status=SourceStatus.VERIFIED, version_ref='arXiv:2407.16741',
-        license_spdx='MIT', content_digest=None,
+        license_spdx='MIT', content_digest=None, object_type='paper_version',
     ),
     SourceRecord(
         id='SRC-010', title='Rivet Agent OS',
         uri='https://github.com/rivet-dev/agent-os', kind='repository',
         status=SourceStatus.VERIFIED, version_ref='main@retrieved-2026-07-27',
-        license_spdx=None, content_digest=None,
+        license_spdx=None, content_digest=None, object_type='branch',
     ),
     SourceRecord(
         id='SRC-011', title='Microsoft Agent Framework',
         uri='https://github.com/microsoft/agent-framework', kind='repository',
         status=SourceStatus.VERIFIED, version_ref='main@retrieved-2026-07-27',
-        license_spdx='MIT', content_digest=None,
+        license_spdx='MIT', content_digest=None, object_type='branch',
     ),
     SourceRecord(
         id='SRC-012', title='RepoMaster repository-understanding research',
         uri='https://arxiv.org/abs/2505.21577', kind='research_paper',
         status=SourceStatus.VERIFIED, version_ref='arXiv:2505.21577',
-        license_spdx=None, content_digest=None,
+        license_spdx=None, content_digest=None, object_type='paper_version',
     ),
     SourceRecord(
         id='SRC-013', title='User-supplied multi-agent mission-control interface video',
         uri='user-supplied:mission-control-video', kind='video',
         status=SourceStatus.VERIFIED, version_ref='project-reference:mission-control-ui',
-        license_spdx=None, content_digest='mission-control-reference-v1',
+        license_spdx=None, content_digest=None, unverified_digest_label='mission-control-reference-v1', object_type='content_snapshot',
     ),
     SourceRecord(
         id='SRC-014', title='OpenFang agent operating system',
         uri='https://github.com/RightNow-AI/openfang', kind='repository',
         status=SourceStatus.VERIFIED, version_ref='v0.5.10',
-        license_spdx='MIT', content_digest=None,
+        license_spdx='MIT', content_digest=None, object_type='tag',
     ),
     SourceRecord(
         id='SRC-015', title='iii AgentOS',
         uri='https://github.com/iii-hq/agentos', kind='repository',
         status=SourceStatus.VERIFIED, version_ref='main@retrieved-2026-07-27',
-        license_spdx=None, content_digest=None,
+        license_spdx=None, content_digest=None, object_type='branch',
     ),
 )
 

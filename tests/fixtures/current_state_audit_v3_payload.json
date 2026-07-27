@@ -1,0 +1,61 @@
+{
+  "schema_version": 3,
+  "artifact_type": "CurrentStateAudit",
+  "repository": {
+    "root": "C:/historical/worktree",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "working_tree_clean": true,
+    "working_tree_entries": [],
+    "post_test_head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "post_test_working_tree_clean": true,
+    "post_test_working_tree_entries": [],
+    "final_head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "final_working_tree_clean": true,
+    "final_working_tree_entries": [],
+    "tracked_tree_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "docket": {
+    "source_count": 1,
+    "claim_count": 1,
+    "broken_references": [],
+    "receipts_valid": true,
+    "reference_receipts": [
+      {
+        "claim_id": "CLM-HISTORICAL",
+        "kind": "test",
+        "reference": "tests/test_historical.py",
+        "path_valid": true,
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "execution": {
+          "status": "passed"
+        },
+        "valid": true,
+        "issues": []
+      }
+    ]
+  },
+  "tests": {
+    "status": "passed",
+    "passed": 1,
+    "failed": 0,
+    "errors": 0
+  },
+  "commands": [
+    {
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "cwd": "C:/historical/worktree",
+      "return_code": 0,
+      "stdout": "1 passed",
+      "stderr": "",
+      "timed_out": false,
+      "output_truncated": false
+    }
+  ],
+  "failures": [],
+  "complete": true
+}

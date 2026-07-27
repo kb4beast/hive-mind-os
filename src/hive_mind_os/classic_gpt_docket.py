@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from .courtroom import BurdenOfProof, Disposition, ImplementationState, SourceRecord, SourceStatus
+from .courtroom import (
+    BurdenOfProof,
+    Disposition,
+    ImplementationState,
+    SourceRecord,
+    SourceStatus,
+)
 from .founding_docket import ClaimSpec
-
 
 CLASSIC_GPT_SOURCES: tuple[SourceRecord, ...] = (
     SourceRecord(
@@ -13,7 +18,9 @@ CLASSIC_GPT_SOURCES: tuple[SourceRecord, ...] = (
         status=SourceStatus.VERIFIED,
         version_ref="conversation:2026-07-27",
         license_spdx=None,
-        content_digest="classic-gpt-simulation-v1",
+        content_digest=None,
+        unverified_digest_label="classic-gpt-simulation-v2",
+        object_type="conversation",
     ),
 )
 
@@ -28,8 +35,12 @@ CLASSIC_GPT_CLAIMS: tuple[ClaimSpec, ...] = (
         burden=BurdenOfProof.IMPLEMENT,
         state=ImplementationState.IMPLEMENTED,
         section="constitutional-and-court-governance",
-        code_refs=("src/hive_mind_os/classic_gpt.py", "gpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md"),
-        test_refs=("tests/test_classic_gpt.py",),
+        code_refs=(
+            "src/hive_mind_os/classic_gpt.py",
+            "src/hive_mind_os/receipts.py",
+            "gpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md",
+        ),
+        test_refs=("tests/test_classic_gpt.py", "tests/test_receipts.py"),
         metrics=("false_execution_claim_rate=0", "unreceipted_side_effect_rate=0"),
         rationale="Permit a high-fidelity reasoning simulation while making the boundary between model output and externally executed work explicit and machine-checkable.",
     ),
@@ -70,8 +81,12 @@ CLASSIC_GPT_CLAIMS: tuple[ClaimSpec, ...] = (
         burden=BurdenOfProof.IMPLEMENT,
         state=ImplementationState.IMPLEMENTED,
         section="execution-plane",
-        code_refs=("src/hive_mind_os/classic_gpt.py", "gpt_sources/03_TOOL_EVIDENCE_AND_HANDOFF_PROTOCOL.md"),
-        test_refs=("tests/test_classic_gpt.py",),
+        code_refs=(
+            "src/hive_mind_os/classic_gpt.py",
+            "src/hive_mind_os/receipts.py",
+            "gpt_sources/03_TOOL_EVIDENCE_AND_HANDOFF_PROTOCOL.md",
+        ),
+        test_refs=("tests/test_classic_gpt.py", "tests/test_receipts.py"),
         metrics=("proposal_to_receipt_traceability", "fabricated_completion_rate=0"),
         rationale="Prevent a text-only model from converting intention, generated code, or a suggested command into a false claim that work was executed.",
     ),
@@ -98,8 +113,8 @@ CLASSIC_GPT_CLAIMS: tuple[ClaimSpec, ...] = (
         burden=BurdenOfProof.IMPLEMENT,
         state=ImplementationState.IMPLEMENTED,
         section="assurance-and-benchmark-plane",
-        code_refs=("src/hive_mind_os/classic_gpt.py",),
-        test_refs=("tests/test_classic_gpt.py",),
+        code_refs=("src/hive_mind_os/classic_gpt.py", "src/hive_mind_os/receipts.py"),
+        test_refs=("tests/test_classic_gpt.py", "tests/test_receipts.py"),
         metrics=("false_completion_rate=0", "completion_evidence_coverage"),
         rationale="Replace conversational confidence with a fail-closed completion contract.",
     ),

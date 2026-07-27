@@ -1,0 +1,407 @@
+{
+  "audit": {
+    "artifact_type": "CurrentStateAudit",
+    "baseline": {
+      "audited_values": {
+        "claim_count": 80,
+        "claim_state_counts": {
+          "implemented": 19,
+          "inventoried": 3,
+          "planned": 58
+        },
+        "disposition_counts": {
+          "adapt": 52,
+          "adopt": 25,
+          "defer": 3
+        },
+        "earliest_commit": "069ef07807a6be156533a4344355fda3ad31589a",
+        "full_ref_commit_count": 77,
+        "repository_sha": "d7a738a7287cbc487edc35b7ae6aa4a339104f71",
+        "source_count": 22,
+        "source_status_counts": {
+          "partial": 5,
+          "pending_ingestion": 2,
+          "verified": 15
+        },
+        "test_passed_count": 56,
+        "tracked_file_count": 47
+      },
+      "discrepancy_cases": [
+        {
+          "audited_value": "d7a738a7287cbc487edc35b7ae6aa4a339104f71",
+          "case_id": "BASELINE-REPOSITORY-SHA",
+          "field": "repository_sha",
+          "observed_value": "ef9cf05ea1f33a0ffacde3ac948dc12250b42ba1",
+          "status": "open"
+        },
+        {
+          "audited_value": 77,
+          "case_id": "BASELINE-FULL-REF-COMMIT-COUNT",
+          "field": "full_ref_commit_count",
+          "observed_value": 79,
+          "status": "open"
+        },
+        {
+          "audited_value": 47,
+          "case_id": "BASELINE-TRACKED-FILE-COUNT",
+          "field": "tracked_file_count",
+          "observed_value": 48,
+          "status": "open"
+        },
+        {
+          "audited_value": 56,
+          "case_id": "BASELINE-TEST-PASSED-COUNT",
+          "field": "test_passed_count",
+          "observed_value": 61,
+          "status": "open"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": [
+          "git",
+          "rev-parse",
+          "--show-toplevel"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "C:/Repos/HiveMind/hive-mind-os\n"
+      },
+      {
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "ef9cf05ea1f33a0ffacde3ac948dc12250b42ba1\n"
+      },
+      {
+        "command": [
+          "git",
+          "rev-list",
+          "--all",
+          "--count"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "79\n"
+      },
+      {
+        "command": [
+          "git",
+          "rev-list",
+          "--all",
+          "--reverse"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "069ef07807a6be156533a4344355fda3ad31589a\n683275759a8141c65fcf73a9e9b844b5506fffc2\ne05a4531a445a33d4f4878215333d7cf6d05abcb\n7f6463176599abcc10c6ff5355f5248b6a205015\nd8e9ea60e0d9d9075809e54454a8629df73258ee\nf5143f976052ff55cb382d35dd74db49d338733e\ndc386481b6215fb338c07a96629a40d300044c85\n47dab961e3f062ded0e958f2cfd62d6d27d32c50\n3de6d7d473661f36d676b032d21264c90a5b2b7a\nb695110bd7e71a1a2e2f3297fb60677390d981b6\ne8ba17c4f25d5fb85bc8a2837c828a7986bbabf4\n7d8b6a51447a7553ff0b9e4aba5c51432d44898f\n95d59dc2465ef5c1dafed18b3fa39cda82d0fee5\n2cd0c312aa7a11d9da69ac556973ea36113508b2\n65992336097d97c03906dd2aab63674ffc859a0c\n4fb0aaa2d633e8d68b6855b2a632b6081717c16b\nfa73c2327efc4abea6953f8449709120aec31679\nddfa8f7289fc46c722ff3786615eaffd337f6efd\n26b27f9eafb8f1e5e62c9b2bc0635a48393f2ed8\n148cf0b50003e455acd940cd0cb4a895b4768ade\n0a42f64a6a011e4568c8a57ad804b19851142061\n359ea0b366e53777c1c8e07fd3bf27e05e71b41d\n8643ee0b2261e86d31e967a3b6cc73201eed1a20\n4958a40e1042d4ac33c44b98c503e57fd3b7a439\n178c87a6fbfe07a12281da22974efdfc703a2e71\n2e2a7e847b56a7763843e77767c57a36bc5f993c\n5d640d266ad06920e2cc2f092e6a65238cd6ddbf\ne5a80ee798f9b9e43cdc8fc208ddceead374e314\naae132fedc6b00fb0930c4684d74e95aec47385a\n3bf114bb251534b89448cf2267624828d3619994\n7c1db9ba1559cd6aba454d937d74be6f301fdedc\n934ca2b20f53cbba0e2a99eb455a9552d5cda54a\n367a907b4e256cb92e80da4b5606fb234bd20929\nc48bb8f687eacc0c36b219db09460f01205f0431\nd18077074f7b2020fcc1412aa4f76daaa379437c\n5b8042b2baa64c502acda4f839dbe75b0ad6c72f\n52f65ad0b411ba0051621f3d12e06b37f050d687\ndc5be33f2eeffb2b75ca02e69678b93a414b2217\ndfde2464f8c0888b79186301cbc4a38bf9f62ac9\nb9b8d3d13afe84eda2635a08bf33ba41eb555e11\n289faaa62ed9390d275b6bff6d225f0425c13a7a\n331f726639a7477833b0536996ad757770516cd1\nda8f7198c5966649bdd3952a570d316968d9b168\n8536b095403dff32d5c1885c82ac96accf4e9de7\n13f18434f7d6c7e114a85fd6dc3dfcf24cc2bf0f\ne141bf528406e2de653f3f090deeaa7de571d146\ndeb5163d919f738c3f9933f11ffad82e486a81e5\nebd3bc4cb963e86a92dc02acba34f5481393b1c6\ndf0f2c2ef7f40cf7d6dfb1887e20fcb383fb01e2\n25539d007caa5a04facd2f85358d7b8b31787049\ne566736f01159a3ddcc785661553f8163f283663\nd43bd1f9b109ac67a3cab8b81c58043e5c5724aa\ne1968a55aee95a81e53d9a320700eba5b782dbb6\n4a117223b1cfee00a36481460e0b345134b8b752\n95116055418c7d4d64f7c77c6e7f525c7953e890\nf09c2fe72aedbc91384649e5096f1be2ccc13b84\nccbd66ca808f6e14b33f3843b3e269f74139c185\n66e8bed5b6df47d8b2310d31607e913214a331e5\nfeb38485831aab6c85d0504553df8160bdf6560a\nfc1c85877ec546b3b62924ea6043ce8a16c766a4\nd4d1c9b23f8147047d0d782c47b54d64e4289b55\n63920e4079716c731a867c15b4520a239836c574\n7e05aef03297ddef0f9e695a9c9c43c994c75ca2\n0ac27c9bea2af5920c2cc7ac6f22ff37865d1091\n3fb8e1895b676ff0e196e37324abc30f742ab6d2\nddd3f5f9a68e25f77272a6d224ea7ed580f231ce\n636e2c0b436cbd896f557aca199376a36e272916\n2348c718b94abce275ec9f4238bff18f8e476ffb\n733f17f6bb8c44c0ef41a1909f928e01871a0a69\n5dc8fd52aec736b83336765b0fcde13e25ab6ba4\n9b631094ad2b0d04ca5db443f050e2baa26c3b17\n642d12887c24d6103f69cad5ee77b2d26103f886\n3d8119e12e4335c429ed2fb83111a4af03b63ec7\n5fbd4ced04962d4c7d54c734a834d8ed442480c7\n3690499d0eb03f30ab85c2b1bca3eec25fdd53a7\n1a5a475ebaefba19f36dc916ce84f11bb7d869b9\nd7a738a7287cbc487edc35b7ae6aa4a339104f71\nde91019f56acc09ed8868e8f77c2441557d5f4e7\nef9cf05ea1f33a0ffacde3ac948dc12250b42ba1\n"
+      },
+      {
+        "command": [
+          "git",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": ".github/workflows/ci.yml\u0000.gitignore\u0000AGENTS.md\u0000LICENSE\u0000README.md\u0000benchmarks/founding-comparator-suite.json\u0000docs/architecture/ADDITIONAL_VIDEO_DOCKET.md\u0000docs/architecture/ADR-001-COURTROOM-SOURCE-SYNTHESIS.md\u0000docs/architecture/BOUNDED_EVOLUTION.md\u0000docs/architecture/CONGLOMERATED_SYSTEM.md\u0000docs/architecture/COURTROOM_SYNTHESIS.md\u0000docs/architecture/FOUNDATION_PLAN.md\u0000docs/architecture/HARDENED_VISION_CONTRACT.md\u0000docs/architecture/MASTER_IMPLEMENTATION_PROMPT.md\u0000docs/architecture/RECURSIVE_SELF_IMPROVEMENT_DOCKET.md\u0000gpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md\u0000gpt_sources/01_RUNTIME_STATE_SCHEMA.json\u0000gpt_sources/02_ROLE_AND_COURT_PROTOCOL.md\u0000gpt_sources/03_TOOL_EVIDENCE_AND_HANDOFF_PROTOCOL.md\u0000gpt_sources/manifest.json\u0000pyproject.toml\u0000src/hive_mind_os/__init__.py\u0000src/hive_mind_os/additional_video_docket.py\u0000src/hive_mind_os/autonomy.py\u0000src/hive_mind_os/classic_gpt.py\u0000src/hive_mind_os/classic_gpt_docket.py\u0000src/hive_mind_os/cli.py\u0000src/hive_mind_os/courtroom.py\u0000src/hive_mind_os/founding_docket.py\u0000src/hive_mind_os/learning.py\u0000src/hive_mind_os/ledger.py\u0000src/hive_mind_os/models.py\u0000src/hive_mind_os/policy.py\u0000src/hive_mind_os/recursive_improvement.py\u0000src/hive_mind_os/recursive_improvement_docket.py\u0000src/hive_mind_os/repository_learning.py\u0000src/hive_mind_os/roles.py\u0000src/hive_mind_os/runtime.py\u0000src/hive_mind_os/source_docket.py\u0000src/hive_mind_os/vision.py\u0000tests/test_autonomy.py\u0000tests/test_classic_gpt.py\u0000tests/test_courtroom.py\u0000tests/test_kernel.py\u0000tests/test_recursive_improvement.py\u0000tests/test_repository_learning.py\u0000tests/test_source_docket.py\u0000tests/test_vision.py\u0000"
+      },
+      {
+        "command": [
+          "git",
+          "ls-files",
+          "-s",
+          "-z"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "100644 7989835a28c016b7ce732ae2fca3307ce70d9da1 0\t.github/workflows/ci.yml\u0000100644 d5a18deed8813c6c817c9090bf0443d7fad48a9d 0\t.gitignore\u0000100644 f6e9014f0ee415e1473d50c35313657426edcf70 0\tAGENTS.md\u0000100644 06da1af7996f5e2b059cd52045e36f9f2cfac201 0\tLICENSE\u0000100644 c506e29425fabb8a37fc4e1ee460d01d61f178c7 0\tREADME.md\u0000100644 41ff1bec2698706c70b7b8f37adfc74a4bf0a013 0\tbenchmarks/founding-comparator-suite.json\u0000100644 90c4e2e8d42fe3b2269e6568493d112207c3cca4 0\tdocs/architecture/ADDITIONAL_VIDEO_DOCKET.md\u0000100644 1e9073a1e0f17161efd03841a03501ce1efa86d5 0\tdocs/architecture/ADR-001-COURTROOM-SOURCE-SYNTHESIS.md\u0000100644 d2d6120dc7170cc661291af5dd480d8b08ab2262 0\tdocs/architecture/BOUNDED_EVOLUTION.md\u0000100644 2101f5cf2ffb0274751510030ad653cdf0b1ec4a 0\tdocs/architecture/CONGLOMERATED_SYSTEM.md\u0000100644 4c560f7c8c774b3e0515b974434440cb239a0798 0\tdocs/architecture/COURTROOM_SYNTHESIS.md\u0000100644 3cad8e9e006f5a907d75d970541f5fcb4e59628b 0\tdocs/architecture/FOUNDATION_PLAN.md\u0000100644 2263216b5490edf514a9f07d31e0dbdf610406ab 0\tdocs/architecture/HARDENED_VISION_CONTRACT.md\u0000100644 0f5f8c72ea5c3689138af0c5522d46c48fe95262 0\tdocs/architecture/MASTER_IMPLEMENTATION_PROMPT.md\u0000100644 8a10a29d6f68e27e526ac3fb5a8a71e5f754e83c 0\tdocs/architecture/RECURSIVE_SELF_IMPROVEMENT_DOCKET.md\u0000100644 e1717e0fdb2e2eed532a96de2d601fa6f2442c66 0\tgpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md\u0000100644 66d9dcf54455aae00d96a38de64b75db7bab9d96 0\tgpt_sources/01_RUNTIME_STATE_SCHEMA.json\u0000100644 f974a29c00339b1e03ff82dec7b5405680c8993c 0\tgpt_sources/02_ROLE_AND_COURT_PROTOCOL.md\u0000100644 6ca2271add1a74af711217398d4b1a0097ecb67b 0\tgpt_sources/03_TOOL_EVIDENCE_AND_HANDOFF_PROTOCOL.md\u0000100644 f23f80884ee2b544ab4d72e2fb9bc53946986a1e 0\tgpt_sources/manifest.json\u0000100644 0ca33c148ca4f4258d26af77fdaded1fac146618 0\tpyproject.toml\u0000100644 9cb8ed9cd386d79ee5b6c1ae013e4daf3ade52ea 0\tsrc/hive_mind_os/__init__.py\u0000100644 0408737124879ea8429e37722d9ac8e4ee5fdd17 0\tsrc/hive_mind_os/additional_video_docket.py\u0000100644 8552692551049d691e7bf185106c15706c5f5c4d 0\tsrc/hive_mind_os/autonomy.py\u0000100644 2fb9f3f6a5f93ba7095ca960562c1f4571102bee 0\tsrc/hive_mind_os/classic_gpt.py\u0000100644 97819a961ea8c77997894a96bfed6b890458e3d9 0\tsrc/hive_mind_os/classic_gpt_docket.py\u0000100644 ad15c539c5accc312c5e90bf0e6b617a53b35773 0\tsrc/hive_mind_os/cli.py\u0000100644 a8c6267ac90e55369e57272c821c445aff4d4f13 0\tsrc/hive_mind_os/courtroom.py\u0000100644 72a99e56cfc46d98e613bb1f7181a9e1a6023d55 0\tsrc/hive_mind_os/founding_docket.py\u0000100644 890bf37b966ed80e1bd88315f264ee7446808ab2 0\tsrc/hive_mind_os/learning.py\u0000100644 96aebf7445a26f551c9c0969db1887f430da7920 0\tsrc/hive_mind_os/ledger.py\u0000100644 cd0215552b62d31524a2f21c6dc8f36eab3a2919 0\tsrc/hive_mind_os/models.py\u0000100644 c3f6c3220b67d7f1136c8c195b49df19a7eb0d6e 0\tsrc/hive_mind_os/policy.py\u0000100644 9d9de4e012154f957321cc371d4b7e91b414f0a9 0\tsrc/hive_mind_os/recursive_improvement.py\u0000100644 5fbc9d77d7eb714fec4aa8f56487993e972de814 0\tsrc/hive_mind_os/recursive_improvement_docket.py\u0000100644 a6c976954b0e036967ce2c2c07431e320def8e89 0\tsrc/hive_mind_os/repository_learning.py\u0000100644 01248336b1ff566ab66c5b90be447ec497d3604d 0\tsrc/hive_mind_os/roles.py\u0000100644 056e2352f74c6a4916b59a9a2c1d7a0ba7e2ce4d 0\tsrc/hive_mind_os/runtime.py\u0000100644 f077dfcf4ff1cf0145481a53aee53edcd10bf34c 0\tsrc/hive_mind_os/source_docket.py\u0000100644 f4906b438661d6ea5fb3c00f802cfc060b1a6034 0\tsrc/hive_mind_os/vision.py\u0000100644 2bcb75016f151058582f4a853cb2a7c1ed987647 0\ttests/test_autonomy.py\u0000100644 3fb9c727124fbbe067187087eea669e1ea9fdfdd 0\ttests/test_classic_gpt.py\u0000100644 a2f753d376cbbe77668430605eb495da53723fbe 0\ttests/test_courtroom.py\u0000100644 2ddced98f0fabe1097624f2b8def47ff077f32e5 0\ttests/test_kernel.py\u0000100644 769b46820edba408f3b8614ead6b716a0fdd5a91 0\ttests/test_recursive_improvement.py\u0000100644 2c50742df8a3f6058947e80d219d22383cacb36f 0\ttests/test_repository_learning.py\u0000100644 bee25fb2e3ad40e6bf831520be301b593898a829 0\ttests/test_source_docket.py\u0000100644 78fc098e59f1baea7673826675439a388c538aa0 0\ttests/test_vision.py\u0000"
+      },
+      {
+        "command": [
+          "git",
+          "status",
+          "--porcelain=v1",
+          "--untracked-files=all",
+          "-z"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": " M README.md\u0000 M src/hive_mind_os/__init__.py\u0000 M src/hive_mind_os/cli.py\u0000?? docs/architecture/ADR-002-REPRODUCIBLE-CURRENT-STATE-AUDIT.md\u0000?? src/hive_mind_os/current_state_audit.py\u0000?? tests/test_current_state_audit.py\u0000"
+      },
+      {
+        "command": [
+          "git",
+          "status",
+          "--ignored",
+          "--porcelain=v1",
+          "-z"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": " M README.md\u0000 M src/hive_mind_os/__init__.py\u0000 M src/hive_mind_os/cli.py\u0000?? docs/architecture/ADR-002-REPRODUCIBLE-CURRENT-STATE-AUDIT.md\u0000?? src/hive_mind_os/current_state_audit.py\u0000?? tests/test_current_state_audit.py\u0000!! .pytest_cache/\u0000!! src/hive_mind_os/__pycache__/\u0000!! tests/__pycache__/\u0000"
+      },
+      {
+        "command": [
+          "git",
+          "for-each-ref",
+          "--sort=refname",
+          "--format=%(refname)%09%(objectname)"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "refs/codex/turn-diffs/captures/1785134243962/ef9d599f-41bd-4413-9c1b-c001d073eb13/base\t8619293b7a6b0f60c2a13a9eece7971866ffb09c\nrefs/codex/turn-diffs/captures/1785137349889/21828fec-97c7-4470-a242-52f4bdb58a13/base\t3cef33b74c5802c5f2bf3dc5c69a376adcfeaabf\nrefs/codex/turn-diffs/checkpoints/f746062e0cf314f442f259eadd7088346356719e5c7fc3d8538e32c96b4f7332/40a0ceefc34e048abd263a0ae116c67a5eab41792b797d07b34658fed5713b23/1785136905794/8e80cdd0-3096-4a8c-84cc-8f1afd52d269\t3cef33b74c5802c5f2bf3dc5c69a376adcfeaabf\nrefs/heads/codex/master-implementation-bootstrap\tef9cf05ea1f33a0ffacde3ac948dc12250b42ba1\nrefs/heads/codex/publish-master-prompt\tde91019f56acc09ed8868e8f77c2441557d5f4e7\nrefs/heads/main\tef9cf05ea1f33a0ffacde3ac948dc12250b42ba1\nrefs/remotes/origin/HEAD\tef9cf05ea1f33a0ffacde3ac948dc12250b42ba1\nrefs/remotes/origin/main\tef9cf05ea1f33a0ffacde3ac948dc12250b42ba1\n"
+      },
+      {
+        "command": [
+          "git",
+          "log",
+          "--all",
+          "--format=",
+          "--name-only",
+          "-z"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "docs/architecture/MASTER_IMPLEMENTATION_PROMPT.md\u0000pyproject.toml\u0000src/hive_mind_os/__init__.py\u0000README.md\u0000tests/test_vision.py\u0000tests/test_source_docket.py\u0000src/hive_mind_os/vision.py\u0000src/hive_mind_os/source_docket.py\u0000tests/test_classic_gpt.py\u0000gpt_sources/manifest.json\u0000gpt_sources/03_TOOL_EVIDENCE_AND_HANDOFF_PROTOCOL.md\u0000gpt_sources/02_ROLE_AND_COURT_PROTOCOL.md\u0000gpt_sources/01_RUNTIME_STATE_SCHEMA.json\u0000gpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md\u0000src/hive_mind_os/classic_gpt_docket.py\u0000src/hive_mind_os/classic_gpt.py\u0000docs/architecture/RECURSIVE_SELF_IMPROVEMENT_DOCKET.md\u0000tests/test_vision.py\u0000tests/test_source_docket.py\u0000src/hive_mind_os/__init__.py\u0000src/hive_mind_os/vision.py\u0000src/hive_mind_os/source_docket.py\u0000src/hive_mind_os/recursive_improvement_docket.py\u0000tests/test_recursive_improvement.py\u0000src/hive_mind_os/recursive_improvement.py\u0000docs/architecture/ADDITIONAL_VIDEO_DOCKET.md\u0000tests/test_vision.py\u0000tests/test_source_docket.py\u0000src/hive_mind_os/vision.py\u0000src/hive_mind_os/source_docket.py\u0000src/hive_mind_os/additional_video_docket.py\u0000README.md\u0000AGENTS.md\u0000pyproject.toml\u0000src/hive_mind_os/__init__.py\u0000tests/test_vision.py\u0000src/hive_mind_os/vision.py\u0000docs/architecture/COURTROOM_SYNTHESIS.md\u0000docs/architecture/CONGLOMERATED_SYSTEM.md\u0000docs/architecture/ADR-001-COURTROOM-SOURCE-SYNTHESIS.md\u0000benchmarks/founding-comparator-suite.json\u0000tests/test_source_docket.py\u0000tests/test_courtroom.py\u0000src/hive_mind_os/source_docket.py\u0000src/hive_mind_os/founding_docket.py\u0000src/hive_mind_os/courtroom.py\u0000src/hive_mind_os/__init__.py\u0000README.md\u0000AGENTS.md\u0000docs/architecture/HARDENED_VISION_CONTRACT.md\u0000tests/test_repository_learning.py\u0000tests/test_vision.py\u0000src/hive_mind_os/repository_learning.py\u0000src/hive_mind_os/vision.py\u0000README.md\u0000docs/architecture/BOUNDED_EVOLUTION.md\u0000pyproject.toml\u0000src/hive_mind_os/__init__.py\u0000tests/test_kernel.py\u0000src/hive_mind_os/policy.py\u0000tests/test_autonomy.py\u0000src/hive_mind_os/autonomy.py\u0000.github/workflows/ci.yml\u0000docs/architecture/FOUNDATION_PLAN.md\u0000AGENTS.md\u0000tests/test_kernel.py\u0000src/hive_mind_os/cli.py\u0000src/hive_mind_os/runtime.py\u0000src/hive_mind_os/learning.py\u0000src/hive_mind_os/ledger.py\u0000src/hive_mind_os/policy.py\u0000src/hive_mind_os/roles.py\u0000src/hive_mind_os/models.py\u0000src/hive_mind_os/__init__.py\u0000pyproject.toml\u0000README.md\u0000.gitignore\u0000LICENSE\u0000README.md\u0000"
+      },
+      {
+        "command": [
+          "git",
+          "log",
+          "--all",
+          "--diff-filter=D",
+          "--format=",
+          "--name-only",
+          "-z"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "log",
+          "--all",
+          "--diff-filter=R",
+          "--format=",
+          "--name-only",
+          "-z"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "--version"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": "git version 2.53.0.windows.3\n"
+      },
+      {
+        "command": [
+          "C:\\Python314\\python.exe",
+          "-m",
+          "pytest",
+          "-q"
+        ],
+        "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+        "return_code": 0,
+        "stderr": "",
+        "stdout": ".............................................................            [100%]\n61 passed in 0.76s\n"
+      }
+    ],
+    "complete": true,
+    "docket": {
+      "broken_references": [
+        {
+          "claim_id": "CLM-026",
+          "kind": "test",
+          "reason": "referenced file does not exist",
+          "reference": "tests/test_policy_invariants.py"
+        }
+      ],
+      "claim_count": 80,
+      "claim_state_counts": {
+        "implemented": 19,
+        "inventoried": 3,
+        "planned": 58
+      },
+      "disposition_counts": {
+        "adapt": 52,
+        "adopt": 25,
+        "defer": 3
+      },
+      "inventory_complete": true,
+      "issues": [
+        {
+          "claim_id": null,
+          "message": "source requires complete ingestion before derived ideas may be promoted",
+          "severity": "blocking",
+          "source_id": "SRC-005"
+        },
+        {
+          "claim_id": null,
+          "message": "source requires complete ingestion before derived ideas may be promoted",
+          "severity": "blocking",
+          "source_id": "SRC-006"
+        },
+        {
+          "claim_id": null,
+          "message": "source requires complete ingestion before derived ideas may be promoted",
+          "severity": "blocking",
+          "source_id": "SRC-016"
+        },
+        {
+          "claim_id": null,
+          "message": "source requires complete ingestion before derived ideas may be promoted",
+          "severity": "blocking",
+          "source_id": "SRC-017"
+        },
+        {
+          "claim_id": null,
+          "message": "source requires complete ingestion before derived ideas may be promoted",
+          "severity": "blocking",
+          "source_id": "SRC-018"
+        },
+        {
+          "claim_id": null,
+          "message": "source requires complete ingestion before derived ideas may be promoted",
+          "severity": "blocking",
+          "source_id": "SRC-019"
+        },
+        {
+          "claim_id": null,
+          "message": "source requires complete ingestion before derived ideas may be promoted",
+          "severity": "blocking",
+          "source_id": "SRC-020"
+        }
+      ],
+      "release_ready": false,
+      "source_blockers": [
+        "SRC-005",
+        "SRC-006",
+        "SRC-016",
+        "SRC-017",
+        "SRC-018",
+        "SRC-019",
+        "SRC-020"
+      ],
+      "source_count": 22,
+      "source_status_counts": {
+        "partial": 5,
+        "pending_ingestion": 2,
+        "verified": 15
+      }
+    },
+    "failures": [],
+    "generated_at": "2026-07-27T07:39:43.747162+00:00",
+    "invocation": [
+      "hive-mind",
+      "audit",
+      "--repository",
+      ".",
+      "--output",
+      "evidence/audits/current-state-audit-ef9cf05.json"
+    ],
+    "repository": {
+      "deleted_paths": [],
+      "earliest_commit": "069ef07807a6be156533a4344355fda3ad31589a",
+      "full_ref_commit_count": 79,
+      "head": "ef9cf05ea1f33a0ffacde3ac948dc12250b42ba1",
+      "historical_path_count": 48,
+      "historical_path_inventory_digest": "sha256:07737dc392a0cc0320c5c4944ae6236f4040dbca880ebbc4c4b98b83b687d157",
+      "ignored_entries": [
+        "!! .pytest_cache/",
+        "!! src/hive_mind_os/__pycache__/",
+        "!! tests/__pycache__/"
+      ],
+      "refs": [
+        {
+          "object_id": "8619293b7a6b0f60c2a13a9eece7971866ffb09c",
+          "ref": "refs/codex/turn-diffs/captures/1785134243962/ef9d599f-41bd-4413-9c1b-c001d073eb13/base"
+        },
+        {
+          "object_id": "3cef33b74c5802c5f2bf3dc5c69a376adcfeaabf",
+          "ref": "refs/codex/turn-diffs/captures/1785137349889/21828fec-97c7-4470-a242-52f4bdb58a13/base"
+        },
+        {
+          "object_id": "3cef33b74c5802c5f2bf3dc5c69a376adcfeaabf",
+          "ref": "refs/codex/turn-diffs/checkpoints/f746062e0cf314f442f259eadd7088346356719e5c7fc3d8538e32c96b4f7332/40a0ceefc34e048abd263a0ae116c67a5eab41792b797d07b34658fed5713b23/1785136905794/8e80cdd0-3096-4a8c-84cc-8f1afd52d269"
+        },
+        {
+          "object_id": "ef9cf05ea1f33a0ffacde3ac948dc12250b42ba1",
+          "ref": "refs/heads/codex/master-implementation-bootstrap"
+        },
+        {
+          "object_id": "de91019f56acc09ed8868e8f77c2441557d5f4e7",
+          "ref": "refs/heads/codex/publish-master-prompt"
+        },
+        {
+          "object_id": "ef9cf05ea1f33a0ffacde3ac948dc12250b42ba1",
+          "ref": "refs/heads/main"
+        },
+        {
+          "object_id": "ef9cf05ea1f33a0ffacde3ac948dc12250b42ba1",
+          "ref": "refs/remotes/origin/HEAD"
+        },
+        {
+          "object_id": "ef9cf05ea1f33a0ffacde3ac948dc12250b42ba1",
+          "ref": "refs/remotes/origin/main"
+        }
+      ],
+      "renamed_paths": [],
+      "root": "C:\\Repos\\HiveMind\\hive-mind-os",
+      "tracked_file_count": 48,
+      "tracked_tree_digest": "sha256:c0fb76d720621e839ea9e464a7de6c1bca3ceaec1a13fc6b405ba8c0d6ec1ec0",
+      "working_tree_clean": false,
+      "working_tree_entries": [
+        " M README.md",
+        " M src/hive_mind_os/__init__.py",
+        " M src/hive_mind_os/cli.py",
+        "?? docs/architecture/ADR-002-REPRODUCIBLE-CURRENT-STATE-AUDIT.md",
+        "?? src/hive_mind_os/current_state_audit.py",
+        "?? tests/test_current_state_audit.py"
+      ]
+    },
+    "schema_version": 1,
+    "tests": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 61,
+      "status": "passed"
+    },
+    "tools": {
+      "git": "git version 2.53.0.windows.3",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "python": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]",
+      "python_executable": "C:\\Python314\\python.exe"
+    }
+  },
+  "integrity": {
+    "canonicalization": "json-sort-keys-utf8-v1",
+    "digest": "sha256:6c3d47ce336d4da046835c92ddc3474b2bf8b3beb9733156301d89dfe455b9da",
+    "signature": null
+  }
+}

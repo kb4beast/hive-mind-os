@@ -60,6 +60,8 @@ class EvidenceLedger:
                 "INSERT INTO events(run_id,event_type,actor,payload,created_at) VALUES(?,?,?,?,?)",
                 (run_id, event_type, actor, encoded, utc_now()),
             )
+            if cursor.lastrowid is None:
+                raise RuntimeError("SQLite did not return an event sequence")
             return int(cursor.lastrowid)
 
     def append_lessons(

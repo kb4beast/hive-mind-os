@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from .courtroom import BurdenOfProof, Disposition, ImplementationState, SourceRecord, SourceStatus
+from .courtroom import (
+    BurdenOfProof,
+    Disposition,
+    ImplementationState,
+    SourceRecord,
+    SourceStatus,
+)
 from .founding_docket import ClaimSpec
-
 
 RECURSIVE_IMPROVEMENT_SOURCES: tuple[SourceRecord, ...] = (
     SourceRecord(
@@ -14,6 +19,7 @@ RECURSIVE_IMPROVEMENT_SOURCES: tuple[SourceRecord, ...] = (
         version_ref="youtube:t7_ZXgfJVG8",
         license_spdx=None,
         content_digest=None,
+        object_type="video_id",
     ),
     SourceRecord(
         id="SRC-021",
@@ -24,6 +30,7 @@ RECURSIVE_IMPROVEMENT_SOURCES: tuple[SourceRecord, ...] = (
         version_ref="228791fb499afffb54b46200aca536f79142f117",
         license_spdx="MIT",
         content_digest=None,
+        object_type="commit",
     ),
 )
 

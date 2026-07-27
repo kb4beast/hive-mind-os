@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from typing import Iterable, Mapping
 
@@ -47,6 +47,14 @@ class ImplementationState(StrEnum):
     VALIDATED = "validated"
 
 
+class CapabilityMaturity(StrEnum):
+    SPECIFIED = "specified"
+    STRUCTURALLY_PROTOTYPED = "structurally_prototyped"
+    EXECUTED_IN_ISOLATION = "executed_in_isolation"
+    INDEPENDENTLY_VERIFIED_E2E = "independently_verified_e2e"
+    PRODUCTION_PROVEN = "production_proven"
+
+
 class IssueSeverity(StrEnum):
     WARNING = "warning"
     BLOCKING = "blocking"
@@ -62,14 +70,37 @@ class SourceRecord:
     version_ref: str | None = None
     license_spdx: str | None = None
     content_digest: str | None = None
+    unverified_digest_label: str | None = None
     provenance_complete: bool = True
     requires_complete_ingestion: bool = True
+    object_type: str | None = None
+    retrieved_at: str | None = None
+    snapshot_ref: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.title.strip() or not self.uri.strip():
             raise ValueError("source id, title, and URI are required")
         if self.status is SourceStatus.VERIFIED and not (self.version_ref or self.content_digest):
             raise ValueError("verified sources require a version reference or content digest")
+
+    def to_contract(self) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "id": self.id,
+            "title": self.title,
+            "uri": self.uri,
+            "kind": self.kind,
+            "status": self.status.value,
+            "version_ref": self.version_ref,
+            "object_type": self.object_type,
+            "retrieved_at": self.retrieved_at,
+            "license_spdx": self.license_spdx,
+            "content_digest": self.content_digest,
+            "unverified_digest_label": self.unverified_digest_label,
+            "provenance_complete": self.provenance_complete,
+            "requires_complete_ingestion": self.requires_complete_ingestion,
+            "snapshot_ref": self.snapshot_ref,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,12 +119,33 @@ class IdeaClaim:
     benchmark_refs: tuple[str, ...] = ()
     comparator_source_ids: tuple[str, ...] = ()
     implementation_state: ImplementationState = ImplementationState.INVENTORIED
+    capability_maturity: CapabilityMaturity = CapabilityMaturity.SPECIFIED
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.case_id.strip() or not self.proposition.strip():
             raise ValueError("claim id, case id, and proposition are required")
         if not self.source_ids:
             raise ValueError("every claim must identify at least one source")
+
+    def to_contract(self) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "id": self.id,
+            "case_id": self.case_id,
+            "proposition": self.proposition,
+            "source_ids": list(self.source_ids),
+            "category": self.category,
+            "burden": self.burden.name.lower(),
+            "implementation_state": self.implementation_state.value,
+            "capability_maturity": self.capability_maturity.value,
+            "architecture_refs": list(self.architecture_refs),
+            "acceptance_tests": list(self.acceptance_tests),
+            "outcome_metrics": list(self.outcome_metrics),
+            "code_refs": list(self.code_refs),
+            "test_refs": list(self.test_refs),
+            "benchmark_refs": list(self.benchmark_refs),
+            "comparator_source_ids": list(self.comparator_source_ids),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,6 +268,20 @@ class Courtroom:
             for source in source_records
             if not source.provenance_complete
             or (source.requires_complete_ingestion and source.status is not SourceStatus.VERIFIED)
+            or source.license_spdx is None
+            or source.unverified_digest_label is not None
+            or (
+                "repository" in source.kind.split("_")
+                and (
+                    source.object_type != "commit"
+                    or not source.version_ref
+                    or len(source.version_ref) != 40
+                    or any(
+                        character not in "0123456789abcdef"
+                        for character in source.version_ref
+                    )
+                )
+            )
         ]
         if incomplete_sources and case.claim.burden > BurdenOfProof.CAPTURE:
             reasons.append("source ingestion or provenance is incomplete: " + ", ".join(sorted(incomplete_sources)))
@@ -299,6 +365,16 @@ class DocketDecision:
         if not self.expert_findings:
             raise ValueError("at least one expert finding is required")
 
+    def to_contract(self) -> dict[str, object]:
+        return {
+            "claim_id": self.claim_id,
+            "disposition": self.disposition.value,
+            "rationale": self.rationale,
+            "advocate_case": self.advocate_case,
+            "cross_examination": self.cross_examination,
+            "expert_findings": list(self.expert_findings),
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class DocketIssue:
@@ -325,6 +401,20 @@ class DocketAudit:
     @property
     def release_ready(self) -> bool:
         return not any(issue.severity is IssueSeverity.BLOCKING for issue in self.issues)
+
+    @property
+    def machine_blocked_claim_ids(self) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                {
+                    issue.claim_id
+                    for issue in self.issues
+                    if issue.claim_id
+                    and issue.message
+                    == "dependent claim is machine-blocked by incomplete source evidence"
+                }
+            )
+        )
 
 
 class SourceDocketAuditor:
@@ -400,6 +490,88 @@ class SourceDocketAuditor:
                         IssueSeverity.BLOCKING,
                         "source requires complete ingestion before derived ideas may be promoted",
                         source_id=source_id,
+                    )
+                )
+            if "repository" in source.kind.split("_"):
+                if source.object_type != "commit":
+                    issues.append(
+                        DocketIssue(
+                            IssueSeverity.BLOCKING,
+                            "repository source lacks an exact commit object pin",
+                            source_id=source_id,
+                        )
+                    )
+                if (
+                    not source.version_ref
+                    or len(source.version_ref) != 40
+                    or any(character not in "0123456789abcdef" for character in source.version_ref)
+                ):
+                    issues.append(
+                        DocketIssue(
+                            IssueSeverity.BLOCKING,
+                            "repository source pin is mutable or ambiguous",
+                            source_id=source_id,
+                        )
+                    )
+            if source.content_digest is not None and (
+                not source.content_digest.startswith("sha256:")
+                or len(source.content_digest) != 71
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in source.content_digest.removeprefix("sha256:")
+                )
+            ):
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        "source content digest is not a raw-byte SHA-256 receipt",
+                        source_id=source_id,
+                    )
+                )
+            if source.unverified_digest_label is not None:
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        (
+                            "source has an unverified digest label instead of a raw-byte "
+                            "SHA-256 receipt"
+                        ),
+                        source_id=source_id,
+                    )
+                )
+            if source.license_spdx is None:
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        "source license or reuse grant is unresolved",
+                        source_id=source_id,
+                    )
+                )
+
+        incomplete_source_ids = {
+            issue.source_id
+            for issue in issues
+            if issue.source_id
+            and issue.message
+            in {
+                "source provenance is incomplete",
+                "source requires complete ingestion before derived ideas may be promoted",
+                "repository source lacks an exact commit object pin",
+                "repository source pin is mutable or ambiguous",
+                "source content digest is not a raw-byte SHA-256 receipt",
+                "source has an unverified digest label instead of a raw-byte SHA-256 receipt",
+                "source license or reuse grant is unresolved",
+            }
+        }
+        for claim in claim_map.values():
+            blocking_sources = sorted(set(claim.source_ids) & incomplete_source_ids)
+            if blocking_sources:
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        "dependent claim is machine-blocked by incomplete source evidence",
+                        source_id=",".join(blocking_sources),
+                        claim_id=claim.id,
                     )
                 )
 
