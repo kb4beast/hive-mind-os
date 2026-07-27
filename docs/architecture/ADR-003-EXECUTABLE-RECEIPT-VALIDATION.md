@@ -146,7 +146,7 @@ Harden the current-state audit:
   output measurement rather than raising during verification;
 - non-finite, non-serializable, cyclic, excessively nested, or non-object envelopes reject as
   non-canonical JSON rather than raising from the verifier; the preflight covers audit,
-  integrity, and extension fields.
+  integrity, and extension fields, with a maximum nesting depth of 128 containers.
 
 Harden policy invariants:
 

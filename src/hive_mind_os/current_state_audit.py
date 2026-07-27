@@ -37,6 +37,7 @@ AUDITED_BASELINE: Mapping[str, object] = {
 COMMAND_TIMEOUT_SECONDS = 300
 MAX_COMMAND_OUTPUT_BYTES = 1_000_000
 OUTPUT_DRAIN_TIMEOUT_SECONDS = 1.0
+MAX_ARTIFACT_NESTING_DEPTH = 128
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _GIT_OBJECT_PATTERN = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
 _CREATE_SUSPENDED = 0x00000004
@@ -114,6 +115,26 @@ def _contains_invalid_unicode_scalar(
                 continue
             seen.add(id(current))
             pending.extend(current)
+    return False
+
+
+def _exceeds_artifact_nesting_depth(value: object) -> bool:
+    pending = [(value, 0)]
+    seen: set[int] = set()
+    while pending:
+        current, depth = pending.pop()
+        if not isinstance(current, (Mapping, list, tuple)):
+            continue
+        if depth > MAX_ARTIFACT_NESTING_DEPTH:
+            return True
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if isinstance(current, Mapping):
+            for key, item in current.items():
+                pending.extend(((key, depth + 1), (item, depth + 1)))
+        else:
+            pending.extend((item, depth + 1) for item in current)
     return False
 
 
@@ -938,6 +959,8 @@ def verify_audit_artifact(
         return False, ("artifact must be an object",)
     if _contains_invalid_unicode_scalar(artifact):
         return False, ("artifact contains an invalid Unicode scalar value",)
+    if _exceeds_artifact_nesting_depth(artifact):
+        return False, ("artifact exceeds maximum nesting depth",)
     try:
         _canonical_bytes(artifact)
     except (TypeError, ValueError, UnicodeError, RecursionError):

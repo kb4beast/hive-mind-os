@@ -452,20 +452,13 @@ class CurrentStateAuditTests(unittest.TestCase):
             self.assertIn("artifact is not canonical JSON", issues)
 
         deeply_nested: object = "leaf"
-        for _ in range(1_500):
+        for _ in range(256):
             deeply_nested = [deeply_nested]
         deep_audit = self.valid_audit(deeply_nested=deeply_nested)
-        deep_artifact = {
-            "audit": deep_audit,
-            "integrity": {
-                "canonicalization": "json-sort-keys-utf8-v1",
-                "digest": f"sha256:{'0' * 64}",
-                "signature": None,
-            },
-        }
+        deep_artifact = create_audit_artifact(deep_audit)
         valid, issues = verify_audit_artifact(deep_artifact)
         self.assertFalse(valid)
-        self.assertTrue(issues)
+        self.assertEqual(issues, ("artifact exceeds maximum nesting depth",))
 
     def test_optional_signature_requires_matching_key(self) -> None:
         artifact = create_audit_artifact(
