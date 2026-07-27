@@ -51,6 +51,12 @@ liveness, and pipe draining; reserves allowance under a lock; rejects NUL before
 routes every reproduced pre-spawn denial through the append-only ledger path. The adverse
 candidate and dissent remain preserved in Git history and the P03 pull request.
 
+A later Curator re-review closed those mechanisms but found two more denial-boundary inputs:
+`subprocess.SubprocessError` escaped process creation unchanged, and a non-object intent
+caused the denial recorder itself to raise `AttributeError`. The final challenger treats
+stdlib process-creation exceptions as typed denials and records schema-invalid objects
+without assuming mapping methods.
+
 ## Decision
 
 Add `SandboxSpec` and `SandboxRunner` as the only sanctioned command-execution API for new

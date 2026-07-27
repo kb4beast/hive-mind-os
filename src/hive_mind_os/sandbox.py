@@ -161,7 +161,7 @@ class SandboxRunner:
         deadline = started + self.spec.timeout_s
         try:
             process = self._spawn(argv)
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
             self._deny(intent, f"process creation failed: {type(error).__name__}")
         with self._usage_lock:
             self.spawn_count += 1
@@ -522,15 +522,16 @@ class SandboxRunner:
 
     def _deny(
         self,
-        intent: Mapping[str, Any],
+        intent: object,
         reason: str,
         error_type: type[SandboxDenied] = SandboxDenied,
     ) -> NoReturn:
+        document = intent if isinstance(intent, Mapping) else {}
         if self.ledger is not None:
             self.ledger.append_event(
-                str(intent.get("mission_id", "unknown")),
+                str(document.get("mission_id", "unknown")),
                 "sandbox.denied",
                 self.role.value,
-                {"action_id": intent.get("action_id"), "reason": reason},
+                {"action_id": document.get("action_id"), "reason": reason},
             )
         raise error_type(reason)

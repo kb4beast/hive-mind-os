@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -329,6 +330,36 @@ class SandboxTests(unittest.TestCase):
                 ]
                 self.assertEqual(len(denials), 1)
                 self.assertEqual(runner.spawn_count, 0)
+
+    def test_subprocess_creation_error_is_a_receipted_denial(self) -> None:
+        class FailingRunner(SandboxRunner):
+            def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
+                raise subprocess.SubprocessError("simulated child setup failure")
+
+        ledger = EvidenceLedger()
+        runner = FailingRunner(
+            self.spec(),
+            self.trusted,
+            EpisodeAllowance(1, 1.0),
+            ledger=ledger,
+        )
+        with self.assertRaisesRegex(SandboxDenied, "SubprocessError"):
+            runner.run(self.intent([sys.executable, "-c", "print('no')"]))
+        self.assertEqual(runner.spawn_count, 0)
+        self.assertEqual(
+            [event["event_type"] for event in ledger.events()],
+            ["sandbox.denied"],
+        )
+
+    def test_non_object_intent_is_a_receipted_schema_denial(self) -> None:
+        ledger = EvidenceLedger()
+        runner = self.runner(ledger=ledger)
+        with self.assertRaises(SandboxDenied):
+            runner.run([])  # type: ignore[arg-type]
+        self.assertEqual(runner.spawn_count, 0)
+        events = ledger.events()
+        self.assertEqual([event["event_type"] for event in events], ["sandbox.denied"])
+        self.assertEqual(events[0]["payload"]["action_id"], None)
 
     def test_interrupted_publish_leaves_no_receipt_claim(self) -> None:
         class InterruptedRunner(SandboxRunner):
