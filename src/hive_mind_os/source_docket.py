@@ -14,10 +14,14 @@ from .courtroom import (
 from .founding_docket import CLAIMS as FOUNDING_CLAIMS
 from .founding_docket import SOURCES as FOUNDING_SOURCES
 from .founding_docket import ClaimSpec
+from .recursive_improvement_docket import (
+    RECURSIVE_IMPROVEMENT_CLAIMS,
+    RECURSIVE_IMPROVEMENT_SOURCES,
+)
 
 
-SOURCES = (*FOUNDING_SOURCES, *ADDITIONAL_SOURCES)
-CLAIMS = (*FOUNDING_CLAIMS, *ADDITIONAL_CLAIMS)
+SOURCES = (*FOUNDING_SOURCES, *ADDITIONAL_SOURCES, *RECURSIVE_IMPROVEMENT_SOURCES)
+CLAIMS = (*FOUNDING_CLAIMS, *ADDITIONAL_CLAIMS, *RECURSIVE_IMPROVEMENT_CLAIMS)
 
 
 @dataclass(frozen=True, slots=True)
