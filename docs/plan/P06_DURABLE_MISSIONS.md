@@ -276,3 +276,12 @@ through `MissionStore` without inventing new state.
   `[[allowlists]]` schema introduced in 8.25.0. The configuration now uses the
   version-compatible singular `[allowlist]`; the exception remains line-targeted and
   default rules remain enabled.
+- Final implementation/configuration commit:
+  `ca82df3b0fa458531f961e66c7f49313e6214b4e`. The checksum-verified Gitleaks
+  8.24.3 Windows release reproduced the exact seven-commit pull-request scan locally
+  with no leaks, and both exact-head GitHub event paths completed successfully.
+- Final repair audit: `evidence/audits/P06-repair3-post.json`
+  (canonical digest:
+  `sha256:1d05da17311147d5c0bac31dbede3966941c33d951700dc03cd011c772b1a7cd`;
+  complete: true; failures: none; audited implementation/configuration commit:
+  `ca82df3b0fa458531f961e66c7f49313e6214b4e`; audit pytest: 265 passed).
