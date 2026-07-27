@@ -234,3 +234,34 @@ reversibility check; no merge authority exists anywhere in the adapter.
   result `complete: true`, with no failures.
 - The failing candidate, original audit, and GitHub logs remain preserved. Exact-head
   GitHub rerun and the single consolidated independent review remain delivery gates.
+
+### Consolidated court repair
+
+- The consolidated court rejected exact candidate
+  `2a08800b75ee7b3e50a7dfd4a4daff356247d115`. The Curator reproduced direct Git branch
+  creation and local-origin push through `run_tests()` under `SANDBOX` authority, plus
+  `.git/HEAD` and `.git/refs/**` mutation through `write_file()`. The Judge independently
+  reproduced the test-command bypass and found that unknown manifest schema versions and
+  an empty receipt index still verified. The Orchestrator's permit is preserved as dissent
+  because it did not reproduce those counterexamples.
+- Repair commit `c62f6d49f78dfb923d7d201308ad90a5e65f99a1` reserves Git execution
+  for typed adapter methods, rejects lexical and resolved case-insensitive `.git` writes,
+  embeds the content-addressed receipts and artifacts in the delivery, requires schema
+  version 1 and a nonempty structurally valid receipt index, and revalidates every receipt
+  binding through `FileReceiptValidator`.
+- Repaired regressions prove lower `SANDBOX` authority cannot create a branch, push to the
+  retained local `origin`, or mutate Git metadata; no process is spawned for direct-Git
+  test requests. Unknown schema, empty receipts, and corrupted embedded receipts all make
+  `verify_delivery()` return false.
+- Repaired gates: 15 targeted tests and 16 subtests; full suite 184 passed, 2 skipped, and
+  1,724 subtests; Ruff and Pyright clean; forbidden API inspection clean.
+- Additive audit: `evidence/audits/P04-court-repair.json`, collected from the clean repair
+  commit above; digest
+  `sha256:f61dca095444245d33b765175fc65b02a80819580628fca059295275a0982c3d`;
+  result `complete: true`, with no failures.
+- Wording correction: materialization intentionally retains an isolated local `origin` for
+  reversibility tests. P04 grants no external/network remote, credential, or typed push
+  authority. This supersedes the earlier shorthand "no remotes" without erasing it.
+- The rejected candidate, all three independent findings, prior audits, and GitHub checks
+  remain preserved. One final consolidated exact-candidate review is required after the
+  repaired GitHub checks pass.
