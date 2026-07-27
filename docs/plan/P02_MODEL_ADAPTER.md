@@ -215,21 +215,24 @@ fail closed before spend.
 - Executor (model/agent identity): Codex primary Builder/Integrator; independent review is
   required on the complete pull-request candidate.
 - Branch and final commit SHA: `phase/P02-model-adapter`; audited implementation commit
-  `e1acee2d70fa3000c5c841636876619a0c5e1031`; the audit was collected from clean commit
-  `53f8351`. The pull-request head records the final evidence/metadata commit because a
-  commit cannot contain its own SHA.
-- Gates: 15 targeted model-provider/backend tests passed under stdlib `unittest`
-  discovery; full suite ran 149 tests (148 passed, 1 skipped; 1,695 subtests passed);
+  `7ee787db0c73f5d04f3c4b656efadb431928da68`; the audit was collected from clean commit
+  `b616c2479458438b9f5414682527e4fab351be91`. The pull-request head records the final
+  evidence/metadata commit because a commit cannot contain its own SHA.
+- Gates: 16 targeted model-provider/backend tests passed under stdlib `unittest`
+  discovery; full suite ran 150 tests (149 passed, 1 skipped; 1,695 subtests passed);
   Ruff 0.16.0 passed; Pyright 1.1.411
   passed with zero errors; schema catalog and deterministic-default CLI smokes passed.
 - Audit artifact: `evidence/audits/P02-post.json` (digest:
-  `sha256:3b3f7f735f9ce0f898e146fcdf57f112203944368fd537dd3026892ae76c65bc`)
+  `sha256:6fa096f8acff57cc4cc15c01604cc37b6e196cbf13d9101d6b2d229384351839`)
 - Manual model smoke: not run — neither `OPENAI_API_KEY` nor `ANTHROPIC_API_KEY` was
   available. No credential-dependent claim is made.
 - Deviations from the phase spec: none.
 - Preserved dissent: the first consolidated review issued `adapt` because CI could not
   discover the original pytest-style tests and because retry-budget, corrective-message
   accounting, response-digest, secret-path, and truncation claims were not yet adequately
-  implemented or exercised. Those findings were repaired together in the audited
-  implementation commit above; final independent re-review remains a delivery gate.
+  implemented or exercised. A later Curator re-review reproduced one additional gap:
+  non-2xx HTTP response bodies were discarded before receipt digesting, despite being
+  available from `HTTPError`. The audited implementation commit above preserves and
+  digests those bodies without storing them; final independent re-review remains a
+  delivery gate.
 - New blockers discovered (mirrored into docs/plan/BLOCKERS.md): none.
