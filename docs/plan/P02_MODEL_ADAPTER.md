@@ -215,14 +215,21 @@ fail closed before spend.
 - Executor (model/agent identity): Codex primary Builder/Integrator; independent review is
   required on the complete pull-request candidate.
 - Branch and final commit SHA: `phase/P02-model-adapter`; audited implementation commit
-  `a510a7144cf509cbe087c68c526086409f969d88`. The pull-request head records the final
-  evidence/metadata commit because a commit cannot contain its own SHA.
-- Gates: 13 targeted model-provider/backend tests passed; full suite ran 147 tests
-  (146 passed, 1 skipped; 1,695 subtests passed); Ruff 0.16.0 passed; Pyright 1.1.411
+  `e1acee2d70fa3000c5c841636876619a0c5e1031`; the audit was collected from clean commit
+  `53f8351`. The pull-request head records the final evidence/metadata commit because a
+  commit cannot contain its own SHA.
+- Gates: 15 targeted model-provider/backend tests passed under stdlib `unittest`
+  discovery; full suite ran 149 tests (148 passed, 1 skipped; 1,695 subtests passed);
+  Ruff 0.16.0 passed; Pyright 1.1.411
   passed with zero errors; schema catalog and deterministic-default CLI smokes passed.
 - Audit artifact: `evidence/audits/P02-post.json` (digest:
-  `sha256:ed90d481da427307`)
+  `sha256:3b3f7f735f9ce0f898e146fcdf57f112203944368fd537dd3026892ae76c65bc`)
 - Manual model smoke: not run — neither `OPENAI_API_KEY` nor `ANTHROPIC_API_KEY` was
   available. No credential-dependent claim is made.
 - Deviations from the phase spec: none.
+- Preserved dissent: the first consolidated review issued `adapt` because CI could not
+  discover the original pytest-style tests and because retry-budget, corrective-message
+  accounting, response-digest, secret-path, and truncation claims were not yet adequately
+  implemented or exercised. Those findings were repaired together in the audited
+  implementation commit above; final independent re-review remains a delivery gate.
 - New blockers discovered (mirrored into docs/plan/BLOCKERS.md): none.
