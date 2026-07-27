@@ -11,8 +11,8 @@ class SourceDocketTests(unittest.TestCase):
     def test_every_source_has_claims_and_every_claim_has_a_verdict(self):
         audit = self.docket.audit()
         self.assertTrue(audit.inventory_complete)
-        self.assertEqual(self.docket.source_count, 21)
-        self.assertEqual(self.docket.claim_count, 73)
+        self.assertEqual(self.docket.source_count, 22)
+        self.assertEqual(self.docket.claim_count, 80)
         self.assertEqual(len(self.docket.decisions), self.docket.claim_count)
 
     def test_unverified_videos_remain_explicit_blocking_evidence_obligations(self):
@@ -51,7 +51,7 @@ class SourceDocketTests(unittest.TestCase):
         self.assertGreaterEqual(len(set(claim.comparator_source_ids)), 2)
         self.assertTrue(claim.benchmark_refs)
 
-    def test_new_video_claims_are_atomic_and_source_bound(self):
+    def test_new_video_and_classic_gpt_claims_are_atomic_and_source_bound(self):
         claims = {claim.id: claim for claim in self.docket.claims}
         expected = {
             "CLM-058": "SRC-016",
@@ -70,6 +70,13 @@ class SourceDocketTests(unittest.TestCase):
             "CLM-071": "SRC-020",
             "CLM-072": "SRC-020",
             "CLM-073": "SRC-020",
+            "CLM-074": "SRC-022",
+            "CLM-075": "SRC-022",
+            "CLM-076": "SRC-022",
+            "CLM-077": "SRC-022",
+            "CLM-078": "SRC-022",
+            "CLM-079": "SRC-022",
+            "CLM-080": "SRC-022",
         }
         for claim_id, source_id in expected.items():
             self.assertIn(claim_id, claims)
@@ -78,6 +85,12 @@ class SourceDocketTests(unittest.TestCase):
     def test_recursive_improvement_claims_have_code_and_test_receipts(self):
         claims = {claim.id: claim for claim in self.docket.claims}
         for claim_id in ("CLM-067", "CLM-068", "CLM-069", "CLM-070", "CLM-071", "CLM-072"):
+            self.assertTrue(claims[claim_id].code_refs, claim_id)
+            self.assertTrue(claims[claim_id].test_refs, claim_id)
+
+    def test_classic_gpt_claims_have_code_and_test_receipts(self):
+        claims = {claim.id: claim for claim in self.docket.claims}
+        for claim_id in ("CLM-074", "CLM-075", "CLM-076", "CLM-077", "CLM-078", "CLM-079", "CLM-080"):
             self.assertTrue(claims[claim_id].code_refs, claim_id)
             self.assertTrue(claims[claim_id].test_refs, claim_id)
 
