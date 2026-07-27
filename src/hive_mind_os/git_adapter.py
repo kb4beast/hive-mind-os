@@ -1,0 +1,764 @@
+"""Typed, local-only Git workspace operations over the receipted process sandbox."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import sys
+import tempfile
+import threading
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterator, Mapping, Sequence
+from uuid import uuid4
+
+from .autonomy import EpisodeAllowance
+from .contracts import tool_intent_digest
+from .models import AutonomyLevel, RiskTier, Role
+from .policy import Action, PolicyEngine
+from .receipts import portable_path_parts, sha256_digest
+from .sandbox import ConfinementViolation, SandboxRunner, SandboxSpec
+
+_FULL_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
+_BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
+_GIT_ENV_LOCK = threading.RLock()
+
+
+class GitOperationFailed(RuntimeError):
+    """Raised when a typed Git operation cannot produce its required result."""
+
+
+class PinViolation(GitOperationFailed):
+    """Raised when materialization is not bound to a local source and full commit SHA."""
+
+
+class WorkspaceDirty(GitOperationFailed):
+    """Raised when delivery export observes uncommitted workspace bytes."""
+
+
+class GitPolicyDenied(GitOperationFailed):
+    """Raised before execution when policy does not authorize the Git operation."""
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryArtifact:
+    root: Path
+    bundle_path: Path
+    patch_path: Path
+    manifest_path: Path
+    base_sha: str
+    head_sha: str
+    tree_digest: str
+    diff_digest: str
+    receipts: tuple[dict[str, Any], ...]
+
+
+def _atomic_write(destination: Path, content: bytes) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=destination.parent,
+        delete=False,
+    ) as handle:
+        handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
+        temporary = Path(handle.name)
+    os.replace(temporary, destination)
+
+
+def _local_source(value: str | Path) -> Path:
+    raw = str(value)
+    if "://" in raw or raw.startswith(("git@", "ssh:", "file:", "\\\\", "//")):
+        raise PinViolation("repository URLs are disabled until P07")
+    source = Path(value).resolve()
+    if str(source).startswith(("\\\\", "//")):
+        raise PinViolation("network filesystem repositories are disabled until P07")
+    if not source.is_dir() or not (source / ".git").exists():
+        raise PinViolation("source must be a local Git repository")
+    return source
+
+
+def _full_sha(value: str) -> str:
+    if not _FULL_SHA.fullmatch(value):
+        raise PinViolation("commit pin must be a full 40-hex SHA")
+    return value.lower()
+
+
+def _branch_name(value: str) -> str:
+    if (
+        not _BRANCH.fullmatch(value)
+        or value.endswith((".", "/"))
+        or ".." in value
+        or "@{" in value
+        or value.startswith("-")
+        or value.lower() in {"head", "fetch_head"}
+    ):
+        raise GitOperationFailed("branch name is not a safe local ref")
+    return value
+
+
+@contextmanager
+def _git_dates(author_date: str, committer_date: str) -> Iterator[None]:
+    names = ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE")
+    with _GIT_ENV_LOCK:
+        previous = {name: os.environ.get(name) for name in names}
+        os.environ[names[0]] = author_date
+        os.environ[names[1]] = committer_date
+        try:
+            yield
+        finally:
+            for name, value in previous.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+
+@contextmanager
+def _isolated_git_config(config_path: Path) -> Iterator[None]:
+    values = {
+        "GIT_CONFIG_GLOBAL": str(config_path),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+    with _GIT_ENV_LOCK:
+        previous = {name: os.environ.get(name) for name in values}
+        os.environ.update(values)
+        try:
+            yield
+        finally:
+            for name, value in previous.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+
+@contextmanager
+def _scrubbed_git_environment() -> Iterator[None]:
+    names = (
+        "GIT_AUTHOR_DATE",
+        "GIT_COMMITTER_DATE",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_NOSYSTEM",
+        "GIT_TERMINAL_PROMPT",
+    )
+    with _GIT_ENV_LOCK:
+        previous = {name: os.environ.pop(name, None) for name in names}
+        try:
+            yield
+        finally:
+            for name, value in previous.items():
+                if value is not None:
+                    os.environ[name] = value
+
+
+class GitWorkspace:
+    """Pinned, isolated local Git workspace with no merge/push/rebase authority."""
+
+    def __init__(
+        self,
+        *,
+        root: Path,
+        container_root: Path,
+        trusted_root: Path,
+        hooks_root: Path,
+        git_config: Path,
+        base_sha: str,
+        runner: SandboxRunner,
+        policy: PolicyEngine,
+        role: Role,
+        mission_id: str,
+        receipts: list[dict[str, Any]],
+    ) -> None:
+        self.root = root
+        self.container_root = container_root
+        self.trusted_root = trusted_root
+        self.hooks_root = hooks_root
+        self.git_config = git_config
+        self.base_sha = base_sha
+        self.runner = runner
+        self.policy = policy
+        self.role = role
+        self.mission_id = mission_id
+        self.state_ref = f"MISSION_STATE:{mission_id}:1"
+        self.branch_name: str | None = None
+        self.receipt_records = receipts
+
+    @classmethod
+    def materialize(
+        cls,
+        source_path_or_url: str | Path,
+        commit_sha: str,
+        workspace_root: str | Path,
+        trusted_root: str | Path,
+        *,
+        policy: PolicyEngine | None = None,
+        role: Role = Role.BUILDER,
+        allowance: EpisodeAllowance = EpisodeAllowance(200, 200.0),
+        test_executables: tuple[str, ...] = (Path(sys.executable).name,),
+    ) -> GitWorkspace:
+        source = _local_source(source_path_or_url)
+        pin = _full_sha(commit_sha)
+        engine = policy or PolicyEngine(AutonomyLevel.REPOSITORY)
+        decision = engine.decide(role, Action.READ_REPOSITORY, RiskTier.MODERATE)
+        if not decision.allowed:
+            raise GitPolicyDenied(decision.reason)
+
+        container = Path(workspace_root).resolve()
+        if container.exists() and any(container.iterdir()):
+            raise WorkspaceDirty("materialization root must be absent or empty")
+        container.mkdir(parents=True, exist_ok=True)
+        evidence = Path(trusted_root).resolve()
+        try:
+            evidence.relative_to(container)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("trusted receipt root must be outside the workspace container")
+
+        staged_source = container / "source"
+        repository = container / "repo"
+        hooks = container / "disabled-hooks"
+        hooks.mkdir()
+        staging_config = container / "isolated-gitconfig"
+        _atomic_write(staging_config, b"")
+        shutil.copytree(source, staged_source, symlinks=True)
+        mission_id = f"git-workspace-{uuid4()}"
+        receipts: list[dict[str, Any]] = []
+        git_name = Path(shutil.which("git") or "git").name
+        staging_runner = SandboxRunner(
+            SandboxSpec(
+                container,
+                argv_allowlist=(git_name,),
+                env_allowlist=(
+                    "GIT_CONFIG_GLOBAL",
+                    "GIT_CONFIG_NOSYSTEM",
+                    "GIT_TERMINAL_PROMPT",
+                ),
+                timeout_s=60.0,
+                max_output_bytes=10_000_000,
+            ),
+            evidence,
+            allowance,
+            policy=engine,
+            role=role,
+            runner_identity="git-sandbox-runner-v1",
+        )
+        clone_args = ["clone", "--no-hardlinks", "source", "repo"]
+        with _isolated_git_config(staging_config):
+            clone_receipt = cls._execute(
+                staging_runner,
+                cls._git_argv(hooks, clone_args),
+                mission_id=mission_id,
+                role=role,
+                description="clone approved local repository snapshot",
+                path_args=[9, 10],
+            )
+        cls._append_receipt(receipts, staging_runner, clone_receipt)
+        if clone_receipt["result"] != "succeeded":
+            raise GitOperationFailed("local repository clone failed")
+
+        remaining = EpisodeAllowance(
+            max(0, allowance.tool_calls - staging_runner.tool_calls_used),
+            max(0.0, allowance.compute_units - staging_runner.compute_units_used),
+        )
+        git_config = repository / ".git" / "hive-mind-isolated-config"
+        _atomic_write(git_config, b"")
+        runner = SandboxRunner(
+            SandboxSpec(
+                repository,
+                argv_allowlist=(git_name, *test_executables),
+                env_allowlist=(
+                    "GIT_AUTHOR_DATE",
+                    "GIT_COMMITTER_DATE",
+                    "GIT_CONFIG_GLOBAL",
+                    "GIT_CONFIG_NOSYSTEM",
+                    "GIT_TERMINAL_PROMPT",
+                ),
+                timeout_s=60.0,
+                max_output_bytes=10_000_000,
+            ),
+            evidence,
+            remaining,
+            policy=engine,
+            role=role,
+            runner_identity="git-sandbox-runner-v1",
+        )
+        workspace = cls(
+            root=repository,
+            container_root=container,
+            trusted_root=evidence,
+            hooks_root=hooks,
+            git_config=git_config,
+            base_sha=pin,
+            runner=runner,
+            policy=engine,
+            role=role,
+            mission_id=mission_id,
+            receipts=receipts,
+        )
+        workspace._run_git(
+            ["checkout", "--detach", pin],
+            Action.READ_REPOSITORY,
+            "checkout exact pinned commit",
+        )
+        observed = workspace._git_text(
+            ["rev-parse", "HEAD"],
+            Action.READ_REPOSITORY,
+            "verify pinned commit",
+        )
+        if observed != pin:
+            raise PinViolation(f"materialized HEAD {observed} does not match pin {pin}")
+        return workspace
+
+    @staticmethod
+    def _git_argv(hooks_root: Path, args: Sequence[str]) -> list[str]:
+        git = shutil.which("git") or "git"
+        return [
+            git,
+            "-c",
+            f"core.hooksPath={hooks_root}",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "commit.gpgsign=false",
+            *args,
+        ]
+
+    @staticmethod
+    def _execute(
+        runner: SandboxRunner,
+        argv: list[str],
+        *,
+        mission_id: str,
+        role: Role,
+        description: str,
+        path_args: list[int] | None = None,
+    ) -> dict[str, Any]:
+        intent: dict[str, Any] = {
+            "schema_version": 1,
+            "action_id": f"ACT-git-{uuid4()}",
+            "mission_id": mission_id,
+            "state_ref": f"MISSION_STATE:{mission_id}:1",
+            "actor_id": role.value,
+            "kind": "command",
+            "description": description,
+            "action_digest": f"sha256:{'0' * 64}",
+            "policy_decision_ref": f"POLICY-git-{uuid4()}",
+            "lease_id": f"LEASE-git-{uuid4()}",
+            "idempotency_key": f"IDEMPOTENCY-git-{uuid4()}",
+            "rollback_ref": None,
+            "command": {
+                "argv": argv,
+                "path_args": path_args or [],
+            },
+            "status": "proposed",
+        }
+        intent["action_digest"] = tool_intent_digest(intent)
+        return runner.run(intent)
+
+    @staticmethod
+    def _append_receipt(
+        records: list[dict[str, Any]],
+        runner: SandboxRunner,
+        receipt: Mapping[str, Any],
+    ) -> None:
+        reference = runner.last_reference
+        if reference is None:
+            raise GitOperationFailed("sandbox execution did not publish a receipt")
+        records.append(
+            {
+                "path": reference.path,
+                "digest": reference.digest,
+                "mission_id": receipt["mission_id"],
+                "state_ref": receipt["state_ref"],
+                "actor_id": receipt["actor_id"],
+                "action_id": receipt["action_id"],
+                "action_kind": receipt["action_kind"],
+                "action_digest": receipt["action_digest"],
+                "result": receipt["result"],
+            }
+        )
+
+    def _authorize(self, action: Action) -> None:
+        decision = self.policy.decide(self.role, action, RiskTier.MODERATE)
+        if not decision.allowed:
+            raise GitPolicyDenied(decision.reason)
+
+    def _artifact(self, receipt: Mapping[str, Any], artifact_id: str) -> bytes:
+        for artifact in receipt["artifacts"]:
+            if artifact.get("artifact_id") == artifact_id:
+                parts = portable_path_parts(artifact["path"])
+                return (self.trusted_root / Path(*parts)).read_bytes()
+        raise GitOperationFailed(f"git receipt lacks {artifact_id} artifact")
+
+    def _run_git(
+        self,
+        args: Sequence[str],
+        action: Action,
+        description: str,
+        *,
+        path_args: list[int] | None = None,
+        extra_config: Sequence[str] = (),
+        allow_failure: bool = False,
+    ) -> tuple[dict[str, Any], bytes]:
+        self._authorize(action)
+        argv = self._git_argv(
+            self.hooks_root,
+            [*extra_config, *args],
+        )
+        adjusted_paths = (
+            [index + 7 + len(extra_config) for index in path_args]
+            if path_args
+            else []
+        )
+        with _isolated_git_config(self.git_config):
+            receipt = self._execute(
+                self.runner,
+                argv,
+                mission_id=self.mission_id,
+                role=self.role,
+                description=description,
+                path_args=adjusted_paths,
+            )
+        self._append_receipt(self.receipt_records, self.runner, receipt)
+        stdout = self._artifact(receipt, "stdout")
+        if receipt["execution"]["stdout"]["truncated"]:
+            raise GitOperationFailed(f"{description} exceeded the Git output limit")
+        if receipt["result"] != "succeeded" and not allow_failure:
+            stderr = self._artifact(receipt, "stderr").decode("utf-8", "replace").strip()
+            raise GitOperationFailed(f"{description} failed: {stderr}")
+        return receipt, stdout
+
+    def _git_text(
+        self,
+        args: Sequence[str],
+        action: Action,
+        description: str,
+    ) -> str:
+        _, stdout = self._run_git(args, action, description)
+        return stdout.decode("utf-8", "strict").strip()
+
+    def status_clean(self) -> bool:
+        _, output = self._run_git(
+            ["status", "--porcelain", "--untracked-files=all"],
+            Action.READ_REPOSITORY,
+            "inspect workspace status",
+        )
+        return not output.strip()
+
+    def create_branch(self, name: str) -> None:
+        branch = _branch_name(name)
+        self._run_git(
+            ["check-ref-format", "--branch", branch],
+            Action.CREATE_BRANCH,
+            "validate local branch name",
+        )
+        self._run_git(
+            ["switch", "-c", branch],
+            Action.CREATE_BRANCH,
+            "create isolated branch",
+        )
+        self.branch_name = branch
+
+    def write_file(self, relative_path: str, content: bytes) -> Path:
+        self._authorize(Action.WRITE_WORKSPACE)
+        parts = portable_path_parts(relative_path)
+        destination = self.root / Path(*parts)
+        resolved = destination.resolve()
+        try:
+            resolved.relative_to(self.root)
+        except ValueError:
+            raise ConfinementViolation("write path escapes Git workspace") from None
+        _atomic_write(destination, content)
+        return destination
+
+    def diff(self) -> tuple[bytes, str]:
+        _, content = self._run_git(
+            ["diff", "--binary", self.base_sha, "--"],
+            Action.READ_REPOSITORY,
+            "render workspace diff",
+        )
+        return content, sha256_digest(content)
+
+    def commit(
+        self,
+        message: str,
+        *,
+        author_date: str = "2026-01-03T00:00:00Z",
+        committer_date: str | None = None,
+    ) -> str:
+        if self.branch_name is None:
+            raise GitOperationFailed("create an isolated branch before committing")
+        if not message.strip():
+            raise ValueError("commit message is required")
+        self._run_git(
+            ["add", "--all"],
+            Action.CREATE_BRANCH,
+            "stage workspace changes",
+        )
+        date = committer_date or author_date
+        identity = [
+            "-c",
+            f"user.name={self.role.value}",
+            "-c",
+            f"user.email={self.role.value}@hive-mind.invalid",
+        ]
+        with _git_dates(author_date, date):
+            self._run_git(
+                ["commit", "--no-gpg-sign", "-m", message],
+                Action.CREATE_BRANCH,
+                "commit isolated branch changes",
+                extra_config=identity,
+            )
+        return self._git_text(
+            ["rev-parse", "HEAD"],
+            Action.READ_REPOSITORY,
+            "read committed head",
+        )
+
+    def run_tests(self, argv: Sequence[str]) -> dict[str, Any]:
+        self._authorize(Action.RUN_COMMANDS)
+        if not argv:
+            raise ValueError("test argv is required")
+        with _scrubbed_git_environment():
+            receipt = self._execute(
+                self.runner,
+                list(argv),
+                mission_id=self.mission_id,
+                role=self.role,
+                description="run caller-declared repository tests",
+            )
+        self._append_receipt(self.receipt_records, self.runner, receipt)
+        return receipt
+
+    def export_delivery(self, out_dir: str | Path) -> DeliveryArtifact:
+        self._authorize(Action.WRITE_WORKSPACE)
+        if self.branch_name is None:
+            raise GitOperationFailed("delivery requires an isolated branch")
+        if not self.status_clean():
+            raise WorkspaceDirty("delivery requires a clean committed workspace")
+        head_sha = self._git_text(
+            ["rev-parse", "HEAD"],
+            Action.READ_REPOSITORY,
+            "read delivery head",
+        )
+        tree_digest = self._git_text(
+            ["rev-parse", "HEAD^{tree}"],
+            Action.READ_REPOSITORY,
+            "read delivery tree",
+        )
+        diff_bytes, diff_digest = self.diff()
+        _, files_bytes = self._run_git(
+            ["diff", "--name-only", self.base_sha, head_sha],
+            Action.READ_REPOSITORY,
+            "list delivery files",
+        )
+        files = [
+            line
+            for line in files_bytes.decode("utf-8", "strict").splitlines()
+            if line
+        ]
+        for relative in files:
+            portable_path_parts(relative)
+        _, bundle = self._run_git(
+            ["bundle", "create", "-", self.branch_name],
+            Action.READ_REPOSITORY,
+            "export delivery bundle",
+        )
+        _, patch = self._run_git(
+            ["format-patch", "--stdout", "--binary", f"{self.base_sha}..{head_sha}"],
+            Action.READ_REPOSITORY,
+            "export delivery patch",
+        )
+
+        root = Path(out_dir).resolve()
+        try:
+            root.relative_to(self.root)
+        except ValueError:
+            pass
+        else:
+            raise ConfinementViolation("delivery directory must be outside the Git workspace")
+        root.mkdir(parents=True, exist_ok=True)
+        bundle_path = root / "changes.bundle"
+        patch_path = root / "changes.patch"
+        manifest_path = root / "delivery.json"
+        _atomic_write(bundle_path, bundle)
+        _atomic_write(patch_path, patch)
+        receipt_snapshot = tuple(dict(record) for record in self.receipt_records)
+        manifest = {
+            "schema_version": 1,
+            "base_sha": self.base_sha,
+            "branch_name": self.branch_name,
+            "head_sha": head_sha,
+            "head_tree": tree_digest,
+            "diff_digest": diff_digest,
+            "bundle_digest": sha256_digest(bundle),
+            "patch_digest": sha256_digest(patch),
+            "files": files,
+            "receipts": list(receipt_snapshot),
+        }
+        _atomic_write(
+            manifest_path,
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        return DeliveryArtifact(
+            root,
+            bundle_path,
+            patch_path,
+            manifest_path,
+            self.base_sha,
+            head_sha,
+            tree_digest,
+            diff_digest,
+            receipt_snapshot,
+        )
+
+
+def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
+    artifact_root = Path(artifact_dir).resolve()
+    try:
+        manifest = json.loads(
+            (artifact_root / "delivery.json").read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(manifest, dict):
+        return False
+    required = {
+        "base_sha",
+        "branch_name",
+        "head_sha",
+        "head_tree",
+        "diff_digest",
+        "bundle_digest",
+        "patch_digest",
+        "files",
+        "receipts",
+    }
+    if not required.issubset(manifest):
+        return False
+    try:
+        base_sha = _full_sha(manifest["base_sha"])
+        head_sha = _full_sha(manifest["head_sha"])
+        head_tree = _full_sha(manifest["head_tree"])
+        branch = _branch_name(manifest["branch_name"])
+        source = _local_source(base_source)
+        bundle = (artifact_root / "changes.bundle").read_bytes()
+        patch = (artifact_root / "changes.patch").read_bytes()
+        files = manifest["files"]
+        if not isinstance(files, list) or not all(
+            isinstance(relative, str) for relative in files
+        ):
+            return False
+        for relative in files:
+            portable_path_parts(relative)
+        if not isinstance(manifest["receipts"], list):
+            return False
+    except (GitOperationFailed, OSError, TypeError):
+        return False
+    if (
+        sha256_digest(bundle) != manifest["bundle_digest"]
+        or sha256_digest(patch) != manifest["patch_digest"]
+    ):
+        return False
+
+    with tempfile.TemporaryDirectory() as temporary:
+        temporary_root = Path(temporary)
+        try:
+            workspace = GitWorkspace.materialize(
+                source,
+                base_sha,
+                temporary_root / "workspace",
+                temporary_root / "evidence",
+            )
+            workspace.write_file("changes.bundle", bundle)
+            workspace._run_git(
+                [
+                    "fetch",
+                    "changes.bundle",
+                    f"{branch}:refs/heads/{branch}",
+                ],
+                Action.READ_REPOSITORY,
+                "apply delivery bundle to fresh clone",
+                path_args=[1],
+            )
+            workspace._run_git(
+                ["checkout", "--detach", head_sha],
+                Action.READ_REPOSITORY,
+                "checkout delivered head",
+            )
+            ancestor = workspace._run_git(
+                ["merge-base", "--is-ancestor", base_sha, head_sha],
+                Action.READ_REPOSITORY,
+                "verify delivery descends from base",
+                allow_failure=True,
+            )[0]
+            if ancestor["result"] != "succeeded":
+                return False
+            observed_head = workspace._git_text(
+                ["rev-parse", "HEAD"],
+                Action.READ_REPOSITORY,
+                "verify delivered head",
+            )
+            observed_tree = workspace._git_text(
+                ["rev-parse", "HEAD^{tree}"],
+                Action.READ_REPOSITORY,
+                "verify delivered tree",
+            )
+            diff, diff_digest = workspace.diff()
+            _, observed_files = workspace._run_git(
+                ["diff", "--name-only", base_sha, head_sha],
+                Action.READ_REPOSITORY,
+                "verify delivered file list",
+            )
+            _, observed_patch = workspace._run_git(
+                ["format-patch", "--stdout", "--binary", f"{base_sha}..{head_sha}"],
+                Action.READ_REPOSITORY,
+                "verify canonical delivery patch",
+            )
+
+            patch_workspace = GitWorkspace.materialize(
+                source,
+                base_sha,
+                temporary_root / "patch-workspace",
+                temporary_root / "patch-evidence",
+            )
+            patch_workspace.write_file("changes.patch", patch)
+            patch_workspace._run_git(
+                ["apply", "--check", "changes.patch"],
+                Action.WRITE_WORKSPACE,
+                "check delivery patch against base",
+                path_args=[2],
+            )
+            patch_workspace._run_git(
+                ["apply", "--index", "changes.patch"],
+                Action.WRITE_WORKSPACE,
+                "apply delivery patch to base",
+                path_args=[2],
+            )
+            patch_tree = patch_workspace._git_text(
+                ["write-tree"],
+                Action.READ_REPOSITORY,
+                "verify delivery patch tree",
+            )
+        except (GitOperationFailed, ConfinementViolation, OSError, ValueError):
+            return False
+    return (
+        observed_head == head_sha
+        and observed_tree == head_tree
+        and patch_tree == head_tree
+        and diff_digest == manifest["diff_digest"]
+        and sha256_digest(diff) == manifest["diff_digest"]
+        and observed_files.decode("utf-8", "strict").splitlines() == files
+        and observed_patch == patch
+    )
