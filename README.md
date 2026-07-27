@@ -28,11 +28,11 @@ Every user requirement and external source is treated as evidence, not inspirati
 - architecture, acceptance-test, metric, rollback, and implementation mappings;
 - an append-only appeal path.
 
-The founding docket currently records **15 sources and 57 atomic claims**. It is inventory-complete. It intentionally remains source-incomplete until verified transcripts for both referenced YouTube videos are ingested; the system records those as blocking evidence obligations rather than inventing their contents.
+The founding docket currently records **22 sources and 80 atomic claims**. It is inventory-complete. It intentionally remains source-incomplete while seven video sources await complete verified ingestion; the system records those as blocking evidence obligations rather than inventing their contents.
 
 - Courtroom engine: `src/hive_mind_os/courtroom.py`
 - Docket loader and completeness audit: `src/hive_mind_os/source_docket.py`
-- Machine-readable source/claim docket: `src/hive_mind_os/founding_docket.py`
+- Machine-readable source/claim dockets: `src/hive_mind_os/founding_docket.py` and the specialized docket modules
 - Full case record: [Courtroom Synthesis](docs/architecture/COURTROOM_SYNTHESIS.md)
 - Best-of-all-sources architecture: [Conglomerated System](docs/architecture/CONGLOMERATED_SYSTEM.md)
 
@@ -40,7 +40,7 @@ The founding docket currently records **15 sources and 57 atomic claims**. It is
 
 ## Hardened founding vision
 
-The original product prompt, supplied “New Team Model” images, reference repositories, mission-control reference, research, and linked videos are preserved as a normative, machine-checkable product constitution.
+The original product prompt, supplied “New Team Model” images, reference repositories, mission-control reference, research, linked videos, recursive-improvement evidence, and classic-GPT simulation requirement are preserved as a normative, machine-checkable product constitution.
 
 - Human-readable contract: [Hardened Founding Vision Contract](docs/architecture/HARDENED_VISION_CONTRACT.md)
 - Machine-readable contract and compliance gate: `src/hive_mind_os/vision.py`
@@ -48,6 +48,12 @@ The original product prompt, supplied “New Team Model” images, reference rep
 - License-aware repository scouting and anti-cheat historical curriculum: `src/hive_mind_os/repository_learning.py`
 
 A run fails full-autonomy compliance when it omits a specialist or lifecycle stage, lacks source or courtroom evidence, uses future repository knowledge, permits self-approval, lacks provenance or rollback evidence, violates policy, makes an unbenchmarked superiority claim, or depends on discretionary human supervision for routine work.
+
+## Classic GPT simulation pack
+
+For a single classic GPT or custom GPT, load the files in `gpt_sources/manifest.json` order. The pack externalizes mission state, labels all eight role passes, enforces courtroom identities, distinguishes proposed actions from external receipts, and makes handoff and resume explicit.
+
+The Python gate in `src/hive_mind_os/classic_gpt.py` validates source-pack integrity, evidence, identity separation, receipted side effects, and completion. A text-only simulation cannot claim persistent memory, distributed independence, sandbox execution, Git changes, messages, deployments, or other side effects without external evidence.
 
 ## What is implemented
 
@@ -73,6 +79,8 @@ The foundation includes:
 - Automatic quarantine for unsafe, deceptive, or unsupported variants.
 - Evidence-supported teaching packets for cross-agent learning.
 - A persistent autonomous mission loop that stops on completion, policy failure, or budget exhaustion.
+- A bounded recursive-improvement gate with repeated measurements, noise floors, hard guardrails, retained lineage, rollback, quarantine, and deterministic stopping.
+- A load-ordered classic GPT source pack with portable state, role/court protocols, receipt-backed side effects, and fail-closed completion.
 - Tests and GitHub Actions CI.
 
 ## Bounded evolutionary autonomy
@@ -109,5 +117,6 @@ The included deterministic backend exercises the role lifecycle offline. Real mo
 13. Routine work is designed to recover and resume without repeated human prompting.
 14. Superiority requires a reproducible comparator court.
 15. Models, tools, sandboxes, storage, schedulers, Git providers, research providers, and interfaces remain replaceable.
+16. A classic GPT simulation cannot convert generated text into a claim of real execution without a matching external receipt.
 
-See the [foundation plan](docs/architecture/FOUNDATION_PLAN.md), [hardened vision contract](docs/architecture/HARDENED_VISION_CONTRACT.md), [courtroom synthesis](docs/architecture/COURTROOM_SYNTHESIS.md), [conglomerated architecture](docs/architecture/CONGLOMERATED_SYSTEM.md), and [agent instructions](AGENTS.md).
+See the [foundation plan](docs/architecture/FOUNDATION_PLAN.md), [hardened vision contract](docs/architecture/HARDENED_VISION_CONTRACT.md), [courtroom synthesis](docs/architecture/COURTROOM_SYNTHESIS.md), [conglomerated architecture](docs/architecture/CONGLOMERATED_SYSTEM.md), [classic GPT source-pack manifest](gpt_sources/manifest.json), and [agent instructions](AGENTS.md).
