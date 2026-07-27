@@ -234,14 +234,16 @@ rlimits.
 - Executor (model/agent identity): Codex primary Builder/Integrator; independent Curator,
   Judge, and Orchestrator review is required on the complete pull-request candidate.
 - Branch and audited implementation commit: `phase/P03-sandbox-runner`;
-  `d25fb81` includes the P03 implementation and current P02-bearing `main`.
+  `d25fb81` includes the P03 implementation and current P02-bearing `main`; the audit was
+  collected from clean completion candidate `df7059ef131ed26b361352e5b70da5412094fef7`.
 - Gates before audit: 14 targeted sandbox tests ran on Windows (13 passed, the POSIX-only
   symlink case skipped); constitutional discovery ran 164 tests (162 passed, 2 skipped);
   1,695 subtests passed; Ruff 0.16.0, Pyright 1.1.411, and the schema catalog passed.
 - Concrete runner/validator smoke: passed; ephemeral receipt digest
   `sha256:5c2ad2b87a5d8b3fd6d544467beb199132a006f9e4bda0701ca80e10af841cb0`.
-- Audit artifact: pending clean generation at `evidence/audits/P03-post.json`; the final
-  evidence commit will record its digest because a commit cannot contain its own SHA.
+- Audit artifact: `evidence/audits/P03-post.json` (digest:
+  `sha256:5af013ccec4a5dfda52feb4c7635d58385071e89d1baddf97f01bf12083fddb7`);
+  the final evidence commit cannot contain its own SHA.
 - Constitutional schema delta: `tool-intent.command` and `tool-receipt.execution` were
   added under proposed ADR-007 with catalog, golden-fixture, mutation, and validator
   regressions. Historical non-command documents remain compatible; untyped command intents
