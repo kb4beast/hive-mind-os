@@ -1,14 +1,14 @@
 {
   "base_sha": "f1c725ed6033f6e484f779fb01cd7939f2ae1863",
   "branch_name": "phase/fix-increment",
-  "bundle_digest": "sha256:498cd2226ab1e7a0a19d9d65e499d11a69255bb665880d746fbc8e3874a6df89",
+  "bundle_digest": "<git-serialization-digest>",
   "diff_digest": "sha256:430994a8555668eb892cf408c06c060a280f14ed57a666d6c31ff9813c0f2166",
   "files": [
     "tiny_pkg/maths.py"
   ],
   "head_sha": "6c4a1f8d7036a1520260c004170c740bf41b89a5",
   "head_tree": "e2fed4976f15a32feb343b06e51e634bddcae76c",
-  "patch_digest": "sha256:cc3d8d4d72ed59fe4c4bd5e37f64a442cfc3e5411375d80ddc8c4e120510a748",
+  "patch_digest": "<git-serialization-digest>",
   "receipts": [
     "<content-addressed-receipts>"
   ],

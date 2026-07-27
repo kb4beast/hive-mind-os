@@ -250,6 +250,8 @@ class GitAdapterTests(unittest.TestCase):
             ).read_text(encoding="utf-8")
         )
         normalized = deepcopy(manifest)
+        normalized["bundle_digest"] = "<git-serialization-digest>"
+        normalized["patch_digest"] = "<git-serialization-digest>"
         normalized["receipts"] = ["<content-addressed-receipts>"]
         self.assertEqual(normalized, golden)
 
