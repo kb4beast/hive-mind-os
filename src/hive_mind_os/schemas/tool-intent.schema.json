@@ -18,6 +18,21 @@
     "lease_id": {"type": "string", "minLength": 1},
     "idempotency_key": {"type": "string", "minLength": 1},
     "rollback_ref": {"type": ["string", "null"], "minLength": 1},
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "path_args"],
+      "properties": {
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "path_args": {"type": "array", "items": {"type": "integer", "minimum": 1}, "uniqueItems": true}
+      }
+    },
     "status": {"const": "proposed"}
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "command"}}},
+      "then": {"required": ["command"]}
+    }
+  ]
 }
