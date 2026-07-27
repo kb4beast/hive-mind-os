@@ -20,7 +20,8 @@ from hive_mind_os.contracts import (
     validate_contract,
 )
 from hive_mind_os.ledger import EvidenceLedger
-from hive_mind_os.models import Role
+from hive_mind_os.models import AutonomyLevel, Role
+from hive_mind_os.policy import PolicyEngine
 from hive_mind_os.receipts import (
     FileReceiptValidator,
     ReceiptReference,
@@ -63,6 +64,7 @@ class SandboxTests(unittest.TestCase):
         role: Role = Role.BUILDER,
         trusted: Path | None = None,
         ledger: EvidenceLedger | None = None,
+        policy: PolicyEngine | None = None,
     ) -> SandboxRunner:
         return SandboxRunner(
             spec or self.spec(),
@@ -70,6 +72,7 @@ class SandboxTests(unittest.TestCase):
             allowance or EpisodeAllowance(20, 100.0),
             role=role,
             ledger=ledger,
+            policy=policy,
         )
 
     def intent(
@@ -292,8 +295,8 @@ class SandboxTests(unittest.TestCase):
         self.assertEqual(stream["digest"], sha256_digest(stdout))
 
     def test_policy_denial_occurs_before_spawn(self) -> None:
-        runner = self.runner(role=Role.EXPLORER)
-        with self.assertRaisesRegex(SandboxDenied, "read-only"):
+        runner = self.runner(policy=PolicyEngine(AutonomyLevel.ADVISE))
+        with self.assertRaisesRegex(SandboxDenied, "requires autonomy level"):
             runner.run(self.intent([sys.executable, "-c", "print('denied')"]))
         self.assertEqual(runner.spawn_count, 0)
 

@@ -213,3 +213,181 @@ paths (bad fix, policy, budget) fail closed with recorded state.
 - Do not special-case the fixture inside mission code (fixture knowledge lives only in
   the scripted backend and test fixtures; `RepositoryMission` must be repository-agnostic).
 - Do not weaken kernel result validation to fit mission wiring.
+
+---
+## Completion record
+- Date (UTC): 2026-07-27
+- Executor (model/agent identity): Codex (GPT-5)
+- Branch and implementation commit SHA: `phase/P05-vertical-slice` at
+  `dc41483384b7654f450fbc413aa17f51ef31a4fa`
+- Gates: P05 tests 10 passed; full pytest 196 passed, 2 skipped, 1,718 subtests;
+  Ruff passed; Pyright passed with 0 errors; offline CLI golden path passed twice
+- Audit artifact: `evidence/audits/P05-post.json`
+  (digest: `sha256:96bf4b4fac5b3c56af53abda62851fca53a0f72dfa1bb5f7e95bc6dde4c1a8b4`;
+  complete: true; failures: none)
+- Real-model path: not exercised against a network provider because neither a model ID nor
+  provider credential was configured. The actual `ModelBackend` path was exercised offline
+  with a deterministic fake provider through the same capability executor.
+- Deviations from the phase spec:
+  - Added ADR-009 and the narrow policy change permitting sandbox-level Explorer command
+    execution while retaining every Explorer mutation denial. This was required to make
+    the specified read-only failing-test reproduction reachable.
+  - Extended `verify_delivery` with optional Curator identity, allowance, evidence-root,
+    and receipt-sink parameters so all internal verification commands remain reachable
+    from `MissionReport`; existing P04 callers retain their prior defaults.
+  - Used `fixture_repo.fixture_fix()` and scripted-backend fixture bytes instead of a
+    standalone patch file.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing P07,
+  P08, P09, P12, and B-OPS-06 obligations remain open and are not reclassified here.
+- Capability boundary: this closes the P05 local/offline vertical-slice exit criteria only.
+  It does not establish production readiness, hostile-code isolation, external delivery,
+  authenticated identity, resolved source licensing, or superiority.
+
+---
+## Consolidated-review appeal record
+
+- Date (UTC): 2026-07-27
+- Challenged candidate:
+  `f6cc1cc9947b526b1656eed7e71da321cde26c54`
+- Independent challenged-candidate dispositions:
+  - Curator: `block`
+  - Judge: `adapt`
+  - Orchestrator: `block`
+- Preserved dissent and reproduced counterexamples:
+  - A deterministic model provider substituted passing no-op commands after Explorer
+    reproduced the real failure, causing the challenged candidate to publish an unfixed
+    repository.
+  - Eight `model.call` events were outside the report correlation.
+  - A Git operation emitted successful and failed receipts before raising, but the
+    challenged report omitted both receipts and their budget usage.
+  - Failed reports returned receipt references after their temporary backing bytes had
+    been deleted.
+- Repair implementation: `a5bdb333cbcd04df106e39fcee66c9ea9d5c25f1`
+  (`docs/architecture/ADR-010-P05-VERIFICATION-AND-FAILURE-EVIDENCE.md`).
+- Repair evidence:
+  - Builder and Curator test execution is sealed to the exact Explorer
+    failure-reproducing argument vector; adversarial substitution fails closed.
+  - The mission objective, report, model backend, and ledger share one correlation.
+  - Exceptional Git calls settle actual receipts and budget usage before propagating the
+    original failure.
+  - Failed-run receipt bytes and the failed report are retained in a separate evidence
+    directory; the requested delivery output remains absent.
+- Gates on the repair implementation: P05 tests 12 passed; full pytest 198 passed,
+  2 skipped, 1,718 subtests; Ruff passed; Pyright passed with 0 errors; offline CLI
+  golden and sabotage paths passed twice.
+- Additive audit artifact: `evidence/audits/P05-repair-post.json`
+  (canonical digest:
+  `sha256:c70f34b01c4b5213b996045bb750156dbec966e0adf2edf34ac38e925b988d16`;
+  complete: true; failures: none; audited implementation commit:
+  `a5bdb333cbcd04df106e39fcee66c9ea9d5c25f1`).
+- Final delivery eligibility remains pending one consolidated independent review of the
+  complete repaired candidate and exact-head GitHub checks.
+- The original completion record is retained as point-in-time evidence; this appeal
+  record supersedes its delivery-eligibility implication, not its historical receipts.
+- Existing P06, P07, P08, P09, P12, and B-OPS-06 obligations remain open. This appeal
+  makes no production-readiness, source-completeness, hostile-isolation, external-delivery,
+  or superiority claim.
+
+---
+## Consolidated-review appeal record 2
+
+- Date (UTC): 2026-07-27
+- Challenged repaired candidate:
+  `b8a1d418664fd7226e29ca76cb4e592f388ba66b`
+- Independent dispositions:
+  - Curator: `permit`
+  - Judge: `adapt`
+  - Orchestrator: `permit`
+- Preserved dissent: the Curator and Orchestrator found the four first-appeal blockers
+  closed and would have delivered. The Judge additionally exercised a split-budget API
+  construction that they did not reproduce, and the fail-closed rule controlled.
+- Reproduced counterexample: a `ModelBackend` with its own budget and a
+  `RepositoryMission` limited to 45 calls completed 53 actual calls—45 Git/sandbox calls
+  plus eight model calls—while the report claimed only the mission's 45. A zero-call
+  mission could likewise allow a model request before workspace enforcement.
+- Repair implementation: `94a7e5ecc9b79ba6efe956deb34da7d67a741498`.
+  `RepositoryMission` now binds a model backend to the same autonomy budget just as it
+  binds the ledger. The regression constructs distinct budgets and proves that the
+  45-call envelope fails closed, all observed model calls remain correlated, reported
+  consumption never exceeds the limit, and total reported calls equal model events plus
+  capability receipts.
+- Gates on the budget repair implementation: P05 tests 13 passed; full pytest 199 passed,
+  2 skipped, 1,718 subtests; Ruff passed; Pyright passed with 0 errors.
+- Additive audit artifact: `evidence/audits/P05-budget-repair-post.json`
+  (canonical digest:
+  `sha256:bed4356708a1a3727603eedeeae1e55058d836dc24db95a92ca78b198566609e`;
+  complete: true; failures: none; audited implementation commit:
+  `94a7e5ecc9b79ba6efe956deb34da7d67a741498`).
+- Delivery remains pending exact-head CI and one final consolidated independent review of
+  this complete challenger. No earlier permit is carried forward.
+- Existing P06, P07, P08, P09, P11, P12, and B-OPS-06 obligations remain open. This
+  appeal makes no production-readiness, source-completeness, hostile-isolation,
+  external-delivery, or superiority claim.
+
+---
+## Consolidated-review reliability record
+
+- Date (UTC): 2026-07-27
+- Candidate: `3ff394089c15f46b42a8384b15ada61ed45f77cb`
+- Independent dispositions:
+  - Curator: `permit`
+  - Judge: `adopt`
+  - Orchestrator: `block`
+- Preserved Orchestrator finding: while all three reviewers ran overlapping full and P05
+  suites in the same desktop workspace, one Orchestrator P05 run saw the golden CLI return
+  success followed by an independent `verify_delivery` false result. Its immediate
+  targeted retry passed. The Curator separately observed a different transient
+  Curator-independence failure in a full-suite process competing with a duplicate P05
+  process; the same test passed in the concurrent P05 process, in isolation, and in the
+  later non-overlapping full suite.
+- Reproduction result with reviewer workloads stopped:
+  - three simultaneous targeted CLI golden/sabotage tests: 3 passed;
+  - five consecutive targeted CLI golden/sabotage tests: 5 passed;
+  - sequential full suite already recorded at this candidate: 200 passed, 2 skipped,
+    1,718 subtests;
+  - exact-head CI remained green.
+- Disposition: no verifier or test logic was changed because neither transient failure
+  reproduced under bounded targeted concurrency or repeated sequential execution, and no
+  fail-open counterexample was found. The review procedure will run Curator, Judge, and
+  Orchestrator sequentially for the next exact-candidate boundary so overlapping reviewer
+  test processes cannot create artificial shared-host contention.
+- Delivery remains pending that fresh sequential consolidated review. The Orchestrator
+  block and contrary Curator/Judge evidence are both retained; no earlier permit is
+  carried forward.
+
+---
+## Consolidated-review appeal record 3
+
+- Date (UTC): 2026-07-27
+- Challenged budget-repair candidate:
+  `983e2380d5487b6311e897754968c84ae42ca392`
+- Independent dispositions:
+  - Curator: `permit`
+  - Judge: `adapt`
+  - Orchestrator: `permit`
+- Preserved dissent: the Curator and Orchestrator reproduced the explicit mission-budget
+  repair and would have delivered. The Judge additionally exercised an omitted
+  mission-budget construction that they did not reproduce, and the fail-closed rule
+  controlled.
+- Reproduced counterexample: a `ModelBackend` explicitly configured with a zero-call
+  budget was passed to `RepositoryMission` without a mission budget. The constructor
+  replaced the restrictive backend envelope with its 500-call default, executed eight
+  model calls and 53 total calls, and published successfully. Capability construction
+  therefore expanded pre-existing authority.
+- Repair implementation: `b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9`.
+  When the mission budget is omitted, `RepositoryMission` now adopts an existing backend
+  budget. When a mission budget is explicit, that envelope binds both mission and backend.
+  The zero-call regression proves zero provider calls, zero reported consumption, failed
+  status, and no publication.
+- Gates on the authority repair implementation: P05 tests 14 passed; full pytest 200
+  passed, 2 skipped, 1,718 subtests; Ruff passed; Pyright passed with 0 errors.
+- Additive audit artifact: `evidence/audits/P05-authority-repair-post.json`
+  (canonical digest:
+  `sha256:ffa0580a358d5cbfa1924ef59ebefa133a92ffc917d3c4ddb4070096c471faef`;
+  complete: true; failures: none; audited implementation commit:
+  `b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9`).
+- Delivery remains pending exact-head CI and one final consolidated independent review of
+  this complete challenger. No earlier permit is carried forward.
+- Existing P06, P07, P08, P09, P11, P12, and B-OPS-06 obligations remain open. This
+  appeal makes no production-readiness, source-completeness, hostile-isolation,
+  external-delivery, or superiority claim.

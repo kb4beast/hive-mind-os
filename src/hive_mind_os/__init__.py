@@ -41,6 +41,7 @@ from .current_state_audit import (
     write_audit_artifact,
 )
 from .governed_sources import GovernedSourceAudit, audit_governed_source
+from .mission import MissionReport, RepositoryMission, ScriptedRepositoryBackend
 from .models import AutonomyLevel, Objective, RiskTier, Role
 from .receipts import (
     FileReceiptValidator,
@@ -102,11 +103,13 @@ __all__ = [
     "MetricObservation",
     "MetricSpec",
     "MissionCharter",
+    "MissionReport",
     "Objective",
     "RecursiveImprovementContract",
     "RecursiveImprovementController",
     "RecursiveImprovementGate",
     "RepositoryLearningCurriculum",
+    "RepositoryMission",
     "RepositoryScout",
     "ReceiptReference",
     "ReceiptResult",
@@ -116,6 +119,7 @@ __all__ = [
     "Role",
     "SimulatedAction",
     "SimulationPhase",
+    "ScriptedRepositoryBackend",
     "SourceDocketAuditor",
     "SourceRecord",
     "VisionComplianceGate",
