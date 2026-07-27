@@ -251,3 +251,6 @@ A run fails closed when any of the following occurs:
 8. Model router with controlled diversity, consensus, disagreement, and cost-quality measurement.
 9. Mission-control UI showing agents, rooms, queues, confidence, cost, evidence, risks, outcomes, and intervention points.
 10. Reproducible benchmark suite comparing Hive Mind OS against reference systems and ablations.
+
+Sequencing for this work is now owned by `docs/plan/00_OVERVIEW.md` (see ADR-006);
+this section remains as originally recorded.

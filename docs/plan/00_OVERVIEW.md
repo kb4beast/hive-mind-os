@@ -62,7 +62,7 @@ Sequencing principles:
 
 | Phase | Title | Depends on | Status |
 |---|---|---|---|
-| [P01](P01_STAGE0_CLOSEOUT.md) | Stage 0 closeout and blocker backlog | — | pending |
+| [P01](P01_STAGE0_CLOSEOUT.md) | Stage 0 closeout and blocker backlog | — | done |
 | [P02](P02_MODEL_ADAPTER.md) | Real model adapter behind `AgentBackend` | P01 | pending |
 | [P03](P03_SANDBOX_RUNNER.md) | Sandboxed command execution with receipts | P01 | pending |
 | [P04](P04_GIT_ADAPTER.md) | Local Git adapter and fixture repository | P03 | pending |

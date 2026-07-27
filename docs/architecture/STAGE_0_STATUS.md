@@ -27,3 +27,18 @@ receipts are the latest post-commit `CurrentStateAudit` artifact.
   separately reconstructed Git/docket context instead of trusting a self-digested report.
 - Stage 0 is not called fully complete while remote governance, source evidence, licenses, or
   genuinely independent final verification remain unresolved.
+
+## Exit posture (ADR-006)
+
+Stage 0 is closed in its fail-closed form by
+[ADR-006](ADR-006-STAGE-0-EXIT.md): incomplete evidence and dependent claims remain
+machine-blocked, and further verifier hardening requires a reproduced fail-open
+counterexample. The active obligation census, owners, review dates, phase routing, and exit
+conditions are maintained in [the blocker backlog](../plan/BLOCKERS.md).
+
+This closure is not release readiness or blocker-free status. The current audit still reports
+`release_ready=false`, no evidence above structural prototype maturity, and unresolved
+source, licensing, host-governance, identity, durable-operation, independent-verification,
+and production obligations. Implementation sequencing is owned by
+`docs/plan/00_OVERVIEW.md`; the earlier sequencing sections remain preserved as originally
+recorded.

@@ -145,6 +145,9 @@ binds Git HEAD, tracked bytes, docket identity/counts, source metadata, claim ma
 maturity partitions. Test and command claims still require independent reproduction or
 authenticated execution receipts.
 
+The active implementation roadmap and fail-closed Stage 0 blocker routing are maintained in
+[`docs/plan/00_OVERVIEW.md`](docs/plan/00_OVERVIEW.md).
+
 ## Core guarantees
 
 1. Evidence before authority.

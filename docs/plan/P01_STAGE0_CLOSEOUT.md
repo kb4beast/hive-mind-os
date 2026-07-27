@@ -164,3 +164,24 @@ there; Stage 0 hardening is closed to speculative expansion.
 - Do not mark any blocker resolved, deferred, or waived — that is courtroom work for P12.
 - Do not edit inside the master prompt's BEGIN/END block.
 - Do not "clean up" or reflow existing documents while adding pointers.
+
+---
+## Completion record
+- Date (UTC): 2026-07-27T16:31:01Z
+- Executor (model/agent identity): Codex primary Builder/Integrator; independent Curator,
+  Judge, and Orchestrator identities are separate from this executor.
+- Branch and final commit SHA: `phase/P01-stage0-closeout`; audited implementation commit
+  `b29deaec9757df922160ab49ec259a5507211131`. The pull-request head records the final metadata
+  commit because a commit cannot contain its own SHA.
+- Gates: pre-change and implementation gates each ran 134 tests (133 passed, 1 skipped;
+  1,695 subtests passed); Ruff 0.16.0 passed; Pyright 1.1.411 passed with zero errors.
+- Audit artifact: `evidence/audits/P01-post.json` (digest:
+  `sha256:e818c833a751f00b`)
+- Deviations from the phase spec: Target-phase routing includes P05, P06, P08, and P11 where
+  the operator instruction and canonical phase exit criteria identify the actual owner,
+  while P07, P12, and post-P13 retain their specified obligations. This changes no code,
+  policy, audit schema, or source docket.
+- New blockers discovered (mirrored into docs/plan/BLOCKERS.md): 21 open rows preserve the
+  current evidence census: 20 blocked sources, 73 machine-blocked claims, 17 license/reuse
+  obligations, five exact-pin obligations, four raw-digest obligations, seven incomplete
+  YouTube ingestions, and governance/independence/durability/E2E/production/benchmark gaps.
