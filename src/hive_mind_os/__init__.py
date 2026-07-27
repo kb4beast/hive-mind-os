@@ -7,6 +7,14 @@ from .autonomy import (
     EvolutionArena,
     MissionCharter,
 )
+from .classic_gpt import (
+    ActionKind,
+    ClassicGptSimulationGate,
+    ClassicGptSourcePack,
+    ClassicGptTurn,
+    SimulatedAction,
+    SimulationPhase,
+)
 from .courtroom import (
     BurdenOfProof,
     CourtCase,
@@ -35,11 +43,15 @@ from .source_docket import FoundingSourceDocket, load_default_source_docket, loa
 from .vision import HardenedVisionContract, VisionComplianceGate
 
 __all__ = [
+    "ActionKind",
     "AgentVariant",
     "AutonomyBudget",
     "AutonomyLevel",
     "AutonomousMissionLoop",
     "BurdenOfProof",
+    "ClassicGptSimulationGate",
+    "ClassicGptSourcePack",
+    "ClassicGptTurn",
     "CourtCase",
     "Courtroom",
     "CourtVerdict",
@@ -64,10 +76,12 @@ __all__ = [
     "RepositoryScout",
     "RiskTier",
     "Role",
+    "SimulatedAction",
+    "SimulationPhase",
     "SourceDocketAuditor",
     "SourceRecord",
     "VisionComplianceGate",
     "load_default_source_docket",
     "load_source_docket",
 ]
-__version__ = "0.4.0"
+__version__ = "0.5.0"
