@@ -129,33 +129,42 @@ class SandboxRunner:
         self.compute_units_used = 0.0
         self.spawn_count = 0
         self.last_reference: ReceiptReference | None = None
+        self._usage_lock = threading.Lock()
 
     def run(self, intent: dict[str, Any]) -> dict[str, Any]:
         self._validate_intent(intent)
         decision = self.policy.decide(self.role, Action.RUN_COMMANDS, self.risk)
         if not decision.allowed:
             self._deny(intent, decision.reason)
-        if self.tool_calls_used + 1 > self.allowance.tool_calls:
-            self._deny(intent, "episode tool-call allowance exhausted")
-        if self.compute_units_used + 1.0 > self.allowance.compute_units:
-            self._deny(intent, "episode compute allowance exhausted")
+        with self._usage_lock:
+            if self.tool_calls_used + 1 > self.allowance.tool_calls:
+                self._deny(intent, "episode tool-call allowance exhausted")
+            if self.compute_units_used + 1.0 > self.allowance.compute_units:
+                self._deny(intent, "episode compute allowance exhausted")
+            self.tool_calls_used += 1
+            self.compute_units_used += 1.0
         command = intent["command"]
         argv = list(command["argv"])
+        if any("\x00" in argument for argument in argv):
+            self._deny(intent, "command arguments must not contain NUL bytes")
         resolved = shutil.which(argv[0])
         if resolved is None or _normalized_executable(resolved) not in {
             _normalized_executable(value) for value in self.spec.argv_allowlist
         }:
             self._deny(intent, "executable is not allowlisted")
         argv[0] = str(Path(resolved).resolve())
-        self._validate_paths(argv, command["path_args"])
+        self._validate_paths(intent, argv, command["path_args"])
         if intent["actor_id"] == self.runner_identity:
             self._deny(intent, "runner identity must differ from acting identity")
 
-        self.tool_calls_used += 1
-        self.compute_units_used += 1.0
-        self.spawn_count += 1
         started = time.monotonic()
-        process = self._spawn(argv)
+        deadline = started + self.spec.timeout_s
+        try:
+            process = self._spawn(argv)
+        except (OSError, ValueError) as error:
+            self._deny(intent, f"process creation failed: {type(error).__name__}")
+        with self._usage_lock:
+            self.spawn_count += 1
         stdout: list[bytes] = []
         stderr: list[bytes] = []
         truncated = [False, False]
@@ -175,13 +184,33 @@ class SandboxRunner:
             reader.start()
         timed_out = False
         try:
-            process.wait(timeout=self.spec.timeout_s)
+            process.wait(timeout=max(0.0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             timed_out = True
+        while not timed_out:
+            readers_alive = any(reader.is_alive() for reader in readers)
+            tree_alive = self._tree_alive(process)
+            if not readers_alive and not tree_alive:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = True
+                break
+            for reader in readers:
+                if reader.is_alive():
+                    reader.join(timeout=min(remaining, 0.02))
+            if not any(reader.is_alive() for reader in readers) and tree_alive:
+                time.sleep(min(remaining, 0.01))
+        if timed_out:
             self._kill_tree(process)
-            process.wait()
+            if process.poll() is None:
+                try:
+                    process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
         for reader in readers:
-            reader.join(timeout=2)
+            reader.join(timeout=0.5)
         if process.stdout is not None:
             process.stdout.close()
         if process.stderr is not None:
@@ -206,29 +235,42 @@ class SandboxRunner:
     def _validate_intent(self, intent: dict[str, Any]) -> None:
         validation = validate_contract("tool-intent", intent)
         if not validation.valid:
-            raise SandboxDenied("; ".join(validation.issues))
+            self._deny(intent, "; ".join(validation.issues))
         if intent.get("kind") != "command" or not isinstance(intent.get("command"), dict):
-            raise SandboxDenied("sandbox requires a typed command intent")
+            self._deny(intent, "sandbox requires a typed command intent")
         try:
             expected = tool_intent_digest(intent)
         except (TypeError, ValueError):
-            raise SandboxDenied("intent cannot be canonically digested") from None
+            self._deny(intent, "intent cannot be canonically digested")
         if intent.get("action_digest") != expected:
-            raise SandboxDenied("intent digest does not bind the command")
+            self._deny(intent, "intent digest does not bind the command")
 
-    def _validate_paths(self, argv: list[str], indexes: list[int]) -> None:
+    def _validate_paths(
+        self,
+        intent: Mapping[str, Any],
+        argv: list[str],
+        indexes: list[int],
+    ) -> None:
         for index in indexes:
             if index < 1 or index >= len(argv):
-                raise ConfinementViolation("path argument index is invalid")
+                self._deny(
+                    intent,
+                    "path argument index is invalid",
+                    ConfinementViolation,
+                )
             try:
                 parts = portable_path_parts(argv[index])
             except ValueError as error:
-                raise ConfinementViolation(str(error)) from None
+                self._deny(intent, str(error), ConfinementViolation)
             resolved = (self.spec.root / Path(*parts)).resolve()
             try:
                 resolved.relative_to(self.spec.root)
             except ValueError:
-                raise ConfinementViolation("path argument escapes sandbox root") from None
+                self._deny(
+                    intent,
+                    "path argument escapes sandbox root",
+                    ConfinementViolation,
+                )
             argv[index] = str(resolved)
 
     def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
@@ -270,7 +312,10 @@ class SandboxRunner:
     ) -> None:
         remaining = self.spec.max_output_bytes
         while True:
-            chunk = pipe.read(65536)
+            try:
+                chunk = pipe.read(65536)
+            except (OSError, ValueError):
+                return
             if not chunk:
                 return
             accepted_bytes = 0
@@ -283,7 +328,85 @@ class SandboxRunner:
                 truncated[stream_index] = True
 
     @staticmethod
-    def _kill_tree(process: subprocess.Popen[bytes]) -> None:
+    def _windows_process_table() -> dict[int, int]:
+        if os.name != "nt":
+            return {}
+        import ctypes
+
+        class ProcessEntry(ctypes.Structure):
+            _fields_ = [
+                ("size", ctypes.c_ulong),
+                ("usage", ctypes.c_ulong),
+                ("pid", ctypes.c_ulong),
+                ("default_heap", ctypes.c_size_t),
+                ("module_id", ctypes.c_ulong),
+                ("threads", ctypes.c_ulong),
+                ("parent_pid", ctypes.c_ulong),
+                ("priority", ctypes.c_long),
+                ("flags", ctypes.c_ulong),
+                ("executable", ctypes.c_wchar * 260),
+            ]
+
+        kernel32 = ctypes.windll.kernel32
+        create_snapshot = kernel32.CreateToolhelp32Snapshot
+        create_snapshot.argtypes = [ctypes.c_ulong, ctypes.c_ulong]
+        create_snapshot.restype = ctypes.c_void_p
+        first_process = kernel32.Process32FirstW
+        first_process.argtypes = [ctypes.c_void_p, ctypes.POINTER(ProcessEntry)]
+        first_process.restype = ctypes.c_int
+        next_process = kernel32.Process32NextW
+        next_process.argtypes = [ctypes.c_void_p, ctypes.POINTER(ProcessEntry)]
+        next_process.restype = ctypes.c_int
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [ctypes.c_void_p]
+        close_handle.restype = ctypes.c_int
+        snapshot = create_snapshot(0x00000002, 0)
+        invalid_handle = ctypes.c_void_p(-1).value
+        if snapshot == invalid_handle:
+            return {}
+        table: dict[int, int] = {}
+        try:
+            entry = ProcessEntry()
+            entry.size = ctypes.sizeof(ProcessEntry)
+            success = first_process(snapshot, ctypes.byref(entry))
+            while success:
+                table[int(entry.pid)] = int(entry.parent_pid)
+                success = next_process(snapshot, ctypes.byref(entry))
+        finally:
+            close_handle(snapshot)
+        return table
+
+    @classmethod
+    def _windows_descendants(cls, root_pid: int) -> set[int]:
+        table = cls._windows_process_table()
+        descendants: set[int] = set()
+        frontier = {root_pid}
+        while frontier:
+            children = {
+                pid
+                for pid, parent_pid in table.items()
+                if parent_pid in frontier and pid not in descendants
+            }
+            descendants.update(children)
+            frontier = children
+        return descendants
+
+    @classmethod
+    def _tree_alive(cls, process: subprocess.Popen[bytes]) -> bool:
+        if process.poll() is None:
+            return True
+        if os.name == "posix":
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                return True
+            return True
+        return bool(cls._windows_descendants(process.pid))
+
+    @classmethod
+    def _kill_tree(cls, process: subprocess.Popen[bytes]) -> None:
         if os.name == "posix":
             try:
                 os.killpg(process.pid, signal.SIGKILL)
@@ -302,7 +425,18 @@ class SandboxRunner:
                 )
                 if completed.returncode == 0:
                     return
-            process.kill()
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            for pid in cls._windows_descendants(process.pid):
+                handle = kernel32.OpenProcess(0x0001, False, pid)
+                if handle:
+                    try:
+                        kernel32.TerminateProcess(handle, 1)
+                    finally:
+                        kernel32.CloseHandle(handle)
+            if process.poll() is None:
+                process.kill()
 
     def _persist(
         self,
@@ -386,7 +520,12 @@ class SandboxRunner:
             temporary = Path(handle.name)
         os.replace(temporary, destination)
 
-    def _deny(self, intent: Mapping[str, Any], reason: str) -> NoReturn:
+    def _deny(
+        self,
+        intent: Mapping[str, Any],
+        reason: str,
+        error_type: type[SandboxDenied] = SandboxDenied,
+    ) -> NoReturn:
         if self.ledger is not None:
             self.ledger.append_event(
                 str(intent.get("mission_id", "unknown")),
@@ -394,4 +533,4 @@ class SandboxRunner:
                 self.role.value,
                 {"action_id": intent.get("action_id"), "reason": reason},
             )
-        raise SandboxDenied(reason)
+        raise error_type(reason)

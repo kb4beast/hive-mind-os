@@ -34,6 +34,23 @@ work order, the existing local contracts and ADR-003, executable tests, a clean 
 artifact, and the final independent pull-request review. Existing source-ingestion and
 licensing obligations remain assigned to P12.
 
+### Initial candidate appeal
+
+The first consolidated review rejected exact candidate
+`68f061396547ec9d1d89b056c76370035e5173ac`; green local and GitHub checks did not override
+three reproduced counterexamples:
+
+- an early-exiting parent left a background descendant alive or retained its pipes past the
+  configured deadline, yet emitted a successful receipt;
+- synchronized calls overbooked one shared episode allowance; and
+- digest, confinement, and embedded-NUL failures could bypass `sandbox.denied` evidence or
+  reach raw process creation.
+
+The repaired challenger applies one absolute deadline to parent execution, process-tree
+liveness, and pipe draining; reserves allowance under a lock; rejects NUL before spawn; and
+routes every reproduced pre-spawn denial through the append-only ledger path. The adverse
+candidate and dissent remain preserved in Git history and the P03 pull request.
+
 ## Decision
 
 Add `SandboxSpec` and `SandboxRunner` as the only sanctioned command-execution API for new
@@ -73,11 +90,15 @@ against a hostile allowed executable.
 
 - POSIX starts a new session, kills the process group on timeout, and applies configured
   `RLIMIT_CPU`/`RLIMIT_AS`.
-- Windows starts a new process group and uses `taskkill /T /F`, with direct process kill as
-  fallback. It does not use a Job Object or implement CPU/memory limits.
+- Windows starts a new process group and uses `taskkill /T /F`, with a Toolhelp
+  parent-process snapshot and direct termination as fallback. It does not use a Job Object
+  or implement CPU/memory limits.
 - The environment is scrubbed, but the process tier does **not** block network syscalls.
 - Declared path arguments are confined and replaced with their checked resolved targets.
   An allowed program can still synthesize an undeclared absolute path internally.
+- POSIX descendants remain bounded while they stay in the runner-created process group. A
+  hostile descendant that creates a new session can escape that process-tier group; that
+  case belongs to the hard-isolation obligation in `B-OPS-06`, not to a production claim.
 - `writable` records and validates intended in-root write locations for policy evolution,
   but this tier does not impose filesystem ACLs. Container/VM enforcement must convert that
   declaration into a real mount or ACL policy before hostile-code isolation is claimed.
@@ -98,7 +119,7 @@ audit subprocesses.
 | PATH substitution | Resolve executable to a real path; compare normalized basename to allowlist | Allowlist does not pin executable bytes |
 | Path traversal or symlink escape | Portable path grammar plus resolved-root containment | Undeclared paths synthesized by a program are not intercepted |
 | Ambient credentials | Empty-by-default environment allowlist | Explicitly allowlisted values can appear in child output |
-| Hung command or descendant | Wall timeout plus POSIX process group / Windows tree kill | Windows enforcement is best effort |
+| Hung command or descendant | One absolute deadline covers parent wait, tree liveness, and pipe drain; then POSIX group / Windows snapshot-backed tree kill | A hostile POSIX `setsid` escape and Windows snapshot races require the hard tier |
 | Unbounded captured output | Per-stream byte cap and explicit truncation receipts | Process continues while excess bytes are drained until timeout/exit |
 | Forged or substituted evidence | Trusted root outside workspace, exact artifact/receipt digests, atomic publication | Local process-tier evidence is not externally signed |
 | Self-verification | Runner identity must differ from actor identity | Structural identity is not yet cryptographic |
@@ -125,7 +146,10 @@ non-bypassable. P04 may depend on the runner only after P03 merges.
 - executable, traversal, symlink, policy, and allowance denials before spawn;
 - empty-by-default and explicit environment propagation;
 - process-tree timeout with a failed receipt;
+- early-parent-exit background-child timeout;
 - exact capped-output bytes, digest, and truncation flag;
+- atomic allowance reservation under concurrent calls;
+- ledger evidence for invalid-digest, confinement, and NUL denials;
 - interrupted publication without a receipt claim;
 - deterministic nonvolatile receipt content;
 - golden intent/receipt contract fixtures; and
@@ -152,4 +176,3 @@ decision; never delete or rewrite that evidence.
 - P07 owns secret-scoped execution and redaction.
 - P08 owns structural identity independence.
 - P11 owns durable operational monitoring and orphan cleanup.
-

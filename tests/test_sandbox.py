@@ -4,8 +4,10 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,7 @@ from hive_mind_os.contracts import (
     tool_intent_digest,
     validate_contract,
 )
+from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.models import Role
 from hive_mind_os.receipts import (
     FileReceiptValidator,
@@ -58,12 +61,14 @@ class SandboxTests(unittest.TestCase):
         allowance: EpisodeAllowance | None = None,
         role: Role = Role.BUILDER,
         trusted: Path | None = None,
+        ledger: EvidenceLedger | None = None,
     ) -> SandboxRunner:
         return SandboxRunner(
             spec or self.spec(),
             trusted or self.trusted,
             allowance or EpisodeAllowance(20, 100.0),
             role=role,
+            ledger=ledger,
         )
 
     def intent(
@@ -214,6 +219,27 @@ class SandboxTests(unittest.TestCase):
         time.sleep(1.0)
         self.assertFalse(marker.exists())
 
+    def test_timeout_covers_early_parent_exit_and_background_child(self) -> None:
+        marker = self.root / "background-survived.txt"
+        child = (
+            "import pathlib,time;"
+            "time.sleep(0.8);"
+            "pathlib.Path('background-survived.txt').write_text('not killed')"
+        )
+        parent = (
+            "import subprocess,sys;"
+            f"subprocess.Popen([sys.executable,'-c',{child!r}],"
+            "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)"
+        )
+        runner = self.runner(spec=self.spec(timeout_s=0.2))
+        started = time.monotonic()
+        with self.assertRaises(SandboxTimeout) as captured:
+            runner.run(self.intent([sys.executable, "-c", parent]))
+        self.assertLess(time.monotonic() - started, 1.0)
+        self.assertEqual(captured.exception.receipt["execution"]["outcome"], "timeout")
+        time.sleep(1.0)
+        self.assertFalse(marker.exists())
+
     def test_output_cap_is_explicit_and_digest_bound(self) -> None:
         runner = self.runner(spec=self.spec(max_output_bytes=100))
         receipt = runner.run(
@@ -239,6 +265,70 @@ class SandboxTests(unittest.TestCase):
         with self.assertRaisesRegex(SandboxDenied, "allowance exhausted"):
             runner.run(self.intent([sys.executable, "-c", "print('denied')"]))
         self.assertEqual(runner.spawn_count, 0)
+
+    def test_concurrent_calls_cannot_overbook_one_call_allowance(self) -> None:
+        barrier = threading.Barrier(2)
+
+        class SynchronizedRunner(SandboxRunner):
+            def _validate_intent(self, intent: dict[str, Any]) -> None:
+                super()._validate_intent(intent)
+                barrier.wait(timeout=2)
+
+        runner = SynchronizedRunner(
+            self.spec(),
+            self.trusted,
+            EpisodeAllowance(1, 1.0),
+        )
+        intents = [
+            self.intent(
+                [sys.executable, "-c", "print('one')"],
+                action_id=f"ACT-concurrent-{index}",
+            )
+            for index in range(2)
+        ]
+
+        def invoke(intent: dict[str, Any]) -> str:
+            try:
+                runner.run(intent)
+            except SandboxDenied:
+                return "denied"
+            return "succeeded"
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            outcomes = list(executor.map(invoke, intents))
+        self.assertEqual(sorted(outcomes), ["denied", "succeeded"])
+        self.assertEqual(runner.tool_calls_used, 1)
+        self.assertEqual(runner.spawn_count, 1)
+
+    def test_all_pre_spawn_denials_append_ledger_evidence(self) -> None:
+        cases: list[tuple[str, dict[str, Any], type[SandboxDenied]]] = []
+        invalid_digest = self.intent([sys.executable, "-c", "print('no')"])
+        invalid_digest["description"] = "mutated"
+        cases.append(("digest", invalid_digest, SandboxDenied))
+        escape = self.intent(
+            [sys.executable, "-c", "print('no')", "../outside.txt"],
+            path_args=[3],
+        )
+        cases.append(("escape", escape, ConfinementViolation))
+        embedded_nul = self.intent([sys.executable, "-c", "print('no')\x00"])
+        cases.append(("nul", embedded_nul, SandboxDenied))
+
+        for label, intent, error_type in cases:
+            with self.subTest(case=label):
+                ledger = EvidenceLedger()
+                runner = self.runner(
+                    trusted=self.base / f"{label}-evidence",
+                    ledger=ledger,
+                )
+                with self.assertRaises(error_type):
+                    runner.run(intent)
+                denials = [
+                    event
+                    for event in ledger.events()
+                    if event["event_type"] == "sandbox.denied"
+                ]
+                self.assertEqual(len(denials), 1)
+                self.assertEqual(runner.spawn_count, 0)
 
     def test_interrupted_publish_leaves_no_receipt_claim(self) -> None:
         class InterruptedRunner(SandboxRunner):
