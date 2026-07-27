@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -274,15 +275,27 @@ class GitAdapterTests(unittest.TestCase):
         self.assertEqual(normalized, golden)
 
         original_manifest = delivery.manifest_path.read_bytes()
-        invalid_manifest = deepcopy(manifest)
-        invalid_manifest["schema_version"] = 999
-        invalid_manifest["receipts"] = []
-        delivery.manifest_path.write_text(
-            json.dumps(invalid_manifest, sort_keys=True, separators=(",", ":")),
-            encoding="utf-8",
-        )
-        self.assertFalse(verify_delivery(delivery.root, self.fixture.root))
-        delivery.manifest_path.write_bytes(original_manifest)
+        invalid_manifests = []
+        for schema_version in (999, True):
+            invalid = deepcopy(manifest)
+            invalid["schema_version"] = schema_version
+            invalid_manifests.append(invalid)
+        empty_receipts = deepcopy(manifest)
+        empty_receipts["receipts"] = []
+        invalid_manifests.append(empty_receipts)
+        truncated_receipts = deepcopy(manifest)
+        truncated_receipts["receipts"] = truncated_receipts["receipts"][:1]
+        invalid_manifests.append(truncated_receipts)
+        escaping_file = deepcopy(manifest)
+        escaping_file["files"] = ["../escape"]
+        invalid_manifests.append(escaping_file)
+        for invalid_manifest in invalid_manifests:
+            delivery.manifest_path.write_text(
+                json.dumps(invalid_manifest, sort_keys=True, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            self.assertFalse(verify_delivery(delivery.root, self.fixture.root))
+            delivery.manifest_path.write_bytes(original_manifest)
 
         first_receipt = delivery.root / "evidence" / manifest["receipts"][0]["path"]
         original_receipt = first_receipt.read_bytes()
@@ -305,6 +318,49 @@ class GitAdapterTests(unittest.TestCase):
         workspace.write_file("dirty.txt", b"uncommitted")
         with self.assertRaises(WorkspaceDirty):
             workspace.export_delivery(self.base / "dirty-delivery")
+
+    def test_preexisting_delivery_root_is_rejected_before_any_write(self) -> None:
+        workspace = self.fix_and_commit()
+        delivery_root = self.base / "unsafe-delivery"
+        outside = self.base / "outside-evidence"
+        delivery_root.mkdir()
+        outside.mkdir()
+        evidence = delivery_root / "evidence"
+        try:
+            evidence.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            evidence.mkdir()
+        with self.assertRaises(WorkspaceDirty):
+            workspace.export_delivery(delivery_root)
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_verifier_rejects_escaped_evidence_root(self) -> None:
+        workspace = self.fix_and_commit()
+        delivery = workspace.export_delivery(self.base / "delivery")
+        evidence = delivery.root / "evidence"
+        outside = self.base / "outside-evidence"
+        evidence.rename(outside)
+        try:
+            evidence.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            if os.name != "nt":
+                self.skipTest("directory symlinks are unavailable")
+            linked = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(evidence), str(outside)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                shell=False,
+                check=False,
+            )
+            if linked.returncode != 0:
+                self.skipTest("directory junctions are unavailable")
+        self.assertFalse(verify_delivery(delivery.root, self.fixture.root))
+        if evidence.is_symlink():
+            evidence.unlink()
+        else:
+            evidence.rmdir()
+        outside.rename(evidence)
 
     def test_truncated_git_output_fails_closed(self) -> None:
         workspace = self.workspace()
