@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "pack_id": "hive-mind-os-classic-gpt-simulation-v1",
+  "purpose": "Simulate the governed reasoning, role, court, state, evidence, and handoff semantics of Hive Mind OS in a classic GPT session without fabricating autonomy or tool execution.",
+  "load_order": [
+    "gpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md",
+    "gpt_sources/01_RUNTIME_STATE_SCHEMA.json",
+    "gpt_sources/02_ROLE_AND_COURT_PROTOCOL.md",
+    "gpt_sources/03_TOOL_EVIDENCE_AND_HANDOFF_PROTOCOL.md"
+  ],
+  "authority_model": "reasoning-only until an external tool receipt proves a side effect",
+  "simulation_limit": "A single GPT can emulate labeled role passes but cannot claim distributed independence, persistent memory, sandbox execution, or external side effects without external evidence.",
+  "required_runtime_objects": [
+    "MISSION_STATE",
+    "ROLE_OUTPUT",
+    "COURT_RECORD",
+    "ACTION_STATUS",
+    "HANDOFF_PACKET"
+  ],
+  "fail_closed_on": [
+    "missing source pack file",
+    "source pack fingerprint mismatch",
+    "unreceipted side effect",
+    "self-verification",
+    "missing state reference",
+    "missing next action",
+    "completion with blockers",
+    "completion without all role passes"
+  ]
+}
