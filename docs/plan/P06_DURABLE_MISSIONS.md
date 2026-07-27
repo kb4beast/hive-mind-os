@@ -181,3 +181,47 @@ through `MissionStore` without inventing new state.
 - No silent workspace rebuild when recorded digests mismatch disk.
 - No timestamps as ordering keys.
 - Do not weaken or fork P05's mission validation to accommodate persistence.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-27T21:53:48Z
+- Executor (model/agent identity): Codex primary Builder/Integrator; independent Curator,
+  Judge, and Orchestrator review remains required on the complete exact-SHA pull-request
+  candidate.
+- Branch and audited implementation commit: `phase/P06-durable-missions`;
+  `a136af13a9ed7fd595329bbeffa3ad2a9507d6a0`.
+- Gates: P06 tests 62 passed, including 54/54 injected crash boundaries; audit full pytest
+  263 passed, 2 skipped, 1,718 subtests; Ruff passed; Pyright passed with 0 errors.
+- Audit artifact: `evidence/audits/P06-post.json`
+  (canonical digest:
+  `sha256:d56d0efad6e672270e8287829de4a8a9e4f6c484e4dcc33bb6ea199b2882ed1f`;
+  complete: true; failures: none; audited implementation commit:
+  `a136af13a9ed7fd595329bbeffa3ad2a9507d6a0`).
+- Preserved challenged audit: `evidence/audits/P06-post-timeout.json`
+  (complete: false; its Python 3.12 pytest command returned 124 at the former 300-second
+  ceiling). ADR-011 records the reproduced counterexample and the 1,200-second repair.
+- Manual hard-kill confirmation: Windows terminated the real scripted `deliver` process
+  during Explorer materialization. The first resume reproduced an uncheckpointed partial
+  workspace failure. After the repair, the same durable mission resumed successfully with
+  18 completed checkpoints, 18 idempotency records, and zero duplicate intent digests.
+- Workspace and state evidence: digest drift blocks with a reconciliation report; missing
+  recorded workspaces and uncheckpointed partial materializations rebuild; checkpoint
+  digest tamper and unknown store versions fail closed; serialized state validates against
+  `mission-state`.
+- Deviations from the phase spec:
+  - Shortened private durable candidate staging and the Git adapter's private staging
+    prefix after a reproduced Windows `MAX_PATH` failure while copying content-addressed
+    evidence. Artifact names and delivery contracts are unchanged.
+  - Increased the current-state audit command timeout from 300 to 1,200 seconds after the
+    required recovery suite reproducibly exceeded the former ceiling. Timeout failure,
+    process-tree termination, output caps, and result recognition remain fail closed.
+  - Added an uncheckpointed-partial-workspace regression after the real process kill
+    reached a boundary not represented by the deterministic post-effect hook.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing P07,
+  P08, P11, P12, and B-OPS-06 obligations remain open.
+- Capability boundary: P06 supplies single-writer local persistence and exactly-once
+  effect adoption for the offline scripted repository mission. It does not establish
+  exactly-once physical execution, durable live-provider replay, distributed scheduling,
+  external GitHub delivery, authenticated identity, hostile-code isolation, production
+  readiness, complete source coverage, or superiority.
