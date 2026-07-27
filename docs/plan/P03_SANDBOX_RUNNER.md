@@ -234,18 +234,17 @@ rlimits.
 - Executor (model/agent identity): Codex primary Builder/Integrator; independent Curator,
   Judge, and Orchestrator review is required on the complete pull-request candidate.
 - Branch and audited implementation commit: `phase/P03-sandbox-runner`;
-  `77fb5d765a614d8ca5670e4c1908bec707b9f457` includes the reviewed timeout, concurrency,
-  and denial-evidence repairs on the current P02-bearing `main`; the audit was collected
-  from clean completion candidate `002ae0e083dcd5184d4bd59e38efe095fd7668b3`.
-- Gates before the replacement audit: 17 targeted sandbox tests ran on Windows (16 passed,
-  the POSIX-only symlink case skipped; 3 subtests passed); constitutional discovery ran 167
-  tests (165 passed, 2 skipped); 1,698 subtests passed; Ruff 0.16.0, Pyright 1.1.411, and
-  the schema catalog passed.
+  `d6988b260cefc19a7588dec61e2c5de3e209be75` includes the reviewed timeout, concurrency,
+  denial-evidence, non-object-input, and process-creation-exception repairs on the current
+  P02-bearing `main`.
+- Gates before the final replacement audit: 19 targeted sandbox tests ran on Windows (18
+  passed, the POSIX-only symlink case skipped; 3 subtests passed); constitutional discovery
+  ran 169 tests (167 passed, 2 skipped); 1,698 subtests passed; Ruff 0.16.0, Pyright
+  1.1.411, and the schema catalog passed.
 - Concrete runner/validator smoke: passed; ephemeral receipt digest
   `sha256:5c2ad2b87a5d8b3fd6d544467beb199132a006f9e4bda0701ca80e10af841cb0`.
-- Audit artifact: `evidence/audits/P03-post.json` (digest:
-  `sha256:f14eb66544de0799cf9e9471471cf886f4551ba8cb43ecbbd0d68327463277a2`);
-  the final evidence commit cannot contain its own SHA.
+- Audit artifact: pending clean replacement at `evidence/audits/P03-post.json`; the final
+  evidence commit will record its digest and cannot contain its own SHA.
 - Constitutional schema delta: `tool-intent.command` and `tool-receipt.execution` were
   added under proposed ADR-007 with catalog, golden-fixture, mutation, and validator
   regressions. Historical non-command documents remain compatible; untyped command intents
@@ -256,8 +255,9 @@ rlimits.
 - Preserved dissent: the first consolidated review rejected candidate `68f0613` after
   reproducing an early-parent-exit descendant timeout bypass, concurrent allowance
   overbooking, and missing denial evidence for digest/confinement/NUL failures. The repaired
-  implementation commit above closes those cases; final exact-candidate re-review remains a
-  delivery gate.
+  candidate closed those cases. Curator re-review then reproduced raw `SubprocessError` and
+  non-object-intent `AttributeError` escapes; the implementation commit above closes both.
+  Final exact-candidate re-review remains a delivery gate.
 - New blocker: `B-OPS-06` tracks the hard container/VM isolation tier and cannot be
   represented as resolved by this phase.
 - Production readiness, release readiness, hostile-code isolation, and superiority are not
