@@ -15,6 +15,12 @@ from .current_state_audit import (
 )
 from .ledger import EvidenceLedger
 from .mission import RepositoryMission, ScriptedRepositoryBackend
+from .mission_store import (
+    MissionStore,
+    MissionStoreError,
+    ReconciliationError,
+    resume_mission,
+)
 from .model_backend import ModelBackend
 from .model_provider import ModelProviderError, provider_from_env
 from .models import AutonomyLevel, Objective
@@ -108,6 +114,37 @@ def build_deliver_parser() -> argparse.ArgumentParser:
         default="good",
         help=argparse.SUPPRESS,
     )
+    parser.add_argument(
+        "--state-dir",
+        help="Persist checkpoints and receipts here for later resume",
+    )
+    return parser
+
+
+def build_resume_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind resume",
+        description="Resume one interrupted durable repository mission",
+    )
+    parser.add_argument("mission_id", help="Durable mission identifier")
+    parser.add_argument(
+        "--state-dir",
+        default=".hive-mind-state",
+        help="Mission state directory (default: .hive-mind-state)",
+    )
+    return parser
+
+
+def build_missions_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind missions",
+        description="List durable repository missions",
+    )
+    parser.add_argument(
+        "--state-dir",
+        default=".hive-mind-state",
+        help="Mission state directory (default: .hive-mind-state)",
+    )
     return parser
 
 
@@ -140,7 +177,12 @@ async def _run(args: argparse.Namespace) -> int:
 
 
 async def _run_deliver(args: argparse.Namespace) -> int:
-    ledger = EvidenceLedger()
+    state_store = MissionStore(args.state_dir) if args.state_dir else None
+    ledger = EvidenceLedger(
+        state_store.state_dir / "evidence-ledger.sqlite3"
+        if state_store is not None
+        else ":memory:"
+    )
     budget = AutonomyBudget(
         max_episodes=1000,
         max_tool_calls=500,
@@ -186,6 +228,7 @@ async def _run_deliver(args: argparse.Namespace) -> int:
             policy=PolicyEngine(AutonomyLevel.REPOSITORY),
             budget=budget,
             ledger=ledger,
+            mission_store=state_store,
         )
         report = await mission.run()
     except (OSError, RuntimeError, ValueError) as error:
@@ -211,6 +254,67 @@ async def _run_deliver(args: argparse.Namespace) -> int:
         file=stream,
     )
     return 0 if report.status.value == "succeeded" else 1
+
+
+async def _run_resume(args: argparse.Namespace) -> int:
+    store = MissionStore(args.state_dir)
+    try:
+        report = await resume_mission(store, args.mission_id)
+    except ReconciliationError as error:
+        print(
+            json.dumps(
+                {
+                    "status": "blocked",
+                    "error": str(error),
+                    "reconciliation": error.report,
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    except (MissionStoreError, OSError, ValueError) as error:
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": f"{type(error).__name__}: {error}",
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    finally:
+        store.close()
+    print(
+        json.dumps(
+            report.to_dict(),
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0 if report.status.value == "succeeded" else 1
+
+
+def _run_missions(args: argparse.Namespace) -> int:
+    store = MissionStore(args.state_dir)
+    try:
+        inventory = store.list_missions()
+    finally:
+        store.close()
+    print(
+        json.dumps(
+            {"missions": inventory},
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
 
 
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
@@ -255,6 +359,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "deliver":
         args = build_deliver_parser().parse_args(arguments[1:])
         raise SystemExit(asyncio.run(_run_deliver(args)))
+    if arguments and arguments[0] == "resume":
+        args = build_resume_parser().parse_args(arguments[1:])
+        raise SystemExit(asyncio.run(_run_resume(args)))
+    if arguments and arguments[0] == "missions":
+        args = build_missions_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_missions(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 

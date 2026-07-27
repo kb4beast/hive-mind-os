@@ -1,9 +1,9 @@
 """Local repository mission orchestration for the P05 vertical slice.
 
 The mission composes the model boundary, typed Git adapter, process sandbox, policy
-engine, append-only ledger, and fixed autonomy budget.  It intentionally remains local:
-remote repositories, credentials, pushes, pull requests, resume, and hard hostile-code
-isolation belong to later phases.
+engine, append-only ledger, and fixed autonomy budget.  An optional P06 mission store
+adds local checkpoints and resume.  Remote repositories, credentials, pushes, pull
+requests, and hard hostile-code isolation remain later-phase work.
 """
 
 from __future__ import annotations
@@ -12,14 +12,17 @@ import base64
 import json
 import os
 import shutil
+import stat
 import sys
 import tempfile
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, TypeVar
 from uuid import uuid4
 
 from .autonomy import AutonomyBudget, BudgetExceeded, EpisodeAllowance
+from .contracts import tool_intent_digest
 from .git_adapter import (
     GitPolicyDenied,
     GitWorkspace,
@@ -38,9 +41,12 @@ from .models import (
     utc_now,
 )
 from .policy import Action, PolicyEngine
-from .receipts import FileReceiptValidator, ReceiptReference
+from .receipts import FileReceiptValidator, ReceiptReference, sha256_digest
 from .roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS, RoleContract
 from .runtime import AgentBackend, HiveKernel
+
+if TYPE_CHECKING:
+    from .mission_store import MissionStore
 
 _T = TypeVar("_T")
 _GOOD_FIX = b"def increment(value: int) -> int:\n    return value + 1\n"
@@ -345,12 +351,18 @@ class _CapabilityBase:
         action: Action,
         expected_calls: int,
         operation: Callable[[], _T],
+        *,
+        description: str,
+        details: Mapping[str, Any],
     ) -> tuple[_T, tuple[dict[str, Any], ...]]:
         self._authorize(action)
         return self.mission._workspace_call(
             self.workspace,
             expected_calls,
             operation,
+            description=description,
+            details=details,
+            workspace_key=self.role.value,
         )
 
 
@@ -361,14 +373,26 @@ class ExplorerCapabilities(_CapabilityBase):
         self,
         argv: Sequence[str],
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
-        return self._call(Action.RUN_COMMANDS, 1, lambda: self.workspace.run_tests(argv))
+        return self._call(
+            Action.RUN_COMMANDS,
+            1,
+            lambda: self.workspace.run_tests(argv),
+            description="run repository tests",
+            details={"argv": list(argv)},
+        )
 
 
 class BuilderCapabilities(_CapabilityBase):
     """Typed branch, write, test, and commit capabilities for the Builder only."""
 
     def create_branch(self, name: str) -> tuple[None, tuple[dict[str, Any], ...]]:
-        return self._call(Action.CREATE_BRANCH, 2, lambda: self.workspace.create_branch(name))
+        return self._call(
+            Action.CREATE_BRANCH,
+            2,
+            lambda: self.workspace.create_branch(name),
+            description="create isolated Builder branch",
+            details={"name": name},
+        )
 
     def write_file(
         self,
@@ -379,19 +403,32 @@ class BuilderCapabilities(_CapabilityBase):
             Action.WRITE_WORKSPACE,
             0,
             lambda: self.workspace.write_file(path, content),
+            description="write Builder workspace file",
+            details={
+                "path": path,
+                "content_digest": sha256_digest(content),
+            },
         )
 
     def run_tests(
         self,
         argv: Sequence[str],
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
-        return self._call(Action.RUN_COMMANDS, 1, lambda: self.workspace.run_tests(argv))
+        return self._call(
+            Action.RUN_COMMANDS,
+            1,
+            lambda: self.workspace.run_tests(argv),
+            description="run Builder tests",
+            details={"argv": list(argv)},
+        )
 
     def commit(self, message: str) -> tuple[str, tuple[dict[str, Any], ...]]:
         return self._call(
             Action.CREATE_BRANCH,
             3,
             lambda: self.workspace.commit(message),
+            description="commit Builder candidate",
+            details={"message": message},
         )
 
 
@@ -411,7 +448,13 @@ class CuratorCapabilities(_CapabilityBase):
         self,
         argv: Sequence[str],
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
-        return self._call(Action.RUN_COMMANDS, 1, lambda: self.workspace.run_tests(argv))
+        return self._call(
+            Action.RUN_COMMANDS,
+            1,
+            lambda: self.workspace.run_tests(argv),
+            description="run Curator verification command",
+            details={"argv": list(argv)},
+        )
 
     def verify_delivery(
         self,
@@ -442,13 +485,18 @@ class RepositoryMission:
         policy: PolicyEngine | None = None,
         budget: AutonomyBudget | None = None,
         ledger: EvidenceLedger | None = None,
+        mission_store: MissionStore | None = None,
+        crash_hook: Callable[[int, str], None] | None = None,
+        _run_id: str | None = None,
+        _resume: bool = False,
+        _missing_workspaces: set[str] | None = None,
     ) -> None:
         self.repository = Path(repository).resolve()
         if not self.repository.is_dir() or not (self.repository / ".git").exists():
             raise ValueError("repository must be a local Git worktree")
         if not objective.strip():
             raise ValueError("objective is required")
-        self.run_id = str(uuid4())
+        self.run_id = _run_id or str(uuid4())
         self.objective = Objective(
             objective,
             id=self.run_id,
@@ -456,7 +504,7 @@ class RepositoryMission:
             acceptance_criteria=tuple(acceptance_criteria),
         )
         self.backend = backend or ScriptedRepositoryBackend()
-        self.pin = pin
+        self.pin = pin or _read_local_head(self.repository)
         self.output_dir = Path(os.path.abspath(output_dir))
         self.policy = policy or PolicyEngine(AutonomyLevel.REPOSITORY)
         backend_budget = getattr(self.backend, "budget", None)
@@ -483,6 +531,43 @@ class RepositoryMission:
         self._receipt_records: list[dict[str, Any]] = []
         self._context_manifests: list[dict[str, Any]] = []
         self._evidence_root: Path | None = None
+        self.mission_store = mission_store
+        self.crash_hook = crash_hook
+        self._resume = _resume
+        self._step_index = 0
+        self._missing_workspaces = set(_missing_workspaces or ())
+        self._replaying_workspaces: set[str] = set()
+        if self.mission_store is not None:
+            if not isinstance(self.backend, ScriptedRepositoryBackend):
+                raise ValueError(
+                    "P06 durable resume supports ScriptedRepositoryBackend only"
+                )
+            config = {
+                "repository": str(self.repository),
+                "objective": objective,
+                "acceptance_criteria": list(acceptance_criteria),
+                "pin": self.pin,
+                "output_dir": str(self.output_dir),
+                "backend": "scripted",
+                "scripted_variant": self.backend.variant,
+                "test_argv": list(self.backend.test_argv),
+                "criterion_argv": list(self.backend.criterion_argv),
+                "source_pack_fingerprint": sha256_digest(
+                    (
+                        str(self.repository)
+                        + "\0"
+                        + self.pin
+                        + "\0"
+                        + objective
+                    ).encode("utf-8")
+                ),
+            }
+            if not self.mission_store.has_mission(self.run_id):
+                self.mission_store.register_mission(
+                    self.run_id,
+                    config,
+                    self.budget,
+                )
 
     async def run(self) -> MissionReport:
         started_at = utc_now()
@@ -499,8 +584,12 @@ class RepositoryMission:
         failure: dict[str, str] | None = None
         staging_parent: Path | None = None
         published = False
-        final_output = self._validated_output()
+        final_output = self._validated_output(
+            allow_existing=self.mission_store is not None and self._resume
+        )
         explorer_test_argv: tuple[str, ...] | None = None
+        if self.mission_store is not None:
+            self.mission_store.mark_status(self.run_id, "active")
         self.ledger.append_event(
             self.run_id,
             "mission.started",
@@ -520,18 +609,32 @@ class RepositoryMission:
             if not _is_full_sha(base_sha):
                 raise MissionFailed("repository pin must be a full 40-hex SHA")
 
-            output_parent = final_output.parent
-            staging_parent = Path(
-                tempfile.mkdtemp(
-                    dir=output_parent,
-                    prefix=f".{final_output.name}-mission-",
+            if self.mission_store is not None:
+                staging_parent = (
+                    self.mission_store.mission_root(self.run_id) / "staging"
                 )
+                staging_parent.mkdir(parents=True, exist_ok=True)
+                work_root = self.mission_store.mission_root(self.run_id) / "workspaces"
+                work_root.mkdir(parents=True, exist_ok=True)
+                temporary_context = nullcontext(str(work_root))
+            else:
+                output_parent = final_output.parent
+                staging_parent = Path(
+                    tempfile.mkdtemp(
+                        dir=output_parent,
+                        prefix=f".{final_output.name}-mission-",
+                    )
+                )
+                temporary_context = tempfile.TemporaryDirectory(
+                    prefix="hive-mind-p05-"
+                )
+            candidate = staging_parent / (
+                "c" if self.mission_store is not None else "candidate"
             )
-            candidate = staging_parent / "candidate"
-            with tempfile.TemporaryDirectory(prefix="hive-mind-p05-") as temporary:
+            with temporary_context as temporary:
                 work_root = Path(temporary)
                 evidence_root = staging_parent / "evidence"
-                evidence_root.mkdir()
+                evidence_root.mkdir(exist_ok=True)
                 self._evidence_root = evidence_root
                 explorer: ExplorerCapabilities | None = None
                 builder_workspace: GitWorkspace | None = None
@@ -542,6 +645,8 @@ class RepositoryMission:
                 delivery_verified = False
 
                 for role in DEFAULT_LIFECYCLE:
+                    if self.mission_store is not None:
+                        self.mission_store.mark_role(self.run_id, role, "running")
                     self._authorize(role, Action.READ_REPOSITORY)
                     context = self._context_for(role, results)
                     manifest = self._context_manifest(role, context)
@@ -678,6 +783,9 @@ class RepositoryMission:
                                 Action.READ_REPOSITORY,
                                 "read mission delivery tree",
                             ),
+                            description="read Builder delivery tree",
+                            details={},
+                            workspace_key=Role.BUILDER.value,
                         )
                         action_receipts.extend(tree_records)
                         self._authorize(Role.BUILDER, Action.WRITE_WORKSPACE)
@@ -685,6 +793,9 @@ class RepositoryMission:
                             active_builder,
                             7,
                             lambda: active_builder.export_delivery(candidate),
+                            description="export reversible delivery candidate",
+                            details={"candidate": str(candidate)},
+                            workspace_key=Role.BUILDER.value,
                         )
                         action_receipts.extend(export_records)
                     elif role is Role.CURATOR:
@@ -778,6 +889,12 @@ class RepositoryMission:
                         role.value,
                         result.lessons,
                     )
+                    if self.mission_store is not None:
+                        self.mission_store.mark_role(
+                            self.run_id,
+                            role,
+                            "succeeded",
+                        )
 
                 if (
                     builder_workspace is None
@@ -787,8 +904,31 @@ class RepositoryMission:
                     or tree_digest is None
                 ):
                     raise MissionFailed("mission reached an incomplete delivery state")
-                self._copy_and_validate_mission_evidence(candidate)
-                os.replace(candidate, final_output)
+                if self.mission_store is None:
+                    self._copy_and_validate_mission_evidence(candidate)
+                else:
+                    self._durable_value_step(
+                        Role.CURATOR,
+                        "write",
+                        "bind mission evidence into candidate",
+                        {"candidate": str(candidate)},
+                        lambda: self._copy_and_validate_mission_evidence(
+                            candidate
+                        ),
+                    )
+                if self.mission_store is None:
+                    os.replace(candidate, final_output)
+                else:
+                    self._durable_value_step(
+                        Role.INTEGRATOR,
+                        "write",
+                        "publish verified delivery artifact",
+                        {"output": str(final_output)},
+                        lambda: self._publish_durable_candidate(
+                            candidate,
+                            final_output,
+                        ),
+                    )
                 published = True
                 artifact_directory = str(final_output)
                 receipt_root = str(final_output / "mission-evidence")
@@ -830,16 +970,36 @@ class RepositoryMission:
                 None,
             )
             assert artifact_directory is not None
-            (Path(artifact_directory) / "mission-report.json").write_text(
+            report_path = Path(artifact_directory) / "mission-report.json"
+            report_content = (
                 json.dumps(
                     report.to_dict(),
                     ensure_ascii=False,
                     indent=2,
                     sort_keys=True,
                 )
-                + "\n",
-                encoding="utf-8",
+                + "\n"
             )
+            if self.mission_store is None:
+                report_path.write_text(report_content, encoding="utf-8")
+            else:
+                self._durable_value_step(
+                    Role.STEWARD,
+                    "write",
+                    "persist mission report",
+                    {"path": str(report_path)},
+                    lambda: report_path.write_text(
+                        report_content,
+                        encoding="utf-8",
+                    ),
+                )
+            if self.mission_store is not None:
+                self.mission_store.update_budget(self.run_id, self.budget)
+                self.mission_store.mark_status(
+                    self.run_id,
+                    "succeeded",
+                    report=report.to_dict(),
+                )
             return report
         except Exception as error:
             failure = {
@@ -888,18 +1048,33 @@ class RepositoryMission:
                     + "\n",
                     encoding="utf-8",
                 )
+            if self.mission_store is not None:
+                self.mission_store.update_budget(self.run_id, self.budget)
+                self.mission_store.mark_status(
+                    self.run_id,
+                    "failed",
+                    blocker=f"{failure['type']}: {failure['message']}",
+                    report=report.to_dict(),
+                )
             return report
         finally:
-            if staging_parent is not None and staging_parent.exists():
+            if (
+                self.mission_store is None
+                and staging_parent is not None
+                and staging_parent.exists()
+            ):
                 shutil.rmtree(staging_parent)
 
-    def _validated_output(self) -> Path:
+    def _validated_output(self, *, allow_existing: bool = False) -> Path:
         parent = self.output_dir.parent
         if not parent.is_dir():
             raise ValueError("output parent must be an existing directory")
         if parent.resolve() != parent:
             raise ValueError("output parent must not traverse a symlink or junction")
-        if self.output_dir.exists() or self.output_dir.is_symlink():
+        if (
+            not allow_existing
+            and (self.output_dir.exists() or self.output_dir.is_symlink())
+        ):
             raise ValueError("output directory must not already exist")
         try:
             self.output_dir.relative_to(self.repository)
@@ -957,6 +1132,16 @@ class RepositoryMission:
         root: Path,
         role: Role,
     ) -> GitWorkspace:
+        if self.mission_store is not None:
+            return self._durable_materialize(base_sha, root, role)
+        return self._materialize_once(base_sha, root, role)
+
+    def _materialize_once(
+        self,
+        base_sha: str,
+        root: Path,
+        role: Role,
+    ) -> GitWorkspace:
         self._authorize(role, Action.READ_REPOSITORY)
         allowance = self._reserve(3)
         assert self._evidence_root is not None
@@ -1001,6 +1186,9 @@ class RepositoryMission:
             workspace,
             0,
             lambda: workspace.write_file("candidate.bundle", bundle),
+            description="stage candidate bundle for Curator",
+            details={"bundle_digest": sha256_digest(bundle)},
+            workspace_key=Role.CURATOR.value,
         )
         manifest = json.loads(
             (candidate / "delivery.json").read_text(encoding="utf-8")
@@ -1028,6 +1216,9 @@ class RepositoryMission:
                     "checkout candidate head for Curator",
                 ),
             ),
+            description="materialize candidate head for Curator",
+            details={"branch": branch, "head_sha": head_sha},
+            workspace_key=Role.CURATOR.value,
         )
         self.ledger.append_event(
             self.run_id,
@@ -1042,6 +1233,31 @@ class RepositoryMission:
         return workspace
 
     def _workspace_call(
+        self,
+        workspace: GitWorkspace,
+        expected_calls: int,
+        operation: Callable[[], _T],
+        *,
+        description: str,
+        details: Mapping[str, Any],
+        workspace_key: str,
+    ) -> tuple[_T, tuple[dict[str, Any], ...]]:
+        if self.mission_store is not None:
+            return self._durable_workspace_call(
+                workspace,
+                expected_calls,
+                operation,
+                description=description,
+                details=details,
+                workspace_key=workspace_key,
+            )
+        return self._workspace_call_once(
+            workspace,
+            expected_calls,
+            operation,
+        )
+
+    def _workspace_call_once(
         self,
         workspace: GitWorkspace,
         expected_calls: int,
@@ -1080,6 +1296,338 @@ class RepositoryMission:
         self._record_workspace_receipts(workspace)
         return value, records
 
+    def _durable_materialize(
+        self,
+        base_sha: str,
+        root: Path,
+        role: Role,
+    ) -> GitWorkspace:
+        from .mission_store import reopen_workspace
+
+        assert self.mission_store is not None
+        step_index, intent = self._next_durable_intent(
+            role,
+            "git",
+            f"materialize {role.value} workspace",
+            {"base_sha": base_sha, "workspace": role.value},
+        )
+        checkpoint = self._prepare_checkpoint(step_index, intent)
+        missing = role.value in self._missing_workspaces
+        if checkpoint.state == "completed" and not missing:
+            adopted = self._adopt_checkpoint(checkpoint)
+            metadata = adopted["value"]
+            assert self._evidence_root is not None
+            workspace = reopen_workspace(
+                root,
+                self._evidence_root,
+                base_sha=base_sha,
+                role=role,
+                policy=self.policy,
+                allowance=EpisodeAllowance(
+                    self.budget.max_tool_calls_per_episode,
+                    self.budget.max_compute_units_per_episode,
+                ),
+                mission_id=str(metadata["git_mission_id"]),
+                records=adopted["records"],
+            )
+            self._record_workspace_receipts(workspace)
+            return workspace
+
+        if (missing or checkpoint.state != "completed") and root.exists():
+            _remove_workspace_tree(root)
+        if checkpoint.state != "completed":
+            self.mission_store.begin_effect(self.run_id, step_index)
+        workspace = self._materialize_once(base_sha, root, role)
+        outcome = {
+            "value": {
+                "git_mission_id": workspace.mission_id,
+            },
+            "records": [dict(record) for record in workspace.receipt_records],
+        }
+        self.mission_store.update_workspace(
+            self.run_id,
+            role.value,
+            workspace.container_root,
+        )
+        if checkpoint.state != "completed":
+            reference = self.mission_store.write_effect_receipt(
+                checkpoint,
+                outcome,
+                workspace.receipt_records,
+            )
+            self._checkpoint_hook(step_index, "after_effect")
+            self.mission_store.complete_step(checkpoint, reference, outcome)
+        else:
+            self._replaying_workspaces.add(role.value)
+        self._record_workspace_receipts(workspace)
+        self.mission_store.update_budget(self.run_id, self.budget)
+        return workspace
+
+    def _durable_workspace_call(
+        self,
+        workspace: GitWorkspace,
+        expected_calls: int,
+        operation: Callable[[], _T],
+        *,
+        description: str,
+        details: Mapping[str, Any],
+        workspace_key: str,
+    ) -> tuple[_T, tuple[dict[str, Any], ...]]:
+        assert self.mission_store is not None
+        step_index, intent = self._next_durable_intent(
+            workspace.role,
+            "command",
+            description,
+            details,
+        )
+        checkpoint = self._prepare_checkpoint(step_index, intent)
+        replay = (
+            checkpoint.state == "completed"
+            and workspace_key in self._replaying_workspaces
+        )
+        if checkpoint.state == "completed" and not replay:
+            adopted = self._adopt_checkpoint(checkpoint)
+            records = tuple(dict(record) for record in adopted["records"])
+            self._append_workspace_records(workspace, records)
+            return self._decode_durable_value(adopted["value"]), records
+        if checkpoint.state != "completed":
+            self._replaying_workspaces.discard(workspace_key)
+            self.mission_store.begin_effect(self.run_id, step_index)
+        value, records = self._workspace_call_once(
+            workspace,
+            expected_calls,
+            operation,
+        )
+        outcome = {
+            "value": self._encode_durable_value(value),
+            "records": [dict(record) for record in records],
+        }
+        self.mission_store.update_workspace(
+            self.run_id,
+            workspace_key,
+            workspace.container_root,
+        )
+        if checkpoint.state != "completed":
+            reference = self.mission_store.write_effect_receipt(
+                checkpoint,
+                outcome,
+                records,
+            )
+            self._checkpoint_hook(step_index, "after_effect")
+            self.mission_store.complete_step(checkpoint, reference, outcome)
+        self.mission_store.update_budget(self.run_id, self.budget)
+        return value, records
+
+    def _durable_value_step(
+        self,
+        role: Role,
+        kind: str,
+        description: str,
+        details: Mapping[str, Any],
+        operation: Callable[[], _T],
+    ) -> _T:
+        assert self.mission_store is not None
+        step_index, intent = self._next_durable_intent(
+            role,
+            kind,
+            description,
+            details,
+        )
+        checkpoint = self._prepare_checkpoint(step_index, intent)
+        if checkpoint.state == "completed":
+            adopted = self._adopt_checkpoint(checkpoint)
+            return self._decode_durable_value(adopted["value"])
+        self.mission_store.begin_effect(self.run_id, step_index)
+        value = operation()
+        outcome = {
+            "value": self._encode_durable_value(value),
+            "records": [],
+        }
+        reference = self.mission_store.write_effect_receipt(
+            checkpoint,
+            outcome,
+            (),
+        )
+        self._checkpoint_hook(step_index, "after_effect")
+        self.mission_store.complete_step(checkpoint, reference, outcome)
+        self.mission_store.update_budget(self.run_id, self.budget)
+        return value
+
+    def _next_durable_intent(
+        self,
+        role: Role,
+        kind: str,
+        description: str,
+        details: Mapping[str, Any],
+    ) -> tuple[int, dict[str, Any]]:
+        step_index = self._step_index
+        self._step_index += 1
+        rendered = _canonical_details(details)
+        intent: dict[str, Any] = {
+            "schema_version": 1,
+            "action_id": f"ACT-P06-{self.run_id}-{step_index}",
+            "mission_id": self.run_id,
+            "state_ref": f"MISSION_STATE:{self.run_id}:1",
+            "actor_id": f"agent-{role.value}",
+            "kind": kind,
+            "description": f"{description}: {rendered}",
+            "action_digest": f"sha256:{'0' * 64}",
+            "policy_decision_ref": f"POLICY-P06-{self.run_id}-{step_index}",
+            "lease_id": f"LEASE-P06-{self.run_id}-{step_index}",
+            "idempotency_key": f"IDEMPOTENCY-P06-{self.run_id}-{step_index}",
+            "rollback_ref": None,
+            "status": "proposed",
+        }
+        if kind == "command":
+            argv = details.get("argv")
+            intent["command"] = {
+                "argv": (
+                    list(argv)
+                    if isinstance(argv, list) and argv
+                    else ["hive-mind-internal", description]
+                ),
+                "path_args": [],
+            }
+        intent["action_digest"] = tool_intent_digest(intent)
+        return step_index, intent
+
+    def _prepare_checkpoint(
+        self,
+        step_index: int,
+        intent: Mapping[str, Any],
+    ) -> Any:
+        assert self.mission_store is not None
+        try:
+            checkpoint = self.mission_store.checkpoint(
+                self.run_id,
+                step_index,
+            )
+        except KeyError:
+            self._checkpoint_hook(step_index, "before_intent")
+            checkpoint = self.mission_store.record_intent(
+                self.run_id,
+                step_index,
+                intent,
+            )
+            self._checkpoint_hook(step_index, "after_intent")
+        if checkpoint.intent_digest != intent["action_digest"]:
+            raise MissionFailed(
+                f"durable step {step_index} intent changed across resume"
+            )
+        if checkpoint.state == "intent":
+            found = self.mission_store.find_effect_receipt(checkpoint)
+            if found is not None:
+                reference, wrapper = found
+                self.mission_store.complete_step(
+                    checkpoint,
+                    reference,
+                    wrapper["outcome"],
+                )
+                checkpoint = self.mission_store.checkpoint(
+                    self.run_id,
+                    step_index,
+                )
+        return checkpoint
+
+    def _adopt_checkpoint(self, checkpoint: Any) -> dict[str, Any]:
+        assert self.mission_store is not None
+        found = self.mission_store.find_effect_receipt(checkpoint)
+        if found is None:
+            raise MissionFailed(
+                f"completed durable step {checkpoint.step_index} lacks its receipt"
+            )
+        reference, wrapper = found
+        if checkpoint.receipt_reference != reference:
+            raise MissionFailed(
+                f"durable step {checkpoint.step_index} receipt reference changed"
+            )
+        records = tuple(dict(record) for record in wrapper["records"])
+        self._record_receipts(records)
+        return {
+            "value": wrapper["outcome"]["value"],
+            "records": list(records),
+        }
+
+    def _checkpoint_hook(self, step_index: int, boundary: str) -> None:
+        if self.crash_hook is None:
+            return
+        assert self.mission_store is not None
+        self.mission_store.update_budget(self.run_id, self.budget)
+        self.mission_store.mark_status(self.run_id, "interrupted")
+        self.crash_hook(step_index, boundary)
+
+    def _append_workspace_records(
+        self,
+        workspace: GitWorkspace,
+        records: Sequence[Mapping[str, Any]],
+    ) -> None:
+        existing = {
+            (str(record["path"]), str(record["digest"]))
+            for record in workspace.receipt_records
+        }
+        for record in records:
+            key = (str(record["path"]), str(record["digest"]))
+            if key not in existing:
+                workspace.receipt_records.append(dict(record))
+                existing.add(key)
+        self._record_receipts(records)
+
+    @staticmethod
+    def _encode_durable_value(value: Any) -> Any:
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, bytes):
+            return {
+                "__type__": "bytes",
+                "base64": base64.b64encode(value).decode("ascii"),
+            }
+        if isinstance(value, Path):
+            return {"__type__": "path", "value": str(value)}
+        if isinstance(value, Mapping):
+            return {
+                str(key): RepositoryMission._encode_durable_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [
+                RepositoryMission._encode_durable_value(item)
+                for item in value
+            ]
+        return {"__type__": "ignored", "value": type(value).__name__}
+
+    @staticmethod
+    def _decode_durable_value(value: Any) -> Any:
+        if isinstance(value, dict):
+            if value.get("__type__") == "bytes":
+                return base64.b64decode(value["base64"], validate=True)
+            if value.get("__type__") == "path":
+                return Path(value["value"])
+            if value.get("__type__") == "ignored":
+                return None
+            return {
+                key: RepositoryMission._decode_durable_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return tuple(
+                RepositoryMission._decode_durable_value(item)
+                for item in value
+            )
+        return value
+
+    @staticmethod
+    def _publish_durable_candidate(candidate: Path, output: Path) -> str:
+        if output.exists():
+            return str(output)
+        staging = output.with_name(f".{output.name}.p06-publish-{uuid4()}")
+        try:
+            shutil.copytree(candidate, staging)
+            os.replace(staging, output)
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging)
+        return str(output)
+
     def _preserve_failure_evidence(self, final_output: Path) -> str | None:
         if not self._receipt_records:
             return None
@@ -1116,6 +1664,14 @@ class RepositoryMission:
         self,
         candidate: Path,
     ) -> tuple[bool, tuple[dict[str, Any], ...]]:
+        if self.mission_store is not None:
+            return self._durable_verify_candidate(candidate)
+        return self._verify_candidate_once(candidate)
+
+    def _verify_candidate_once(
+        self,
+        candidate: Path,
+    ) -> tuple[bool, tuple[dict[str, Any], ...]]:
         allowance = self._reserve(17)
         records: list[dict[str, Any]] = []
         assert self._evidence_root is not None
@@ -1133,6 +1689,40 @@ class RepositoryMission:
             self._consume(allowance, len(records))
             self._record_receipts(records)
         return verified, tuple(dict(record) for record in records)
+
+    def _durable_verify_candidate(
+        self,
+        candidate: Path,
+    ) -> tuple[bool, tuple[dict[str, Any], ...]]:
+        assert self.mission_store is not None
+        step_index, intent = self._next_durable_intent(
+            Role.CURATOR,
+            "command",
+            "verify reversible delivery candidate",
+            {"candidate": str(candidate)},
+        )
+        checkpoint = self._prepare_checkpoint(step_index, intent)
+        if checkpoint.state == "completed":
+            adopted = self._adopt_checkpoint(checkpoint)
+            return (
+                bool(adopted["value"]),
+                tuple(dict(record) for record in adopted["records"]),
+            )
+        self.mission_store.begin_effect(self.run_id, step_index)
+        verified, records = self._verify_candidate_once(candidate)
+        outcome = {
+            "value": verified,
+            "records": [dict(record) for record in records],
+        }
+        reference = self.mission_store.write_effect_receipt(
+            checkpoint,
+            outcome,
+            records,
+        )
+        self._checkpoint_hook(step_index, "after_effect")
+        self.mission_store.complete_step(checkpoint, reference, outcome)
+        self.mission_store.update_budget(self.run_id, self.budget)
+        return verified, records
 
     def _record_workspace_receipts(self, workspace: GitWorkspace) -> None:
         self._record_receipts(workspace.receipt_records)
@@ -1158,6 +1748,8 @@ class RepositoryMission:
     def _copy_and_validate_mission_evidence(self, candidate: Path) -> None:
         assert self._evidence_root is not None
         destination = candidate / "mission-evidence"
+        if destination.exists():
+            shutil.rmtree(destination)
         shutil.copytree(self._evidence_root, destination)
         validator = FileReceiptValidator(destination)
         for record in self._receipt_records:
@@ -1342,11 +1934,34 @@ class RepositoryMission:
         )
 
 
+def _remove_workspace_tree(root: Path) -> None:
+    def make_writable_and_retry(
+        function: Callable[..., Any],
+        path: str,
+        _error: Any,
+    ) -> None:
+        os.chmod(path, stat.S_IWRITE)
+        function(path)
+
+    shutil.rmtree(root, onerror=make_writable_and_retry)
+
+
 def _required_string(document: Mapping[str, Any], field: str) -> str:
     value = document.get(field)
     if not isinstance(value, str) or not value.strip():
         raise MissionFailed(f"{field} must be a nonempty string")
     return value
+
+
+def _canonical_details(details: Mapping[str, Any]) -> str:
+    return json.dumps(
+        dict(details),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+        default=str,
+    )
 
 
 def _string_argv(value: object) -> tuple[str, ...]:

@@ -100,7 +100,7 @@ def _staged_delivery(destination: Path) -> Iterator[Path]:
     staging = Path(
         tempfile.mkdtemp(
             dir=destination.parent,
-            prefix=f".{destination.name}-staging-",
+            prefix=".s-",
         )
     )
     try:
