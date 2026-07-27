@@ -1,6 +1,7 @@
 # ADR-003: Executable Receipt Validation and Policy Invariants
 
-- **Status:** Accepted for corrected Stage 0 implementation; promotion evidence pending
+- **Status:** Accepted for bounded Stage 0 backlog item 2 at `e105ea4`; not a Stage 0
+  exit or release verdict
 - **Date:** 2026-07-27
 - **Originating work order:** `docs/architecture/MASTER_IMPLEMENTATION_PROMPT.md`,
   Stage 0 and first implementation backlog item 2
@@ -37,12 +38,14 @@ role/risk bypasses, and blank charter binding.
 - `product-receipts-pass-1`: reducing false completion is necessary infrastructure, but it
   is not yet customer-outcome or production-enforcement evidence.
 
-**Judge:** pending a disjoint post-implementation evidence review.
+**Judge:** `judge-final-verdict-e105ea4`, independent of all specialist and court actors,
+issued `adapt` for exact commit `e105ea49164953e97f69634dd3e03c1e71a51fea`.
 
 **Independence disclosure:** Explorer, Architect/Advocate, and Cross-Examiner were separately
-identified read-only agents. Builder changes remain unpromoted until a disjoint Curator and
-Judge reproduce the committed implementation. Source-ingestion blockers remain independent
-of this decision.
+identified read-only agents. A disjoint Curator reproduced the final commit under Python 3.14
+and a fresh Python 3.12 environment; separate Integrator, Steward, Optimizer, Orchestrator,
+and Judge identities also reviewed the exact commit. Source-ingestion blockers remain
+independent of this decision.
 
 **Verdict:** `adapt`
 
@@ -69,8 +72,8 @@ preserved:
 The corrected challenger uses unique keyword-only actions, exact enum/schema types, strict
 RFC 3339 timestamps, portable POSIX-relative paths, deep audit consistency validation,
 post-test HEAD/worktree/digest reconciliation, bounded command observations, atomic artifact
-publication, and version 2 of the portable GPT contract. Promotion still requires another
-disjoint reproduction and Judge verdict over the corrected commit.
+publication, and version 2 of the portable GPT contract. The appeal chain was independently
+reproduced and judged at `e105ea4`; that verdict applies only to this bounded item.
 
 Later appeal passes also preserved and closed: immediate mutation that was restored before
 final validation; zero-exit pytest output without a recognized result; schema-v2 shape drift;
@@ -270,4 +273,5 @@ may propose measurement changes but cannot promote its own verifier.
 - Local receipt files do not prove provider authenticity or append-only retention.
 - Formal schemas, signed identities, provider reconciliation, the non-bypassable enforcement
   gateway, and durable hash-chained evidence remain later work.
-- Promotion requires a disjoint Curator and Judge verdict over the committed implementation.
+- Stage 0 exit and release readiness remain blocked despite the completed independent
+  Curator and Judge verdict for backlog item 2.
