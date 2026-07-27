@@ -119,3 +119,6 @@ The goal is A5 for routine, reversible work—not unrestricted authority. Critic
 3. Persist objective graphs and resume interrupted runs.
 4. Implement Curator separation: independent context, tests, and model selection.
 5. Build the first point-in-time benchmark from Hive Mind OS's own commit history.
+
+Sequencing for this work is now owned by `docs/plan/00_OVERVIEW.md` (see ADR-006);
+this section remains as originally recorded.

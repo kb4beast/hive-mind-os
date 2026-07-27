@@ -304,6 +304,9 @@ capability maturity.
 - comparator harness;
 - outcome attribution, teaching packets, promotion, rollback, and appeals.
 
+Sequencing for this work is now owned by `docs/plan/00_OVERVIEW.md` (see ADR-006);
+this section remains as originally recorded.
+
 ## Non-negotiable definition of done
 
 A feature is not complete until its source claim has a verdict, architecture mapping, executable acceptance test, code and test receipts, independent Curator reproduction, policy and budget receipts, rollback evidence, outcome metric, and append-only ledger entries. No superiority claim is complete without the comparator court.

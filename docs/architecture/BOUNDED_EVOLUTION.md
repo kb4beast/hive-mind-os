@@ -101,6 +101,9 @@ Runs tasks without human prompting until completion, budget exhaustion, or quara
 8. Add controlled model diversity and consensus/disagreement scoring across providers.
 9. Add explicit rollback and kill-switch adapters outside the agent-controlled runtime.
 
+Sequencing for this work is now owned by `docs/plan/00_OVERVIEW.md` (see ADR-006);
+this section remains as originally recorded.
+
 ## Definition of success
 
 Hive Mind OS is highly autonomous when it can independently discover, plan, implement, test, review, integrate, measure, and improve repository changes for long periods. It is robust when greater capability does not expand authority, hide evidence, alter the mission, or escape fixed resource and policy boundaries.

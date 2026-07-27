@@ -1663,3 +1663,6 @@ This prompt deliberately distinguishes persistent service availability from agen
 open-ended competence from a universal-solver claim, and governed weak self-improvement from
 strong recursive self-modification. Those distinctions are architectural safety properties
 and truthfulness requirements, not reductions of the founding goal.
+
+Sequencing for this work is now owned by `docs/plan/00_OVERVIEW.md` (see ADR-006);
+the staged sequence inside the preserved master prompt remains as originally recorded.
