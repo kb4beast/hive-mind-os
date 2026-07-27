@@ -234,10 +234,10 @@ class _WindowsJob:
                 ("PeakJobMemoryUsed", ctypes.c_size_t),
             ]
 
-        self._ctypes = ctypes
-        self._wintypes = wintypes
-        self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        self._ntdll = ctypes.WinDLL("ntdll")
+        win_dll: Any = getattr(ctypes, "WinDLL")
+        self._get_last_error: Callable[[], int] = getattr(ctypes, "get_last_error")
+        self._kernel32 = win_dll("kernel32", use_last_error=True)
+        self._ntdll = win_dll("ntdll")
         self._kernel32.CreateJobObjectW.argtypes = (ctypes.c_void_p, wintypes.LPCWSTR)
         self._kernel32.CreateJobObjectW.restype = wintypes.HANDLE
         self._kernel32.SetInformationJobObject.argtypes = (
@@ -261,7 +261,7 @@ class _WindowsJob:
 
         self.handle = self._kernel32.CreateJobObjectW(None, None)
         if not self.handle:
-            raise OSError(ctypes.get_last_error(), "CreateJobObjectW failed")
+            raise OSError(self._get_last_error(), "CreateJobObjectW failed")
         limits = ExtendedLimitInformation()
         limits.BasicLimitInformation.LimitFlags = 0x00002000
         if not self._kernel32.SetInformationJobObject(
@@ -270,7 +270,7 @@ class _WindowsJob:
             ctypes.byref(limits),
             ctypes.sizeof(limits),
         ):
-            error = ctypes.get_last_error()
+            error = self._get_last_error()
             self.close()
             raise OSError(error, "SetInformationJobObject failed")
 
@@ -278,7 +278,7 @@ class _WindowsJob:
         process_handle = int(process._handle)  # type: ignore[attr-defined]
         if not self._kernel32.AssignProcessToJobObject(self.handle, process_handle):
             raise OSError(
-                self._ctypes.get_last_error(),
+                self._get_last_error(),
                 "AssignProcessToJobObject failed",
             )
         status = self._ntdll.NtResumeProcess(process_handle)
