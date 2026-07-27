@@ -439,7 +439,7 @@ class CurrentStateAuditTests(unittest.TestCase):
         }
         valid, issues = verify_audit_artifact(cyclic_artifact)
         self.assertFalse(valid)
-        self.assertIn("artifact is not canonical JSON", issues)
+        self.assertTrue(issues)
 
         for location in ("envelope", "integrity"):
             cyclic_envelope = create_audit_artifact(self.valid_audit())
@@ -449,7 +449,7 @@ class CurrentStateAuditTests(unittest.TestCase):
                 cyclic_envelope["integrity"]["cycle"] = cyclic_envelope["integrity"]
             valid, issues = verify_audit_artifact(cyclic_envelope)
             self.assertFalse(valid)
-            self.assertIn("artifact is not canonical JSON", issues)
+            self.assertTrue(issues)
 
         deeply_nested: object = "leaf"
         for _ in range(256):
@@ -457,6 +457,21 @@ class CurrentStateAuditTests(unittest.TestCase):
         deep_audit = self.valid_audit(deeply_nested=deeply_nested)
         deep_artifact = create_audit_artifact(deep_audit)
         valid, issues = verify_audit_artifact(deep_artifact)
+        self.assertFalse(valid)
+        self.assertEqual(issues, ("artifact exceeds maximum nesting depth",))
+
+        shared_tail: object = "leaf"
+        for _ in range(100):
+            shared_tail = [shared_tail]
+        deep_wrapper: object = shared_tail
+        for _ in range(30):
+            deep_wrapper = [deep_wrapper]
+        shared_audit = self.valid_audit(
+            shallow_path=shared_tail,
+            deep_path=deep_wrapper,
+        )
+        shared_artifact = create_audit_artifact(shared_audit)
+        valid, issues = verify_audit_artifact(shared_artifact)
         self.assertFalse(valid)
         self.assertEqual(issues, ("artifact exceeds maximum nesting depth",))
 

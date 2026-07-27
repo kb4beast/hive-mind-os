@@ -120,16 +120,17 @@ def _contains_invalid_unicode_scalar(
 
 def _exceeds_artifact_nesting_depth(value: object) -> bool:
     pending = [(value, 0)]
-    seen: set[int] = set()
+    greatest_depth: dict[int, int] = {}
     while pending:
         current, depth = pending.pop()
         if not isinstance(current, (Mapping, list, tuple)):
             continue
         if depth > MAX_ARTIFACT_NESTING_DEPTH:
             return True
-        if id(current) in seen:
+        previous_depth = greatest_depth.get(id(current), -1)
+        if depth <= previous_depth:
             continue
-        seen.add(id(current))
+        greatest_depth[id(current)] = depth
         if isinstance(current, Mapping):
             for key, item in current.items():
                 pending.extend(((key, depth + 1), (item, depth + 1)))
