@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .additional_video_docket import ADDITIONAL_CLAIMS, ADDITIONAL_SOURCES
+from .classic_gpt_docket import CLASSIC_GPT_CLAIMS, CLASSIC_GPT_SOURCES
 from .courtroom import (
     Disposition,
     DocketAudit,
@@ -20,8 +21,18 @@ from .recursive_improvement_docket import (
 )
 
 
-SOURCES = (*FOUNDING_SOURCES, *ADDITIONAL_SOURCES, *RECURSIVE_IMPROVEMENT_SOURCES)
-CLAIMS = (*FOUNDING_CLAIMS, *ADDITIONAL_CLAIMS, *RECURSIVE_IMPROVEMENT_CLAIMS)
+SOURCES = (
+    *FOUNDING_SOURCES,
+    *ADDITIONAL_SOURCES,
+    *RECURSIVE_IMPROVEMENT_SOURCES,
+    *CLASSIC_GPT_SOURCES,
+)
+CLAIMS = (
+    *FOUNDING_CLAIMS,
+    *ADDITIONAL_CLAIMS,
+    *RECURSIVE_IMPROVEMENT_CLAIMS,
+    *CLASSIC_GPT_CLAIMS,
+)
 
 
 @dataclass(frozen=True, slots=True)
