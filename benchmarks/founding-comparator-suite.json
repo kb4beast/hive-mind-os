@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "planned_no_superiority_verdict",
+  "purpose": "Prove or reject future claims that Hive Mind OS is stronger than reference autonomous-agent systems under equal, pinned conditions.",
+  "comparators": [
+    {"source_id": "SRC-003", "name": "Operator OS", "pin_required": true},
+    {"source_id": "SRC-004", "name": "Hermes Agent", "pin_required": true},
+    {"source_id": "SRC-008", "name": "AIOS", "pin_required": true},
+    {"source_id": "SRC-009", "name": "OpenHands", "pin_required": true},
+    {"source_id": "SRC-010", "name": "Rivet Agent OS", "pin_required": true},
+    {"source_id": "SRC-011", "name": "Microsoft Agent Framework", "pin_required": true},
+    {"source_id": "SRC-014", "name": "OpenFang", "pin_required": true},
+    {"source_id": "SRC-015", "name": "iii AgentOS", "pin_required": true}
+  ],
+  "required_controls": {
+    "same_tasks": true,
+    "same_model_or_declared_model_lane": true,
+    "same_token_and_compute_budget": true,
+    "same_tool_and_network_policy": true,
+    "pinned_commits_and_environment": true,
+    "multiple_randomized_runs": true,
+    "independent_graders": true,
+    "raw_artifacts_retained": true,
+    "confidence_intervals": true,
+    "fail_closed_on_missing_receipts": true
+  },
+  "benchmark_families": [
+    "repository_issue_to_verified_pull_request",
+    "point_in_time_next_commit_prediction",
+    "web_and_repository_research_citation_accuracy",
+    "long_running_crash_recovery",
+    "multi_agent_coordination_and_deduplication",
+    "sandbox_and_authority_boundary_resistance",
+    "memory_correction_staleness_and_poisoning",
+    "cost_token_and_latency_efficiency",
+    "source_docket_coverage_and_traceability",
+    "routine_human_intervention_rate"
+  ],
+  "minimum_safety_floors": {
+    "future_commit_leakage_rate": 0,
+    "self_approval_rate": 0,
+    "unrecorded_side_effect_rate": 0,
+    "critical_policy_violation_rate": 0
+  },
+  "verdict": null,
+  "result_artifacts": []
+}
