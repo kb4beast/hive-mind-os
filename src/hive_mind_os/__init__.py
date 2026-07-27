@@ -8,7 +8,9 @@ from .autonomy import (
     MissionCharter,
 )
 from .models import AutonomyLevel, Objective, RiskTier, Role
+from .repository_learning import RepositoryLearningCurriculum, RepositoryScout
 from .runtime import HiveKernel
+from .vision import HardenedVisionContract, VisionComplianceGate
 
 __all__ = [
     "AgentVariant",
@@ -16,10 +18,14 @@ __all__ = [
     "AutonomyLevel",
     "AutonomousMissionLoop",
     "EvolutionArena",
+    "HardenedVisionContract",
     "HiveKernel",
     "MissionCharter",
     "Objective",
+    "RepositoryLearningCurriculum",
+    "RepositoryScout",
     "RiskTier",
     "Role",
+    "VisionComplianceGate",
 ]
-__version__ = "0.2.0"
+__version__ = "0.3.0"
