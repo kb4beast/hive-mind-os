@@ -11,8 +11,8 @@ class SourceDocketTests(unittest.TestCase):
     def test_every_source_has_claims_and_every_claim_has_a_verdict(self):
         audit = self.docket.audit()
         self.assertTrue(audit.inventory_complete)
-        self.assertEqual(self.docket.source_count, 19)
-        self.assertEqual(self.docket.claim_count, 66)
+        self.assertEqual(self.docket.source_count, 21)
+        self.assertEqual(self.docket.claim_count, 73)
         self.assertEqual(len(self.docket.decisions), self.docket.claim_count)
 
     def test_unverified_videos_remain_explicit_blocking_evidence_obligations(self):
@@ -25,6 +25,7 @@ class SourceDocketTests(unittest.TestCase):
             "SRC-017",
             "SRC-018",
             "SRC-019",
+            "SRC-020",
         }
         self.assertTrue(expected_video_blockers.issubset(blockers))
         self.assertFalse(audit.release_ready)
@@ -62,10 +63,23 @@ class SourceDocketTests(unittest.TestCase):
             "CLM-064": "SRC-018",
             "CLM-065": "SRC-019",
             "CLM-066": "SRC-019",
+            "CLM-067": "SRC-020",
+            "CLM-068": "SRC-020",
+            "CLM-069": "SRC-020",
+            "CLM-070": "SRC-020",
+            "CLM-071": "SRC-020",
+            "CLM-072": "SRC-020",
+            "CLM-073": "SRC-020",
         }
         for claim_id, source_id in expected.items():
             self.assertIn(claim_id, claims)
             self.assertIn(source_id, claims[claim_id].source_ids)
+
+    def test_recursive_improvement_claims_have_code_and_test_receipts(self):
+        claims = {claim.id: claim for claim in self.docket.claims}
+        for claim_id in ("CLM-067", "CLM-068", "CLM-069", "CLM-070", "CLM-071", "CLM-072"):
+            self.assertTrue(claims[claim_id].code_refs, claim_id)
+            self.assertTrue(claims[claim_id].test_refs, claim_id)
 
 
 if __name__ == "__main__":
