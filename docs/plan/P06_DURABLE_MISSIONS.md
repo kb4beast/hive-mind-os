@@ -271,3 +271,8 @@ through `MissionStore` without inventing new state.
   `c1498fda3113902ad2075ce3a2d042bacd4767e4`; audit pytest: 265 passed).
 - Both exact-head push and pull-request event paths must be green before consolidated
   independent review begins.
+- The next pull-request path (`30313641642/90134451946`) loaded the corrected filename
+  but still failed because its pinned Gitleaks 8.24.3 runtime predates the global
+  `[[allowlists]]` schema introduced in 8.25.0. The configuration now uses the
+  version-compatible singular `[allowlist]`; the exception remains line-targeted and
+  default rules remain enabled.

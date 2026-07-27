@@ -3,7 +3,7 @@ title = "Hive Mind OS secret-scanning policy"
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Removed P06 synthetic idempotency fixture retained in PR history"
 regexTarget = "line"
 regexes = ['''IDEMPOTENCY-P06-test''']

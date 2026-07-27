@@ -185,3 +185,10 @@ because its scanned commit range did not include the original fixture, not becau
 configuration was active. The challenger therefore corrects the filename to the
 observed `.gitleaks.toml` contract. Both event paths must pass before the appeal can
 advance.
+
+The next pull-request job `30313641642/90134451946` loaded `.gitleaks.toml` but still
+reproduced the finding. Its exact Gitleaks version was 8.24.3. Upstream configuration
+documentation states that the global `[[allowlists]]` array replaces singular
+`[allowlist]` only in 8.25.0; the pinned runner therefore requires `[allowlist]`.
+The challenger adapts to that observed version contract without disabling any default
+rule or broadening the exception.

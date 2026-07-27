@@ -73,8 +73,8 @@ class RepositoryGovernanceTests(unittest.TestCase):
     def test_secret_scan_allowlist_is_narrow_and_extends_defaults(self) -> None:
         config = tomllib.loads((ROOT / ".gitleaks.toml").read_text())
         self.assertEqual(config["extend"], {"useDefault": True})
-        self.assertEqual(len(config["allowlists"]), 1)
-        allowlist = config["allowlists"][0]
+        self.assertEqual(set(config), {"title", "extend", "allowlist"})
+        allowlist = config["allowlist"]
         self.assertEqual(allowlist["regexTarget"], "line")
         self.assertEqual(
             allowlist["regexes"],
