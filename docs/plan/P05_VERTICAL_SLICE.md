@@ -242,3 +242,48 @@ paths (bad fix, policy, budget) fail closed with recorded state.
 - Capability boundary: this closes the P05 local/offline vertical-slice exit criteria only.
   It does not establish production readiness, hostile-code isolation, external delivery,
   authenticated identity, resolved source licensing, or superiority.
+
+---
+## Consolidated-review appeal record
+
+- Date (UTC): 2026-07-27
+- Challenged candidate:
+  `f6cc1cc9947b526b1656eed7e71da321cde26c54`
+- Independent challenged-candidate dispositions:
+  - Curator: `block`
+  - Judge: `adapt`
+  - Orchestrator: `block`
+- Preserved dissent and reproduced counterexamples:
+  - A deterministic model provider substituted passing no-op commands after Explorer
+    reproduced the real failure, causing the challenged candidate to publish an unfixed
+    repository.
+  - Eight `model.call` events were outside the report correlation.
+  - A Git operation emitted successful and failed receipts before raising, but the
+    challenged report omitted both receipts and their budget usage.
+  - Failed reports returned receipt references after their temporary backing bytes had
+    been deleted.
+- Repair implementation: `a5bdb333cbcd04df106e39fcee66c9ea9d5c25f1`
+  (`docs/architecture/ADR-010-P05-VERIFICATION-AND-FAILURE-EVIDENCE.md`).
+- Repair evidence:
+  - Builder and Curator test execution is sealed to the exact Explorer
+    failure-reproducing argument vector; adversarial substitution fails closed.
+  - The mission objective, report, model backend, and ledger share one correlation.
+  - Exceptional Git calls settle actual receipts and budget usage before propagating the
+    original failure.
+  - Failed-run receipt bytes and the failed report are retained in a separate evidence
+    directory; the requested delivery output remains absent.
+- Gates on the repair implementation: P05 tests 12 passed; full pytest 198 passed,
+  2 skipped, 1,718 subtests; Ruff passed; Pyright passed with 0 errors; offline CLI
+  golden and sabotage paths passed twice.
+- Additive audit artifact: `evidence/audits/P05-repair-post.json`
+  (canonical digest:
+  `sha256:c70f34b01c4b5213b996045bb750156dbec966e0adf2edf34ac38e925b988d16`;
+  complete: true; failures: none; audited implementation commit:
+  `a5bdb333cbcd04df106e39fcee66c9ea9d5c25f1`).
+- Final delivery eligibility remains pending one consolidated independent review of the
+  complete repaired candidate and exact-head GitHub checks.
+- The original completion record is retained as point-in-time evidence; this appeal
+  record supersedes its delivery-eligibility implication, not its historical receipts.
+- Existing P06, P07, P08, P09, P12, and B-OPS-06 obligations remain open. This appeal
+  makes no production-readiness, source-completeness, hostile-isolation, external-delivery,
+  or superiority claim.
