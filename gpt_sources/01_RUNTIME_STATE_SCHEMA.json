@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "mission": {
+    "id": "MISSION-REQUIRED",
+    "state_version": 1,
+    "objective": "REQUIRED",
+    "acceptance_criteria": [],
+    "constraints": [],
+    "risk": "moderate",
+    "authority_level": "reasoning_only",
+    "active_phase": "intake",
+    "active_role": "orchestrator",
+    "status": "active",
+    "source_pack_fingerprint": "REQUIRED",
+    "created_at": "RFC3339-REQUIRED",
+    "updated_at": "RFC3339-REQUIRED"
+  },
+  "budgets": {
+    "turns_remaining": null,
+    "tool_calls_remaining": null,
+    "token_budget_remaining": null,
+    "time_budget_seconds": null,
+    "money_budget_usd": null
+  },
+  "role_runs": [
+    {
+      "role": "orchestrator",
+      "actor_id": "orchestrator-pass-1",
+      "status": "pending",
+      "input_refs": [],
+      "output_refs": [],
+      "evidence_refs": [],
+      "confidence": 0.0,
+      "completed_at": null
+    }
+  ],
+  "court_cases": [
+    {
+      "case_id": "CASE-REQUIRED-WHEN-DISPUTED",
+      "claim": "",
+      "burden": "design",
+      "advocate_id": "",
+      "cross_examiner_id": "",
+      "judge_ids": [],
+      "supporting_evidence": [],
+      "opposing_evidence": [],
+      "expert_findings": [],
+      "verdict": "defer",
+      "obligations": [],
+      "dissent": []
+    }
+  ],
+  "evidence": [
+    {
+      "ref": "source:SRC-000",
+      "kind": "source",
+      "summary": "",
+      "provenance": "",
+      "digest": "",
+      "freshness": "",
+      "verified": false
+    }
+  ],
+  "proposed_actions": [
+    {
+      "id": "ACT-000",
+      "kind": "reasoning",
+      "description": "",
+      "authority_required": "reasoning_only",
+      "risk": "low",
+      "idempotency_key": null,
+      "rollback_ref": null,
+      "status": "PROPOSED_ACTION"
+    }
+  ],
+  "tool_receipts": [
+    {
+      "receipt_ref": "provider:receipt-id",
+      "action_id": "ACT-000",
+      "provider": "",
+      "result": "",
+      "observed_at": "",
+      "artifact_refs": [],
+      "verified_by": ""
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DEC-000",
+      "decision": "",
+      "rationale": "",
+      "evidence_refs": [],
+      "rollback_ref": null,
+      "decided_by": []
+    }
+  ],
+  "blockers": [
+    {
+      "id": "BLK-000",
+      "description": "",
+      "owner_role": "orchestrator",
+      "required_input": "",
+      "status": "open",
+      "quarantine_reason": null
+    }
+  ],
+  "artifacts": [
+    {
+      "ref": "artifact:000",
+      "kind": "",
+      "digest": "",
+      "location": "",
+      "verified": false,
+      "rollback_ref": null
+    }
+  ],
+  "next_action": {
+    "owner_role": "orchestrator",
+    "description": "REQUIRED",
+    "required_inputs": [],
+    "success_condition": "REQUIRED"
+  },
+  "handoff": {
+    "state_ref": "MISSION_STATE:MISSION-REQUIRED:1",
+    "unresolved_items": [],
+    "verified_artifacts": [],
+    "resume_instruction": "Load the source pack in manifest order, validate this state and its receipts, then execute only next_action."
+  }
+}
