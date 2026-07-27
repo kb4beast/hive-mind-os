@@ -165,8 +165,8 @@ The repaired challenger makes these decisions:
 ### Operational source receipt
 
 The existing pinned `gitleaks/gitleaks-action` at
-`e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e` documents automatic discovery of a root
-`gitleaks.toml`. The README and `LICENSE.txt` were retrieved from that exact commit on
+`e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e` documents configuration discovery. The
+README and `LICENSE.txt` were retrieved from that exact commit on
 2026-07-27. The action is governed by the Gitleaks Action EULA (not an SPDX open-source
 license); this repair copies no action code and changes no existing use right. The narrow
 configuration mechanism is adapted only to preserve default scanning while excluding the
@@ -175,3 +175,13 @@ obligations.
 
 The challenged Curator block remains controlling until the repaired exact candidate has
 green GitHub checks and a fresh sequential Curator, Judge, and Orchestrator review.
+
+### Pull-request event correction
+
+The first repair used `gitleaks.toml`, but the exact-head pull-request job
+`30312848557/90132054922` reported `no gitleaks config found in path .gitleaks.toml` and
+reproduced the historical synthetic finding. A concurrent push-triggered job passed
+because its scanned commit range did not include the original fixture, not because the
+configuration was active. The challenger therefore corrects the filename to the
+observed `.gitleaks.toml` contract. Both event paths must pass before the appeal can
+advance.
