@@ -91,17 +91,27 @@ def _retain_json_escaped_utf8(value: str, remaining: int) -> tuple[str, bool]:
     return value, False
 
 
-def _contains_invalid_unicode_scalar(value: object) -> bool:
+def _contains_invalid_unicode_scalar(
+    value: object,
+    seen: set[int] | None = None,
+) -> bool:
+    seen = seen if seen is not None else set()
     if isinstance(value, str):
         return any(0xD800 <= ord(character) <= 0xDFFF for character in value)
     if isinstance(value, Mapping):
+        if id(value) in seen:
+            return False
+        seen.add(id(value))
         return any(
-            _contains_invalid_unicode_scalar(key)
-            or _contains_invalid_unicode_scalar(item)
+            _contains_invalid_unicode_scalar(key, seen)
+            or _contains_invalid_unicode_scalar(item, seen)
             for key, item in value.items()
         )
     if isinstance(value, (list, tuple)):
-        return any(_contains_invalid_unicode_scalar(item) for item in value)
+        if id(value) in seen:
+            return False
+        seen.add(id(value))
+        return any(_contains_invalid_unicode_scalar(item, seen) for item in value)
     return False
 
 
@@ -349,6 +359,7 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
 def _canonical_bytes(value: object) -> bytes:
     return json.dumps(
         value,
+        allow_nan=False,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -1117,7 +1128,11 @@ def verify_audit_artifact(
     if integrity.get("canonicalization") != "json-sort-keys-utf8-v1":
         issues.append("unsupported canonicalization")
 
-    expected_digest = _sha256(_canonical_bytes(dict(audit)))
+    try:
+        expected_digest = _sha256(_canonical_bytes(dict(audit)))
+    except (TypeError, ValueError, UnicodeError, RecursionError):
+        issues.append("audit is not canonical JSON")
+        return False, tuple(issues)
     observed_digest = integrity.get("digest")
     if not hmac.compare_digest(str(observed_digest), expected_digest):
         issues.append("audit digest mismatch")

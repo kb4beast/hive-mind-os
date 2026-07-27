@@ -395,6 +395,36 @@ class CurrentStateAuditTests(unittest.TestCase):
             ("artifact contains an invalid Unicode scalar value",),
         )
 
+    def test_noncanonical_json_values_fail_closed(self) -> None:
+        for invalid_value in (float("nan"), b"not-json"):
+            with self.subTest(invalid_value=invalid_value):
+                audit = self.valid_audit(invalid_value=invalid_value)
+                artifact = {
+                    "audit": audit,
+                    "integrity": {
+                        "canonicalization": "json-sort-keys-utf8-v1",
+                        "digest": f"sha256:{'0' * 64}",
+                        "signature": None,
+                    },
+                }
+                valid, issues = verify_audit_artifact(artifact)
+                self.assertFalse(valid)
+                self.assertIn("audit is not canonical JSON", issues)
+
+        cyclic_audit = self.valid_audit()
+        cyclic_audit["cycle"] = cyclic_audit
+        cyclic_artifact = {
+            "audit": cyclic_audit,
+            "integrity": {
+                "canonicalization": "json-sort-keys-utf8-v1",
+                "digest": f"sha256:{'0' * 64}",
+                "signature": None,
+            },
+        }
+        valid, issues = verify_audit_artifact(cyclic_artifact)
+        self.assertFalse(valid)
+        self.assertIn("audit is not canonical JSON", issues)
+
     def test_optional_signature_requires_matching_key(self) -> None:
         artifact = create_audit_artifact(
             self.valid_audit(),

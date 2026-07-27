@@ -143,7 +143,9 @@ Harden the current-state audit:
 - artifact verification independently recomputes the JSON-escaped output-content size, so a
   self-digested payload cannot bypass the live collector's byte budget;
 - untrusted artifacts containing lone Unicode surrogates reject before canonicalization or
-  output measurement rather than raising during verification.
+  output measurement rather than raising during verification;
+- non-finite, non-serializable, or cyclic payloads reject as non-canonical JSON rather than
+  raising from the verifier.
 
 Harden policy invariants:
 
