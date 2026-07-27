@@ -14,9 +14,15 @@ _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _RFC3339_PATTERN = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\Z"
 )
+_PORTABLE_SEGMENT_PATTERN = re.compile(r"[A-Za-z0-9._ -]+\Z")
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{index}" for index in range(1, 10)}
+    | {f"LPT{index}" for index in range(1, 10)}
+)
 
 
-def _portable_path_parts(value: str) -> tuple[str, ...]:
+def portable_path_parts(value: str) -> tuple[str, ...]:
     if (
         not value
         or value.startswith("/")
@@ -27,6 +33,13 @@ def _portable_path_parts(value: str) -> tuple[str, ...]:
     raw_parts = value.split("/")
     if any(part in {"", ".", ".."} for part in raw_parts):
         raise ValueError("path must not contain empty, current, or parent segments")
+    for part in raw_parts:
+        if (
+            not _PORTABLE_SEGMENT_PATTERN.fullmatch(part)
+            or part.endswith((" ", "."))
+            or part.split(".", 1)[0].upper() in _WINDOWS_RESERVED_NAMES
+        ):
+            raise ValueError("path contains a nonportable or reserved segment")
     normalized = PurePosixPath(*raw_parts).as_posix()
     if normalized != value:
         raise ValueError("path must use canonical portable relative POSIX syntax")
@@ -48,7 +61,7 @@ class ReceiptReference:
     def __post_init__(self) -> None:
         if not self.path.strip():
             raise ValueError("receipt path is required")
-        _portable_path_parts(self.path)
+        portable_path_parts(self.path)
         if not _SHA256_PATTERN.fullmatch(self.digest):
             raise ValueError("receipt digest must be lowercase sha256:<64 hex>")
 
@@ -102,7 +115,7 @@ class FileReceiptValidator:
             return None, [f"{label} digest must be lowercase sha256:<64 hex>"]
 
         try:
-            path_parts = _portable_path_parts(relative_path)
+            path_parts = portable_path_parts(relative_path)
         except ValueError as error:
             return None, [f"{label} {error}"]
         candidate = Path(*path_parts)

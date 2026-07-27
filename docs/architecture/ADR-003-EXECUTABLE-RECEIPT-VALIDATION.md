@@ -72,6 +72,13 @@ post-test HEAD/worktree/digest reconciliation, bounded command observations, ato
 publication, and version 2 of the portable GPT contract. Promotion still requires another
 disjoint reproduction and Judge verdict over the corrected commit.
 
+Later appeal passes also preserved and closed: immediate mutation that was restored before
+final validation; zero-exit pytest output without a recognized result; schema-v2 shape drift;
+separate stdout/stderr budgets; descendant processes retaining evidence pipes after timeout;
+contradictory per-reference receipt flags; Windows alternate-data-stream/reserved paths; and
+the missing receipt schema version in the portable migration example. Audit evidence now uses
+schema version 3, while the classic-GPT protocol remains version 2.
+
 ## Considered alternatives
 
 1. **Keep accepting provider-style strings:** rejected because syntax or truthiness cannot
@@ -93,6 +100,8 @@ Add `FileReceiptValidator` and `ReceiptReference`:
 
 - references use repository-independent relative paths and strict lowercase SHA-256 digests;
 - paths use one canonical POSIX-relative grammar on every host;
+- Windows reserved device names, alternate-data-stream colons, wildcard/control characters,
+  and trailing spaces/dots are nonportable and rejected on every host;
 - receipt and artifact paths must resolve to regular files beneath an explicitly trusted root;
 - the verifier reads and hashes exact bytes before accepting their JSON claims;
 - version, provider, execution, policy, lease, timestamp, result, artifact, and verifier
@@ -116,8 +125,8 @@ Harden the current-state audit:
   the recorded `HEAD`;
 - HEAD, worktree status, and every cited file digest are checked again after tests;
 - both the immediate post-test snapshot and the final post-validation snapshot are retained;
-- command pipes are drained with a hard read limit, time out, and cannot accept oversized
-  output as successful evidence;
+- commands run in an isolated process group; stdout and stderr share one hard byte budget;
+  timeout or overflow terminates the descendant tree and cannot succeed;
 - evidence publication uses a fully flushed temporary file plus atomic exclusive link;
 - integrity verification rejects underspecified payloads while continuing to distinguish
   digest integrity from external authenticity.
@@ -162,6 +171,9 @@ Harden policy invariants:
 | Boolean/float schema or string enum confusion | Require exact runtime types |
 | Partial artifact blocks retry | Publish a flushed temporary file through an exclusive atomic link |
 | Hung or excessively verbose command | Bound command time and accepted output |
+| Descendant retains evidence pipes after parent timeout | Isolate and terminate the process tree; bound reader joins |
+| Windows ADS/device path accepted on one host | Apply one cross-platform segment grammar before native resolution |
+| Receipt `valid` contradicts path/execution/issues | Derive and reconcile validity during artifact verification |
 | New policy action silently bypasses checks | Exhaustively assert `set(ACTION_LEVEL) == set(Action)` |
 | String/int role or risk bypass | Runtime type checks produce explicit denial |
 | Full autonomy grants A4/A5 effects | Deny grant-required effects until a separate verified grant model exists |
@@ -198,11 +210,12 @@ The portable classic-GPT pack and runtime-state example advance to version 2. Th
 the exact action, receipt-reference, binding, execution, result, and artifact fields. The tool
 protocol includes the explicit migration from `provider:receipt-id` labels.
 
-The audit artifact advances to schema version 2 because post-test reconciliation, bounded
-command metadata, receipt observations, and semantic consistency are a breaking verification
-contract. The committed version-1 artifact remains historical evidence, but the version-2
-verifier intentionally refuses to call it a current executable receipt. This versioned Python
-contract does not replace the formal schema set scheduled for backlog item 3.
+The audit artifact advances to schema version 3 because post-test and final reconciliation,
+hard-bounded command metadata, receipt observations, and semantic consistency are a breaking
+verification contract. Committed version-1 and version-2 artifacts and a version-2
+compatibility fixture remain historical evidence, but the version-3 verifier intentionally
+refuses to call them current executable receipts. This versioned Python contract does not
+replace the formal schema set scheduled for backlog item 3.
 
 There is no persistent database migration.
 

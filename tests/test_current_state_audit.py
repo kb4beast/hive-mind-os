@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import json
 import sys
 import tempfile
+import time
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,7 +30,7 @@ class CurrentStateAuditTests(unittest.TestCase):
     def valid_audit(self, **overrides) -> dict[str, object]:
         head = "a" * 40
         audit: dict[str, object] = {
-            "schema_version": 2,
+            "schema_version": 3,
             "artifact_type": "CurrentStateAudit",
             "repository": {
                 "root": str(self.repository),
@@ -124,7 +126,7 @@ class CurrentStateAuditTests(unittest.TestCase):
         broken = _broken_references(docket, self.repository)
         reasons = {item["reason"] for item in broken}
         self.assertIn("referenced file does not exist", reasons)
-        self.assertIn("referenced path escapes the repository", reasons)
+        self.assertIn("path must not contain empty, current, or parent segments", reasons)
 
     def test_free_form_success_text_is_not_a_test_receipt(self) -> None:
         command = ("python", "-c", "print('999 passed')")
@@ -184,18 +186,72 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertFalse(observation.succeeded)
         self.assertTrue(observation.timed_out)
         self.assertEqual(observation.return_code, 124)
-        self.assertIn("timed out", observation.stderr)
 
     def test_command_output_limit_stops_and_rejects_verbose_process(self) -> None:
-        with patch("hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_CHARACTERS", 32):
+        with patch("hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_BYTES", 32):
             observation = execute_command(
                 (sys.executable, "-c", "print('x' * 10000)"),
                 self.repository,
             )
         self.assertFalse(observation.succeeded)
         self.assertTrue(observation.output_truncated)
-        self.assertLessEqual(len(observation.stdout), 32)
-        self.assertIn("exceeded", observation.stderr)
+        self.assertLessEqual(
+            len(observation.stdout.encode("utf-8"))
+            + len(observation.stderr.encode("utf-8")),
+            32,
+        )
+
+    def test_command_output_limit_is_shared_across_both_streams(self) -> None:
+        with patch("hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_BYTES", 32):
+            observation = execute_command(
+                (
+                    sys.executable,
+                    "-c",
+                    "import sys; print('o' * 1000); print('e' * 1000, file=sys.stderr)",
+                ),
+                self.repository,
+            )
+        self.assertFalse(observation.succeeded)
+        self.assertTrue(observation.output_truncated)
+        self.assertLessEqual(
+            len(observation.stdout.encode("utf-8"))
+            + len(observation.stderr.encode("utf-8")),
+            32,
+        )
+
+    def test_timeout_terminates_descendants_that_inherit_output_pipes(self) -> None:
+        command = (
+            sys.executable,
+            "-c",
+            (
+                "import subprocess,sys,time;"
+                "subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']);"
+                "time.sleep(30)"
+            ),
+        )
+        started = time.perf_counter()
+        with patch("hive_mind_os.current_state_audit.COMMAND_TIMEOUT_SECONDS", 0.05):
+            observation = execute_command(command, self.repository)
+        self.assertLess(time.perf_counter() - started, 3)
+        self.assertTrue(observation.timed_out)
+        self.assertFalse(observation.succeeded)
+
+    def test_output_cap_terminates_descendants_that_inherit_output_pipes(self) -> None:
+        command = (
+            sys.executable,
+            "-c",
+            (
+                "import subprocess,sys,time;"
+                "subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']);"
+                "print('x'*10000,flush=True);time.sleep(30)"
+            ),
+        )
+        started = time.perf_counter()
+        with patch("hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_BYTES", 32):
+            observation = execute_command(command, self.repository)
+        self.assertLess(time.perf_counter() - started, 3)
+        self.assertTrue(observation.output_truncated)
+        self.assertFalse(observation.succeeded)
 
     def test_unrecognized_overall_pytest_result_cannot_complete(self) -> None:
         status_calls = 0
@@ -251,19 +307,19 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("audit signature mismatch", issues)
 
     def test_unknown_schema_is_not_verified(self) -> None:
-        artifact = create_audit_artifact(self.valid_audit(schema_version=3))
+        artifact = create_audit_artifact(self.valid_audit(schema_version=4))
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("unsupported CurrentStateAudit schema version", issues)
 
     def test_minimal_self_digested_payload_is_not_a_verified_audit(self) -> None:
-        artifact = create_audit_artifact({"schema_version": 2})
+        artifact = create_audit_artifact({"schema_version": 3})
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("artifact type must be CurrentStateAudit", issues)
 
         underspecified = {
-            "schema_version": 2,
+            "schema_version": 3,
             "artifact_type": "CurrentStateAudit",
             "repository": {},
             "docket": {},
@@ -277,6 +333,13 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("audit repository head is invalid", issues)
         self.assertIn("audit contains no command observations", issues)
         self.assertIn("complete audit requires passing tests", issues)
+
+    def test_version_two_shape_is_preserved_but_not_currently_verified(self) -> None:
+        fixture = self.repository / "tests" / "fixtures" / "current_state_audit_v2_payload.json"
+        payload = json.loads(fixture.read_text(encoding="utf-8"))
+        valid, issues = verify_audit_artifact(create_audit_artifact(payload))
+        self.assertFalse(valid)
+        self.assertIn("unsupported CurrentStateAudit schema version", issues)
 
     def test_boolean_schema_and_contradictory_complete_audit_are_rejected(self) -> None:
         boolean_schema = create_audit_artifact(self.valid_audit(schema_version=True))
@@ -296,6 +359,16 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("complete audit requires passing tests", issues)
         self.assertIn("complete audit requires valid reference receipts", issues)
         self.assertIn("complete audit cannot contain failures", issues)
+
+        deep_contradiction = self.valid_audit()
+        receipt = deep_contradiction["docket"]["reference_receipts"][0]
+        receipt["path_valid"] = False
+        receipt["execution"] = {"status": "failed"}
+        receipt["issues"] = ["missing"]
+        receipt["valid"] = True
+        valid, issues = verify_audit_artifact(create_audit_artifact(deep_contradiction))
+        self.assertFalse(valid)
+        self.assertIn("audit reference receipt 0 validity is contradictory", issues)
 
     def test_written_artifact_is_newline_terminated(self) -> None:
         artifact = create_audit_artifact(self.valid_audit())

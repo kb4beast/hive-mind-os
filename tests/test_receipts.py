@@ -166,6 +166,13 @@ class FileReceiptValidatorTests(unittest.TestCase):
             r"nested\receipt.json",
             "nested/../receipt.json",
             "nested//receipt.json",
+            "carrier.txt:receipt.json",
+            "CON",
+            "con.txt",
+            "file?.json",
+            "trailing.",
+            "trailing ",
+            "nul\u0000byte.json",
         ):
             with self.subTest(path=path):
                 with self.assertRaises(ValueError):

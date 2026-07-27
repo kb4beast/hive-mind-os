@@ -109,6 +109,7 @@ class ClassicGptSimulationTests(unittest.TestCase):
         receipt = runtime_state["tool_receipts"][0]
         self.assertEqual(set(receipt["receipt_ref"]), {"path", "digest"})
         for field in (
+            "schema_version",
             "execution_id",
             "mission_id",
             "state_ref",
@@ -122,6 +123,56 @@ class ClassicGptSimulationTests(unittest.TestCase):
             "verified_by",
         ):
             self.assertIn(field, receipt)
+
+        proposed = SimulatedAction(
+            id=action["id"],
+            kind=ActionKind(action["kind"]),
+            description=action["description"] or "Documented action",
+            actor_id=action["actor_id"],
+        )
+        artifact_path = self.receipt_root / "artifacts" / "ART-000.bin"
+        artifact_path.parent.mkdir()
+        artifact_path.write_bytes(b"observed example artifact")
+        receipt_document = dict(receipt)
+        receipt_reference = receipt_document.pop("receipt_ref")
+        receipt_document.update(
+            {
+                "provider": "example-provider",
+                "mission_id": runtime_state["mission"]["id"],
+                "state_ref": runtime_state["handoff"]["state_ref"],
+                "actor_id": proposed.actor_id,
+                "action_id": proposed.id,
+                "action_kind": proposed.kind.value,
+                "action_digest": proposed.digest,
+                "artifacts": [
+                    {
+                        "path": "artifacts/ART-000.bin",
+                        "digest": sha256_digest(artifact_path.read_bytes()),
+                    }
+                ],
+                "verified_by": "curator-pass-1",
+            }
+        )
+        receipt_path = self.receipt_root / receipt_reference["path"]
+        receipt_path.parent.mkdir()
+        receipt_path.write_text(
+            json.dumps(receipt_document, sort_keys=True),
+            encoding="utf-8",
+        )
+        validation = self.validator.validate(
+            ReceiptReference(
+                receipt_reference["path"],
+                sha256_digest(receipt_path.read_bytes()),
+            ),
+            mission_id=runtime_state["mission"]["id"],
+            state_ref=runtime_state["handoff"]["state_ref"],
+            actor_id=proposed.actor_id,
+            action_id=proposed.id,
+            action_kind=proposed.kind.value,
+            action_digest=proposed.digest,
+        )
+        self.assertTrue(validation.valid, validation.issues)
+        self.assertTrue(validation.succeeded)
 
     def test_missing_source_or_required_marker_fails_closed(self) -> None:
         documents = {item.path: "placeholder" for item in self.pack.files[:-1]}

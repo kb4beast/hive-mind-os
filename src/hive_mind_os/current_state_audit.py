@@ -7,6 +7,7 @@ import json
 import os
 import platform
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -15,8 +16,10 @@ import types
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
+
+from .receipts import portable_path_parts
 
 
 AUDITED_BASELINE: Mapping[str, object] = {
@@ -32,7 +35,8 @@ AUDITED_BASELINE: Mapping[str, object] = {
     "test_passed_count": 56,
 }
 COMMAND_TIMEOUT_SECONDS = 300
-MAX_COMMAND_OUTPUT_CHARACTERS = 1_000_000
+MAX_COMMAND_OUTPUT_BYTES = 1_000_000
+OUTPUT_DRAIN_TIMEOUT_SECONDS = 1.0
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _GIT_OBJECT_PATTERN = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
 
@@ -58,32 +62,73 @@ CommandExecutor = Callable[[Sequence[str], Path], CommandObservation]
 def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
     timed_out = False
     output_truncated = False
+    popen_options: dict[str, object]
+    if os.name == "nt":
+        popen_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    else:
+        popen_options = {"start_new_session": True}
     process = subprocess.Popen(
         list(command),
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        **popen_options,
     )
     stdout_chunks: list[bytes] = []
     stderr_chunks: list[bytes] = []
-    truncation_lock = threading.Lock()
+    output_lock = threading.Lock()
+    termination_lock = threading.Lock()
+    retained_output_bytes = 0
+    termination_started = False
+
+    def terminate_process_tree() -> None:
+        nonlocal termination_started
+        with termination_lock:
+            if termination_started:
+                return
+            termination_started = True
+        if os.name == "nt":
+            try:
+                subprocess.run(
+                    ("taskkill", "/PID", str(process.pid), "/T", "/F"),
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                pass
+        try:
+            process.kill()
+        except OSError:
+            pass
 
     def drain(stream: Any, chunks: list[bytes]) -> None:
-        nonlocal output_truncated
-        retained = 0
-        while data := stream.read(65_536):
-            remaining = MAX_COMMAND_OUTPUT_CHARACTERS - retained
-            if remaining > 0:
-                chunks.append(data[:remaining])
-                retained += min(len(data), remaining)
-            if len(data) > remaining:
-                with truncation_lock:
+        nonlocal output_truncated, retained_output_bytes
+        try:
+            read_available = getattr(stream, "read1", stream.read)
+            while data := read_available(65_536):
+                with output_lock:
+                    remaining = MAX_COMMAND_OUTPUT_BYTES - retained_output_bytes
+                    retained = data[: max(remaining, 0)]
+                    if retained:
+                        chunks.append(retained)
+                        retained_output_bytes += len(retained)
+                    exceeded = len(data) > max(remaining, 0)
+                    if exceeded:
+                        output_truncated = True
+                if exceeded:
+                    terminate_process_tree()
+                    break
+        except (OSError, ValueError):
+            if not termination_started:
+                with output_lock:
                     output_truncated = True
-                try:
-                    process.kill()
-                except OSError:
-                    pass
-                break
 
     stdout_thread = threading.Thread(
         target=drain,
@@ -101,17 +146,25 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
         return_code = process.wait(timeout=COMMAND_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         timed_out = True
-        process.kill()
-        process.wait()
+        terminate_process_tree()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
         return_code = 124
-    stdout_thread.join()
-    stderr_thread.join()
+    stdout_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
+    stderr_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
+    if stdout_thread.is_alive() or stderr_thread.is_alive():
+        terminate_process_tree()
+        for stream in (process.stdout, process.stderr):
+            try:
+                stream.close()
+            except OSError:
+                pass
+        stdout_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
+        stderr_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
     stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace")
     stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace")
-    if timed_out:
-        stderr = f"{stderr}\ncommand timed out after {COMMAND_TIMEOUT_SECONDS} seconds".strip()
-    if output_truncated:
-        stderr = f"{stderr}\ncommand output exceeded the evidence limit".strip()
     return CommandObservation(
         command=tuple(command),
         cwd=str(cwd),
@@ -175,13 +228,10 @@ def _resolve_reference(
     local_path = _local_reference(reference)
     if not local_path or "://" in local_path:
         return None, "reference is not a repository-local path"
-    if local_path.startswith("/") or "\\" in local_path or re.match(r"^[A-Za-z]:", local_path):
-        return None, "reference must use portable relative POSIX syntax"
-    raw_parts = local_path.split("/")
-    if any(part in {"", ".", ".."} for part in raw_parts):
-        return None, "referenced path escapes the repository"
-    if PurePosixPath(*raw_parts).as_posix() != local_path:
-        return None, "reference must use canonical portable relative POSIX syntax"
+    try:
+        raw_parts = portable_path_parts(local_path)
+    except ValueError as error:
+        return None, str(error)
     candidate = Path(*raw_parts)
     resolved = (repository / candidate).resolve()
     try:
@@ -598,7 +648,7 @@ def collect_current_state_audit(
 
     timestamp = (generated_at or datetime.now(UTC)).astimezone(UTC).isoformat()
     audit: dict[str, object] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "artifact_type": "CurrentStateAudit",
         "generated_at": timestamp,
         "invocation": list(invocation),
@@ -703,7 +753,7 @@ def verify_audit_artifact(
     if not isinstance(audit, Mapping) or not isinstance(integrity, Mapping):
         return False, ("artifact must contain audit and integrity objects",)
 
-    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 2:
+    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 3:
         issues.append("unsupported CurrentStateAudit schema version")
     if audit.get("artifact_type") != "CurrentStateAudit":
         issues.append("artifact type must be CurrentStateAudit")
@@ -799,6 +849,30 @@ def verify_audit_artifact(
                         issues.append(f"audit reference receipt {index} execution is invalid")
                     if not isinstance(receipt.get("issues"), list):
                         issues.append(f"audit reference receipt {index} issues are invalid")
+                    execution = receipt.get("execution")
+                    execution_status = (
+                        execution.get("status") if isinstance(execution, Mapping) else None
+                    )
+                    expected_execution_status = (
+                        "passed" if receipt.get("kind") == "test" else "not_applicable"
+                    )
+                    derived_valid = (
+                        receipt.get("path_valid") is True
+                        and isinstance(digest, str)
+                        and bool(_SHA256_PATTERN.fullmatch(digest))
+                        and receipt.get("issues") == []
+                        and execution_status == expected_execution_status
+                    )
+                    if receipt.get("valid") is not derived_valid:
+                        issues.append(
+                            f"audit reference receipt {index} validity is contradictory"
+                        )
+                derived_receipts_valid = bool(receipts) and all(
+                    isinstance(receipt, Mapping) and receipt.get("valid") is True
+                    for receipt in receipts
+                )
+                if docket.get("receipts_valid") is not derived_receipts_valid:
+                    issues.append("audit receipt-valid flag contradicts its receipts")
         if isinstance(tests, Mapping):
             if tests.get("status") not in {"passed", "failed", "not_run", "unverified"}:
                 issues.append("audit test status is invalid")

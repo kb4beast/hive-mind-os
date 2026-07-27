@@ -78,6 +78,7 @@
   ],
   "tool_receipts": [
     {
+      "schema_version": 1,
       "receipt_ref": {
         "path": "receipts/REC-000.json",
         "digest": "sha256:64-lowercase-hex-required"

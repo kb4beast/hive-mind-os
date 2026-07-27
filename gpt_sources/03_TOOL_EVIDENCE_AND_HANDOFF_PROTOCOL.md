@@ -52,6 +52,7 @@ PROPOSED_ACTION:
   receipt_ref: null
 
 TOOL_RECEIPT:
+  schema_version: 1
   receipt_ref:
     path: receipts/REC-12.json
     digest: sha256:<digest-of-receipt-json-bytes>
