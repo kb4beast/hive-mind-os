@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .additional_video_docket import ADDITIONAL_CLAIMS, ADDITIONAL_SOURCES
 from .courtroom import (
     Disposition,
     DocketAudit,
@@ -10,7 +11,13 @@ from .courtroom import (
     SourceDocketAuditor,
     SourceRecord,
 )
-from .founding_docket import CLAIMS, SOURCES, ClaimSpec
+from .founding_docket import CLAIMS as FOUNDING_CLAIMS
+from .founding_docket import SOURCES as FOUNDING_SOURCES
+from .founding_docket import ClaimSpec
+
+
+SOURCES = (*FOUNDING_SOURCES, *ADDITIONAL_SOURCES)
+CLAIMS = (*FOUNDING_CLAIMS, *ADDITIONAL_CLAIMS)
 
 
 @dataclass(frozen=True, slots=True)
