@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/model-turn.schema.json",
+  "title": "Hive Mind OS Structured Model Turn",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "outputs", "proposed_actions", "lessons", "success"],
+  "properties": {
+    "summary": {"type": "string", "minLength": 1},
+    "outputs": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "proposed_actions": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "lessons": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "success": {"type": "boolean"}
+  }
+}
