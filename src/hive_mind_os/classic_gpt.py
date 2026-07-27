@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 from hashlib import sha256
+from pathlib import Path
 from typing import Mapping
 
 from .models import Role
@@ -67,6 +68,32 @@ class ClassicGptSourceFile:
 class SourcePackAudit:
     valid: bool
     issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SourcePackFileRecord:
+    path: str
+    priority: int
+    bytes: int
+    sha256: str
+
+    def __post_init__(self) -> None:
+        if not self.path.startswith("gpt_sources/") or "\\" in self.path or ".." in self.path:
+            raise ValueError("source-pack paths must be portable and rooted at gpt_sources/")
+        if type(self.priority) is not int or self.priority < 0:
+            raise ValueError("source-pack priorities must be non-negative integers")
+        if type(self.bytes) is not int or self.bytes < 0:
+            raise ValueError("source-pack byte counts must be non-negative integers")
+        if not re_full_sha256(self.sha256):
+            raise ValueError("source-pack SHA-256 values must be lowercase hexadecimal")
+
+
+def re_full_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
 
 
 DEFAULT_CLASSIC_GPT_FILES: tuple[ClassicGptSourceFile, ...] = (
@@ -138,11 +165,13 @@ DEFAULT_CLASSIC_GPT_FILES: tuple[ClassicGptSourceFile, ...] = (
 
 @dataclass(frozen=True, slots=True)
 class ClassicGptSourcePack:
-    schema_version: int = 2
+    schema_version: int = 3
     files: tuple[ClassicGptSourceFile, ...] = DEFAULT_CLASSIC_GPT_FILES
+    records: tuple[SourcePackFileRecord, ...] = ()
+    pack_id: str = "hive-mind-os-classic-gpt-simulation-v3"
 
     def __post_init__(self) -> None:
-        if type(self.schema_version) is not int or self.schema_version != 2:
+        if type(self.schema_version) is not int or self.schema_version != 3:
             raise ValueError(f"unsupported classic GPT source-pack schema: {self.schema_version}")
         paths = [item.path for item in self.files]
         priorities = [item.priority for item in self.files]
@@ -152,37 +181,111 @@ class ClassicGptSourcePack:
             raise ValueError("classic GPT source pack contains duplicate priorities")
         if priorities != sorted(priorities):
             raise ValueError("classic GPT source pack must be stored in load order")
+        record_paths = [item.path for item in self.records]
+        record_priorities = [item.priority for item in self.records]
+        expected_paths = [item.path for item in self.files if not item.path.endswith("/manifest.json")]
+        if self.records and record_paths != expected_paths:
+            raise ValueError("source-pack manifest records do not match declared load order")
+        if self.records and record_priorities != list(range(len(self.records))):
+            raise ValueError("source-pack manifest priorities must be contiguous load order")
 
     @property
     def fingerprint(self) -> str:
-        canonical = "\n".join(
-            (
-                str(self.schema_version),
-                *(
-                    "|".join((item.path, item.purpose, str(item.priority), *item.required_markers))
-                    for item in self.files
-                ),
-            )
-        )
-        return sha256(canonical.encode("utf-8")).hexdigest()
+        if not self.records:
+            raise RuntimeError("source-pack fingerprint requires a byte-validated manifest")
+        canonical = json.dumps(
+            {
+                "schema_version": self.schema_version,
+                "pack_id": self.pack_id,
+                "files": [
+                    {
+                        "path": item.path,
+                        "priority": item.priority,
+                        "bytes": item.bytes,
+                        "sha256": item.sha256,
+                    }
+                    for item in self.records
+                ],
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return f"sha256:{sha256(canonical).hexdigest()}"
 
-    def audit(self, documents: Mapping[str, str]) -> SourcePackAudit:
+    @classmethod
+    def load(cls, repository: Path) -> "ClassicGptSourcePack":
+        root = repository.resolve()
+        manifest_path = root / "gpt_sources" / "manifest.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise ValueError(f"cannot load classic GPT source-pack manifest: {error}") from error
+        if not isinstance(manifest, dict):
+            raise ValueError("classic GPT source-pack manifest must be an object")
+        if type(manifest.get("schema_version")) is not int or manifest.get("schema_version") != 3:
+            raise ValueError("unsupported classic GPT source-pack manifest schema")
+        if manifest.get("pack_id") != "hive-mind-os-classic-gpt-simulation-v3":
+            raise ValueError("unknown classic GPT source-pack identity")
+        raw_records = manifest.get("files")
+        load_order = manifest.get("load_order")
+        if not isinstance(raw_records, list) or not isinstance(load_order, list):
+            raise ValueError("source-pack manifest requires files and load_order arrays")
+        records: list[SourcePackFileRecord] = []
+        for raw in raw_records:
+            if not isinstance(raw, dict) or set(raw) != {"path", "priority", "bytes", "sha256"}:
+                raise ValueError("source-pack manifest file records have an invalid shape")
+            records.append(SourcePackFileRecord(**raw))
+        if load_order != [record.path for record in records]:
+            raise ValueError("source-pack load_order differs from byte inventory order")
+        pack = cls(records=tuple(records))
+        documents: dict[str, bytes] = {}
+        source_directory = root / "gpt_sources"
+        for path in source_directory.iterdir():
+            if path.is_file():
+                documents[f"gpt_sources/{path.name}"] = path.read_bytes()
+        audit = pack.audit(documents)
+        if not audit.valid:
+            raise ValueError("; ".join(audit.issues))
+        return pack
+
+    def audit(self, documents: Mapping[str, str | bytes]) -> SourcePackAudit:
         issues: list[str] = []
         expected = {item.path for item in self.files}
         unknown = set(documents) - expected
+        missing = expected - set(documents)
         if unknown:
             issues.append("unexpected source files: " + ", ".join(sorted(unknown)))
+        if missing:
+            issues.append("missing source files: " + ", ".join(sorted(missing)))
 
+        records = {item.path: item for item in self.records}
+        if not self.records:
+            issues.append("source pack has no byte inventory")
         for item in self.files:
             content = documents.get(item.path)
             if content is None:
-                issues.append(f"missing source file: {item.path}")
                 continue
-            if not content.strip():
+            raw = content.encode("utf-8") if isinstance(content, str) else content
+            if not raw:
                 issues.append(f"empty source file: {item.path}")
                 continue
+            if item.path != "gpt_sources/manifest.json":
+                record = records.get(item.path)
+                if record is None:
+                    issues.append(f"source file is absent from byte inventory: {item.path}")
+                else:
+                    if len(raw) != record.bytes:
+                        issues.append(f"{item.path} byte count differs from manifest")
+                    if sha256(raw).hexdigest() != record.sha256:
+                        issues.append(f"{item.path} digest differs from manifest")
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                issues.append(f"{item.path} is not valid UTF-8")
+                continue
             for marker in item.required_markers:
-                if marker not in content:
+                if marker not in text:
                     issues.append(f"{item.path} missing required marker: {marker}")
         return SourcePackAudit(not issues, tuple(issues))
 
@@ -266,7 +369,7 @@ class ClassicGptSimulationGate:
         source_pack: ClassicGptSourcePack | None = None,
         receipt_validator: ReceiptValidator | None = None,
     ) -> None:
-        self.source_pack = source_pack or ClassicGptSourcePack()
+        self.source_pack = source_pack or ClassicGptSourcePack.load(Path.cwd())
         self.receipt_validator = receipt_validator
 
     def evaluate(self, turn: ClassicGptTurn) -> SimulationDecision:

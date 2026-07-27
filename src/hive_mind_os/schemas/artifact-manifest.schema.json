@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/artifact-manifest.schema.json",
+  "title": "Hive Mind OS Artifact Manifest Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["path", "digest"],
+  "properties": {
+    "artifact_id": {"type": "string", "minLength": 1},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "media_type": {"type": ["string", "null"], "minLength": 1},
+    "bytes": {"type": ["integer", "null"], "minimum": 0},
+    "created_by": {"type": ["string", "null"], "minLength": 1},
+    "created_at": {"type": ["string", "null"], "format": "date-time"},
+    "provenance_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+  }
+}

@@ -28,7 +28,12 @@ Every user requirement and external source is treated as evidence, not inspirati
 - architecture, acceptance-test, metric, rollback, and implementation mappings;
 - an append-only appeal path.
 
-The founding docket currently records **22 sources and 80 atomic claims**. It is inventory-complete. It intentionally remains source-incomplete while seven video sources await complete verified ingestion; the system records those as blocking evidence obligations rather than inventing their contents.
+The additive docket currently records **23 sources and 84 atomic claims**. The original
+22-source/80-claim record remains conserved; the separately captured sibling classic-GPT
+pack adds `SRC-023` and `CLM-081`–`CLM-084`. The inventory is complete, but the evidence is
+not release-ready. Seven video sources remain incomplete, several historical pins/digests or
+licenses remain unresolved, and every dependent claim is machine-blocked at the affected
+burden rather than silently promoted.
 
 - Courtroom engine: `src/hive_mind_os/courtroom.py`
 - Docket loader and completeness audit: `src/hive_mind_os/source_docket.py`
@@ -61,13 +66,18 @@ mission/state/action/actor binding, policy decision, lease, execution result, ti
 independent verifier. This is a local structural verifier; authenticated provider identities
 and the non-bypassable enforcement gateway remain later kernel stages.
 
-The portable classic-GPT state/protocol is version 2. Actions use explicit keyword fields and
-content-addressed receipt references; the source protocol documents migration from legacy
-`provider:receipt-id` strings.
+The portable classic-GPT state/protocol is version 3. The byte-hashed version-3 manifest
+fails on additions, removals, substitutions, reorder, or schema drift. Formal Draft 2020-12
+contracts for source, claim, event, identity, lease, policy decision, tool intent/receipt,
+mission state, handoff, and artifacts ship under `src/hive_mind_os/schemas/`; the runtime
+validator adds cross-record receipt, role, verifier, state, and completion checks.
 
-## What is implemented
+## Prototype inventory
 
-The foundation includes:
+The foundation includes the following typed or executable prototypes. The current-state audit
+classifies them no higher than `structurally_prototyped`; it does not claim complete
+mediation, distributed independence, durable external enforcement, production operation, or
+customer-outcome proof:
 
 - Typed objectives, work items, evidence, results, risks, and autonomy levels.
 - Contracts for all eight specialist agents.
@@ -91,7 +101,9 @@ The foundation includes:
 - A persistent autonomous mission loop that stops on completion, policy failure, or budget exhaustion.
 - A bounded recursive-improvement gate with repeated measurements, noise floors, hard guardrails, retained lineage, rollback, quarantine, and deterministic stopping.
 - A load-ordered classic GPT source pack with portable state, role/court protocols, receipt-backed side effects, and fail-closed completion.
-- Tests and GitHub Actions CI.
+- Tests and commit-pinned GitHub Actions CI, plus a machine-checked repository-protection
+  contract. Host-side rule activation remains explicitly unverified until independently
+  observed on GitHub.
 
 ## Bounded evolutionary autonomy
 
@@ -112,11 +124,12 @@ The included deterministic backend exercises the role lifecycle offline. Real mo
 
 ## Audit the current state
 
-The Stage 0 audit command records the Git history and worktree, docket counts and blockers,
-broken code/test/benchmark references, tool versions, exact command outputs, baseline
-discrepancies, and content-digested reference receipts in a canonical SHA-256 envelope. Each
-cited test file is executed explicitly, and a dirty worktree or an unrecognized test command
-keeps the audit incomplete:
+The Stage 0 audit command records the Git history and worktree, full source/claim coverage,
+machine-blocked claims, capability maturity, implementation evidence classes, docket counts
+and blockers, broken code/test/benchmark references, tool versions, exact command outputs,
+baseline discrepancies, and content-digested reference receipts in a canonical SHA-256
+envelope. Each cited test file is executed explicitly, and a dirty worktree or an
+unrecognized test command keeps the audit incomplete:
 
 ```bash
 hive-mind audit --output evidence/audits/current-state.json

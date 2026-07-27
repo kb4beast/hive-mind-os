@@ -7,7 +7,11 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .current_state_audit import collect_current_state_audit, create_audit_artifact, write_audit_artifact
+from .current_state_audit import (
+    collect_current_state_audit,
+    create_audit_artifact,
+    write_audit_artifact,
+)
 from .models import Objective
 from .runtime import HiveKernel
 
@@ -87,11 +91,13 @@ def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     )
     if args.output:
         write_audit_artifact(artifact, args.output)
+        integrity = artifact.get("integrity")
+        digest = integrity.get("digest") if isinstance(integrity, dict) else None
         print(
             json.dumps(
                 {
                     "artifact": str(Path(args.output).resolve()),
-                    "digest": artifact["integrity"]["digest"],
+                    "digest": digest,
                     "complete": audit["complete"],
                     "failures": audit["failures"],
                 },

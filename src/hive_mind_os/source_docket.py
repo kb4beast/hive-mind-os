@@ -5,10 +5,12 @@ from dataclasses import dataclass
 from .additional_video_docket import ADDITIONAL_CLAIMS, ADDITIONAL_SOURCES
 from .classic_gpt_docket import CLASSIC_GPT_CLAIMS, CLASSIC_GPT_SOURCES
 from .courtroom import (
+    CapabilityMaturity,
     Disposition,
     DocketAudit,
     DocketDecision,
     IdeaClaim,
+    ImplementationState,
     SourceDocketAuditor,
     SourceRecord,
 )
@@ -19,19 +21,21 @@ from .recursive_improvement_docket import (
     RECURSIVE_IMPROVEMENT_CLAIMS,
     RECURSIVE_IMPROVEMENT_SOURCES,
 )
-
+from .sibling_gpt_docket import SIBLING_GPT_CLAIMS, SIBLING_GPT_SOURCES
 
 SOURCES = (
     *FOUNDING_SOURCES,
     *ADDITIONAL_SOURCES,
     *RECURSIVE_IMPROVEMENT_SOURCES,
     *CLASSIC_GPT_SOURCES,
+    *SIBLING_GPT_SOURCES,
 )
 CLAIMS = (
     *FOUNDING_CLAIMS,
     *ADDITIONAL_CLAIMS,
     *RECURSIVE_IMPROVEMENT_CLAIMS,
     *CLASSIC_GPT_CLAIMS,
+    *SIBLING_GPT_CLAIMS,
 )
 
 
@@ -93,6 +97,11 @@ def _claim(spec: ClaimSpec) -> IdeaClaim:
         benchmark_refs=spec.benchmark_refs,
         comparator_source_ids=spec.comparators,
         implementation_state=spec.state,
+        capability_maturity=(
+            CapabilityMaturity.STRUCTURALLY_PROTOTYPED
+            if spec.state in {ImplementationState.IMPLEMENTED, ImplementationState.VALIDATED}
+            else CapabilityMaturity.SPECIFIED
+        ),
     )
 
 

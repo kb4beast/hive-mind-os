@@ -1,0 +1,74 @@
+{
+  "pack": "Hive OS Classic GPT Simulation Pack",
+  "repository": "kb4beast/hive-mind-os",
+  "pull_request": 1,
+  "analyzed_head": "d4d1c9b23f8147047d0d782c47b54d64e4289b55",
+  "instruction_file": "HIVE_OS_GPT_INSTRUCTIONS.txt",
+  "knowledge_files": [
+    "00_CONSTITUTION.md",
+    "01_ROLES_LIFECYCLE.md",
+    "02_RUNTIME_STATE_MACHINE.md",
+    "03_COURTROOM_SOURCE_DOCKET.md",
+    "04_POLICY_AUTONOMY_SAFETY.md",
+    "05_EVIDENCE_LEDGER_MEMORY.md",
+    "06_RECURSIVE_IMPROVEMENT.md",
+    "07_REPOSITORY_LEARNING.md",
+    "08_OUTPUT_SCHEMAS.md",
+    "09_TEST_SCENARIOS.md"
+  ],
+  "alternative_single_knowledge_file": "HIVE_OS_ALL_IN_ONE.md",
+  "files": {
+    "00_CONSTITUTION.md": {
+      "bytes": 4001,
+      "sha256": "a008a4f25cf95593854b8837909c66404f5ebd50bd576e6b651660c4dd2f368e"
+    },
+    "01_ROLES_LIFECYCLE.md": {
+      "bytes": 3814,
+      "sha256": "2a7e2affca5e1a0acdda7a8919c5ec0a50efdb83288533437161c79132ec8e5c"
+    },
+    "02_RUNTIME_STATE_MACHINE.md": {
+      "bytes": 2677,
+      "sha256": "d0cb0b8e6b15f90fef05a7d6b6932beb6413d61d744e5a17c5565759ea08e4b7"
+    },
+    "03_COURTROOM_SOURCE_DOCKET.md": {
+      "bytes": 3026,
+      "sha256": "8be3863cfff86a07fffd655ee42f51c48c8eeb168f3b84d87d9bef46db6679c5"
+    },
+    "04_POLICY_AUTONOMY_SAFETY.md": {
+      "bytes": 2335,
+      "sha256": "ed781d00f91f7a8148e9b39014063bc365ffb2b2e95033b30390325ad8fe6db1"
+    },
+    "05_EVIDENCE_LEDGER_MEMORY.md": {
+      "bytes": 2390,
+      "sha256": "b980a404962daf06d3a9c933555c59e82a4984b62ed986040a8d5bcef938f314"
+    },
+    "06_RECURSIVE_IMPROVEMENT.md": {
+      "bytes": 2854,
+      "sha256": "81944a5c81ddcfbb5adbd22b458cc574778ea76a27ca8523958e3560e53765f0"
+    },
+    "07_REPOSITORY_LEARNING.md": {
+      "bytes": 1984,
+      "sha256": "6a46731adbe93ca01867548cc43b37e6acee8c3f1fde87845f21388edfab2545"
+    },
+    "08_OUTPUT_SCHEMAS.md": {
+      "bytes": 2401,
+      "sha256": "cfe8534de5c27440ed6bd8d8b53c3804556f09c9b5fcb5df3b584a987e34aa7b"
+    },
+    "09_TEST_SCENARIOS.md": {
+      "bytes": 2700,
+      "sha256": "75be81375886a075b92e7de84104a64da65ab530f4ecc84e596393bd7f21076b"
+    },
+    "HIVE_OS_ALL_IN_ONE.md": {
+      "bytes": 28747,
+      "sha256": "16250b448620b8050f2b91b015ad8c4aede0f8e52f9217fe6e0ed69971516c9a"
+    },
+    "HIVE_OS_GPT_INSTRUCTIONS.txt": {
+      "bytes": 6628,
+      "sha256": "07390fd058878d7705a449850166d4812e793d154da1493dbc5e9887d238a623"
+    },
+    "README_SETUP.md": {
+      "bytes": 1833,
+      "sha256": "a61761f8186b17808bd5d16c542fc37da891dce2eb0f3f3ea16123752114c3d3"
+    }
+  }
+}

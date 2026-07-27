@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from .courtroom import BurdenOfProof, Disposition, ImplementationState, SourceRecord, SourceStatus
+from .courtroom import (
+    BurdenOfProof,
+    Disposition,
+    ImplementationState,
+    SourceRecord,
+    SourceStatus,
+)
 from .founding_docket import ClaimSpec
-
 
 CLASSIC_GPT_SOURCES: tuple[SourceRecord, ...] = (
     SourceRecord(
@@ -14,6 +19,7 @@ CLASSIC_GPT_SOURCES: tuple[SourceRecord, ...] = (
         version_ref="conversation:2026-07-27",
         license_spdx=None,
         content_digest="classic-gpt-simulation-v2",
+        object_type="conversation",
     ),
 )
 

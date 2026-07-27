@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/tool-receipt.schema.json",
+  "title": "Hive Mind OS Tool Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "action_id", "provider", "execution_id", "mission_id", "state_ref", "actor_id", "policy_decision_ref", "lease_id", "action_kind", "action_digest", "executed", "result", "observed_at", "artifacts", "verified_by"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "receipt_id": {"type": "string", "minLength": 1},
+    "action_id": {"type": "string", "minLength": 1},
+    "provider": {"type": "string", "minLength": 1},
+    "execution_id": {"type": "string", "minLength": 1},
+    "mission_id": {"type": "string", "minLength": 1},
+    "state_ref": {"type": "string", "minLength": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "policy_decision_ref": {"type": "string", "minLength": 1},
+    "lease_id": {"type": "string", "minLength": 1},
+    "action_kind": {"enum": ["reasoning", "read", "write", "command", "network", "git", "message", "deploy"]},
+    "action_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "executed": {"const": true},
+    "result": {"enum": ["succeeded", "failed", "unknown"]},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "artifacts": {"type": "array", "items": {"$ref": "artifact-manifest.schema.json"}},
+    "verified_by": {"type": "string", "minLength": 1}
+  }
+}

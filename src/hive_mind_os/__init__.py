@@ -2,8 +2,8 @@
 
 from .autonomy import (
     AgentVariant,
-    AutonomyBudget,
     AutonomousMissionLoop,
+    AutonomyBudget,
     EvolutionArena,
     MissionCharter,
 )
@@ -14,6 +14,13 @@ from .classic_gpt import (
     ClassicGptTurn,
     SimulatedAction,
     SimulationPhase,
+)
+from .contracts import (
+    ContractValidation,
+    load_schema,
+    validate_contract,
+    validate_runtime_state,
+    validate_schema_catalog,
 )
 from .courtroom import (
     BurdenOfProof,
@@ -31,7 +38,16 @@ from .current_state_audit import (
     verify_audit_artifact,
     write_audit_artifact,
 )
+from .governed_sources import GovernedSourceAudit, audit_governed_source
 from .models import AutonomyLevel, Objective, RiskTier, Role
+from .receipts import (
+    FileReceiptValidator,
+    ReceiptReference,
+    ReceiptResult,
+    ReceiptValidation,
+    ReceiptValidator,
+    sha256_digest,
+)
 from .recursive_improvement import (
     ExperimentCandidate,
     ExperimentDecision,
@@ -45,16 +61,12 @@ from .recursive_improvement import (
     RecursiveImprovementGate,
 )
 from .repository_learning import RepositoryLearningCurriculum, RepositoryScout
-from .receipts import (
-    FileReceiptValidator,
-    ReceiptReference,
-    ReceiptResult,
-    ReceiptValidator,
-    ReceiptValidation,
-    sha256_digest,
-)
 from .runtime import HiveKernel
-from .source_docket import FoundingSourceDocket, load_default_source_docket, load_source_docket
+from .source_docket import (
+    FoundingSourceDocket,
+    load_default_source_docket,
+    load_source_docket,
+)
 from .vision import HardenedVisionContract, VisionComplianceGate
 
 __all__ = [
@@ -68,6 +80,7 @@ __all__ = [
     "ClassicGptSimulationGate",
     "ClassicGptSourcePack",
     "ClassicGptTurn",
+    "ContractValidation",
     "CourtCase",
     "Courtroom",
     "CourtVerdict",
@@ -81,6 +94,7 @@ __all__ = [
     "FileReceiptValidator",
     "HardenedVisionContract",
     "HiveKernel",
+    "GovernedSourceAudit",
     "MetricDirection",
     "MetricObservation",
     "MetricSpec",
@@ -102,12 +116,17 @@ __all__ = [
     "SourceDocketAuditor",
     "SourceRecord",
     "VisionComplianceGate",
+    "audit_governed_source",
     "collect_current_state_audit",
     "create_audit_artifact",
     "load_default_source_docket",
+    "load_schema",
     "load_source_docket",
     "sha256_digest",
+    "validate_contract",
+    "validate_runtime_state",
+    "validate_schema_catalog",
     "verify_audit_artifact",
     "write_audit_artifact",
 ]
-__version__ = "0.5.0"
+__version__ = "0.6.0"

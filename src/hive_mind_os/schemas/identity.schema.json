@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/identity.schema.json",
+  "title": "Hive Mind OS Actor Identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "actor_id", "role", "issuer", "public_key_id", "valid_from", "valid_until", "conflict_set"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "role": {"enum": ["orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer", "clerk", "advocate", "cross_examiner", "expert_witness", "judge", "appeals_judge"]},
+    "issuer": {"type": "string", "minLength": 1},
+    "public_key_id": {"type": "string", "minLength": 1},
+    "valid_from": {"type": "string", "format": "date-time"},
+    "valid_until": {"type": "string", "format": "date-time"},
+    "conflict_set": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "signature": {"type": ["string", "null"], "minLength": 1}
+  }
+}

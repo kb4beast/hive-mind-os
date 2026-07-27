@@ -1,0 +1,12 @@
+# Constitutional and evidence-bearing files require explicit code-owner review.
+* @kb4beast
+
+/AGENTS.md @kb4beast
+/docs/architecture/ @kb4beast
+/src/hive_mind_os/courtroom.py @kb4beast
+/src/hive_mind_os/policy.py @kb4beast
+/src/hive_mind_os/source_docket.py @kb4beast
+/src/hive_mind_os/*_docket.py @kb4beast
+/src/hive_mind_os/schemas/ @kb4beast
+/evidence/ @kb4beast
+/.github/ @kb4beast

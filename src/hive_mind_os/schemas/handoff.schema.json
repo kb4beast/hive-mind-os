@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/handoff.schema.json",
+  "title": "Hive Mind OS Handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "handoff_id", "mission_id", "state_ref", "from_actor_id", "to_role", "unresolved_items", "verified_artifacts", "next_action", "resume_instruction", "created_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "handoff_id": {"type": "string", "minLength": 1},
+    "mission_id": {"type": "string", "minLength": 1},
+    "state_ref": {"type": "string", "minLength": 1},
+    "from_actor_id": {"type": "string", "minLength": 1},
+    "to_role": {"enum": ["orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer"]},
+    "unresolved_items": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "verified_artifacts": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "next_action": {"type": "string", "minLength": 1},
+    "resume_instruction": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

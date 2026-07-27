@@ -17,7 +17,8 @@ from hive_mind_os.receipts import FileReceiptValidator, ReceiptReference, sha256
 
 class ClassicGptSimulationTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.pack = ClassicGptSourcePack()
+        self.repository = Path(__file__).resolve().parents[1]
+        self.pack = ClassicGptSourcePack.load(self.repository)
         self.directory = tempfile.TemporaryDirectory()
         self.receipt_root = Path(self.directory.name)
         self.validator = FileReceiptValidator(self.receipt_root)
@@ -88,26 +89,25 @@ class ClassicGptSimulationTests(unittest.TestCase):
 
     def test_source_pack_files_exist_and_pass_marker_audit(self) -> None:
         documents = {
-            item.path: Path(item.path).read_text(encoding="utf-8")
+            item.path: (self.repository / item.path).read_bytes()
             for item in self.pack.files
         }
         audit = self.pack.audit(documents)
         self.assertTrue(audit.valid, audit.issues)
 
         manifest = json.loads(documents["gpt_sources/manifest.json"])
-        self.assertEqual(manifest["schema_version"], 2)
-        self.assertEqual(manifest["pack_id"], "hive-mind-os-classic-gpt-simulation-v2")
+        self.assertEqual(manifest["schema_version"], 3)
+        self.assertEqual(manifest["pack_id"], "hive-mind-os-classic-gpt-simulation-v3")
         self.assertEqual(
             manifest["load_order"],
             [item.path for item in self.pack.files if item.path != "gpt_sources/manifest.json"],
         )
         runtime_state = json.loads(documents["gpt_sources/01_RUNTIME_STATE_SCHEMA.json"])
-        self.assertEqual(runtime_state["schema_version"], 2)
+        self.assertEqual(runtime_state["schema_version"], 3)
         action = runtime_state["proposed_actions"][0]
         self.assertIn("actor_id", action)
         self.assertIn("action_digest", action)
         receipt = runtime_state["tool_receipts"][0]
-        self.assertEqual(set(receipt["receipt_ref"]), {"path", "digest"})
         for field in (
             "schema_version",
             "execution_id",
@@ -125,7 +125,7 @@ class ClassicGptSimulationTests(unittest.TestCase):
             self.assertIn(field, receipt)
 
         proposed = SimulatedAction(
-            id=action["id"],
+            id=action["action_id"],
             kind=ActionKind(action["kind"]),
             description=action["description"] or "Documented action",
             actor_id=action["actor_id"],
@@ -134,7 +134,6 @@ class ClassicGptSimulationTests(unittest.TestCase):
         artifact_path.parent.mkdir()
         artifact_path.write_bytes(b"observed example artifact")
         receipt_document = dict(receipt)
-        receipt_reference = receipt_document.pop("receipt_ref")
         receipt_document.update(
             {
                 "provider": "example-provider",
@@ -153,7 +152,7 @@ class ClassicGptSimulationTests(unittest.TestCase):
                 "verified_by": "curator-pass-1",
             }
         )
-        receipt_path = self.receipt_root / receipt_reference["path"]
+        receipt_path = self.receipt_root / "receipts" / "REC-000.json"
         receipt_path.parent.mkdir()
         receipt_path.write_text(
             json.dumps(receipt_document, sort_keys=True),
@@ -161,7 +160,7 @@ class ClassicGptSimulationTests(unittest.TestCase):
         )
         validation = self.validator.validate(
             ReceiptReference(
-                receipt_reference["path"],
+                "receipts/REC-000.json",
                 sha256_digest(receipt_path.read_bytes()),
             ),
             mission_id=runtime_state["mission"]["id"],
@@ -173,6 +172,49 @@ class ClassicGptSimulationTests(unittest.TestCase):
         )
         self.assertTrue(validation.valid, validation.issues)
         self.assertTrue(validation.succeeded)
+
+    def test_byte_inventory_fails_on_add_remove_substitute_and_reorder(self) -> None:
+        documents = {
+            item.path: (self.repository / item.path).read_bytes()
+            for item in self.pack.files
+        }
+        removed = dict(documents)
+        removed.pop(self.pack.records[0].path)
+        self.assertFalse(self.pack.audit(removed).valid)
+
+        added = dict(documents)
+        added["gpt_sources/uninventoried.md"] = b"extra"
+        self.assertFalse(self.pack.audit(added).valid)
+
+        substituted = dict(documents)
+        substituted[self.pack.records[0].path] += b"\nsubstitution"
+        self.assertFalse(self.pack.audit(substituted).valid)
+
+        manifest = json.loads(documents["gpt_sources/manifest.json"])
+        manifest["load_order"] = list(reversed(manifest["load_order"]))
+        invalid_manifest = json.dumps(manifest).encode()
+        reordered = dict(documents)
+        reordered["gpt_sources/manifest.json"] = invalid_manifest
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "gpt_sources").mkdir()
+            for path, content in reordered.items():
+                (root / path).write_bytes(content)
+            with self.assertRaisesRegex(ValueError, "load_order"):
+                ClassicGptSourcePack.load(root)
+
+    def test_manifest_schema_incompatibility_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "gpt_sources").mkdir()
+            for item in self.pack.files:
+                (root / item.path).write_bytes((self.repository / item.path).read_bytes())
+            manifest_path = root / "gpt_sources" / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["schema_version"] = 4
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unsupported"):
+                ClassicGptSourcePack.load(root)
 
     def test_missing_source_or_required_marker_fails_closed(self) -> None:
         documents = {item.path: "placeholder" for item in self.pack.files[:-1]}

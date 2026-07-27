@@ -30,7 +30,7 @@ class CurrentStateAuditTests(unittest.TestCase):
     def valid_audit(self, **overrides) -> dict[str, object]:
         head = "a" * 40
         audit: dict[str, object] = {
-            "schema_version": 4,
+            "schema_version": 5,
             "artifact_type": "CurrentStateAudit",
             "repository": {
                 "root": str(self.repository),
@@ -48,6 +48,19 @@ class CurrentStateAuditTests(unittest.TestCase):
             "docket": {
                 "source_count": 1,
                 "claim_count": 1,
+                "machine_blocked_claim_ids": [],
+                "source_coverage": [{"source_id": "SRC-001"}],
+                "implementation_state_audit": {
+                    "maturity_scale": [
+                        "specified",
+                        "structurally_prototyped",
+                        "executed_in_isolation",
+                        "independently_verified_e2e",
+                        "production_proven",
+                    ],
+                    "maturity_counts": {"specified": 1},
+                    "evidence_classes": {"production_proof": []},
+                },
                 "broken_references": [],
                 "receipts_valid": True,
                 "reference_receipts": [
@@ -92,13 +105,39 @@ class CurrentStateAuditTests(unittest.TestCase):
 
         self.assertEqual(audit["artifact_type"], "CurrentStateAudit")
         self.assertGreaterEqual(audit["repository"]["full_ref_commit_count"], 79)
-        self.assertEqual(audit["docket"]["source_count"], 22)
-        self.assertEqual(audit["docket"]["claim_count"], 80)
+        self.assertEqual(audit["schema_version"], 5)
+        self.assertEqual(audit["docket"]["source_count"], 23)
+        self.assertEqual(audit["docket"]["claim_count"], 84)
         self.assertTrue(audit["docket"]["inventory_complete"])
         self.assertFalse(audit["docket"]["release_ready"])
         self.assertEqual(
             audit["docket"]["source_blockers"],
-            ["SRC-005", "SRC-006", "SRC-016", "SRC-017", "SRC-018", "SRC-019", "SRC-020"],
+            [
+                "SRC-001",
+                "SRC-002",
+                "SRC-005",
+                "SRC-006",
+                "SRC-010",
+                "SRC-011",
+                "SRC-013",
+                "SRC-014",
+                "SRC-015",
+                "SRC-016",
+                "SRC-017",
+                "SRC-018",
+                "SRC-019",
+                "SRC-020",
+                "SRC-022",
+                "SRC-023",
+            ],
+        )
+        self.assertEqual(len(audit["docket"]["source_coverage"]), 23)
+        self.assertTrue(audit["docket"]["machine_blocked_claim_ids"])
+        self.assertEqual(
+            audit["docket"]["implementation_state_audit"]["claims_by_maturity"][
+                "production_proven"
+            ],
+            [],
         )
         self.assertEqual(audit["docket"]["broken_references"], [])
         self.assertFalse(audit["docket"]["receipts_valid"])
@@ -489,19 +528,19 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("audit signature mismatch", issues)
 
     def test_unknown_schema_is_not_verified(self) -> None:
-        artifact = create_audit_artifact(self.valid_audit(schema_version=5))
+        artifact = create_audit_artifact(self.valid_audit(schema_version=6))
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("unsupported CurrentStateAudit schema version", issues)
 
     def test_minimal_self_digested_payload_is_not_a_verified_audit(self) -> None:
-        artifact = create_audit_artifact({"schema_version": 4})
+        artifact = create_audit_artifact({"schema_version": 5})
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("artifact type must be CurrentStateAudit", issues)
 
         underspecified = {
-            "schema_version": 4,
+            "schema_version": 5,
             "artifact_type": "CurrentStateAudit",
             "repository": {},
             "docket": {},

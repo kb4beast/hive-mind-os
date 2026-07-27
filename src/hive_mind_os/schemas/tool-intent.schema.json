@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/tool-intent.schema.json",
+  "title": "Hive Mind OS Tool Intent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "action_id", "mission_id", "state_ref", "actor_id", "kind", "description", "action_digest", "policy_decision_ref", "lease_id", "idempotency_key", "status"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "action_id": {"type": "string", "minLength": 1},
+    "mission_id": {"type": "string", "minLength": 1},
+    "state_ref": {"type": "string", "minLength": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["reasoning", "read", "write", "command", "network", "git", "message", "deploy"]},
+    "description": {"type": "string", "minLength": 1},
+    "action_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "policy_decision_ref": {"type": "string", "minLength": 1},
+    "lease_id": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "rollback_ref": {"type": ["string", "null"], "minLength": 1},
+    "status": {"const": "proposed"}
+  }
+}

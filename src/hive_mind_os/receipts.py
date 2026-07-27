@@ -9,7 +9,6 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Mapping, Protocol
 
-
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _RFC3339_PATTERN = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\Z"

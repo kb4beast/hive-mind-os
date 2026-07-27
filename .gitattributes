@@ -1,0 +1,10 @@
+# Repository-authored text remains normalized and reproducible.
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Source exhibits are evidentiary bytes. Never normalize line endings or text diffs.
+evidence/sources/**/raw/** -text -diff

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "source_id": "SRC-023",
+  "title": "Sibling Hive OS Classic GPT Simulation Pack",
+  "source_uri": "user-supplied-sibling:C:/Repos/HiveMind/hive_os_classic_gpt_pack",
+  "captured_at": "2026-07-27T00:00:00-05:00",
+  "license_spdx": null,
+  "provenance_complete": false,
+  "canonical_instruction_file": "raw/HIVE_MIND_OS_INSTRUCTIONS_V2.txt",
+  "module_load_order": [
+    "raw/00_CONSTITUTION.md",
+    "raw/01_ROLES_LIFECYCLE.md",
+    "raw/02_RUNTIME_STATE_MACHINE.md",
+    "raw/03_COURTROOM_SOURCE_DOCKET.md",
+    "raw/04_POLICY_AUTONOMY_SAFETY.md",
+    "raw/05_EVIDENCE_LEDGER_MEMORY.md",
+    "raw/06_RECURSIVE_IMPROVEMENT.md",
+    "raw/07_REPOSITORY_LEARNING.md",
+    "raw/08_OUTPUT_SCHEMAS.md",
+    "raw/09_TEST_SCENARIOS.md"
+  ],
+  "generated_all_in_one": "raw/HIVE_OS_ALL_IN_ONE.md",
+  "generation_recipe": "classic-gpt-all-in-one-v1",
+  "inventory_digest": "sha256:9d55be7e5d4e18fc77473e50afe8cb17dccb4e866f3c24317d300e1594455369",
+  "files": [
+    {"path": "raw/00_CONSTITUTION.md", "bytes": 4001, "sha256": "sha256:a008a4f25cf95593854b8837909c66404f5ebd50bd576e6b651660c4dd2f368e", "classification": "canonical_module"},
+    {"path": "raw/01_ROLES_LIFECYCLE.md", "bytes": 3814, "sha256": "sha256:2a7e2affca5e1a0acdda7a8919c5ec0a50efdb83288533437161c79132ec8e5c", "classification": "canonical_module"},
+    {"path": "raw/02_RUNTIME_STATE_MACHINE.md", "bytes": 2677, "sha256": "sha256:d0cb0b8e6b15f90fef05a7d6b6932beb6413d61d744e5a17c5565759ea08e4b7", "classification": "canonical_module"},
+    {"path": "raw/03_COURTROOM_SOURCE_DOCKET.md", "bytes": 3026, "sha256": "sha256:8be3863cfff86a07fffd655ee42f51c48c8eeb168f3b84d87d9bef46db6679c5", "classification": "canonical_module"},
+    {"path": "raw/04_POLICY_AUTONOMY_SAFETY.md", "bytes": 2335, "sha256": "sha256:ed781d00f91f7a8148e9b39014063bc365ffb2b2e95033b30390325ad8fe6db1", "classification": "canonical_module"},
+    {"path": "raw/05_EVIDENCE_LEDGER_MEMORY.md", "bytes": 2390, "sha256": "sha256:b980a404962daf06d3a9c933555c59e82a4984b62ed986040a8d5bcef938f314", "classification": "canonical_module"},
+    {"path": "raw/06_RECURSIVE_IMPROVEMENT.md", "bytes": 2854, "sha256": "sha256:81944a5c81ddcfbb5adbd22b458cc574778ea76a27ca8523958e3560e53765f0", "classification": "canonical_module"},
+    {"path": "raw/07_REPOSITORY_LEARNING.md", "bytes": 1984, "sha256": "sha256:6a46731adbe93ca01867548cc43b37e6acee8c3f1fde87845f21388edfab2545", "classification": "canonical_module"},
+    {"path": "raw/08_OUTPUT_SCHEMAS.md", "bytes": 2401, "sha256": "sha256:cfe8534de5c27440ed6bd8d8b53c3804556f09c9b5fcb5df3b584a987e34aa7b", "classification": "canonical_module"},
+    {"path": "raw/09_TEST_SCENARIOS.md", "bytes": 2700, "sha256": "sha256:75be81375886a075b92e7de84104a64da65ab530f4ecc84e596393bd7f21076b", "classification": "canonical_module"},
+    {"path": "raw/HIVE_MIND_OS_INSTRUCTIONS_V2.txt", "bytes": 7665, "sha256": "sha256:29c4c118aa35c45fb10ce5586ba68f9395c246ef60b2f3e5c8d0768f43ade25b", "classification": "canonical_instruction"},
+    {"path": "raw/HIVE_OS_ALL_IN_ONE.md", "bytes": 28747, "sha256": "sha256:16250b448620b8050f2b91b015ad8c4aede0f8e52f9217fe6e0ed69971516c9a", "classification": "generated_bundle"},
+    {"path": "raw/README_SETUP.md", "bytes": 1833, "sha256": "sha256:a61761f8186b17808bd5d16c542fc37da891dce2eb0f3f3ea16123752114c3d3", "classification": "setup_document"},
+    {"path": "raw/imgo.jpg", "bytes": 81841, "sha256": "sha256:afecb977868b1f2268cfc6dd497319079950c5a5fe6b1a7cf0c3c767851f9327", "classification": "image_exhibit"},
+    {"path": "raw/Logo.png", "bytes": 1841430, "sha256": "sha256:600edc0d6665ea74f9599436e8ee141a5903b71e9afa3d1635e1f5d9d28e101c", "classification": "image_exhibit"},
+    {"path": "raw/manifest.json", "bytes": 2542, "sha256": "sha256:ddbc89ced718accae7c2c8985e31a107c8900ea40f70c3cdbc2c4e68f21e8a1e", "classification": "superseded_manifest"}
+  ],
+  "historical_manifest_corrections": [
+    "HIVE_OS_GPT_INSTRUCTIONS.txt was absent; HIVE_MIND_OS_INSTRUCTIONS_V2.txt is canonical.",
+    "The actual instruction file, both images, README, generated bundle, and historical manifest are inventoried.",
+    "The analyzed repository head in the historical manifest is preserved as stale context, not treated as the current repository pin."
+  ],
+  "relationships": [
+    {
+      "target_source_id": "SRC-022",
+      "relationship": "refines_and_expands",
+      "adjudication": "Preserve both sources. SRC-023 supplies a broader earlier simulation pack; SRC-022 supplies later truth-boundary and receipt hardening. Neither silently supersedes the other."
+    },
+    {
+      "target_source_id": "SRC-002",
+      "relationship": "possible_common_origin",
+      "adjudication": "imgo.jpg is a new non-independent exhibit with unresolved chain of custody. Its digest does not replace the pseudo digest or missing original bytes recorded for SRC-002."
+    }
+  ],
+  "image_exhibits": [
+    {
+      "path": "raw/imgo.jpg",
+      "related_source_ids": ["SRC-002", "SRC-023"],
+      "independent": false,
+      "chain_of_custody": "unresolved",
+      "evidence_use": "context_only_until_chain_of_custody_is_resolved"
+    },
+    {
+      "path": "raw/Logo.png",
+      "related_source_ids": ["SRC-022", "SRC-023"],
+      "independent": false,
+      "chain_of_custody": "user-supplied-derived-visual",
+      "evidence_use": "derived_summary_not_independent_proof"
+    }
+  ],
+  "blocking_obligations": [
+    "Resolve a compatible license or explicit reuse grant.",
+    "Resolve authorship and chain of custody for the pack and imgo.jpg.",
+    "Do not treat Logo.png as independent proof of its underlying architecture claims."
+  ]
+}

@@ -21,7 +21,6 @@ from typing import Any, Callable, Mapping, Sequence
 
 from .receipts import portable_path_parts
 
-
 AUDITED_BASELINE: Mapping[str, object] = {
     "repository_sha": "d7a738a7287cbc487edc35b7ae6aa4a339104f71",
     "full_ref_commit_count": 77,
@@ -219,7 +218,7 @@ class _WindowsJob:
             self.close()
             raise OSError(error, "SetInformationJobObject failed")
 
-    def assign_and_resume(self, process: subprocess.Popen[bytes]) -> None:
+    def assign_and_resume(self, process: subprocess.Popen[Any]) -> None:
         process_handle = int(process._handle)  # type: ignore[attr-defined]
         if not self._kernel32.AssignProcessToJobObject(self.handle, process_handle):
             raise OSError(
@@ -245,7 +244,7 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
     output_truncated = False
     drain_incomplete = False
     windows_job = _WindowsJob() if os.name == "nt" else None
-    popen_options: dict[str, object]
+    popen_options: dict[str, Any]
     if os.name == "nt":
         popen_options = {
             "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | _CREATE_SUSPENDED
@@ -288,7 +287,9 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
             windows_job.terminate()
         else:
             try:
-                os.killpg(process.pid, signal.SIGKILL)
+                kill_process_group = getattr(os, "killpg")
+                kill_signal = getattr(signal, "SIGKILL")
+                kill_process_group(process.pid, kill_signal)
             except (OSError, ProcessLookupError):
                 pass
         try:
@@ -344,7 +345,9 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
         windows_job.close()
     else:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            kill_process_group = getattr(os, "killpg")
+            kill_signal = getattr(signal, "SIGKILL")
+            kill_process_group(process.pid, kill_signal)
         except (OSError, ProcessLookupError):
             pass
     stdout_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
@@ -353,6 +356,9 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
         drain_incomplete = True
         stdout_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
         stderr_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
+    for stream in (process.stdout, process.stderr):
+        if stream is not None:
+            stream.close()
     stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace")
     stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace")
 
@@ -555,10 +561,13 @@ def _reference_receipts(
                 "issues": [reason] if reason else [],
             }
             if kind == "test":
+                entry_issues = entry["issues"]
+                if not isinstance(entry_issues, list):
+                    raise TypeError("reference receipt issues must be a list")
                 if not run_tests:
                     entry["execution"] = {"status": "not_run"}
                     entry["valid"] = False
-                    entry["issues"].append("test receipt was not executed")
+                    entry_issues.append("test receipt was not executed")
                 elif path is not None:
                     local_path = path.relative_to(repository).as_posix()
                     command = (sys.executable, "-m", "pytest", "-q", "--", local_path)
@@ -568,7 +577,7 @@ def _reference_receipts(
                     entry["execution"] = result
                     entry["valid"] = result["status"] == "passed"
                     if not entry["valid"]:
-                        entry["issues"].append("test receipt execution did not pass")
+                        entry_issues.append("test receipt execution did not pass")
                         failures.append(
                             {
                                 "kind": "test_receipt_failure",
@@ -691,14 +700,24 @@ def collect_current_state_audit(
         docket_audit = docket.audit()
         source_status_counts = _counter([source.status.value for source in docket.sources])
         claim_state_counts = _counter([claim.implementation_state.value for claim in docket.claims])
+        capability_maturity_counts = _counter(
+            [claim.capability_maturity.value for claim in docket.claims]
+        )
         disposition_counts = _counter([decision.disposition.value for decision in docket.decisions])
         source_blockers = sorted(
             {
                 issue.source_id
                 for issue in docket_audit.issues
                 if issue.source_id
+                and "," not in issue.source_id
                 and issue.message
-                == "source requires complete ingestion before derived ideas may be promoted"
+                in {
+                    "source provenance is incomplete",
+                    "source requires complete ingestion before derived ideas may be promoted",
+                    "repository source lacks an exact commit object pin",
+                    "repository source pin is mutable or ambiguous",
+                    "source content digest is not a raw-byte SHA-256 receipt",
+                }
             }
         )
         docket_issues = [
@@ -710,6 +729,82 @@ def collect_current_state_audit(
             }
             for issue in docket_audit.issues
         ]
+        machine_blocked_claim_ids = list(docket_audit.machine_blocked_claim_ids)
+        claims_by_source: dict[str, list[str]] = {
+            source.id: sorted(
+                claim.id for claim in docket.claims if source.id in claim.source_ids
+            )
+            for source in docket.sources
+        }
+        source_coverage = [
+            {
+                "source_id": source.id,
+                "status": source.status.value,
+                "version_ref": source.version_ref,
+                "object_type": source.object_type,
+                "retrieved_at": source.retrieved_at,
+                "license_spdx": source.license_spdx,
+                "content_digest": source.content_digest,
+                "provenance_complete": source.provenance_complete,
+                "requires_complete_ingestion": source.requires_complete_ingestion,
+                "snapshot_ref": source.snapshot_ref,
+                "claim_ids": claims_by_source[source.id],
+                "blocking_issues": sorted(
+                    {
+                        issue.message
+                        for issue in docket_audit.issues
+                        if source.id in (issue.source_id or "").split(",")
+                    }
+                ),
+            }
+            for source in docket.sources
+        ]
+        implementation_state_audit = {
+            "maturity_scale": [
+                "specified",
+                "structurally_prototyped",
+                "executed_in_isolation",
+                "independently_verified_e2e",
+                "production_proven",
+            ],
+            "maturity_counts": capability_maturity_counts,
+            "claims_by_maturity": {
+                maturity: sorted(
+                    claim.id
+                    for claim in docket.claims
+                    if claim.capability_maturity.value == maturity
+                )
+                for maturity in (
+                    "specified",
+                    "structurally_prototyped",
+                    "executed_in_isolation",
+                    "independently_verified_e2e",
+                    "production_proven",
+                )
+            },
+            "evidence_classes": {
+                "typed_domain_prototype": sorted(
+                    claim.id
+                    for claim in docket.claims
+                    if claim.capability_maturity.value == "structurally_prototyped"
+                ),
+                "classic_gpt_simulation": [
+                    f"CLM-{number:03d}" for number in range(74, 81)
+                ],
+                "partial_in_process_enforcement": [
+                    "CLM-026",
+                    "CLM-027",
+                    "CLM-074",
+                    "CLM-077",
+                    "CLM-079",
+                ],
+                "production_proof": [],
+            },
+            "scope_warning": (
+                "Typed models, simulations, and in-process gates do not prove complete "
+                "mediation, durable external enforcement, independent agents, or production operation."
+            ),
+        }
         broken_references = _broken_references(docket, requested_repository)
         source_count: int | None = docket.source_count
         claim_count: int | None = docket.claim_count
@@ -718,9 +813,13 @@ def collect_current_state_audit(
     else:
         source_status_counts = {}
         claim_state_counts = {}
+        capability_maturity_counts = {}
         disposition_counts = {}
         source_blockers = []
         docket_issues = []
+        machine_blocked_claim_ids = []
+        source_coverage = []
+        implementation_state_audit = {}
         broken_references = []
         source_count = None
         claim_count = None
@@ -851,13 +950,14 @@ def collect_current_state_audit(
         "claim_count": claim_count,
         "source_status_counts": source_status_counts,
         "claim_state_counts": claim_state_counts,
+        "capability_maturity_counts": capability_maturity_counts,
         "disposition_counts": disposition_counts,
         "test_passed_count": test_result["passed"],
     }
 
     timestamp = (generated_at or datetime.now(UTC)).astimezone(UTC).isoformat()
     audit: dict[str, object] = {
-        "schema_version": 4,
+        "schema_version": 5,
         "artifact_type": "CurrentStateAudit",
         "generated_at": timestamp,
         "invocation": list(invocation),
@@ -890,11 +990,15 @@ def collect_current_state_audit(
             "claim_count": claim_count,
             "source_status_counts": source_status_counts,
             "claim_state_counts": claim_state_counts,
+            "capability_maturity_counts": capability_maturity_counts,
             "disposition_counts": disposition_counts,
             "inventory_complete": inventory_complete,
             "release_ready": release_ready,
             "source_blockers": source_blockers,
             "issues": docket_issues,
+            "machine_blocked_claim_ids": machine_blocked_claim_ids,
+            "source_coverage": source_coverage,
+            "implementation_state_audit": implementation_state_audit,
             "broken_references": broken_references,
             "reference_receipts": reference_receipts,
             "receipts_valid": receipts_valid,
@@ -972,7 +1076,7 @@ def verify_audit_artifact(
     if not isinstance(audit, Mapping) or not isinstance(integrity, Mapping):
         return False, ("artifact must contain audit and integrity objects",)
 
-    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 4:
+    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 5:
         issues.append("unsupported CurrentStateAudit schema version")
     if audit.get("artifact_type") != "CurrentStateAudit":
         issues.append("artifact type must be CurrentStateAudit")
@@ -1027,8 +1131,9 @@ def verify_audit_artifact(
                 repository.get("final_working_tree_entries") == []
             ):
                 issues.append("audit final cleanliness contradicts its entries")
-            if not isinstance(repository.get("tracked_tree_digest"), str) or not _SHA256_PATTERN.fullmatch(
-                repository.get("tracked_tree_digest")
+            tracked_tree_digest = repository.get("tracked_tree_digest")
+            if not isinstance(tracked_tree_digest, str) or not _SHA256_PATTERN.fullmatch(
+                tracked_tree_digest
             ):
                 issues.append("audit tracked tree digest is invalid")
         if isinstance(docket, Mapping):
@@ -1038,6 +1143,28 @@ def verify_audit_artifact(
                 issues.append("audit claim count is invalid")
             if not isinstance(docket.get("broken_references"), list):
                 issues.append("audit broken references are invalid")
+            if not isinstance(docket.get("machine_blocked_claim_ids"), list):
+                issues.append("audit machine-blocked claims are invalid")
+            if not isinstance(docket.get("source_coverage"), list):
+                issues.append("audit source coverage is invalid")
+            elif len(docket["source_coverage"]) != docket.get("source_count"):
+                issues.append("audit source coverage count contradicts source count")
+            if not isinstance(docket.get("implementation_state_audit"), Mapping):
+                issues.append("audit implementation-state evidence is invalid")
+            else:
+                implementation_audit = docket["implementation_state_audit"]
+                if implementation_audit.get("maturity_scale") != [
+                    "specified",
+                    "structurally_prototyped",
+                    "executed_in_isolation",
+                    "independently_verified_e2e",
+                    "production_proven",
+                ]:
+                    issues.append("audit capability maturity scale is invalid")
+                if not isinstance(implementation_audit.get("maturity_counts"), Mapping):
+                    issues.append("audit capability maturity counts are invalid")
+                if not isinstance(implementation_audit.get("evidence_classes"), Mapping):
+                    issues.append("audit implementation evidence classes are invalid")
             if not isinstance(docket.get("reference_receipts"), list):
                 issues.append("audit reference receipts are invalid")
             if not isinstance(docket.get("receipts_valid"), bool):

@@ -3,7 +3,12 @@ import sqlite3
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from hive_mind_os.learning import CommitSnapshot, EvaluationSummary, LearningPromotionGate, PointInTimeReplay
+from hive_mind_os.learning import (
+    CommitSnapshot,
+    EvaluationSummary,
+    LearningPromotionGate,
+    PointInTimeReplay,
+)
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.models import AutonomyLevel, Objective, RiskTier, Role, WorkStatus
 from hive_mind_os.policy import Action, PolicyEngine

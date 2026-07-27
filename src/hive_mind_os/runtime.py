@@ -6,7 +6,16 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from .ledger import EvidenceLedger
-from .models import AgentResult, Evidence, Objective, Role, RunReport, WorkItem, WorkStatus, utc_now
+from .models import (
+    AgentResult,
+    Evidence,
+    Objective,
+    Role,
+    RunReport,
+    WorkItem,
+    WorkStatus,
+    utc_now,
+)
 from .policy import PolicyEngine
 from .roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS, RoleContract
 

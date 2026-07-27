@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from typing import Iterable, Mapping
 
@@ -47,6 +47,14 @@ class ImplementationState(StrEnum):
     VALIDATED = "validated"
 
 
+class CapabilityMaturity(StrEnum):
+    SPECIFIED = "specified"
+    STRUCTURALLY_PROTOTYPED = "structurally_prototyped"
+    EXECUTED_IN_ISOLATION = "executed_in_isolation"
+    INDEPENDENTLY_VERIFIED_E2E = "independently_verified_e2e"
+    PRODUCTION_PROVEN = "production_proven"
+
+
 class IssueSeverity(StrEnum):
     WARNING = "warning"
     BLOCKING = "blocking"
@@ -64,6 +72,9 @@ class SourceRecord:
     content_digest: str | None = None
     provenance_complete: bool = True
     requires_complete_ingestion: bool = True
+    object_type: str | None = None
+    retrieved_at: str | None = None
+    snapshot_ref: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.title.strip() or not self.uri.strip():
@@ -88,6 +99,7 @@ class IdeaClaim:
     benchmark_refs: tuple[str, ...] = ()
     comparator_source_ids: tuple[str, ...] = ()
     implementation_state: ImplementationState = ImplementationState.INVENTORIED
+    capability_maturity: CapabilityMaturity = CapabilityMaturity.SPECIFIED
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.case_id.strip() or not self.proposition.strip():
@@ -326,6 +338,20 @@ class DocketAudit:
     def release_ready(self) -> bool:
         return not any(issue.severity is IssueSeverity.BLOCKING for issue in self.issues)
 
+    @property
+    def machine_blocked_claim_ids(self) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                {
+                    issue.claim_id
+                    for issue in self.issues
+                    if issue.claim_id
+                    and issue.message
+                    == "dependent claim is machine-blocked by incomplete source evidence"
+                }
+            )
+        )
+
 
 class SourceDocketAuditor:
     """Proves that no source or idea silently disappears from the system."""
@@ -400,6 +426,75 @@ class SourceDocketAuditor:
                         IssueSeverity.BLOCKING,
                         "source requires complete ingestion before derived ideas may be promoted",
                         source_id=source_id,
+                    )
+                )
+            if source.kind == "repository":
+                if source.object_type != "commit":
+                    issues.append(
+                        DocketIssue(
+                            IssueSeverity.BLOCKING,
+                            "repository source lacks an exact commit object pin",
+                            source_id=source_id,
+                        )
+                    )
+                if (
+                    not source.version_ref
+                    or len(source.version_ref) != 40
+                    or any(character not in "0123456789abcdef" for character in source.version_ref)
+                ):
+                    issues.append(
+                        DocketIssue(
+                            IssueSeverity.BLOCKING,
+                            "repository source pin is mutable or ambiguous",
+                            source_id=source_id,
+                        )
+                    )
+            if source.content_digest is not None and (
+                not source.content_digest.startswith("sha256:")
+                or len(source.content_digest) != 71
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in source.content_digest.removeprefix("sha256:")
+                )
+            ):
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        "source content digest is not a raw-byte SHA-256 receipt",
+                        source_id=source_id,
+                    )
+                )
+            if source.license_spdx is None:
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        "source license or reuse grant is unresolved",
+                        source_id=source_id,
+                    )
+                )
+
+        incomplete_source_ids = {
+            issue.source_id
+            for issue in issues
+            if issue.source_id
+            and issue.message
+            in {
+                "source provenance is incomplete",
+                "source requires complete ingestion before derived ideas may be promoted",
+                "repository source lacks an exact commit object pin",
+                "repository source pin is mutable or ambiguous",
+                "source content digest is not a raw-byte SHA-256 receipt",
+            }
+        }
+        for claim in claim_map.values():
+            blocking_sources = sorted(set(claim.source_ids) & incomplete_source_ids)
+            if blocking_sources:
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        "dependent claim is machine-blocked by incomplete source evidence",
+                        source_id=",".join(blocking_sources),
+                        claim_id=claim.id,
                     )
                 )
 

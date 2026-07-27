@@ -4,8 +4,8 @@ from dataclasses import replace
 
 from hive_mind_os.autonomy import (
     AgentVariant,
-    AutonomyBudget,
     AutonomousMissionLoop,
+    AutonomyBudget,
     EpisodeOutcome,
     EvolutionArena,
     MissionCharter,
