@@ -47,6 +47,7 @@ _SOURCE_EVIDENCE_BLOCKERS = frozenset(
         "repository source lacks an exact commit object pin",
         "repository source pin is mutable or ambiguous",
         "source content digest is not a raw-byte SHA-256 receipt",
+        "source has an unverified digest label instead of a raw-byte SHA-256 receipt",
         "source license or reuse grant is unresolved",
     }
 )
@@ -758,6 +759,7 @@ def collect_current_state_audit(
         source_coverage = [
             {
                 "source_id": source.id,
+                "kind": source.kind,
                 "status": source.status.value,
                 "version_ref": source.version_ref,
                 "object_type": source.object_type,
@@ -965,7 +967,7 @@ def collect_current_state_audit(
 
     timestamp = (generated_at or datetime.now(UTC)).astimezone(UTC).isoformat()
     audit: dict[str, object] = {
-        "schema_version": 5,
+        "schema_version": 6,
         "artifact_type": "CurrentStateAudit",
         "generated_at": timestamp,
         "invocation": list(invocation),
@@ -1063,7 +1065,96 @@ def create_audit_artifact(
     }
 
 
-def _validate_schema5_docket(
+def _coverage_derived_source_blockers(
+    item: Mapping[str, object],
+    *,
+    source_id: str,
+    issues: list[str],
+) -> set[str]:
+    expected_fields = {
+        "source_id",
+        "kind",
+        "status",
+        "version_ref",
+        "object_type",
+        "retrieved_at",
+        "license_spdx",
+        "content_digest",
+        "unverified_digest_label",
+        "provenance_complete",
+        "requires_complete_ingestion",
+        "snapshot_ref",
+        "claim_ids",
+        "blocking_issues",
+    }
+    if set(item) != expected_fields:
+        issues.append(f"audit source coverage {source_id} has an invalid shape")
+
+    derived: set[str] = set()
+    status = item.get("status")
+    kind = item.get("kind")
+    provenance_complete = item.get("provenance_complete")
+    requires_complete_ingestion = item.get("requires_complete_ingestion")
+    if status not in {"verified", "partial", "pending_ingestion"}:
+        issues.append(f"audit source coverage {source_id} has invalid status")
+    if not isinstance(kind, str) or not kind:
+        issues.append(f"audit source coverage {source_id} has invalid kind")
+    if not isinstance(provenance_complete, bool):
+        issues.append(f"audit source coverage {source_id} has invalid provenance")
+    elif not provenance_complete:
+        derived.add("source provenance is incomplete")
+    if not isinstance(requires_complete_ingestion, bool):
+        issues.append(f"audit source coverage {source_id} has invalid ingestion policy")
+    elif requires_complete_ingestion and status != "verified":
+        derived.add(
+            "source requires complete ingestion before derived ideas may be promoted"
+        )
+
+    version_ref = item.get("version_ref")
+    object_type = item.get("object_type")
+    repository_bearing = (
+        isinstance(kind, str) and "repository" in kind.split("_")
+    )
+    if repository_bearing:
+        if object_type != "commit":
+            derived.add("repository source lacks an exact commit object pin")
+        if (
+            not isinstance(version_ref, str)
+            or re.fullmatch(r"[0-9a-f]{40}", version_ref) is None
+        ):
+            derived.add("repository source pin is mutable or ambiguous")
+    elif version_ref is not None and not isinstance(version_ref, str):
+        issues.append(f"audit source coverage {source_id} has invalid version reference")
+
+    content_digest = item.get("content_digest")
+    if content_digest is not None and (
+        not isinstance(content_digest, str)
+        or _SHA256_PATTERN.fullmatch(content_digest) is None
+    ):
+        derived.add("source content digest is not a raw-byte SHA-256 receipt")
+    digest_label = item.get("unverified_digest_label")
+    if digest_label is not None:
+        if not isinstance(digest_label, str) or not digest_label:
+            issues.append(f"audit source coverage {source_id} has invalid digest label")
+        else:
+            derived.add(
+                "source has an unverified digest label instead of a raw-byte SHA-256 receipt"
+            )
+    license_spdx = item.get("license_spdx")
+    if license_spdx is None:
+        derived.add("source license or reuse grant is unresolved")
+    elif not isinstance(license_spdx, str) or not license_spdx:
+        issues.append(f"audit source coverage {source_id} has invalid license")
+    for optional_field in ("object_type", "retrieved_at", "snapshot_ref"):
+        value = item.get(optional_field)
+        if value is not None and not isinstance(value, str):
+            issues.append(
+                f"audit source coverage {source_id} has invalid {optional_field}"
+            )
+    return derived
+
+
+def _validate_current_docket(
     docket: Mapping[str, object],
     issues: list[str],
 ) -> None:
@@ -1085,6 +1176,7 @@ def _validate_schema5_docket(
     coverage_claims: set[str] = set()
     claims_by_source: dict[str, set[str]] = {}
     coverage_blockers: dict[str, set[str]] = {}
+    derived_blockers: dict[str, set[str]] = {}
     coverage_statuses: list[str] = []
     for index, item in enumerate(coverage):
         if not isinstance(item, Mapping):
@@ -1118,13 +1210,16 @@ def _validate_schema5_docket(
             blocker_set = set(blocking_issues)
             if len(blocker_set) != len(blocking_issues):
                 issues.append(f"audit source coverage {source_id} repeats blockers")
-        if not isinstance(status, str):
-            issues.append(f"audit source coverage {source_id} has invalid status")
-        else:
+        if isinstance(status, str):
             coverage_statuses.append(status)
         claims_by_source[source_id] = claim_set
         coverage_claims.update(claim_set)
         coverage_blockers[source_id] = blocker_set
+        derived_blockers[source_id] = _coverage_derived_source_blockers(
+            item,
+            source_id=source_id,
+            issues=issues,
+        )
     if len(source_ids) != len(set(source_ids)):
         issues.append("audit source coverage contains duplicate sources")
     if type(claim_count) is int and len(coverage_claims) != claim_count:
@@ -1158,12 +1253,18 @@ def _validate_schema5_docket(
             issues.append(
                 f"audit source coverage blockers contradict docket issues: {source_id}"
             )
+        if not derived_blockers.get(source_id, set()) <= coverage_blockers.get(
+            source_id, set()
+        ):
+            issues.append(
+                f"audit source coverage omits metadata-derived blockers: {source_id}"
+            )
 
     expected_source_blockers = sorted(
         {
             source_id
             for source_id, messages in coverage_blockers.items()
-            if messages & _SOURCE_EVIDENCE_BLOCKERS
+            if derived_blockers.get(source_id, set())
         }
     )
     source_blockers = docket.get("source_blockers")
@@ -1186,7 +1287,7 @@ def _validate_schema5_docket(
     coverage_derived_claims = {
         claim_id
         for source_id, claim_ids in claims_by_source.items()
-        if coverage_blockers.get(source_id, set()) & _SOURCE_EVIDENCE_BLOCKERS
+        if derived_blockers.get(source_id, set())
         for claim_id in claim_ids
     }
     machine_blocked = docket.get("machine_blocked_claim_ids")
@@ -1206,7 +1307,10 @@ def _validate_schema5_docket(
         issues.append("audit source-status counts contradict source coverage")
 
     blocking_present = any(item.get("severity") == "blocking" for item in issue_rows)
-    if docket.get("release_ready") is not (not blocking_present):
+    metadata_blocking_present = any(derived_blockers.values())
+    if docket.get("release_ready") is not (
+        not blocking_present and not metadata_blocking_present
+    ):
         issues.append("audit release readiness contradicts blocking docket issues")
     inventory_failures_present = any(
         item.get("message") in _INVENTORY_FAILURES for item in issue_rows
@@ -1301,7 +1405,7 @@ def verify_audit_artifact(
     if not isinstance(audit, Mapping) or not isinstance(integrity, Mapping):
         return False, ("artifact must contain audit and integrity objects",)
 
-    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 5:
+    if type(audit.get("schema_version")) is not int or audit.get("schema_version") != 6:
         issues.append("unsupported CurrentStateAudit schema version")
     if audit.get("artifact_type") != "CurrentStateAudit":
         issues.append("artifact type must be CurrentStateAudit")
@@ -1362,7 +1466,7 @@ def verify_audit_artifact(
             ):
                 issues.append("audit tracked tree digest is invalid")
         if isinstance(docket, Mapping):
-            _validate_schema5_docket(docket, issues)
+            _validate_current_docket(docket, issues)
             if not isinstance(docket.get("broken_references"), list):
                 issues.append("audit broken references are invalid")
             if not isinstance(docket.get("reference_receipts"), list):

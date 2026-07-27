@@ -47,10 +47,11 @@ promotion receipt.
    unkeyed digest.
 6. Unknown licenses and every repository-bearing source kind are source-evidence blockers.
    Their dependent claims are blocked at design, implementation, and promotion burdens.
-7. Schema-5 verification reconciles unique source coverage, source-status counts, docket
-   issues, source blockers, machine-blocked claims, release readiness, inventory
-   completeness, the complete maturity partition, and evidence classes. A freshly
-   self-digested contradiction remains invalid.
+7. CurrentStateAudit schema 6 derives mandatory blockers directly from source kind, status,
+   version, object type, license, digest, provenance, and ingestion metadata. It then
+   reconciles unique source coverage, source-status counts, docket issues, source blockers,
+   machine-blocked claims, release readiness, inventory completeness, the complete maturity
+   partition, and evidence classes. A freshly self-digested contradiction remains invalid.
 8. `SourceRecord` and `IdeaClaim` expose lossless contract serializers. Historical
    non-digests such as `prompt-v1` remain preserved as `unverified_digest_label`, never in a
    cryptographic digest field.
@@ -64,7 +65,7 @@ promotion receipt.
 | Authority text substituted in a valid byte inventory | Strict full-manifest fingerprint | Local SHA-256 does not authenticate the manifest author |
 | Image or overlap reclassified as independent/superseding | Governance digest plus source-specific semantic constraints | Provenance and reuse rights remain unresolved |
 | Licensed/pinned source gap escapes claim blocking | License and composite-repository blockers feed courtroom and audit gates | External evidence still has to be retrieved and adjudicated |
-| Self-digested audit claims false production readiness | Conservation and contradiction checks across every schema-5 truth set | Signed external identity and durable storage remain later stages |
+| Self-digested audit claims false production readiness | Metadata-derived blockers plus conservation and contradiction checks across every schema-6 truth set | Signed external identity and durable storage remain later stages |
 
 ## Acceptance evidence
 
@@ -85,6 +86,8 @@ fail-open edge may now be rejected. The runtime-state schema version remains 3 b
 wire fields are unchanged; action-digest semantics are clarified and the example digest is
 regenerated. The governed `SRC-023` manifest gains `governance_digest`; no raw exhibit changes.
 Historical non-digest labels move to an explicit field without deleting their values.
+CurrentStateAudit schema 5 remains historical adverse evidence; schema 6 adds source kind and
+explicit non-digest labels so blocker derivation no longer trusts attacker-controlled lists.
 
 Rollback is additive supersession only. Do not restore the rejected validators or delete the
 appealed commit, adverse reports, manifests, source records, or audits. A future relaxation

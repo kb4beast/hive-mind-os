@@ -269,6 +269,7 @@ class Courtroom:
             if not source.provenance_complete
             or (source.requires_complete_ingestion and source.status is not SourceStatus.VERIFIED)
             or source.license_spdx is None
+            or source.unverified_digest_label is not None
             or (
                 "repository" in source.kind.split("_")
                 and (
@@ -517,6 +518,17 @@ class SourceDocketAuditor:
                         source_id=source_id,
                     )
                 )
+            if source.unverified_digest_label is not None:
+                issues.append(
+                    DocketIssue(
+                        IssueSeverity.BLOCKING,
+                        (
+                            "source has an unverified digest label instead of a raw-byte "
+                            "SHA-256 receipt"
+                        ),
+                        source_id=source_id,
+                    )
+                )
             if source.license_spdx is None:
                 issues.append(
                     DocketIssue(
@@ -537,6 +549,7 @@ class SourceDocketAuditor:
                 "repository source lacks an exact commit object pin",
                 "repository source pin is mutable or ambiguous",
                 "source content digest is not a raw-byte SHA-256 receipt",
+                "source has an unverified digest label instead of a raw-byte SHA-256 receipt",
                 "source license or reuse grant is unresolved",
             }
         }

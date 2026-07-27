@@ -5,7 +5,7 @@ receipts are the latest post-commit `CurrentStateAudit` artifact.
 
 | Stage 0 deliverable | Repository status | Remaining external or later obligation |
 |---|---|---|
-| Reproducible current-state/history audit | Implemented and independently verified for prior slices; schema 5 adds coverage and maturity | Re-run on the final exact commit |
+| Reproducible current-state/history audit | Implemented and independently verified for prior slices; schema 6 derives source blockers and reconciles coverage/maturity truth sets | Re-run on the final exact commit |
 | Source snapshots, pins, object types, digests, licenses, coverage | Audit and coverage are executable; sibling pack is preserved exactly | Several original bytes, external commit pins, retrieval receipts, and licenses remain unresolved |
 | Seven video capture cases | All seven and their dependent claims are machine-blocked | Verified timestamped ingestion is still required |
 | Sibling GPT pack and images | All 16 bytes preserved, validated, registered separately, and overlap-adjudicated; ADR-005 binds governance semantics as well as raw inventory | License/authorship and `imgo.jpg` chain of custody remain unresolved |
@@ -22,7 +22,7 @@ receipts are the latest post-commit `CurrentStateAudit` artifact.
 - Mutable or ambiguous repository pins cannot support an adopted implementation claim through
   the audit gate.
 - Unknown licenses and composite repository source kinds machine-block their dependent claims.
-- Schema-5 verification conserves source identities, claim/maturity partitions, blockers,
+- Schema-6 verification derives blockers from source metadata and conserves source identities, claim/maturity partitions, blockers,
   release readiness, and production evidence instead of trusting a self-digested report.
 - Stage 0 is not called fully complete while remote governance, source evidence, licenses, or
   genuinely independent final verification remain unresolved.

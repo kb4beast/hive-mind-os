@@ -30,7 +30,7 @@ class CurrentStateAuditTests(unittest.TestCase):
     def valid_audit(self, **overrides) -> dict[str, object]:
         head = "a" * 40
         audit: dict[str, object] = {
-            "schema_version": 5,
+            "schema_version": 6,
             "artifact_type": "CurrentStateAudit",
             "repository": {
                 "root": str(self.repository),
@@ -58,7 +58,17 @@ class CurrentStateAuditTests(unittest.TestCase):
                 "source_coverage": [
                     {
                         "source_id": "SRC-001",
+                        "kind": "paper",
                         "status": "verified",
+                        "version_ref": "v1",
+                        "object_type": "paper_version",
+                        "retrieved_at": "2026-07-27T00:00:00Z",
+                        "license_spdx": "MIT",
+                        "content_digest": None,
+                        "unverified_digest_label": None,
+                        "provenance_complete": True,
+                        "requires_complete_ingestion": False,
+                        "snapshot_ref": None,
                         "claim_ids": ["CLM-001"],
                         "blocking_issues": [],
                     }
@@ -128,7 +138,7 @@ class CurrentStateAuditTests(unittest.TestCase):
 
         self.assertEqual(audit["artifact_type"], "CurrentStateAudit")
         self.assertGreaterEqual(audit["repository"]["full_ref_commit_count"], 79)
-        self.assertEqual(audit["schema_version"], 5)
+        self.assertEqual(audit["schema_version"], 6)
         self.assertEqual(audit["docket"]["source_count"], 23)
         self.assertEqual(audit["docket"]["claim_count"], 84)
         self.assertTrue(audit["docket"]["inventory_complete"])
@@ -555,19 +565,19 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("audit signature mismatch", issues)
 
     def test_unknown_schema_is_not_verified(self) -> None:
-        artifact = create_audit_artifact(self.valid_audit(schema_version=6))
+        artifact = create_audit_artifact(self.valid_audit(schema_version=7))
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("unsupported CurrentStateAudit schema version", issues)
 
     def test_minimal_self_digested_payload_is_not_a_verified_audit(self) -> None:
-        artifact = create_audit_artifact({"schema_version": 5})
+        artifact = create_audit_artifact({"schema_version": 6})
         valid, issues = verify_audit_artifact(artifact)
         self.assertFalse(valid)
         self.assertIn("artifact type must be CurrentStateAudit", issues)
 
         underspecified = {
-            "schema_version": 5,
+            "schema_version": 6,
             "artifact_type": "CurrentStateAudit",
             "repository": {},
             "docket": {},
@@ -649,7 +659,7 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn("audit reference receipt 0 validity is contradictory", issues)
 
-    def test_schema5_rejects_fabricated_coverage_blockers_and_maturity(self) -> None:
+    def test_schema6_rejects_fabricated_coverage_blockers_and_maturity(self) -> None:
         duplicate_coverage = self.valid_audit()
         duplicate_coverage["docket"]["source_count"] = 2
         duplicate_coverage["docket"]["source_status_counts"] = {"verified": 2}
@@ -713,6 +723,37 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn(
             "audit production proof contradicts production maturity",
+            issues,
+        )
+
+        coordinated_removal = self.valid_audit()
+        source = coordinated_removal["docket"]["source_coverage"][0]
+        source.update(
+            {
+                "kind": "research_and_repository",
+                "status": "partial",
+                "version_ref": "arXiv:2407.16741",
+                "object_type": "paper_version",
+                "license_spdx": None,
+                "provenance_complete": False,
+                "requires_complete_ingestion": True,
+            }
+        )
+        coordinated_removal["docket"]["issues"] = []
+        coordinated_removal["docket"]["source_blockers"] = []
+        coordinated_removal["docket"]["machine_blocked_claim_ids"] = []
+        coordinated_removal["docket"]["release_ready"] = True
+        source["blocking_issues"] = []
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(coordinated_removal)
+        )
+        self.assertFalse(valid)
+        self.assertIn(
+            "audit source coverage omits metadata-derived blockers: SRC-001",
+            issues,
+        )
+        self.assertIn(
+            "audit release readiness contradicts blocking docket issues",
             issues,
         )
 
