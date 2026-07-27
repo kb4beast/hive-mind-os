@@ -42,6 +42,8 @@ class HardenedVisionTests(unittest.TestCase):
             "https://www.youtube.com/watch?v=IbFaY3xFpZM",
             "https://www.youtube.com/watch?v=eA9Zf2-qYYM",
             "https://www.youtube.com/watch?v=kIWMLL0S8X8",
+            "https://www.youtube.com/watch?v=t7_ZXgfJVG8",
+            "https://github.com/karpathy/autoresearch",
             "https://github.com/rangerrick337/operator-os/tree/main",
             "https://github.com/nousresearch/hermes-agent",
             "https://github.com/agiresearch/AIOS",
@@ -52,6 +54,17 @@ class HardenedVisionTests(unittest.TestCase):
             "user-supplied:mission-control-video",
         }
         self.assertTrue(expected.issubset(set(self.contract.source_references)))
+
+    def test_recursive_improvement_shortcuts_are_forbidden(self) -> None:
+        expected = {
+            "live_champion_mutation",
+            "single_metric_optimization_without_guardrails",
+            "promotion_below_measured_noise",
+            "protected_holdout_access",
+            "unbounded_recursive_improvement",
+            "self_weight_modification",
+        }
+        self.assertTrue(expected.issubset(set(self.contract.forbidden_shortcuts)))
 
     def test_missing_role_and_capability_fail_closed(self) -> None:
         evidence = replace(
