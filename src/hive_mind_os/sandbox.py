@@ -301,7 +301,14 @@ class SandboxRunner:
             kwargs["creationflags"] = getattr(
                 subprocess, "CREATE_NEW_PROCESS_GROUP", 0
             )
-        return cast(subprocess.Popen[bytes], subprocess.Popen(argv, **kwargs))
+        process = cast(subprocess.Popen[bytes], subprocess.Popen(argv, **kwargs))
+        if os.name == "nt":
+            setattr(
+                process,
+                "_hive_mind_creation_time",
+                self._windows_process_creation_time(process),
+            )
+        return process
 
     def _read_capped(
         self,
@@ -376,20 +383,138 @@ class SandboxRunner:
             close_handle(snapshot)
         return table
 
+    @staticmethod
+    def _windows_process_creation_time_from_handle(handle: int) -> int | None:
+        if os.name != "nt":
+            return None
+        import ctypes
+
+        class FileTime(ctypes.Structure):
+            _fields_ = [
+                ("low", ctypes.c_ulong),
+                ("high", ctypes.c_ulong),
+            ]
+
+        kernel32 = ctypes.windll.kernel32
+        get_process_times = kernel32.GetProcessTimes
+        get_process_times.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(FileTime),
+            ctypes.POINTER(FileTime),
+            ctypes.POINTER(FileTime),
+            ctypes.POINTER(FileTime),
+        ]
+        get_process_times.restype = ctypes.c_int
+        created = FileTime()
+        exited = FileTime()
+        kernel = FileTime()
+        user = FileTime()
+        if not get_process_times(
+            ctypes.c_void_p(handle),
+            ctypes.byref(created),
+            ctypes.byref(exited),
+            ctypes.byref(kernel),
+            ctypes.byref(user),
+        ):
+            return None
+        return (int(created.high) << 32) | int(created.low)
+
     @classmethod
-    def _windows_descendants(cls, root_pid: int) -> set[int]:
-        table = cls._windows_process_table()
+    def _windows_process_creation_time(
+        cls,
+        process: subprocess.Popen[bytes],
+    ) -> int | None:
+        handle = getattr(process, "_handle", None)
+        if handle is None:
+            return None
+        return cls._windows_process_creation_time_from_handle(int(handle))
+
+    @classmethod
+    def _windows_pid_creation_time(cls, pid: int) -> int | None:
+        if os.name != "nt":
+            return None
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        open_process = kernel32.OpenProcess
+        open_process.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        open_process.restype = ctypes.c_void_p
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [ctypes.c_void_p]
+        close_handle.restype = ctypes.c_int
+        handle = open_process(0x1000, False, pid)
+        if not handle:
+            return None
+        try:
+            return cls._windows_process_creation_time_from_handle(int(handle))
+        finally:
+            close_handle(handle)
+
+    @staticmethod
+    def _descendants_from_table(
+        root_pid: int,
+        root_creation_time: int | None,
+        table: Mapping[int, int],
+        creation_times: Mapping[int, int | None],
+    ) -> set[int]:
+        def eligible(pid: int) -> bool:
+            created = creation_times.get(pid)
+            return (
+                root_creation_time is None
+                or created is None
+                or created >= root_creation_time
+            )
+
         descendants: set[int] = set()
         frontier = {root_pid}
         while frontier:
             children = {
                 pid
                 for pid, parent_pid in table.items()
-                if parent_pid in frontier and pid not in descendants
+                if parent_pid in frontier
+                and pid not in descendants
+                and eligible(pid)
             }
             descendants.update(children)
             frontier = children
         return descendants
+
+    @classmethod
+    def _windows_descendants(
+        cls,
+        root_pid: int,
+        root_creation_time: int | None,
+    ) -> set[int]:
+        table = cls._windows_process_table()
+        candidates: set[int] = set()
+        frontier = {root_pid}
+        while frontier:
+            children = {
+                pid
+                for pid, parent_pid in table.items()
+                if parent_pid in frontier and pid not in candidates
+            }
+            candidates.update(children)
+            frontier = children
+        creation_times = {
+            pid: cls._windows_pid_creation_time(pid) for pid in candidates
+        }
+        return cls._descendants_from_table(
+            root_pid,
+            root_creation_time,
+            table,
+            creation_times,
+        )
+
+    @classmethod
+    def _root_creation_time(
+        cls,
+        process: subprocess.Popen[bytes],
+    ) -> int | None:
+        creation_time = getattr(process, "_hive_mind_creation_time", None)
+        if isinstance(creation_time, int):
+            return creation_time
+        return cls._windows_process_creation_time(process)
 
     @classmethod
     def _tree_alive(cls, process: subprocess.Popen[bytes]) -> bool:
@@ -403,7 +528,12 @@ class SandboxRunner:
             except PermissionError:
                 return True
             return True
-        return bool(cls._windows_descendants(process.pid))
+        return bool(
+            cls._windows_descendants(
+                process.pid,
+                cls._root_creation_time(process),
+            )
+        )
 
     @classmethod
     def _kill_tree(cls, process: subprocess.Popen[bytes]) -> None:
@@ -428,7 +558,10 @@ class SandboxRunner:
             import ctypes
 
             kernel32 = ctypes.windll.kernel32
-            for pid in cls._windows_descendants(process.pid):
+            for pid in cls._windows_descendants(
+                process.pid,
+                cls._root_creation_time(process),
+            ):
                 handle = kernel32.OpenProcess(0x0001, False, pid)
                 if handle:
                     try:
