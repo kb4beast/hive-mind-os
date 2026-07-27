@@ -52,6 +52,7 @@ class HardenedVisionTests(unittest.TestCase):
             "https://github.com/microsoft/agent-framework",
             "https://arxiv.org/abs/2505.21577",
             "user-supplied:mission-control-video",
+            "user-supplied:classic-gpt-simulation-instruction",
         }
         self.assertTrue(expected.issubset(set(self.contract.source_references)))
 
@@ -63,6 +64,14 @@ class HardenedVisionTests(unittest.TestCase):
             "protected_holdout_access",
             "unbounded_recursive_improvement",
             "self_weight_modification",
+        }
+        self.assertTrue(expected.issubset(set(self.contract.forbidden_shortcuts)))
+
+    def test_classic_gpt_simulation_shortcuts_are_forbidden(self) -> None:
+        expected = {
+            "simulated_tool_execution_claimed_as_real",
+            "implicit_memory_as_authoritative",
+            "unlabeled_role_blending",
         }
         self.assertTrue(expected.issubset(set(self.contract.forbidden_shortcuts)))
 
