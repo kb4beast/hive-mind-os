@@ -176,3 +176,38 @@ reversibility check; no merge authority exists anywhere in the adapter.
 - Do not bypass `SandboxRunner` "just for fast read-only commands" — every git call is
   receipted or it did not happen.
 - Do not have the adapter guess test commands; callers declare them.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-27T18:08:59Z
+- Executor: Codex primary Builder/Integrator; independent Curator, Judge, and Orchestrator
+  review remains required on the complete exact-SHA pull-request candidate.
+- Branch and audited implementation commit: `phase/P04-git-adapter`;
+  `09e2a56114ec539cb8b42620d89b1c4d87c6ab44`.
+- Prerequisite appeal: P04 reproduced the merged P03 Windows stale-parent-PID timeout and
+  paused. ADR-008, its appeal audit, and PR #11 closed that exact defect before P04 resumed
+  from merged `main` commit `2355fd82544a16fadc3526d1e1bfd5a21122a6a5`.
+- Adapter gates: 13 targeted tests and 9 subtests passed; the full suite passed 182 tests
+  with 2 platform-specific skips and 1,718 subtests; Ruff and Pyright were clean; the
+  explicit API inspection found no merge, rebase, push, or force surface.
+- Deterministic fixture: base/head commits
+  `842376f736beea0350d18dc2b983d0414e827885` and
+  `f1c725ed6033f6e484f779fb01cd7939f2ae1863`; repaired delivery head/tree
+  `6c4a1f8d7036a1520260c004170c740bf41b89a5` and
+  `e2fed4976f15a32feb343b06e51e634bddcae76c`.
+- Evidence coverage: all Git subprocesses use `SandboxRunner`; receipts validate through
+  `FileReceiptValidator`; mutable/short pins, URLs and UNC paths, host Git configuration,
+  hooks, dirty export, policy denial, truncated Git output, noncanonical patches, and
+  forbidden authority fail closed in executable tests.
+- Reversibility: the bundle restores the exact delivery head and tree in a fresh pinned
+  clone; the patch is independently checked, applied to the base, and required to produce
+  the same tree and canonical bytes.
+- Audit artifact: `evidence/audits/P04-post.json`, collected from the clean implementation
+  commit above; digest
+  `sha256:b8dde1d52a1e850b7aa5a6adf48010ccc4ace60b92d3bb85dd01fbb55869ac5a`;
+  result `complete: true`, with no failures.
+- Preserved limits: local repositories only; no push, remotes, credentials, pull requests,
+  merges, rebases, history rewriting, submodule/LFS support, or production-readiness claim.
+  Existing source-ingestion, hard-isolation, repository-protection, and authenticated
+  evidence obligations remain open in their assigned later phases.

@@ -65,7 +65,7 @@ Sequencing principles:
 | [P01](P01_STAGE0_CLOSEOUT.md) | Stage 0 closeout and blocker backlog | — | done |
 | [P02](P02_MODEL_ADAPTER.md) | Real model adapter behind `AgentBackend` | P01 | done |
 | [P03](P03_SANDBOX_RUNNER.md) | Sandboxed command execution with receipts | P01 | done |
-| [P04](P04_GIT_ADAPTER.md) | Local Git adapter and fixture repository | P03 | pending |
+| [P04](P04_GIT_ADAPTER.md) | Local Git adapter and fixture repository | P03 | done |
 | [P05](P05_VERTICAL_SLICE.md) | End-to-end vertical slice: objective → verified delivery artifact | P02, P03, P04 | pending |
 | [P06](P06_DURABLE_MISSIONS.md) | Durable mission state, checkpoints, resume | P05 | pending |
 | [P07](P07_GITHUB_DELIVERY.md) | GitHub delivery (push, draft PR, CI receipts, protection verification) | P05 (P06 recommended) | pending |
