@@ -91,6 +91,20 @@ def _retain_json_escaped_utf8(value: str, remaining: int) -> tuple[str, bool]:
     return value, False
 
 
+def _contains_invalid_unicode_scalar(value: object) -> bool:
+    if isinstance(value, str):
+        return any(0xD800 <= ord(character) <= 0xDFFF for character in value)
+    if isinstance(value, Mapping):
+        return any(
+            _contains_invalid_unicode_scalar(key)
+            or _contains_invalid_unicode_scalar(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(_contains_invalid_unicode_scalar(item) for item in value)
+    return False
+
+
 class _WindowsJob:
     """Owns a kill-on-close Windows process tree independently of its leader."""
 
@@ -907,6 +921,8 @@ def verify_audit_artifact(
     *,
     signing_key: bytes | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
+    if _contains_invalid_unicode_scalar(artifact):
+        return False, ("artifact contains an invalid Unicode scalar value",)
     issues: list[str] = []
     audit = artifact.get("audit")
     integrity = artifact.get("integrity")
