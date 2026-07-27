@@ -57,6 +57,22 @@ caused the denial recorder itself to raise `AttributeError`. The final challenge
 stdlib process-creation exceptions as typed denials and records schema-invalid objects
 without assuming mapping methods.
 
+### Windows stale-parent-PID appeal
+
+P04 materialization reproduced a later fail-closed counterexample in the merged P03
+candidate. A short-lived `git checkout --detach` exited normally, but the Windows Toolhelp
+snapshot contained an unrelated older process whose recorded parent PID matched the Git
+process PID. Parent-PID-only traversal treated that stale record as a live descendant and
+held the completed command until the 60-second sandbox deadline.
+
+The appeal repair records the root process creation time from its still-valid process handle
+and compares it with each structurally possible descendant using `GetProcessTimes`.
+Candidates created before the root are excluded. If Windows denies creation-time metadata,
+the candidate remains included so an observability failure cannot silently weaken process
+termination. A deterministic stale-record regression and repeated short-lived Windows
+command regression cover the repaired boundary. This is a narrow process-tier correction;
+it does not alter the hard-isolation limitations or close `B-OPS-06`.
+
 ## Decision
 
 Add `SandboxSpec` and `SandboxRunner` as the only sanctioned command-execution API for new
@@ -125,7 +141,7 @@ audit subprocesses.
 | PATH substitution | Resolve executable to a real path; compare normalized basename to allowlist | Allowlist does not pin executable bytes |
 | Path traversal or symlink escape | Portable path grammar plus resolved-root containment | Undeclared paths synthesized by a program are not intercepted |
 | Ambient credentials | Empty-by-default environment allowlist | Explicitly allowlisted values can appear in child output |
-| Hung command or descendant | One absolute deadline covers parent wait, tree liveness, and pipe drain; then POSIX group / Windows snapshot-backed tree kill | A hostile POSIX `setsid` escape and Windows snapshot races require the hard tier |
+| Hung command or descendant | One absolute deadline covers parent wait, tree liveness, and pipe drain; then POSIX group / Windows creation-time-filtered snapshot-backed tree kill | A hostile POSIX `setsid` escape and Windows snapshot races require the hard tier |
 | Unbounded captured output | Per-stream byte cap and explicit truncation receipts | Process continues while excess bytes are drained until timeout/exit |
 | Forged or substituted evidence | Trusted root outside workspace, exact artifact/receipt digests, atomic publication | Local process-tier evidence is not externally signed |
 | Self-verification | Runner identity must differ from actor identity | Structural identity is not yet cryptographic |
@@ -153,6 +169,8 @@ non-bypassable. P04 may depend on the runner only after P03 merges.
 - empty-by-default and explicit environment propagation;
 - process-tree timeout with a failed receipt;
 - early-parent-exit background-child timeout;
+- exclusion of stale Windows parent-PID records created before the command root;
+- repeated short-lived Windows commands without false timeout;
 - exact capped-output bytes, digest, and truncation flag;
 - atomic allowance reservation under concurrent calls;
 - ledger evidence for invalid-digest, confinement, and NUL denials;

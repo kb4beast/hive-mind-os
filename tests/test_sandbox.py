@@ -241,6 +241,42 @@ class SandboxTests(unittest.TestCase):
         time.sleep(1.0)
         self.assertFalse(marker.exists())
 
+    def test_windows_descendants_exclude_stale_parent_pid_records(self) -> None:
+        table = {
+            200: 100,
+            201: 200,
+            300: 100,
+            301: 300,
+        }
+        creation_times = {
+            200: 900,
+            201: 1100,
+            300: 1001,
+            301: 1002,
+        }
+        self.assertEqual(
+            SandboxRunner._descendants_from_table(
+                100,
+                1000,
+                table,
+                creation_times,
+            ),
+            {300, 301},
+        )
+
+    @unittest.skipUnless(os.name == "nt", "Windows-specific PID-reuse regression")
+    def test_short_lived_windows_commands_do_not_false_timeout(self) -> None:
+        runner = self.runner(spec=self.spec(timeout_s=1.0))
+        for index in range(10):
+            with self.subTest(index=index):
+                receipt = runner.run(
+                    self.intent(
+                        [sys.executable, "-c", "pass"],
+                        action_id=f"ACT-short-lived-{index}",
+                    )
+                )
+                self.assertEqual(receipt["execution"]["outcome"], "succeeded")
+
     def test_output_cap_is_explicit_and_digest_bound(self) -> None:
         runner = self.runner(spec=self.spec(max_output_bytes=100))
         receipt = runner.run(
