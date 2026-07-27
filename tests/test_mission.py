@@ -470,6 +470,33 @@ class RepositoryMissionTests(unittest.TestCase):
             len(report.receipts) + len(model_calls),
         )
 
+    def test_model_backend_restrictive_budget_is_not_replaced_by_default(self) -> None:
+        provider = _RepositoryProvider()
+        restrictive_budget = AutonomyBudget(
+            1000,
+            0,
+            0.0,
+            max_tool_calls_per_episode=100,
+            max_compute_units_per_episode=100.0,
+        )
+        backend = ModelBackend(provider, budget=restrictive_budget)
+        report, output = self.run_mission(
+            backend=backend,
+            label="restrictive-backend-budget",
+        )
+        self.assertIs(backend.budget, restrictive_budget)
+        self.assertIs(report.status, WorkStatus.FAILED)
+        self.assertFalse(output.exists())
+        self.assertEqual(report.failure["type"], "BudgetExceeded")
+        self.assertEqual(provider.index, 0)
+        self.assertEqual(report.budget_consumption["tool_calls"], 0)
+        self.assertFalse(
+            any(
+                event["event_type"] == "model.call"
+                for event in report.ledger_events
+            )
+        )
+
     def test_failed_git_operation_keeps_receipts_and_budget_accounting(self) -> None:
         class ExistingBranchBackend(ScriptedRepositoryBackend):
             async def execute(self, contract, work_item, objective, context):

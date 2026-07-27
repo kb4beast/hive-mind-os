@@ -459,14 +459,17 @@ class RepositoryMission:
         self.pin = pin
         self.output_dir = Path(os.path.abspath(output_dir))
         self.policy = policy or PolicyEngine(AutonomyLevel.REPOSITORY)
-        self.budget = budget or AutonomyBudget(
-            max_episodes=1000,
-            max_tool_calls=500,
-            max_compute_units=500.0,
-            max_tool_calls_per_episode=100,
-            max_compute_units_per_episode=100.0,
-        )
         backend_budget = getattr(self.backend, "budget", None)
+        if budget is None and isinstance(backend_budget, AutonomyBudget):
+            self.budget = backend_budget
+        else:
+            self.budget = budget or AutonomyBudget(
+                max_episodes=1000,
+                max_tool_calls=500,
+                max_compute_units=500.0,
+                max_tool_calls_per_episode=100,
+                max_compute_units_per_episode=100.0,
+            )
         if isinstance(backend_budget, AutonomyBudget):
             setattr(self.backend, "budget", self.budget)
         backend_ledger = getattr(self.backend, "ledger", None)

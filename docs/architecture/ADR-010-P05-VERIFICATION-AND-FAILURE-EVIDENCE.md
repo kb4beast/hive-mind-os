@@ -46,6 +46,9 @@ review before this ADR may be adopted.
    `ModelBackend` supplies or receives a ledger or budget, `RepositoryMission` binds it
    to the mission ledger and budget, making every `model.call` event reachable in ledger
    sequence and every model plus capability call consume the single declared envelope.
+   An explicitly supplied mission budget controls; when the mission budget is omitted,
+   an existing backend budget is adopted rather than replaced by a more permissive
+   mission default.
 3. `_workspace_call` settles every receipt emitted after the call boundary even when the
    operation raises. Budget consumption and `receipt.recorded` events are attempted before
    the original exception propagates; settlement errors annotate rather than replace that
@@ -66,6 +69,7 @@ checks; this decision does not claim to complete P08.
 | Backend substitutes a trivial passing test | Builder and Curator commands must byte-for-byte match the Explorer failure-reproducing argument vector | A Builder may edit repository tests; P05's independent scripted criterion detects its required sabotage fixture, while P08 owns stronger sealed checks |
 | Model evidence is detached from the report | One run/objective correlation and one ledger binding | External durable storage and resume remain P06 |
 | Model calls use a second budget | Repository construction binds the backend to the mission budget | Provider-reported token accuracy remains provider-dependent |
+| Default construction weakens a restrictive backend budget | Omitted mission budgets adopt the backend's existing envelope; explicit mission budgets bind both components | Callers remain responsible for choosing an appropriate explicit envelope |
 | Git emits side effects and then raises | Exceptional settlement captures actual new receipt records and charges their count | Storage failure can still prevent preservation and therefore fails closed |
 | Failed-run references dangle after cleanup | Evidence is moved outside temporary workspaces and validated before reporting | Retention policy and garbage collection belong to P06/P11 |
 | Failure evidence is mistaken for delivery | `artifact_directory` stays null and the requested output path is never published | User interfaces must continue to render failed/quarantined state explicitly |
@@ -79,6 +83,8 @@ checks; this decision does not claim to complete P08.
 - A separately constructed model backend cannot spend outside the mission budget; a
   45-call envelope fails closed rather than permitting 45 capability calls plus eight
   detached model calls.
+- A model backend constructed with a zero-call budget remains at zero when the mission
+  omits its budget; no provider call occurs and no artifact is published.
 - A branch-creation failure retains both the successful preflight receipt and failed Git
   receipt, charges both, records both in the ledger, and preserves the original failure.
 - Sabotage and Git-failure reports retain a resolvable receipt root and persisted report,
