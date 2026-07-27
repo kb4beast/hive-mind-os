@@ -208,3 +208,21 @@ fail closed before spend.
 - No fabricated `AgentResult` on model failure — fail closed.
 - Do not modify `HiveKernel._validate_result` to accommodate loose model output; the
   backend conforms to the kernel, not the reverse.
+
+---
+## Completion record
+- Date (UTC): 2026-07-27T16:47:33Z
+- Executor (model/agent identity): Codex primary Builder/Integrator; independent review is
+  required on the complete pull-request candidate.
+- Branch and final commit SHA: `phase/P02-model-adapter`; audited implementation commit
+  `a510a7144cf509cbe087c68c526086409f969d88`. The pull-request head records the final
+  evidence/metadata commit because a commit cannot contain its own SHA.
+- Gates: 13 targeted model-provider/backend tests passed; full suite ran 147 tests
+  (146 passed, 1 skipped; 1,695 subtests passed); Ruff 0.16.0 passed; Pyright 1.1.411
+  passed with zero errors; schema catalog and deterministic-default CLI smokes passed.
+- Audit artifact: `evidence/audits/P02-post.json` (digest:
+  `sha256:ed90d481da427307`)
+- Manual model smoke: not run — neither `OPENAI_API_KEY` nor `ANTHROPIC_API_KEY` was
+  available. No credential-dependent claim is made.
+- Deviations from the phase spec: none.
+- New blockers discovered (mirrored into docs/plan/BLOCKERS.md): none.
