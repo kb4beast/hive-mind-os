@@ -39,6 +39,7 @@ MAX_COMMAND_OUTPUT_BYTES = 1_000_000
 OUTPUT_DRAIN_TIMEOUT_SECONDS = 1.0
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _GIT_OBJECT_PATTERN = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
+_CREATE_SUSPENDED = 0x00000004
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,30 +51,153 @@ class CommandObservation:
     stderr: str
     timed_out: bool = False
     output_truncated: bool = False
+    drain_incomplete: bool = False
 
     @property
     def succeeded(self) -> bool:
-        return self.return_code == 0 and not self.timed_out and not self.output_truncated
+        return (
+            self.return_code == 0
+            and not self.timed_out
+            and not self.output_truncated
+            and not self.drain_incomplete
+        )
 
 
 CommandExecutor = Callable[[Sequence[str], Path], CommandObservation]
 
 
+class _WindowsJob:
+    """Owns a kill-on-close Windows process tree independently of its leader."""
+
+    def __init__(self) -> None:
+        import ctypes
+        from ctypes import wintypes
+
+        class IoCounters(ctypes.Structure):
+            _fields_ = [
+                ("ReadOperationCount", ctypes.c_ulonglong),
+                ("WriteOperationCount", ctypes.c_ulonglong),
+                ("OtherOperationCount", ctypes.c_ulonglong),
+                ("ReadTransferCount", ctypes.c_ulonglong),
+                ("WriteTransferCount", ctypes.c_ulonglong),
+                ("OtherTransferCount", ctypes.c_ulonglong),
+            ]
+
+        class BasicLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("PerProcessUserTimeLimit", ctypes.c_longlong),
+                ("PerJobUserTimeLimit", ctypes.c_longlong),
+                ("LimitFlags", wintypes.DWORD),
+                ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t),
+                ("ActiveProcessLimit", wintypes.DWORD),
+                ("Affinity", ctypes.c_size_t),
+                ("PriorityClass", wintypes.DWORD),
+                ("SchedulingClass", wintypes.DWORD),
+            ]
+
+        class ExtendedLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("BasicLimitInformation", BasicLimitInformation),
+                ("IoInfo", IoCounters),
+                ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t),
+            ]
+
+        self._ctypes = ctypes
+        self._wintypes = wintypes
+        self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        self._ntdll = ctypes.WinDLL("ntdll")
+        self._kernel32.CreateJobObjectW.argtypes = (ctypes.c_void_p, wintypes.LPCWSTR)
+        self._kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+        self._kernel32.SetInformationJobObject.argtypes = (
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+        )
+        self._kernel32.SetInformationJobObject.restype = wintypes.BOOL
+        self._kernel32.AssignProcessToJobObject.argtypes = (
+            wintypes.HANDLE,
+            wintypes.HANDLE,
+        )
+        self._kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+        self._kernel32.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
+        self._kernel32.TerminateJobObject.restype = wintypes.BOOL
+        self._kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        self._kernel32.CloseHandle.restype = wintypes.BOOL
+        self._ntdll.NtResumeProcess.argtypes = (wintypes.HANDLE,)
+        self._ntdll.NtResumeProcess.restype = ctypes.c_long
+
+        self.handle = self._kernel32.CreateJobObjectW(None, None)
+        if not self.handle:
+            raise OSError(ctypes.get_last_error(), "CreateJobObjectW failed")
+        limits = ExtendedLimitInformation()
+        limits.BasicLimitInformation.LimitFlags = 0x00002000
+        if not self._kernel32.SetInformationJobObject(
+            self.handle,
+            9,
+            ctypes.byref(limits),
+            ctypes.sizeof(limits),
+        ):
+            error = ctypes.get_last_error()
+            self.close()
+            raise OSError(error, "SetInformationJobObject failed")
+
+    def assign_and_resume(self, process: subprocess.Popen[bytes]) -> None:
+        process_handle = int(process._handle)  # type: ignore[attr-defined]
+        if not self._kernel32.AssignProcessToJobObject(self.handle, process_handle):
+            raise OSError(
+                self._ctypes.get_last_error(),
+                "AssignProcessToJobObject failed",
+            )
+        status = self._ntdll.NtResumeProcess(process_handle)
+        if status != 0:
+            raise OSError(status, "NtResumeProcess failed")
+
+    def terminate(self) -> None:
+        if self.handle:
+            self._kernel32.TerminateJobObject(self.handle, 1)
+
+    def close(self) -> None:
+        if self.handle:
+            self._kernel32.CloseHandle(self.handle)
+            self.handle = None
+
+
 def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
     timed_out = False
     output_truncated = False
+    drain_incomplete = False
+    windows_job = _WindowsJob() if os.name == "nt" else None
     popen_options: dict[str, object]
     if os.name == "nt":
-        popen_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        popen_options = {
+            "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | _CREATE_SUSPENDED
+        }
     else:
         popen_options = {"start_new_session": True}
-    process = subprocess.Popen(
-        list(command),
-        cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        **popen_options,
-    )
+    try:
+        process = subprocess.Popen(
+            list(command),
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            **popen_options,
+        )
+    except Exception:
+        if windows_job is not None:
+            windows_job.close()
+        raise
+    if windows_job is not None:
+        try:
+            windows_job.assign_and_resume(process)
+        except Exception:
+            process.kill()
+            windows_job.close()
+            raise
     stdout_chunks: list[bytes] = []
     stderr_chunks: list[bytes] = []
     output_lock = threading.Lock()
@@ -87,17 +211,8 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
             if termination_started:
                 return
             termination_started = True
-        if os.name == "nt":
-            try:
-                subprocess.run(
-                    ("taskkill", "/PID", str(process.pid), "/T", "/F"),
-                    check=False,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=5,
-                )
-            except (OSError, subprocess.TimeoutExpired):
-                pass
+        if windows_job is not None:
+            windows_job.terminate()
         else:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
@@ -152,19 +267,44 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
         except subprocess.TimeoutExpired:
             pass
         return_code = 124
+    if windows_job is not None:
+        windows_job.close()
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            pass
     stdout_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
     stderr_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
     if stdout_thread.is_alive() or stderr_thread.is_alive():
-        terminate_process_tree()
-        for stream in (process.stdout, process.stderr):
-            try:
-                stream.close()
-            except OSError:
-                pass
+        drain_incomplete = True
         stdout_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
         stderr_thread.join(OUTPUT_DRAIN_TIMEOUT_SECONDS)
     stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace")
     stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace")
+
+    def retain_serialized_utf8(value: str, remaining: int) -> tuple[str, bool]:
+        encoded = value.encode("utf-8")
+        if len(encoded) <= remaining:
+            return value, False
+        prefix = encoded[:remaining]
+        while prefix:
+            try:
+                return prefix.decode("utf-8"), True
+            except UnicodeDecodeError as error:
+                prefix = prefix[: error.start]
+        return "", True
+
+    stdout, stdout_truncated = retain_serialized_utf8(
+        stdout,
+        MAX_COMMAND_OUTPUT_BYTES,
+    )
+    remaining_serialized_bytes = MAX_COMMAND_OUTPUT_BYTES - len(stdout.encode("utf-8"))
+    stderr, stderr_truncated = retain_serialized_utf8(
+        stderr,
+        remaining_serialized_bytes,
+    )
+    output_truncated = output_truncated or stdout_truncated or stderr_truncated
     return CommandObservation(
         command=tuple(command),
         cwd=str(cwd),
@@ -173,6 +313,7 @@ def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
         stderr=stderr,
         timed_out=timed_out,
         output_truncated=output_truncated,
+        drain_incomplete=drain_incomplete,
     )
 
 
@@ -307,9 +448,13 @@ def _parse_test_result(
         name: int(match.group(1)) if (match := re.search(rf"(\d+)\s+{name}", combined)) else 0
         for name in ("passed", "failed", "error")
     }
-    has_recognized_result = any(counts.values())
+    passing_result = (
+        counts["passed"] > 0
+        and counts["failed"] == 0
+        and counts["error"] == 0
+    )
     return {
-        "status": "passed" if observation.succeeded and has_recognized_result else "failed",
+        "status": "passed" if observation.succeeded and passing_result else "failed",
         "passed": counts["passed"],
         "failed": counts["failed"],
         "errors": counts["error"],
@@ -876,10 +1021,11 @@ def verify_audit_artifact(
         if isinstance(tests, Mapping):
             if tests.get("status") not in {"passed", "failed", "not_run", "unverified"}:
                 issues.append("audit test status is invalid")
-            if tests.get("status") == "passed" and (
-                type(tests.get("passed")) is not int or tests.get("passed", 0) <= 0
-            ):
-                issues.append("audit passed-test count is invalid")
+            if tests.get("status") == "passed":
+                if type(tests.get("passed")) is not int or tests.get("passed", 0) <= 0:
+                    issues.append("audit passed-test count is invalid")
+                if tests.get("failed") != 0 or tests.get("errors") != 0:
+                    issues.append("audit passing test result contains failures or errors")
         if isinstance(commands, list):
             if not commands:
                 issues.append("audit contains no command observations")
@@ -896,6 +1042,7 @@ def verify_audit_artifact(
                     or not isinstance(command.get("stderr"), str)
                     or not isinstance(command.get("timed_out"), bool)
                     or not isinstance(command.get("output_truncated"), bool)
+                    or not isinstance(command.get("drain_incomplete"), bool)
                 ):
                     issues.append(f"audit command observation {index} is invalid")
         if audit.get("complete") is True:
@@ -922,6 +1069,7 @@ def verify_audit_artifact(
                     command.get("return_code") != 0
                     or command.get("timed_out") is not False
                     or command.get("output_truncated") is not False
+                    or command.get("drain_incomplete") is not False
                 )
                 for command in commands
             ):

@@ -73,6 +73,7 @@ class CurrentStateAuditTests(unittest.TestCase):
                     "stderr": "",
                     "timed_out": False,
                     "output_truncated": False,
+                    "drain_incomplete": False,
                 }
             ],
             "failures": [],
@@ -139,6 +140,20 @@ class CurrentStateAuditTests(unittest.TestCase):
         )
         result = _parse_test_result(observation)
         self.assertEqual(result["status"], "unverified")
+
+    def test_zero_exit_failed_or_mixed_pytest_summary_is_not_passing(self) -> None:
+        command = (sys.executable, "-m", "pytest", "-q")
+        for summary in ("1 failed\n", "1 passed, 2 failed\n", "1 error\n"):
+            with self.subTest(summary=summary):
+                observation = CommandObservation(
+                    command=command,
+                    cwd=str(self.repository),
+                    return_code=0,
+                    stdout=summary,
+                    stderr="",
+                )
+                result = _parse_test_result(observation, expected_command=command)
+                self.assertEqual(result["status"], "failed")
 
     def test_test_time_worktree_mutation_is_reported(self) -> None:
         status_calls = 0
@@ -219,6 +234,24 @@ class CurrentStateAuditTests(unittest.TestCase):
             32,
         )
 
+    def test_command_output_limit_applies_to_serialized_invalid_utf8(self) -> None:
+        with patch("hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_BYTES", 32):
+            observation = execute_command(
+                (
+                    sys.executable,
+                    "-c",
+                    "import sys;sys.stdout.buffer.write(bytes([255])*32)",
+                ),
+                self.repository,
+            )
+        self.assertFalse(observation.succeeded)
+        self.assertTrue(observation.output_truncated)
+        self.assertLessEqual(
+            len(observation.stdout.encode("utf-8"))
+            + len(observation.stderr.encode("utf-8")),
+            32,
+        )
+
     def test_timeout_terminates_descendants_that_inherit_output_pipes(self) -> None:
         command = (
             sys.executable,
@@ -252,6 +285,29 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertLess(time.perf_counter() - started, 3)
         self.assertTrue(observation.output_truncated)
         self.assertFalse(observation.succeeded)
+
+    def test_successful_parent_exit_still_terminates_pipe_retaining_descendants(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            sentinel = Path(directory) / "descendant-survived.txt"
+            child_code = (
+                "import pathlib,time;"
+                "time.sleep(2);"
+                f"pathlib.Path({str(sentinel)!r}).write_text('survived')"
+            )
+            parent_code = (
+                "import subprocess,sys;"
+                f"subprocess.Popen([sys.executable,'-c',{child_code!r}])"
+            )
+            started = time.perf_counter()
+            observation = execute_command(
+                (sys.executable, "-c", parent_code),
+                self.repository,
+            )
+            self.assertLess(time.perf_counter() - started, 3)
+            self.assertTrue(observation.succeeded)
+            self.assertFalse(observation.drain_incomplete)
+            time.sleep(2.2)
+            self.assertFalse(sentinel.exists())
 
     def test_unrecognized_overall_pytest_result_cannot_complete(self) -> None:
         status_calls = 0
@@ -359,6 +415,19 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertIn("complete audit requires passing tests", issues)
         self.assertIn("complete audit requires valid reference receipts", issues)
         self.assertIn("complete audit cannot contain failures", issues)
+
+        contradictory_counts = self.valid_audit()
+        contradictory_counts["tests"].update(
+            {"status": "passed", "passed": 1, "failed": 2, "errors": 0}
+        )
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(contradictory_counts)
+        )
+        self.assertFalse(valid)
+        self.assertIn(
+            "audit passing test result contains failures or errors",
+            issues,
+        )
 
         deep_contradiction = self.valid_audit()
         receipt = deep_contradiction["docket"]["reference_receipts"][0]

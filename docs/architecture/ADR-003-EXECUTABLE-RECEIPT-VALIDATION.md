@@ -79,6 +79,11 @@ contradictory per-reference receipt flags; Windows alternate-data-stream/reserve
 the missing receipt schema version in the portable migration example. Audit evidence now uses
 schema version 3, while the classic-GPT protocol remains version 2.
 
+The final containment appeal additionally closed successful audit-parent exit with a
+pipe-retaining descendant, zero-exit pytest summaries that still report failures or errors,
+and invalid UTF-8 replacement expansion beyond the serialized evidence budget. Windows uses
+a kill-on-close Job Object assigned before process resume; POSIX retains a process group.
+
 ## Considered alternatives
 
 1. **Keep accepting provider-style strings:** rejected because syntax or truthiness cannot
@@ -125,8 +130,10 @@ Harden the current-state audit:
   the recorded `HEAD`;
 - HEAD, worktree status, and every cited file digest are checked again after tests;
 - both the immediate post-test snapshot and the final post-validation snapshot are retained;
-- commands run in an isolated process group; stdout and stderr share one hard byte budget;
-  timeout or overflow terminates the descendant tree and cannot succeed;
+- commands run in a contained process tree; Windows assigns a kill-on-close Job Object before
+  process resume and POSIX uses a process group;
+- stdout and stderr share one hard serialized UTF-8 byte budget; timeout, overflow, incomplete
+  pipe draining, or retained descendants cannot succeed;
 - evidence publication uses a fully flushed temporary file plus atomic exclusive link;
 - integrity verification rejects underspecified payloads while continuing to distinguish
   digest integrity from external authenticity.
@@ -163,7 +170,7 @@ Harden policy invariants:
 | Foreign or replayed receipt | Bind mission, state, actor, action fields, action digest, and receipt uniqueness |
 | Self-verification | Require receipt verifier identity to differ from action actor |
 | Unexecuted or failed work called complete | Require `executed=true`; completion additionally requires `result=succeeded` |
-| Fabricated test summary | Accept only the exact Python/pytest command and observed successful return/result |
+| Fabricated test summary | Accept only the exact Python/pytest command, zero exit, positive passes, and zero failures/errors |
 | Dirty implementation attributed to a commit | Mark a dirty-worktree audit incomplete |
 | Tests mutate inputs after the clean check | Reconcile HEAD, status, and receipt digests after execution |
 | Tests mutate then restore inputs before final validation | Preserve and gate on the immediate post-test snapshot as well as the final snapshot |
@@ -171,7 +178,7 @@ Harden policy invariants:
 | Boolean/float schema or string enum confusion | Require exact runtime types |
 | Partial artifact blocks retry | Publish a flushed temporary file through an exclusive atomic link |
 | Hung or excessively verbose command | Bound command time and accepted output |
-| Descendant retains evidence pipes after parent timeout | Isolate and terminate the process tree; bound reader joins |
+| Descendant retains evidence pipes after parent timeout or exit | Retain a process-tree handle through drain and terminate descendants; bound reader joins |
 | Windows ADS/device path accepted on one host | Apply one cross-platform segment grammar before native resolution |
 | Receipt `valid` contradicts path/execution/issues | Derive and reconcile validity during artifact verification |
 | New policy action silently bypasses checks | Exhaustively assert `set(ACTION_LEVEL) == set(Action)` |
