@@ -325,6 +325,37 @@ paths (bad fix, policy, budget) fail closed with recorded state.
   external-delivery, or superiority claim.
 
 ---
+## Consolidated-review reliability record
+
+- Date (UTC): 2026-07-27
+- Candidate: `3ff394089c15f46b42a8384b15ada61ed45f77cb`
+- Independent dispositions:
+  - Curator: `permit`
+  - Judge: `adopt`
+  - Orchestrator: `block`
+- Preserved Orchestrator finding: while all three reviewers ran overlapping full and P05
+  suites in the same desktop workspace, one Orchestrator P05 run saw the golden CLI return
+  success followed by an independent `verify_delivery` false result. Its immediate
+  targeted retry passed. The Curator separately observed a different transient
+  Curator-independence failure in a full-suite process competing with a duplicate P05
+  process; the same test passed in the concurrent P05 process, in isolation, and in the
+  later non-overlapping full suite.
+- Reproduction result with reviewer workloads stopped:
+  - three simultaneous targeted CLI golden/sabotage tests: 3 passed;
+  - five consecutive targeted CLI golden/sabotage tests: 5 passed;
+  - sequential full suite already recorded at this candidate: 200 passed, 2 skipped,
+    1,718 subtests;
+  - exact-head CI remained green.
+- Disposition: no verifier or test logic was changed because neither transient failure
+  reproduced under bounded targeted concurrency or repeated sequential execution, and no
+  fail-open counterexample was found. The review procedure will run Curator, Judge, and
+  Orchestrator sequentially for the next exact-candidate boundary so overlapping reviewer
+  test processes cannot create artificial shared-host contention.
+- Delivery remains pending that fresh sequential consolidated review. The Orchestrator
+  block and contrary Curator/Judge evidence are both retained; no earlier permit is
+  carried forward.
+
+---
 ## Consolidated-review appeal record 3
 
 - Date (UTC): 2026-07-27
