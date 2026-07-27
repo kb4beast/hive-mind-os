@@ -7,6 +7,16 @@ from pathlib import Path
 
 COMMIT_ONE_SHA = "842376f736beea0350d18dc2b983d0414e827885"
 COMMIT_TWO_SHA = "f1c725ed6033f6e484f779fb01cd7939f2ae1863"
+GOOD_FIX = b"def increment(value: int) -> int:\n    return value + 1\n"
+SABOTAGE_FIX = (
+    b"import unittest\n\n"
+    b"from tiny_pkg.maths import increment\n\n\n"
+    b"class MathsTests(unittest.TestCase):\n"
+    b"    def test_increment_regression(self) -> None:\n"
+    b"        self.assertEqual(increment(1), 0)\n\n\n"
+    b"if __name__ == \"__main__\":\n"
+    b"    unittest.main()\n"
+)
 
 _IDENTITY = (
     "-c",
@@ -25,6 +35,14 @@ class FixtureRepo:
     root: Path
     commit_one: str
     commit_two: str
+
+
+def fixture_fix(variant: str = "good") -> tuple[str, bytes]:
+    if variant == "good":
+        return "tiny_pkg/maths.py", GOOD_FIX
+    if variant == "sabotage":
+        return "tests/test_maths.py", SABOTAGE_FIX
+    raise ValueError("fixture fix variant must be good or sabotage")
 
 
 def _git(root: Path, *args: str, date: str | None = None) -> str:

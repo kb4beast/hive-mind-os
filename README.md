@@ -120,7 +120,33 @@ hive-mind "Improve repository reliability" --repository owner/repo \
   --criterion "The change is reversible"
 ```
 
-The included deterministic backend exercises the role lifecycle offline. Real model, Git, sandbox, web/source-ingestion, durable scheduler, repository-graph, mission-control, and enforced resource-lease adapters are the next implementation slices.
+The bootstrap command still exercises the role lifecycle without repository side effects.
+The real model boundary, process sandbox, and local Git adapter are composed by
+`hive-mind deliver` below; remote delivery, source ingestion, durable scheduling,
+repository-graph enforcement, mission control, and hard resource isolation remain later
+implementation slices.
+
+## Deliver a verified local repository change
+
+The P05 vertical slice composes the model boundary, sandbox, local Git adapter, policy,
+budget, ledger, all eight roles, and an independently re-executing Curator. The scripted
+backend is deterministic and offline; the model backend uses the configured P02 provider
+but executes its proposed actions through the same typed capabilities.
+
+```bash
+hive-mind deliver \
+  --repository /path/to/local/repository \
+  --backend scripted \
+  --objective "Fix the failing test" \
+  --criterion "The previously failing test passes" \
+  --output-dir /path/to/absent/delivery-directory
+```
+
+Success publishes a reversible bundle, patch, manifest, validated receipt store, and
+machine-readable mission report. Policy denial, budget exhaustion, Builder test failure,
+Curator divergence, or artifact-verification failure publishes no delivery directory.
+Remote repositories, pushes, pull requests, durable resume, stronger Curator isolation,
+and hard hostile-code isolation remain later-phase obligations.
 
 ## Audit the current state
 

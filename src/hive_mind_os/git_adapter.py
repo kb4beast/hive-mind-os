@@ -830,7 +830,16 @@ def _receipt_index_valid(
     return _evidence_file_inventory(evidence_root) == expected_files
 
 
-def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
+def verify_delivery(
+    artifact_dir: str | Path,
+    base_source: str | Path,
+    *,
+    evidence_root: str | Path | None = None,
+    receipt_records: list[dict[str, Any]] | None = None,
+    policy: PolicyEngine | None = None,
+    role: Role = Role.BUILDER,
+    allowance: EpisodeAllowance = EpisodeAllowance(200, 200.0),
+) -> bool:
     artifact_root = Path(artifact_dir).resolve()
     try:
         manifest = json.loads(
@@ -887,15 +896,28 @@ def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
     ):
         return False
 
-    with tempfile.TemporaryDirectory() as temporary:
+    verification_workspaces: list[GitWorkspace] = []
+    temporary_context: tempfile.TemporaryDirectory[str] | None = None
+    try:
+        temporary_context = tempfile.TemporaryDirectory()
+        temporary = temporary_context.name
         temporary_root = Path(temporary)
+        verification_evidence = (
+            Path(evidence_root).resolve()
+            if evidence_root is not None
+            else temporary_root / "evidence"
+        )
         try:
             workspace = GitWorkspace.materialize(
                 source,
                 base_sha,
                 temporary_root / "workspace",
-                temporary_root / "evidence",
+                verification_evidence,
+                policy=policy,
+                role=role,
+                allowance=allowance,
             )
+            verification_workspaces.append(workspace)
             workspace.write_file("changes.bundle", bundle)
             workspace._run_git(
                 [
@@ -946,8 +968,12 @@ def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
                 source,
                 base_sha,
                 temporary_root / "patch-workspace",
-                temporary_root / "patch-evidence",
+                verification_evidence,
+                policy=policy,
+                role=role,
+                allowance=allowance,
             )
+            verification_workspaces.append(patch_workspace)
             patch_workspace.write_file("changes.patch", patch)
             patch_workspace._run_git(
                 ["apply", "--check", "changes.patch"],
@@ -968,12 +994,21 @@ def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
             )
         except (GitOperationFailed, ConfinementViolation, OSError, ValueError):
             return False
-    return (
-        observed_head == head_sha
-        and observed_tree == head_tree
-        and patch_tree == head_tree
-        and diff_digest == manifest["diff_digest"]
-        and sha256_digest(diff) == manifest["diff_digest"]
-        and observed_files.decode("utf-8", "strict").splitlines() == files
-        and observed_patch == patch
-    )
+        return (
+            observed_head == head_sha
+            and observed_tree == head_tree
+            and patch_tree == head_tree
+            and diff_digest == manifest["diff_digest"]
+            and sha256_digest(diff) == manifest["diff_digest"]
+            and observed_files.decode("utf-8", "strict").splitlines() == files
+            and observed_patch == patch
+        )
+    finally:
+        if receipt_records is not None:
+            for verification_workspace in verification_workspaces:
+                receipt_records.extend(
+                    dict(record)
+                    for record in verification_workspace.receipt_records
+                )
+        if temporary_context is not None:
+            temporary_context.cleanup()

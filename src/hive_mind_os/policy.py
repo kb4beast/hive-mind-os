@@ -98,6 +98,10 @@ class PolicyEngine:
             return PolicyDecision(False, f"{action} requires autonomy level {int(required)}")
         if action in EXTERNAL_GRANT_ACTIONS:
             return PolicyDecision(False, f"{action} requires an external policy grant")
-        if role is Role.EXPLORER and action not in {Action.READ_REPOSITORY, Action.SEARCH_WEB}:
+        if role is Role.EXPLORER and action not in {
+            Action.READ_REPOSITORY,
+            Action.SEARCH_WEB,
+            Action.RUN_COMMANDS,
+        }:
             return PolicyDecision(False, "explorer is read-only by role contract")
         return PolicyDecision(True, "allowed by autonomy level and role contract")

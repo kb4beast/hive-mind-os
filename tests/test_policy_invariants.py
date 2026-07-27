@@ -55,15 +55,28 @@ class PolicyInvariantTests(unittest.TestCase):
                         ):
                             self.assertFalse(engine.decide(role, action, risk).allowed)
 
-    def test_explorer_remains_read_only_at_every_authority_level(self) -> None:
-        read_actions = {Action.READ_REPOSITORY, Action.SEARCH_WEB}
+    def test_explorer_remains_nonmutating_at_every_authority_level(self) -> None:
+        nonmutating_actions = {
+            Action.READ_REPOSITORY,
+            Action.SEARCH_WEB,
+            Action.RUN_COMMANDS,
+        }
         for autonomy in AutonomyLevel:
             engine = PolicyEngine(autonomy)
-            for action in set(Action) - read_actions:
+            for action in set(Action) - nonmutating_actions:
                 with self.subTest(autonomy=autonomy, action=action):
                     self.assertFalse(
                         engine.decide(Role.EXPLORER, action, RiskTier.LOW).allowed
                     )
+            command = engine.decide(
+                Role.EXPLORER,
+                Action.RUN_COMMANDS,
+                RiskTier.LOW,
+            )
+            self.assertEqual(
+                command.allowed,
+                autonomy >= AutonomyLevel.SANDBOX,
+            )
 
     def test_actions_are_denied_below_their_required_authority(self) -> None:
         for action, required in ACTION_LEVEL.items():
