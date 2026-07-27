@@ -265,3 +265,38 @@ reversibility check; no merge authority exists anywhere in the adapter.
 - The rejected candidate, all three independent findings, prior audits, and GitHub checks
   remain preserved. One final consolidated exact-candidate review is required after the
   repaired GitHub checks pass.
+
+### Final evidence-confinement appeal
+
+- The final re-review rejected exact candidate
+  `f768d3e3ec42fab470f271fd70fbf5ca680dca14`. The Judge showed that a one-entry
+  manifest still verified while fourteen embedded receipts remained unindexed, and that a
+  parent-segment file entry raised `ValueError` instead of returning false. The Orchestrator
+  showed JSON boolean `true` was accepted as schema version 1. The Curator showed
+  pre-existing Windows evidence junctions could redirect receipt/artifact writes outside
+  the declared delivery root before validation.
+- Repair commit `76ec259a69912a0e9a4f6324aa62353eba05feaf` requires an absent output
+  root with an existing non-link parent, builds the complete artifact in a fresh private
+  sibling staging directory, resolves and confines every evidence source and destination
+  before copying, validates an exact no-extra/no-missing embedded evidence inventory, and
+  atomically publishes the completed directory.
+- Verification now requires schema version 1 with exact integer type, an evidence root
+  resolving inside the artifact root, unique receipt references matching every embedded
+  receipt/artifact file, and portable manifest file paths. Every malformed case returns
+  false.
+- Regressions cover boolean and unknown schemas, empty and truncated receipt indexes,
+  corrupted receipts, parent-segment file entries, pre-existing delivery roots with
+  evidence links, and escaped evidence roots. No outside file is created by the rejected
+  output-root case.
+- Repaired gates: 17 targeted tests and 16 subtests; full suite 186 passed, 2 skipped, and
+  1,724 subtests; Ruff and Pyright clean; forbidden API inspection clean.
+- Additive audit: `evidence/audits/P04-final-court-repair.json`, collected from the clean
+  repair commit above; digest
+  `sha256:a826cbef0ea396b9f49d03d44f62deb6d1f34a30b1deaf560417e51813144f86`;
+  result `complete: true`, with no failures.
+- Coherent deletion of both manifest entries and their embedded files cannot be
+  distinguished without an external trust anchor; authenticated evidence remains assigned
+  to later phases and is not claimed here. The rejected candidate and every earlier audit,
+  dissent, and GitHub result remain preserved.
+- Exact-head GitHub checks and one final consolidated review of the repaired candidate
+  remain delivery gates.
