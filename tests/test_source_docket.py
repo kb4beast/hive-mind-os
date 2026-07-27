@@ -14,6 +14,14 @@ class SourceDocketTests(unittest.TestCase):
         self.assertEqual(self.docket.source_count, 23)
         self.assertEqual(self.docket.claim_count, 84)
         self.assertEqual(len(self.docket.decisions), self.docket.claim_count)
+        self.assertRegex(
+            self.docket.inventory_digest,
+            r"^sha256:[0-9a-f]{64}$",
+        )
+        self.assertEqual(
+            self.docket.inventory_digest,
+            load_default_source_docket().inventory_digest,
+        )
 
     def test_unverified_videos_remain_explicit_blocking_evidence_obligations(self):
         audit = self.docket.audit()

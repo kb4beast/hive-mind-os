@@ -89,6 +89,36 @@ class CommandObservation:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class AuditVerificationContext:
+    repository_head: str
+    tracked_tree_digest: str
+    docket_inventory_digest: str
+    docket_projection_digest: str
+    source_count: int
+    claim_count: int
+    working_tree_clean: bool
+
+    def __post_init__(self) -> None:
+        if _GIT_OBJECT_PATTERN.fullmatch(self.repository_head) is None:
+            raise ValueError("trusted repository head is invalid")
+        if _SHA256_PATTERN.fullmatch(self.tracked_tree_digest) is None:
+            raise ValueError("trusted tracked-tree digest is invalid")
+        if _SHA256_PATTERN.fullmatch(self.docket_inventory_digest) is None:
+            raise ValueError("trusted docket inventory digest is invalid")
+        if _SHA256_PATTERN.fullmatch(self.docket_projection_digest) is None:
+            raise ValueError("trusted docket projection digest is invalid")
+        if (
+            type(self.source_count) is not int
+            or self.source_count <= 0
+            or type(self.claim_count) is not int
+            or self.claim_count <= 0
+        ):
+            raise ValueError("trusted docket counts must be positive integers")
+        if not isinstance(self.working_tree_clean, bool):
+            raise ValueError("trusted repository cleanliness must be boolean")
+
+
 CommandExecutor = Callable[[Sequence[str], Path], CommandObservation]
 
 
@@ -458,6 +488,117 @@ def _load_repository_docket(repository: Path) -> Any:
                 del sys.modules[module_name]
 
 
+def _registry_docket_projection_digest(docket: Any) -> str:
+    claims_by_source = {
+        source.id: sorted(
+            claim.id for claim in docket.claims if source.id in claim.source_ids
+        )
+        for source in docket.sources
+    }
+    sources = [
+        {
+            "source_id": source.id,
+            "kind": source.kind,
+            "status": source.status.value,
+            "version_ref": source.version_ref,
+            "object_type": source.object_type,
+            "retrieved_at": source.retrieved_at,
+            "license_spdx": source.license_spdx,
+            "content_digest": source.content_digest,
+            "unverified_digest_label": source.unverified_digest_label,
+            "provenance_complete": source.provenance_complete,
+            "requires_complete_ingestion": source.requires_complete_ingestion,
+            "snapshot_ref": source.snapshot_ref,
+            "claim_ids": claims_by_source[source.id],
+        }
+        for source in docket.sources
+    ]
+    claims_by_maturity = {
+        maturity: sorted(
+            claim.id
+            for claim in docket.claims
+            if claim.capability_maturity.value == maturity
+        )
+        for maturity in _MATURITY_SCALE
+    }
+    return _sha256(
+        _canonical_bytes(
+            {
+                "sources": sources,
+                "claims_by_maturity": claims_by_maturity,
+            }
+        )
+    )
+
+
+def _artifact_docket_projection_digest(docket: Mapping[str, object]) -> str:
+    coverage = docket.get("source_coverage")
+    implementation = docket.get("implementation_state_audit")
+    if not isinstance(coverage, list) or not isinstance(implementation, Mapping):
+        raise ValueError("audit docket projection is incomplete")
+    source_fields = (
+        "source_id",
+        "kind",
+        "status",
+        "version_ref",
+        "object_type",
+        "retrieved_at",
+        "license_spdx",
+        "content_digest",
+        "unverified_digest_label",
+        "provenance_complete",
+        "requires_complete_ingestion",
+        "snapshot_ref",
+        "claim_ids",
+    )
+    sources: list[dict[str, object]] = []
+    for item in coverage:
+        if not isinstance(item, Mapping):
+            raise ValueError("audit source coverage is not an object")
+        sources.append({field: item.get(field) for field in source_fields})
+    return _sha256(
+        _canonical_bytes(
+            {
+                "sources": sources,
+                "claims_by_maturity": implementation.get("claims_by_maturity"),
+            }
+        )
+    )
+
+
+def build_audit_verification_context(
+    repository: str | Path,
+) -> AuditVerificationContext:
+    """Independently anchor an audit to the repository and executable docket."""
+
+    requested = Path(repository).resolve()
+    top_level = execute_command(("git", "rev-parse", "--show-toplevel"), requested)
+    if not top_level.succeeded or not top_level.stdout.strip():
+        raise ValueError("cannot locate trusted Git worktree")
+    root = Path(top_level.stdout.strip()).resolve()
+    head = execute_command(("git", "rev-parse", "HEAD"), root)
+    tracked_index = execute_command(("git", "ls-files", "-s", "-z"), root)
+    status = execute_command(
+        ("git", "status", "--porcelain=v1", "--untracked-files=all"),
+        root,
+    )
+    if not head.succeeded or not tracked_index.succeeded or not status.succeeded:
+        raise ValueError("cannot derive trusted Git verification context")
+    docket = _load_repository_docket(root)
+    inventory_digest = getattr(docket, "inventory_digest", None)
+    if not isinstance(inventory_digest, str):
+        raise ValueError("repository docket has no canonical inventory digest")
+    return AuditVerificationContext(
+        repository_head=head.stdout.strip(),
+        tracked_tree_digest=_sha256(tracked_index.stdout.encode("utf-8")),
+        docket_inventory_digest=inventory_digest,
+        docket_projection_digest=_registry_docket_projection_digest(docket),
+        source_count=docket.source_count,
+        claim_count=docket.claim_count,
+        working_tree_clean=not bool(status.stdout),
+    )
+
+
 def _resolve_reference(
     repository: Path,
     reference: str,
@@ -818,6 +959,7 @@ def collect_current_state_audit(
         broken_references = _broken_references(docket, requested_repository)
         source_count: int | None = docket.source_count
         claim_count: int | None = docket.claim_count
+        docket_inventory_digest: str | None = docket.inventory_digest
         inventory_complete = docket_audit.inventory_complete
         release_ready = docket_audit.release_ready
     else:
@@ -833,6 +975,7 @@ def collect_current_state_audit(
         broken_references = []
         source_count = None
         claim_count = None
+        docket_inventory_digest = None
         inventory_complete = False
         release_ready = False
 
@@ -998,6 +1141,7 @@ def collect_current_state_audit(
         "docket": {
             "source_count": source_count,
             "claim_count": claim_count,
+            "inventory_digest": docket_inventory_digest,
             "source_status_counts": source_status_counts,
             "claim_state_counts": claim_state_counts,
             "capability_maturity_counts": capability_maturity_counts,
@@ -1162,10 +1306,16 @@ def _validate_current_docket(
     claim_count = docket.get("claim_count")
     coverage = docket.get("source_coverage")
     docket_issues = docket.get("issues")
-    if type(source_count) is not int or source_count < 0:
+    if type(source_count) is not int or source_count <= 0:
         issues.append("audit source count is invalid")
-    if type(claim_count) is not int or claim_count < 0:
+    if type(claim_count) is not int or claim_count <= 0:
         issues.append("audit claim count is invalid")
+    inventory_digest = docket.get("inventory_digest")
+    if (
+        not isinstance(inventory_digest, str)
+        or _SHA256_PATTERN.fullmatch(inventory_digest) is None
+    ):
+        issues.append("audit docket inventory digest is invalid")
     if not isinstance(coverage, list):
         issues.append("audit source coverage is invalid")
         return
@@ -1388,6 +1538,7 @@ def verify_audit_artifact(
     artifact: Mapping[str, object],
     *,
     signing_key: bytes | None = None,
+    verification_context: AuditVerificationContext | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
     if not isinstance(artifact, Mapping):
         return False, ("artifact must be an object",)
@@ -1523,6 +1674,46 @@ def verify_audit_artifact(
                 )
                 if docket.get("receipts_valid") is not derived_receipts_valid:
                     issues.append("audit receipt-valid flag contradicts its receipts")
+        if verification_context is None:
+            if audit.get("schema_version") == 6:
+                issues.append("schema 6 audit verification requires a trusted context")
+        elif audit.get("schema_version") == 6:
+            if not verification_context.working_tree_clean:
+                issues.append("trusted repository worktree is not clean")
+            if isinstance(repository, Mapping):
+                if repository.get("head") != verification_context.repository_head:
+                    issues.append("audit repository head contradicts trusted context")
+                if (
+                    repository.get("tracked_tree_digest")
+                    != verification_context.tracked_tree_digest
+                ):
+                    issues.append(
+                        "audit tracked-tree digest contradicts trusted context"
+                    )
+            if isinstance(docket, Mapping):
+                if (
+                    docket.get("inventory_digest")
+                    != verification_context.docket_inventory_digest
+                ):
+                    issues.append(
+                        "audit docket inventory contradicts trusted context"
+                    )
+                if docket.get("source_count") != verification_context.source_count:
+                    issues.append("audit source count contradicts trusted context")
+                if docket.get("claim_count") != verification_context.claim_count:
+                    issues.append("audit claim count contradicts trusted context")
+                try:
+                    observed_projection = _artifact_docket_projection_digest(docket)
+                except (TypeError, ValueError, UnicodeError, RecursionError):
+                    issues.append("audit docket projection cannot be verified")
+                else:
+                    if (
+                        observed_projection
+                        != verification_context.docket_projection_digest
+                    ):
+                        issues.append(
+                            "audit docket projection contradicts trusted context"
+                        )
         if isinstance(tests, Mapping):
             if tests.get("status") not in {"passed", "failed", "not_run", "unverified"}:
                 issues.append("audit test status is invalid")

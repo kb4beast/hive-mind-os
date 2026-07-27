@@ -33,6 +33,8 @@ from .courtroom import (
 )
 from .current_state_audit import (
     AUDITED_BASELINE,
+    AuditVerificationContext,
+    build_audit_verification_context,
     collect_current_state_audit,
     create_audit_artifact,
     verify_audit_artifact,
@@ -76,6 +78,7 @@ __all__ = [
     "AutonomyLevel",
     "AutonomousMissionLoop",
     "AUDITED_BASELINE",
+    "AuditVerificationContext",
     "BurdenOfProof",
     "ClassicGptSimulationGate",
     "ClassicGptSourcePack",
@@ -117,6 +120,7 @@ __all__ = [
     "SourceRecord",
     "VisionComplianceGate",
     "audit_governed_source",
+    "build_audit_verification_context",
     "collect_current_state_audit",
     "create_audit_artifact",
     "load_default_source_docket",

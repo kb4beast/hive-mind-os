@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 
 from .additional_video_docket import ADDITIONAL_CLAIMS, ADDITIONAL_SOURCES
@@ -66,6 +68,23 @@ class FoundingSourceDocket:
     @property
     def claim_count(self) -> int:
         return len(self.claims)
+
+    @property
+    def inventory_digest(self) -> str:
+        payload = {
+            "schema_version": self.schema_version,
+            "sources": [source.to_contract() for source in self.sources],
+            "claims": [claim.to_contract() for claim in self.claims],
+            "decisions": [decision.to_contract() for decision in self.decisions],
+        }
+        canonical = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        return f"sha256:{hashlib.sha256(canonical).hexdigest()}"
 
 
 def _claim(spec: ClaimSpec) -> IdeaClaim:

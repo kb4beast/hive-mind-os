@@ -137,7 +137,13 @@ hive-mind audit --output evidence/audits/current-state.json
 
 Pass `--signing-key-file` and `--signing-key-id` to add a local HMAC signature. Without an
 external signing authority, the artifact remains explicitly unsigned but is always digested
-and independently integrity-checkable.
+and independently integrity-checkable. A matching self-digest is not proof that the payload
+preserved the real docket. Schema 6 semantic verification therefore also requires a trusted
+context independently reconstructed from the exact repository with
+`build_audit_verification_context`, then supplied to `verify_audit_artifact`. That context
+binds Git HEAD, tracked bytes, docket identity/counts, source metadata, claim mappings, and
+maturity partitions. Test and command claims still require independent reproduction or
+authenticated execution receipts.
 
 ## Core guarantees
 

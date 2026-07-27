@@ -12,15 +12,73 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from hive_mind_os.current_state_audit import (
+    AuditVerificationContext,
     CommandObservation,
+    _artifact_docket_projection_digest,
     _broken_references,
     _parse_test_result,
+    build_audit_verification_context,
     collect_current_state_audit,
     create_audit_artifact,
     execute_command,
-    verify_audit_artifact,
     write_audit_artifact,
 )
+from hive_mind_os.current_state_audit import (
+    verify_audit_artifact as _verify_audit_artifact,
+)
+
+_TEST_SOURCE_COVERAGE = {
+    "source_id": "SRC-001",
+    "kind": "paper",
+    "status": "verified",
+    "version_ref": "v1",
+    "object_type": "paper_version",
+    "retrieved_at": "2026-07-27T00:00:00Z",
+    "license_spdx": "MIT",
+    "content_digest": None,
+    "unverified_digest_label": None,
+    "provenance_complete": True,
+    "requires_complete_ingestion": False,
+    "snapshot_ref": None,
+    "claim_ids": ["CLM-001"],
+    "blocking_issues": [],
+}
+_TEST_CLAIMS_BY_MATURITY = {
+    "specified": ["CLM-001"],
+    "structurally_prototyped": [],
+    "executed_in_isolation": [],
+    "independently_verified_e2e": [],
+    "production_proven": [],
+}
+_TEST_DOCKET_INVENTORY_DIGEST = f"sha256:{'d' * 64}"
+_TEST_VERIFICATION_CONTEXT = AuditVerificationContext(
+    repository_head="a" * 40,
+    tracked_tree_digest=f"sha256:{'b' * 64}",
+    docket_inventory_digest=_TEST_DOCKET_INVENTORY_DIGEST,
+    docket_projection_digest=_artifact_docket_projection_digest(
+        {
+            "source_coverage": [_TEST_SOURCE_COVERAGE],
+            "implementation_state_audit": {
+                "claims_by_maturity": _TEST_CLAIMS_BY_MATURITY
+            },
+        }
+    ),
+    source_count=1,
+    claim_count=1,
+    working_tree_clean=True,
+)
+
+
+def verify_audit_artifact(
+    artifact: object,
+    *,
+    signing_key: bytes | None = None,
+) -> tuple[bool, tuple[str, ...]]:
+    return _verify_audit_artifact(
+        artifact,  # type: ignore[arg-type]
+        signing_key=signing_key,
+        verification_context=_TEST_VERIFICATION_CONTEXT,
+    )
 
 
 class CurrentStateAuditTests(unittest.TestCase):
@@ -48,6 +106,7 @@ class CurrentStateAuditTests(unittest.TestCase):
             "docket": {
                 "source_count": 1,
                 "claim_count": 1,
+                "inventory_digest": _TEST_DOCKET_INVENTORY_DIGEST,
                 "source_status_counts": {"verified": 1},
                 "capability_maturity_counts": {"specified": 1},
                 "inventory_complete": True,
@@ -55,24 +114,7 @@ class CurrentStateAuditTests(unittest.TestCase):
                 "source_blockers": [],
                 "issues": [],
                 "machine_blocked_claim_ids": [],
-                "source_coverage": [
-                    {
-                        "source_id": "SRC-001",
-                        "kind": "paper",
-                        "status": "verified",
-                        "version_ref": "v1",
-                        "object_type": "paper_version",
-                        "retrieved_at": "2026-07-27T00:00:00Z",
-                        "license_spdx": "MIT",
-                        "content_digest": None,
-                        "unverified_digest_label": None,
-                        "provenance_complete": True,
-                        "requires_complete_ingestion": False,
-                        "snapshot_ref": None,
-                        "claim_ids": ["CLM-001"],
-                        "blocking_issues": [],
-                    }
-                ],
+                "source_coverage": [copy.deepcopy(_TEST_SOURCE_COVERAGE)],
                 "implementation_state_audit": {
                     "maturity_scale": [
                         "specified",
@@ -82,13 +124,9 @@ class CurrentStateAuditTests(unittest.TestCase):
                         "production_proven",
                     ],
                     "maturity_counts": {"specified": 1},
-                    "claims_by_maturity": {
-                        "specified": ["CLM-001"],
-                        "structurally_prototyped": [],
-                        "executed_in_isolation": [],
-                        "independently_verified_e2e": [],
-                        "production_proven": [],
-                    },
+                    "claims_by_maturity": copy.deepcopy(
+                        _TEST_CLAIMS_BY_MATURITY
+                    ),
                     "evidence_classes": {
                         "typed_domain_prototype": [],
                         "production_proof": [],
@@ -190,6 +228,16 @@ class CurrentStateAuditTests(unittest.TestCase):
         )
         self.assertEqual(audit["tests"]["status"], "not_run")
         self.assertFalse(audit["complete"])
+        context = build_audit_verification_context(self.repository)
+        valid, issues = _verify_audit_artifact(
+            create_audit_artifact(audit),
+            verification_context=context,
+        )
+        if context.working_tree_clean:
+            self.assertTrue(valid, issues)
+        else:
+            self.assertFalse(valid)
+            self.assertIn("trusted repository worktree is not clean", issues)
 
     def test_broken_reference_detector_rejects_missing_and_escaping_paths(self) -> None:
         claim = SimpleNamespace(
@@ -754,6 +802,80 @@ class CurrentStateAuditTests(unittest.TestCase):
         )
         self.assertIn(
             "audit release readiness contradicts blocking docket issues",
+            issues,
+        )
+
+        erased_inventory = self.valid_audit()
+        erased_inventory["docket"].update(
+            {
+                "source_count": 0,
+                "claim_count": 0,
+                "source_status_counts": {},
+                "capability_maturity_counts": {},
+                "source_coverage": [],
+                "issues": [],
+                "source_blockers": [],
+                "machine_blocked_claim_ids": [],
+                "release_ready": True,
+                "inventory_complete": True,
+            }
+        )
+        erased_implementation = erased_inventory["docket"][
+            "implementation_state_audit"
+        ]
+        erased_implementation["maturity_counts"] = {}
+        erased_implementation["claims_by_maturity"] = {
+            maturity: [] for maturity in _TEST_CLAIMS_BY_MATURITY
+        }
+        erased_implementation["evidence_classes"] = {
+            "typed_domain_prototype": [],
+            "production_proof": [],
+        }
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(erased_inventory)
+        )
+        self.assertFalse(valid)
+        self.assertIn("audit source count contradicts trusted context", issues)
+        self.assertIn(
+            "audit docket projection contradicts trusted context",
+            issues,
+        )
+
+        fabricated_identity = self.valid_audit()
+        fabricated_source = fabricated_identity["docket"]["source_coverage"][0]
+        fabricated_source["source_id"] = "SRC-999"
+        fabricated_source["claim_ids"] = ["CLM-999"]
+        fabricated_identity["docket"]["implementation_state_audit"][
+            "claims_by_maturity"
+        ]["specified"] = ["CLM-999"]
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(fabricated_identity)
+        )
+        self.assertFalse(valid)
+        self.assertIn(
+            "audit docket projection contradicts trusted context",
+            issues,
+        )
+
+        changed_repository = self.valid_audit()
+        changed_repository["repository"]["head"] = "f" * 40
+        changed_repository["repository"]["post_test_head"] = "f" * 40
+        changed_repository["repository"]["final_head"] = "f" * 40
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(changed_repository)
+        )
+        self.assertFalse(valid)
+        self.assertIn(
+            "audit repository head contradicts trusted context",
+            issues,
+        )
+
+        valid, issues = _verify_audit_artifact(
+            create_audit_artifact(self.valid_audit())
+        )
+        self.assertFalse(valid)
+        self.assertIn(
+            "schema 6 audit verification requires a trusted context",
             issues,
         )
 

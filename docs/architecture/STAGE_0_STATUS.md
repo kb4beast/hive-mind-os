@@ -22,7 +22,8 @@ receipts are the latest post-commit `CurrentStateAudit` artifact.
 - Mutable or ambiguous repository pins cannot support an adopted implementation claim through
   the audit gate.
 - Unknown licenses and composite repository source kinds machine-block their dependent claims.
-- Schema-6 verification derives blockers from source metadata and conserves source identities, claim/maturity partitions, blockers,
-  release readiness, and production evidence instead of trusting a self-digested report.
+- Schema-6 verification derives blockers from source metadata and conserves source identities,
+  claim/maturity partitions, blockers, release readiness, and production evidence against a
+  separately reconstructed Git/docket context instead of trusting a self-digested report.
 - Stage 0 is not called fully complete while remote governance, source evidence, licenses, or
   genuinely independent final verification remain unresolved.

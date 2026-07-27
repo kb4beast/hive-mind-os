@@ -365,6 +365,16 @@ class DocketDecision:
         if not self.expert_findings:
             raise ValueError("at least one expert finding is required")
 
+    def to_contract(self) -> dict[str, object]:
+        return {
+            "claim_id": self.claim_id,
+            "disposition": self.disposition.value,
+            "rationale": self.rationale,
+            "advocate_case": self.advocate_case,
+            "cross_examination": self.cross_examination,
+            "expert_findings": list(self.expert_findings),
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class DocketIssue:

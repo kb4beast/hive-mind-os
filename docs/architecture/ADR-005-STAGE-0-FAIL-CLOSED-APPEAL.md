@@ -1,6 +1,7 @@
 # ADR-005: Stage 0 Fail-Closed Appeal
 
-- **Status:** Accepted as an appeal amendment to ADR-004; Stage 0 external obligations remain open
+- **Status:** Proposed appeal amendment pending one final independent review; Stage 0 external
+  obligations remain open
 - **Date:** 2026-07-27
 - **Case:** `CASE-IMPL-003-004-STAGE0-TRUTH-SOURCE-GOVERNANCE`
 - **Appealed commit:** `577cc2f3bad9c7c78dd372a8207a871b8a06eb35`
@@ -27,6 +28,16 @@ fail-open counterexamples:
 The appeal treats the earlier test pass and audit as adverse historical evidence, not as a
 promotion receipt.
 
+Two intermediate appeals are also preserved as rejected evidence:
+
+- `cd09870b52c1b49b5598fdf21504424058bc4863` reconciled attacker-controlled blocker lists
+  but did not derive them from source metadata.
+- `c1d709a24af56e9df1dfb787c496633265b999cf` derived metadata blockers but still allowed a
+  coordinated attacker to erase the entire source/claim inventory and re-digest the payload.
+
+The final design therefore moves repository and docket identity outside the artifact rather
+than adding another self-reported field.
+
 ## Decision
 
 1. A portable artifact path uses canonical relative POSIX syntax, has no empty/current/parent
@@ -52,6 +63,12 @@ promotion receipt.
    reconciles unique source coverage, source-status counts, docket issues, source blockers,
    machine-blocked claims, release readiness, inventory completeness, the complete maturity
    partition, and evidence classes. A freshly self-digested contradiction remains invalid.
+   Schema 6 is never considered verified from its payload and unkeyed digest alone. The
+   verifier requires a separately constructed trusted context that independently reads the
+   exact Git HEAD, tracked-tree digest, full docket inventory digest/counts, and a canonical
+   source/claim-maturity projection from the repository under review. Coordinated deletion,
+   substitution, or fabrication therefore disagrees with an external anchor even when every
+   attacker-controlled field and the envelope digest are changed consistently.
 8. `SourceRecord` and `IdeaClaim` expose lossless contract serializers. Historical
    non-digests such as `prompt-v1` remain preserved as `unverified_digest_label`, never in a
    cryptographic digest field.
@@ -65,12 +82,13 @@ promotion receipt.
 | Authority text substituted in a valid byte inventory | Strict full-manifest fingerprint | Local SHA-256 does not authenticate the manifest author |
 | Image or overlap reclassified as independent/superseding | Governance digest plus source-specific semantic constraints | Provenance and reuse rights remain unresolved |
 | Licensed/pinned source gap escapes claim blocking | License and composite-repository blockers feed courtroom and audit gates | External evidence still has to be retrieved and adjudicated |
-| Self-digested audit claims false production readiness | Metadata-derived blockers plus conservation and contradiction checks across every schema-6 truth set | Signed external identity and durable storage remain later stages |
+| Self-digested audit claims false production readiness or erases the docket | Metadata-derived blockers, conservation checks, and an independently recomputed repository/docket verification context | The context anchors repository and docket truth; test execution still requires independent reproduction or authenticated receipts |
 
 ## Acceptance evidence
 
 - Regression tests reproduce every rejected path, time, number, action, receipt, manifest,
-  source-blocking, and audit-verifier counterexample.
+  source-blocking, audit-verifier, coordinated blocker-clearing, zero-inventory, fabricated
+  identity, and repository-substitution counterexample.
 - All live docket source and claim records validate through their formal serializers.
 - The full suite, Ruff, and Pyright pass.
 - A wheel built from the exact committed tree contains all eleven schemas and passes in a
@@ -88,6 +106,10 @@ regenerated. The governed `SRC-023` manifest gains `governance_digest`; no raw e
 Historical non-digest labels move to an explicit field without deleting their values.
 CurrentStateAudit schema 5 remains historical adverse evidence; schema 6 adds source kind and
 explicit non-digest labels so blocker derivation no longer trusts attacker-controlled lists.
+Schema 6 verification now requires `AuditVerificationContext`; callers that previously
+treated a matching self-digest as truth must independently build the context from the exact
+repository. An unkeyed digest proves canonical payload integrity only, not authorship or
+execution.
 
 Rollback is additive supersession only. Do not restore the rejected validators or delete the
 appealed commit, adverse reports, manifests, source records, or audits. A future relaxation
