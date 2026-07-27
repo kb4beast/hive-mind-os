@@ -466,6 +466,9 @@ class RepositoryMission:
             max_tool_calls_per_episode=100,
             max_compute_units_per_episode=100.0,
         )
+        backend_budget = getattr(self.backend, "budget", None)
+        if isinstance(backend_budget, AutonomyBudget):
+            setattr(self.backend, "budget", self.budget)
         backend_ledger = getattr(self.backend, "ledger", None)
         if ledger is None and isinstance(backend_ledger, EvidenceLedger):
             self.ledger = backend_ledger

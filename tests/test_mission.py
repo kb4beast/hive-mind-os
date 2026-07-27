@@ -435,6 +435,41 @@ class RepositoryMissionTests(unittest.TestCase):
         )
         self.assertNotEqual(failing.returncode, 0)
 
+    def test_model_backend_is_bound_to_the_mission_budget(self) -> None:
+        provider = _RepositoryProvider()
+        backend = ModelBackend(provider)
+        mission_budget = AutonomyBudget(
+            1000,
+            45,
+            500.0,
+            max_tool_calls_per_episode=100,
+            max_compute_units_per_episode=100.0,
+        )
+        report, output = self.run_mission(
+            backend=backend,
+            budget=mission_budget,
+            label="shared-model-budget",
+        )
+        self.assertIs(backend.budget, mission_budget)
+        self.assertIs(report.status, WorkStatus.FAILED)
+        self.assertFalse(output.exists())
+        self.assertEqual(report.failure["type"], "BudgetExceeded")
+        self.assertLessEqual(
+            report.budget_consumption["tool_calls"],
+            45,
+        )
+        model_calls = [
+            event
+            for event in report.ledger_events
+            if event["event_type"] == "model.call"
+        ]
+        self.assertEqual(len(model_calls), provider.index)
+        self.assertGreater(len(model_calls), 0)
+        self.assertEqual(
+            report.budget_consumption["tool_calls"],
+            len(report.receipts) + len(model_calls),
+        )
+
     def test_failed_git_operation_keeps_receipts_and_budget_accounting(self) -> None:
         class ExistingBranchBackend(ScriptedRepositoryBackend):
             async def execute(self, contract, work_item, objective, context):

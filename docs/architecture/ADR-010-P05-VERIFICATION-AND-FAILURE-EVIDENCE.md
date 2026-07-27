@@ -43,8 +43,9 @@ review before this ADR may be adopted.
    sealed repository test command for that mission. Builder and Curator must request the
    exact same argument vector. A substituted command fails the mission before publication.
 2. `Objective.id` and `MissionReport.run_id` use one mission correlation. When a
-   `ModelBackend` supplies or receives a ledger, `RepositoryMission` binds it to the
-   mission ledger, making every `model.call` event reachable in ledger sequence.
+   `ModelBackend` supplies or receives a ledger or budget, `RepositoryMission` binds it
+   to the mission ledger and budget, making every `model.call` event reachable in ledger
+   sequence and every model plus capability call consume the single declared envelope.
 3. `_workspace_call` settles every receipt emitted after the call boundary even when the
    operation raises. Budget consumption and `receipt.recorded` events are attempted before
    the original exception propagates; settlement errors annotate rather than replace that
@@ -64,6 +65,7 @@ checks; this decision does not claim to complete P08.
 |---|---|---|
 | Backend substitutes a trivial passing test | Builder and Curator commands must byte-for-byte match the Explorer failure-reproducing argument vector | A Builder may edit repository tests; P05's independent scripted criterion detects its required sabotage fixture, while P08 owns stronger sealed checks |
 | Model evidence is detached from the report | One run/objective correlation and one ledger binding | External durable storage and resume remain P06 |
+| Model calls use a second budget | Repository construction binds the backend to the mission budget | Provider-reported token accuracy remains provider-dependent |
 | Git emits side effects and then raises | Exceptional settlement captures actual new receipt records and charges their count | Storage failure can still prevent preservation and therefore fails closed |
 | Failed-run references dangle after cleanup | Evidence is moved outside temporary workspaces and validated before reporting | Retention policy and garbage collection belong to P06/P11 |
 | Failure evidence is mistaken for delivery | `artifact_directory` stays null and the requested output path is never published | User interfaces must continue to render failed/quarantined state explicitly |
@@ -74,6 +76,9 @@ checks; this decision does not claim to complete P08.
   a passing no-op and publishes no artifact.
 - All eight `model.call` events are reachable from the model-path report, share the mission
   correlation, and explain the difference between model tool calls and Git/sandbox receipts.
+- A separately constructed model backend cannot spend outside the mission budget; a
+  45-call envelope fails closed rather than permitting 45 capability calls plus eight
+  detached model calls.
 - A branch-creation failure retains both the successful preflight receipt and failed Git
   receipt, charges both, records both in the ledger, and preserves the original failure.
 - Sabotage and Git-failure reports retain a resolvable receipt root and persisted report,
