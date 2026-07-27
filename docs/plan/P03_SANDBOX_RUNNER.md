@@ -264,3 +264,29 @@ rlimits.
   represented as resolved by this phase.
 - Production readiness, release readiness, hostile-code isolation, and superiority are not
   claimed.
+
+---
+## Windows process-tree liveness appeal record
+
+- Date (UTC): 2026-07-27
+- Reproduced counterexample: while P04 exercised the merged P03 gateway, a completed
+  `git checkout --detach` was held until the 60-second deadline because an unrelated
+  process created before the Git command had a stale parent PID equal to the Git PID.
+- Appeal implementation commit: `a92e6776bb8a47f02ff84d6c309c4971dfb4e02f`.
+- Decision record: `docs/architecture/ADR-008-WINDOWS-PROCESS-TREE-LIVENESS.md`, with an
+  additive appeal note preserved in ADR-007.
+- Deterministic validation: the stale-parent table regression excludes the older record
+  and its descendants; the Windows short-command regression passed ten internal
+  iterations; existing early-parent-exit and timeout-tree tests remained passing.
+- Full gates: 169 tests passed, 2 platform-specific tests skipped, and 1,708 subtests
+  passed; Ruff and Pyright were clean.
+- P04 counterexample replay: exact detached-pin materialization passed ten consecutive
+  isolated runs against the repaired sandbox, each completing in under one second.
+- Audit artifact: `evidence/audits/P03-windows-liveness-appeal.json`, collected from the
+  clean appeal implementation commit above; digest
+  `sha256:dd2529ad7a964762a82c0c0a6299bdbc53ef30ed0391801b1d5ebfc85c1a9a3b`;
+  audit result `complete: true`.
+- Delivery remains gated on exact-candidate GitHub checks and one consolidated independent
+  Curator, Judge, and Orchestrator review. `B-OPS-06` and every process-tier limitation
+  remain open; no production-readiness, hostile-code-isolation, or superiority claim is
+  made.
