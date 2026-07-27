@@ -38,6 +38,10 @@ class HardenedVisionTests(unittest.TestCase):
         expected = {
             "https://www.youtube.com/watch?v=mazBhCg3urw",
             "https://www.youtube.com/watch?v=Gw_hnD7m00M",
+            "https://www.youtube.com/watch?v=eaNA2oOXoUg",
+            "https://www.youtube.com/watch?v=IbFaY3xFpZM",
+            "https://www.youtube.com/watch?v=eA9Zf2-qYYM",
+            "https://www.youtube.com/watch?v=kIWMLL0S8X8",
             "https://github.com/rangerrick337/operator-os/tree/main",
             "https://github.com/nousresearch/hermes-agent",
             "https://github.com/agiresearch/AIOS",
