@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import types
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -56,37 +57,61 @@ CommandExecutor = Callable[[Sequence[str], Path], CommandObservation]
 
 def execute_command(command: Sequence[str], cwd: Path) -> CommandObservation:
     timed_out = False
-    try:
-        completed = subprocess.run(
-            list(command),
-            cwd=cwd,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=COMMAND_TIMEOUT_SECONDS,
-        )
-        return_code = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-    except subprocess.TimeoutExpired as error:
-        timed_out = True
-        return_code = 124
-        stdout = error.stdout or ""
-        stderr = error.stderr or ""
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode("utf-8", errors="replace")
-        if isinstance(stderr, bytes):
-            stderr = stderr.decode("utf-8", errors="replace")
-        stderr = f"{stderr}\ncommand timed out after {COMMAND_TIMEOUT_SECONDS} seconds".strip()
-
-    output_truncated = (
-        len(stdout) > MAX_COMMAND_OUTPUT_CHARACTERS
-        or len(stderr) > MAX_COMMAND_OUTPUT_CHARACTERS
+    output_truncated = False
+    process = subprocess.Popen(
+        list(command),
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    stdout = stdout[:MAX_COMMAND_OUTPUT_CHARACTERS]
-    stderr = stderr[:MAX_COMMAND_OUTPUT_CHARACTERS]
+    stdout_chunks: list[bytes] = []
+    stderr_chunks: list[bytes] = []
+    truncation_lock = threading.Lock()
+
+    def drain(stream: Any, chunks: list[bytes]) -> None:
+        nonlocal output_truncated
+        retained = 0
+        while data := stream.read(65_536):
+            remaining = MAX_COMMAND_OUTPUT_CHARACTERS - retained
+            if remaining > 0:
+                chunks.append(data[:remaining])
+                retained += min(len(data), remaining)
+            if len(data) > remaining:
+                with truncation_lock:
+                    output_truncated = True
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+                break
+
+    stdout_thread = threading.Thread(
+        target=drain,
+        args=(process.stdout, stdout_chunks),
+        daemon=True,
+    )
+    stderr_thread = threading.Thread(
+        target=drain,
+        args=(process.stderr, stderr_chunks),
+        daemon=True,
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+    try:
+        return_code = process.wait(timeout=COMMAND_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        process.kill()
+        process.wait()
+        return_code = 124
+    stdout_thread.join()
+    stderr_thread.join()
+    stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace")
+    stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace")
+    if timed_out:
+        stderr = f"{stderr}\ncommand timed out after {COMMAND_TIMEOUT_SECONDS} seconds".strip()
+    if output_truncated:
+        stderr = f"{stderr}\ncommand output exceeded the evidence limit".strip()
     return CommandObservation(
         command=tuple(command),
         cwd=str(cwd),
@@ -471,6 +496,15 @@ def collect_current_state_audit(
                 "message": test_result["reason"],
             }
         )
+    elif run_tests and test_result["status"] != "passed" and test_observation is not None:
+        failures.append(
+            {
+                "kind": "unrecognized_test_result",
+                "command": list(expected_test_command),
+                "return_code": test_observation.return_code,
+                "message": "pytest did not emit a recognized successful result",
+            }
+        )
 
     if docket is not None:
         reference_receipts, receipts_valid = _reference_receipts(
@@ -489,6 +523,7 @@ def collect_current_state_audit(
     post_test_status = observe(
         ("git", "status", "--porcelain=v1", "--untracked-files=all", "-z")
     )
+    immediate_post_test_entries = _split_nul(post_test_status.stdout)
 
     post_reference_failures: set[tuple[str, str]] = set()
     for receipt in reference_receipts:
@@ -518,10 +553,7 @@ def collect_current_state_audit(
         ("git", "status", "--porcelain=v1", "--untracked-files=all", "-z")
     )
     final_entries = _split_nul(final_status.stdout)
-    if (
-        post_test_head.stdout.strip() != head.stdout.strip()
-        or final_head.stdout.strip() != head.stdout.strip()
-    ):
+    if post_test_head.stdout.strip() != head.stdout.strip() or final_head.stdout.strip() != head.stdout.strip():
         failures.append(
             {
                 "kind": "head_changed_during_audit",
@@ -530,13 +562,16 @@ def collect_current_state_audit(
                 "after_receipt_validation": final_head.stdout.strip(),
             }
         )
-    if final_entries != working_tree_entries:
+    if (
+        immediate_post_test_entries != working_tree_entries
+        or final_entries != working_tree_entries
+    ):
         failures.append(
             {
                 "kind": "worktree_changed_during_audit",
                 "message": "test or receipt validation changed repository status entries",
                 "before": working_tree_entries,
-                "after_tests": _split_nul(post_test_status.stdout),
+                "after_tests": immediate_post_test_entries,
                 "after_receipt_validation": final_entries,
             }
         )
@@ -572,9 +607,12 @@ def collect_current_state_audit(
             "head": current_counts["repository_sha"],
             "working_tree_clean": not bool(working_tree_entries),
             "working_tree_entries": working_tree_entries,
-            "post_test_head": final_head.stdout.strip() or None,
-            "post_test_working_tree_clean": not bool(final_entries),
-            "post_test_working_tree_entries": final_entries,
+            "post_test_head": post_test_head.stdout.strip() or None,
+            "post_test_working_tree_clean": not bool(immediate_post_test_entries),
+            "post_test_working_tree_entries": immediate_post_test_entries,
+            "final_head": final_head.stdout.strip() or None,
+            "final_working_tree_clean": not bool(final_entries),
+            "final_working_tree_entries": final_entries,
             "tracked_file_count": current_counts["tracked_file_count"],
             "tracked_tree_digest": _sha256(tracked_index.stdout.encode("utf-8")),
             "full_ref_commit_count": current_counts["full_ref_commit_count"],
@@ -615,7 +653,12 @@ def collect_current_state_audit(
         },
         "commands": [asdict(observation) for observation in observations],
         "failures": failures,
-        "complete": run_tests and receipts_valid and not failures,
+        "complete": (
+            run_tests
+            and test_result["status"] == "passed"
+            and receipts_valid
+            and not failures
+        ),
     }
     return audit
 
@@ -691,12 +734,30 @@ def verify_audit_artifact(
                 issues.append("audit repository cleanliness is required")
             if not isinstance(repository.get("working_tree_entries"), list):
                 issues.append("audit repository entries are invalid")
+            elif repository.get("working_tree_clean") is not (
+                repository.get("working_tree_entries") == []
+            ):
+                issues.append("audit repository cleanliness contradicts its entries")
             if repository.get("post_test_head") != head:
                 issues.append("audit repository head changed during tests")
             if not isinstance(repository.get("post_test_working_tree_clean"), bool):
                 issues.append("audit post-test cleanliness is required")
             if not isinstance(repository.get("post_test_working_tree_entries"), list):
                 issues.append("audit post-test repository entries are invalid")
+            elif repository.get("post_test_working_tree_clean") is not (
+                repository.get("post_test_working_tree_entries") == []
+            ):
+                issues.append("audit post-test cleanliness contradicts its entries")
+            if repository.get("final_head") != head:
+                issues.append("audit repository head changed during receipt validation")
+            if not isinstance(repository.get("final_working_tree_clean"), bool):
+                issues.append("audit final cleanliness is required")
+            if not isinstance(repository.get("final_working_tree_entries"), list):
+                issues.append("audit final repository entries are invalid")
+            elif repository.get("final_working_tree_clean") is not (
+                repository.get("final_working_tree_entries") == []
+            ):
+                issues.append("audit final cleanliness contradicts its entries")
             if not isinstance(repository.get("tracked_tree_digest"), str) or not _SHA256_PATTERN.fullmatch(
                 repository.get("tracked_tree_digest")
             ):
@@ -767,6 +828,7 @@ def verify_audit_artifact(
             if not isinstance(repository, Mapping) or not (
                 repository.get("working_tree_clean") is True
                 and repository.get("post_test_working_tree_clean") is True
+                and repository.get("final_working_tree_clean") is True
             ):
                 issues.append("complete audit requires a clean repository")
             if not isinstance(tests, Mapping) or tests.get("status") != "passed":
@@ -780,6 +842,16 @@ def verify_audit_artifact(
                     issues.append("complete audit contains an invalid reference receipt")
             if failures != []:
                 issues.append("complete audit cannot contain failures")
+            if isinstance(commands, list) and any(
+                isinstance(command, Mapping)
+                and (
+                    command.get("return_code") != 0
+                    or command.get("timed_out") is not False
+                    or command.get("output_truncated") is not False
+                )
+                for command in commands
+            ):
+                issues.append("complete audit contains an unsuccessful command observation")
     if integrity.get("canonicalization") != "json-sort-keys-utf8-v1":
         issues.append("unsupported canonicalization")
 

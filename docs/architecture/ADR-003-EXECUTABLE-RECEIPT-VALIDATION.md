@@ -115,7 +115,9 @@ Harden the current-state audit:
 - a dirty worktree makes the audit incomplete because its test bytes are not attributable to
   the recorded `HEAD`;
 - HEAD, worktree status, and every cited file digest are checked again after tests;
-- commands time out and oversized output cannot be accepted as successful evidence;
+- both the immediate post-test snapshot and the final post-validation snapshot are retained;
+- command pipes are drained with a hard read limit, time out, and cannot accept oversized
+  output as successful evidence;
 - evidence publication uses a fully flushed temporary file plus atomic exclusive link;
 - integrity verification rejects underspecified payloads while continuing to distinguish
   digest integrity from external authenticity.
@@ -155,6 +157,7 @@ Harden policy invariants:
 | Fabricated test summary | Accept only the exact Python/pytest command and observed successful return/result |
 | Dirty implementation attributed to a commit | Mark a dirty-worktree audit incomplete |
 | Tests mutate inputs after the clean check | Reconcile HEAD, status, and receipt digests after execution |
+| Tests mutate then restore inputs before final validation | Preserve and gate on the immediate post-test snapshot as well as the final snapshot |
 | Duplicate action identity masks a failure | Reject duplicate IDs and key results by canonical action digest |
 | Boolean/float schema or string enum confusion | Require exact runtime types |
 | Partial artifact blocks retry | Publish a flushed temporary file through an exclusive atomic link |

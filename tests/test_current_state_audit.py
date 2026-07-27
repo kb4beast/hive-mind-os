@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import UTC, datetime
@@ -10,7 +10,6 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from hive_mind_os.current_state_audit import (
-    COMMAND_TIMEOUT_SECONDS,
     CommandObservation,
     _broken_references,
     _parse_test_result,
@@ -39,6 +38,9 @@ class CurrentStateAuditTests(unittest.TestCase):
                 "post_test_head": head,
                 "post_test_working_tree_clean": True,
                 "post_test_working_tree_entries": [],
+                "final_head": head,
+                "final_working_tree_clean": True,
+                "final_working_tree_entries": [],
                 "tracked_tree_digest": f"sha256:{'b' * 64}",
             },
             "docket": {
@@ -148,7 +150,7 @@ class CurrentStateAuditTests(unittest.TestCase):
                     command_tuple,
                     str(cwd),
                     0,
-                    "" if status_calls == 1 else " M README.md\0",
+                    " M README.md\0" if status_calls == 2 else "",
                     "",
                 )
             if len(command_tuple) >= 4 and command_tuple[1:4] == ("-m", "pytest", "-q"):
@@ -163,19 +165,66 @@ class CurrentStateAuditTests(unittest.TestCase):
         )
         self.assertFalse(audit["complete"])
         self.assertFalse(audit["repository"]["post_test_working_tree_clean"])
+        self.assertTrue(audit["repository"]["final_working_tree_clean"])
         self.assertIn(
             "worktree_changed_during_audit",
             {failure.get("kind") for failure in audit["failures"]},
         )
 
     def test_command_timeout_is_a_visible_failed_observation(self) -> None:
-        timeout = subprocess.TimeoutExpired(("test",), COMMAND_TIMEOUT_SECONDS)
-        with patch("hive_mind_os.current_state_audit.subprocess.run", side_effect=timeout):
-            observation = execute_command(("test",), self.repository)
+        with patch("hive_mind_os.current_state_audit.COMMAND_TIMEOUT_SECONDS", 0.01):
+            observation = execute_command(
+                (
+                    sys.executable,
+                    "-c",
+                    "import time; time.sleep(1)",
+                ),
+                self.repository,
+            )
         self.assertFalse(observation.succeeded)
         self.assertTrue(observation.timed_out)
         self.assertEqual(observation.return_code, 124)
         self.assertIn("timed out", observation.stderr)
+
+    def test_command_output_limit_stops_and_rejects_verbose_process(self) -> None:
+        with patch("hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_CHARACTERS", 32):
+            observation = execute_command(
+                (sys.executable, "-c", "print('x' * 10000)"),
+                self.repository,
+            )
+        self.assertFalse(observation.succeeded)
+        self.assertTrue(observation.output_truncated)
+        self.assertLessEqual(len(observation.stdout), 32)
+        self.assertIn("exceeded", observation.stderr)
+
+    def test_unrecognized_overall_pytest_result_cannot_complete(self) -> None:
+        status_calls = 0
+
+        def executor(command, cwd):
+            nonlocal status_calls
+            command_tuple = tuple(command)
+            if command_tuple[:4] == ("git", "status", "--porcelain=v1", "--untracked-files=all"):
+                status_calls += 1
+                return CommandObservation(command_tuple, str(cwd), 0, "", "")
+            if command_tuple == (sys.executable, "-m", "pytest", "-q"):
+                return CommandObservation(command_tuple, str(cwd), 0, "done\n", "")
+            if len(command_tuple) >= 4 and command_tuple[1:4] == ("-m", "pytest", "-q"):
+                return CommandObservation(command_tuple, str(cwd), 0, "1 passed\n", "")
+            return execute_command(command_tuple, cwd)
+
+        audit = collect_current_state_audit(
+            self.repository,
+            run_tests=True,
+            generated_at=datetime(2026, 7, 27, tzinfo=UTC),
+            executor=executor,
+        )
+        self.assertEqual(status_calls, 3)
+        self.assertEqual(audit["tests"]["status"], "failed")
+        self.assertFalse(audit["complete"])
+        self.assertIn(
+            "unrecognized_test_result",
+            {failure.get("kind") for failure in audit["failures"]},
+        )
 
     def test_digest_detects_mutation(self) -> None:
         artifact = create_audit_artifact(self.valid_audit(value="original"))
