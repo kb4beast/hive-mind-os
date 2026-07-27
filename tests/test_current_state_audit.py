@@ -396,6 +396,12 @@ class CurrentStateAuditTests(unittest.TestCase):
         )
 
     def test_noncanonical_json_values_fail_closed(self) -> None:
+        for invalid_artifact in (None, [], "not-an-object", 3):
+            with self.subTest(invalid_artifact=invalid_artifact):
+                valid, issues = verify_audit_artifact(invalid_artifact)
+                self.assertFalse(valid)
+                self.assertEqual(issues, ("artifact must be an object",))
+
         for invalid_value in (float("nan"), b"not-json"):
             with self.subTest(invalid_value=invalid_value):
                 audit = self.valid_audit(invalid_value=invalid_value)
@@ -409,7 +415,17 @@ class CurrentStateAuditTests(unittest.TestCase):
                 }
                 valid, issues = verify_audit_artifact(artifact)
                 self.assertFalse(valid)
-                self.assertIn("audit is not canonical JSON", issues)
+                self.assertIn("artifact is not canonical JSON", issues)
+
+                for location in ("envelope", "integrity"):
+                    valid_artifact = create_audit_artifact(self.valid_audit())
+                    if location == "envelope":
+                        valid_artifact["extra"] = invalid_value
+                    else:
+                        valid_artifact["integrity"]["extra"] = invalid_value
+                    valid, issues = verify_audit_artifact(valid_artifact)
+                    self.assertFalse(valid)
+                    self.assertIn("artifact is not canonical JSON", issues)
 
         cyclic_audit = self.valid_audit()
         cyclic_audit["cycle"] = cyclic_audit
@@ -423,7 +439,33 @@ class CurrentStateAuditTests(unittest.TestCase):
         }
         valid, issues = verify_audit_artifact(cyclic_artifact)
         self.assertFalse(valid)
-        self.assertIn("audit is not canonical JSON", issues)
+        self.assertIn("artifact is not canonical JSON", issues)
+
+        for location in ("envelope", "integrity"):
+            cyclic_envelope = create_audit_artifact(self.valid_audit())
+            if location == "envelope":
+                cyclic_envelope["cycle"] = cyclic_envelope
+            else:
+                cyclic_envelope["integrity"]["cycle"] = cyclic_envelope["integrity"]
+            valid, issues = verify_audit_artifact(cyclic_envelope)
+            self.assertFalse(valid)
+            self.assertIn("artifact is not canonical JSON", issues)
+
+        deeply_nested: object = "leaf"
+        for _ in range(1_500):
+            deeply_nested = [deeply_nested]
+        deep_audit = self.valid_audit(deeply_nested=deeply_nested)
+        deep_artifact = {
+            "audit": deep_audit,
+            "integrity": {
+                "canonicalization": "json-sort-keys-utf8-v1",
+                "digest": f"sha256:{'0' * 64}",
+                "signature": None,
+            },
+        }
+        valid, issues = verify_audit_artifact(deep_artifact)
+        self.assertFalse(valid)
+        self.assertTrue(issues)
 
     def test_optional_signature_requires_matching_key(self) -> None:
         artifact = create_audit_artifact(

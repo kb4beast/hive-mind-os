@@ -144,8 +144,9 @@ Harden the current-state audit:
   self-digested payload cannot bypass the live collector's byte budget;
 - untrusted artifacts containing lone Unicode surrogates reject before canonicalization or
   output measurement rather than raising during verification;
-- non-finite, non-serializable, or cyclic payloads reject as non-canonical JSON rather than
-  raising from the verifier.
+- non-finite, non-serializable, cyclic, excessively nested, or non-object envelopes reject as
+  non-canonical JSON rather than raising from the verifier; the preflight covers audit,
+  integrity, and extension fields.
 
 Harden policy invariants:
 

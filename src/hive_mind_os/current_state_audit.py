@@ -93,25 +93,27 @@ def _retain_json_escaped_utf8(value: str, remaining: int) -> tuple[str, bool]:
 
 def _contains_invalid_unicode_scalar(
     value: object,
-    seen: set[int] | None = None,
 ) -> bool:
-    seen = seen if seen is not None else set()
-    if isinstance(value, str):
-        return any(0xD800 <= ord(character) <= 0xDFFF for character in value)
-    if isinstance(value, Mapping):
-        if id(value) in seen:
-            return False
-        seen.add(id(value))
-        return any(
-            _contains_invalid_unicode_scalar(key, seen)
-            or _contains_invalid_unicode_scalar(item, seen)
-            for key, item in value.items()
-        )
-    if isinstance(value, (list, tuple)):
-        if id(value) in seen:
-            return False
-        seen.add(id(value))
-        return any(_contains_invalid_unicode_scalar(item, seen) for item in value)
+    pending = [value]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if isinstance(current, str):
+            if any(0xD800 <= ord(character) <= 0xDFFF for character in current):
+                return True
+            continue
+        if isinstance(current, Mapping):
+            if id(current) in seen:
+                continue
+            seen.add(id(current))
+            for key, item in current.items():
+                pending.extend((key, item))
+            continue
+        if isinstance(current, (list, tuple)):
+            if id(current) in seen:
+                continue
+            seen.add(id(current))
+            pending.extend(current)
     return False
 
 
@@ -932,8 +934,14 @@ def verify_audit_artifact(
     *,
     signing_key: bytes | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
+    if not isinstance(artifact, Mapping):
+        return False, ("artifact must be an object",)
     if _contains_invalid_unicode_scalar(artifact):
         return False, ("artifact contains an invalid Unicode scalar value",)
+    try:
+        _canonical_bytes(artifact)
+    except (TypeError, ValueError, UnicodeError, RecursionError):
+        return False, ("artifact is not canonical JSON",)
     issues: list[str] = []
     audit = artifact.get("audit")
     integrity = artifact.get("integrity")
