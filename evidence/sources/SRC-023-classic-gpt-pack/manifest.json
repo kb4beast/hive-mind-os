@@ -22,6 +22,7 @@
   "generated_all_in_one": "raw/HIVE_OS_ALL_IN_ONE.md",
   "generation_recipe": "classic-gpt-all-in-one-v1",
   "inventory_digest": "sha256:9d55be7e5d4e18fc77473e50afe8cb17dccb4e866f3c24317d300e1594455369",
+  "governance_digest": "sha256:96da1bdd4f0b65b848514d46b1a094b087bff18f8b45368bb9c9bf1dcd54ea22",
   "files": [
     {"path": "raw/00_CONSTITUTION.md", "bytes": 4001, "sha256": "sha256:a008a4f25cf95593854b8837909c66404f5ebd50bd576e6b651660c4dd2f368e", "classification": "canonical_module"},
     {"path": "raw/01_ROLES_LIFECYCLE.md", "bytes": 3814, "sha256": "sha256:2a7e2affca5e1a0acdda7a8919c5ec0a50efdb83288533437161c79132ec8e5c", "classification": "canonical_module"},

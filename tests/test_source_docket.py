@@ -51,6 +51,24 @@ class SourceDocketTests(unittest.TestCase):
             if set(claim.source_ids) & incomplete:
                 self.assertIn(claim.id, blocked)
 
+    def test_license_and_composite_repository_gaps_machine_block_claims(self):
+        audit = self.docket.audit()
+        blocked = set(audit.machine_blocked_claim_ids)
+        self.assertTrue(
+            {
+                "CLM-028",
+                "CLM-029",
+                "CLM-030",
+                "CLM-031",
+                "CLM-032",
+                "CLM-034",
+                "CLM-035",
+                "CLM-044",
+                "CLM-045",
+                "CLM-046",
+            }.issubset(blocked)
+        )
+
     def test_sibling_pack_is_separate_and_overlap_is_deferred(self):
         sources = {source.id: source for source in self.docket.sources}
         self.assertIn("SRC-023", sources)

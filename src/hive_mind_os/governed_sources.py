@@ -28,6 +28,11 @@ def inventory_digest(records: object) -> str:
     return f"sha256:{sha256(_canonical_bytes(records)).hexdigest()}"
 
 
+def governance_digest(manifest: Mapping[str, object]) -> str:
+    bound = {key: value for key, value in manifest.items() if key != "governance_digest"}
+    return f"sha256:{sha256(_canonical_bytes(bound)).hexdigest()}"
+
+
 def generate_classic_gpt_all_in_one(
     module_documents: Mapping[str, bytes],
     *,
@@ -69,6 +74,28 @@ def audit_governed_source(snapshot_root: Path) -> GovernedSourceAudit:
         )
     if not isinstance(manifest, dict):
         return GovernedSourceAudit(False, None, None, ("manifest must be an object",))
+    expected_manifest_keys = {
+        "schema_version",
+        "source_id",
+        "title",
+        "source_uri",
+        "captured_at",
+        "license_spdx",
+        "provenance_complete",
+        "canonical_instruction_file",
+        "module_load_order",
+        "generated_all_in_one",
+        "generation_recipe",
+        "inventory_digest",
+        "governance_digest",
+        "files",
+        "historical_manifest_corrections",
+        "relationships",
+        "image_exhibits",
+        "blocking_obligations",
+    }
+    if set(manifest) != expected_manifest_keys:
+        issues.append("governed source manifest has an invalid shape")
     source_id = manifest.get("source_id")
     if type(manifest.get("schema_version")) is not int or manifest.get("schema_version") != 1:
         issues.append("unsupported governed source manifest schema")
@@ -140,6 +167,13 @@ def audit_governed_source(snapshot_root: Path) -> GovernedSourceAudit:
     actual_digest = inventory_digest(records)
     if manifest.get("inventory_digest") != actual_digest:
         issues.append("inventory digest does not bind the ordered file records")
+    try:
+        actual_governance_digest = governance_digest(manifest)
+    except (TypeError, ValueError, UnicodeError):
+        issues.append("governed source manifest is not canonical JSON")
+    else:
+        if manifest.get("governance_digest") != actual_governance_digest:
+            issues.append("governance digest does not bind source adjudication metadata")
 
     instruction = manifest.get("canonical_instruction_file")
     if instruction not in expected_paths:
@@ -176,6 +210,96 @@ def audit_governed_source(snapshot_root: Path) -> GovernedSourceAudit:
         issues.append("source snapshot incorrectly claims complete provenance")
     if manifest.get("license_spdx") is not None:
         issues.append("source snapshot license must remain unresolved until proven")
+    relationships = manifest.get("relationships")
+    expected_relationships = {
+        (
+            "SRC-022",
+            "refines_and_expands",
+            "Preserve both sources. SRC-023 supplies a broader earlier simulation pack; "
+            "SRC-022 supplies later truth-boundary and receipt hardening. Neither silently "
+            "supersedes the other.",
+        ),
+        (
+            "SRC-002",
+            "possible_common_origin",
+            "imgo.jpg is a new non-independent exhibit with unresolved chain of custody. "
+            "Its digest does not replace the pseudo digest or missing original bytes "
+            "recorded for SRC-002.",
+        ),
+    }
+    if not isinstance(relationships, list) or any(
+        not isinstance(item, dict)
+        or set(item) != {"target_source_id", "relationship", "adjudication"}
+        or any(not isinstance(item.get(key), str) for key in item)
+        for item in relationships
+    ):
+        issues.append("source relationships have an invalid shape")
+    else:
+        observed_relationships = {
+            (
+                item["target_source_id"],
+                item["relationship"],
+                item["adjudication"],
+            )
+            for item in relationships
+        }
+        if observed_relationships != expected_relationships:
+            issues.append("source relationships do not preserve the adjudicated overlap")
+
+    exhibits = manifest.get("image_exhibits")
+    if not isinstance(exhibits, list) or len(exhibits) != 2:
+        issues.append("image exhibits have an invalid shape")
+    else:
+        exhibits_by_path: dict[object, dict[str, object]] = {}
+        for item in exhibits:
+            if not isinstance(item, dict) or set(item) != {
+                "path",
+                "related_source_ids",
+                "independent",
+                "chain_of_custody",
+                "evidence_use",
+            }:
+                issues.append("image exhibit has an invalid shape")
+                continue
+            path_value = item.get("path")
+            if not isinstance(path_value, str):
+                issues.append("image exhibit has a non-string path")
+                continue
+            exhibits_by_path[path_value] = item
+        expected_exhibits = {
+            "raw/imgo.jpg": {
+                "related_source_ids": ["SRC-002", "SRC-023"],
+                "independent": False,
+                "chain_of_custody": "unresolved",
+                "evidence_use": "context_only_until_chain_of_custody_is_resolved",
+            },
+            "raw/Logo.png": {
+                "related_source_ids": ["SRC-022", "SRC-023"],
+                "independent": False,
+                "chain_of_custody": "user-supplied-derived-visual",
+                "evidence_use": "derived_summary_not_independent_proof",
+            },
+        }
+        if set(exhibits_by_path) != set(expected_exhibits):
+            issues.append("image exhibit inventory is incomplete")
+        else:
+            for path, expected in expected_exhibits.items():
+                observed = exhibits_by_path[path]
+                if any(observed.get(key) != value for key, value in expected.items()):
+                    issues.append(f"image exhibit adjudication changed: {path}")
+
+    expected_obligations = {
+        "Resolve a compatible license or explicit reuse grant.",
+        "Resolve authorship and chain of custody for the pack and imgo.jpg.",
+        "Do not treat Logo.png as independent proof of its underlying architecture claims.",
+    }
+    obligations = manifest.get("blocking_obligations")
+    if (
+        not isinstance(obligations, list)
+        or len(obligations) != len(set(obligations))
+        or set(obligations) != expected_obligations
+    ):
+        issues.append("source blocking obligations are incomplete")
     return GovernedSourceAudit(
         not issues,
         source_id if isinstance(source_id, str) else None,

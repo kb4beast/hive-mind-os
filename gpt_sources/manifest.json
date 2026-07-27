@@ -13,26 +13,26 @@
     {
       "path": "gpt_sources/00_HIVE_MIND_SYSTEM_INSTRUCTIONS.md",
       "priority": 0,
-      "bytes": 6118,
-      "sha256": "2e04de240cf382bcc1bd25908ebdd1a50fe262bc036c208269168665b481077d"
+      "bytes": 5999,
+      "sha256": "cb049da16d943e5cda9c54af253e282f5bf0cbe84cf42ce375d25895d8a3be35"
     },
     {
       "path": "gpt_sources/01_RUNTIME_STATE_SCHEMA.json",
       "priority": 1,
       "bytes": 3147,
-      "sha256": "b821cd3adc31bb02e292c70618004c8b698acfc71633902a053e5fb8a9f6a8a9"
+      "sha256": "13d4f7732e64938d2f3f462c828d0b05fd5fd80f84adaade8732e8aad658037f"
     },
     {
       "path": "gpt_sources/02_ROLE_AND_COURT_PROTOCOL.md",
       "priority": 2,
-      "bytes": 4116,
-      "sha256": "79de4d9fd537b3bf14576c0ddec1c71ff0c059e1661488db7013e2b54756efc5"
+      "bytes": 4028,
+      "sha256": "e7bfa50681a67ac562fb5342eef1970e4ede725d8b12675c928b26fe3589a3a5"
     },
     {
       "path": "gpt_sources/03_TOOL_EVIDENCE_AND_HANDOFF_PROTOCOL.md",
       "priority": 3,
-      "bytes": 4899,
-      "sha256": "4b6c5b3f3057ecd7526aa5b771a8bc9a6de9edd81a4d98d51fd74104e244d748"
+      "bytes": 4804,
+      "sha256": "0d76c607fcd73adb8427a57d57b850b6e3af09666dea3d9c5b94975f823455c6"
     }
   ],
   "authority_model": "reasoning-only until an independently validated external tool receipt proves a side effect",

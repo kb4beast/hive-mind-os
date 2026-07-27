@@ -1,7 +1,7 @@
 # ADR-004: Stage 0 Truth Contracts and Source Governance
 
-- **Status:** Accepted for bounded Stage 0 repository implementation; source and remote-host
-  obligations remain open
+- **Status:** Amended by ADR-005 after independent rejection of the first implementation;
+  source and remote-host obligations remain open
 - **Date:** 2026-07-27
 - **Scope:** Stage 0 backlog items 3–4 and the in-repository portions of source coverage,
   implementation-state audit, and protected-governance delivery

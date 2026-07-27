@@ -19,6 +19,8 @@
     "acceptance_tests": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "code_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "test_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "benchmark_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "comparator_source_ids": {"type": "array", "items": {"type": "string", "pattern": "^SRC-[0-9]{3,}$"}, "uniqueItems": true},
     "outcome_metrics": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "blocked_by": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
   }

@@ -169,6 +169,7 @@ class ClassicGptSourcePack:
     files: tuple[ClassicGptSourceFile, ...] = DEFAULT_CLASSIC_GPT_FILES
     records: tuple[SourcePackFileRecord, ...] = ()
     pack_id: str = "hive-mind-os-classic-gpt-simulation-v3"
+    manifest_fingerprint: str = ""
 
     def __post_init__(self) -> None:
         if type(self.schema_version) is not int or self.schema_version != 3:
@@ -191,27 +192,9 @@ class ClassicGptSourcePack:
 
     @property
     def fingerprint(self) -> str:
-        if not self.records:
+        if not self.records or not self.manifest_fingerprint:
             raise RuntimeError("source-pack fingerprint requires a byte-validated manifest")
-        canonical = json.dumps(
-            {
-                "schema_version": self.schema_version,
-                "pack_id": self.pack_id,
-                "files": [
-                    {
-                        "path": item.path,
-                        "priority": item.priority,
-                        "bytes": item.bytes,
-                        "sha256": item.sha256,
-                    }
-                    for item in self.records
-                ],
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        return f"sha256:{sha256(canonical).hexdigest()}"
+        return self.manifest_fingerprint
 
     @classmethod
     def load(cls, repository: Path) -> "ClassicGptSourcePack":
@@ -223,10 +206,57 @@ class ClassicGptSourcePack:
             raise ValueError(f"cannot load classic GPT source-pack manifest: {error}") from error
         if not isinstance(manifest, dict):
             raise ValueError("classic GPT source-pack manifest must be an object")
+        expected_keys = {
+            "schema_version",
+            "pack_id",
+            "purpose",
+            "digest_algorithm",
+            "load_order",
+            "files",
+            "authority_model",
+            "simulation_limit",
+            "formal_runtime_schema",
+            "fail_closed_on",
+        }
+        if set(manifest) != expected_keys:
+            raise ValueError("classic GPT source-pack manifest has an invalid shape")
         if type(manifest.get("schema_version")) is not int or manifest.get("schema_version") != 3:
             raise ValueError("unsupported classic GPT source-pack manifest schema")
         if manifest.get("pack_id") != "hive-mind-os-classic-gpt-simulation-v3":
             raise ValueError("unknown classic GPT source-pack identity")
+        expected_semantics = {
+            "purpose": (
+                "Simulate governed reasoning, role, court, state, evidence, and handoff "
+                "semantics without fabricating autonomy or tool execution."
+            ),
+            "digest_algorithm": "sha256",
+            "authority_model": (
+                "reasoning-only until an independently validated external tool receipt "
+                "proves a side effect"
+            ),
+            "simulation_limit": (
+                "A single GPT can emulate labeled role passes but cannot claim distributed "
+                "independence, persistent memory, sandbox execution, or external side "
+                "effects without external evidence."
+            ),
+            "formal_runtime_schema": "src/hive_mind_os/schemas/mission-state.schema.json",
+            "fail_closed_on": [
+                "extra, missing, reordered, or substituted source bytes",
+                "manifest schema incompatibility",
+                "source pack fingerprint mismatch",
+                "unreceipted side effect",
+                "receipt path, digest, action, or mission-state mismatch",
+                "failed receipt used for completion",
+                "self-verification",
+                "completion with blockers",
+                "completion without all role passes",
+            ],
+        }
+        for manifest_field, expected_value in expected_semantics.items():
+            if manifest.get(manifest_field) != expected_value:
+                raise ValueError(
+                    f"classic GPT source-pack {manifest_field} is not authorized"
+                )
         raw_records = manifest.get("files")
         load_order = manifest.get("load_order")
         if not isinstance(raw_records, list) or not isinstance(load_order, list):
@@ -238,7 +268,17 @@ class ClassicGptSourcePack:
             records.append(SourcePackFileRecord(**raw))
         if load_order != [record.path for record in records]:
             raise ValueError("source-pack load_order differs from byte inventory order")
-        pack = cls(records=tuple(records))
+        canonical_manifest = json.dumps(
+            manifest,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        pack = cls(
+            records=tuple(records),
+            manifest_fingerprint=f"sha256:{sha256(canonical_manifest).hexdigest()}",
+        )
         documents: dict[str, bytes] = {}
         source_directory = root / "gpt_sources"
         for path in source_directory.iterdir():

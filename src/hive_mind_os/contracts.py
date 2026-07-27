@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from hashlib import sha256
 from importlib.resources import files
 from pathlib import PurePosixPath
 from typing import Any, Mapping, Sequence
+
+from .receipts import portable_path_parts
 
 SCHEMA_NAMES = (
     "artifact-manifest",
@@ -35,6 +39,9 @@ ROLE_NAMES = frozenset(
 )
 SIDE_EFFECTING_ACTIONS = frozenset(
     {"write", "command", "network", "git", "message", "deploy"}
+)
+_RFC3339_PATTERN = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\Z"
 )
 
 
@@ -147,16 +154,31 @@ def _validate_node(
         minimum_length = schema.get("minLength")
         if type(minimum_length) is int and len(value) < minimum_length:
             issues.append(f"{path}: string is shorter than {minimum_length}")
+        maximum_length = schema.get("maxLength")
+        if type(maximum_length) is int and len(value) > maximum_length:
+            issues.append(f"{path}: string is longer than {maximum_length}")
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and re.search(pattern, value) is None:
             issues.append(f"{path}: string does not match required pattern")
         if schema.get("format") == "date-time":
             try:
-                datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if _RFC3339_PATTERN.fullmatch(value) is None:
+                    raise ValueError("not RFC 3339")
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if parsed.tzinfo is None or parsed.utcoffset() is None:
+                    raise ValueError("offset is required")
             except ValueError:
                 issues.append(f"{path}: invalid date-time")
+        if schema.get("format") == "portable-relative-path":
+            try:
+                portable_path_parts(value)
+            except ValueError:
+                issues.append(f"{path}: invalid portable relative path")
 
     if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if not math.isfinite(value):
+            issues.append(f"{path}: number must be finite")
+            return
         minimum = schema.get("minimum")
         if isinstance(minimum, (int, float)) and not isinstance(minimum, bool) and value < minimum:
             issues.append(f"{path}: number is below minimum {minimum}")
@@ -224,6 +246,20 @@ def validate_contract(name: str, document: Any) -> ContractValidation:
     return ContractValidation(not issues, tuple(dict.fromkeys(issues)))
 
 
+def tool_intent_digest(document: Mapping[str, Any]) -> str:
+    """Bind every declared tool-intent field except the digest field itself."""
+
+    payload = {key: value for key, value in document.items() if key != "action_digest"}
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return f"sha256:{sha256(canonical).hexdigest()}"
+
+
 def validate_runtime_state(
     document: Any,
     *,
@@ -275,6 +311,19 @@ def validate_runtime_state(
                 issues.append(f"duplicate action id: {action_id}")
             else:
                 action_map[action_id] = action
+            if action.get("mission_id") != mission_id:
+                issues.append(f"action {action_id} belongs to another mission")
+            if action.get("state_ref") != expected_state_ref:
+                issues.append(f"action {action_id} references another mission state")
+            if action.get("actor_id") not in role_actors:
+                issues.append(f"action {action_id} actor lacks a role run")
+            try:
+                expected_digest = tool_intent_digest(action)
+            except (TypeError, ValueError, UnicodeError):
+                issues.append(f"action {action_id} cannot be canonically digested")
+            else:
+                if action.get("action_digest") != expected_digest:
+                    issues.append(f"action {action_id} digest does not bind its intent")
 
     receipt_map: dict[str, Mapping[str, Any]] = {}
     receipts = document.get("tool_receipts")
@@ -318,6 +367,8 @@ def validate_runtime_state(
                     expected_value = None
                 if receipt.get(field) != expected_value:
                     issues.append(f"receipt {receipt_id} has foreign {field}")
+            if receipt.get("verified_by") == receipt.get("actor_id"):
+                issues.append(f"receipt {receipt_id} was self-verified")
             if isinstance(action_id, str):
                 if action_id in receipt_map:
                     issues.append(f"action has multiple receipts: {action_id}")

@@ -70,6 +70,7 @@ class SourceRecord:
     version_ref: str | None = None
     license_spdx: str | None = None
     content_digest: str | None = None
+    unverified_digest_label: str | None = None
     provenance_complete: bool = True
     requires_complete_ingestion: bool = True
     object_type: str | None = None
@@ -81,6 +82,25 @@ class SourceRecord:
             raise ValueError("source id, title, and URI are required")
         if self.status is SourceStatus.VERIFIED and not (self.version_ref or self.content_digest):
             raise ValueError("verified sources require a version reference or content digest")
+
+    def to_contract(self) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "id": self.id,
+            "title": self.title,
+            "uri": self.uri,
+            "kind": self.kind,
+            "status": self.status.value,
+            "version_ref": self.version_ref,
+            "object_type": self.object_type,
+            "retrieved_at": self.retrieved_at,
+            "license_spdx": self.license_spdx,
+            "content_digest": self.content_digest,
+            "unverified_digest_label": self.unverified_digest_label,
+            "provenance_complete": self.provenance_complete,
+            "requires_complete_ingestion": self.requires_complete_ingestion,
+            "snapshot_ref": self.snapshot_ref,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +126,26 @@ class IdeaClaim:
             raise ValueError("claim id, case id, and proposition are required")
         if not self.source_ids:
             raise ValueError("every claim must identify at least one source")
+
+    def to_contract(self) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "id": self.id,
+            "case_id": self.case_id,
+            "proposition": self.proposition,
+            "source_ids": list(self.source_ids),
+            "category": self.category,
+            "burden": self.burden.name.lower(),
+            "implementation_state": self.implementation_state.value,
+            "capability_maturity": self.capability_maturity.value,
+            "architecture_refs": list(self.architecture_refs),
+            "acceptance_tests": list(self.acceptance_tests),
+            "outcome_metrics": list(self.outcome_metrics),
+            "code_refs": list(self.code_refs),
+            "test_refs": list(self.test_refs),
+            "benchmark_refs": list(self.benchmark_refs),
+            "comparator_source_ids": list(self.comparator_source_ids),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,6 +268,19 @@ class Courtroom:
             for source in source_records
             if not source.provenance_complete
             or (source.requires_complete_ingestion and source.status is not SourceStatus.VERIFIED)
+            or source.license_spdx is None
+            or (
+                "repository" in source.kind.split("_")
+                and (
+                    source.object_type != "commit"
+                    or not source.version_ref
+                    or len(source.version_ref) != 40
+                    or any(
+                        character not in "0123456789abcdef"
+                        for character in source.version_ref
+                    )
+                )
+            )
         ]
         if incomplete_sources and case.claim.burden > BurdenOfProof.CAPTURE:
             reasons.append("source ingestion or provenance is incomplete: " + ", ".join(sorted(incomplete_sources)))
@@ -428,7 +481,7 @@ class SourceDocketAuditor:
                         source_id=source_id,
                     )
                 )
-            if source.kind == "repository":
+            if "repository" in source.kind.split("_"):
                 if source.object_type != "commit":
                     issues.append(
                         DocketIssue(
@@ -484,6 +537,7 @@ class SourceDocketAuditor:
                 "repository source lacks an exact commit object pin",
                 "repository source pin is mutable or ambiguous",
                 "source content digest is not a raw-byte SHA-256 receipt",
+                "source license or reuse grant is unresolved",
             }
         }
         for claim in claim_map.values():

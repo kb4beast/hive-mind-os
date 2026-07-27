@@ -1,4 +1,5 @@
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -215,6 +216,32 @@ class ClassicGptSimulationTests(unittest.TestCase):
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "unsupported"):
                 ClassicGptSourcePack.load(root)
+
+    def test_manifest_semantics_and_unknown_fields_are_fingerprint_bound(self) -> None:
+        baseline_fingerprint = self.pack.fingerprint
+        for field, value, expected in (
+            ("invented_authority", True, "invalid shape"),
+            ("authority_model", "unbounded execution", "not authorized"),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                shutil.copytree(self.repository / "gpt_sources", root / "gpt_sources")
+                manifest_path = root / "gpt_sources" / "manifest.json"
+                manifest = json.loads(manifest_path.read_text())
+                manifest[field] = value
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, expected):
+                    ClassicGptSourcePack.load(root)
+        self.assertEqual(self.pack.fingerprint, baseline_fingerprint)
+
+    def test_manifest_matches_lf_bytes_used_by_clean_checkouts(self) -> None:
+        manifest = json.loads(
+            (self.repository / "gpt_sources" / "manifest.json").read_text()
+        )
+        for record in manifest["files"]:
+            content = (self.repository / record["path"]).read_bytes()
+            self.assertNotIn(b"\r\n", content, record["path"])
+            self.assertEqual(len(content), record["bytes"])
 
     def test_missing_source_or_required_marker_fails_closed(self) -> None:
         documents = {item.path: "placeholder" for item in self.pack.files[:-1]}

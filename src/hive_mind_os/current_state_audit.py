@@ -40,6 +40,31 @@ MAX_ARTIFACT_NESTING_DEPTH = 128
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _GIT_OBJECT_PATTERN = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
 _CREATE_SUSPENDED = 0x00000004
+_SOURCE_EVIDENCE_BLOCKERS = frozenset(
+    {
+        "source provenance is incomplete",
+        "source requires complete ingestion before derived ideas may be promoted",
+        "repository source lacks an exact commit object pin",
+        "repository source pin is mutable or ambiguous",
+        "source content digest is not a raw-byte SHA-256 receipt",
+        "source license or reuse grant is unresolved",
+    }
+)
+_INVENTORY_FAILURES = frozenset(
+    {
+        "source has no captured claim",
+        "claim has no courtroom decision",
+        "claim references an unknown source",
+        "decision references an unknown claim",
+    }
+)
+_MATURITY_SCALE = (
+    "specified",
+    "structurally_prototyped",
+    "executed_in_isolation",
+    "independently_verified_e2e",
+    "production_proven",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -711,13 +736,7 @@ def collect_current_state_audit(
                 if issue.source_id
                 and "," not in issue.source_id
                 and issue.message
-                in {
-                    "source provenance is incomplete",
-                    "source requires complete ingestion before derived ideas may be promoted",
-                    "repository source lacks an exact commit object pin",
-                    "repository source pin is mutable or ambiguous",
-                    "source content digest is not a raw-byte SHA-256 receipt",
-                }
+                in _SOURCE_EVIDENCE_BLOCKERS
             }
         )
         docket_issues = [
@@ -745,6 +764,7 @@ def collect_current_state_audit(
                 "retrieved_at": source.retrieved_at,
                 "license_spdx": source.license_spdx,
                 "content_digest": source.content_digest,
+                "unverified_digest_label": source.unverified_digest_label,
                 "provenance_complete": source.provenance_complete,
                 "requires_complete_ingestion": source.requires_complete_ingestion,
                 "snapshot_ref": source.snapshot_ref,
@@ -760,13 +780,7 @@ def collect_current_state_audit(
             for source in docket.sources
         ]
         implementation_state_audit = {
-            "maturity_scale": [
-                "specified",
-                "structurally_prototyped",
-                "executed_in_isolation",
-                "independently_verified_e2e",
-                "production_proven",
-            ],
+            "maturity_scale": list(_MATURITY_SCALE),
             "maturity_counts": capability_maturity_counts,
             "claims_by_maturity": {
                 maturity: sorted(
@@ -774,13 +788,7 @@ def collect_current_state_audit(
                     for claim in docket.claims
                     if claim.capability_maturity.value == maturity
                 )
-                for maturity in (
-                    "specified",
-                    "structurally_prototyped",
-                    "executed_in_isolation",
-                    "independently_verified_e2e",
-                    "production_proven",
-                )
+                for maturity in _MATURITY_SCALE
             },
             "evidence_classes": {
                 "typed_domain_prototype": sorted(
@@ -1055,6 +1063,223 @@ def create_audit_artifact(
     }
 
 
+def _validate_schema5_docket(
+    docket: Mapping[str, object],
+    issues: list[str],
+) -> None:
+    source_count = docket.get("source_count")
+    claim_count = docket.get("claim_count")
+    coverage = docket.get("source_coverage")
+    docket_issues = docket.get("issues")
+    if type(source_count) is not int or source_count < 0:
+        issues.append("audit source count is invalid")
+    if type(claim_count) is not int or claim_count < 0:
+        issues.append("audit claim count is invalid")
+    if not isinstance(coverage, list):
+        issues.append("audit source coverage is invalid")
+        return
+    if type(source_count) is int and len(coverage) != source_count:
+        issues.append("audit source coverage count contradicts source count")
+
+    source_ids: list[str] = []
+    coverage_claims: set[str] = set()
+    claims_by_source: dict[str, set[str]] = {}
+    coverage_blockers: dict[str, set[str]] = {}
+    coverage_statuses: list[str] = []
+    for index, item in enumerate(coverage):
+        if not isinstance(item, Mapping):
+            issues.append(f"audit source coverage {index} is not an object")
+            continue
+        source_id = item.get("source_id")
+        if not isinstance(source_id, str) or re.fullmatch(r"SRC-[0-9]{3,}", source_id) is None:
+            issues.append(f"audit source coverage {index} has invalid identity")
+            continue
+        source_ids.append(source_id)
+        claim_ids = item.get("claim_ids")
+        blocking_issues = item.get("blocking_issues")
+        status = item.get("status")
+        if not isinstance(claim_ids, list) or any(
+            not isinstance(claim_id, str)
+            or re.fullmatch(r"CLM-[0-9]{3,}", claim_id) is None
+            for claim_id in claim_ids
+        ):
+            issues.append(f"audit source coverage {source_id} has invalid claims")
+            claim_set: set[str] = set()
+        else:
+            claim_set = set(claim_ids)
+            if len(claim_set) != len(claim_ids):
+                issues.append(f"audit source coverage {source_id} repeats claims")
+        if not isinstance(blocking_issues, list) or any(
+            not isinstance(message, str) for message in blocking_issues
+        ):
+            issues.append(f"audit source coverage {source_id} has invalid blockers")
+            blocker_set: set[str] = set()
+        else:
+            blocker_set = set(blocking_issues)
+            if len(blocker_set) != len(blocking_issues):
+                issues.append(f"audit source coverage {source_id} repeats blockers")
+        if not isinstance(status, str):
+            issues.append(f"audit source coverage {source_id} has invalid status")
+        else:
+            coverage_statuses.append(status)
+        claims_by_source[source_id] = claim_set
+        coverage_claims.update(claim_set)
+        coverage_blockers[source_id] = blocker_set
+    if len(source_ids) != len(set(source_ids)):
+        issues.append("audit source coverage contains duplicate sources")
+    if type(claim_count) is int and len(coverage_claims) != claim_count:
+        issues.append("audit source coverage does not conserve the claim inventory")
+
+    if not isinstance(docket_issues, list):
+        issues.append("audit docket issues are invalid")
+        docket_issues = []
+    issue_rows: list[Mapping[str, object]] = []
+    for index, item in enumerate(docket_issues):
+        if (
+            not isinstance(item, Mapping)
+            or item.get("severity") not in {"warning", "blocking"}
+            or not isinstance(item.get("message"), str)
+            or item.get("source_id") is not None
+            and not isinstance(item.get("source_id"), str)
+            or item.get("claim_id") is not None
+            and not isinstance(item.get("claim_id"), str)
+        ):
+            issues.append(f"audit docket issue {index} is invalid")
+            continue
+        issue_rows.append(item)
+
+    for source_id in set(source_ids):
+        expected_messages = {
+            str(item["message"])
+            for item in issue_rows
+            if source_id in str(item.get("source_id") or "").split(",")
+        }
+        if coverage_blockers.get(source_id, set()) != expected_messages:
+            issues.append(
+                f"audit source coverage blockers contradict docket issues: {source_id}"
+            )
+
+    expected_source_blockers = sorted(
+        {
+            source_id
+            for source_id, messages in coverage_blockers.items()
+            if messages & _SOURCE_EVIDENCE_BLOCKERS
+        }
+    )
+    source_blockers = docket.get("source_blockers")
+    if (
+        not isinstance(source_blockers, list)
+        or any(not isinstance(source_id, str) for source_id in source_blockers)
+        or len(source_blockers) != len(set(source_blockers))
+        or source_blockers != sorted(source_blockers)
+        or source_blockers != expected_source_blockers
+    ):
+        issues.append("audit source blockers contradict source coverage")
+
+    dependent_issue_claims = {
+        str(item["claim_id"])
+        for item in issue_rows
+        if item.get("message")
+        == "dependent claim is machine-blocked by incomplete source evidence"
+        and isinstance(item.get("claim_id"), str)
+    }
+    coverage_derived_claims = {
+        claim_id
+        for source_id, claim_ids in claims_by_source.items()
+        if coverage_blockers.get(source_id, set()) & _SOURCE_EVIDENCE_BLOCKERS
+        for claim_id in claim_ids
+    }
+    machine_blocked = docket.get("machine_blocked_claim_ids")
+    if (
+        not isinstance(machine_blocked, list)
+        or any(not isinstance(claim_id, str) for claim_id in machine_blocked)
+        or len(machine_blocked) != len(set(machine_blocked))
+        or machine_blocked != sorted(machine_blocked)
+        or set(machine_blocked) != dependent_issue_claims
+        or set(machine_blocked) != coverage_derived_claims
+    ):
+        issues.append("audit machine-blocked claims contradict source evidence")
+
+    source_status_counts = docket.get("source_status_counts")
+    expected_status_counts = dict(sorted(Counter(coverage_statuses).items()))
+    if source_status_counts != expected_status_counts:
+        issues.append("audit source-status counts contradict source coverage")
+
+    blocking_present = any(item.get("severity") == "blocking" for item in issue_rows)
+    if docket.get("release_ready") is not (not blocking_present):
+        issues.append("audit release readiness contradicts blocking docket issues")
+    inventory_failures_present = any(
+        item.get("message") in _INVENTORY_FAILURES for item in issue_rows
+    )
+    if docket.get("inventory_complete") is not (not inventory_failures_present):
+        issues.append("audit inventory completeness contradicts docket issues")
+
+    implementation = docket.get("implementation_state_audit")
+    if not isinstance(implementation, Mapping):
+        issues.append("audit implementation-state evidence is invalid")
+        return
+    if implementation.get("maturity_scale") != list(_MATURITY_SCALE):
+        issues.append("audit capability maturity scale is invalid")
+    claims_by_maturity = implementation.get("claims_by_maturity")
+    maturity_counts = implementation.get("maturity_counts")
+    if not isinstance(claims_by_maturity, Mapping) or set(claims_by_maturity) != set(
+        _MATURITY_SCALE
+    ):
+        issues.append("audit claims-by-maturity partition is invalid")
+        return
+    maturity_claim_sets: dict[str, set[str]] = {}
+    for maturity in _MATURITY_SCALE:
+        claim_ids = claims_by_maturity.get(maturity)
+        if not isinstance(claim_ids, list) or any(
+            not isinstance(claim_id, str) for claim_id in claim_ids
+        ):
+            issues.append(f"audit {maturity} claim set is invalid")
+            maturity_claim_sets[maturity] = set()
+            continue
+        maturity_claim_sets[maturity] = set(claim_ids)
+        if len(maturity_claim_sets[maturity]) != len(claim_ids):
+            issues.append(f"audit {maturity} claim set contains duplicates")
+    maturity_union: set[str] = set()
+    maturity_total = 0
+    for claim_ids in maturity_claim_sets.values():
+        maturity_union.update(claim_ids)
+        maturity_total += len(claim_ids)
+    if maturity_total != len(maturity_union):
+        issues.append("audit maturity claim sets overlap")
+    if maturity_union != coverage_claims:
+        issues.append("audit maturity claims do not conserve the claim inventory")
+    expected_maturity_counts = {
+        maturity: len(claim_ids)
+        for maturity, claim_ids in maturity_claim_sets.items()
+        if claim_ids
+    }
+    if maturity_counts != expected_maturity_counts:
+        issues.append("audit maturity counts contradict maturity claim sets")
+    if docket.get("capability_maturity_counts") != expected_maturity_counts:
+        issues.append("audit docket maturity counts contradict maturity claim sets")
+
+    evidence_classes = implementation.get("evidence_classes")
+    if not isinstance(evidence_classes, Mapping):
+        issues.append("audit implementation evidence classes are invalid")
+        return
+    for evidence_class, claim_ids in evidence_classes.items():
+        if not isinstance(evidence_class, str) or not isinstance(claim_ids, list) or any(
+            not isinstance(claim_id, str) for claim_id in claim_ids
+        ):
+            issues.append("audit implementation evidence class is invalid")
+            continue
+        if not set(claim_ids) <= coverage_claims:
+            issues.append(f"audit {evidence_class} cites unknown claims")
+    if set(evidence_classes.get("typed_domain_prototype", [])) != maturity_claim_sets[
+        "structurally_prototyped"
+    ]:
+        issues.append("audit prototype evidence contradicts structural maturity")
+    if set(evidence_classes.get("production_proof", [])) != maturity_claim_sets[
+        "production_proven"
+    ]:
+        issues.append("audit production proof contradicts production maturity")
+
+
 def verify_audit_artifact(
     artifact: Mapping[str, object],
     *,
@@ -1137,34 +1362,9 @@ def verify_audit_artifact(
             ):
                 issues.append("audit tracked tree digest is invalid")
         if isinstance(docket, Mapping):
-            if type(docket.get("source_count")) is not int or docket.get("source_count", 0) < 0:
-                issues.append("audit source count is invalid")
-            if type(docket.get("claim_count")) is not int or docket.get("claim_count", 0) < 0:
-                issues.append("audit claim count is invalid")
+            _validate_schema5_docket(docket, issues)
             if not isinstance(docket.get("broken_references"), list):
                 issues.append("audit broken references are invalid")
-            if not isinstance(docket.get("machine_blocked_claim_ids"), list):
-                issues.append("audit machine-blocked claims are invalid")
-            if not isinstance(docket.get("source_coverage"), list):
-                issues.append("audit source coverage is invalid")
-            elif len(docket["source_coverage"]) != docket.get("source_count"):
-                issues.append("audit source coverage count contradicts source count")
-            if not isinstance(docket.get("implementation_state_audit"), Mapping):
-                issues.append("audit implementation-state evidence is invalid")
-            else:
-                implementation_audit = docket["implementation_state_audit"]
-                if implementation_audit.get("maturity_scale") != [
-                    "specified",
-                    "structurally_prototyped",
-                    "executed_in_isolation",
-                    "independently_verified_e2e",
-                    "production_proven",
-                ]:
-                    issues.append("audit capability maturity scale is invalid")
-                if not isinstance(implementation_audit.get("maturity_counts"), Mapping):
-                    issues.append("audit capability maturity counts are invalid")
-                if not isinstance(implementation_audit.get("evidence_classes"), Mapping):
-                    issues.append("audit implementation evidence classes are invalid")
             if not isinstance(docket.get("reference_receipts"), list):
                 issues.append("audit reference receipts are invalid")
             if not isinstance(docket.get("receipts_valid"), bool):

@@ -34,13 +34,13 @@ SOURCES: tuple[SourceRecord, ...] = (
         id='SRC-001', title='Founding autonomous-SDLC prompt',
         uri='user-supplied:founding-prompt', kind='user_requirement',
         status=SourceStatus.VERIFIED, version_ref='conversation:2026-07-27',
-        license_spdx=None, content_digest='prompt-v1', object_type='conversation',
+        license_spdx=None, content_digest=None, unverified_digest_label='prompt-v1', object_type='conversation',
     ),
     SourceRecord(
         id='SRC-002', title='New Team Model and Product & Engineering slides',
         uri='user-supplied:new-team-model-images', kind='image_deck',
         status=SourceStatus.VERIFIED, version_ref='files:927059b1+1f461893',
-        license_spdx=None, content_digest='image-deck-v1', object_type='content_snapshot',
+        license_spdx=None, content_digest=None, unverified_digest_label='image-deck-v1', object_type='content_snapshot',
     ),
     SourceRecord(
         id='SRC-003', title='Operator OS',
@@ -106,7 +106,7 @@ SOURCES: tuple[SourceRecord, ...] = (
         id='SRC-013', title='User-supplied multi-agent mission-control interface video',
         uri='user-supplied:mission-control-video', kind='video',
         status=SourceStatus.VERIFIED, version_ref='project-reference:mission-control-ui',
-        license_spdx=None, content_digest='mission-control-reference-v1', object_type='content_snapshot',
+        license_spdx=None, content_digest=None, unverified_digest_label='mission-control-reference-v1', object_type='content_snapshot',
     ),
     SourceRecord(
         id='SRC-014', title='OpenFang agent operating system',

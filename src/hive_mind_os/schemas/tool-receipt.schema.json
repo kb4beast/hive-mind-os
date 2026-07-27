@@ -17,7 +17,7 @@
     "policy_decision_ref": {"type": "string", "minLength": 1},
     "lease_id": {"type": "string", "minLength": 1},
     "action_kind": {"enum": ["reasoning", "read", "write", "command", "network", "git", "message", "deploy"]},
-    "action_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "action_digest": {"type": "string", "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
     "executed": {"const": true},
     "result": {"enum": ["succeeded", "failed", "unknown"]},
     "observed_at": {"type": "string", "format": "date-time"},

@@ -48,8 +48,21 @@ class CurrentStateAuditTests(unittest.TestCase):
             "docket": {
                 "source_count": 1,
                 "claim_count": 1,
+                "source_status_counts": {"verified": 1},
+                "capability_maturity_counts": {"specified": 1},
+                "inventory_complete": True,
+                "release_ready": True,
+                "source_blockers": [],
+                "issues": [],
                 "machine_blocked_claim_ids": [],
-                "source_coverage": [{"source_id": "SRC-001"}],
+                "source_coverage": [
+                    {
+                        "source_id": "SRC-001",
+                        "status": "verified",
+                        "claim_ids": ["CLM-001"],
+                        "blocking_issues": [],
+                    }
+                ],
                 "implementation_state_audit": {
                     "maturity_scale": [
                         "specified",
@@ -59,7 +72,17 @@ class CurrentStateAuditTests(unittest.TestCase):
                         "production_proven",
                     ],
                     "maturity_counts": {"specified": 1},
-                    "evidence_classes": {"production_proof": []},
+                    "claims_by_maturity": {
+                        "specified": ["CLM-001"],
+                        "structurally_prototyped": [],
+                        "executed_in_isolation": [],
+                        "independently_verified_e2e": [],
+                        "production_proven": [],
+                    },
+                    "evidence_classes": {
+                        "typed_domain_prototype": [],
+                        "production_proof": [],
+                    },
                 },
                 "broken_references": [],
                 "receipts_valid": True,
@@ -117,8 +140,12 @@ class CurrentStateAuditTests(unittest.TestCase):
                 "SRC-002",
                 "SRC-005",
                 "SRC-006",
+                "SRC-007",
+                "SRC-008",
+                "SRC-009",
                 "SRC-010",
                 "SRC-011",
+                "SRC-012",
                 "SRC-013",
                 "SRC-014",
                 "SRC-015",
@@ -621,6 +648,73 @@ class CurrentStateAuditTests(unittest.TestCase):
         valid, issues = verify_audit_artifact(create_audit_artifact(deep_contradiction))
         self.assertFalse(valid)
         self.assertIn("audit reference receipt 0 validity is contradictory", issues)
+
+    def test_schema5_rejects_fabricated_coverage_blockers_and_maturity(self) -> None:
+        duplicate_coverage = self.valid_audit()
+        duplicate_coverage["docket"]["source_count"] = 2
+        duplicate_coverage["docket"]["source_status_counts"] = {"verified": 2}
+        duplicate_coverage["docket"]["source_coverage"].append(
+            copy.deepcopy(duplicate_coverage["docket"]["source_coverage"][0])
+        )
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(duplicate_coverage)
+        )
+        self.assertFalse(valid)
+        self.assertIn("audit source coverage contains duplicate sources", issues)
+
+        missing_block = self.valid_audit()
+        missing_block["docket"]["release_ready"] = True
+        missing_block["docket"]["source_blockers"] = ["SRC-001"]
+        missing_block["docket"]["source_coverage"][0]["blocking_issues"] = [
+            "source license or reuse grant is unresolved",
+            "dependent claim is machine-blocked by incomplete source evidence",
+        ]
+        missing_block["docket"]["issues"] = [
+            {
+                "severity": "blocking",
+                "message": "source license or reuse grant is unresolved",
+                "source_id": "SRC-001",
+                "claim_id": None,
+            },
+            {
+                "severity": "blocking",
+                "message": (
+                    "dependent claim is machine-blocked by incomplete source evidence"
+                ),
+                "source_id": "SRC-001",
+                "claim_id": "CLM-001",
+            },
+        ]
+        valid, issues = verify_audit_artifact(create_audit_artifact(missing_block))
+        self.assertFalse(valid)
+        self.assertIn(
+            "audit machine-blocked claims contradict source evidence",
+            issues,
+        )
+        self.assertIn(
+            "audit release readiness contradicts blocking docket issues",
+            issues,
+        )
+
+        fabricated_maturity = self.valid_audit()
+        implementation = fabricated_maturity["docket"][
+            "implementation_state_audit"
+        ]
+        implementation["claims_by_maturity"]["specified"] = []
+        implementation["claims_by_maturity"]["production_proven"] = ["CLM-001"]
+        implementation["maturity_counts"] = {"production_proven": 1}
+        fabricated_maturity["docket"]["capability_maturity_counts"] = {
+            "production_proven": 1
+        }
+        implementation["evidence_classes"]["production_proof"] = ["CLM-FAKE"]
+        valid, issues = verify_audit_artifact(
+            create_audit_artifact(fabricated_maturity)
+        )
+        self.assertFalse(valid)
+        self.assertIn(
+            "audit production proof contradicts production maturity",
+            issues,
+        )
 
     def test_written_artifact_is_newline_terminated(self) -> None:
         artifact = create_audit_artifact(self.valid_audit())

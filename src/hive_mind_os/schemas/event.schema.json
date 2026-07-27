@@ -15,8 +15,8 @@
     "occurred_at": {"type": "string", "format": "date-time"},
     "causation_id": {"type": ["string", "null"], "minLength": 1},
     "correlation_id": {"type": ["string", "null"], "minLength": 1},
-    "previous_event_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
-    "payload_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "previous_event_digest": {"type": ["string", "null"], "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
+    "payload_digest": {"type": "string", "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
     "payload": {"type": "object"}
   }
 }

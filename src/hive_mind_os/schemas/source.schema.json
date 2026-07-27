@@ -16,9 +16,11 @@
     "object_type": {"type": ["string", "null"], "enum": ["commit", "tree", "blob", "tag", "branch", "paper_version", "video_id", "content_snapshot", "conversation", null]},
     "retrieved_at": {"type": ["string", "null"], "format": "date-time"},
     "license_spdx": {"type": ["string", "null"], "minLength": 1},
-    "content_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "content_digest": {"type": ["string", "null"], "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
+    "unverified_digest_label": {"type": ["string", "null"], "minLength": 1},
     "provenance_complete": {"type": "boolean"},
     "requires_complete_ingestion": {"type": "boolean"},
+    "snapshot_ref": {"type": ["string", "null"], "minLength": 1},
     "supersedes": {"type": "array", "items": {"type": "string", "pattern": "^SRC-[0-9]{3,}$"}, "uniqueItems": true}
   }
 }

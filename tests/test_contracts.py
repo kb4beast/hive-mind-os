@@ -10,10 +10,12 @@ from hive_mind_os.contracts import (
     ROLE_NAMES,
     SCHEMA_NAMES,
     load_schema,
+    tool_intent_digest,
     validate_contract,
     validate_runtime_state,
     validate_schema_catalog,
 )
+from hive_mind_os.source_docket import load_default_source_docket
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -67,7 +69,9 @@ class ContractSchemaTests(unittest.TestCase):
         state["role_runs"] = [
             {
                 "role": role,
-                "actor_id": f"{role}-actor",
+                "actor_id": (
+                    "builder-example-1" if role == "builder" else f"{role}-actor"
+                ),
                 "status": "succeeded",
                 "evidence_refs": [f"evidence:{role}"],
             }
@@ -93,7 +97,7 @@ class ContractSchemaTests(unittest.TestCase):
             (
                 lambda value: value.__setitem__(
                     "independent_verification",
-                    [{"actor_id": "builder-actor", "evidence_refs": ["self"]}],
+                    [{"actor_id": "builder-example-1", "evidence_refs": ["self"]}],
                 ),
                 "attempted to verify",
             ),
@@ -126,9 +130,82 @@ class ContractSchemaTests(unittest.TestCase):
             "digest": "sha256:" + "0" * 64,
         }
         self.assertTrue(validate_contract("artifact-manifest", base).valid)
-        for path in ("../secret", "artifacts\\result.bin", "/absolute/result.bin"):
+        for path in (
+            "../secret",
+            "artifacts\\result.bin",
+            "/absolute/result.bin",
+            "C:/secret",
+            "carrier.txt:stream",
+            "CON",
+            "a//b",
+            "a/./b",
+            "trailing.",
+            "trailing ",
+        ):
             invalid = dict(base, path=path)
             self.assertFalse(validate_contract("artifact-manifest", invalid).valid)
+        self.assertFalse(
+            validate_contract(
+                "artifact-manifest",
+                dict(base, digest=base["digest"] + "\n"),
+            ).valid
+        )
+
+    def test_rfc3339_and_finite_number_contracts_fail_closed(self) -> None:
+        lease = {
+            "schema_version": 1,
+            "lease_id": "LEASE-1",
+            "subject_actor_id": "builder-1",
+            "mission_id": "MISSION-1",
+            "capabilities": ["read"],
+            "resource_limits": {"seconds": 1.0},
+            "issued_at": "2026-07-27T00:00:00Z",
+            "expires_at": "2026-07-27T01:00:00+00:00",
+            "revocation_ref": "revocation:LEASE-1",
+            "issuer_actor_id": "orchestrator-1",
+        }
+        self.assertTrue(validate_contract("capability-lease", lease).valid)
+        for timestamp in (
+            "2026-07-27 00:00:00Z",
+            "2026-07-27T00:00:00",
+            "2026-07-27T00:00:00+00:00:01",
+        ):
+            candidate = copy.deepcopy(lease)
+            candidate["issued_at"] = timestamp
+            self.assertFalse(validate_contract("capability-lease", candidate).valid)
+        nonfinite = copy.deepcopy(lease)
+        nonfinite["resource_limits"]["seconds"] = float("nan")
+        self.assertFalse(validate_contract("capability-lease", nonfinite).valid)
+
+    def test_actions_bind_mission_state_actor_digest_and_receipt_verifier(self) -> None:
+        baseline = self.runtime_state()
+        action = baseline["proposed_actions"][0]
+        self.assertEqual(action["action_digest"], tool_intent_digest(action))
+
+        foreign = copy.deepcopy(baseline)
+        foreign["proposed_actions"][0]["mission_id"] = "MISSION-FOREIGN"
+        result = validate_runtime_state(foreign)
+        self.assertIn("action ACT-000 belongs to another mission", result.issues)
+
+        fabricated = copy.deepcopy(baseline)
+        fabricated["proposed_actions"][0]["action_digest"] = "sha256:" + "f" * 64
+        fabricated["tool_receipts"][0]["action_digest"] = "sha256:" + "f" * 64
+        result = validate_runtime_state(fabricated)
+        self.assertIn("action ACT-000 digest does not bind its intent", result.issues)
+
+        self_verified = copy.deepcopy(baseline)
+        self_verified["tool_receipts"][0]["verified_by"] = "builder-example-1"
+        result = validate_runtime_state(self_verified)
+        self.assertIn("receipt REC-000 was self-verified", result.issues)
+
+    def test_live_source_and_claim_records_conform_to_formal_contracts(self) -> None:
+        docket = load_default_source_docket()
+        for source in docket.sources:
+            result = validate_contract("source", source.to_contract())
+            self.assertTrue(result.valid, (source.id, result.issues))
+        for claim in docket.claims:
+            result = validate_contract("claim", claim.to_contract())
+            self.assertTrue(result.valid, (claim.id, result.issues))
 
 
 if __name__ == "__main__":

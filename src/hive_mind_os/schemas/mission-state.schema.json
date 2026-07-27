@@ -18,7 +18,7 @@
         "active_phase": {"enum": ["intake", "discover", "design", "build", "validate", "integrate", "maintain", "optimize", "complete", "blocked", "quarantined"]},
         "active_role": {"enum": ["orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer"]},
         "status": {"enum": ["active", "complete", "blocked", "quarantined"]},
-        "source_pack_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        "source_pack_fingerprint": {"type": "string", "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },
     "role_runs": {
