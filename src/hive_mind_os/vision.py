@@ -19,6 +19,10 @@ class LifecycleStage(StrEnum):
 
 class SystemCapability(StrEnum):
     DECOMPOSE_OUTCOMES = "decompose_outcomes"
+    INGEST_SOURCES = "ingest_sources"
+    EXTRACT_ATOMIC_IDEAS = "extract_atomic_ideas"
+    LITIGATE_IDEAS = "litigate_ideas"
+    TRACE_REQUIREMENTS_TO_TESTS = "trace_requirements_to_tests"
     SEARCH_WEB = "search_web"
     SCOUT_REPOSITORIES = "scout_repositories"
     INSPECT_REPOSITORY = "inspect_repository"
@@ -35,6 +39,7 @@ class SystemCapability(StrEnum):
     LEARN_FROM_OUTCOMES = "learn_from_outcomes"
     TEACH_PEERS = "teach_peers"
     RECOVER_AND_RESUME = "recover_and_resume"
+    BENCHMARK_COMPARATORS = "benchmark_comparators"
 
 
 REQUIRED_ROLES: tuple[Role, ...] = (
@@ -65,21 +70,35 @@ class HardenedVisionContract:
         "self_approval",
         "unsupported_claims",
         "unlicensed_source_copying",
+        "silent_source_omission",
         "silent_policy_weakening",
         "silent_test_weakening",
         "concealed_activity",
         "unbounded_self_replication",
         "goal_or_policy_mutation",
+        "marketing_only_superiority_claim",
     )
     source_references: tuple[str, ...] = (
+        "user-supplied:founding-prompt",
         "user-supplied:new-team-model-images",
+        "user-supplied:mission-control-video",
         "https://github.com/rangerrick337/operator-os/tree/main",
         "https://github.com/nousresearch/hermes-agent",
         "https://www.youtube.com/watch?v=mazBhCg3urw",
         "https://www.youtube.com/watch?v=Gw_hnD7m00M",
         "https://arxiv.org/abs/2303.16200",
+        "https://github.com/agiresearch/AIOS",
+        "https://arxiv.org/abs/2407.16741",
+        "https://github.com/rivet-dev/agent-os",
+        "https://github.com/microsoft/agent-framework",
+        "https://arxiv.org/abs/2505.21577",
+        "https://github.com/RightNow-AI/openfang",
+        "https://github.com/iii-hq/agentos",
     )
     target_unsupervised_routine_work: bool = True
+    courtroom_required: bool = True
+    source_docket_required: bool = True
+    comparative_claims_require_benchmarks: bool = True
 
     @property
     def fingerprint(self) -> str:
@@ -92,6 +111,9 @@ class HardenedVisionContract:
                 *self.forbidden_shortcuts,
                 *self.source_references,
                 str(self.target_unsupervised_routine_work),
+                str(self.courtroom_required),
+                str(self.source_docket_required),
+                str(self.comparative_claims_require_benchmarks),
             )
         )
         return sha256(canonical.encode("utf-8")).hexdigest()
@@ -114,6 +136,12 @@ class VisionRunEvidence:
     policy_violations: tuple[str, ...] = ()
     rollback_evidence_ref: str | None = None
     provenance_complete: bool = True
+    court_case_refs: tuple[str, ...] = ()
+    source_docket_audit_ref: str | None = None
+    source_inventory_complete: bool = False
+    unresolved_source_ids: tuple[str, ...] = ()
+    superiority_claimed: bool = False
+    comparative_benchmark_ref: str | None = None
 
     def __post_init__(self) -> None:
         if self.human_interventions < 0 or self.policy_required_interventions < 0:
@@ -171,6 +199,25 @@ class VisionComplianceGate:
             reasons.append("run contains policy violations")
         if not evidence.rollback_evidence_ref:
             reasons.append("rollback was not proven")
+
+        if self.contract.courtroom_required and not evidence.court_case_refs:
+            reasons.append("courtroom review evidence is missing")
+        if self.contract.source_docket_required:
+            if not evidence.source_docket_audit_ref:
+                reasons.append("source docket audit is missing")
+            if not evidence.source_inventory_complete:
+                reasons.append("source idea inventory is incomplete")
+            if evidence.unresolved_source_ids:
+                reasons.append(
+                    "required sources remain unresolved: "
+                    + ", ".join(sorted(evidence.unresolved_source_ids))
+                )
+        if (
+            self.contract.comparative_claims_require_benchmarks
+            and evidence.superiority_claimed
+            and not evidence.comparative_benchmark_ref
+        ):
+            reasons.append("superiority claim lacks comparative benchmark evidence")
 
         actor_ids = {item for item in evidence.actor_variant_ids if item}
         verifier_ids = {item for item in evidence.verifier_variant_ids if item}
