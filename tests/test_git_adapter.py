@@ -203,10 +203,28 @@ class GitAdapterTests(unittest.TestCase):
 
     def test_write_file_rejects_nonportable_and_escaping_paths(self) -> None:
         workspace = self.workspace()
-        for path in ("../outside.txt", "/absolute.txt", r"nested\windows.txt"):
+        for path in (
+            "../outside.txt",
+            "/absolute.txt",
+            r"nested\windows.txt",
+            ".git/HEAD",
+            ".GIT/config",
+        ):
             with self.subTest(path=path):
                 with self.assertRaises((ValueError, ConfinementViolation)):
                     workspace.write_file(path, b"denied")
+
+    def test_lower_authority_cannot_write_git_metadata(self) -> None:
+        workspace = self.workspace()
+        workspace.policy = PolicyEngine(AutonomyLevel.SANDBOX)
+        with self.assertRaises(GitPolicyDenied):
+            workspace.create_branch("phase/typed-denial")
+        original_head = (workspace.root / ".git" / "HEAD").read_bytes()
+        for path in (".git/HEAD", ".GIT/refs/heads/metadata-bypass"):
+            with self.subTest(path=path):
+                with self.assertRaises(ConfinementViolation):
+                    workspace.write_file(path, b"ref: refs/heads/metadata-bypass\n")
+        self.assertEqual((workspace.root / ".git" / "HEAD").read_bytes(), original_head)
 
     def test_declared_tests_fail_at_fixture_head_and_pass_after_fix(self) -> None:
         workspace = self.workspace()
@@ -255,6 +273,23 @@ class GitAdapterTests(unittest.TestCase):
         normalized["receipts"] = ["<content-addressed-receipts>"]
         self.assertEqual(normalized, golden)
 
+        original_manifest = delivery.manifest_path.read_bytes()
+        invalid_manifest = deepcopy(manifest)
+        invalid_manifest["schema_version"] = 999
+        invalid_manifest["receipts"] = []
+        delivery.manifest_path.write_text(
+            json.dumps(invalid_manifest, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        self.assertFalse(verify_delivery(delivery.root, self.fixture.root))
+        delivery.manifest_path.write_bytes(original_manifest)
+
+        first_receipt = delivery.root / "evidence" / manifest["receipts"][0]["path"]
+        original_receipt = first_receipt.read_bytes()
+        first_receipt.write_bytes(b"{}")
+        self.assertFalse(verify_delivery(delivery.root, self.fixture.root))
+        first_receipt.write_bytes(original_receipt)
+
         tampered_patch = delivery.patch_path.read_bytes() + b"\n# coherent tamper\n"
         delivery.patch_path.write_bytes(tampered_patch)
         manifest["patch_digest"] = sha256_digest(tampered_patch)
@@ -299,6 +334,34 @@ class GitAdapterTests(unittest.TestCase):
         with self.assertRaises(GitPolicyDenied):
             workspace.create_branch("phase/denied")
         self.assertEqual(workspace.runner.spawn_count, before)
+
+    def test_run_tests_cannot_bypass_typed_git_authority(self) -> None:
+        workspace = self.workspace()
+        workspace.policy = PolicyEngine(AutonomyLevel.SANDBOX)
+        with self.assertRaises(GitPolicyDenied):
+            workspace.create_branch("phase/typed-denial")
+        before = workspace.runner.spawn_count
+        git = shutil.which("git") or "git"
+        bypasses = (
+            [git, "switch", "-c", "phase/bypass"],
+            [git, "push", "origin", "HEAD:refs/heads/forbidden-push"],
+        )
+        for argv in bypasses:
+            with self.subTest(argv=argv):
+                with self.assertRaisesRegex(GitPolicyDenied, "reserved"):
+                    workspace.run_tests(argv)
+        self.assertEqual(workspace.runner.spawn_count, before)
+        self.assertFalse((workspace.root / ".git" / "refs" / "heads" / "bypass").exists())
+        self.assertFalse(
+            (
+                workspace.container_root
+                / "source"
+                / ".git"
+                / "refs"
+                / "heads"
+                / "forbidden-push"
+            ).exists()
+        )
 
     def test_api_has_no_merge_rebase_push_or_force_surface(self) -> None:
         forbidden = [

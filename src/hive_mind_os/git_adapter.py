@@ -19,7 +19,12 @@ from .autonomy import EpisodeAllowance
 from .contracts import tool_intent_digest
 from .models import AutonomyLevel, RiskTier, Role
 from .policy import Action, PolicyEngine
-from .receipts import portable_path_parts, sha256_digest
+from .receipts import (
+    FileReceiptValidator,
+    ReceiptReference,
+    portable_path_parts,
+    sha256_digest,
+)
 from .sandbox import ConfinementViolation, SandboxRunner, SandboxSpec
 
 _FULL_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
@@ -85,6 +90,10 @@ def _full_sha(value: str) -> str:
     if not _FULL_SHA.fullmatch(value):
         raise PinViolation("commit pin must be a full 40-hex SHA")
     return value.lower()
+
+
+def _normalized_executable(value: str) -> str:
+    return Path(value).name.casefold().removesuffix(".exe")
 
 
 def _branch_name(value: str) -> str:
@@ -468,12 +477,16 @@ class GitWorkspace:
     def write_file(self, relative_path: str, content: bytes) -> Path:
         self._authorize(Action.WRITE_WORKSPACE)
         parts = portable_path_parts(relative_path)
+        if parts[0].casefold() == ".git":
+            raise ConfinementViolation("writes to Git metadata are forbidden")
         destination = self.root / Path(*parts)
         resolved = destination.resolve()
         try:
-            resolved.relative_to(self.root)
+            resolved_relative = resolved.relative_to(self.root)
         except ValueError:
             raise ConfinementViolation("write path escapes Git workspace") from None
+        if resolved_relative.parts[0].casefold() == ".git":
+            raise ConfinementViolation("writes to Git metadata are forbidden")
         _atomic_write(destination, content)
         return destination
 
@@ -522,9 +535,17 @@ class GitWorkspace:
         )
 
     def run_tests(self, argv: Sequence[str]) -> dict[str, Any]:
-        self._authorize(Action.RUN_COMMANDS)
         if not argv:
             raise ValueError("test argv is required")
+        self._authorize(Action.RUN_COMMANDS)
+        requested = shutil.which(argv[0])
+        git = shutil.which("git")
+        if requested is not None and git is not None and (
+            _normalized_executable(requested) == _normalized_executable(git)
+        ):
+            raise GitPolicyDenied(
+                "direct Git execution is reserved for typed adapter operations"
+            )
         with _scrubbed_git_environment():
             receipt = self._execute(
                 self.runner,
@@ -590,6 +611,10 @@ class GitWorkspace:
         _atomic_write(bundle_path, bundle)
         _atomic_write(patch_path, patch)
         receipt_snapshot = tuple(dict(record) for record in self.receipt_records)
+        evidence_root = root / "evidence"
+        self._copy_delivery_evidence(receipt_snapshot, evidence_root)
+        if not _receipt_index_valid(receipt_snapshot, evidence_root):
+            raise GitOperationFailed("delivery receipt index failed validation")
         manifest = {
             "schema_version": 1,
             "base_sha": self.base_sha,
@@ -623,6 +648,76 @@ class GitWorkspace:
             receipt_snapshot,
         )
 
+    def _copy_delivery_evidence(
+        self,
+        records: Sequence[Mapping[str, Any]],
+        destination_root: Path,
+    ) -> None:
+        for record in records:
+            receipt_parts = portable_path_parts(str(record["path"]))
+            receipt_source = self.trusted_root / Path(*receipt_parts)
+            receipt_bytes = receipt_source.read_bytes()
+            receipt = json.loads(receipt_bytes)
+            if not isinstance(receipt, dict):
+                raise GitOperationFailed("delivery receipt must be a JSON object")
+            _atomic_write(destination_root / Path(*receipt_parts), receipt_bytes)
+            artifacts = receipt.get("artifacts")
+            if not isinstance(artifacts, list):
+                raise GitOperationFailed("delivery receipt lacks artifacts")
+            for artifact in artifacts:
+                if not isinstance(artifact, dict) or not isinstance(
+                    artifact.get("path"), str
+                ):
+                    raise GitOperationFailed("delivery receipt artifact is malformed")
+                artifact_parts = portable_path_parts(artifact["path"])
+                artifact_source = self.trusted_root / Path(*artifact_parts)
+                _atomic_write(
+                    destination_root / Path(*artifact_parts),
+                    artifact_source.read_bytes(),
+                )
+
+
+def _receipt_index_valid(records: object, evidence_root: Path) -> bool:
+    if not isinstance(records, (list, tuple)) or not records:
+        return False
+    validator = FileReceiptValidator(evidence_root)
+    required = {
+        "path",
+        "digest",
+        "mission_id",
+        "state_ref",
+        "actor_id",
+        "action_id",
+        "action_kind",
+        "action_digest",
+        "result",
+    }
+    for record in records:
+        if not isinstance(record, dict) or not required.issubset(record):
+            return False
+        if not all(isinstance(record[field], str) for field in required):
+            return False
+        if record["result"] not in {"succeeded", "failed"}:
+            return False
+        try:
+            result = validator.validate(
+                ReceiptReference(record["path"], record["digest"]),
+                mission_id=record["mission_id"],
+                state_ref=record["state_ref"],
+                actor_id=record["actor_id"],
+                action_id=record["action_id"],
+                action_kind=record["action_kind"],
+                action_digest=record["action_digest"],
+            )
+        except (OSError, TypeError, ValueError):
+            return False
+        if not result.valid:
+            return False
+        expected_result = "succeeded" if result.succeeded else "failed"
+        if record["result"] != expected_result:
+            return False
+    return True
+
 
 def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
     artifact_root = Path(artifact_dir).resolve()
@@ -633,6 +728,8 @@ def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return False
     if not isinstance(manifest, dict):
+        return False
+    if manifest.get("schema_version") != 1:
         return False
     required = {
         "base_sha",
@@ -662,7 +759,10 @@ def verify_delivery(artifact_dir: str | Path, base_source: str | Path) -> bool:
             return False
         for relative in files:
             portable_path_parts(relative)
-        if not isinstance(manifest["receipts"], list):
+        if not _receipt_index_valid(
+            manifest["receipts"],
+            artifact_root / "evidence",
+        ):
             return False
     except (GitOperationFailed, OSError, TypeError):
         return False
