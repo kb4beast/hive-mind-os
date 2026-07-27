@@ -225,3 +225,30 @@ through `MissionStore` without inventing new state.
   exactly-once physical execution, durable live-provider replay, distributed scheduling,
   external GitHub delivery, authenticated identity, hostile-code isolation, production
   readiness, complete source coverage, or superiority.
+
+### Consolidated-review appeal record
+
+- The independent Curator blocked candidate
+  `51d749f323a8bca1721c92d6a0a650afb8fa6e10` after reproducing a stop between a
+  physical sandbox receipt and its synthetic checkpoint receipt. The same review found
+  that GitHub's `unittest discover` jobs could not import the pytest-dependent P06 test
+  module and that Gitleaks classified one synthetic idempotency fixture as a secret.
+  ADR-011 preserves the findings, counterexample, repair rationale, and narrow
+  operational-source receipt.
+- Repaired implementation commit:
+  `ca5742bbd6c842ab68db3165e7b3be3daca4272b`. It adopts or accounts validated
+  unclaimed physical receipts, transactionally binds budget consumption to checkpoint
+  completion, adds the missing `after_capability_effect` boundary, makes all P06 cases
+  discoverable by stdlib `unittest`, and constrains the historical Gitleaks exception to
+  one exact line while retaining default rules.
+- Direct repaired-candidate gates: `python -m unittest discover -s tests -v` passed
+  267 tests with 2 skips; `python -m pytest -q` passed 265 tests with 2 skips and 1,718
+  subtests; Ruff passed; Pyright passed with 0 errors.
+- Repair audit: `evidence/audits/P06-repair-post.json`
+  (canonical digest:
+  `sha256:8a5aa9280b8a4e0b1c9a40159139a6494eead5fd0f4f13fcb3da3a391b4ec703`;
+  complete: true; failures: none; audited implementation commit:
+  `ca5742bbd6c842ab68db3165e7b3be3daca4272b`; audit pytest: 265 passed).
+- The challenged block remains preserved rather than overwritten. Delivery still
+  requires green exact-head GitHub checks and a fresh sequential Curator, Judge, and
+  Orchestrator disposition on the complete repaired candidate.
