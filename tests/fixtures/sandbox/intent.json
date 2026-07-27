@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "action_id": "ACT-golden-1",
+  "mission_id": "mission-golden",
+  "state_ref": "MISSION_STATE:mission-golden:1",
+  "actor_id": "builder-golden",
+  "kind": "command",
+  "description": "golden bounded Python command",
+  "action_digest": "sha256:2257a73875835124f8b2a439dd7efab6df4e10e5d693fd425be9bbbf3b82fed9",
+  "policy_decision_ref": "POLICY-golden-1",
+  "lease_id": "LEASE-golden-1",
+  "idempotency_key": "golden-1",
+  "rollback_ref": null,
+  "command": {
+    "argv": [
+      "<python>",
+      "-c",
+      "print('ok')"
+    ],
+    "path_args": []
+  },
+  "status": "proposed"
+}

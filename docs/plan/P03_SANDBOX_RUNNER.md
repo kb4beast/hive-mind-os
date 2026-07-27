@@ -168,13 +168,37 @@ python - <<'EOF'
 import tempfile, sys
 from pathlib import Path
 sys.path.insert(0, "src")
+from hive_mind_os.autonomy import EpisodeAllowance
+from hive_mind_os.contracts import tool_intent_digest
+from hive_mind_os.receipts import FileReceiptValidator
 from hive_mind_os.sandbox import SandboxRunner, SandboxSpec
-# minimal smoke: run `python -c print('ok')` inside a tmp root and validate the returned receipt
+with tempfile.TemporaryDirectory() as td:
+    base = Path(td); root = base / "workspace"; root.mkdir()
+    intent = {
+        "schema_version": 1, "action_id": "ACT-smoke", "mission_id": "mission-smoke",
+        "state_ref": "MISSION_STATE:mission-smoke:1", "actor_id": "builder-smoke",
+        "kind": "command", "description": "sandbox smoke",
+        "action_digest": "sha256:" + "0" * 64,
+        "policy_decision_ref": "POLICY-smoke", "lease_id": "LEASE-smoke",
+        "idempotency_key": "smoke", "rollback_ref": None,
+        "command": {"argv": [sys.executable, "-c", "print('ok')"], "path_args": []},
+        "status": "proposed",
+    }
+    intent["action_digest"] = tool_intent_digest(intent)
+    runner = SandboxRunner(
+        SandboxSpec(root, argv_allowlist=(Path(sys.executable).name,)),
+        base / "evidence", EpisodeAllowance(1, 1.0),
+    )
+    runner.run(intent); assert runner.last_reference is not None
+    result = FileReceiptValidator(base / "evidence").validate(
+        runner.last_reference, mission_id=intent["mission_id"],
+        state_ref=intent["state_ref"], actor_id=intent["actor_id"],
+        action_id=intent["action_id"], action_kind="command",
+        action_digest=intent["action_digest"],
+    )
+    assert result.valid and result.succeeded
 EOF
 ```
-
-(The final smoke block above must be made concrete in the phase implementation — the
-executor completes it as a working snippet and records it in the completion record.)
 
 ## 11. Evidence
 
@@ -202,3 +226,41 @@ rlimits.
 - Do not loosen `tool-intent`/`tool-receipt` schema validation to "make receipts easier".
 - Do not claim network isolation — the ADR must state plainly it is not provided at this
   tier.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-27T17:16:17Z
+- Executor (model/agent identity): Codex primary Builder/Integrator; independent Curator,
+  Judge, and Orchestrator review is required on the complete pull-request candidate.
+- Branch and audited implementation commit: `phase/P03-sandbox-runner`;
+  `d6988b260cefc19a7588dec61e2c5de3e209be75` includes the reviewed timeout, concurrency,
+  denial-evidence, non-object-input, and process-creation-exception repairs on the current
+  P02-bearing `main`; the audit was collected from clean completion candidate
+  `c0c777917c79fbcbcf69208effc59a757515bb75`.
+- Gates before the final replacement audit: 19 targeted sandbox tests ran on Windows (18
+  passed, the POSIX-only symlink case skipped; 3 subtests passed); constitutional discovery
+  ran 169 tests (167 passed, 2 skipped); 1,698 subtests passed; Ruff 0.16.0, Pyright
+  1.1.411, and the schema catalog passed.
+- Concrete runner/validator smoke: passed; ephemeral receipt digest
+  `sha256:5c2ad2b87a5d8b3fd6d544467beb199132a006f9e4bda0701ca80e10af841cb0`.
+- Audit artifact: `evidence/audits/P03-post.json` (digest:
+  `sha256:131e4e4bff190e755607f49322d66120e58babf1a9985f89d841f2afb7060051`);
+  the final evidence commit cannot contain its own SHA.
+- Constitutional schema delta: `tool-intent.command` and `tool-receipt.execution` were
+  added under proposed ADR-007 with catalog, golden-fixture, mutation, and validator
+  regressions. Historical non-command documents remain compatible; untyped command intents
+  now fail closed.
+- Preserved limitations: this is a process tier, not hard filesystem or network isolation;
+  Windows resource enforcement is best effort; local receipts are neither externally
+  authenticated nor append-only; existing legacy subprocess callers remain out of scope.
+- Preserved dissent: the first consolidated review rejected candidate `68f0613` after
+  reproducing an early-parent-exit descendant timeout bypass, concurrent allowance
+  overbooking, and missing denial evidence for digest/confinement/NUL failures. The repaired
+  candidate closed those cases. Curator re-review then reproduced raw `SubprocessError` and
+  non-object-intent `AttributeError` escapes; the implementation commit above closes both.
+  Final exact-candidate re-review remains a delivery gate.
+- New blocker: `B-OPS-06` tracks the hard container/VM isolation tier and cannot be
+  represented as resolved by this phase.
+- Production readiness, release readiness, hostile-code isolation, and superiority are not
+  claimed.
