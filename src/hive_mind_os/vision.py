@@ -43,6 +43,7 @@ class SystemCapability(StrEnum):
     RUN_RECURSIVE_EXPERIMENTS = "run_recursive_experiments"
     DETECT_METRIC_GAMING = "detect_metric_gaming"
     STOP_DIMINISHING_RETURNS = "stop_diminishing_returns"
+    SIMULATE_CLASSIC_GPT = "simulate_classic_gpt"
 
 
 REQUIRED_ROLES: tuple[Role, ...] = (
@@ -86,11 +87,15 @@ class HardenedVisionContract:
         "protected_holdout_access",
         "unbounded_recursive_improvement",
         "self_weight_modification",
+        "simulated_tool_execution_claimed_as_real",
+        "implicit_memory_as_authoritative",
+        "unlabeled_role_blending",
     )
     source_references: tuple[str, ...] = (
         "user-supplied:founding-prompt",
         "user-supplied:new-team-model-images",
         "user-supplied:mission-control-video",
+        "user-supplied:classic-gpt-simulation-instruction",
         "https://github.com/rangerrick337/operator-os/tree/main",
         "https://github.com/nousresearch/hermes-agent",
         "https://www.youtube.com/watch?v=mazBhCg3urw",
