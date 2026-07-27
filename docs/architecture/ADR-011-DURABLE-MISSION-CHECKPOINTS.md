@@ -28,6 +28,13 @@ refused to overwrite it. The repaired rule removes only a local workspace whose 
 has no completed checkpoint or matching receipt, then rematerializes it. A recorded
 workspace with digest drift remains blocked and is never silently rebuilt.
 
+The first post-commit audit preserved in `evidence/audits/P06-post-timeout.json` exposed a
+second concrete boundary: the audit runner's 300-second command ceiling terminated the
+now-mandatory full suite, whose durable Windows recovery sweep takes about nine minutes.
+The audit remained fail-closed and marked itself incomplete. The repaired ceiling is 1,200
+seconds; timeout, output, process-tree termination, and result-recognition controls remain
+unchanged.
+
 ## Court record
 
 - **Advocate:** add a versioned SQLite `MissionStore`, canonical intent checkpoints, a
@@ -64,6 +71,9 @@ obligations remain assigned to P12.
 8. Expose offline `missions` and `resume` CLI operations. P06 durable resume is limited to
    the deterministic scripted repository backend; durable provider-call replay belongs to
    later provider and scheduler work.
+9. Permit the deterministic post-commit audit command up to 1,200 seconds so the required
+   recovery suite can complete. A timeout still terminates the process tree, returns 124,
+   and makes the audit incomplete.
 
 ## Threats and controls
 
@@ -77,6 +87,7 @@ obligations remain assigned to P12.
 | Persisted intent is edited | Canonical digest is recomputed on read; mismatch fails closed | State-directory access control remains an operational concern |
 | Unknown database format is opened | Version stamp mismatch closes the connection and fails closed | Schema migration is deferred until a second version exists |
 | Durable state is mistaken for distributed scheduling | P06 is explicitly single writer | Leases, queues, heartbeats, and contention belong to P11 |
+| Required audit suite exceeds its collector budget | 1,200-second ceiling covers the measured nine-minute Windows run | A genuine hang still consumes up to the declared ceiling before failing closed |
 
 ## Acceptance evidence
 
@@ -90,6 +101,8 @@ obligations remain assigned to P12.
 - A real Windows process-tree termination during Explorer materialization resumes to a
   successful delivery with 18 completed checkpoints, 18 idempotency records, and zero
   duplicate intent digests.
+- The original 300-second audit timeout remains preserved as incomplete evidence; the
+  repaired audit completes under the 1,200-second ceiling.
 - Full tests, Ruff, Pyright, the P06 audit, and one consolidated independent review must
   pass on the final exact candidate before adoption.
 
