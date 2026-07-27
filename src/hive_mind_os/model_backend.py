@@ -15,7 +15,7 @@ from hashlib import sha256
 from typing import Any
 from urllib.parse import urlsplit
 
-from .autonomy import AutonomyBudget
+from .autonomy import AutonomyBudget, BudgetExceeded
 from .contracts import validate_contract
 from .ledger import EvidenceLedger
 from .model_provider import (
@@ -23,6 +23,7 @@ from .model_provider import (
     ModelProviderError,
     ModelRequest,
     ModelResponse,
+    ModelResponseError,
     redact,
 )
 from .models import AgentResult, Evidence, Objective, WorkItem
@@ -69,74 +70,74 @@ class ModelBackend:
         )
         corrective: str | None = None
         last_error = "model did not return a valid turn"
-        for retry_index in range(self.provider.config.max_retries + 1):
-            request = ModelRequest(system, user, corrective)
-            body = self.provider.build_request_body(request)
-            response: ModelResponse | None = None
-            started = time.monotonic()
-            try:
-                allowance = self.budget.issue_allowance()
-                estimated_tokens = max(1, (len(system) + len(user)) // 4)
-                compute_units = (
+        allowance = self.budget.issue_allowance()
+        used_calls = 0
+        used_compute = 0.0
+        try:
+            for retry_index in range(self.provider.config.max_retries + 1):
+                request = ModelRequest(system, user, corrective)
+                body = self.provider.build_request_body(request)
+                response: ModelResponse | None = None
+                started = time.monotonic()
+                estimated_tokens = max(1, len(body) // 4)
+                request_compute = (
                     estimated_tokens + self.provider.config.max_output_tokens
                 ) / 1000.0
+                if (
+                    used_calls + 1 > allowance.tool_calls
+                    or used_compute + request_compute > allowance.compute_units
+                ):
+                    raise BudgetExceeded("role-turn allowance exhausted before model request")
+                used_calls += 1
+                used_compute += request_compute
+                try:
+                    response = await asyncio.to_thread(
+                        self.provider.complete_once, request
+                    )
+                    turn = self._parse_turn(response.content, contract)
+                    self._record_call(
+                        objective,
+                        contract,
+                        work_item,
+                        body,
+                        response,
+                        retry_index,
+                        time.monotonic() - started,
+                        "succeeded",
+                        truncated,
+                    )
+                    return self._to_result(turn, contract, work_item)
+                except ModelTurnError as error:
+                    last_error = str(error)
+                    self._record_call(
+                        objective, contract, work_item, body, response, retry_index,
+                        time.monotonic() - started, "invalid_output", truncated,
+                        error=last_error,
+                    )
+                    corrective = (
+                        "Your previous response was invalid. Return only JSON matching the "
+                        f"required contract. Validation error: {last_error}"
+                    )
+                except ModelProviderError as error:
+                    if isinstance(error, ModelResponseError):
+                        response = ModelResponse("", error.raw_body, None, None)
+                    last_error = redact(str(error))
+                    self._record_call(
+                        objective, contract, work_item, body, response, retry_index,
+                        time.monotonic() - started, "provider_failure", truncated,
+                        error=last_error,
+                    )
+                    if retry_index >= self.provider.config.max_retries:
+                        raise
+            raise ModelTurnError(
+                f"model output remained invalid after "
+                f"{self.provider.config.max_retries + 1} attempts: {last_error}"
+            )
+        finally:
+            if used_calls:
                 self.budget.consume(
-                    allowance, tool_calls=1, compute_units=compute_units
+                    allowance, tool_calls=used_calls, compute_units=used_compute
                 )
-                response = await asyncio.to_thread(
-                    self.provider.complete_once, request
-                )
-                turn = self._parse_turn(response.content, contract)
-                self._record_call(
-                    objective,
-                    contract,
-                    work_item,
-                    body,
-                    response,
-                    retry_index,
-                    time.monotonic() - started,
-                    "succeeded",
-                    truncated,
-                )
-                return self._to_result(turn, contract, work_item)
-            except ModelTurnError as error:
-                last_error = str(error)
-                self._record_call(
-                    objective,
-                    contract,
-                    work_item,
-                    body,
-                    response,
-                    retry_index,
-                    time.monotonic() - started,
-                    "invalid_output",
-                    truncated,
-                    error=last_error,
-                )
-                corrective = (
-                    "Your previous response was invalid. Return only JSON matching the "
-                    f"required contract. Validation error: {last_error}"
-                )
-            except ModelProviderError as error:
-                last_error = redact(str(error))
-                self._record_call(
-                    objective,
-                    contract,
-                    work_item,
-                    body,
-                    response,
-                    retry_index,
-                    time.monotonic() - started,
-                    "provider_failure",
-                    truncated,
-                    error=last_error,
-                )
-                if retry_index >= self.provider.config.max_retries:
-                    raise
-        raise ModelTurnError(
-            f"model output remained invalid after "
-            f"{self.provider.config.max_retries + 1} attempts: {last_error}"
-        )
 
     def _prompt(
         self,

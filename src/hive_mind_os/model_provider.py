@@ -35,6 +35,10 @@ class ModelTransportError(ModelProviderError):
 class ModelResponseError(ModelProviderError):
     """Raised when a provider response cannot be interpreted."""
 
+    def __init__(self, message: str, raw_body: bytes) -> None:
+        super().__init__(message)
+        self.raw_body = raw_body
+
 
 @dataclass(frozen=True, slots=True)
 class ProviderConfig:
@@ -130,10 +134,11 @@ def _decode_object(raw: bytes, secret: str) -> dict[str, object]:
         value = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ModelResponseError(
-            redact(f"provider returned invalid UTF-8 JSON: {error}", (secret,))
+            redact(f"provider returned invalid UTF-8 JSON: {error}", (secret,)),
+            raw,
         ) from None
     if not isinstance(value, dict):
-        raise ModelResponseError("provider response must be a JSON object")
+        raise ModelResponseError("provider response must be a JSON object", raw)
     return value
 
 
@@ -240,9 +245,13 @@ class OpenAICompatibleProvider(_BaseProvider):
             first = choices[0]  # type: ignore[index]
             content = first["message"]["content"]  # type: ignore[index]
         except (KeyError, IndexError, TypeError):
-            raise ModelResponseError("OpenAI-compatible response lacks message content") from None
+            raise ModelResponseError(
+                "OpenAI-compatible response lacks message content", raw
+            ) from None
         if not isinstance(content, str):
-            raise ModelResponseError("OpenAI-compatible message content must be a string")
+            raise ModelResponseError(
+                "OpenAI-compatible message content must be a string", raw
+            )
         usage = value.get("usage")
         usage_map = usage if isinstance(usage, dict) else {}
         return ModelResponse(
@@ -289,9 +298,9 @@ class AnthropicProvider(_BaseProvider):
             blocks = value["content"]
             content = blocks[0]["text"]  # type: ignore[index]
         except (KeyError, IndexError, TypeError):
-            raise ModelResponseError("Anthropic response lacks text content") from None
+            raise ModelResponseError("Anthropic response lacks text content", raw) from None
         if not isinstance(content, str):
-            raise ModelResponseError("Anthropic text content must be a string")
+            raise ModelResponseError("Anthropic text content must be a string", raw)
         usage = value.get("usage")
         usage_map = usage if isinstance(usage, dict) else {}
         return ModelResponse(
