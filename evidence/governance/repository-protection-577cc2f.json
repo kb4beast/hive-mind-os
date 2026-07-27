@@ -1,0 +1,42 @@
+{
+  "evidence": {
+    "schema_version": 1,
+    "artifact_type": "RepositoryProtectionObservation",
+    "observed_at": "2026-07-27T10:05:57.0409426Z",
+    "repository": "kb4beast/hive-mind-os",
+    "implementation_commit": "577cc2f3bad9c7c78dd372a8207a871b8a06eb35",
+    "observer": "builder-stage0-primary",
+    "tool": "gh version 2.92.0 (2026-04-28)",
+    "observations": [
+      {
+        "command": [
+          "gh",
+          "api",
+          "repos/kb4beast/hive-mind-os/rulesets"
+        ],
+        "http_status": 200,
+        "response": []
+      },
+      {
+        "command": [
+          "gh",
+          "api",
+          "repos/kb4beast/hive-mind-os/branches/main/protection"
+        ],
+        "http_status": 404,
+        "response": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        }
+      }
+    ],
+    "conclusion": "required_host_protection_absent",
+    "blocking_obligation": "Apply and independently verify equivalent active repository rules before protected-governance completion is claimed.",
+    "mutation_performed": false
+  },
+  "integrity": {
+    "canonicalization": "json-sort-keys-utf8-v1",
+    "digest": "sha256:be1dd52c43345b20ec9749d43cbf460662692ebec62dbfb7ab490bfe93e3f2a7"
+  }
+}
