@@ -168,8 +168,8 @@ there; Stage 0 hardening is closed to speculative expansion.
 ---
 ## Completion record
 - Date (UTC): 2026-07-27T16:31:01Z
-- Executor (model/agent identity): Codex primary Builder/Integrator; consolidated independent
-  review is recorded on the P01 pull request.
+- Executor (model/agent identity): Codex primary Builder/Integrator; independent Curator,
+  Judge, and Orchestrator identities are separate from this executor.
 - Branch and final commit SHA: `phase/P01-stage0-closeout`; audited implementation commit
   `b29deaec9757df922160ab49ec259a5507211131`. The pull-request head records the final metadata
   commit because a commit cannot contain its own SHA.
