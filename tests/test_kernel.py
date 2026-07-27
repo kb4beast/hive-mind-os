@@ -31,6 +31,15 @@ class KernelTests(unittest.TestCase):
         )
         self.assertFalse(decision.allowed)
 
+    def test_non_delegable_invariant_cannot_be_overridden_by_full_autonomy(self) -> None:
+        decision = PolicyEngine(AutonomyLevel.GOVERNED_FULL).decide(
+            Role.OPTIMIZER,
+            Action.MUTATE_POLICY,
+            RiskTier.LOW,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertIn("non-delegable", decision.reason)
+
     def test_point_in_time_replay_never_exposes_target_or_future(self) -> None:
         start = datetime(2026, 1, 1, tzinfo=timezone.utc)
         commits = [
