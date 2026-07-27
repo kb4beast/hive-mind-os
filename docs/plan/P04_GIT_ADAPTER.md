@@ -211,3 +211,26 @@ reversibility check; no merge authority exists anywhere in the adapter.
   merges, rebases, history rewriting, submodule/LFS support, or production-readiness claim.
   Existing source-ingestion, hard-isolation, repository-protection, and authenticated
   evidence obligations remain open in their assigned later phases.
+
+### Cross-platform golden appeal
+
+- Exact candidate `420899e09744e77b4714efce25e9b6a9b3aa4711` passed Windows gates but
+  failed every Linux unit job because `git format-patch` serialized different raw bytes:
+  the Windows digest was `sha256:cc3d8d4d72ed59fe4c4bd5e37f64a442cfc3e5411375d80ddc8c4e120510a748`
+  and the truncated Linux assertion log exposed the differing prefix
+  `sha256:2e89b74e692bb44a0553a25951a3b1788974a2b21` without printing the full digest.
+- The failure occurred only in the normalized golden comparison after the per-run artifact
+  digest, bundle reconstruction, exact head/tree, patch application, canonical patch, file
+  list, diff digest, and receipt checks had passed.
+- Repair commit `b225538a63ac930c3b8648d891e43c059d1ec033` normalizes only the raw bundle
+  and patch serialization digests in the golden. Runtime manifests retain exact SHA-256
+  digests, and `verify_delivery` still requires exact bytes for that Git environment and an
+  independently reconstructed tree.
+- Repaired local gates: 13 targeted tests and 10 subtests; full suite 182 passed, 2 skipped,
+  and 1,718 subtests; Ruff and Pyright clean.
+- Additive audit: `evidence/audits/P04-ci-repair.json`, collected from the clean repair
+  commit above; digest
+  `sha256:a8cea1240e7f771a6b773ad2131635ceb5db9b4950341e0a50b63065219b0031`;
+  result `complete: true`, with no failures.
+- The failing candidate, original audit, and GitHub logs remain preserved. Exact-head
+  GitHub rerun and the single consolidated independent review remain delivery gates.
