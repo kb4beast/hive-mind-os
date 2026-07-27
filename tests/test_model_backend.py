@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import os
 import unittest
+import urllib.error
 from dataclasses import dataclass
+from hashlib import sha256
 from unittest.mock import patch
 
 from hive_mind_os.autonomy import AutonomyBudget, BudgetExceeded
@@ -68,13 +71,15 @@ class FakeProvider:
 
 
 class BackendTransport:
-    def __init__(self, raw: bytes) -> None:
-        self.raw = raw
+    def __init__(self, response: bytes | BaseException) -> None:
+        self.response = response
         self.calls = 0
 
     def post(self, url, headers, body, timeout_s):
         self.calls += 1
-        return self.raw
+        if isinstance(self.response, BaseException):
+            raise self.response
+        return self.response
 
 
 def execute_once(backend: ModelBackend, role: Role = Role.ARCHITECT, context=()):
@@ -157,6 +162,39 @@ class ModelBackendTests(unittest.TestCase):
         payload = ledger.events()[0]["payload"]
         self.assertEqual(payload["outcome"], "provider_failure")
         self.assertIsNotNone(payload["response_digest"])
+
+    def test_http_error_response_body_is_digested(self) -> None:
+        raw = b'{"error":"bad request"}'
+        error = urllib.error.HTTPError(
+            "https://models.example/v1/chat/completions",
+            400,
+            "bad request",
+            {},
+            io.BytesIO(raw),
+        )
+        transport = BackendTransport(error)
+        config = ProviderConfig(
+            ProviderKind.OPENAI_COMPATIBLE,
+            "https://models.example/v1",
+            "model",
+            "TEST_MODEL_KEY",
+            max_retries=0,
+        )
+        ledger = EvidenceLedger()
+        with patch.dict(os.environ, {"TEST_MODEL_KEY": "secret"}):
+            with self.assertRaises(ModelResponseError):
+                execute_once(
+                    ModelBackend(
+                        OpenAICompatibleProvider(config, transport),
+                        ledger=ledger,
+                    )
+                )
+        payload = ledger.events()[0]["payload"]
+        self.assertEqual(payload["outcome"], "provider_failure")
+        self.assertEqual(
+            payload["response_digest"],
+            f"sha256:{sha256(raw).hexdigest()}",
+        )
 
     def test_context_truncation_is_actual_and_deterministic(self) -> None:
         prior = AgentResult(

@@ -182,6 +182,16 @@ class _BaseProvider:
                 body,
                 self.config.timeout_s,
             )
+        except urllib.error.HTTPError as error:
+            try:
+                raw = error.read()
+            finally:
+                error.close()
+            message = redact(
+                f"model provider returned HTTP {error.code}: {error.reason}",
+                (api_key,),
+            )
+            raise ModelResponseError(message, raw) from None
         except (TimeoutError, OSError, urllib.error.URLError) as error:
             message = redact(
                 f"model transport failed: {type(error).__name__}: {error}",
