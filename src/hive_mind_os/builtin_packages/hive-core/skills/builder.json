@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.builder",
+  "name": "Receipt-backed implementation",
+  "description": "Build the smallest complete bounded change in isolation with executable verification.",
+  "instruction_path": "skills/instructions/builder.json",
+  "requested_capabilities": ["write_workspace", "run_commands", "create_branch", "open_pull_request"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}

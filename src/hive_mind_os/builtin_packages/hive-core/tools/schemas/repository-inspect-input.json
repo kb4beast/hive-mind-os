@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/tools/v1/repository-inspect-input.json",
+  "title": "Repository Inspect Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["repository", "path"],
+  "properties": {
+    "repository": {"type": "string", "minLength": 1},
+    "path": {"type": "string", "minLength": 1}
+  }
+}

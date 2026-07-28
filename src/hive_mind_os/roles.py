@@ -14,6 +14,10 @@ class RoleContract:
     quality_gates: tuple[str, ...]
 
 
+# This compatibility facade is intentionally independent of the extension
+# catalog. Optional or candidate package resources must never prevent the
+# constitutional runtime from importing. Package parity is enforced by tests
+# and by the separately loaded hive-core catalog.
 ROLE_CONTRACTS: dict[Role, RoleContract] = {
     Role.ORCHESTRATOR: RoleContract(
         Role.ORCHESTRATOR,
@@ -50,12 +54,12 @@ ROLE_CONTRACTS: dict[Role, RoleContract] = {
         ("read_repository", "run_tests", "inspect_diff", "security_scan"),
         ("claims have evidence", "critical regressions are absent"),
     ),
-    Role.OPTIMIZER: RoleContract(
-        Role.OPTIMIZER,
-        "Measure outcomes, run controlled experiments, and improve the system.",
-        ("metrics", "experiment result", "improvement proposal"),
-        ("query_ledger", "run_evaluations", "propose_skill_change"),
-        ("improvement beats baseline", "regressions stay within budget"),
+    Role.INTEGRATOR: RoleContract(
+        Role.INTEGRATOR,
+        "Connect systems, data, tools, and workflows through stable contracts.",
+        ("integration contract", "compatibility result", "data lineage"),
+        ("inspect_interfaces", "write_adapters", "run_contract_tests"),
+        ("contracts are versioned", "provenance is preserved"),
     ),
     Role.STEWARD: RoleContract(
         Role.STEWARD,
@@ -64,17 +68,15 @@ ROLE_CONTRACTS: dict[Role, RoleContract] = {
         ("inspect_runtime", "manage_dependencies", "write_workspace", "run_tests"),
         ("system remains recoverable", "maintenance reduces measured risk"),
     ),
-    Role.INTEGRATOR: RoleContract(
-        Role.INTEGRATOR,
-        "Connect systems, data, tools, and workflows through stable contracts.",
-        ("integration contract", "compatibility result", "data lineage"),
-        ("inspect_interfaces", "write_adapters", "run_contract_tests"),
-        ("contracts are versioned", "provenance is preserved"),
+    Role.OPTIMIZER: RoleContract(
+        Role.OPTIMIZER,
+        "Measure outcomes, run controlled experiments, and improve the system.",
+        ("metrics", "experiment result", "improvement proposal"),
+        ("query_ledger", "run_evaluations", "propose_skill_change"),
+        ("improvement beats baseline", "regressions stay within budget"),
     ),
 }
 
-# Dependency order for a complete product-and-engineering loop. Each role is an
-# independent agent; ordering only expresses evidence dependencies.
 DEFAULT_LIFECYCLE: tuple[Role, ...] = (
     Role.ORCHESTRATOR,
     Role.EXPLORER,

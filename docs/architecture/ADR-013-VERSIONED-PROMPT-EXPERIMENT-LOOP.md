@@ -124,3 +124,45 @@ artifact bindings, and permits discrepancies only when they exactly match the ad
 adverse manifest. Fresh experiment `EXP-98c64c11-bd9c-47a5-a376-d39fad641332` must
 have no direct or nested mismatch. This adapts the retention control; it does not promote
 the capability beyond scripted/local maturity.
+
+### Append-only promotion-decision appeal
+
+A later hostile review reproduced a direct-call bypass: `PromptRegistry.promote`
+could move a non-generation-zero champion pointer when supplied only an
+experiment label and an arbitrary `promoted_by` string. The recursive gate
+normally preceded that call, but the registry did not prove the gate decision
+from append-only evidence and therefore allowed an author or other caller to
+promote directly.
+
+The repaired registry permits an event-free exception only for generation-zero
+bootstrap when the experiment is exactly `generation-0`, the expected champion
+and registered parent are both null, and the registration author is the
+promoter. Every later promotion must cite the sequence of an existing
+append-only `experiment.decision` ledger event. The registry verifies the event
+run, type, `KEEP` verdict, role, candidate and current digests, matching
+registration experiment, role, author and parent, retained artifact references,
+contract fingerprint, and four distinct proposer, builder, evaluator, and
+judge identity labels. The event actor and `promoted_by` must both be the
+recorded judge.
+
+The subsequent architecture cross-examination rejected a same-path runner
+decision and promotion as independent authorization. `ExperimentRunner` now
+records an `experiment.evaluation` and, for a `KEEP` recommendation, a
+`pending-independent-court` promotion appeal. It does not append the
+authoritative `experiment.decision` event and does not move the champion
+pointer. The gate also quarantines proposer-equals-builder, in addition to its
+existing evaluator separation.
+
+`RecursiveImprovementController.evaluate()` is explicitly a non-authoritative
+simulation surface. It retains verdict history and a pending candidate
+recommendation but never changes `champion_id`; only `PromptRegistry` may move
+the authoritative pointer after validating the append-only decision event.
+
+Direct `PromptRegistry.promote()` remains a low-level compatibility boundary
+that validates a cited decision event but does not authenticate its identity
+labels. Therefore no built-in runtime path invokes it for a challenger, and a
+caller able to forge all four labels and append ledger events remains an
+explicit blocker. Cryptographically authenticated actors, policy/lease-bound
+court authorization, multi-process locking, and an independent production
+promotion service remain deferred. This repair closes self-promotion by the
+experiment runner but does not raise the scripted/local maturity claim.

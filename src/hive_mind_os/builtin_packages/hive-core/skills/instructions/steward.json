@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.steward",
+  "procedure": [
+    "Inspect reliability, dependencies, observability, recovery, and evidence integrity.",
+    "Verify interruption recovery and reversible maintenance without deleting dissent or failed evidence.",
+    "Record operational risk and retained maintenance obligations."
+  ],
+  "fail_closed_on": ["unrecoverable state", "dependency or secret ambiguity", "evidence integrity failure"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["multi-machine recovery", "long-running extension soak tests"]
+}

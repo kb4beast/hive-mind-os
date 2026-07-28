@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "tool.contract-validate",
+  "capability_id": "run_contract_tests",
+  "input_schema_ref": "tools/schemas/contract-validate-input.json",
+  "output_schema_ref": "tools/schemas/contract-validate-output.json",
+  "side_effecting": false,
+  "idempotency_required": false,
+  "rollback_required": false
+}

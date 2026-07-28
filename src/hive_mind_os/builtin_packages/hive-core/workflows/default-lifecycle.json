@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "component_id": "workflow.default-lifecycle",
+  "initial_state": "start",
+  "terminal_states": ["complete"],
+  "transitions": [
+    {
+      "from_state": "start",
+      "to_state": "orchestrator",
+      "event": "advance",
+      "allowed_role_bindings": ["orchestrator"],
+      "required_evidence": ["objective"]
+    },
+    {
+      "from_state": "orchestrator",
+      "to_state": "explorer",
+      "event": "advance",
+      "allowed_role_bindings": ["explorer"],
+      "required_evidence": ["execution plan"]
+    },
+    {
+      "from_state": "explorer",
+      "to_state": "architect",
+      "event": "advance",
+      "allowed_role_bindings": ["architect"],
+      "required_evidence": ["evidence map"]
+    },
+    {
+      "from_state": "architect",
+      "to_state": "builder",
+      "event": "advance",
+      "allowed_role_bindings": ["builder"],
+      "required_evidence": ["architecture"]
+    },
+    {
+      "from_state": "builder",
+      "to_state": "curator",
+      "event": "advance",
+      "allowed_role_bindings": ["curator"],
+      "required_evidence": ["implementation", "tests"]
+    },
+    {
+      "from_state": "curator",
+      "to_state": "integrator",
+      "event": "advance",
+      "allowed_role_bindings": ["integrator"],
+      "required_evidence": ["verification report"]
+    },
+    {
+      "from_state": "integrator",
+      "to_state": "steward",
+      "event": "advance",
+      "allowed_role_bindings": ["steward"],
+      "required_evidence": ["compatibility result"]
+    },
+    {
+      "from_state": "steward",
+      "to_state": "optimizer",
+      "event": "advance",
+      "allowed_role_bindings": ["optimizer"],
+      "required_evidence": ["health report"]
+    },
+    {
+      "from_state": "optimizer",
+      "to_state": "complete",
+      "event": "advance",
+      "allowed_role_bindings": ["optimizer"],
+      "required_evidence": ["experiment result"]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.curator",
+  "name": "Independent verification",
+  "description": "Reproduce material claims and fail closed on trust, provenance, security, and release gaps.",
+  "instruction_path": "skills/instructions/curator.json",
+  "requested_capabilities": ["read_repository", "run_tests", "inspect_diff", "security_scan"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}

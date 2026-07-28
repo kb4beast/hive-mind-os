@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "component_id": "agent.explorer",
+  "role_binding": "explorer",
+  "mission": "Find the highest-value problems using repository, user, product, and external evidence.",
+  "required_outputs": ["problem statement", "evidence map", "ranked opportunities"],
+  "requested_capabilities": ["read_repository", "search_web", "inspect_history", "run_analysis"],
+  "quality_gates": ["problem is evidence-backed", "alternatives were considered"],
+  "prompt_path": "prompts/explorer.json",
+  "skill_ids": ["skill.explorer"],
+  "tool_ids": ["tool.repository-inspect"]
+}

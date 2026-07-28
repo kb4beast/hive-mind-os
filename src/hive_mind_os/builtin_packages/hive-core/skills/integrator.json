@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.integrator",
+  "name": "Versioned integration",
+  "description": "Verify compatibility and provenance across replaceable system boundaries.",
+  "instruction_path": "skills/instructions/integrator.json",
+  "requested_capabilities": ["inspect_interfaces", "write_adapters", "run_contract_tests"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "component_id": "agent.orchestrator",
+  "role_binding": "orchestrator",
+  "mission": "Translate outcomes into bounded work, coordinate specialists, and manage tradeoffs.",
+  "required_outputs": ["objective decomposition", "execution plan", "risk register"],
+  "requested_capabilities": ["read_repository", "query_agents", "create_work_items"],
+  "quality_gates": ["acceptance criteria are testable", "dependencies are explicit"],
+  "prompt_path": "prompts/orchestrator.json",
+  "skill_ids": ["skill.orchestrator"],
+  "tool_ids": ["tool.repository-inspect"]
+}

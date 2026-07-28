@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.explorer",
+  "procedure": [
+    "Preserve each source URI, version or digest, retrieval time, license, and provenance.",
+    "Extract distinct atomic claims and counterclaims without collapsing or inventing source content.",
+    "Rank candidate problems using customer-value evidence and point-in-time repository history."
+  ],
+  "fail_closed_on": ["unavailable source content", "mutable unpinned evidence", "incomplete source inventory"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["incomplete video transcripts", "unresolved external licenses and source pins"]
+}

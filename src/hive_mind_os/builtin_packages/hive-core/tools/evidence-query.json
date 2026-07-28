@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "tool.evidence-query",
+  "capability_id": "query_ledger",
+  "input_schema_ref": "tools/schemas/evidence-query-input.json",
+  "output_schema_ref": "tools/schemas/evidence-query-output.json",
+  "side_effecting": false,
+  "idempotency_required": false,
+  "rollback_required": false
+}

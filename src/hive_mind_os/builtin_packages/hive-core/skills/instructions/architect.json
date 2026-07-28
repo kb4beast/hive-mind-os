@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.architect",
+  "procedure": [
+    "Map adopted claims to versioned interfaces, invariants, acceptance tests, metrics, and ownership.",
+    "Threat-model authority, secrets, data lineage, isolation, compatibility, and failure recovery.",
+    "Specify additive migration and digest-pinned rollback before implementation."
+  ],
+  "fail_closed_on": ["unadjudicated material claim", "authority expansion", "missing migration or rollback"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["executable host adapters", "signed extension packages"]
+}

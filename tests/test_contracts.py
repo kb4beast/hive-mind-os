@@ -7,6 +7,8 @@ from pathlib import Path
 
 from hive_mind_os.classic_gpt import ClassicGptSourcePack
 from hive_mind_os.contracts import (
+    EXTENSION_SCHEMA_NAMES,
+    LEGACY_SCHEMA_NAMES,
     ROLE_NAMES,
     SCHEMA_NAMES,
     load_schema,
@@ -15,9 +17,14 @@ from hive_mind_os.contracts import (
     validate_runtime_state,
     validate_schema_catalog,
 )
+from hive_mind_os.package_system import OODAState, validate_ooda_contract
 from hive_mind_os.source_docket import load_default_source_docket
 
 ROOT = Path(__file__).resolve().parents[1]
+LEGACY_SCHEMA_IDS = {
+    name: f"https://hive-mind-os.invalid/schemas/v1/{name}.schema.json"
+    for name in LEGACY_SCHEMA_NAMES
+}
 
 
 class ContractSchemaTests(unittest.TestCase):
@@ -27,12 +34,20 @@ class ContractSchemaTests(unittest.TestCase):
         return state
 
     def test_catalog_is_complete_strict_and_draft_2020_12(self) -> None:
-        self.assertEqual(len(SCHEMA_NAMES), 12)
+        self.assertEqual(len(LEGACY_SCHEMA_NAMES), 12)
+        self.assertEqual(len(EXTENSION_SCHEMA_NAMES), 8)
+        self.assertEqual(len(SCHEMA_NAMES), 20)
         result = validate_schema_catalog()
         self.assertTrue(result.valid, result.issues)
         for name in SCHEMA_NAMES:
             schema = load_schema(name)
             self.assertEqual(schema["additionalProperties"], False)
+
+    def test_legacy_schema_names_and_identifiers_are_unchanged(self) -> None:
+        self.assertEqual(
+            {name: load_schema(name)["$id"] for name in LEGACY_SCHEMA_NAMES},
+            LEGACY_SCHEMA_IDS,
+        )
 
     def test_runtime_example_validates_against_formal_contract(self) -> None:
         state = self.runtime_state()
@@ -206,6 +221,86 @@ class ContractSchemaTests(unittest.TestCase):
         for claim in docket.claims:
             result = validate_contract("claim", claim.to_contract())
             self.assertTrue(result.valid, (claim.id, result.issues))
+
+    def test_extension_component_identifiers_match_runtime_rules(self) -> None:
+        documents = {
+            "agent-component": {
+                "schema_version": 1,
+                "component_id": "agent.example",
+                "role_binding": "builder",
+                "mission": "Build the bounded change.",
+                "required_outputs": ["implementation"],
+                "requested_capabilities": ["read_repository"],
+                "quality_gates": ["evidence exists"],
+                "prompt_path": "prompts/builder.json",
+                "skill_ids": [],
+                "tool_ids": [],
+            },
+            "skill-component": {
+                "schema_version": 1,
+                "component_id": "skill.example",
+                "name": "Example",
+                "description": "An inert example skill.",
+                "instruction_path": "skills/example.json",
+                "requested_capabilities": [],
+                "reference_paths": [],
+                "test_refs": ["tests/test_example.py"],
+            },
+            "tool-component": {
+                "schema_version": 1,
+                "component_id": "tool.example",
+                "capability_id": "read_repository",
+                "input_schema_ref": "schemas/input.json",
+                "output_schema_ref": "schemas/output.json",
+                "side_effecting": False,
+                "idempotency_required": False,
+                "rollback_required": False,
+            },
+            "workflow-component": {
+                "schema_version": 1,
+                "component_id": "workflow.example",
+                "initial_state": "start",
+                "terminal_states": ["complete"],
+                "transitions": [
+                    {
+                        "from_state": "start",
+                        "to_state": "complete",
+                        "event": "advance",
+                        "allowed_role_bindings": ["builder"],
+                        "required_evidence": ["implementation"],
+                    }
+                ],
+            },
+        }
+        for schema_name, document in documents.items():
+            self.assertTrue(
+                validate_contract(schema_name, document).valid,
+                schema_name,
+            )
+            invalid = copy.deepcopy(document)
+            invalid["component_id"] = "INVALID ID"
+            self.assertFalse(validate_contract(schema_name, invalid).valid)
+
+    def test_package_trust_and_ooda_contracts_fail_closed(self) -> None:
+        package = json.loads(
+            (
+                ROOT
+                / "src"
+                / "hive_mind_os"
+                / "builtin_packages"
+                / "hive-core"
+                / "package.json"
+            ).read_text()
+        )
+        self.assertTrue(validate_contract("package-manifest", package).valid)
+        package["trust_state"] = "trusted"
+        package["license_status"] = "pending"
+        self.assertFalse(validate_contract("package-manifest", package).valid)
+
+        state = OODAState.initial(cycle_id="OODA-CONTRACT", mission_id="MISSION-1")
+        document = state.to_contract()
+        self.assertTrue(validate_contract("ooda-state", document).valid)
+        self.assertTrue(validate_ooda_contract(document).valid)
 
 
 if __name__ == "__main__":

@@ -8,5 +8,7 @@
 /src/hive_mind_os/source_docket.py @kb4beast
 /src/hive_mind_os/*_docket.py @kb4beast
 /src/hive_mind_os/schemas/ @kb4beast
+/src/hive_mind_os/package_system/ @kb4beast
+/src/hive_mind_os/builtin_packages/ @kb4beast
 /evidence/ @kb4beast
 /.github/ @kb4beast

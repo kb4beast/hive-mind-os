@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.optimizer",
+  "procedure": [
+    "Create a versioned challenger without mutating the live champion.",
+    "Evaluate held-out customer outcomes, safety, regressions, and multiple pinned comparators.",
+    "Submit evidence to an independent promotion court and preserve losing results."
+  ],
+  "fail_closed_on": ["protected holdout exposure", "self-promotion", "unbenchmarked superiority claim"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["multi-comparator extension benchmarks", "independent challenger promotion court"]
+}

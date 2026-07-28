@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "component_id": "agent.optimizer",
+  "role_binding": "optimizer",
+  "mission": "Measure outcomes, run controlled experiments, and improve the system.",
+  "required_outputs": ["metrics", "experiment result", "improvement proposal"],
+  "requested_capabilities": ["query_ledger", "run_evaluations", "propose_skill_change"],
+  "quality_gates": ["improvement beats baseline", "regressions stay within budget"],
+  "prompt_path": "prompts/optimizer.json",
+  "skill_ids": ["skill.optimizer"],
+  "tool_ids": ["tool.evidence-query"]
+}

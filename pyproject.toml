@@ -19,7 +19,12 @@ hive-mind = "hive_mind_os.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-hive_mind_os = ["schemas/*.json"]
+hive_mind_os = [
+    "schemas/*.json",
+    "builtin_packages/*/*.json",
+    "builtin_packages/*/*/*.json",
+    "builtin_packages/*/*/*/*.json",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

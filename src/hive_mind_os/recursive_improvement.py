@@ -182,6 +182,10 @@ class RecursiveImprovementGate:
         quarantine_reasons: list[str] = []
         if evidence.contract_fingerprint != self.contract.fingerprint:
             quarantine_reasons.append("recursive-improvement contract changed")
+        if evidence.proposer_id == evidence.builder_id:
+            quarantine_reasons.append(
+                "candidate proposer attempted to build its own challenger"
+            )
         if evidence.evaluator_id in {evidence.proposer_id, evidence.builder_id}:
             quarantine_reasons.append("acting agent attempted to evaluate its own candidate")
         if not evidence.artifact_refs:
@@ -325,13 +329,15 @@ class RecursiveImprovementGate:
 
 @dataclass(slots=True)
 class RecursiveImprovementController:
-    """Tracks a champion without erasing discarded, quarantined, or stopped experiments."""
+    """Simulate evaluations without changing an authoritative champion pointer."""
 
     contract: RecursiveImprovementContract
     champion_id: str
     experiments_completed: int = 0
     consecutive_non_improvements: int = 0
     decisions: list[ExperimentDecision] = field(default_factory=list)
+    pending_candidate_id: str | None = None
+    evaluated_candidate_ids: list[str] = field(default_factory=list)
 
     def evaluate(self, evidence: ExperimentEvidence) -> ExperimentDecision:
         if evidence.candidate.parent_champion_id != self.champion_id:
@@ -349,7 +355,8 @@ class RecursiveImprovementController:
 
         self.experiments_completed += 1
         self.decisions.append(decision)
+        self.evaluated_candidate_ids.append(evidence.candidate.id)
         self.consecutive_non_improvements = decision.next_non_improvement_count
         if decision.verdict is ExperimentVerdict.KEEP:
-            self.champion_id = evidence.candidate.id
+            self.pending_candidate_id = evidence.candidate.id
         return decision

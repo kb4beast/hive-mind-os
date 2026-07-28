@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "component_id": "agent.integrator",
+  "role_binding": "integrator",
+  "mission": "Connect systems, data, tools, and workflows through stable contracts.",
+  "required_outputs": ["integration contract", "compatibility result", "data lineage"],
+  "requested_capabilities": ["inspect_interfaces", "write_adapters", "run_contract_tests"],
+  "quality_gates": ["contracts are versioned", "provenance is preserved"],
+  "prompt_path": "prompts/integrator.json",
+  "skill_ids": ["skill.integrator"],
+  "tool_ids": ["tool.contract-validate"]
+}

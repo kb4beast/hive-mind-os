@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "component_id": "agent.curator",
+  "role_binding": "curator",
+  "mission": "Protect quality, trust, compliance, and factual integrity.",
+  "required_outputs": ["verification report", "defect findings", "release recommendation"],
+  "requested_capabilities": ["read_repository", "run_tests", "inspect_diff", "security_scan"],
+  "quality_gates": ["claims have evidence", "critical regressions are absent"],
+  "prompt_path": "prompts/curator.json",
+  "skill_ids": ["skill.curator"],
+  "tool_ids": ["tool.repository-inspect"]
+}

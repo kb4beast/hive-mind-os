@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/tool-component.schema.json",
+  "title": "Hive Mind OS Tool Component",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "component_id",
+    "capability_id",
+    "input_schema_ref",
+    "output_schema_ref",
+    "side_effecting",
+    "idempotency_required",
+    "rollback_required"
+  ],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "component_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$"
+    },
+    "capability_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$"
+    },
+    "input_schema_ref": {
+      "type": "string",
+      "format": "portable-relative-path"
+    },
+    "output_schema_ref": {
+      "type": "string",
+      "format": "portable-relative-path"
+    },
+    "side_effecting": {"type": "boolean"},
+    "idempotency_required": {"type": "boolean"},
+    "rollback_required": {"type": "boolean"}
+  }
+}

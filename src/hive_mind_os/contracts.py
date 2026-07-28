@@ -12,7 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from .receipts import portable_path_parts
 
-SCHEMA_NAMES = (
+LEGACY_SCHEMA_NAMES = (
     "artifact-manifest",
     "capability-lease",
     "claim",
@@ -26,6 +26,17 @@ SCHEMA_NAMES = (
     "tool-intent",
     "tool-receipt",
 )
+EXTENSION_SCHEMA_NAMES = (
+    "package-manifest",
+    "agent-component",
+    "skill-component",
+    "tool-component",
+    "workflow-component",
+    "host-capability-profile",
+    "ooda-state",
+    "war-room-event",
+)
+SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES)
 ROLE_NAMES = frozenset(
     {
         "orchestrator",
@@ -244,6 +255,13 @@ def validate_contract(name: str, document: Any) -> ContractValidation:
     except (KeyError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         return ContractValidation(False, (f"schema unavailable: {type(error).__name__}: {error}",))
     _validate_node(document, schema, "$", issues)
+    if name == "host-capability-profile":
+        from .package_system.host_profiles import HostCapabilityProfile
+
+        try:
+            HostCapabilityProfile.from_contract(document)
+        except ValueError as error:
+            issues.append(f"$: semantic host-profile validation failed: {error}")
     return ContractValidation(not issues, tuple(dict.fromkeys(issues)))
 
 

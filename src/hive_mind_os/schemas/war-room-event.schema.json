@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/war-room-event.schema.json",
+  "title": "Hive Mind OS War Room Projection Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "mission_id",
+    "occurred_at",
+    "event_type",
+    "severity",
+    "actor_id",
+    "summary",
+    "evidence_refs",
+    "ooda_cycle_ref",
+    "command_intent_ref"
+  ],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "event_id": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+    "mission_id": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "objective",
+        "observation",
+        "hypothesis",
+        "decision",
+        "dissent",
+        "policy",
+        "action",
+        "receipt",
+        "blocker",
+        "quarantine",
+        "rollback",
+        "outcome"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warning", "high", "critical"]
+    },
+    "actor_id": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+    "summary": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+    "evidence_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "ooda_cycle_ref": {"type": ["string", "null"], "minLength": 1, "pattern": ".*\\S.*"},
+    "command_intent_ref": {"type": ["string", "null"], "minLength": 1, "pattern": ".*\\S.*"}
+  }
+}
