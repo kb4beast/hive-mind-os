@@ -45,3 +45,20 @@ The follow-up repair:
 
 This record and the repair do not authorize release readiness, production operation,
 source completeness, authenticated independence, hostile-code isolation, or superiority.
+
+## Post-repair appeal
+
+The final independent review of repaired `main`
+`7fb152744f31b5543c5cdaf6a01152c10070871f` reproduced the Windows clean-checkout repair:
+the raw benchmark digest matched both bound records, the benchmark Git tree was unchanged,
+and exact-main CI passed.
+
+- Judge: **adopt — PERMIT**.
+- Orchestrator: **PERMIT**.
+- Curator: **BLOCK** because PR #20 marked `B-OPS-03` resolved by narrowing its original
+  non-substitution exit condition to P05's deterministic local artifact.
+
+The Curator's governance block controls. `B-OPS-03` is restored to `open` with its original
+real-capability burden, the missing provider-backed evidence is explicit, and the contrary
+permits remain preserved as dissent. No code, audit, source-docket, or benchmark evidence
+is changed by this truth-ledger correction.
