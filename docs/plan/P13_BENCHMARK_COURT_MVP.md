@@ -203,3 +203,30 @@ until a full multi-comparator court exists.
 - New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing
   multi-comparator and multi-family evidence obligations remain open; this run records
   measurements only and makes no comparative quality claim.
+
+### Constitutional-CI appeal
+
+- Challenged exact candidate:
+  `8c852eef09ba00e685d02a352dc1bead805aa67c`. All six Python unit-test jobs failed
+  because `tests/test_benchmark_harness.py` imported the undeclared `pytest` package
+  while constitutional CI installs the project without development dependencies and
+  runs `python -m unittest discover -s tests -v`.
+- Removing only the import would have made the module importable while silently leaving
+  its eight top-level pytest functions undiscovered by the constitutional runner. The
+  repair therefore converted the complete P13 suite to `unittest.TestCase`, replaced
+  pytest fixtures and exception helpers with stdlib equivalents, and retained pytest
+  compatibility.
+- Repaired implementation commit:
+  `24bba32113c46d3e5490bd075f90b9e394fc0cf7`. The focused suite passed all 8 tests
+  under both the constitutional unittest runner and pytest. The full constitutional
+  runner passed 275 tests with 2 skipped in 560.532 seconds; Ruff passed; Pyright
+  1.1.411 passed with 0 errors.
+- Fresh audit: `evidence/audits/P13-post-ci-repair.json`; canonical digest
+  `sha256:2c043414301b24a678e3bfe6ae3aab0cfbc8281659d1fd0668c504070dfa57b1`;
+  `complete=true`; failures none; audited head
+  `24bba32113c46d3e5490bd075f90b9e394fc0cf7`; audit pytest 273 passed.
+- The benchmark corpus, harness, raw 30-attempt measurement, verdict, budgets, and
+  comparative-claim guard are unchanged. Delivery remains blocked until one
+  consolidated independent Curator, Judge, and Orchestrator review permits the repaired
+  exact head. This appeal makes no comparative quality, source-completeness, release-
+  readiness, or superiority claim.
