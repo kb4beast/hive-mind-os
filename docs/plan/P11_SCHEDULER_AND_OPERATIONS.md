@@ -180,3 +180,31 @@ later target.
   fine" self-reports).
 - No UI state that renders missing evidence as success — this is a constitutional UI
   requirement, test it.
+
+---
+
+## Completion record
+
+- Date (UTC): 2026-07-28T12:58:16Z
+- Executor (model/agent identity): Codex primary Builder/Integrator. Per the user's
+  consolidated-review instruction, independent Curator, Judge, and Orchestrator review
+  is reserved for the final all-merged boundary; this record is not self-approval.
+- Branch and audited implementation commit: `phase/P11-scheduler-operations`;
+  `d12713480840474eb6021d4a56377980e8116d11`. The audit was collected from that clean
+  commit; the pull-request head contains the append-only audit/status follow-up.
+- Gates: P11 exit tests passed (14); full pytest passed (348 passed, 2 pre-existing
+  skips, 1,744 subtests); Ruff 0.16.0 passed; Pyright 1.1.411 passed with 0 errors.
+- Offline operational check: a fixture regression was enqueued, drained by two workers,
+  completed all eight roles, retained 45 receipt events, rendered `succeeded` in parsed
+  JSON, and produced a self-contained static HTML status page.
+- Reproduced repair: the first offline run exposed Windows path-budget exhaustion during
+  durable publication. Mission identifiers and scheduler delivery paths are now bounded;
+  the real durable-worker regression test reproduces successful publication and unique
+  adopted effect digests.
+- Audit artifact: `evidence/audits/P11-post.json`
+  (digest: `sha256:f864a338d59250903ac7c1a60c5f6b401c2f22191ffcda877a702c57f13459e3`;
+  complete: true; failures: none).
+- Deviations from the phase spec: none.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. P11 remains a
+  local single-machine capability and does not close existing source, real-provider,
+  authenticated-identity, hostile-isolation, or production-operation obligations.
