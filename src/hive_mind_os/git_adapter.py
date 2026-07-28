@@ -37,6 +37,7 @@ _GIT_CREDENTIAL_ENV = (
     "GIT_CONFIG_KEY_0",
     "GIT_CONFIG_VALUE_0",
 )
+_GIT_PLATFORM_ENV = ("SYSTEMROOT",) if os.name == "nt" else ()
 
 
 class GitOperationFailed(RuntimeError):
@@ -384,6 +385,7 @@ class GitWorkspace:
                     "GIT_CONFIG_NOSYSTEM",
                     "GIT_TERMINAL_PROMPT",
                     *_GIT_CREDENTIAL_ENV,
+                    *_GIT_PLATFORM_ENV,
                 ),
                 timeout_s=60.0,
                 max_output_bytes=10_000_000,
@@ -430,6 +432,7 @@ class GitWorkspace:
                     "GIT_CONFIG_NOSYSTEM",
                     "GIT_TERMINAL_PROMPT",
                     *_GIT_CREDENTIAL_ENV,
+                    *_GIT_PLATFORM_ENV,
                 ),
                 timeout_s=60.0,
                 max_output_bytes=10_000_000,

@@ -160,6 +160,8 @@ class GitAdapterTests(unittest.TestCase):
             ),
             COMMIT_TWO_SHA,
         )
+        if os.name == "nt":
+            self.assertIn("SYSTEMROOT", workspace.runner.spec.env_allowlist)
 
     def test_materialize_ignores_host_global_git_configuration(self) -> None:
         global_config = self.base / "host-global.gitconfig"
