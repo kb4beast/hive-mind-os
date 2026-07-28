@@ -40,6 +40,15 @@ from .current_state_audit import (
     verify_audit_artifact,
     write_audit_artifact,
 )
+from .github_adapter import (
+    CheckResult,
+    GitHubClient,
+    GitHubDelivery,
+    GitHubDeliveryTarget,
+    ProtectionReport,
+    PullRequestResult,
+    PushResult,
+)
 from .governed_sources import GovernedSourceAudit, audit_governed_source
 from .mission import MissionReport, RepositoryMission, ScriptedRepositoryBackend
 from .mission_store import (
@@ -105,6 +114,9 @@ __all__ = [
     "HardenedVisionContract",
     "HiveKernel",
     "GovernedSourceAudit",
+    "GitHubClient",
+    "GitHubDelivery",
+    "GitHubDeliveryTarget",
     "MetricDirection",
     "MetricObservation",
     "MetricSpec",
@@ -112,6 +124,9 @@ __all__ = [
     "MissionReport",
     "MissionStore",
     "Objective",
+    "ProtectionReport",
+    "PullRequestResult",
+    "PushResult",
     "RecursiveImprovementContract",
     "RecursiveImprovementController",
     "RecursiveImprovementGate",
@@ -131,6 +146,7 @@ __all__ = [
     "SourceDocketAuditor",
     "SourceRecord",
     "StepCheckpoint",
+    "CheckResult",
     "VisionComplianceGate",
     "audit_governed_source",
     "build_audit_verification_context",

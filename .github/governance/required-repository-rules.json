@@ -30,6 +30,10 @@
     ]
   },
   "separation_requirement": "At least one approval must come from an identity that did not author, push, build, or judge the change.",
-  "verification_status": "not_verified_on_remote",
-  "blocking_obligation": "A repository administrator must apply and independently verify equivalent GitHub rules before protected-governance completion can be claimed."
+  "verification_status": "verified_on_remote",
+  "verification_evidence": "evidence/live/P07/github-receipts/github/protection/08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7.json",
+  "verification_evidence_digest": "sha256:08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7",
+  "verified_at": "2026-07-28",
+  "verification_residual": "The host rules are active, but one-maintainer review independence and administrator bypass are not resolved by configuration alone.",
+  "blocking_obligation": null
 }

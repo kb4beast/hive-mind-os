@@ -1,0 +1,12 @@
+{
+  "number": 71,
+  "html_url": "https://github.com/octocat/hive-mind-os/pull/71",
+  "draft": true,
+  "head": {
+    "ref": "phase/P07-live-fixture",
+    "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "base": {
+    "ref": "main"
+  }
+}

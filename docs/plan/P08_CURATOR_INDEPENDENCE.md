@@ -175,3 +175,112 @@ honest about what it did not evaluate.
 - No checklist items that silently pass when their heuristic cannot run.
 - Do not let a same-model configuration masquerade as different-model in receipts.
 - Do not relax P05 assertions while strengthening them.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-28T01:05:05Z
+- Executor (model/agent identity): Codex P08 Builder only. Independent Curator, Judge,
+  and Orchestrator review remains required on the complete exact-SHA draft pull-request
+  candidate; this record is not self-approval.
+- Branch and audited implementation commit: `phase/P08-curator-independence`;
+  `f7e0249746e95a0bae827bef36402d2ccc329114`.
+- Gates: P08 exit tests 22 passed; full pytest 273 passed, 2 skipped, 1,718 subtests;
+  Ruff passed; Pyright module 1.1.411 passed with 0 errors (the standalone `pyright`
+  executable was not on PATH, so the installed `python -m pyright` entry point was used).
+- Audit artifact: `evidence/audits/P08-post.json`
+  (canonical digest:
+  `sha256:4870335d3c7f4f46be618e7d54598b6c77c343238c513009bf27854b46cd1b16`;
+  complete: true; failures: none; audit pytest: 273 passed; audited implementation
+  commit: `f7e0249746e95a0bae827bef36402d2ccc329114`).
+- Acceptance evidence: the blind seal precedes candidate-head materialization; late
+  checks fail closed; Builder-receipt contamination and Builder-attributed verification
+  append `contaminated-verification`; the P05 sabotage fixture fails both its sealed
+  original criterion and retained-assertion heuristic; tri-state checklist findings
+  preserve `not-evaluated`; provider receipts distinguish role overrides from shared
+  configuration; the golden mission succeeds and the sabotage mission remains
+  unpublished.
+- Deviations from the phase spec:
+  - Added `docs/architecture/ADR-012-BLIND-FIRST-CURATOR-INDEPENDENCE.md` because
+    `AGENTS.md` requires an ADR for operating-kernel semantics. It remains proposed for
+    independent review.
+  - Modified `src/hive_mind_os/model_backend.py` and `src/hive_mind_os/cli.py` in addition
+    to the listed paths so role-scoped provider settings are actually selected and their
+    effective model/provider identity is recorded. The `model-turn` schema is unchanged.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none.
+- Explicit limits: role identities are not externally authenticated; a distinct Curator
+  model remains recommended rather than mandatory; SAST and automated introduced-code
+  license classification remain out of scope and are recorded as `not-evaluated`; no
+  production-readiness or superiority claim is made.
+
+## Post-review appeal — malformed context manifests
+
+- The first consolidated review of exact candidate
+  `32e3fd8394a1e0899a72348a7d5713449a8556c7` reproduced a fail-open: scalar or missing
+  `prior_roles`, `summaries`, and `receipt_digests` values were silently treated as
+  empty collections. The Curator blocked delivery; the Judge's earlier permit is
+  preserved as dissent against that later counterexample.
+- Repair commit `96efccd0efa4258d68911cae0b7e4dc2620c94eb` requires all three fields to exist as
+  lists containing only strings. Mission-path regressions cover scalar contaminated
+  roles, scalar diff summaries, and a missing receipt-digest field.
+- The repaired boundary gate passed: 276 standard-library tests with 2 skips, Ruff, and
+  Pyright 1.1.411. Fresh audit
+  `evidence/audits/P08-post-manifest-repair.json` is complete with no failures, reports
+  274 pytest tests passed, binds implementation commit
+  `96efccd0efa4258d68911cae0b7e4dc2620c94eb`, and has canonical digest
+  `sha256:77fe5d78cb025708416e378dcfa067fb47f7414f1c9ca541ad32091bbeabd649`.
+- The original identity-authentication, optional distinct-model, SAST, and licensing
+  limits remain unchanged. A fresh independent exact-candidate review is still
+  required; this appeal is Builder evidence, not approval.
+
+## Post-review appeal — unsupported manifest channels
+
+- The next consolidated review of exact candidate
+  `db07abad6b0b34cd87a2612f7269c1f6216dac2a` preserved the Curator and Judge permits,
+  but the independent Orchestrator reproduced a remaining fail-open: an unknown
+  manifest field could carry `diff --git` bytes because only known summary values and
+  suspicious field names were examined. The Orchestrator blocked delivery.
+- Repair commit `eb1c8a6dc13ddbc9c74b9de229a1577ee9691d3b` defines the accepted manifest field
+  schema, rejects every unknown field, validates optional scalar fields, and scans all
+  allowed recorded strings for diff bytes and Builder rationale. Mission-path
+  regressions cover both an unknown `notes` channel and a contaminated allowed
+  `model_id` channel.
+- The repaired boundary gate passed: 276 standard-library tests with 2 skips, Ruff, and
+  Pyright 1.1.411. Fresh audit `evidence/audits/P08-post-schema-appeal.json` is complete
+  with no failures, reports 274 pytest tests passed, binds implementation commit
+  `eb1c8a6dc13ddbc9c74b9de229a1577ee9691d3b`, and has canonical digest
+  `sha256:e6a2176236348fe15c9ff7dfe2bba3ee4820f74fb5f778f22535d46e085ae36d`.
+- All prior dissent and limits remain preserved. A fresh independent exact-candidate
+  review remains required.
+
+## Post-review appeal — verifier role binding
+
+- The independent Orchestrator blocked exact candidate
+  `d390d58bf924ddecd0cb2dc95f6632abec408925` after reproducing acceptance of
+  `role="builder"` with `verifying_identity="curator"`. Type validation alone did not
+  bind the recorded role to the verifier.
+- Repair commit `defde79f468346c3feb0f4ac3136c9838c1e3c06` requires the complete seven-field
+  manifest schema, non-empty scalar identity/provider values, and exact equality
+  between manifest role and verifier identity. Mission-path regressions cover a
+  Builder role, missing role, missing provider kind, and malformed provider
+  configuration.
+- The first audit attempt,
+  `evidence/audits/P08-post-role-binding.json`
+  (`sha256:788a7455c4614fc9ba7604ef2e105ebffc13ff730d894b52691a3fdb13145c8e`),
+  is intentionally preserved as incomplete. It exposed that the model-backed manifest
+  producer still emitted only the three context lists. That integration failure was
+  real: model-backed mission tests failed with `ContaminationError`.
+- The gate was not weakened. The model producer now emits the same complete schema as
+  the scripted producer, including its effective role and provider identity. Pytest's
+  two recorded failures pass after this producer repair, as do the provider-receipt
+  regression, Ruff, and Pyright 1.1.411.
+- A clean final audit, exact-head CI, and fresh independent review remain required.
+
+### Role-binding audit result
+
+Clean serial audit `evidence/audits/P08-post-role-binding-final.json` is complete with
+no failures, reports 274 pytest tests passed, and binds clean commit
+`48a110a352e96cb9cfb5e8b78f7b3fa3e79d0299`, which includes the failed audit and
+model-producer repair. Its canonical digest is
+`sha256:0e22116c3fe8d27311d1604597bb1119ca0480f0cc4891aa5984f7ac7adf1122`.
+Exact-head CI and fresh independent review remain required.

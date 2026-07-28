@@ -422,6 +422,68 @@ class MissionStore:
                 )
         return self.checkpoint(mission_id, step_index)
 
+    def checkpoint_for_intent(
+        self,
+        mission_id: str,
+        intent: Mapping[str, Any],
+        *,
+        minimum_step_index: int = 0,
+    ) -> StepCheckpoint:
+        """Return or atomically allocate the checkpoint bound to an intent digest."""
+
+        if minimum_step_index < 0:
+            raise ValueError("minimum checkpoint index cannot be negative")
+        digest = tool_intent_digest(intent)
+        if intent.get("action_digest") != digest:
+            raise StoreIntegrityError("intent action_digest is not canonical")
+        validation = validate_contract("tool-intent", dict(intent))
+        if not validation.valid:
+            raise StoreIntegrityError(
+                "checkpoint intent violates schema: "
+                + "; ".join(validation.issues)
+            )
+        with self._lock, self._connection:
+            existing = self._connection.execute(
+                """
+                SELECT step_index FROM checkpoints
+                WHERE mission_id=? AND intent_digest=?
+                """,
+                (mission_id, digest),
+            ).fetchone()
+            if existing is None:
+                next_step = int(
+                    self._connection.execute(
+                        """
+                        SELECT COALESCE(MAX(step_index),-1)+1 FROM checkpoints
+                        WHERE mission_id=?
+                        """,
+                        (mission_id,),
+                    ).fetchone()[0]
+                )
+                step_index = max(minimum_step_index, next_step)
+                self._connection.execute(
+                    """
+                    INSERT INTO checkpoints(
+                        mission_id,step_index,intent_digest,state,intent_json
+                    ) VALUES(?,?,?,?,?)
+                    """,
+                    (
+                        mission_id,
+                        step_index,
+                        digest,
+                        "intent",
+                        _canonical_json(dict(intent)),
+                    ),
+                )
+            else:
+                step_index = int(existing["step_index"])
+        checkpoint = self.checkpoint(mission_id, step_index)
+        if checkpoint.intent != dict(intent):
+            raise StoreIntegrityError(
+                "idempotency digest maps to a different canonical intent"
+            )
+        return checkpoint
+
     def checkpoint(
         self,
         mission_id: str,
@@ -916,6 +978,7 @@ async def resume_mission(
 ) -> Any:
     """Reconcile and continue an interrupted scripted repository mission."""
 
+    from .github_adapter import GitHubClient, GitHubDeliveryTarget
     from .ledger import EvidenceLedger
     from .mission import RepositoryMission, ScriptedRepositoryBackend
     from .models import AutonomyLevel
@@ -944,6 +1007,30 @@ async def resume_mission(
         test_argv=config["test_argv"],
         criterion_argv=config["criterion_argv"],
     )
+    github_delivery = None
+    github_config = config.get("github_delivery")
+    policy = PolicyEngine(AutonomyLevel.REPOSITORY)
+    if isinstance(github_config, Mapping):
+        github_client = GitHubClient(
+            str(github_config["owner"]),
+            str(github_config["repository"]),
+            store.mission_root(mission_id) / "staging" / "evidence",
+            token_env=str(github_config["token_env"]),
+            api_base=str(github_config["api_base"]),
+            policy=policy,
+            ledger=ledger,
+            mission_store=store,
+            mission_id=mission_id,
+        )
+        github_delivery = GitHubDeliveryTarget(
+            github_client,
+            str(github_config["base"]),
+            str(github_config["title"]),
+            str(github_config["body"]),
+            Path(str(github_config["desired_rules_path"])),
+            int(github_config["max_check_attempts"]),
+            float(github_config["check_interval_s"]),
+        )
     runner = RepositoryMission(
         config["repository"],
         config["objective"],
@@ -951,10 +1038,11 @@ async def resume_mission(
         backend=backend,
         pin=config["pin"],
         output_dir=config["output_dir"],
-        policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+        policy=policy,
         budget=budget,
         ledger=ledger,
         mission_store=store,
+        github_delivery=github_delivery,
         _run_id=mission_id,
         _resume=True,
         _missing_workspaces=missing,
