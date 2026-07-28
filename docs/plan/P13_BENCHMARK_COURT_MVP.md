@@ -174,3 +174,32 @@ until a full multi-comparator court exists.
   prior runs — new corpus digest, new run, both retained).
 - No superiority language anywhere, including commit messages and the completion record.
 - No CI-time network or model lanes.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-28T01:45:36Z
+- Executor (model/agent identity): Codex `/root/p13_builder` acting as Builder;
+  independent exact-SHA Curator, Judge, and Orchestrator review remains required.
+- Branch and audited implementation commit: `phase/P13-benchmark-mvp`;
+  `c582cc0f5d5c962dd0e9954c9f6b576712678856`.
+- Gates: P13 suite 8 passed; full pytest 273 passed, 2 skipped, 1,718 subtests;
+  Ruff passed; Pyright 1.1.411 passed with 0 errors.
+- Benchmark evidence: `evidence/benchmarks/p13-19083f235b2820d7/` binds repaired
+  harness code commit `a2669a874c00633d986df8f078cf4b841555cbc1`, five tasks,
+  two lanes, three repetitions, seed 7, 30 raw attempts, and disposition
+  `measurement-recorded`; raw-results digest
+  `sha256:665a2d0e1b4f56b93acceeae5a7b451db1a96c64b066d3d7f206c7e29cc40c87`.
+- Audit artifact: `evidence/audits/P13-post.json` (canonical digest:
+  `sha256:7c9382e091e5bb563862b77e8430f0f4d844310099b0793f834078650dfbbb02`;
+  complete: true; failures: none; audited commit:
+  `c582cc0f5d5c962dd0e9954c9f6b576712678856`; audit pytest: 273 passed).
+- Deviations from the phase spec: the unavailable global `pyright` launcher was replaced
+  by the installed equivalent `python -m pyright`. The first uncommitted exit run
+  reproduced a Windows path-length failure while staging raw attempt evidence. The
+  candidate was repaired to use bounded content-addressed attempt directories, the P13
+  suite was rerun, and the complete 30-attempt measurement was regenerated on the
+  repaired code before any benchmark evidence was committed.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing
+  multi-comparator and multi-family evidence obligations remain open; this run records
+  measurements only and makes no comparative quality claim.

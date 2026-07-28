@@ -74,7 +74,7 @@ Sequencing principles:
 | [P10](P10_LEARNING_LOOP.md) | Champion/challenger learning loop on real artifacts | P05, P09 | pending |
 | [P11](P11_SCHEDULER_AND_OPERATIONS.md) | Durable scheduler, role workers, mission-control projection | P06 | pending |
 | [P12](P12_SOURCE_INGESTION.md) | Source ingestion pipeline; resolve or formally defer open evidence obligations | P01 | pending |
-| [P13](P13_BENCHMARK_COURT_MVP.md) | Benchmark court MVP (one comparator, one family, no claims) | P05 | pending |
+| [P13](P13_BENCHMARK_COURT_MVP.md) | Benchmark court MVP (one comparator, one family, no claims) | P05 | done |
 
 ### Dependency graph
 
