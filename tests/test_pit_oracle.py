@@ -184,6 +184,48 @@ class PointInTimeOracleTests(unittest.TestCase):
         with self.assertRaisesRegex(SealViolation, "altered"):
             self.oracle.grade(environment, altered, reveal)
 
+    def test_forged_reveal_is_rejected_before_grading(self) -> None:
+        environment = self.environment(6)
+        sealed = self.oracle.seal_prediction(
+            environment,
+            target_position=6,
+            learner_identity="reveal-integrity-learner",
+            prediction_content={"changed_paths": ["forged.txt"]},
+        )
+        reveal = self.oracle.reveal(environment, sealed)
+        forged_reveal = {**reveal, "changed_paths": ["forged.txt"]}
+
+        with self.assertRaisesRegex(
+            SealViolation,
+            "altered, foreign, or not recorded",
+        ):
+            self.oracle.grade(environment, sealed, forged_reveal)
+
+        event_types = [
+            event["event_type"] for event in self.ledger.events(environment.episode_id)
+        ]
+        self.assertEqual(event_types[-1], "pit.violation")
+        self.assertNotIn("pit.episode.graded", event_types)
+
+    def test_seal_rejects_mutated_target_environment(self) -> None:
+        environment = self.environment(6)
+        sealed = self.oracle.seal_prediction(
+            environment,
+            target_position=6,
+            learner_identity="target-binding-learner",
+            prediction_content={"changed_paths": ["tests/core.txt"]},
+        )
+        environment.target_sha = self.fixture.commits[7]
+
+        with self.assertRaisesRegex(SealViolation, "altered"):
+            self.oracle.reveal(environment, sealed)
+
+        event_types = [
+            event["event_type"] for event in self.ledger.events(environment.episode_id)
+        ]
+        self.assertEqual(event_types[-1], "pit.violation")
+        self.assertNotIn("pit.target.revealed", event_types)
+
     def test_cheating_probes_fail_and_every_attempt_has_a_receipt(self) -> None:
         environment = self.environment(6)
         probes = self.oracle.run_adversarial_probes(environment)

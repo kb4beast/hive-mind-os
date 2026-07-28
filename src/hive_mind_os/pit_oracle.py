@@ -68,6 +68,8 @@ class PITEnvironment:
 class SealedPrediction:
     episode_id: str
     target_position: int
+    target_sha: str
+    environment_digest: str
     learner_identity: str
     prediction_content: Mapping[str, Any]
     digest: str
@@ -77,6 +79,8 @@ class SealedPrediction:
         return {
             "episode_id": self.episode_id,
             "target_position": self.target_position,
+            "target_sha": self.target_sha,
+            "environment_digest": self.environment_digest,
             "learner_identity": self.learner_identity,
             "prediction_content": self.prediction_content,
         }
@@ -264,6 +268,7 @@ class PointInTimeOracle:
         self._owns_ledger = ledger is None
         self.ledger = ledger or EvidenceLedger(self.state_dir / "evidence-ledger.sqlite3")
         self._seals: dict[str, SealedPrediction] = {}
+        self._reveal_digests: dict[str, str] = {}
         self._git_name = Path(shutil.which("git") or "git").name
 
     def close(self) -> None:
@@ -651,6 +656,8 @@ class PointInTimeOracle:
         document = {
             "episode_id": environment.episode_id,
             "target_position": target_position,
+            "target_sha": environment.target_sha,
+            "environment_digest": environment.environment_digest,
             "learner_identity": learner_identity,
             "prediction_content": prediction_content,
         }
@@ -664,6 +671,8 @@ class PointInTimeOracle:
         sealed = SealedPrediction(
             environment.episode_id,
             target_position,
+            environment.target_sha,
+            environment.environment_digest,
             learner_identity,
             prediction_content,
             digest,
@@ -689,6 +698,8 @@ class PointInTimeOracle:
         observed_digest = _prediction_digest(sealed.document())
         if (
             sealed.episode_id != environment.episode_id
+            or sealed.target_sha != environment.target_sha
+            or sealed.environment_digest != environment.environment_digest
             or observed_digest != sealed.digest
             or recorded.digest != sealed.digest
         ):
@@ -768,6 +779,17 @@ class PointInTimeOracle:
             "diff": diff_output.decode("utf-8", "replace"),
             "seal_digest": intact.digest,
         }
+        reveal_digest = _prediction_digest(reveal)
+        recorded_digest = self._reveal_digests.get(environment.episode_id)
+        if recorded_digest is not None and recorded_digest != reveal_digest:
+            self.ledger.append_event(
+                environment.episode_id,
+                "pit.violation",
+                Role.OPTIMIZER.value,
+                {"kind": "canonical_reveal_changed"},
+            )
+            raise SealViolation("canonical target reveal changed after it was recorded")
+        self._reveal_digests[environment.episode_id] = reveal_digest
         self.ledger.append_event(
             environment.episode_id,
             "pit.target.revealed",
@@ -775,6 +797,7 @@ class PointInTimeOracle:
             {
                 "target_sha": environment.target_sha,
                 "seal_digest": intact.digest,
+                "reveal_digest": reveal_digest,
                 "changed_paths": reveal["changed_paths"],
             },
         )
@@ -787,6 +810,21 @@ class PointInTimeOracle:
         reveal: Mapping[str, Any],
     ) -> EpisodeGrade:
         intact = self._require_intact_seal(environment, sealed)
+        recorded_reveal_digest = self._reveal_digests.get(environment.episode_id)
+        observed_reveal_digest = _prediction_digest(reveal)
+        if (
+            recorded_reveal_digest is None
+            or observed_reveal_digest != recorded_reveal_digest
+        ):
+            self.ledger.append_event(
+                environment.episode_id,
+                "pit.violation",
+                Role.OPTIMIZER.value,
+                {"kind": "reveal_digest_mismatch"},
+            )
+            raise SealViolation(
+                "grading reveal was altered, foreign, or not recorded by the oracle"
+            )
         content = intact.prediction_content
         predicted_value = content.get("changed_paths")
         actual_value = reveal.get("changed_paths")
