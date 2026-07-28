@@ -27,6 +27,7 @@ from .model_provider import (
     redact,
 )
 from .models import AgentResult, Evidence, Objective, Role, WorkItem
+from .prompt_registry import PromptRegistry, generation_zero_prompt, prompt_digest
 from .roles import RoleContract
 
 
@@ -47,6 +48,7 @@ class ModelBackend:
         budget: AutonomyBudget | None = None,
         context_limit_chars: int = 8000,
         role_providers: Mapping[Role, ModelProvider] | None = None,
+        prompt_registry: PromptRegistry | None = None,
     ) -> None:
         if context_limit_chars < 1:
             raise ValueError("context limit must be positive")
@@ -59,6 +61,7 @@ class ModelBackend:
             max_compute_units=10_000.0,
         )
         self.context_limit_chars = context_limit_chars
+        self.prompt_registry = prompt_registry
 
     async def execute(
         self,
@@ -67,7 +70,7 @@ class ModelBackend:
         objective: Objective,
         context: tuple[AgentResult, ...],
     ) -> AgentResult:
-        system, user, truncated = self._prompt(
+        system, user, truncated, prompt_artifact_digest = self._prompt(
             contract, work_item, objective, context
         )
         corrective: str | None = None
@@ -115,6 +118,7 @@ class ModelBackend:
                         truncated,
                         provider,
                         context_manifest,
+                        prompt_artifact_digest,
                     )
                     return self._to_result(turn, contract, work_item)
                 except ModelTurnError as error:
@@ -123,6 +127,7 @@ class ModelBackend:
                         objective, contract, work_item, body, response, retry_index,
                         time.monotonic() - started, "invalid_output", truncated,
                         provider, context_manifest,
+                        prompt_artifact_digest,
                         error=last_error,
                     )
                     corrective = (
@@ -137,6 +142,7 @@ class ModelBackend:
                         objective, contract, work_item, body, response, retry_index,
                         time.monotonic() - started, "provider_failure", truncated,
                         provider, context_manifest,
+                        prompt_artifact_digest,
                         error=last_error,
                     )
                     if retry_index >= provider.config.max_retries:
@@ -157,16 +163,29 @@ class ModelBackend:
         work_item: WorkItem,
         objective: Objective,
         context: tuple[AgentResult, ...],
-    ) -> tuple[str, str, bool]:
-        system = (
-            "You are the Hive Mind OS specialist for role "
-            f"{contract.role.value}. Mission: {contract.mission}\n"
-            "Return only a JSON object with summary, outputs, proposed_actions, lessons, "
-            "and success. outputs must contain exactly these keys: "
-            + ", ".join(contract.required_outputs)
-            + ". Quality gates: "
-            + "; ".join(contract.quality_gates)
-        )
+    ) -> tuple[str, str, bool, str]:
+        system = generation_zero_prompt(contract)
+        artifact_digest = prompt_digest(system)
+        if self.prompt_registry is not None:
+            try:
+                system, artifact_digest = self.prompt_registry.champion_prompt(
+                    contract.role
+                )
+            except KeyError:
+                artifact_digest = self.prompt_registry.register(
+                    contract.role,
+                    system,
+                    parent_digest=None,
+                    created_by="model-backend:generation-0",
+                    experiment_id="generation-0",
+                )
+                self.prompt_registry.promote(
+                    contract.role,
+                    artifact_digest,
+                    promoted_by="model-backend:generation-0",
+                    experiment_id="generation-0",
+                    expected_current=None,
+                )
         rendered = json.dumps(
             [
                 {
@@ -197,7 +216,7 @@ class ModelBackend:
             sort_keys=True,
             separators=(",", ":"),
         )
-        return system, user, truncated
+        return system, user, truncated, artifact_digest
 
     @staticmethod
     def _parse_turn(content: str, contract: RoleContract) -> dict[str, Any]:
@@ -257,6 +276,7 @@ class ModelBackend:
         context_truncated: bool,
         provider: ModelProvider,
         context_manifest: Mapping[str, object],
+        prompt_artifact_digest: str,
         *,
         error: str | None = None,
     ) -> None:
@@ -277,6 +297,7 @@ class ModelBackend:
                 "api_key_env": provider.config.api_key_env,
             },
             "request_digest": _digest(request_body),
+            "prompt_artifact_digest": prompt_artifact_digest,
             "response_digest": _digest(response.raw_body) if response else None,
             "prompt_tokens": response.prompt_tokens if response else None,
             "completion_tokens": response.completion_tokens if response else None,

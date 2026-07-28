@@ -196,3 +196,33 @@ classes and auto-generated challengers.
 - No evaluator == author, even for scripted surfaces.
 - Do not bypass the gate with a custom "simpler" promotion path; `LearningPromotionGate`
   overlap is resolved in favor of the RSI gate here.
+
+---
+
+## Completion record
+
+- Date (UTC): 2026-07-28T12:01:52Z
+- Executor (model/agent identity): Codex primary Builder/Integrator. Per the user's
+  consolidated-review instruction, independent Curator, Judge, and Orchestrator review
+  remains deferred until the remaining approved phase PRs are merged; this record is not
+  self-approval.
+- Branch and audited implementation commit: `phase/P10-learning-loop`;
+  `809630224065151cfc3b38e972d27ae79a698300`. The audit was collected from that clean
+  commit; the pull-request head carries this append-only audit/status metadata because a
+  commit cannot contain its own SHA.
+- Gates: P10 exit tests passed (13); full pytest passed (334 passed, 2 pre-existing
+  skips, 1,744 subtests); Ruff 0.16.0 passed; Pyright 1.1.411 passed with 0 errors.
+- End-to-end experiment:
+  `evidence/experiments/EXP-663f252d-8320-47ae-9694-21d2ce36a282.json` recorded a
+  repeated scripted-fixture `keep` verdict, distinct author/builder/evaluator
+  identities, valid holdout ordering, the prior rollback digest, and atomic Builder
+  champion promotion.
+- Audit artifact: `evidence/audits/P10-post.json`
+  (digest: `sha256:d0d0de25a475199922972133f55c095c75d9e4c390bfd7edef537351e6612221`;
+  complete: true; failures: none).
+- Deviations from the phase spec: none. The CLI intentionally exposes the required
+  fixture-mission surface; the library also supplies the specified pinned P09 episode
+  surface without claiming model-backed outcome improvement.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing
+  real-provider, source, authenticated-identity, and hostile-isolation obligations remain
+  explicitly unresolved and are not promoted by P10.

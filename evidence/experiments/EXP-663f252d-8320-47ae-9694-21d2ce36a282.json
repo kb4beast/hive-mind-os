@@ -1,0 +1,108 @@
+{
+  "artifact_refs": [
+    "prompt:sha256:a25a4864b7355eceb423717dc3741c818b8a5a4831e14777bcf59cb467dadf08",
+    "prompt:sha256:6551beeeff337d096a15835f6ce94d332ee03ad464578def2835c6b8f40b2c4f",
+    "fixture:repair-regression:repetition-0",
+    "fixture:preserve-evidence:repetition-0",
+    "fixture:bounded-delivery:repetition-0",
+    "fixture:repair-regression:repetition-1",
+    "fixture:preserve-evidence:repetition-1",
+    "fixture:bounded-delivery:repetition-1",
+    "fixture:repair-regression:repetition-2",
+    "fixture:preserve-evidence:repetition-2",
+    "fixture:bounded-delivery:repetition-2"
+  ],
+  "challenger_digest": "sha256:6551beeeff337d096a15835f6ce94d332ee03ad464578def2835c6b8f40b2c4f",
+  "champion_after": "sha256:6551beeeff337d096a15835f6ce94d332ee03ad464578def2835c6b8f40b2c4f",
+  "champion_before": "sha256:a25a4864b7355eceb423717dc3741c818b8a5a4831e14777bcf59cb467dadf08",
+  "contract": {
+    "fingerprint": "d51b8dcc898c94a03a296cb98ef7d8e25868b97abf9a4d76e980fe09b7c345e0",
+    "guardrails": [
+      {
+        "direction": "minimize",
+        "hard_guardrail": true,
+        "maximum_regression": 64.0,
+        "name": "token_cost"
+      },
+      {
+        "direction": "maximize",
+        "hard_guardrail": true,
+        "maximum_regression": 0.0,
+        "name": "evidence_completeness"
+      }
+    ],
+    "primary": "task_success_rate"
+  },
+  "decision": {
+    "next_non_improvement_count": 0,
+    "primary_effect": 0.2,
+    "reasons": [
+      "candidate beat the champion beyond the measured noise floor"
+    ],
+    "required_effect": 0.01,
+    "verdict": "keep"
+  },
+  "episode_ids": [
+    "fixture:repair-regression",
+    "fixture:preserve-evidence",
+    "fixture:bounded-delivery"
+  ],
+  "experiment_id": "EXP-663f252d-8320-47ae-9694-21d2ce36a282",
+  "holdout_ordering": {
+    "author_reveal_sequences": [],
+    "experiment_close_sequence": 20,
+    "experiment_start_sequence": 18,
+    "valid": true
+  },
+  "identities": {
+    "author": "author:cli",
+    "builder": "builder:prompt-registry",
+    "evaluator": "evaluator:scripted-harness"
+  },
+  "observations": [
+    {
+      "baseline_samples": [
+        0.8,
+        0.8,
+        0.8
+      ],
+      "candidate_samples": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "metric_name": "task_success_rate"
+    },
+    {
+      "baseline_samples": [
+        94.0,
+        94.0,
+        94.0
+      ],
+      "candidate_samples": [
+        116.5,
+        116.5,
+        116.5
+      ],
+      "metric_name": "token_cost"
+    },
+    {
+      "baseline_samples": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "candidate_samples": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "metric_name": "evidence_completeness"
+    }
+  ],
+  "recorded_at": "2026-07-28T11:33:51.114659+00:00",
+  "repetitions": 3,
+  "role": "builder",
+  "schema_version": 1,
+  "surface": "fixture-missions"
+}
