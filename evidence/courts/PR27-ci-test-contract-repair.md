@@ -113,6 +113,18 @@ already-planned P17 hard-isolation court. The exact Linux matrix remains the
 promotion boundary for this repair; Windows sandbox or host support remains
 explicitly unclaimed.
 
+The independent Curator confirmed that both files are byte-identical to
+baseline (`sandbox.py` blob `0fa7b6b...`, `test_sandbox.py` blob `b9cfed6...`)
+and traced the current creation-time filter to baseline ancestor `a92e677`.
+The fail-open mechanism is a single non-atomic Toolhelp parent-PID snapshot:
+after the leader exits, a transiently missed child lets the runner persist
+`succeeded` without durable ownership of the process tree. Twenty focused
+repetitions also produced timing instability. The credible repair is a
+suspended Windows root assigned to a kill-on-close Job Object before resume,
+with job liveness governed by the same deadline and fail-closed create,
+assignment, and resume paths. Toolhelp snapshots may remain diagnostic but
+cannot be authoritative containment.
+
 ## Alternatives
 
 ### Alternative A — preserve dependency-free unittest CI
