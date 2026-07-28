@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .autonomy import AutonomyBudget
+from .benchmark_harness import BenchmarkHarness
 from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
@@ -207,6 +208,47 @@ def build_missions_parser() -> argparse.ArgumentParser:
         "--state-dir",
         default=".hive-mind-state",
         help="Mission state directory (default: .hive-mind-state)",
+    )
+    return parser
+
+
+def build_benchmark_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind benchmark run",
+        description="Run the offline P13 benchmark measurement harness",
+    )
+    parser.add_argument(
+        "action",
+        choices=("run",),
+        help="Benchmark action",
+    )
+    parser.add_argument(
+        "--lanes",
+        default="hive,baseline",
+        help="Comma-separated lanes: hive,baseline",
+    )
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=3,
+        help="Repetitions per task and lane (default: 3)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=7,
+        help="Fixed bootstrap seed (default: 7)",
+    )
+    parser.add_argument(
+        "--output",
+        default="evidence/benchmarks",
+        help="Append-only benchmark evidence root",
+    )
+    parser.add_argument(
+        "--task",
+        action="append",
+        default=[],
+        help="Optional task ID subset; repeatable",
     )
     return parser
 
@@ -417,6 +459,32 @@ def _run_missions(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_benchmark(args: argparse.Namespace) -> int:
+    lanes = tuple(part.strip() for part in args.lanes.split(",") if part.strip())
+    try:
+        report = BenchmarkHarness().run(
+            args.output,
+            repetitions=args.repetitions,
+            seed=args.seed,
+            lane_names=lanes,
+            task_ids=tuple(args.task) or None,
+        )
+    except (OSError, RuntimeError, ValueError) as error:
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": f"{type(error).__name__}: {error}",
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
 def _run_pit_episode(args: argparse.Namespace) -> int:
     repository = Path(args.repository).resolve()
     self_history = False
@@ -588,6 +656,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "missions":
         args = build_missions_parser().parse_args(arguments[1:])
         raise SystemExit(_run_missions(args))
+    if arguments and arguments[0] == "benchmark":
+        args = build_benchmark_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_benchmark(args))
     if arguments and arguments[0] == "ingest":
         args = build_ingest_parser().parse_args(arguments[1:])
         raise SystemExit(_run_ingest(args))

@@ -1,0 +1,1 @@
+{"checker_digest":"sha256:87cdee2c9b4a611d68e8ec03bd33693cc16805245a3550cfbd74d097c16ba391","passed":false,"returncode":1,"schema_version":1,"stderr":"Traceback (most recent call last):\r\n  File \"<string>\", line 1, in <module>\r\nAssertionError\r\n","stdout":""}
