@@ -253,11 +253,10 @@ def _git_http_credentials(remote_url: str, token: str) -> Iterator[tuple[str, ..
     if not token:
         raise GitOperationFailed("GitHub credential is required")
     remote = _github_remote(remote_url)
-    origin = remote.removesuffix(".git")
     encoded = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
     values = {
         "GIT_CONFIG_COUNT": "3" if os.name == "nt" else "1",
-        "GIT_CONFIG_KEY_0": f"http.{origin}/.extraHeader",
+        "GIT_CONFIG_KEY_0": f"http.{remote}/.extraHeader",
         "GIT_CONFIG_VALUE_0": f"Authorization: Basic {encoded}",
     }
     if os.name == "nt":
