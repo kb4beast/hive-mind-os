@@ -90,7 +90,8 @@ P01 ─┬─ P02 ──────────────┐
 Reading: P02, P03→P04 feed P05. P09 needs only P04. P10 needs both P05 and P09.
 P12 needs only P01 and can run any time.
 
-After P05, four tracks can proceed in parallel without conflict:
+After P05, five dependency tracks can proceed concurrently when their declared file
+ownership does not overlap:
 
 - **Delivery track:** P06 → P07 → P11
 - **Verification track:** P08
@@ -100,6 +101,8 @@ After P05, four tracks can proceed in parallel without conflict:
 
 Executors working in parallel must claim different phases and must not edit files owned by
 another in-flight phase (each phase file lists its deliverable paths; overlap = conflict).
+P10 and P11 both integrate with `src/hive_mind_os/cli.py`; develop them on separate
+branches, merge P10 first, then update P11 from `main` and resolve that integration once.
 
 ## 4. Executor protocol (how any LLM runs a phase)
 
