@@ -599,7 +599,7 @@ _CLAIM_PATTERN = re.compile(
 
 
 def find_unauthorized_claims(root: str | Path) -> tuple[str, ...]:
-    """Return user-facing Markdown files that make an unbound comparative claim."""
+    """Return user-facing Markdown files with P13-forbidden comparative claims."""
 
     repository = Path(root)
     candidates = [repository / "README.md"]
@@ -615,7 +615,7 @@ def find_unauthorized_claims(root: str | Path) -> tuple[str, ...]:
             text = "\n".join(
                 line for line in text.splitlines() if "planting " not in line
             )
-        if _CLAIM_PATTERN.search(text) and "superiority-verdict:" not in text.lower():
+        if _CLAIM_PATTERN.search(text):
             findings.append(path.relative_to(repository).as_posix())
     return tuple(findings)
 

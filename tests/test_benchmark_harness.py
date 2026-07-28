@@ -234,7 +234,10 @@ class BenchmarkHarnessTests(unittest.TestCase):
             "superiority-verdict: court-123\n",
             encoding="utf-8",
         )
-        self.assertEqual(find_unauthorized_claims(repository), ())
+        self.assertEqual(
+            find_unauthorized_claims(repository),
+            ("docs/claim.md",),
+        )
 
     def test_two_task_two_repetition_run_completes_offline(self) -> None:
         output = self.root / "evidence"

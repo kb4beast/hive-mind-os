@@ -84,8 +84,11 @@ Non-goals:
   with a superiority adjudication.
 - **Claim guard.** A test greps `README.md` and `docs/` for superiority-adjacent claims
   tied to these results (patterns like "outperforms", "beats", "stronger than" adjacent
-  to "benchmark"/comparator names) and fails if found without a courtroom superiority
-  verdict reference. Crude is fine; the point is a tripwire plus the recorded norm.
+  to "benchmark"/comparator names) and fails on every match. P13 cannot produce a
+  qualifying superiority verdict, so no textual reference can bypass the guard. A later
+  multi-comparator phase may replace this prohibition only with fail-closed resolution
+  and validation of a genuine court artifact. Crude is fine; the point is a tripwire
+  plus the recorded norm.
 
 ## 7. Deliverables
 
@@ -135,8 +138,8 @@ Modified files:
    `measurement-recorded`; judge identity differs from lane identities; a superiority
    disposition from this harness is impossible (constructor rejects it).
 7. Claim guard: planting "Hive Mind OS outperforms the baseline benchmark" in a docs
-   file makes the guard fail (use tmp copy or fixture injection — do not commit the
-   violation).
+   file makes the guard fail, and adding an arbitrary `superiority-verdict:` marker
+   cannot bypass it (use tmp copy or fixture injection — do not commit the violation).
 8. End-to-end: `benchmark run` on a 2-task subset with K=2 completes offline in CI
    within reasonable time (mark the full corpus run as the manual/exit path if CI time
    is a concern; the subset proves the machinery).
