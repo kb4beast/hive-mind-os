@@ -73,7 +73,11 @@ class ModelBackend:
         corrective: str | None = None
         last_error = "model did not return a valid turn"
         provider = self.role_providers.get(contract.role, self.provider)
-        context_manifest = self._context_manifest(context)
+        context_manifest = self._context_manifest(
+            context,
+            role=contract.role,
+            provider=provider,
+        )
         allowance = self.budget.issue_allowance()
         used_calls = 0
         used_compute = 0.0
@@ -304,9 +308,15 @@ class ModelBackend:
             ),
         }
 
-    @staticmethod
-    def _context_manifest(context: tuple[AgentResult, ...]) -> dict[str, object]:
+    def _context_manifest(
+        self,
+        context: tuple[AgentResult, ...],
+        *,
+        role: Role,
+        provider: ModelProvider,
+    ) -> dict[str, object]:
         return {
+            "role": role.value,
             "prior_roles": [item.role.value for item in context],
             "summaries": [item.summary for item in context],
             "receipt_digests": [
@@ -316,4 +326,11 @@ class ModelBackend:
                 for digest in evidence.payload.get("receipt_digests", [])
                 if isinstance(digest, str)
             ],
+            "provider_kind": provider.kind.value,
+            "model_id": provider.config.model,
+            "provider_configuration": (
+                "shared"
+                if provider.config == self.provider.config
+                else "role-override"
+            ),
         }

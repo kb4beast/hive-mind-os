@@ -252,3 +252,26 @@ honest about what it did not evaluate.
   `sha256:e6a2176236348fe15c9ff7dfe2bba3ee4820f74fb5f778f22535d46e085ae36d`.
 - All prior dissent and limits remain preserved. A fresh independent exact-candidate
   review remains required.
+
+## Post-review appeal — verifier role binding
+
+- The independent Orchestrator blocked exact candidate
+  `d390d58bf924ddecd0cb2dc95f6632abec408925` after reproducing acceptance of
+  `role="builder"` with `verifying_identity="curator"`. Type validation alone did not
+  bind the recorded role to the verifier.
+- Repair commit `defde79f468346c3feb0f4ac3136c9838c1e3c06` requires the complete seven-field
+  manifest schema, non-empty scalar identity/provider values, and exact equality
+  between manifest role and verifier identity. Mission-path regressions cover a
+  Builder role, missing role, missing provider kind, and malformed provider
+  configuration.
+- The first audit attempt,
+  `evidence/audits/P08-post-role-binding.json`
+  (`sha256:788a7455c4614fc9ba7604ef2e105ebffc13ff730d894b52691a3fdb13145c8e`),
+  is intentionally preserved as incomplete. It exposed that the model-backed manifest
+  producer still emitted only the three context lists. That integration failure was
+  real: model-backed mission tests failed with `ContaminationError`.
+- The gate was not weakened. The model producer now emits the same complete schema as
+  the scripted producer, including its effective role and provider identity. Pytest's
+  two recorded failures pass after this producer repair, as do the provider-receipt
+  regression, Ruff, and Pyright 1.1.411.
+- A clean final audit, exact-head CI, and fresh independent review remain required.

@@ -351,6 +351,18 @@ class CuratorReviewTests(unittest.TestCase):
         call = ledger.events()[0]["payload"]
         self.assertEqual(call["model_id"], "curator-model")
         self.assertEqual(
+            call["context_manifest"],
+            {
+                "role": Role.CURATOR.value,
+                "prior_roles": [],
+                "summaries": [],
+                "receipt_digests": [],
+                "provider_kind": "openai_compatible",
+                "model_id": "curator-model",
+                "provider_configuration": "role-override",
+            },
+        )
+        self.assertEqual(
             backend.identity_for_role(Role.CURATOR)["configuration"],
             "role-override",
         )
