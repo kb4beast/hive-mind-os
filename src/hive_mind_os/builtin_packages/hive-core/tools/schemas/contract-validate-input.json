@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/tools/v1/contract-validate-input.json",
+  "title": "Contract Validate Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_name", "document"],
+  "properties": {
+    "schema_name": {"type": "string", "minLength": 1},
+    "document": {"type": "object"}
+  }
+}

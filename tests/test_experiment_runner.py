@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from hive_mind_os.experiment_runner import (
     ExperimentRunner,
@@ -40,7 +41,7 @@ from hive_mind_os.roles import ROLE_CONTRACTS
 
 class RiggedSurface:
     name = "rigged-fixtures"
-    episode_ids = ("episode-1", "episode-2")
+    episode_ids: tuple[str, ...] = ("episode-1", "episode-2")
 
     def __init__(
         self,
@@ -128,7 +129,7 @@ class ExperimentRunnerTests(unittest.TestCase):
         self.registry = PromptRegistry(self.root / "registry", ledger=self.ledger)
         self.champion = self.registry.register(
             Role.BUILDER,
-            "champion",
+            generation_zero_prompt(ROLE_CONTRACTS[Role.BUILDER]),
             parent_digest=None,
             created_by="repository:generation-0",
         )
@@ -161,7 +162,40 @@ class ExperimentRunnerTests(unittest.TestCase):
             candidate=candidate,
         )
 
-    def test_keep_promotes_and_records_complete_lineage(self) -> None:
+    def _manual_decision(
+        self,
+        *,
+        experiment_id: str,
+        candidate: str,
+        current: str,
+        author: str = "author:test",
+        judge: str = "judge:test",
+    ) -> int:
+        return self.ledger.append_event(
+            experiment_id,
+            "experiment.decision",
+            judge,
+            {
+                "verdict": "keep",
+                "role": Role.BUILDER.value,
+                "candidate_digest": candidate,
+                "current_digest": current,
+                "registration_experiment_id": experiment_id,
+                "registration_role": Role.BUILDER.value,
+                "registration_author": author,
+                "registration_parent_digest": current,
+                "proposer_id": author,
+                "builder_id": "builder:test",
+                "evaluator_id": "evaluator:test",
+                "judge_id": judge,
+                "retained_artifact_refs": [
+                    "artifact:test#sha256:" + "a" * 64
+                ],
+                "contract_fingerprint": "sha256:" + "b" * 64,
+            },
+        )
+
+    def test_keep_records_pending_appeal_without_self_promotion(self) -> None:
         result = self.runner.run(
             Role.BUILDER,
             "challenger",
@@ -169,15 +203,12 @@ class ExperimentRunnerTests(unittest.TestCase):
             repetitions=3,
         )
         self.assertIs(result.decision.verdict, ExperimentVerdict.KEEP)
-        self.assertEqual(self.registry.champion_digest(Role.BUILDER), result.challenger_digest)
+        self.assertTrue(result.promotion_pending)
+        self.assertEqual(self.registry.champion_digest(Role.BUILDER), self.champion)
+        self.assertEqual(result.champion_after, self.champion)
         lineage = self.registry.lineage(result.challenger_digest)
-        self.assertTrue(
-            any(
-                row["kind"] == "promotion"
-                and row["parent_digest"] == self.champion
-                and row["experiment_id"] == result.experiment_id
-                for row in lineage
-            )
+        self.assertFalse(
+            any(row["kind"] == "promotion" for row in lineage)
         )
         event_types = [
             event["event_type"]
@@ -185,9 +216,33 @@ class ExperimentRunnerTests(unittest.TestCase):
         ]
         self.assertEqual(event_types[0], "prompt.registered")
         self.assertIn("experiment.started", event_types)
-        self.assertIn("prompt.promoted", event_types)
+        self.assertIn("experiment.evaluation", event_types)
+        self.assertIn("experiment.promotion_appeal", event_types)
+        self.assertNotIn("experiment.decision", event_types)
+        self.assertNotIn("prompt.promoted", event_types)
         self.assertIn("experiment.closed", event_types)
         self.assertIn("experiment.recorded", event_types)
+        evaluation_event = [
+            event
+            for event in self.ledger.events(result.experiment_id)
+            if event["event_type"] == "experiment.evaluation"
+        ][0]
+        self.assertEqual(evaluation_event["actor"], "evaluator:scripted-harness")
+        appeal_event = [
+            event
+            for event in self.ledger.events(result.experiment_id)
+            if event["event_type"] == "experiment.promotion_appeal"
+        ][0]
+        self.assertEqual(
+            appeal_event["payload"]["status"],
+            "pending-independent-court",
+        )
+        record = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+        self.assertTrue(record["promotion_pending"])
+        self.assertEqual(
+            record["decision"]["event_sequence"],
+            evaluation_event["sequence"],
+        )
 
     def test_noise_retests_then_stops_at_patience_without_promotion(self) -> None:
         contract = RecursiveImprovementContract(
@@ -240,7 +295,7 @@ class ExperimentRunnerTests(unittest.TestCase):
     def test_missing_surface_artifact_quarantines_instead_of_promoting(self) -> None:
         class MissingSurface:
             name = "missing"
-            episode_ids = ("missing",)
+            episode_ids: tuple[str, ...] = ("missing",)
 
             def evaluate(self, prompt: str, role: Role, repetition: int):
                 selected = 0.8 if prompt == "challenger" else 0.4
@@ -277,7 +332,7 @@ class ExperimentRunnerTests(unittest.TestCase):
 
         class TamperedSurface:
             name = "tampered"
-            episode_ids = ("tampered",)
+            episode_ids: tuple[str, ...] = ("tampered",)
 
             def evaluate(self, prompt: str, role: Role, repetition: int):
                 selected = 0.8 if prompt == "challenger" else 0.4
@@ -317,6 +372,21 @@ class ExperimentRunnerTests(unittest.TestCase):
         self.assertTrue(self.registry.is_quarantined(result.challenger_digest))
         self.assertEqual(self.registry.champion_digest(Role.BUILDER), self.champion)
 
+    def test_self_builder_is_quarantined(self) -> None:
+        result = self.runner.run(
+            Role.BUILDER,
+            "challenger",
+            surface=self._surface((0.4, 10, 1), (0.8, 10, 1)),
+            repetitions=3,
+            author_id="same-identity",
+            builder_id="same-identity",
+        )
+        self.assertIs(result.decision.verdict, ExperimentVerdict.QUARANTINE)
+        self.assertTrue(
+            any("build its own" in reason for reason in result.decision.reasons)
+        )
+        self.assertEqual(self.registry.champion_digest(Role.BUILDER), self.champion)
+
     def test_author_reveal_before_start_invalidates_and_records(self) -> None:
         self.ledger.append_event(
             "episode-1",
@@ -343,13 +413,20 @@ class ExperimentRunnerTests(unittest.TestCase):
             champion_prompt,
             parent_digest=self.champion,
             created_by="author:test",
+            experiment_id="EXP-original",
+        )
+        original_decision = self._manual_decision(
+            experiment_id="EXP-original",
+            candidate=original,
+            current=self.champion,
         )
         self.registry.promote(
             role,
             original,
-            promoted_by="evaluator:test",
+            promoted_by="judge:test",
             experiment_id="EXP-original",
             expected_current=self.champion,
+            decision_event_sequence=original_decision,
         )
         variant_prompt = champion_prompt + "\nVerify every required output and receipt."
         variant = self.registry.register(
@@ -357,13 +434,20 @@ class ExperimentRunnerTests(unittest.TestCase):
             variant_prompt,
             parent_digest=original,
             created_by="author:test",
+            experiment_id="EXP-variant",
+        )
+        variant_decision = self._manual_decision(
+            experiment_id="EXP-variant",
+            candidate=variant,
+            current=original,
         )
         self.registry.promote(
             role,
             variant,
-            promoted_by="evaluator:test",
+            promoted_by="judge:test",
             experiment_id="EXP-variant",
             expected_current=original,
+            decision_event_sequence=variant_decision,
         )
         self._execute_model(role)
         first_call = [
@@ -586,7 +670,11 @@ class ExperimentRunnerTests(unittest.TestCase):
     ) -> None:
         selected_provider = provider or FakeProvider([valid_turn(role)])
         selected_ledger = ledger or self.ledger
-        selected_registry = self.registry if registry is ... else registry
+        selected_registry = (
+            self.registry
+            if registry is ...
+            else cast(PromptRegistry | None, registry)
+        )
         backend = ModelBackend(
             selected_provider,
             ledger=selected_ledger,

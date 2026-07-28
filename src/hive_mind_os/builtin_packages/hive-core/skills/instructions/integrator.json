@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.integrator",
+  "procedure": [
+    "Check exact contract versions, data lineage, and adapter boundaries across affected systems.",
+    "Run compatibility and conformance checks without treating provider access as host support.",
+    "Preserve replacement, migration, and rollback evidence."
+  ],
+  "fail_closed_on": ["contract drift", "undeclared dependency", "unverified host capability"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["Codex Claude Code and Hermes adapters", "versioned activation and atomic rollback"]
+}

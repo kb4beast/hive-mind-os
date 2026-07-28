@@ -645,6 +645,7 @@ def _run_experiment(args: argparse.Namespace) -> int:
                 "evidence_path": str(result.evidence_path),
                 "champion_before": result.champion_before,
                 "champion_after": result.champion_after,
+                "promotion_pending": result.promotion_pending,
             },
             indent=2,
             sort_keys=True,

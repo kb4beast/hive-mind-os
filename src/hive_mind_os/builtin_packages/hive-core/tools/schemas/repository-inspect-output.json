@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/tools/v1/repository-inspect-output.json",
+  "title": "Repository Inspect Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "evidence_refs"],
+  "properties": {
+    "summary": {"type": "string"},
+    "evidence_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}

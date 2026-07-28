@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/skill-component.schema.json",
+  "title": "Hive Mind OS Skill Component",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "component_id",
+    "name",
+    "description",
+    "instruction_path",
+    "requested_capabilities",
+    "reference_paths",
+    "test_refs"
+  ],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "component_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$"
+    },
+    "name": {"type": "string", "minLength": 1},
+    "description": {"type": "string", "minLength": 1},
+    "instruction_path": {
+      "type": "string",
+      "format": "portable-relative-path"
+    },
+    "requested_capabilities": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "reference_paths": {
+      "type": "array",
+      "items": {"type": "string", "format": "portable-relative-path"},
+      "uniqueItems": true
+    },
+    "test_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}

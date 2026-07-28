@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.orchestrator",
+  "name": "Bounded mission orchestration",
+  "description": "Decompose outcomes, budgets, dependencies, recovery, and stopping conditions without expanding authority.",
+  "instruction_path": "skills/instructions/orchestrator.json",
+  "requested_capabilities": ["read_repository", "query_agents", "create_work_items"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "host_id": "claude-code",
+  "host_version_ref": "unadmitted-documentation:retrieved-2026-07-28",
+  "adapter_version": "0.0.0",
+  "evidence_level": "declared",
+  "conformance_status": "unverified",
+  "capabilities": ["instruction_projection", "skill_md", "custom_agents", "agent_tool_restriction", "mcp_client", "lifecycle_hooks"],
+  "evidence_refs": [
+    "https://code.claude.com/docs/en/sub-agents",
+    "https://code.claude.com/docs/en/mcp",
+    "https://code.claude.com/docs/en/hooks"
+  ],
+  "evidence_obligations": [
+    "admit primary sources with retrieval receipts, content digests, and licenses",
+    "extract atomic claims, counterclaims, and courtroom dispositions",
+    "pin an installed host version and retain conformance receipts"
+  ]
+}

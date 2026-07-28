@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/agent-component.schema.json",
+  "title": "Hive Mind OS Agent Component",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "component_id",
+    "role_binding",
+    "mission",
+    "required_outputs",
+    "requested_capabilities",
+    "quality_gates",
+    "prompt_path",
+    "skill_ids",
+    "tool_ids"
+  ],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "component_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$"
+    },
+    "role_binding": {
+      "type": "string",
+      "enum": [
+        "orchestrator",
+        "explorer",
+        "architect",
+        "builder",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ]
+    },
+    "mission": {"type": "string", "minLength": 1},
+    "required_outputs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "requested_capabilities": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "quality_gates": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "prompt_path": {"type": "string", "format": "portable-relative-path"},
+    "skill_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$"
+      },
+      "uniqueItems": true
+    },
+    "tool_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$"
+      },
+      "uniqueItems": true
+    }
+  }
+}

@@ -2,6 +2,7 @@ import unittest
 from dataclasses import replace
 
 from hive_mind_os.models import Role
+from hive_mind_os.source_docket import load_default_source_docket
 from hive_mind_os.vision import (
     REQUIRED_CAPABILITIES,
     REQUIRED_ROLES,
@@ -34,27 +35,15 @@ class HardenedVisionTests(unittest.TestCase):
         decision = self.gate.evaluate(self.evidence)
         self.assertTrue(decision.compliant, decision.reasons)
 
-    def test_original_and_expanded_sources_are_part_of_immutable_contract(self) -> None:
-        expected = {
-            "https://www.youtube.com/watch?v=mazBhCg3urw",
-            "https://www.youtube.com/watch?v=Gw_hnD7m00M",
-            "https://www.youtube.com/watch?v=eaNA2oOXoUg",
-            "https://www.youtube.com/watch?v=IbFaY3xFpZM",
-            "https://www.youtube.com/watch?v=eA9Zf2-qYYM",
-            "https://www.youtube.com/watch?v=kIWMLL0S8X8",
-            "https://www.youtube.com/watch?v=t7_ZXgfJVG8",
-            "https://github.com/karpathy/autoresearch",
-            "https://github.com/rangerrick337/operator-os/tree/main",
-            "https://github.com/nousresearch/hermes-agent",
-            "https://github.com/agiresearch/AIOS",
-            "https://arxiv.org/abs/2407.16741",
-            "https://github.com/rivet-dev/agent-os",
-            "https://github.com/microsoft/agent-framework",
-            "https://arxiv.org/abs/2505.21577",
-            "user-supplied:mission-control-video",
-            "user-supplied:classic-gpt-simulation-instruction",
-        }
-        self.assertTrue(expected.issubset(set(self.contract.source_references)))
+    def test_vision_sources_exactly_match_the_authoritative_docket(self) -> None:
+        docket_uris = tuple(
+            source.uri for source in load_default_source_docket().sources
+        )
+        self.assertEqual(self.contract.source_references, docket_uris)
+        self.assertEqual(
+            len(self.contract.source_references),
+            len(set(self.contract.source_references)),
+        )
 
     def test_recursive_improvement_shortcuts_are_forbidden(self) -> None:
         expected = {

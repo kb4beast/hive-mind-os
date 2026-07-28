@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.architect",
+  "name": "Reversible architecture",
+  "description": "Specify interfaces, invariants, threats, migration, and rollback for adjudicated claims.",
+  "instruction_path": "skills/instructions/architect.json",
+  "requested_capabilities": ["read_repository", "model_system", "write_design"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}

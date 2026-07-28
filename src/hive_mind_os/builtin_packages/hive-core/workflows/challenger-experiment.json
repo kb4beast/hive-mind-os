@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "component_id": "workflow.challenger-experiment",
+  "initial_state": "propose",
+  "terminal_states": ["evaluated", "quarantined"],
+  "transitions": [
+    {
+      "from_state": "propose",
+      "to_state": "isolate",
+      "event": "advance",
+      "allowed_role_bindings": ["architect", "optimizer"],
+      "required_evidence": ["challenger proposal", "acceptance criteria", "rollback"]
+    },
+    {
+      "from_state": "propose",
+      "to_state": "quarantined",
+      "event": "quarantine",
+      "allowed_role_bindings": ["curator"],
+      "required_evidence": ["blocking evidence"]
+    },
+    {
+      "from_state": "isolate",
+      "to_state": "implement",
+      "event": "advance",
+      "allowed_role_bindings": ["builder"],
+      "required_evidence": ["isolated workspace", "resource lease"]
+    },
+    {
+      "from_state": "isolate",
+      "to_state": "quarantined",
+      "event": "quarantine",
+      "allowed_role_bindings": ["curator"],
+      "required_evidence": ["isolation failure"]
+    },
+    {
+      "from_state": "implement",
+      "to_state": "independent-evaluation",
+      "event": "advance",
+      "allowed_role_bindings": ["curator"],
+      "required_evidence": ["implementation", "tests", "change receipts"]
+    },
+    {
+      "from_state": "implement",
+      "to_state": "quarantined",
+      "event": "quarantine",
+      "allowed_role_bindings": ["curator"],
+      "required_evidence": ["implementation blocker"]
+    },
+    {
+      "from_state": "independent-evaluation",
+      "to_state": "evaluated",
+      "event": "record",
+      "allowed_role_bindings": ["curator"],
+      "required_evidence": ["held-out evaluation", "independent verification", "court disposition"]
+    },
+    {
+      "from_state": "independent-evaluation",
+      "to_state": "quarantined",
+      "event": "quarantine",
+      "allowed_role_bindings": ["curator"],
+      "required_evidence": ["failed evaluation", "retained dissent"]
+    }
+  ]
+}

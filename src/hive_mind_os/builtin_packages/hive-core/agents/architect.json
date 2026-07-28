@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "component_id": "agent.architect",
+  "role_binding": "architect",
+  "mission": "Design scalable, secure, evolvable solutions and explicit decision records.",
+  "required_outputs": ["architecture", "interfaces", "threat model", "migration plan"],
+  "requested_capabilities": ["read_repository", "model_system", "write_design"],
+  "quality_gates": ["constraints are satisfied", "failure modes are addressed"],
+  "prompt_path": "prompts/architect.json",
+  "skill_ids": ["skill.architect"],
+  "tool_ids": ["tool.repository-inspect"]
+}

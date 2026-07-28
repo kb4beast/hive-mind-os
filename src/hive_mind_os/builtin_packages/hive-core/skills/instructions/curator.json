@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.curator",
+  "procedure": [
+    "Independently reproduce implementation, provenance, security, license, and compatibility claims.",
+    "Cross-examine hidden assumptions, regressions, self-approval, isolation failures, and missing receipts.",
+    "Issue a release recommendation that preserves blockers and dissent."
+  ],
+  "fail_closed_on": ["acting identity verifies itself", "missing evidence", "critical regression or source obligation"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["signature and revocation verification", "production conformance receipts"]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.explorer",
+  "name": "Evidence-backed discovery",
+  "description": "Conserve sources, extract atomic claims, and rank problems without inventing unavailable evidence.",
+  "instruction_path": "skills/instructions/explorer.json",
+  "requested_capabilities": ["read_repository", "search_web", "inspect_history", "run_analysis"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}

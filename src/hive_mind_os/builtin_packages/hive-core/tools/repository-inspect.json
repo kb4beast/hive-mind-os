@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "tool.repository-inspect",
+  "capability_id": "read_repository",
+  "input_schema_ref": "tools/schemas/repository-inspect-input.json",
+  "output_schema_ref": "tools/schemas/repository-inspect-output.json",
+  "side_effecting": false,
+  "idempotency_required": false,
+  "rollback_required": false
+}

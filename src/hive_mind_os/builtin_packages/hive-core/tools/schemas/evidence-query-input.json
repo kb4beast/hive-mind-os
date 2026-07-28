@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/tools/v1/evidence-query-input.json",
+  "title": "Evidence Query Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["query", "limit"],
+  "properties": {
+    "query": {"type": "string", "minLength": 1},
+    "limit": {"type": "integer", "minimum": 1}
+  }
+}

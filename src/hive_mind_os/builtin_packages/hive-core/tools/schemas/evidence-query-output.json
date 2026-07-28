@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/tools/v1/evidence-query-output.json",
+  "title": "Evidence Query Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_refs"],
+  "properties": {
+    "record_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}

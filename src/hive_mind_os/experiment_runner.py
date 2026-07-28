@@ -32,6 +32,7 @@ from .recursive_improvement import (
 from .roles import ROLE_CONTRACTS
 
 SCRIPTED_EVALUATOR_ID = "evaluator:scripted-harness"
+SCRIPTED_JUDGE_ID = "judge:recursive-improvement"
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +261,7 @@ class ExperimentRun:
     champion_before: str
     champion_after: str
     challenger_digest: str
+    promotion_pending: bool
 
 
 class ExperimentRunner:
@@ -287,6 +289,7 @@ class ExperimentRunner:
         author_id: str = "author:cli",
         builder_id: str = "builder:prompt-registry",
         evaluator_id: str = SCRIPTED_EVALUATOR_ID,
+        judge_id: str = SCRIPTED_JUDGE_ID,
         contract: RecursiveImprovementContract | None = None,
     ) -> ExperimentRun:
         role_value = Role(role)
@@ -339,6 +342,7 @@ class ExperimentRunner:
                 "author_id": author_id,
                 "builder_id": builder_id,
                 "evaluator_id": evaluator_id,
+                "judge_id": judge_id,
             },
         )
         champion_results = [
@@ -389,6 +393,18 @@ class ExperimentRunner:
                 )
             )
         )
+        identities = (author_id, builder_id, evaluator_id, judge_id)
+        if any(not identity.strip() for identity in identities):
+            validation_issues = (
+                *validation_issues,
+                "experiment identities must be nonempty",
+            )
+        elif len(set(identities)) != 4:
+            validation_issues = (
+                *validation_issues,
+                "experiment requires four distinct proposer, builder, evaluator, "
+                "and judge identities",
+            )
         evidence = ExperimentEvidence(
             candidate=ExperimentCandidate(
                 id=challenger_digest,
@@ -418,16 +434,46 @@ class ExperimentRunner:
             decision.next_non_improvement_count
         )
 
+        evaluation_sequence = self.ledger.append_event(
+            experiment_id,
+            "experiment.evaluation",
+            evaluator_id,
+            {
+                "verdict": decision.verdict.value,
+                "role": role_value.value,
+                "candidate_digest": challenger_digest,
+                "current_digest": champion_digest,
+                "registration_experiment_id": experiment_id,
+                "registration_role": role_value.value,
+                "registration_author": author_id,
+                "registration_parent_digest": champion_digest,
+                "proposer_id": author_id,
+                "builder_id": builder_id,
+                "evaluator_id": evaluator_id,
+                "judge_id": judge_id,
+                "retained_artifact_refs": list(artifact_refs),
+                "contract_fingerprint": active_contract.fingerprint,
+                "reasons": list(decision.reasons),
+            },
+        )
         champion_after = champion_digest
+        promotion_pending = decision.verdict is ExperimentVerdict.KEEP
         if decision.verdict is ExperimentVerdict.KEEP:
-            self.registry.promote(
-                role_value,
-                challenger_digest,
-                promoted_by=evaluator_id,
-                experiment_id=experiment_id,
-                expected_current=champion_digest,
+            self.ledger.append_event(
+                experiment_id,
+                "experiment.promotion_appeal",
+                "optimizer:recursive-improvement",
+                {
+                    "role": role_value.value,
+                    "candidate_digest": challenger_digest,
+                    "current_digest": champion_digest,
+                    "evaluation_event_sequence": evaluation_sequence,
+                    "requested_judge_id": judge_id,
+                    "retained_artifact_refs": list(artifact_refs),
+                    "contract_fingerprint": active_contract.fingerprint,
+                    "status": "pending-independent-court",
+                },
             )
-            champion_after = challenger_digest
         elif decision.verdict is ExperimentVerdict.QUARANTINE:
             self.registry.quarantine(
                 role_value,
@@ -446,6 +492,7 @@ class ExperimentRunner:
                 "reasons": list(decision.reasons),
                 "champion_before": champion_digest,
                 "champion_after": champion_after,
+                "promotion_pending": promotion_pending,
                 "holdout_ordering_valid": not reveal_sequences,
             },
         )
@@ -474,10 +521,12 @@ class ExperimentRunner:
                 "author": author_id,
                 "builder": builder_id,
                 "evaluator": evaluator_id,
+                "judge": judge_id,
             },
             "champion_before": champion_digest,
             "challenger_digest": challenger_digest,
             "champion_after": champion_after,
+            "promotion_pending": promotion_pending,
             "observations": [
                 {
                     "metric_name": item.metric_name,
@@ -503,6 +552,7 @@ class ExperimentRunner:
                 "primary_effect": decision.primary_effect,
                 "required_effect": decision.required_effect,
                 "next_non_improvement_count": decision.next_non_improvement_count,
+                "event_sequence": evaluation_sequence,
             },
         }
         evidence_path = self.evidence_root / f"{experiment_id}.json"
@@ -524,6 +574,7 @@ class ExperimentRunner:
             champion_digest,
             champion_after,
             challenger_digest,
+            promotion_pending,
         )
 
     def _retain_prompt_artifact(

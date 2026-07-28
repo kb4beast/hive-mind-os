@@ -81,7 +81,12 @@ class RecursiveImprovementTests(unittest.TestCase):
     def test_significant_reproduced_improvement_is_kept(self) -> None:
         decision = RecursiveImprovementGate(self.contract).evaluate(self.evidence())
         self.assertEqual(decision.verdict, ExperimentVerdict.KEEP)
-        self.assertGreater(decision.primary_effect, decision.required_effect)
+        primary_effect = decision.primary_effect
+        required_effect = decision.required_effect
+        self.assertIsNotNone(primary_effect)
+        self.assertIsNotNone(required_effect)
+        assert primary_effect is not None and required_effect is not None
+        self.assertGreater(primary_effect, required_effect)
         self.assertEqual(decision.next_non_improvement_count, 0)
 
     def test_metric_gaming_or_holdout_access_quarantines_candidate(self) -> None:
@@ -114,7 +119,12 @@ class RecursiveImprovementTests(unittest.TestCase):
         evidence = self.evidence(task_candidate=(1.01, 1.03, 0.99))
         decision = RecursiveImprovementGate(self.contract).evaluate(evidence)
         self.assertEqual(decision.verdict, ExperimentVerdict.RETEST)
-        self.assertLessEqual(decision.primary_effect, decision.required_effect)
+        primary_effect = decision.primary_effect
+        required_effect = decision.required_effect
+        self.assertIsNotNone(primary_effect)
+        self.assertIsNotNone(required_effect)
+        assert primary_effect is not None and required_effect is not None
+        self.assertLessEqual(primary_effect, required_effect)
 
     def test_diminishing_returns_stop_after_patience(self) -> None:
         evidence = self.evidence(task_candidate=(1.01, 1.03, 0.99))
@@ -137,16 +147,18 @@ class RecursiveImprovementTests(unittest.TestCase):
         )
         self.assertEqual(missing.verdict, ExperimentVerdict.QUARANTINE)
 
-    def test_controller_promotes_only_from_active_champion_and_retains_history(self) -> None:
+    def test_controller_evaluates_without_mutating_authoritative_champion(self) -> None:
         controller = RecursiveImprovementController(self.contract, "champion-1")
         decision = controller.evaluate(self.evidence())
         self.assertEqual(decision.verdict, ExperimentVerdict.KEEP)
-        self.assertEqual(controller.champion_id, "challenger-1")
+        self.assertEqual(controller.champion_id, "champion-1")
+        self.assertEqual(controller.pending_candidate_id, "challenger-1")
+        self.assertEqual(controller.evaluated_candidate_ids, ["challenger-1"])
         self.assertEqual(len(controller.decisions), 1)
 
         stale_candidate = ExperimentCandidate(
             id="challenger-2",
-            parent_champion_id="champion-1",
+            parent_champion_id="challenger-1",
             hypothesis="Built from a stale baseline",
             changed_paths=("src/stale.py",),
             rollback_ref="git:champion-1",
@@ -162,7 +174,12 @@ class RecursiveImprovementTests(unittest.TestCase):
         )
         stale = controller.evaluate(stale_evidence)
         self.assertEqual(stale.verdict, ExperimentVerdict.QUARANTINE)
-        self.assertEqual(controller.champion_id, "challenger-1")
+        self.assertEqual(controller.champion_id, "champion-1")
+        self.assertEqual(controller.pending_candidate_id, "challenger-1")
+        self.assertEqual(
+            controller.evaluated_candidate_ids,
+            ["challenger-1", "challenger-2"],
+        )
         self.assertEqual(len(controller.decisions), 2)
 
 

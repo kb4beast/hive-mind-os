@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.optimizer",
+  "name": "Held-out optimization",
+  "description": "Compare challengers to champions on outcome evidence within regression and safety budgets.",
+  "instruction_path": "skills/instructions/optimizer.json",
+  "requested_capabilities": ["query_ledger", "run_evaluations", "propose_skill_change"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}

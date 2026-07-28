@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.builder",
+  "procedure": [
+    "Implement only the bounded adjudicated design in an isolated workspace.",
+    "Add executable tests and preserve source, decision, and code receipts.",
+    "Produce a reversible delivery artifact without approving or promoting the acting implementation."
+  ],
+  "fail_closed_on": ["policy or lease denial", "test weakening", "unreceipted side effect"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["out-of-process extension execution", "package activation and promotion"]
+}

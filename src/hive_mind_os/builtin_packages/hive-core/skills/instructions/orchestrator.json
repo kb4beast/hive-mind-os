@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "skill_id": "skill.orchestrator",
+  "procedure": [
+    "Translate the requested outcome into testable acceptance criteria and explicit constraints.",
+    "Assign all eight constitutional roles with separate acting, verifying, and judging identities.",
+    "Record budgets, dependencies, recovery checkpoints, rollback, and stopping conditions before work begins."
+  ],
+  "fail_closed_on": ["ambiguous authority", "missing acceptance evidence", "critical risk or rollback gap"],
+  "source_refs": ["repo:AGENTS.md", "repo:docs/architecture/ADR-016-GOVERNED-EXTENSION-PACKAGES.md"],
+  "deferred_obligations": ["authenticated role identities", "distributed scheduler recovery"]
+}

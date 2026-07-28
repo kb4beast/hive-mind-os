@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "component_id": "workflow.ooda",
+  "initial_state": "observe",
+  "terminal_states": ["complete"],
+  "transitions": [
+    {
+      "from_state": "observe",
+      "to_state": "orient",
+      "event": "advance",
+      "allowed_role_bindings": ["explorer", "curator", "steward"],
+      "required_evidence": ["observation"]
+    },
+    {
+      "from_state": "observe",
+      "to_state": "complete",
+      "event": "stop",
+      "allowed_role_bindings": ["curator", "steward"],
+      "required_evidence": ["terminal outcome"]
+    },
+    {
+      "from_state": "orient",
+      "to_state": "decide",
+      "event": "advance",
+      "allowed_role_bindings": ["architect", "orchestrator"],
+      "required_evidence": ["context", "alternatives", "dissent"]
+    },
+    {
+      "from_state": "orient",
+      "to_state": "complete",
+      "event": "stop",
+      "allowed_role_bindings": ["curator", "steward"],
+      "required_evidence": ["terminal outcome"]
+    },
+    {
+      "from_state": "decide",
+      "to_state": "act",
+      "event": "advance",
+      "allowed_role_bindings": ["orchestrator"],
+      "required_evidence": ["decision", "policy decision", "action intent"]
+    },
+    {
+      "from_state": "decide",
+      "to_state": "complete",
+      "event": "stop",
+      "allowed_role_bindings": ["curator", "steward"],
+      "required_evidence": ["terminal outcome"]
+    },
+    {
+      "from_state": "act",
+      "to_state": "observe",
+      "event": "advance",
+      "allowed_role_bindings": ["builder", "integrator"],
+      "required_evidence": ["action receipt", "outcome"]
+    },
+    {
+      "from_state": "act",
+      "to_state": "complete",
+      "event": "stop",
+      "allowed_role_bindings": ["curator", "steward"],
+      "required_evidence": ["terminal outcome"]
+    }
+  ]
+}

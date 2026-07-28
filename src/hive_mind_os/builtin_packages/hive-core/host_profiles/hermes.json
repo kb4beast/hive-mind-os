@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "host_id": "hermes",
+  "host_version_ref": "source:SRC-004@d78d6d57f04563f85c4b545703317bed77b6b9b5",
+  "adapter_version": "0.0.0",
+  "evidence_level": "declared",
+  "conformance_status": "unverified",
+  "capabilities": ["skill_md"],
+  "evidence_refs": [
+    "source:SRC-004",
+    "https://hermes-agent.nousresearch.com/docs/user-guide/features/skills"
+  ],
+  "evidence_obligations": [
+    "bind documented capability claims to the admitted repository commit",
+    "capture documentation content digests and source licenses",
+    "retain exact-version conformance receipts"
+  ]
+}

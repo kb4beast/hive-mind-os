@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "component_id": "skill.steward",
+  "name": "Recoverable stewardship",
+  "description": "Protect operational health, evidence integrity, dependency safety, and reversible recovery.",
+  "instruction_path": "skills/instructions/steward.json",
+  "requested_capabilities": ["inspect_runtime", "manage_dependencies", "write_workspace", "run_tests"],
+  "reference_paths": [],
+  "test_refs": ["test:role-compatibility"]
+}
