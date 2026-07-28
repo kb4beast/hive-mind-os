@@ -181,3 +181,107 @@ through `MissionStore` without inventing new state.
 - No silent workspace rebuild when recorded digests mismatch disk.
 - No timestamps as ordering keys.
 - Do not weaken or fork P05's mission validation to accommodate persistence.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-27T21:53:48Z
+- Executor (model/agent identity): Codex primary Builder/Integrator; independent Curator,
+  Judge, and Orchestrator review remains required on the complete exact-SHA pull-request
+  candidate.
+- Branch and audited implementation commit: `phase/P06-durable-missions`;
+  `a136af13a9ed7fd595329bbeffa3ad2a9507d6a0`.
+- Gates: P06 tests 62 passed, including 54/54 injected crash boundaries; audit full pytest
+  263 passed, 2 skipped, 1,718 subtests; Ruff passed; Pyright passed with 0 errors.
+- Audit artifact: `evidence/audits/P06-post.json`
+  (canonical digest:
+  `sha256:d56d0efad6e672270e8287829de4a8a9e4f6c484e4dcc33bb6ea199b2882ed1f`;
+  complete: true; failures: none; audited implementation commit:
+  `a136af13a9ed7fd595329bbeffa3ad2a9507d6a0`).
+- Preserved challenged audit: `evidence/audits/P06-post-timeout.json`
+  (complete: false; its Python 3.12 pytest command returned 124 at the former 300-second
+  ceiling). ADR-011 records the reproduced counterexample and the 1,200-second repair.
+- Manual hard-kill confirmation: Windows terminated the real scripted `deliver` process
+  during Explorer materialization. The first resume reproduced an uncheckpointed partial
+  workspace failure. After the repair, the same durable mission resumed successfully with
+  18 completed checkpoints, 18 idempotency records, and zero duplicate intent digests.
+- Workspace and state evidence: digest drift blocks with a reconciliation report; missing
+  recorded workspaces and uncheckpointed partial materializations rebuild; checkpoint
+  digest tamper and unknown store versions fail closed; serialized state validates against
+  `mission-state`.
+- Deviations from the phase spec:
+  - Shortened private durable candidate staging and the Git adapter's private staging
+    prefix after a reproduced Windows `MAX_PATH` failure while copying content-addressed
+    evidence. Artifact names and delivery contracts are unchanged.
+  - Increased the current-state audit command timeout from 300 to 1,200 seconds after the
+    required recovery suite reproducibly exceeded the former ceiling. Timeout failure,
+    process-tree termination, output caps, and result recognition remain fail closed.
+  - Added an uncheckpointed-partial-workspace regression after the real process kill
+    reached a boundary not represented by the deterministic post-effect hook.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing P07,
+  P08, P11, P12, and B-OPS-06 obligations remain open.
+- Capability boundary: P06 supplies single-writer local persistence and exactly-once
+  effect adoption for the offline scripted repository mission. It does not establish
+  exactly-once physical execution, durable live-provider replay, distributed scheduling,
+  external GitHub delivery, authenticated identity, hostile-code isolation, production
+  readiness, complete source coverage, or superiority.
+
+### Consolidated-review appeal record
+
+- The independent Curator blocked candidate
+  `51d749f323a8bca1721c92d6a0a650afb8fa6e10` after reproducing a stop between a
+  physical sandbox receipt and its synthetic checkpoint receipt. The same review found
+  that GitHub's `unittest discover` jobs could not import the pytest-dependent P06 test
+  module and that Gitleaks classified one synthetic idempotency fixture as a secret.
+  ADR-011 preserves the findings, counterexample, repair rationale, and narrow
+  operational-source receipt.
+- Repaired implementation commit:
+  `ca5742bbd6c842ab68db3165e7b3be3daca4272b`. It adopts or accounts validated
+  unclaimed physical receipts, transactionally binds budget consumption to checkpoint
+  completion, adds the missing `after_capability_effect` boundary, makes all P06 cases
+  discoverable by stdlib `unittest`, and constrains the historical Gitleaks exception to
+  one exact line while retaining default rules.
+- Direct repaired-candidate gates: `python -m unittest discover -s tests -v` passed
+  267 tests with 2 skips; `python -m pytest -q` passed 265 tests with 2 skips and 1,718
+  subtests; Ruff passed; Pyright passed with 0 errors.
+- Repair audit: `evidence/audits/P06-repair-post.json`
+  (canonical digest:
+  `sha256:8a5aa9280b8a4e0b1c9a40159139a6494eead5fd0f4f13fcb3da3a391b4ec703`;
+  complete: true; failures: none; audited implementation commit:
+  `ca5742bbd6c842ab68db3165e7b3be3daca4272b`; audit pytest: 265 passed).
+- The challenged block remains preserved rather than overwritten. Delivery still
+  requires green exact-head GitHub checks and a fresh sequential Curator, Judge, and
+  Orchestrator disposition on the complete repaired candidate.
+
+#### Secret-scan event-path correction
+
+- Candidate `4cd8d64c5c176c09af20189c41b96eb791426654` passed the push-triggered
+  secret scan but failed the concurrent pull-request-triggered scan
+  (`30312848557/90132054922`). The failing log showed that the action searched for
+  `.gitleaks.toml`, did not load `gitleaks.toml`, and rediscovered the historical
+  synthetic fixture. ADR-011 preserves the contradiction and why the narrower push
+  range was not sufficient evidence.
+- Corrected implementation/configuration commit:
+  `c1498fda3113902ad2075ce3a2d042bacd4767e4`. The governance test and repository
+  configuration now use the observed `.gitleaks.toml` contract.
+- Corrected repair audit: `evidence/audits/P06-repair2-post.json`
+  (canonical digest:
+  `sha256:5bed4b828b78193837a6e8bef5946628cfeed9b508071dc470ce7be0f4da8768`;
+  complete: true; failures: none; audited implementation commit:
+  `c1498fda3113902ad2075ce3a2d042bacd4767e4`; audit pytest: 265 passed).
+- Both exact-head push and pull-request event paths must be green before consolidated
+  independent review begins.
+- The next pull-request path (`30313641642/90134451946`) loaded the corrected filename
+  but still failed because its pinned Gitleaks 8.24.3 runtime predates the global
+  `[[allowlists]]` schema introduced in 8.25.0. The configuration now uses the
+  version-compatible singular `[allowlist]`; the exception remains line-targeted and
+  default rules remain enabled.
+- Final implementation/configuration commit:
+  `ca82df3b0fa458531f961e66c7f49313e6214b4e`. The checksum-verified Gitleaks
+  8.24.3 Windows release reproduced the exact seven-commit pull-request scan locally
+  with no leaks, and both exact-head GitHub event paths completed successfully.
+- Final repair audit: `evidence/audits/P06-repair3-post.json`
+  (canonical digest:
+  `sha256:1d05da17311147d5c0bac31dbede3966941c33d951700dc03cd011c772b1a7cd`;
+  complete: true; failures: none; audited implementation/configuration commit:
+  `ca82df3b0fa458531f961e66c7f49313e6214b4e`; audit pytest: 265 passed).

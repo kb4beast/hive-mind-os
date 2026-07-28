@@ -33,7 +33,7 @@ AUDITED_BASELINE: Mapping[str, object] = {
     "disposition_counts": {"adopt": 25, "adapt": 52, "defer": 3},
     "test_passed_count": 56,
 }
-COMMAND_TIMEOUT_SECONDS = 300
+COMMAND_TIMEOUT_SECONDS = 1200
 MAX_COMMAND_OUTPUT_BYTES = 1_000_000
 OUTPUT_DRAIN_TIMEOUT_SECONDS = 1.0
 MAX_ARTIFACT_NESTING_DEPTH = 128

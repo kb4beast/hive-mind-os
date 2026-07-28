@@ -42,6 +42,12 @@ from .current_state_audit import (
 )
 from .governed_sources import GovernedSourceAudit, audit_governed_source
 from .mission import MissionReport, RepositoryMission, ScriptedRepositoryBackend
+from .mission_store import (
+    MissionStore,
+    ReconciliationError,
+    StepCheckpoint,
+    resume_mission,
+)
 from .models import AutonomyLevel, Objective, RiskTier, Role
 from .receipts import (
     FileReceiptValidator,
@@ -104,12 +110,14 @@ __all__ = [
     "MetricSpec",
     "MissionCharter",
     "MissionReport",
+    "MissionStore",
     "Objective",
     "RecursiveImprovementContract",
     "RecursiveImprovementController",
     "RecursiveImprovementGate",
     "RepositoryLearningCurriculum",
     "RepositoryMission",
+    "ReconciliationError",
     "RepositoryScout",
     "ReceiptReference",
     "ReceiptResult",
@@ -122,6 +130,7 @@ __all__ = [
     "ScriptedRepositoryBackend",
     "SourceDocketAuditor",
     "SourceRecord",
+    "StepCheckpoint",
     "VisionComplianceGate",
     "audit_governed_source",
     "build_audit_verification_context",
@@ -130,6 +139,7 @@ __all__ = [
     "load_default_source_docket",
     "load_schema",
     "load_source_docket",
+    "resume_mission",
     "sha256_digest",
     "validate_contract",
     "validate_runtime_state",

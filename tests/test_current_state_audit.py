@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from hive_mind_os.current_state_audit import (
+    COMMAND_TIMEOUT_SECONDS,
     AuditVerificationContext,
     CommandObservation,
     _artifact_docket_projection_digest,
@@ -325,6 +326,9 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertFalse(observation.succeeded)
         self.assertTrue(observation.timed_out)
         self.assertEqual(observation.return_code, 124)
+
+    def test_audit_timeout_covers_the_full_recovery_suite_budget(self) -> None:
+        self.assertGreaterEqual(COMMAND_TIMEOUT_SECONDS, 1200)
 
     def test_command_output_limit_stops_and_rejects_verbose_process(self) -> None:
         with patch("hive_mind_os.current_state_audit.MAX_COMMAND_OUTPUT_BYTES", 32):
