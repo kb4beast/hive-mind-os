@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-PR27-CI-TEST-CONTRACT",
+  "code_candidate_commit": "afb0c20d2a618fc33431ca78c50568831f25aa7f",
+  "evidence_commit_parent": "0f8113bb94cfcfa0466e40f9983dd183f7c9988f",
+  "captured_at": "2026-07-28T22:20:00Z",
+  "unittest": {
+    "command": "python -m unittest discover -s tests -v",
+    "dependency_contract": "python -m pip install --disable-pip-version-check --no-deps -e .",
+    "python_image_digest": "sha256:5f1cdbcab9a50594a79502dd73e885456d2a2fc31f1a1fa18484815b37ee9152",
+    "container_id": "a61a803b8c023e79213bf9a8f754e73ff078fc95b7ec14e0004593b042ed0fd6",
+    "exit_code": 0,
+    "tests_run": 420,
+    "skipped": 1,
+    "duration_seconds": 176.939,
+    "stdout": {
+      "path": "evidence/live/phase0/unittest-afb0c20.stdout.log",
+      "sha256": "dbbe035998d6c5fddbd7f42b1b70ff48c4e5ac491f840500e7add7c84b5f6efd",
+      "bytes": 1138
+    },
+    "stderr": {
+      "path": "evidence/live/phase0/unittest-afb0c20.stderr.log",
+      "sha256": "920c7dbfa2ecbf3dd5153382d9f03e2479c2f978b11a35d7197e0f2bde2a440c",
+      "bytes": 76000
+    }
+  },
+  "installed_wheel": {
+    "wheel_sha256": "3cc9890692e705eb524559a3bdc60981ce2c7cb9f9f44c2cb59eeff1542ed3d3",
+    "wheel_bytes": 267598,
+    "wheel_retention": "Rebuilt and uploaded by the sbom-and-build-provenance GitHub job; local wheel bytes are ephemeral.",
+    "report": {
+      "path": "evidence/live/phase0/installed-wheel-afb0c20.jsonl",
+      "sha256": "0a7119a937f65b381fa2280fb25f70d4b9d110468f20f9fca82aa21cd1589876",
+      "bytes": 436
+    },
+    "resource_set_sha256": "a439cdc93272ff1b3078492a2023447902976e4350335ce6057bb9482267249f",
+    "resource_count": 68,
+    "component_count": 22,
+    "trust_state": "quarantined"
+  },
+  "current_state_audit": {
+    "path": "evidence/audits/PR27-ci-test-contract-repair.json",
+    "outer_file_sha256": "42774119da3facbc4fb9a918c0b1a890b0477f918a4a704b89002448c487887a",
+    "canonical_payload_sha256": "ca51fa285fbfbab33b137ce7209036da287a946000cd969f823925032dd60aef",
+    "complete": true,
+    "failures": []
+  }
+}

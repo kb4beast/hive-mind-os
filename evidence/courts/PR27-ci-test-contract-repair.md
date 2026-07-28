@@ -27,10 +27,12 @@ before beginning the Obsidian or agent-system redesign.
 
 | Function | Identity | Scope |
 | --- | --- | --- |
-| Orchestrator and Builder | `/root` | bounded repair, tests, evidence, and delivery |
+| Builder | `/root` | bounded repair, tests, evidence, and delivery |
+| Final Orchestrator | `/root/orchestrator_final` | outcome boundary, dependencies, stopping conditions, and delivery readiness |
 | Explorer, Clerk, and Advocate | `/root/explorer_ci_court` | immutable baseline inspection and strongest case for repair |
 | Architecture Cross-Examiner and Integrator | `/root/architect_ci_contract` | alternatives, compatibility, installed-wheel boundary, rollback |
-| Curator, Steward, and Expert Witness | `/root/curator_ci_repro` | clean Python 3.11/3.12/3.14 reproduction, GitHub protection inspection, operational dissent |
+| Curator and Expert Witness | `/root/curator_ci_repro` | clean Python 3.11/3.12/3.14 reproduction, GitHub protection inspection, operational dissent |
+| Steward | `/root/steward_exact` | separate maintainability, recovery, evidence-health, and receipt-retention review |
 | Optimizer | `/root/optimizer_ci_metrics` | discoverability and regression measurements |
 | Exact-candidate Integrator | `/root/integrator_exact` | protection provenance, compatibility, wheel/CI contract, and rollback review |
 | Judge | pending independent identity | final disposition only after exact-candidate evidence |
@@ -234,9 +236,10 @@ is `afb0c20d2a618fc33431ca78c50568831f25aa7f`.
   exact no-dependency editable install, and exact unittest discovery;
   420 tests passed in 176.939 seconds with one expected skip.
 - Retained split unittest logs:
-  stdout
+  `evidence/live/phase0/unittest-afb0c20.stdout.log`
   `sha256:dbbe035998d6c5fddbd7f42b1b70ff48c4e5ac491f840500e7add7c84b5f6efd`
-  (1,138 bytes) and stderr
+  (1,138 bytes) and
+  `evidence/live/phase0/unittest-afb0c20.stderr.log`
   `sha256:920c7dbfa2ecbf3dd5153382d9f03e2479c2f978b11a35d7197e0f2bde2a440c`
   (76,000 bytes).
 - Current-state audit:
@@ -251,11 +254,15 @@ is `afb0c20d2a618fc33431ca78c50568831f25aa7f`.
   candidate with zero diagnostics.
 - Exact wheel:
   `sha256:3cc9890692e705eb524559a3bdc60981ce2c7cb9f9f44c2cb59eeff1542ed3d3`
-  (267,598 bytes). Its retained verification report is
+  (267,598 bytes). The wheel is an ephemeral local artifact and is rebuilt for
+  the GitHub build-evidence upload; its retained verification report is
+  `evidence/live/phase0/installed-wheel-afb0c20.jsonl`,
   `sha256:0a7119a937f65b381fa2280fb25f70d4b9d110468f20f9fca82aa21cd1589876`;
   it proves an isolated installed import, 20 schemas plus 48 package files,
   all 68 resource bytes equal to source, 22 components, and quarantined
   `hive-core` trust.
+- `evidence/live/phase0/receipt-manifest.json` binds the commands, environment,
+  candidate, paths, digests, byte counts, and retention boundary.
 - Post-test Windows worktree remained clean. The Windows full run's separately
   blocked process-survivor failure is preserved under `B-OPS-08` and is not
   counted as a passing Windows receipt.
@@ -269,6 +276,44 @@ The Curator's disposition is `adapt`/accept for this bounded Phase 0 repair,
 contingent on an independent Judge and green GitHub checks. `B-GOV-06`,
 `B-OPS-07`, and `B-OPS-08` remain open; the verdict supports no broader host,
 release, production, source-completeness, autonomy, or superiority claim.
+
+## Final Orchestrator readiness finding
+
+`/root/orchestrator_final` confirmed the clean evidence commit was technically
+ready for a draft push but not promotion-ready. Live `enforce_admins=false`
+remains `B-GOV-06`. The active PR author would be `kb4beast`, while current
+write-capable identities are `kb4beast` and `beespinosa04`, protection requires
+two approvals, and CODEOWNERS names only `kb4beast` for the affected paths.
+The author cannot self-approve; current topology therefore cannot supply two
+non-author approvals and a non-author code-owner review. `B-GOV-07` preserves
+the required administrator/reviewer action without weakening review counts or
+assuming that two account names prove genuine independence.
+
+## Separate Steward verdict
+
+`/root/steward_exact` initially rejected the evidence package because the
+unittest logs and installed-wheel report had hashes but no durable repository
+paths. That defect is closed by `evidence/live/phase0/receipt-manifest.json`
+and its three bound artifacts. The Steward independently verified every byte
+count and digest, the audit hashes, manifest bindings, court references, and
+the `.gitattributes` binary-preservation rule for cross-platform checkout.
+
+The amended Steward recommendation conditionally accepts the bounded repair.
+Wheel bytes remain honestly ephemeral and are rebuilt/uploaded by CI; the
+installed-wheel report is durable. Negative unit tests for verifier failure
+branches are a non-blocking Steward + Builder follow-up before expanding the
+resource catalog. `B-GOV-06`, `B-GOV-07`, `B-OPS-07`, and `B-OPS-08` remain
+open.
+
+## Initial judicial disposition and appeal
+
+The first independent Judge review of evidence head `0f8113b` issued `defer`
+because the receipt bytes, separate Steward testimony, and reviewer-topology
+blocker were not yet bound. That losing disposition is preserved. The
+retention artifacts, Steward verdict, and `B-GOV-07` now answer its remand; an
+independent appeal/recheck of the new evidence-only head is pending. Phase 1
+remains prohibited until all required GitHub checks are green on the exact
+final pull-request head.
 
 ## Proposed disposition
 
