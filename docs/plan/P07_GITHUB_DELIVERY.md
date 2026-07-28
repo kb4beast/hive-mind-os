@@ -200,3 +200,62 @@ evidence, not declaration; all external side effects are idempotent and token-sa
 - No storing the token anywhere on disk, however temporarily.
 - Do not mark the protection blocker resolved on a mismatch or a partial check.
 - Do not open non-draft PRs in this phase.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-28T01:40:00Z
+- Executor: Codex primary Builder/Integrator. The complete candidate still requires the
+  one consolidated independent Curator, Judge, and Orchestrator review; it does not
+  approve itself.
+- Branch and audited implementation commit: `phase/P07-github-delivery`;
+  `1b47163a8da8f3ba30d77889b6a1366fac72086a`.
+- Development gate: 277 passed, 2 skipped, 1,722 subtests on the audited commit; Ruff
+  passed; Pyright 1.1.411 passed with 0 errors.
+- Audit: `evidence/audits/P07-post.json`; canonical digest
+  `sha256:8defb16adba482b1e8ee9cf07296e244741c4ad8513c06f438858a524743a9ef`;
+  `complete=true`; failures none; audited head
+  `1b47163a8da8f3ba30d77889b6a1366fac72086a`.
+- Live delivery: draft PR
+  [#18](https://github.com/kb4beast/hive-mind-os/pull/18), exact head
+  `1b47163a8da8f3ba30d77889b6a1366fac72086a`. The pipeline created the branch and
+  draft PR; it did not merge or deploy.
+- CI evidence: 17 completed check-run observations across the push and pull-request
+  event paths, all accepted (`success`, plus one dependency-review `skipped` observation
+  from the push event). The canonical check-list digest is
+  `sha256:7d7559c9f23961b689b69bd699b3cfe898ce54a6b97bba4769c2f1d0d46cc090`.
+  `evidence/live/P07/live-run.json` has raw-file digest
+  `sha256:aa0e2d0945851030ddd466cad21aaa4f1c75b2fa87c4ea5befde564646ee127e`.
+- Protection evidence: the pre-change report
+  `sha256:def2f4345229b9091e41fe490e3eea3ad3c382ce91feb6aa85fab940b4016079`
+  preserves the exact mismatch. After repository-admin activation, report
+  `sha256:08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7`
+  matches every declared rule. B-GOV-01 is resolved for activation and verification.
+  One-maintainer review independence and administrator bypass remain explicit and are
+  not converted into an independence claim.
+- Token posture: a byte scan of every P07 live evidence file found zero occurrences of
+  the bearer token or its Git Basic-auth encoding. Git remotes and configuration did not
+  persist the token.
+- Reproduced live-boundary repairs:
+  - Codex desktop bookkeeping refs exceeded Windows path limits during local staging;
+    the adapter now excludes only `refs/codex`, with a regression.
+  - An empty Git environment omitted Windows runtime/TLS requirements. The adapter now
+    passes `SYSTEMROOT`, binds Schannel explicitly, retains certificate-chain and hostname
+    checks, and records the managed host's unavailable revocation lookup.
+  - Python 3.14 strict X.509 parsing rejected the trusted managed interception CA's legacy
+    encoding. The REST transport clears only `VERIFY_X509_STRICT`; chain, root, and
+    hostname validation remain required and tested.
+  - Git credentials were initially scoped to the URL without `.git`, so authenticated
+    push did not receive the header. The header is now scoped to the exact remote URL.
+  - GitHub's CodeQL check uses `/runs/<id>` rather than an Actions job URL; both documented
+    live URL shapes are now parsed and receipted.
+- Failed attempts caused no PR duplication. One branch created at
+  `bf7ca0c14307e049bfdf3c73a3358e7d6596a642` before REST transport failure was removed
+  only after confirming it had no PR; the commit remains recoverable by SHA. PR #18 was
+  created once and later exact-head runs adopted it.
+- New blockers: none. Existing source, authenticated-identity, external-ledger,
+  hostile-code isolation, and operational obligations remain open.
+- Capability boundary: P07 establishes idempotent exact-head branch delivery, one draft
+  PR, externally observed GitHub checks, and verified host rules. It does not establish
+  release or production readiness, independent human approval, source completeness,
+  signed provider identity, merge authority, deployment authority, or superiority.
