@@ -24,6 +24,7 @@ from .mission_store import (
 from .model_backend import ModelBackend
 from .model_provider import ModelProviderError, provider_from_env
 from .models import AutonomyLevel, Objective
+from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .runtime import HiveKernel
 
@@ -144,6 +145,34 @@ def build_missions_parser() -> argparse.ArgumentParser:
         "--state-dir",
         default=".hive-mind-state",
         help="Mission state directory (default: .hive-mind-state)",
+    )
+    return parser
+
+
+def build_pit_episode_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind pit-episode",
+        description="Run one physically isolated point-in-time Git episode",
+    )
+    parser.add_argument(
+        "--repository",
+        required=True,
+        help="Local Git worktree containing the target commit",
+    )
+    parser.add_argument(
+        "--target",
+        required=True,
+        help="Full 40-hex target commit SHA",
+    )
+    parser.add_argument(
+        "--learner",
+        choices=("scripted",),
+        default="scripted",
+        help="Offline learner implementation (default: scripted)",
+    )
+    parser.add_argument(
+        "--state-dir",
+        help="Episode, ledger, environment, and receipt directory",
     )
     return parser
 
@@ -317,6 +346,50 @@ def _run_missions(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_pit_episode(args: argparse.Namespace) -> int:
+    repository = Path(args.repository).resolve()
+    self_history = False
+    pins_path = repository / "tests" / "fixtures" / "self_history_pins.json"
+    try:
+        pins_document = json.loads(pins_path.read_text(encoding="utf-8"))
+        pins = pins_document.get("shas", [])
+        self_history = isinstance(pins, list) and args.target in pins
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    oracle: PointInTimeOracle | None = None
+    try:
+        oracle = PointInTimeOracle(repository, args.state_dir)
+        record_path = oracle.run_scripted_episode(
+            args.target,
+            self_history=self_history,
+        )
+    except (LeakageError, OSError, RuntimeError, SealViolation, ValueError) as error:
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": f"{type(error).__name__}: {error}",
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    finally:
+        if oracle is not None:
+            oracle.close()
+    print(
+        json.dumps(
+            {
+                "status": "succeeded",
+                "episode_record": str(record_path),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     if bool(args.signing_key_file) != bool(args.signing_key_id):
         raise SystemExit("--signing-key-file and --signing-key-id must be supplied together")
@@ -365,6 +438,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "missions":
         args = build_missions_parser().parse_args(arguments[1:])
         raise SystemExit(_run_missions(args))
+    if arguments and arguments[0] == "pit-episode":
+        args = build_pit_episode_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_pit_episode(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 
