@@ -1,8 +1,9 @@
 # Hive Mind OS — Canonical Implementation Plan
 
-- **Plan version:** 1.0
+- **Plan version:** 1.1
 - **Date established:** 2026-07-27
-- **Status:** ACTIVE — this document owns implementation sequencing for the repository.
+- **Status:** COMPLETE — P01–P13 are merged; this document remains the historical executor
+  contract for that boundary.
 
 ## 1. What this document is
 
@@ -75,6 +76,16 @@ Sequencing principles:
 | [P11](P11_SCHEDULER_AND_OPERATIONS.md) | Durable scheduler, role workers, mission-control projection | P06 | done |
 | [P12](P12_SOURCE_INGESTION.md) | Source ingestion pipeline; resolve or formally defer open evidence obligations | P01 | done |
 | [P13](P13_BENCHMARK_COURT_MVP.md) | Benchmark court MVP (one comparator, one family, no claims) | P05 | done |
+
+### Post-P13 succession
+
+P01–P13 are complete at merged boundary
+`c8f908d4e31d7c469ed2084984cefef59100743f`. The proposed continuation is preserved in
+[`01_POST_P13_OVERVIEW.md`](01_POST_P13_OVERVIEW.md) under
+[ADR-015](../architecture/ADR-015-POST-P13-PRODUCTION-AND-TRUST-PROGRAM.md). It separates
+real-provider capability, authenticated identities and receipts, external retention, hard
+isolation, bounded production, multi-comparator assurance, and release adjudication into
+P14–P20. It becomes executable only after its independent adoption gate passes.
 
 ### Dependency graph
 
