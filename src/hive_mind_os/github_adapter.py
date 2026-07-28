@@ -785,26 +785,32 @@ class GitHubClient:
         branch: str,
     ) -> dict[str, Any]:
         candidates: list[Mapping[str, Any]] = []
+        target = f"refs/heads/{branch}"
         for ruleset in rulesets:
             conditions = ruleset.get("conditions")
-            ref_name = (
-                conditions.get("ref_name")
-                if isinstance(conditions, Mapping)
-                else None
-            )
-            includes = (
-                ref_name.get("include")
-                if isinstance(ref_name, Mapping)
-                else []
-            )
+            if not isinstance(conditions, Mapping):
+                continue
+            ref_name = conditions.get("ref_name")
+            if not isinstance(ref_name, Mapping):
+                continue
+            includes = ref_name.get("include")
+            excludes = ref_name.get("exclude")
             if (
-                ruleset.get("enforcement") == "active"
-                and isinstance(includes, list)
-                and (
-                    f"refs/heads/{branch}" in includes
-                    or "~DEFAULT_BRANCH" in includes
-                )
+                ruleset.get("enforcement") != "active"
+                or not isinstance(includes, list)
+                or not includes
+                or not all(isinstance(item, str) for item in includes)
+                or not isinstance(excludes, list)
+                or not all(isinstance(item, str) for item in excludes)
             ):
+                continue
+            included = target in includes or "~DEFAULT_BRANCH" in includes
+            excluded = target in excludes or "~DEFAULT_BRANCH" in excludes
+            ambiguous_exclusion = any(
+                any(marker in item for marker in ("*", "?", "["))
+                for item in excludes
+            )
+            if included and not excluded and not ambiguous_exclusion:
                 candidates.append(ruleset)
         rules: list[Mapping[str, Any]] = []
         for ruleset in candidates:

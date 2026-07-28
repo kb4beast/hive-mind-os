@@ -529,6 +529,33 @@ class GitHubAdapterTests(unittest.TestCase):
         self.assertFalse(report.matches)
         self.assertIn("rules.required_signed_commits: mismatch", report.mismatches)
 
+    def test_ruleset_branch_exclusion_and_malformed_conditions_fail_closed(
+        self,
+    ) -> None:
+        detail = json.loads(_fixture("ruleset-detail.json"))
+        detail["conditions"]["ref_name"] = {
+            "include": ["~DEFAULT_BRANCH"],
+            "exclude": ["refs/heads/main"],
+        }
+        observed = GitHubClient._ruleset_observation([detail], "main")
+        self.assertFalse(observed["active"])
+
+        for malformed in (
+            None,
+            {},
+            {"ref_name": {"include": ["~DEFAULT_BRANCH"]}},
+            {
+                "ref_name": {
+                    "include": ["~DEFAULT_BRANCH"],
+                    "exclude": ["refs/heads/release-*"],
+                }
+            },
+        ):
+            with self.subTest(conditions=malformed):
+                detail["conditions"] = malformed
+                observed = GitHubClient._ruleset_observation([detail], "main")
+                self.assertFalse(observed["active"])
+
     def test_lower_authority_denies_before_push_or_pr(self) -> None:
         transport = FakeGitHubTransport()
         ledger = EvidenceLedger()

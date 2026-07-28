@@ -259,3 +259,28 @@ evidence, not declaration; all external side effects are idempotent and token-sa
   PR, externally observed GitHub checks, and verified host rules. It does not establish
   release or production readiness, independent human approval, source completeness,
   signed provider identity, merge authority, deployment authority, or superiority.
+
+### Consolidated-review appeal
+
+- Challenged exact candidate:
+  `ba6c8bfaed29bfafa5b4f62268652ed32443c6d3`.
+- The independent Curator issued `BLOCK` after reproducing an active ruleset that included
+  `~DEFAULT_BRANCH` but explicitly excluded `refs/heads/main`; the verifier ignored the
+  exclusion and returned an empty mismatch set. The Curator also found that the declared
+  rules file and its governance test still asserted the superseded
+  `not_verified_on_remote` state. The independent Judge issued `adopt/PERMIT`, and the
+  independent Orchestrator issued `READY/PERMIT`; the concrete Curator counterexample
+  controls and all three dispositions remain preserved.
+- Repair: ruleset applicability now requires well-formed include and exclude lists,
+  rejects an exact/default-branch exclusion, and treats wildcard exclusions as ambiguous
+  rather than assuming they do not match. Excluded, malformed, missing, or ambiguous
+  conditions therefore cannot establish active protection. Regression subtests preserve
+  the exact counterexample and malformed variants.
+- Truth-contract repair: `.github/governance/required-repository-rules.json` now binds
+  `verified_on_remote` to the exact committed post-change protection report and retains
+  the one-maintainer/admin-bypass residual. The governance test recomputes the evidence
+  digest. ADR-004 preserves its original Stage 0 state and records the P07 supersession.
+- Repaired-candidate deterministic validation: 278 passed, 2 skipped, 1,726 subtests;
+  focused GitHub/governance tests 18 passed with 8 subtests; Ruff passed; Pyright 1.1.411
+  passed with 0 errors. Delivery remains blocked until a fresh consolidated Curator,
+  Judge, and Orchestrator review permits the repaired exact head.
