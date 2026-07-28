@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import subprocess
 import tempfile
 import unittest
 from dataclasses import dataclass
@@ -488,6 +489,92 @@ class ExperimentRunnerTests(unittest.TestCase):
             path, _, digest = reference.rpartition("#")
             self.assertTrue(Path(path).is_file())
             self.assertEqual(sha256_digest(Path(path).read_bytes()), digest)
+
+    def test_committed_experiment_artifacts_match_git_bytes_or_adverse_manifest(
+        self,
+    ) -> None:
+        self.maxDiff = None
+        repository = Path(__file__).resolve().parents[1]
+        evidence_root = repository / "evidence" / "experiments"
+        manifest = json.loads(
+            (evidence_root / "adverse-artifact-integrity.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        expected_by_experiment = manifest["experiments"]
+        observed_experiments: set[str] = set()
+        for record_path in sorted(evidence_root.glob("EXP-*.json")):
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            experiment_id = record["experiment_id"]
+            observed_experiments.add(experiment_id)
+            mismatches: dict[tuple[str, str], dict[str, str]] = {}
+            for raw_reference in record["artifact_refs"]:
+                raw_path, separator, expected = raw_reference.rpartition("#")
+                if separator != "#" or not expected.startswith("sha256:"):
+                    mismatches[("unresolvable", raw_reference)] = {
+                        "kind": "unresolvable",
+                        "path": raw_reference,
+                        "expected": "",
+                        "observed": "",
+                    }
+                    continue
+                content = self._git_blob(repository, raw_path)
+                observed = sha256_digest(content)
+                if observed != expected:
+                    mismatches[("direct", raw_path)] = {
+                        "kind": "direct",
+                        "path": raw_path,
+                        "expected": expected,
+                        "observed": observed,
+                    }
+                if "/receipts/" not in raw_path or not raw_path.endswith(".json"):
+                    continue
+                receipt = json.loads(content.decode("utf-8"))
+                receipt_root = Path(raw_path).parent.parent
+                for artifact in receipt.get("artifacts", []):
+                    artifact_path = (
+                        receipt_root / Path(*artifact["path"].split("/"))
+                    ).as_posix()
+                    artifact_content = self._git_blob(repository, artifact_path)
+                    artifact_observed = sha256_digest(artifact_content)
+                    if artifact_observed != artifact["digest"]:
+                        mismatches[("nested", artifact_path)] = {
+                            "kind": "nested",
+                            "path": artifact_path,
+                            "expected": artifact["digest"],
+                            "observed": artifact_observed,
+                        }
+            expected_rows = expected_by_experiment.get(
+                experiment_id,
+                {"mismatches": []},
+            )["mismatches"]
+            self.assertEqual(
+                sorted(mismatches.values(), key=lambda row: (row["kind"], row["path"])),
+                sorted(expected_rows, key=lambda row: (row["kind"], row["path"])),
+                experiment_id,
+            )
+            disposition = expected_by_experiment[experiment_id]["disposition"]
+            self.assertIn(disposition, {"adverse", "validated"})
+            self.assertEqual(disposition == "adverse", bool(expected_rows))
+        self.assertEqual(set(expected_by_experiment), observed_experiments)
+
+    @staticmethod
+    def _git_blob(repository: Path, path: str) -> bytes:
+        completed = subprocess.run(
+            ("git", "show", f"HEAD:{path}"),
+            cwd=repository,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise AssertionError(
+                f"experiment artifact is absent from Git: {path}: "
+                + completed.stderr.decode("utf-8", "replace")
+            )
+        return completed.stdout
 
     def _execute_model(
         self,

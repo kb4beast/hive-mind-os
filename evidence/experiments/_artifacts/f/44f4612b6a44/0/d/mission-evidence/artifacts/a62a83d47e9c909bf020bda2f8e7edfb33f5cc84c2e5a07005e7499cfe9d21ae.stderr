@@ -1,0 +1,15 @@
+test_increment_regression (test_maths.MathsTests.test_increment_regression) ... FAIL
+
+======================================================================
+FAIL: test_increment_regression (test_maths.MathsTests.test_increment_regression)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\beesp\AppData\Local\Temp\hive-mind-p05-hwutj7l7\explorer\repo\tests\test_maths.py", line 8, in test_increment_regression
+    self.assertEqual(increment(1), 2)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 2
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

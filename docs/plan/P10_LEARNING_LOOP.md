@@ -244,3 +244,19 @@ record and `P10-P11-repair-final.json` audit supersede the original promotion cl
 without deleting it. The earlier `P10-P11-repair-post.json` audit passed its gates but
 exposed ignored nested receipt artifacts in its inventory; it is retained as adverse
 packaging evidence. This remains scripted/local evidence and does not close `B-OPS-03`.
+
+### Post-merge byte-integrity appeal
+
+The next exact-main review blocked merged commit
+`6fb396a81f88456ce0566ec2d70b4476ae0ba721`: Git's text attributes normalized three
+mission reports and nested command artifacts after runtime validation, so the committed
+bytes contradicted the retained digests. All three reviewers reproduced the defect.
+
+Experiment artifacts are now byte-preserving Git evidence. A clean-checkout regression
+reads Git objects for every direct reference and every nested receipt artifact; known
+legacy and normalization failures must equal the additive adverse manifest exactly, while
+new experiments permit no mismatch. The first regeneration failed closed on Windows path
+length and is retained under `evidence/experiments/failed/`. The shorter-layout experiment
+`EXP-98c64c11-bd9c-47a5-a376-d39fad641332` completed three real fixture missions and
+recorded `keep`; `P10-byte-integrity-final.json` is the required final audit. P11 and the
+narrow local `B-OPS-02` resolution are unchanged by this appeal.

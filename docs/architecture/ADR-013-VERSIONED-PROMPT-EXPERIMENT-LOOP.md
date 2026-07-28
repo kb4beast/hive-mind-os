@@ -110,3 +110,17 @@ tampered references become policy violations and force quarantine. The original
 experiment and audit remain immutable adverse evidence. The repaired experiment and
 audit are additive, and this ADR remains at `adapt` unless the fresh exact-candidate
 review permits delivery.
+
+### Git-object byte appeal
+
+The next review reproduced a second evidence-integrity failure at merged commit
+`6fb396a81f88456ce0566ec2d70b4476ae0ba721`: pre-commit receipt validation passed,
+but Git line-ending normalization changed retained reports and command artifacts. The
+experiment's `complete` claim therefore did not survive checkout.
+
+Experiment artifact trees are now declared byte evidence with `-text -diff`. A committed
+regression reads each reference from the Git object database, recurses through receipt
+artifact bindings, and permits discrepancies only when they exactly match the additive
+adverse manifest. Fresh experiment `EXP-98c64c11-bd9c-47a5-a376-d39fad641332` must
+have no direct or nested mismatch. This adapts the retention control; it does not promote
+the capability beyond scripted/local maturity.

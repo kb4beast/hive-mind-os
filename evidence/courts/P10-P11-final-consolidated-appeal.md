@@ -47,3 +47,28 @@ then exposed that a broad repository `artifacts/` rule excluded the enforcement
 receipts' nested artifact bytes. The audit is retained as adverse packaging evidence.
 The appeal adds a narrow exception only for the committed experiment evidence tree,
 tracks those digest-bound bytes, and requires a fresh audit of the corrected candidate.
+
+## Post-merge byte-integrity appeal
+
+The second consolidated review of merged commit
+`6fb396a81f88456ce0566ec2d70b4476ae0ba721` supported the P11 repair and
+`B-OPS-02`'s local resolution but blocked P10 again. The Curator, Judge, and Orchestrator
+all reproduced that Git text normalization changed committed evidence bytes after the
+runtime validator had approved them. The exact Git-object discrepancies are retained in
+`evidence/experiments/adverse-artifact-integrity.json`; the old experiment and both prior
+repair audits remain adverse evidence.
+
+The byte-integrity appeal:
+
+1. applies `-text -diff` to `evidence/experiments/_artifacts/**`;
+2. validates every committed experiment reference and each nested enforcement artifact
+   against `git show HEAD:<path>`;
+3. requires every known mismatch or unresolvable legacy label to match the explicit
+   adverse manifest exactly; and
+4. adds fresh experiment `EXP-98c64c11-bd9c-47a5-a376-d39fad641332`, whose direct and
+   nested references must have zero Git-object mismatches.
+
+An initial regeneration attempt (`EXP-f0346c51-f094-4617-91fc-d41b80ce4ec3`) failed
+closed before a verdict when its Windows path budget was exhausted. Its partial artifacts
+and failure record are retained. The successful appeal uses a shorter evidence layout;
+it does not weaken receipt validation or any maturity boundary.
