@@ -302,3 +302,12 @@ under the audit.
 - This appeal changes no source exhibit, docket entry, deferral verdict, blocker row,
   or audit schema. Fresh gate, audit, exact-head CI, and independent review evidence
   must supersede the earlier candidate before delivery.
+
+### Local-policy audit result
+
+Focused licensing regressions, Ruff, and Pyright 1.1.411 passed. Fresh audit
+`evidence/audits/P12-post-local-license-policy.json` is complete with no failures,
+reports 276 pytest tests passed, binds clean implementation commit
+`32734b91eee5050ebd1ab2a02b65c7429a4ea516`, and has canonical digest
+`sha256:faf7c0286e70480edf5fdb0a04b8823eac0c128b7f5a4f92064b586cbc0c75e4`.
+Exact-head CI and fresh independent review remain required.
