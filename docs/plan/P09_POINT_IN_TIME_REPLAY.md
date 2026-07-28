@@ -179,3 +179,71 @@ pinned self-history curriculum exist; every episode carries honest contamination
 - No scrubbing of the contamination caveat from self-history episodes.
 - Do not modify `repository_learning.py` semantics to fit the oracle; the oracle
   conforms to the existing contracts.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-28T01:01:05Z
+- Executor (model/agent identity): Codex P09 Builder only; independent Curator,
+  Cross-Examiner, Judge, Integrator, and other review identities remain required on the
+  complete exact-SHA pull-request candidate.
+- Branch and audited implementation commit: `phase/P09-pit-oracle`;
+  `df666384adabf77fa18ee6592514fb56b7fcfb6a`. The pull-request head records the final
+  append-only evidence/metadata commit because a commit cannot contain its own SHA.
+- Gates: P09 tests 11 passed with 9 subtests; full pytest 276 passed, 2 skipped, and
+  1,727 subtests passed; Ruff passed; Pyright 1.1.411 passed with 0 errors and 0 warnings
+  via `python -m pyright`.
+- Audit artifact: `evidence/audits/P09-post.json`
+  (canonical digest:
+  `sha256:32ee8a3159284e42f3d5c94a0e9a96fadd96c098c02ac96acb889faa93a84fc3`;
+  complete: true; failures: none; audited implementation commit:
+  `df666384adabf77fa18ee6592514fb56b7fcfb6a`; audit pytest: 276 passed).
+- Self-history episode: `evidence/pit/P09-self-history-episode.json`
+  (file SHA-256:
+  `c7903b8509783379443db89917814dd39786481150fd0e3a2cb8aaa5b0281124`;
+  target `b695110bd7e71a1a2e2f3297fb60677390d981b6`; 9 ancestors; 23 resolvable
+  sandbox receipts; 4 adversarial probes; scripted overlap score 0, preserved as the
+  honest graded outcome without a superiority claim).
+- Deviations from the phase spec: the `pyright` console executable was unavailable in
+  this shell, so the installed Pyright module was invoked as `python -m pyright`; the
+  globally installed `hive-mind` console entry point initially resolved the main
+  checkout, so the literal CLI exit command was rerun with this branch's `src` directory
+  on `PYTHONPATH` and exited 0. No product or acceptance criteria were changed.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none.
+
+## Post-review appeal — reveal and target binding
+
+- The first consolidated review of exact candidate
+  `2c3a0e8b18aa8e65918d587beabb9ca81dd671ea` reproduced two fail-open paths. Grading
+  accepted caller-forged or unrecorded reveal data, and mutating the target SHA on a
+  previously sealed environment allowed a different target to be revealed under the
+  original prediction seal. Both the Curator and Judge blocked delivery.
+- Repair commit `575306db44d8ca569a4c08179efcbf42366d1e7d` binds the target SHA and environment
+  digest into the sealed prediction document, records a canonical digest of the
+  oracle-produced reveal, rejects altered, foreign, or unrecorded reveals, and records
+  violations before grading. Regressions cover forged reveal content, absence of a
+  grading event after rejection, and target mutation before reveal.
+- The repaired boundary gate passed: 280 standard-library tests with 2 skips, the 13
+  P09 tests plus 9 subtests under pytest, Ruff, and Pyright 1.1.411.
+- Two incomplete audit attempts are intentionally preserved. The first,
+  `evidence/audits/P09-post-reveal-repair.json`
+  (`sha256:bbeec89943b116016eda63fd34cf1fed2f56cb55b9fdfe899ed7a3bbae2cf9b9`),
+  recorded one unrelated mission-resume test failure while three full audits competed
+  concurrently; pytest's last-failure replay then passed that test in isolation. The
+  second, `evidence/audits/P09-post-reveal-repair-retry.json`
+  (`sha256:13545aaabccc0473732be332d43314a6873b4967021a9a67156f826df4120f83`),
+  correctly refused to bind results because the first adverse artifact was still
+  untracked. These attempts are evidence, not successful audits.
+- A clean final audit and fresh independent exact-candidate review remain required.
+  Existing contamination caveats and the absence of any superiority or release claim
+  remain unchanged.
+
+### Clean audit result
+
+After the adverse attempts were committed, the clean audit
+`evidence/audits/P09-post-reveal-repair-final.json` completed with no failures, reported
+278 pytest tests passed, and bound clean commit
+`73bd07bf647ad6ff2e974ed0ff408d2b828dda3a`. Its canonical digest is
+`sha256:d3d4d11b53d1ef672621a429d834436111d30c863a2d76685ab28d2e4e2b6589`.
+This result satisfies the audit prerequisite but remains subject to the fresh
+independent exact-candidate review.
