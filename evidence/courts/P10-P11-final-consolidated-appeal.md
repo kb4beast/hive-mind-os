@@ -40,3 +40,10 @@ The original experiment, audits, commit, and reviewer dissent remain preserved. 
 appeal does not close `B-OPS-03`, source or licensing obligations, authenticated identity,
 external retention, hostile isolation, production readiness, release readiness, or any
 superiority burden.
+
+The first repair audit, `evidence/audits/P10-P11-repair-post.json`, passed 353 tests with
+no failures at `96268c76d4eb9dad09ca12cdd0bb9c241c242709`. Its ignored-file inventory
+then exposed that a broad repository `artifacts/` rule excluded the enforcement
+receipts' nested artifact bytes. The audit is retained as adverse packaging evidence.
+The appeal adds a narrow exception only for the committed experiment evidence tree,
+tracks those digest-bound bytes, and requires a fresh audit of the corrected candidate.

@@ -219,5 +219,5 @@ The earlier stale-token regression covered only the later post-reclaim state.
 The appeal atomically requires the current token and `lease_expiry >= now` for both
 completion and failure. New no-reclaim regressions preserve the job unchanged after each
 rejected operation, and the existing post-reclaim test remains. A new
-`P10-P11-repair-post.json` audit supersedes the original lease-authority claim while
+`P10-P11-repair-final.json` audit supersedes the original lease-authority claim while
 retaining the original audit and independent dissent.

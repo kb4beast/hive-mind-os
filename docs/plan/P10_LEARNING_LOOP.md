@@ -240,5 +240,7 @@ mission outcome for champion and challenger within that repetition, validates ev
 enforcement receipt, retains the mission reports and receipts beneath the experiment
 evidence root, and recomputes every prompt and surface artifact digest before the RSI
 gate. Missing or tampered references now quarantine the experiment. A new end-to-end
-record and `P10-P11-repair-post.json` audit supersede the original promotion claim without
-deleting it. This remains scripted/local evidence and does not close `B-OPS-03`.
+record and `P10-P11-repair-final.json` audit supersede the original promotion claim
+without deleting it. The earlier `P10-P11-repair-post.json` audit passed its gates but
+exposed ignored nested receipt artifacts in its inventory; it is retained as adverse
+packaging evidence. This remains scripted/local evidence and does not close `B-OPS-03`.
