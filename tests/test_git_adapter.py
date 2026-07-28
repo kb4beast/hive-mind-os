@@ -126,6 +126,47 @@ class GitAdapterTests(unittest.TestCase):
         self.assertEqual(symbolic["result"], "failed")
         self.assertFalse((self.fixture.root.parent / "fixture-hook-ran.txt").exists())
 
+    def test_materialize_excludes_local_codex_bookkeeping_refs(self) -> None:
+        bookkeeping = (
+            self.fixture.root
+            / ".git"
+            / "refs"
+            / "codex"
+            / "turn-diffs"
+            / "checkpoints"
+            / ("a" * 16)
+            / ("b" * 16)
+        )
+        bookkeeping.mkdir(parents=True)
+        (bookkeeping / "1785167248210").write_text(
+            COMMIT_TWO_SHA + "\n",
+            encoding="ascii",
+        )
+        workspace = self.workspace()
+        self.assertFalse(
+            (
+                workspace.container_root
+                / "source"
+                / ".git"
+                / "refs"
+                / "codex"
+            ).exists()
+        )
+        self.assertEqual(
+            workspace._git_text(
+                ["rev-parse", "HEAD"],
+                Action.READ_REPOSITORY,
+                "test materialized head without app refs",
+            ),
+            COMMIT_TWO_SHA,
+        )
+        if os.name == "nt":
+            self.assertIn("SYSTEMROOT", workspace.runner.spec.env_allowlist)
+            self.assertIn("GIT_CONFIG_KEY_1", workspace.runner.spec.env_allowlist)
+            self.assertIn("GIT_CONFIG_VALUE_1", workspace.runner.spec.env_allowlist)
+            self.assertIn("GIT_CONFIG_KEY_2", workspace.runner.spec.env_allowlist)
+            self.assertIn("GIT_CONFIG_VALUE_2", workspace.runner.spec.env_allowlist)
+
     def test_materialize_ignores_host_global_git_configuration(self) -> None:
         global_config = self.base / "host-global.gitconfig"
         global_config.write_text(
@@ -419,15 +460,19 @@ class GitAdapterTests(unittest.TestCase):
             ).exists()
         )
 
-    def test_api_has_no_merge_rebase_push_or_force_surface(self) -> None:
+    def test_api_has_no_merge_rebase_or_force_surface(self) -> None:
         forbidden = [
             name
             for name in dir(GitWorkspace)
             if any(
                 keyword in name.lower()
-                for keyword in ("merge", "rebase", "push", "force")
+                for keyword in ("merge", "rebase", "force")
             )
         ]
         self.assertEqual(forbidden, [])
+        self.assertEqual(
+            [name for name in dir(GitWorkspace) if "push" in name.lower()],
+            ["push_branch"],
+        )
 if __name__ == "__main__":
     unittest.main()

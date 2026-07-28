@@ -8,3 +8,6 @@
 
 # Source exhibits are evidentiary bytes. Never normalize line endings or text diffs.
 evidence/sources/**/raw/** -text -diff
+
+# Live receipts and provider artifacts are evidentiary bytes. Preserve them exactly.
+evidence/live/** -text -diff

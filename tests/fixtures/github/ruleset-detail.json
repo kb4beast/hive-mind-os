@@ -1,0 +1,69 @@
+{
+  "id": 42,
+  "name": "constitutional-code",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/main"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "required_linear_history"
+    },
+    {
+      "type": "required_signatures"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 2,
+        "require_code_owner_review": true,
+        "dismiss_stale_reviews_on_push": true,
+        "require_last_push_approval": true,
+        "required_review_thread_resolution": true
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [
+          {
+            "context": "unit-tests (Python 3.11)"
+          },
+          {
+            "context": "unit-tests (Python 3.12)"
+          },
+          {
+            "context": "unit-tests (Python 3.14)"
+          },
+          {
+            "context": "static-and-type-checks"
+          },
+          {
+            "context": "codeql-security"
+          },
+          {
+            "context": "secret-scan"
+          },
+          {
+            "context": "dependency-and-license-review"
+          },
+          {
+            "context": "sbom-and-build-provenance"
+          }
+        ]
+      }
+    }
+  ]
+}

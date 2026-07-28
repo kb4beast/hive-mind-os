@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import tomllib
@@ -47,7 +48,7 @@ class RepositoryGovernanceTests(unittest.TestCase):
         ):
             self.assertIn(protected, codeowners)
 
-    def test_required_rules_fail_closed_and_admit_remote_verification_gap(self) -> None:
+    def test_required_rules_bind_remote_verification_evidence(self) -> None:
         rules = json.loads(
             (
                 ROOT
@@ -63,8 +64,15 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertGreaterEqual(pull_request["required_approving_review_count"], 2)
         self.assertTrue(pull_request["require_code_owner_review"])
         self.assertTrue(pull_request["require_last_push_approval"])
-        self.assertEqual(rules["verification_status"], "not_verified_on_remote")
-        self.assertTrue(rules["blocking_obligation"])
+        self.assertEqual(rules["verification_status"], "verified_on_remote")
+        evidence = ROOT / rules["verification_evidence"]
+        self.assertTrue(evidence.is_file())
+        self.assertEqual(
+            rules["verification_evidence_digest"],
+            "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest(),
+        )
+        self.assertIsNone(rules["blocking_obligation"])
+        self.assertIn("one-maintainer", rules["verification_residual"])
 
     def test_build_backend_is_exactly_pinned(self) -> None:
         project = (ROOT / "pyproject.toml").read_text()

@@ -36,6 +36,7 @@ from .git_adapter import (
     GitWorkspace,
     verify_delivery,
 )
+from .github_adapter import GitHubDeliveryTarget
 from .ledger import EvidenceLedger
 from .models import (
     AgentResult,
@@ -117,6 +118,7 @@ class MissionReport(RunReport):
     builder_workspace: str | None
     curator_workspace: str | None
     context_manifests: tuple[dict[str, Any], ...]
+    github_delivery: dict[str, Any] | None
     failure: dict[str, str] | None
 
     def to_dict(self, *, normalize_volatile: bool = False) -> dict[str, Any]:
@@ -163,6 +165,8 @@ class MissionReport(RunReport):
             "context_manifests": [dict(item) for item in self.context_manifests],
             "failure": self.failure,
         }
+        if self.github_delivery is not None:
+            payload["github_delivery"] = dict(self.github_delivery)
         if not normalize_volatile:
             return payload
         payload["run_id"] = "<run-id>"
@@ -499,6 +503,7 @@ class RepositoryMission:
         budget: AutonomyBudget | None = None,
         ledger: EvidenceLedger | None = None,
         mission_store: MissionStore | None = None,
+        github_delivery: GitHubDeliveryTarget | None = None,
         crash_hook: Callable[[int, str], None] | None = None,
         _run_id: str | None = None,
         _resume: bool = False,
@@ -545,6 +550,7 @@ class RepositoryMission:
         self._context_manifests: list[dict[str, Any]] = []
         self._evidence_root: Path | None = None
         self.mission_store = mission_store
+        self.github_delivery = github_delivery
         self.crash_hook = crash_hook
         self._resume = _resume
         self._step_index = 0
@@ -577,6 +583,31 @@ class RepositoryMission:
                     ).encode("utf-8")
                 ),
             }
+            if self.github_delivery is not None:
+                client = self.github_delivery.client
+                if (
+                    client.mission_store is not self.mission_store
+                    or client.mission_id != self.run_id
+                ):
+                    raise ValueError(
+                        "GitHub delivery must share the durable mission store and id"
+                    )
+                config["github_delivery"] = {
+                    "owner": client.owner,
+                    "repository": client.repository,
+                    "base": self.github_delivery.base,
+                    "title": self.github_delivery.title,
+                    "body": self.github_delivery.body,
+                    "desired_rules_path": str(
+                        self.github_delivery.desired_rules_path
+                    ),
+                    "max_check_attempts": (
+                        self.github_delivery.max_check_attempts
+                    ),
+                    "check_interval_s": self.github_delivery.check_interval_s,
+                    "token_env": client.token_env,
+                    "api_base": client.api_base,
+                }
             if not self.mission_store.has_mission(self.run_id):
                 self.mission_store.register_mission(
                     self.run_id,
@@ -597,6 +628,7 @@ class RepositoryMission:
         builder_workspace_path: str | None = None
         curator_workspace_path: str | None = None
         failure: dict[str, str] | None = None
+        github_delivery_record: dict[str, Any] | None = None
         staging_parent: Path | None = None
         published = False
         final_output = self._validated_output(
@@ -959,6 +991,69 @@ class RepositoryMission:
                     or tree_digest is None
                 ):
                     raise MissionFailed("mission reached an incomplete delivery state")
+                if self.github_delivery is not None:
+                    assert builder_workspace is not None
+                    assert branch is not None
+                    delivery = self.github_delivery.client.deliver(
+                        builder_workspace,
+                        branch=branch,
+                        base=self.github_delivery.base,
+                        title=self.github_delivery.title,
+                        body=self.github_delivery.body,
+                        desired_rules_path=(
+                            self.github_delivery.desired_rules_path
+                        ),
+                        max_check_attempts=(
+                            self.github_delivery.max_check_attempts
+                        ),
+                        check_interval_s=self.github_delivery.check_interval_s,
+                    )
+                    self._record_workspace_receipts(builder_workspace)
+                    self._record_receipts(
+                        (
+                            delivery.pull_request.receipt,
+                            *(check.receipt for check in delivery.checks),
+                        )
+                    )
+                    github_delivery_record = {
+                        "owner": self.github_delivery.client.owner,
+                        "repository": self.github_delivery.client.repository,
+                        "branch": delivery.push.branch,
+                        "head_sha": delivery.push.head_sha,
+                        "pull_request_number": delivery.pull_request.number,
+                        "pull_request_url": delivery.pull_request.url,
+                        "draft": delivery.pull_request.draft,
+                        "check_count": len(delivery.checks),
+                        "check_receipt_digests": [
+                            check.receipt["digest"]
+                            for check in delivery.checks
+                        ],
+                        "protection_matches": delivery.protection.matches,
+                        "protection_report": {
+                            "path": delivery.protection.evidence_path,
+                            "digest": delivery.protection.evidence_digest,
+                        },
+                    }
+                    self.ledger.append_event(
+                        self.run_id,
+                        "github.delivery.completed",
+                        Role.INTEGRATOR.value,
+                        github_delivery_record,
+                    )
+                    if not delivery.protection.matches:
+                        self.ledger.append_event(
+                            self.run_id,
+                            "github.protection.mismatch",
+                            Role.INTEGRATOR.value,
+                            {
+                                "mismatches": list(
+                                    delivery.protection.mismatches
+                                ),
+                                "report": github_delivery_record[
+                                    "protection_report"
+                                ],
+                            },
+                        )
                 if self.mission_store is None:
                     self._copy_and_validate_mission_evidence(candidate)
                 else:
@@ -1022,6 +1117,7 @@ class RepositoryMission:
                 curator_verdict,
                 builder_workspace_path,
                 curator_workspace_path,
+                github_delivery_record,
                 None,
             )
             assert artifact_directory is not None
@@ -1090,6 +1186,7 @@ class RepositoryMission:
                 curator_verdict,
                 builder_workspace_path,
                 curator_workspace_path,
+                github_delivery_record,
                 failure,
             )
             if failure_receipt_root is not None:
@@ -2410,6 +2507,7 @@ class RepositoryMission:
         curator_verdict: str,
         builder_workspace: str | None,
         curator_workspace: str | None,
+        github_delivery: dict[str, Any] | None,
         failure: dict[str, str] | None,
     ) -> MissionReport:
         events = self.ledger.events(self.run_id)
@@ -2440,6 +2538,7 @@ class RepositoryMission:
             builder_workspace=builder_workspace,
             curator_workspace=curator_workspace,
             context_manifests=tuple(dict(item) for item in self._context_manifests),
+            github_delivery=github_delivery,
             failure=failure,
         )
 

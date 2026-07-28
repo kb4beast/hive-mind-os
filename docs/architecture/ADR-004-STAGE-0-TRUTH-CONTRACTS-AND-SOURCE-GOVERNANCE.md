@@ -93,6 +93,14 @@ Repository files cannot prove GitHub host settings are active. The rules contrac
 keeps `verification_status` equal to `not_verified_on_remote` and blocks a protected-host
 claim until a disjoint observer verifies equivalent active rules.
 
+P07 closure note (2026-07-28): the original fail-closed state above is preserved as the
+point-in-time Stage 0 decision. P07's disjoint Curator independently reproduced the live
+host state and the committed matching report at
+`evidence/live/P07/github-receipts/github/protection/08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7.json`.
+The rules contract now says `verified_on_remote` and binds that digest. This verifies host
+activation only; one-maintainer review independence, administrator bypass, and
+authenticated identity remain explicit residuals.
+
 ## Threat delta
 
 | Threat | Control | Residual risk |
