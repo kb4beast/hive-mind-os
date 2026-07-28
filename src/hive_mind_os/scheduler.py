@@ -251,16 +251,17 @@ class Scheduler:
         *,
         mission_id: str,
     ) -> Job:
+        now = self.clock.now()
         with self._lock:
             row = self._connection.execute(
                 """
                 UPDATE jobs
                 SET state='done',mission_id=?,lease_owner=NULL,lease_token=NULL,
                     lease_expiry=NULL,updated_at=?
-                WHERE id=? AND state='leased' AND lease_token=?
+                WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
                 RETURNING *
                 """,
-                (mission_id, self.clock.now(), job_id, lease_token),
+                (mission_id, now, job_id, lease_token, now),
             ).fetchone()
         if row is None:
             raise StaleLeaseError("completion rejected for stale lease")
@@ -274,19 +275,24 @@ class Scheduler:
         *,
         mission_id: str | None = None,
     ) -> Job:
+        now = self.clock.now()
         with self._lock:
             current = self.get(job_id)
-            if current.state != "leased" or current.lease_token != lease_token:
+            if (
+                current.state != "leased"
+                or current.lease_token != lease_token
+                or current.lease_expiry is None
+                or current.lease_expiry < now
+            ):
                 raise StaleLeaseError("failure rejected for stale lease")
             dead = current.attempts >= current.max_attempts
-            now = self.clock.now()
             not_before = now + self.backoff_seconds * (2 ** (current.attempts - 1))
             row = self._connection.execute(
                 """
                 UPDATE jobs
                 SET state=?,not_before=?,mission_id=COALESCE(?,mission_id),last_error=?,
                     lease_owner=NULL,lease_token=NULL,lease_expiry=NULL,updated_at=?
-                WHERE id=? AND state='leased' AND lease_token=?
+                WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
                 RETURNING *
                 """,
                 (
@@ -297,6 +303,7 @@ class Scheduler:
                     now,
                     job_id,
                     lease_token,
+                    now,
                 ),
             ).fetchone()
         if row is None:

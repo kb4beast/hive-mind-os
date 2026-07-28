@@ -1,6 +1,6 @@
 # ADR-013: Versioned Prompt Experiment Loop
 
-- **Status:** Proposed for P10 consolidated court review
+- **Status:** Adapted; appeal repair pending exact-candidate consolidated review
 - **Date:** 2026-07-28
 - **Originating work order:** `docs/plan/P10_LEARNING_LOOP.md`
 - **Prior decisions:** RECURSIVE_SELF_IMPROVEMENT_DOCKET, ADR-010-P05,
@@ -31,7 +31,9 @@ weaken any promotion burden.
 - **Expert testimony:** P05 mission outcomes supply a deterministic fixture surface; P09
   supplies physically isolated, sealed episode records; the existing
   `RecursiveImprovementGate` supplies the only permitted promotion decision.
-- **Judge:** reserved for the independent consolidated P10 review.
+- **Judge:** the first post-merge Judge issued `adapt — BLOCK`; the independent Curator
+  also blocked. Both reproduced that the fixture surface could promote from synthetic,
+  unresolvable references. The repair is an appeal, not erasure of that dissent.
 
 ## Decision
 
@@ -67,7 +69,7 @@ weaken any promotion burden.
 | Stale experiment overwrites newer champion | Promotion requires the expected current digest | Multi-process advisory locking is deferred |
 | Candidate judges itself | Gate quarantines evaluator equal to author or builder | Authenticated external identities remain deferred |
 | Single lucky run promotes | Contract enforces repeated samples and a noise floor | Scripted fixtures are not production outcome evidence |
-| Improvement hides cost or evidence loss | Token and evidence-completeness hard guardrails | Provider token reports remain provider-dependent |
+| Improvement hides cost or evidence loss | Token guardrail plus fail-closed validation of digest-bound prompt, mission-report, and enforcement-receipt artifacts before the gate | Provider token reports remain provider-dependent |
 | Author sees protected target | Ledger ordering check turns prior author reveal into holdout access | External knowledge and unauthenticated identity claims remain explicit caveats |
 | Losing evidence disappears | All artifacts and verdict records are retained | Long-term evidence retention belongs to P11 |
 
@@ -90,3 +92,21 @@ This decision establishes only a scripted local prompt-learning loop. It does no
 production readiness, superiority, complete source coverage, authenticated independence,
 hostile-code isolation, or automatic recursive improvement. Real provider evidence
 remains tracked by `B-OPS-03`; durable operations and retention remain P11 obligations.
+
+## Consolidated-review appeal
+
+The first all-merged review examined exact `main`
+`939287358679902a175d49abeea684a79b7d76ae`. The Curator found that
+`FixtureMissionSurface` inferred completeness from prompt substrings and emitted
+`fixture:*` labels that resolved to no retained artifact. The Judge independently
+classified the boundary `adapt — BLOCK`. Green tests and the original P10 audit do not
+override that counterexample.
+
+The appeal replaces those labels with real P05 scripted repository missions. Each
+repetition retains its mission report and enforcement receipts; every receipt is checked
+with `FileReceiptValidator`, and every surface and prompt artifact is bound by a
+recomputed SHA-256 reference before the promotion gate executes. Missing, malformed, or
+tampered references become policy violations and force quarantine. The original
+experiment and audit remain immutable adverse evidence. The repaired experiment and
+audit are additive, and this ADR remains at `adapt` unless the fresh exact-candidate
+review permits delivery.

@@ -208,3 +208,16 @@ later target.
 - New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. P11 remains a
   local single-machine capability and does not close existing source, real-provider,
   authenticated-identity, hostile-isolation, or production-operation obligations.
+
+## Post-merge appeal — expired lease authority
+
+The first all-merged Curator and Judge review blocked exact candidate
+`939287358679902a175d49abeea684a79b7d76ae`. Both reproduced that the original worker
+could complete or fail after lease expiry when no competitor had yet reclaimed the job.
+The earlier stale-token regression covered only the later post-reclaim state.
+
+The appeal atomically requires the current token and `lease_expiry >= now` for both
+completion and failure. New no-reclaim regressions preserve the job unchanged after each
+rejected operation, and the existing post-reclaim test remains. A new
+`P10-P11-repair-post.json` audit supersedes the original lease-authority claim while
+retaining the original audit and independent dissent.
