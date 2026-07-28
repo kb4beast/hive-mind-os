@@ -284,3 +284,40 @@ evidence, not declaration; all external side effects are idempotent and token-sa
   focused GitHub/governance tests 18 passed with 8 subtests; Ruff passed; Pyright 1.1.411
   passed with 0 errors. Delivery remains blocked until a fresh consolidated Curator,
   Judge, and Orchestrator review permits the repaired exact head.
+
+### Consolidated-review appeal 2
+
+- Challenged exact candidate:
+  `b91f7550f8f5d150ac7cd698653345da473bd7be`.
+- The independent Curator issued `PERMIT`, and the independent Judge issued
+  `adopt/PERMIT`. The independent Orchestrator issued `BLOCK` after reproducing a
+  late-materialization race: one visible completed successful check caused
+  `poll_checks()` to return before a second declared required check appeared and failed.
+  The concrete fail-open counterexample controls; all three dispositions remain
+  preserved.
+- Repair: `poll_checks()` now requires the declared required-check names and cannot
+  return until every one is visible and terminal with an accepted result. Missing and
+  nonterminal required names are included in the timeout observation and exception.
+  `deliver()` validates and binds the desired-rules check set before any push or pull
+  request side effect. The regression presents one completed success first and a late
+  required failure second; polling makes two observations and raises
+  `CheckRunFailed`.
+- Audited repair implementation:
+  `2eee66d3636fa5ed5d618510b1bbf0d25be729e7`. Focused GitHub, mission, and governance
+  validation passed 33 tests and 8 subtests; Ruff passed; Pyright passed with 0 errors.
+  The fresh audit `evidence/audits/P07-post-appeal2.json` is complete with no failures,
+  passed 279 tests, and has canonical digest
+  `sha256:d7744c41aaaa2817781e2f6b3952470c9624d6a8f63d252dad44c47e6f880408`.
+- Three incomplete audit attempts are preserved as adverse operational evidence:
+  `P07-post-appeal2-failed.json` (`sha256:5cdda2a6219685013d8455881563b57530f765ec37ce7cd6d25afe03c9bb8375`),
+  `P07-post-appeal2-failed-retry.json`
+  (`sha256:b2805860398ef9ce0ac388cc0dd37e01df1f5ab6a9b6ec4de64925f66db908bd`),
+  and `P07-post-appeal2-failed-import-path.json`
+  (`sha256:aecc8fa1181da6a9ffbc0abe87985ab0624ef11cfd53c1ff9d3c6d4ce2f0893f`).
+  The audit CLI had resolved an older editable worktree with a 300-second command
+  timeout; pinning `PYTHONPATH` to this candidate's `src` restored the intended
+  1,200-second audit budget. These attempts do not override the complete audit.
+- Delivery remains blocked until a fresh consolidated Curator, Judge, and Orchestrator
+  review permits the repaired exact head. No release-readiness, independent-human-
+  approval, source-completeness, signed-provider-identity, merge-authority,
+  deployment-authority, or superiority claim is made.
