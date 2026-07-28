@@ -254,3 +254,32 @@ under the audit.
 - The machine-blocked claim count and maintainer evidence requests in the original
   completion record remain unchanged. This CI appeal does not claim source
   completeness, release readiness, or resolution of any licensing obligation.
+
+## Post-review appeal — license promotion integrity
+
+- The consolidated review of exact candidate
+  `3ca672dc4fb5c1515d8a1414727701ec3fa46a22` confirmed the CI repair, but the Curator
+  and Judge independently reproduced licensing fail-open paths. An `unknown` exhibit
+  could be projected as MIT through an unbound override; the syntactically plausible
+  non-SPDX token `banana` was accepted; and `AGPL-3.0-only` cleared the machine block
+  despite the phase's fail-closed reuse requirement.
+- Repair commit `6c7ebd082497ea38004a1ab669d78530eca1de6e` restricts accepted identifiers to a
+  fail-closed pinned subset of SPDX License List 3.28.0, rejects unsupported tokens,
+  binds any projected `license_spdx` to the admitted exhibit metadata, and promotes
+  only the local reuse-policy set (`MIT`, `Apache-2.0`). `AGPL-3.0-only` is recognized
+  but remains unresolved for this policy and therefore blocked. This compatibility set
+  is a Hive Mind OS policy decision, not an SPDX compatibility claim.
+- External reference record: SPDX `license-list-data` tag `v3.28.0`,
+  `https://github.com/spdx/license-list-data/blob/v3.28.0/json/licenses.json`,
+  retrieved 2026-07-28; repository license `CC0-1.0`. No external code or license text
+  was copied.
+- End-to-end regressions cover the unknown-to-MIT override, `banana`, and
+  `AGPL-3.0-only`. The repaired boundary gate passed: 278 standard-library tests with
+  2 skips, 11 ingestion tests under pytest, Ruff, and Pyright 1.1.411.
+- Fresh audit `evidence/audits/P12-post-license-appeal.json` is complete with no
+  failures, reports 276 pytest tests passed, binds implementation commit
+  `6c7ebd082497ea38004a1ab669d78530eca1de6e`, and has canonical digest
+  `sha256:0750b69136575d103bf8ec03cec263cf387071e04b5de7c204011137e167fd7f`.
+- No source exhibit, docket entry, deferral verdict, blocker row, or audit schema
+  changed. The 73 machine-blocked claims and all maintainer evidence requests remain.
+  A fresh independent exact-candidate review remains required.
