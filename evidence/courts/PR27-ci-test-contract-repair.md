@@ -35,7 +35,7 @@ before beginning the Obsidian or agent-system redesign.
 | Steward | `/root/steward_exact` | separate maintainability, recovery, evidence-health, and receipt-retention review |
 | Optimizer | `/root/optimizer_ci_metrics` | discoverability and regression measurements |
 | Exact-candidate Integrator | `/root/integrator_exact` | protection provenance, compatibility, wheel/CI contract, and rollback review |
-| Judge | pending independent identity | final disposition only after exact-candidate evidence |
+| Judge and Appeals Judge | `/root/judge_phase0` | initial adverse disposition, remand, exact evidence-head appeal, and delivery boundary |
 
 The Builder may not use its own results as independent verification. The Judge
 receipt remains pending until it reviews the exact committed candidate and the
@@ -311,9 +311,26 @@ The first independent Judge review of evidence head `0f8113b` issued `defer`
 because the receipt bytes, separate Steward testimony, and reviewer-topology
 blocker were not yet bound. That losing disposition is preserved. The
 retention artifacts, Steward verdict, and `B-GOV-07` now answer its remand; an
-independent appeal/recheck of the new evidence-only head is pending. Phase 1
-remains prohibited until all required GitHub checks are green on the exact
-final pull-request head.
+independent appeal/recheck of evidence head `3e41cb9` answered the remand.
+Phase 1 remains prohibited until all required GitHub checks are green on the
+exact final pull-request head.
+
+## Appeal judicial disposition
+
+`/root/judge_phase0` issued `adapt` on appeal for evidence head `3e41cb9`. The
+Judge independently verified every manifest-bound byte count and digest, the
+420-test receipt, installed-wheel report, audit integrity, unchanged
+`afb0c20` code trees, separate Orchestrator and Steward findings, clean
+worktree, and `B-GOV-07`.
+
+The draft push is authorized solely to open the repair pull request and obtain
+exact-head GitHub checks. Merge or promotion is not authorized while
+`B-GOV-06` and `B-GOV-07` remain open; administrator bypass and weakened
+review rules are prohibited. Phase 1 may not begin until every required check
+is green on the exact final pull-request head, and any new commit resets that
+gate. `B-OPS-07` and `B-OPS-08` remain deferred blockers. No broader host,
+release, production, source-completeness, autonomy, or superiority claim is
+adopted.
 
 ## Proposed disposition
 
@@ -361,6 +378,5 @@ autonomy, or superiority claim is made.
 
 ## Pending receipts
 
-- Independent Judge disposition.
 - Green exact-head GitHub checks.
 - Administrator enforcement receipt for `B-GOV-06`.
