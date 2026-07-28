@@ -224,10 +224,19 @@ class BenchmarkHarnessTests(unittest.TestCase):
             "Hive Mind OS outperforms the baseline benchmark.\n",
             encoding="utf-8",
         )
+        plan = docs / "plan" / "P13_BENCHMARK_COURT_MVP.md"
+        plan.parent.mkdir()
+        plan.write_text(
+            "planting Hive Mind OS outperforms the baseline benchmark.\n",
+            encoding="utf-8",
+        )
 
         self.assertEqual(
             find_unauthorized_claims(repository),
-            ("docs/claim.md",),
+            (
+                "docs/claim.md",
+                "docs/plan/P13_BENCHMARK_COURT_MVP.md",
+            ),
         )
         claim.write_text(
             "Hive Mind OS outperforms the baseline benchmark.\n\n"
@@ -236,7 +245,10 @@ class BenchmarkHarnessTests(unittest.TestCase):
         )
         self.assertEqual(
             find_unauthorized_claims(repository),
-            ("docs/claim.md",),
+            (
+                "docs/claim.md",
+                "docs/plan/P13_BENCHMARK_COURT_MVP.md",
+            ),
         )
 
     def test_two_task_two_repetition_run_completes_offline(self) -> None:

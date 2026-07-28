@@ -137,9 +137,10 @@ Modified files:
 6. Verdict record: binds corpus/code/lane digests; disposition is
    `measurement-recorded`; judge identity differs from lane identities; a superiority
    disposition from this harness is impossible (constructor rejects it).
-7. Claim guard: planting "Hive Mind OS outperforms the baseline benchmark" in a docs
-   file makes the guard fail, and adding an arbitrary `superiority-verdict:` marker
-   cannot bypass it (use tmp copy or fixture injection — do not commit the violation).
+7. Claim guard: planting a prohibited project-versus-baseline comparative sentence in a
+   docs file makes the guard fail, and adding an arbitrary `superiority-verdict:` marker
+   cannot bypass it. The phase-plan filename receives no special treatment (use a temp
+   copy or fixture injection — do not commit the violation).
 8. End-to-end: `benchmark run` on a 2-task subset with K=2 completes offline in CI
    within reasonable time (mark the full corpus run as the manual/exit path if CI time
    is a concern; the subset proves the machinery).

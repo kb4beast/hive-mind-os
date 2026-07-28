@@ -611,10 +611,6 @@ def find_unauthorized_claims(root: str | Path) -> tuple[str, ...]:
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8")
-        if path.name == "P13_BENCHMARK_COURT_MVP.md":
-            text = "\n".join(
-                line for line in text.splitlines() if "planting " not in line
-            )
         if _CLAIM_PATTERN.search(text):
             findings.append(path.relative_to(repository).as_posix())
     return tuple(findings)
