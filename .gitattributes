@@ -15,3 +15,7 @@ evidence/live/** -text -diff
 # Benchmark receipts are also evidentiary bytes. Their recorded digests bind the exact
 # repository bytes, so checkout must never rewrite JSONL line endings.
 evidence/benchmarks/** -text -diff
+
+# Prompt-experiment artifacts are retained evidence, including JSON reports and command
+# streams generated on Windows. Git must preserve their pre-commit bytes exactly.
+evidence/experiments/_artifacts/** -text -diff
