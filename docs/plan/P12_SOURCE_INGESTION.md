@@ -202,3 +202,33 @@ under the audit.
 - No editing docket constants in place; additive registration paths only.
 - No unblocking without both exhibit and verdict.
 - No backdated capture times.
+
+---
+## Completion record
+- Date (UTC): 2026-07-28
+- Executor (model/agent identity): Codex Builder for P12
+- Branch and final commit SHA: `phase/P12-source-ingestion` at
+  `522adedecca16589df017f409ce733674de90ec0` (audited immutable implementation commit;
+  the audit/status follow-up commit containing this record is reported in the PR)
+- Gates: pytest pass (275 passed, 2 pre-existing skips, 1,718 subtests), Ruff pass,
+  Pyright pass via `python -m pyright` (`pyright` console executable was unavailable)
+- Audit artifact: `evidence/audits/P12-post.json` (digest:
+  `sha256:b1d138cb8591c8a73340dd9e30d808492d6aca46b2a41ac803aac0b78bb05463`)
+- Deviations from the phase spec: none
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none
+- Machine-blocked claims before/after: 73 / 73. No source evidence was invented or
+  promoted; all unavailable obligations received dated defer verdicts.
+- Maintainer evidence request list:
+  1. Supply complete timestamped transcripts or equivalent primary artifacts, original
+     media custody, and authoritative reuse terms for `SRC-005`, `SRC-006`, and
+     `SRC-016` through `SRC-020`.
+  2. Supply authoritative versioned license texts or explicit reuse grants for the 17
+     sources enumerated by `B-SRC-08`, together with the identity of an independent
+     licensing reviewer.
+  3. Identify and provide independently retrievable intended historical commit objects
+     for `SRC-009`, `SRC-010`, `SRC-011`, `SRC-014`, and `SRC-015`; current remote heads
+     do not prove the intended historical references.
+  4. Supply the original raw bytes and custody statements for `SRC-001`, `SRC-002`,
+     `SRC-013`, and `SRC-022`.
+  5. Supply the `SRC-023` author/custodian attestation, explicit reuse terms, and
+     independently reviewable origin and chain-of-custody evidence for `imgo.jpg`.
