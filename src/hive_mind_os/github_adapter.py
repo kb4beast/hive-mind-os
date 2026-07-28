@@ -26,7 +26,9 @@ from .receipts import ReceiptReference, portable_path_parts, sha256_digest
 _API_VERSION = "2022-11-28"
 _NAME = re.compile(r"[A-Za-z0-9_.-]+\Z")
 _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
-_RUN_URL = re.compile(r"(?P<url>https://github\.com/[^/]+/[^/]+/actions/runs/(?P<id>\d+))")
+_RUN_URL = re.compile(
+    r"(?P<url>https://github\.com/[^/]+/[^/]+/(?:actions/)?runs/(?P<id>\d+))"
+)
 _SUCCESS_CONCLUSIONS = frozenset({"success", "neutral", "skipped"})
 
 

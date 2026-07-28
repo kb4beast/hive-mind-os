@@ -341,6 +341,32 @@ class GitHubAdapterTests(unittest.TestCase):
             ],
         )
 
+    def test_code_scanning_run_url_is_receipted(self) -> None:
+        transport = FakeGitHubTransport()
+        path = (
+            f"/repos/octocat/hive-mind-os/commits/{HEAD_SHA}/"
+            "check-runs?filter=latest&per_page=100"
+        )
+        document = json.loads(_fixture("check-complete.json"))
+        check = document["check_runs"][0]
+        check["id"] = 90154969167
+        check["name"] = "CodeQL"
+        check["details_url"] = (
+            "https://github.com/octocat/hive-mind-os/runs/90154969167"
+        )
+        document["check_runs"] = [check]
+        transport.add("GET", path, json.dumps(document).encode())
+        result = self.client(transport).poll_checks(
+            HEAD_SHA,
+            max_attempts=1,
+            interval_s=0,
+        )
+        self.assertEqual(result[0].workflow_run_id, 90154969167)
+        self.assertEqual(
+            result[0].workflow_run_url,
+            "https://github.com/octocat/hive-mind-os/runs/90154969167",
+        )
+
     def test_check_timeout_fails_closed_with_failed_observation(self) -> None:
         transport = FakeGitHubTransport()
         path = (
