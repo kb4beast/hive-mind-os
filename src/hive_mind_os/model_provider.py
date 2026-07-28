@@ -14,6 +14,8 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Iterable, Mapping, Protocol
 
+from .models import Role
+
 
 class ProviderKind(StrEnum):
     OPENAI_COMPATIBLE = "openai_compatible"
@@ -322,26 +324,55 @@ class AnthropicProvider(_BaseProvider):
         )
 
 
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
+def _role_env(name: str, role: Role | str | None) -> str | None:
+    if role is not None:
+        role_name = role.value if isinstance(role, Role) else role
+        scoped = os.environ.get(f"{name}__{role_name.upper()}")
+        if scoped is not None:
+            return scoped
+    return os.environ.get(name)
+
+
+def _role_only_env(name: str, role: Role | str | None) -> str | None:
+    if role is None:
+        return None
+    role_name = role.value if isinstance(role, Role) else role
+    return os.environ.get(f"{name}__{role_name.upper()}")
+
+
+def _role_suffix(role: Role | str | None) -> str:
+    if role is None:
+        return ""
+    role_name = role.value if isinstance(role, Role) else role
+    return f"__{role_name.upper()}"
+
+
+def _env_int(name: str, default: int, role: Role | str | None = None) -> int:
+    raw = _role_env(name, role)
     try:
         return default if raw is None else int(raw)
     except ValueError:
-        raise ModelProviderError(f"{name} must be an integer") from None
+        raise ModelProviderError(
+            f"{name}{_role_suffix(role)} must be an integer"
+        ) from None
 
 
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
+def _env_float(name: str, default: float, role: Role | str | None = None) -> float:
+    raw = _role_env(name, role)
     try:
         return default if raw is None else float(raw)
     except ValueError:
-        raise ModelProviderError(f"{name} must be numeric") from None
+        raise ModelProviderError(
+            f"{name}{_role_suffix(role)} must be numeric"
+        ) from None
 
 
 def provider_from_env(
     transport: TransportProtocol | None = None,
+    *,
+    role: Role | str | None = None,
 ) -> OpenAICompatibleProvider | AnthropicProvider:
-    raw_kind = os.environ.get("HIVE_MIND_MODEL_PROVIDER", "openai_compatible")
+    raw_kind = _role_env("HIVE_MIND_MODEL_PROVIDER", role) or "openai_compatible"
     try:
         kind = ProviderKind(raw_kind)
     except ValueError:
@@ -356,15 +387,25 @@ def provider_from_env(
         ProviderKind.ANTHROPIC: ("https://api.anthropic.com/v1", "ANTHROPIC_API_KEY"),
     }
     default_url, default_key_env = defaults[kind]
+    model = (
+        _role_only_env("HIVE_MIND_MODEL_MODEL", role)
+        or _role_only_env("HIVE_MIND_MODEL_ID", role)
+        or os.environ.get("HIVE_MIND_MODEL_MODEL")
+        or os.environ.get("HIVE_MIND_MODEL_ID")
+    )
     config = ProviderConfig(
         kind=kind,
-        base_url=os.environ.get("HIVE_MIND_MODEL_BASE_URL", default_url),
-        model=os.environ.get("HIVE_MIND_MODEL_ID", "").strip(),
-        api_key_env=os.environ.get("HIVE_MIND_MODEL_API_KEY_ENV", default_key_env),
-        timeout_s=_env_float("HIVE_MIND_MODEL_TIMEOUT_S", 60.0),
-        max_output_tokens=_env_int("HIVE_MIND_MODEL_MAX_OUTPUT_TOKENS", 2048),
-        temperature=_env_float("HIVE_MIND_MODEL_TEMPERATURE", 0.0),
-        max_retries=_env_int("HIVE_MIND_MODEL_MAX_RETRIES", 2),
+        base_url=_role_env("HIVE_MIND_MODEL_BASE_URL", role) or default_url,
+        model=(model or "").strip(),
+        api_key_env=(
+            _role_env("HIVE_MIND_MODEL_API_KEY_ENV", role) or default_key_env
+        ),
+        timeout_s=_env_float("HIVE_MIND_MODEL_TIMEOUT_S", 60.0, role),
+        max_output_tokens=_env_int(
+            "HIVE_MIND_MODEL_MAX_OUTPUT_TOKENS", 2048, role
+        ),
+        temperature=_env_float("HIVE_MIND_MODEL_TEMPERATURE", 0.0, role),
+        max_retries=_env_int("HIVE_MIND_MODEL_MAX_RETRIES", 2, role),
     )
     _read_api_key(config)
     if kind is ProviderKind.OPENAI_COMPATIBLE:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from .additional_video_docket import ADDITIONAL_CLAIMS, ADDITIONAL_SOURCES
 from .classic_gpt_docket import CLASSIC_GPT_CLAIMS, CLASSIC_GPT_SOURCES
@@ -159,7 +160,14 @@ def load_default_source_docket() -> FoundingSourceDocket:
     )
 
 
-def load_source_docket() -> FoundingSourceDocket:
-    """Compatibility alias for the embedded, immutable founding docket."""
+def load_source_docket(
+    repository: str | Path | None = None,
+) -> FoundingSourceDocket:
+    """Load the immutable founding docket plus admitted additive reconciliations."""
 
-    return load_default_source_docket()
+    docket = load_default_source_docket()
+    if repository is None:
+        return docket
+    from .ingestion import reconcile_docket
+
+    return reconcile_docket(docket, repository)

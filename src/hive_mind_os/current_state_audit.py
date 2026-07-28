@@ -481,7 +481,7 @@ def _load_repository_docket(repository: Path) -> Any:
     sys.modules[package_name] = package
     try:
         source_docket = importlib.import_module(f"{package_name}.source_docket")
-        return source_docket.load_source_docket()
+        return source_docket.load_source_docket(repository)
     finally:
         for module_name in tuple(sys.modules):
             if module_name == package_name or module_name.startswith(f"{package_name}."):
