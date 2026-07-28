@@ -11,3 +11,7 @@ evidence/sources/**/raw/** -text -diff
 
 # Live receipts and provider artifacts are evidentiary bytes. Preserve them exactly.
 evidence/live/** -text -diff
+
+# Benchmark receipts are also evidentiary bytes. Their recorded digests bind the exact
+# repository bytes, so checkout must never rewrite JSONL line endings.
+evidence/benchmarks/** -text -diff

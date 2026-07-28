@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -77,6 +78,34 @@ class BenchmarkHarnessTests(unittest.TestCase):
             [task.base_sha for task in second.tasks],
         )
         self.assertEqual(len(first.tasks), 5)
+
+    def test_committed_benchmark_receipts_survive_clean_checkout(self) -> None:
+        repository = Path.cwd()
+        benchmark_root = repository / "evidence" / "benchmarks"
+        summaries = sorted(benchmark_root.glob("*/summary.json"))
+        self.assertTrue(summaries, "no committed benchmark summary found")
+
+        for summary_path in summaries:
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            verdict_path = summary_path.with_name("verdict.json")
+            verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
+            raw_path = repository / "evidence" / "benchmarks" / summary["raw_results"]
+            actual_digest = "sha256:" + hashlib.sha256(raw_path.read_bytes()).hexdigest()
+
+            self.assertEqual(actual_digest, summary["results_digest"])
+            self.assertEqual(actual_digest, verdict["results_digest"])
+
+            relative = raw_path.relative_to(repository).as_posix()
+            attributes = subprocess.run(
+                ["git", "check-attr", "text", "diff", "--", relative],
+                cwd=repository,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                shell=False,
+            ).stdout.decode("utf-8")
+            self.assertIn(f"{relative}: text: unset", attributes)
+            self.assertIn(f"{relative}: diff: unset", attributes)
 
     def test_hidden_checks_are_not_materialized_for_lanes(self) -> None:
         corpus = build_corpus(self.root / "corpus")

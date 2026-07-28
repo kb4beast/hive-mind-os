@@ -108,3 +108,14 @@ rewrite them during rollback.
 
 This decision does not claim authenticated human identity, provider diversity, complete
 security scanning, complete license evaluation, production readiness, or superiority.
+
+## Post-review disposition
+
+The complete P08 candidate was adopted after the final role-binding repair, clean audit,
+exact-head CI, and independent review. The original `Proposed` header is retained as the
+decision's point-in-time state. The controlling audit is
+`evidence/audits/P08-post-role-binding-final.json` with canonical digest
+`sha256:0e22116c3fe8d27311d1604597bb1119ca0480f0cc4891aa5984f7ac7adf1122`.
+This adoption closes structural blind-first Curator independence only. Externally
+authenticated identities and complete provider mediation remain open under `B-GOV-02`
+and `B-GOV-03`.

@@ -284,3 +284,12 @@ no failures, reports 274 pytest tests passed, and binds clean commit
 model-producer repair. Its canonical digest is
 `sha256:0e22116c3fe8d27311d1604597bb1119ca0480f0cc4891aa5984f7ac7adf1122`.
 Exact-head CI and fresh independent review remain required.
+
+### Final delivery status
+
+PR #17 merged as `17b1832ca3c6274f92c3c97e762f6405aef5336d`. The consolidated
+post-merge review at `ac906dbb02c6620936fa439a1811de75e2ccf33c` reproduced P08's
+structural controls and preserved its unauthenticated-identity and shared-provider limits.
+The Curator's controlling block concerned P13 benchmark checkout bytes, not the P08
+boundary. P08's structural disposition is therefore adopted; B-GOV-02 and B-GOV-03 remain
+open and no authenticated-independence claim is authorized.
