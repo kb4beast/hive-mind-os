@@ -102,6 +102,21 @@ def check_context_manifest(
 ) -> None:
     """Fail closed when recorded verification evidence is not independent."""
 
+    supported_fields = {
+        "role",
+        "prior_roles",
+        "summaries",
+        "receipt_digests",
+        "provider_kind",
+        "model_id",
+        "provider_configuration",
+    }
+    unsupported_fields = sorted(str(key) for key in set(manifest) - supported_fields)
+    if unsupported_fields:
+        raise ContaminationError(
+            "verification context contains unsupported fields: "
+            + ", ".join(unsupported_fields)
+        )
     if not acting_identity or not verifying_identity:
         raise ContaminationError("verification identities must be recorded")
     if acting_identity == verifying_identity:
@@ -118,6 +133,17 @@ def check_context_manifest(
     prior_roles = _required_string_list(manifest, "prior_roles")
     summaries = _required_string_list(manifest, "summaries")
     receipt_digests = set(_required_string_list(manifest, "receipt_digests"))
+    scalar_fields = (
+        "role",
+        "provider_kind",
+        "model_id",
+        "provider_configuration",
+    )
+    for field in scalar_fields:
+        if field in manifest and not isinstance(manifest[field], str):
+            raise ContaminationError(
+                f"verification context {field} must be a string"
+            )
     forbidden_fields = sorted(
         str(key)
         for key, value in manifest.items()
@@ -141,7 +167,18 @@ def check_context_manifest(
         raise ContaminationError(
             "verification context contains Builder receipt digests"
         )
-    rendered = "\n".join(summaries)
+    rendered = "\n".join(
+        (
+            *prior_roles,
+            *summaries,
+            *receipt_digests,
+            *(
+                str(manifest[field])
+                for field in scalar_fields
+                if field in manifest
+            ),
+        )
+    )
     if "diff --git " in rendered or "\n@@ " in rendered:
         raise ContaminationError("verification context contains candidate diff bytes")
     if any(rationale and rationale in rendered for rationale in builder_rationales):

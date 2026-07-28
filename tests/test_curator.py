@@ -225,6 +225,8 @@ class CuratorReviewTests(unittest.TestCase):
             ("prior_roles", "builder", False),
             ("summaries", "diff --git a/file b/file", False),
             ("receipt_digests", None, True),
+            ("notes", "diff --git a/file b/file", False),
+            ("model_id", "diff --git a/file b/file", False),
         )
         for field, value, remove in malformed_cases:
             with self.subTest(field=field):
@@ -248,7 +250,10 @@ class CuratorReviewTests(unittest.TestCase):
                 if failure is None:
                     self.fail("failed mission did not record its failure")
                 self.assertEqual(failure["type"], "ContaminationError")
-                self.assertIn(field, failure["message"])
+                if field == "model_id":
+                    self.assertIn("candidate diff bytes", failure["message"])
+                else:
+                    self.assertIn(field, failure["message"])
                 self.assertIn("contaminated-verification", report.event_types)
 
     def test_same_identity_verification_is_rejected(self) -> None:
