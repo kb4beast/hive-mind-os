@@ -1,6 +1,6 @@
 # ADR-014: Durable Local Operations and Honest Mission Projection
 
-- **Status:** Proposed for final consolidated court review
+- **Status:** Adapted; appeal repair pending exact-candidate consolidated review
 - **Date:** 2026-07-28
 - **Originating work order:** `docs/plan/P11_SCHEDULER_AND_OPERATIONS.md`
 - **Prior decisions:** ADR-011, ADR-012-P08, ADR-013
@@ -24,8 +24,9 @@ complete.
 - **Expert testimony:** SQLite WAL plus immediate transactions provides the declared
   one-machine coordination boundary; P06 idempotency remains the effect-adoption
   authority.
-- **Judge:** reserved for the user-directed final consolidated review after approved
-  phase PRs merge.
+- **Judge:** the first post-merge Judge issued `adapt — BLOCK`; the Curator independently
+  reproduced the same expired-lease completion path. The repair is an appeal and retains
+  both adverse findings.
 
 ## Decision
 
@@ -53,7 +54,7 @@ complete.
 | Threat | Control | Residual |
 |---|---|---|
 | Two workers claim one ready job | Immediate transaction and conditional update | Multi-host filesystems are unsupported |
-| Expired worker publishes success | Opaque current-token check on completion | A worker may continue an external effect; P06 adoption prevents duplicate acceptance |
+| Expired worker publishes success or failure | One atomic update requires the current token and `lease_expiry >= now` | A worker may continue an external effect; P06 adoption prevents duplicate acceptance |
 | Infinite retry loop | Attempt bound, deterministic backoff, dead-letter state | Operator-triggered appeals are later work |
 | Heartbeat falsely proves mission success | Heartbeat changes only lease expiry | Host clock quality remains an operating dependency |
 | UI claims completion from store state alone | Requires correlated ledger completion evidence | Authenticated external ledger replication is deferred |
@@ -71,3 +72,18 @@ directly from retained state.
 This decision does not establish distributed operation, production readiness, hostile
 code isolation, authenticated worker identity, complete source coverage, or superiority.
 Triggers, retention policy, and external operational integrations remain future work.
+
+## Consolidated-review appeal
+
+The first all-merged review of exact `main`
+`939287358679902a175d49abeea684a79b7d76ae` reproduced a fail-open interval:
+after expiry but before a competing claim, the original token could still call
+`complete()` or `fail()`. The original reclaim test changed the token first and therefore
+did not cover this interval.
+
+The appeal captures one clock value per operation and makes the SQLite mutation
+atomically require `state='leased'`, the current token, and an unexpired lease. Failure
+also rejects an expired lease before calculating retry or dead-letter state. Regressions
+cover expired completion and failure before reclaim while retaining the existing
+post-reclaim stale-token case. The original P11 audit remains adverse evidence; a fresh
+repair audit and exact-candidate review are required.

@@ -620,7 +620,9 @@ def _run_experiment(args: argparse.Namespace) -> int:
         ).run(
             Role(args.role),
             Path(args.challenger).read_bytes(),
-            surface=FixtureMissionSurface(),
+            surface=FixtureMissionSurface(
+                Path(args.evidence_root) / "_artifacts" / "fixture-missions"
+            ),
             repetitions=args.repetitions,
         )
     except (OSError, RuntimeError, TypeError, ValueError) as error:

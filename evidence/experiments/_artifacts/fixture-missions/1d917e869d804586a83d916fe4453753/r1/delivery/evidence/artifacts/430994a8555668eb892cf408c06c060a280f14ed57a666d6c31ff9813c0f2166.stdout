@@ -1,0 +1,8 @@
+diff --git a/tiny_pkg/maths.py b/tiny_pkg/maths.py
+index bf2daa1..f8f32cf 100644
+--- a/tiny_pkg/maths.py
++++ b/tiny_pkg/maths.py
+@@ -1,2 +1,2 @@
+ def increment(value: int) -> int:
+-    return value - 1
++    return value + 1

@@ -360,6 +360,9 @@ dist/
 # Local durable runtime state; content-addressed live receipts remain tracked.
 evidence/live/**/state/
 evidence/live/**/evidence-ledger.sqlite3
+.hive-mind-experiments*/
+!evidence/experiments/_artifacts/
+!evidence/experiments/_artifacts/**
 
 # Cake - Uncomment if you are using it
 #tools/**

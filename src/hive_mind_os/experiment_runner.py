@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,10 +13,11 @@ from typing import Any, Protocol, Sequence
 from uuid import uuid4
 
 from .ledger import EvidenceLedger
-from .models import Role, utc_now
+from .mission import RepositoryMission, ScriptedRepositoryBackend
+from .models import Role, WorkStatus, utc_now
 from .pit_oracle import PointInTimeOracle
 from .prompt_registry import PromptRegistry
-from .receipts import sha256_digest
+from .receipts import FileReceiptValidator, ReceiptReference, sha256_digest
 from .recursive_improvement import (
     ExperimentCandidate,
     ExperimentDecision,
@@ -52,7 +55,7 @@ class EvaluationSurface(Protocol):
 
 
 class FixtureMissionSurface:
-    """Deterministic offline prompt-contract checks over fixture missions."""
+    """Deterministic prompt checks backed by real P05 fixture missions and receipts."""
 
     name: str = "fixture-missions"
     episode_ids: tuple[str, ...] = (
@@ -61,12 +64,26 @@ class FixtureMissionSurface:
         "fixture:bounded-delivery",
     )
 
+    def __init__(
+        self,
+        artifact_root: str | Path = ".hive-mind-experiments/fixture-missions",
+    ) -> None:
+        self.artifact_root = Path(artifact_root).resolve() / uuid4().hex
+        self.artifact_root.mkdir(parents=True, exist_ok=False)
+        self._mission_cache: dict[
+            int,
+            tuple[float, float, tuple[str, ...]],
+        ] = {}
+
     def evaluate(
         self,
         prompt: str,
         role: Role,
         repetition: int,
     ) -> SurfaceObservation:
+        mission_success, completeness, artifact_refs = self._mission_observation(
+            repetition
+        )
         contract = ROLE_CONTRACTS[role]
         checks = (
             ("Return only a JSON object" in prompt, 0.25),
@@ -76,19 +93,72 @@ class FixtureMissionSurface:
             ("verify every required output" in prompt.casefold(), 0.10),
             ("receipt" in prompt.casefold(), 0.10),
         )
-        success = round(sum(weight for passed, weight in checks if passed), 6)
-        complete = float(
-            all(name in prompt for name in contract.required_outputs)
-            and all(gate in prompt for gate in contract.quality_gates)
+        prompt_score = sum(weight for passed, weight in checks if passed)
+        success = round(
+            0.5 * mission_success + 0.5 * prompt_score,
+            6,
         )
         return SurfaceObservation(
             task_success=success,
             token_cost=max(1.0, len(prompt.encode("utf-8")) / 4.0),
-            evidence_completeness=complete,
-            artifact_refs=tuple(
-                f"{episode}:repetition-{repetition}" for episode in self.episode_ids
-            ),
+            evidence_completeness=completeness,
+            artifact_refs=artifact_refs,
         )
+
+    def _mission_observation(
+        self,
+        repetition: int,
+    ) -> tuple[float, float, tuple[str, ...]]:
+        cached = self._mission_cache.get(repetition)
+        if cached is not None:
+            return cached
+        episode_root = self.artifact_root / f"r{repetition}"
+        episode_root.mkdir(parents=True, exist_ok=False)
+        output_root = episode_root / "delivery"
+        with tempfile.TemporaryDirectory(prefix="hmos-p10-") as temporary:
+            repository, pin = _build_fixture_repository(Path(temporary))
+            report = asyncio.run(
+                RepositoryMission(
+                    repository,
+                    "Fix the failing increment regression",
+                    acceptance_criteria=("increment(1) returns 2",),
+                    backend=ScriptedRepositoryBackend(),
+                    pin=pin,
+                    output_dir=output_root,
+                ).run()
+            )
+        report_root = report.artifact_directory or report.receipt_root
+        report_path = (
+            None if report_root is None else Path(report_root) / "mission-report.json"
+        )
+        receipt_complete, receipt_paths = _validate_receipt_records(
+            report.receipt_root,
+            report.receipts,
+        )
+        mission_complete = (
+            report.status is WorkStatus.SUCCEEDED
+            and report.curator_verdict == "adopt"
+            and report_path is not None
+            and report_path.is_file()
+            and receipt_complete
+        )
+        retained_paths = list(receipt_paths)
+        if report_path is not None and report_path.is_file():
+            retained_paths.insert(
+                0,
+                (report_path, sha256_digest(report_path.read_bytes())),
+            )
+        references = tuple(
+            _artifact_reference(path, digest)
+            for path, digest in retained_paths
+        )
+        observation = (
+            float(report.status is WorkStatus.SUCCEEDED),
+            float(mission_complete),
+            references,
+        )
+        self._mission_cache[repetition] = observation
+        return observation
 
 
 class PITEpisodeSurface:
@@ -126,11 +196,22 @@ class PITEpisodeSurface:
             document = json.loads(record_path.read_text(encoding="utf-8"))
             grades.append(float(document["grade"]["score"]))
             references.append(
-                f"{record_path.as_posix()}#{sha256_digest(record_path.read_bytes())}"
+                _artifact_reference(
+                    record_path,
+                    sha256_digest(record_path.read_bytes()),
+                )
+            )
+            receipts_valid, receipt_paths = _validate_receipt_records(
+                document.get("receipt_root"),
+                document.get("receipts"),
+            )
+            references.extend(
+                _artifact_reference(path, digest)
+                for path, digest in receipt_paths
             )
             completeness.append(
                 float(
-                    bool(document.get("receipts"))
+                    receipts_valid
                     and bool(document.get("ledger_events"))
                     and bool(document.get("prediction"))
                 )
@@ -225,6 +306,18 @@ class ExperimentRunner:
         )
         if challenger_digest == champion_digest:
             raise ValueError("challenger must differ from the active champion")
+        prompt_refs = (
+            self._retain_prompt_artifact(
+                experiment_id,
+                champion_digest,
+                champion_prompt.encode("utf-8"),
+            ),
+            self._retain_prompt_artifact(
+                experiment_id,
+                challenger_digest,
+                self.registry.read(challenger_digest).encode("utf-8"),
+            ),
+        )
 
         state = self._read_state()
         role_state = state.setdefault(
@@ -257,6 +350,9 @@ class ExperimentRunner:
             surface.evaluate(challenger_prompt, role_value, index)
             for index in range(repetitions)
         ]
+        validation_issues = self._validate_observations(
+            (*champion_results, *challenger_results)
+        )
         reveal_sequences = self._author_reveal_sequences(
             author_id,
             surface.episode_ids,
@@ -284,8 +380,7 @@ class ExperimentRunner:
         artifact_refs = tuple(
             dict.fromkeys(
                 (
-                    f"prompt:{champion_digest}",
-                    f"prompt:{challenger_digest}",
+                    *prompt_refs,
                     *(
                         reference
                         for result in (*champion_results, *challenger_results)
@@ -309,6 +404,7 @@ class ExperimentRunner:
             observations=observations,
             artifact_refs=artifact_refs,
             accessed_holdout=bool(reveal_sequences),
+            policy_violations=validation_issues,
         )
         decision = RecursiveImprovementGate(active_contract).evaluate(
             evidence,
@@ -391,6 +487,10 @@ class ExperimentRunner:
                 for item in observations
             ],
             "artifact_refs": list(artifact_refs),
+            "surface_validation": {
+                "complete": not validation_issues,
+                "issues": list(validation_issues),
+            },
             "holdout_ordering": {
                 "valid": not reveal_sequences,
                 "author_reveal_sequences": list(reveal_sequences),
@@ -425,6 +525,48 @@ class ExperimentRunner:
             champion_after,
             challenger_digest,
         )
+
+    def _retain_prompt_artifact(
+        self,
+        experiment_id: str,
+        digest: str,
+        content: bytes,
+    ) -> str:
+        if sha256_digest(content) != digest:
+            raise RuntimeError("prompt artifact digest does not match retained bytes")
+        path = (
+            self.evidence_root
+            / "_artifacts"
+            / experiment_id
+            / "prompts"
+            / f"{digest.removeprefix('sha256:')}.txt"
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with path.open("xb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except FileExistsError:
+            if path.read_bytes() != content:
+                raise RuntimeError("retained prompt artifact was mutated")
+        return _artifact_reference(path, digest)
+
+    @staticmethod
+    def _validate_observations(
+        observations: Sequence[SurfaceObservation],
+    ) -> tuple[str, ...]:
+        issues: list[str] = []
+        for index, observation in enumerate(observations):
+            if observation.evidence_completeness != 1.0:
+                issues.append(f"surface observation {index} reported incomplete evidence")
+            if not observation.artifact_refs:
+                issues.append(f"surface observation {index} has no artifact references")
+            for reference in observation.artifact_refs:
+                issue = _validate_artifact_reference(reference)
+                if issue is not None:
+                    issues.append(f"surface observation {index}: {issue}")
+        return tuple(dict.fromkeys(issues))
 
     def _author_reveal_sequences(
         self,
@@ -498,3 +640,142 @@ class ExperimentRunner:
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
+
+
+def _artifact_reference(path: Path, digest: str) -> str:
+    resolved = path.resolve()
+    try:
+        rendered = resolved.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        rendered = resolved.as_posix()
+    return f"{rendered}#{digest}"
+
+
+def _validate_artifact_reference(reference: str) -> str | None:
+    raw_path, separator, expected_digest = reference.rpartition("#")
+    if not separator or not raw_path or not expected_digest.startswith("sha256:"):
+        return "artifact reference must be path#sha256:<digest>"
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    if not path.is_file():
+        return f"artifact does not resolve: {raw_path}"
+    if sha256_digest(path.read_bytes()) != expected_digest:
+        return f"artifact digest mismatch: {raw_path}"
+    return None
+
+
+def _validate_receipt_records(
+    raw_root: object,
+    raw_records: object,
+) -> tuple[bool, tuple[tuple[Path, str], ...]]:
+    if not isinstance(raw_root, str) or not isinstance(raw_records, (list, tuple)):
+        return False, ()
+    if not raw_records:
+        return False, ()
+    try:
+        validator = FileReceiptValidator(raw_root)
+    except ValueError:
+        return False, ()
+    paths: list[tuple[Path, str]] = []
+    valid = True
+    for record in raw_records:
+        if not isinstance(record, dict):
+            valid = False
+            continue
+        try:
+            reference = ReceiptReference(
+                str(record["path"]),
+                str(record["digest"]),
+            )
+            validation = validator.validate(
+                reference,
+                mission_id=str(record["mission_id"]),
+                state_ref=str(record["state_ref"]),
+                actor_id=str(record["actor_id"]),
+                action_id=str(record["action_id"]),
+                action_kind=str(record["action_kind"]),
+                action_digest=str(record["action_digest"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            valid = False
+            continue
+        valid = valid and validation.valid
+        paths.append(
+            (
+                Path(raw_root).resolve() / Path(*reference.path.split("/")),
+                reference.digest,
+            )
+        )
+    return valid and len(paths) == len(raw_records), tuple(paths)
+
+
+def _build_fixture_repository(root: Path) -> tuple[Path, str]:
+    repository = root / "repo"
+    repository.mkdir(parents=True)
+    environment = {
+        **os.environ,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_AUTHOR_DATE": "2026-01-02T00:00:00Z",
+        "GIT_COMMITTER_DATE": "2026-01-02T00:00:00Z",
+    }
+
+    def git(*arguments: str) -> str:
+        completed = subprocess.run(
+            (
+                "git",
+                "-c",
+                "user.name=p10-fixture",
+                "-c",
+                "user.email=p10-fixture@hive-mind.invalid",
+                "-c",
+                "core.autocrlf=false",
+                "-c",
+                "commit.gpgsign=false",
+                *arguments,
+            ),
+            cwd=repository,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(
+                "fixture git command failed: "
+                + completed.stderr.decode("utf-8", "replace")
+            )
+        return completed.stdout.decode("utf-8").strip()
+
+    git("init", "--initial-branch=main")
+    (repository / "tiny_pkg").mkdir()
+    (repository / "tests").mkdir()
+    (repository / "tiny_pkg" / "__init__.py").write_text(
+        "from .maths import increment\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    (repository / "tiny_pkg" / "maths.py").write_text(
+        "def increment(value: int) -> int:\n    return value - 1\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    (repository / "tests" / "test_maths.py").write_text(
+        (
+            "import unittest\n\n"
+            "from tiny_pkg.maths import increment\n\n\n"
+            "class MathsTests(unittest.TestCase):\n"
+            "    def test_increment_regression(self) -> None:\n"
+            "        self.assertEqual(increment(1), 2)\n\n\n"
+            'if __name__ == "__main__":\n'
+            "    unittest.main()\n"
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    git("add", "--all")
+    git("commit", "-m", "fixture: introduce regression")
+    return repository, git("rev-parse", "HEAD")

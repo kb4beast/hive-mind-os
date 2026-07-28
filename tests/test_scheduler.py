@@ -76,6 +76,33 @@ class SchedulerTests(unittest.TestCase):
         )
         self.assertEqual(completed.state, "done")
 
+    def test_expired_lease_rejects_completion_before_reclaim(self) -> None:
+        self._enqueue()
+        claimed = self.scheduler.claim("worker")
+        assert claimed is not None and claimed.lease_token is not None
+        self.clock.advance(11)
+        with self.assertRaises(StaleLeaseError):
+            self.scheduler.complete(
+                claimed.id,
+                claimed.lease_token,
+                mission_id="late-success",
+            )
+        self.assertEqual(self.scheduler.get(claimed.id).state, "leased")
+
+    def test_expired_lease_rejects_failure_before_reclaim(self) -> None:
+        self._enqueue()
+        claimed = self.scheduler.claim("worker")
+        assert claimed is not None and claimed.lease_token is not None
+        self.clock.advance(11)
+        with self.assertRaises(StaleLeaseError):
+            self.scheduler.fail(
+                claimed.id,
+                claimed.lease_token,
+                "late failure",
+                mission_id="late-failure",
+            )
+        self.assertEqual(self.scheduler.get(claimed.id).state, "leased")
+
     def test_heartbeat_extends_lease(self) -> None:
         self._enqueue()
         job = self.scheduler.claim("worker")

@@ -226,3 +226,21 @@ classes and auto-generated challengers.
 - New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none. Existing
   real-provider, source, authenticated-identity, and hostile-isolation obligations remain
   explicitly unresolved and are not promoted by P10.
+
+## Post-merge appeal — resolvable evaluation evidence
+
+The first all-merged Curator and Judge review blocked exact candidate
+`939287358679902a175d49abeea684a79b7d76ae`: the fixture surface scored prompt
+substrings and emitted synthetic `fixture:*` references, so its claimed completeness was
+not backed by resolvable receipts. The original KEEP record and P10 audit remain retained
+as adverse evidence.
+
+The appeal runs one real P05 scripted repository mission per repetition, reuses the same
+mission outcome for champion and challenger within that repetition, validates every
+enforcement receipt, retains the mission reports and receipts beneath the experiment
+evidence root, and recomputes every prompt and surface artifact digest before the RSI
+gate. Missing or tampered references now quarantine the experiment. A new end-to-end
+record and `P10-P11-repair-final.json` audit supersede the original promotion claim
+without deleting it. The earlier `P10-P11-repair-post.json` audit passed its gates but
+exposed ignored nested receipt artifacts in its inventory; it is retained as adverse
+packaging evidence. This remains scripted/local evidence and does not close `B-OPS-03`.

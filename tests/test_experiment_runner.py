@@ -9,6 +9,7 @@ from pathlib import Path
 
 from hive_mind_os.experiment_runner import (
     ExperimentRunner,
+    FixtureMissionSurface,
     PITEpisodeSurface,
     SurfaceObservation,
 )
@@ -26,6 +27,7 @@ from hive_mind_os.prompt_registry import (
     generation_zero_prompt,
     prompt_digest,
 )
+from hive_mind_os.receipts import sha256_digest
 from hive_mind_os.recursive_improvement import (
     ExperimentVerdict,
     MetricDirection,
@@ -41,10 +43,13 @@ class RiggedSurface:
 
     def __init__(
         self,
+        artifact_root: Path,
         *,
         baseline: tuple[float, float, float],
         candidate: tuple[float, float, float],
     ) -> None:
+        self.artifact_root = artifact_root
+        self.artifact_root.mkdir(parents=True, exist_ok=True)
         self.baseline = baseline
         self.candidate = candidate
 
@@ -55,7 +60,14 @@ class RiggedSurface:
         repetition: int,
     ) -> SurfaceObservation:
         selected = self.candidate if prompt == "challenger" else self.baseline
-        return SurfaceObservation(*selected, (f"rigged:{repetition}",))
+        content = f"{prompt}:{role.value}:{repetition}".encode()
+        digest = sha256_digest(content)
+        path = self.artifact_root / f"{digest.removeprefix('sha256:')}.txt"
+        path.write_bytes(content)
+        return SurfaceObservation(
+            *selected,
+            (f"{path.as_posix()}#{digest}",),
+        )
 
 
 @dataclass
@@ -142,7 +154,11 @@ class ExperimentRunnerTests(unittest.TestCase):
         baseline: tuple[float, float, float],
         candidate: tuple[float, float, float],
     ) -> RiggedSurface:
-        return RiggedSurface(baseline=baseline, candidate=candidate)
+        return RiggedSurface(
+            self.root / "rigged-artifacts",
+            baseline=baseline,
+            candidate=candidate,
+        )
 
     def test_keep_promotes_and_records_complete_lineage(self) -> None:
         result = self.runner.run(
@@ -219,6 +235,73 @@ class ExperimentRunnerTests(unittest.TestCase):
         )
         self.assertIs(result.decision.verdict, ExperimentVerdict.DISCARD)
         self.assertEqual(self.registry.champion_digest(Role.BUILDER), self.champion)
+
+    def test_missing_surface_artifact_quarantines_instead_of_promoting(self) -> None:
+        class MissingSurface:
+            name = "missing"
+            episode_ids = ("missing",)
+
+            def evaluate(self, prompt: str, role: Role, repetition: int):
+                selected = 0.8 if prompt == "challenger" else 0.4
+                return SurfaceObservation(
+                    selected,
+                    10,
+                    1,
+                    (f"{self.root}/missing.json#sha256:{'0' * 64}",),
+                )
+
+            def __init__(self, root: Path) -> None:
+                self.root = root
+
+        result = self.runner.run(
+            Role.BUILDER,
+            "challenger",
+            surface=MissingSurface(self.root),
+            repetitions=3,
+        )
+        self.assertIs(result.decision.verdict, ExperimentVerdict.QUARANTINE)
+        self.assertEqual(self.registry.champion_digest(Role.BUILDER), self.champion)
+        record = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+        self.assertFalse(record["surface_validation"]["complete"])
+        self.assertTrue(
+            any(
+                "does not resolve" in issue
+                for issue in record["surface_validation"]["issues"]
+            )
+        )
+
+    def test_tampered_surface_artifact_quarantines_instead_of_promoting(self) -> None:
+        artifact = self.root / "tampered.json"
+        artifact.write_text("observed", encoding="utf-8")
+
+        class TamperedSurface:
+            name = "tampered"
+            episode_ids = ("tampered",)
+
+            def evaluate(self, prompt: str, role: Role, repetition: int):
+                selected = 0.8 if prompt == "challenger" else 0.4
+                return SurfaceObservation(
+                    selected,
+                    10,
+                    1,
+                    (f"{artifact.as_posix()}#sha256:{'0' * 64}",),
+                )
+
+        result = self.runner.run(
+            Role.BUILDER,
+            "challenger",
+            surface=TamperedSurface(),
+            repetitions=3,
+        )
+        self.assertIs(result.decision.verdict, ExperimentVerdict.QUARANTINE)
+        self.assertEqual(self.registry.champion_digest(Role.BUILDER), self.champion)
+        record = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+        self.assertTrue(
+            any(
+                "digest mismatch" in issue
+                for issue in record["surface_validation"]["issues"]
+            )
+        )
 
     def test_self_evaluator_is_quarantined(self) -> None:
         result = self.runner.run(
@@ -315,14 +398,59 @@ class ExperimentRunnerTests(unittest.TestCase):
             ledger.close()
 
     def test_pit_surface_runs_each_pinned_oracle_episode(self) -> None:
+        receipt_root = self.root / "pit-receipts"
+        receipt_root.mkdir()
+        artifact = receipt_root / "artifact.txt"
+        artifact.write_text("observed", encoding="utf-8")
+        bindings = {
+            "mission_id": "pit-mission",
+            "state_ref": "PIT:1",
+            "actor_id": "explorer",
+            "action_id": "ACT-1",
+            "action_kind": "command",
+            "action_digest": f"sha256:{'a' * 64}",
+        }
+        receipt = receipt_root / "receipt.json"
+        receipt.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "receipt_id": "REC-1",
+                    "provider": "test",
+                    "execution_id": "EXEC-1",
+                    **bindings,
+                    "policy_decision_ref": "POLICY-1",
+                    "lease_id": "LEASE-1",
+                    "executed": True,
+                    "result": "succeeded",
+                    "observed_at": "2026-07-28T00:00:00Z",
+                    "verified_by": "curator",
+                    "artifacts": [
+                        {
+                            "path": artifact.name,
+                            "digest": sha256_digest(artifact.read_bytes()),
+                        }
+                    ],
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
         record = self.root / "pit-record.json"
         record.write_text(
             json.dumps(
                 {
                     "grade": {"score": 0.75},
-                    "receipts": [{"digest": "sha256:test"}],
+                    "receipt_root": str(receipt_root),
+                    "receipts": [
+                        {
+                            **bindings,
+                            "path": receipt.name,
+                            "digest": sha256_digest(receipt.read_bytes()),
+                        }
+                    ],
                     "ledger_events": [{"event_type": "pit.episode.graded"}],
-                    "prediction": {"digest": "sha256:test"},
+                    "prediction": {"digest": f"sha256:{'b' * 64}"},
                 }
             ),
             encoding="utf-8",
@@ -347,6 +475,19 @@ class ExperimentRunnerTests(unittest.TestCase):
         self.assertEqual(observation.task_success, 0.75)
         self.assertEqual(observation.evidence_completeness, 1.0)
         self.assertEqual(oracle.targets, ["a" * 40, "b" * 40])
+
+    def test_fixture_surface_runs_real_mission_and_reuses_bound_receipts(self) -> None:
+        surface = FixtureMissionSurface(self.root / "fixture-surface")
+        prompt = generation_zero_prompt(ROLE_CONTRACTS[Role.BUILDER])
+        first = surface.evaluate(prompt, Role.BUILDER, 0)
+        second = surface.evaluate(prompt, Role.BUILDER, 0)
+        self.assertEqual(first.evidence_completeness, 1.0)
+        self.assertEqual(first.artifact_refs, second.artifact_refs)
+        self.assertGreater(len(first.artifact_refs), 1)
+        for reference in first.artifact_refs:
+            path, _, digest = reference.rpartition("#")
+            self.assertTrue(Path(path).is_file())
+            self.assertEqual(sha256_digest(Path(path).read_bytes()), digest)
 
     def _execute_model(
         self,
