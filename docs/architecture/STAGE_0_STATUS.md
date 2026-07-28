@@ -42,3 +42,19 @@ source, licensing, host-governance, identity, durable-operation, independent-ver
 and production obligations. Implementation sequencing is owned by
 `docs/plan/00_OVERVIEW.md`; the earlier sequencing sections remain preserved as originally
 recorded.
+
+## P12 source-ingestion path
+
+P12 adds an executable content-addressed exhibit store, a human-supplied-file CLI, and a
+court-gated additive reconciliation path described by
+[ADR-012](ADR-012-SOURCE-INGESTION-AND-ADDITIVE-RECONCILIATION.md). An exhibit cannot change
+the current source projection without a promoting verdict, and `unknown` or
+`unresolved-pending-review` licensing remains blocking.
+
+No missing video transcript, historical raw byte set, authoritative license or reuse grant,
+historical repository pin, custodian attestation, or independent `imgo.jpg` custody evidence
+was available in the P12 worktree. All 11 `B-SRC` obligations therefore have preserved
+`defer` verdicts with review dates and evidence pointers in
+[`BLOCKERS.md`](../plan/BLOCKERS.md). Their sources and dependent claims remain
+machine-blocked; this records the decision and next review without claiming source
+completion, release readiness, or independent verification.

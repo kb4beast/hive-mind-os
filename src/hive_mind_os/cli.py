@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Sequence
 
 from .autonomy import AutonomyBudget
+from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
     create_audit_artifact,
     write_audit_artifact,
 )
+from .ingestion import ExhibitStore, defer_obligation, register_exhibit
 from .ledger import EvidenceLedger
 from .mission import RepositoryMission, ScriptedRepositoryBackend
 from .mission_store import (
@@ -27,6 +29,7 @@ from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .runtime import HiveKernel
+from .source_docket import load_source_docket
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -69,6 +72,65 @@ def build_audit_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--signing-key-id",
         help="Required stable identifier when --signing-key-file is used",
+    )
+    return parser
+
+
+def build_ingest_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind ingest",
+        description="Capture one human-supplied source exhibit without adjudicating it",
+    )
+    parser.add_argument("--source", required=True, help="Existing source id, such as SRC-005")
+    parser.add_argument("--file", required=True, help="Human-supplied exhibit file")
+    parser.add_argument("--locator", required=True, help="Exact source URI and fragment/timestamp")
+    parser.add_argument("--media-type", required=True, help="IANA-style media type")
+    parser.add_argument(
+        "--license",
+        required=True,
+        help="Locally supported license policy token, unknown, or unresolved-pending-review",
+    )
+    parser.add_argument(
+        "--capturer",
+        default="source-ingestion-cli",
+        help="Identity performing this capture",
+    )
+    parser.add_argument(
+        "--supply-method",
+        choices=("human-provided-file", "agent-derived"),
+        default="human-provided-file",
+    )
+    parser.add_argument("--parent-digest", help="Required SHA-256 digest for derived artifacts")
+    parser.add_argument("--expected-digest", help="Optional independently supplied SHA-256")
+    parser.add_argument(
+        "--evidence-root",
+        default="evidence/sources",
+        help="Source evidence directory (default: evidence/sources)",
+    )
+    return parser
+
+
+def build_defer_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind defer",
+        description="Record a dated courtroom defer verdict for unavailable source evidence",
+    )
+    parser.add_argument(
+        "--source",
+        action="append",
+        required=True,
+        help="Existing source id; repeat for an aggregate obligation",
+    )
+    parser.add_argument("--obligation", help="Stable obligation id")
+    parser.add_argument("--reason", required=True, help="Specific uncaptured evidence obligation")
+    parser.add_argument("--review-by", required=True, help="Future review date (YYYY-MM-DD)")
+    parser.add_argument("--advocate", default="source-evidence-advocate")
+    parser.add_argument("--cross-examiner", default="source-evidence-cross-examiner")
+    parser.add_argument("--judge", default="source-evidence-judge")
+    parser.add_argument(
+        "--evidence-root",
+        default="evidence/sources",
+        help="Source evidence directory (default: evidence/sources)",
     )
     return parser
 
@@ -433,6 +495,85 @@ def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     return 0 if audit["complete"] else 1
 
 
+def _run_ingest(args: argparse.Namespace) -> int:
+    supplied_file = Path(args.file)
+    try:
+        source_ids = {source.id for source in load_source_docket(Path.cwd()).sources}
+        if args.source not in source_ids:
+            raise ValueError(f"unknown source: {args.source}")
+        exhibit = register_exhibit(
+            ExhibitStore(args.evidence_root),
+            args.source,
+            supplied_file.read_bytes(),
+            original_filename=supplied_file.name,
+            media_type=args.media_type,
+            capturer_id=args.capturer,
+            supply_method=args.supply_method,
+            locator=args.locator,
+            license=args.license,
+            parent_exhibit_digest=args.parent_digest,
+            expected_digest=args.expected_digest,
+        )
+    except (OSError, TypeError, ValueError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    print(json.dumps(exhibit.to_record(), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _run_defer(args: argparse.Namespace) -> int:
+    try:
+        docket = load_source_docket(Path.cwd())
+        source_map = {source.id: source for source in docket.sources}
+        unknown = sorted(set(args.source) - set(source_map))
+        if unknown:
+            raise ValueError("unknown source(s): " + ", ".join(unknown))
+        obligation = args.obligation or "DEFER-" + "-".join(args.source)
+        result = defer_obligation(
+            ExhibitStore(args.evidence_root),
+            obligation,
+            tuple(source_map[source_id] for source_id in args.source),
+            reason=args.reason,
+            review_by=args.review_by,
+            participants=CaseParticipants(
+                args.advocate,
+                args.cross_examiner,
+                (args.judge,),
+            ),
+        )
+    except (OSError, TypeError, ValueError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    print(
+        json.dumps(
+            {
+                "status": "deferred",
+                "obligation_id": result.obligation_id,
+                "source_ids": list(result.source_ids),
+                "review_by": result.review_by,
+                "record": result.record_path.as_posix(),
+                "verdict": result.verdict.disposition.value,
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments and arguments[0] == "audit":
@@ -447,6 +588,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "missions":
         args = build_missions_parser().parse_args(arguments[1:])
         raise SystemExit(_run_missions(args))
+    if arguments and arguments[0] == "ingest":
+        args = build_ingest_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_ingest(args))
+    if arguments and arguments[0] == "defer":
+        args = build_defer_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_defer(args))
     if arguments and arguments[0] == "pit-episode":
         args = build_pit_episode_parser().parse_args(arguments[1:])
         raise SystemExit(_run_pit_episode(args))

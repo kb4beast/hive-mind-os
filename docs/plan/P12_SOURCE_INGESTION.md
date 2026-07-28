@@ -202,3 +202,112 @@ under the audit.
 - No editing docket constants in place; additive registration paths only.
 - No unblocking without both exhibit and verdict.
 - No backdated capture times.
+
+---
+## Completion record
+- Date (UTC): 2026-07-28
+- Executor (model/agent identity): Codex Builder for P12
+- Branch and final commit SHA: `phase/P12-source-ingestion` at
+  `522adedecca16589df017f409ce733674de90ec0` (audited immutable implementation commit;
+  the audit/status follow-up commit containing this record is reported in the PR)
+- Gates: pytest pass (275 passed, 2 pre-existing skips, 1,718 subtests), Ruff pass,
+  Pyright pass via `python -m pyright` (`pyright` console executable was unavailable)
+- Audit artifact: `evidence/audits/P12-post.json` (digest:
+  `sha256:b1d138cb8591c8a73340dd9e30d808492d6aca46b2a41ac803aac0b78bb05463`)
+- Deviations from the phase spec: none
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none
+- Machine-blocked claims before/after: 73 / 73. No source evidence was invented or
+  promoted; all unavailable obligations received dated defer verdicts.
+- Maintainer evidence request list:
+  1. Supply complete timestamped transcripts or equivalent primary artifacts, original
+     media custody, and authoritative reuse terms for `SRC-005`, `SRC-006`, and
+     `SRC-016` through `SRC-020`.
+  2. Supply authoritative versioned license texts or explicit reuse grants for the 17
+     sources enumerated by `B-SRC-08`, together with the identity of an independent
+     licensing reviewer.
+  3. Identify and provide independently retrievable intended historical commit objects
+     for `SRC-009`, `SRC-010`, `SRC-011`, `SRC-014`, and `SRC-015`; current remote heads
+     do not prove the intended historical references.
+  4. Supply the original raw bytes and custody statements for `SRC-001`, `SRC-002`,
+     `SRC-013`, and `SRC-022`.
+  5. Supply the `SRC-023` author/custodian attestation, explicit reuse terms, and
+     independently reviewable origin and chain-of-custody evidence for `imgo.jpg`.
+
+## CI appeal — constitutional test discovery
+
+- GitHub's six unit-test jobs for exact candidate
+  `db810cb4e79ad296e22a89d0056c3db2175ca245` failed while the other checks passed.
+  The repository installs the package without development dependencies and runs
+  `python -m unittest discover`; `tests/test_ingestion.py` imported unavailable
+  `pytest`. Merely removing that import would have silently skipped its function-style
+  tests under the constitutional runner.
+- Repair commit `8287c2c075ce45221b8ad6e1f6ca6e4940ead5a6` converts the complete ingestion suite
+  into discoverable `unittest.TestCase` methods while retaining pytest compatibility.
+  No product code, source docket, captured exhibit, verdict, blocker disposition,
+  license record, or audit schema changed.
+- The repaired boundary gate passed: 277 standard-library tests with 2 skips, the 10
+  ingestion tests under pytest, Ruff, and Pyright 1.1.411. Fresh audit
+  `evidence/audits/P12-post-ci-repair.json` is complete with no failures, reports 275
+  pytest tests passed, binds implementation commit
+  `8287c2c075ce45221b8ad6e1f6ca6e4940ead5a6`, and has canonical digest
+  `sha256:34ea62a2c077e58a19cadb2483c9dd2308363410214f6bd66ab0f203075f2f3e`.
+- The machine-blocked claim count and maintainer evidence requests in the original
+  completion record remain unchanged. This CI appeal does not claim source
+  completeness, release readiness, or resolution of any licensing obligation.
+
+## Post-review appeal — license promotion integrity
+
+- The consolidated review of exact candidate
+  `3ca672dc4fb5c1515d8a1414727701ec3fa46a22` confirmed the CI repair, but the Curator
+  and Judge independently reproduced licensing fail-open paths. An `unknown` exhibit
+  could be projected as MIT through an unbound override; the syntactically plausible
+  non-SPDX token `banana` was accepted; and `AGPL-3.0-only` cleared the machine block
+  despite the phase's fail-closed reuse requirement.
+- Repair commit `6c7ebd082497ea38004a1ab669d78530eca1de6e` restricts accepted identifiers to a
+  fail-closed pinned subset of SPDX License List 3.28.0, rejects unsupported tokens,
+  binds any projected `license_spdx` to the admitted exhibit metadata, and promotes
+  only the local reuse-policy set (`MIT`, `Apache-2.0`). `AGPL-3.0-only` is recognized
+  but remains unresolved for this policy and therefore blocked. This compatibility set
+  is a Hive Mind OS policy decision, not an SPDX compatibility claim.
+- External reference record: SPDX `license-list-data` tag `v3.28.0`,
+  `https://github.com/spdx/license-list-data/blob/v3.28.0/json/licenses.json`,
+  retrieved 2026-07-28; repository license `CC0-1.0`. No external code or license text
+  was copied.
+- End-to-end regressions cover the unknown-to-MIT override, `banana`, and
+  `AGPL-3.0-only`. The repaired boundary gate passed: 278 standard-library tests with
+  2 skips, 11 ingestion tests under pytest, Ruff, and Pyright 1.1.411.
+- Fresh audit `evidence/audits/P12-post-license-appeal.json` is complete with no
+  failures, reports 276 pytest tests passed, binds implementation commit
+  `6c7ebd082497ea38004a1ab669d78530eca1de6e`, and has canonical digest
+  `sha256:0750b69136575d103bf8ec03cec263cf387071e04b5de7c204011137e167fd7f`.
+- No source exhibit, docket entry, deferral verdict, blocker row, or audit schema
+  changed. The 73 machine-blocked claims and all maintainer evidence requests remain.
+  A fresh independent exact-candidate review remains required.
+
+## Provenance appeal — local license-token policy
+
+- The independent Orchestrator blocked exact candidate
+  `8a14c3fbf48d75c91a3908571389eab7b7400fab` because its repair described the local
+  allowlist as a pinned subset of external SPDX 3.28.0 data without capturing and
+  governing that material source. The prior citation and dissent above are preserved.
+- The external-reference approach is dispositioned `defer`: the implementation no
+  longer claims to validate a comprehensive SPDX registry, no external data is copied,
+  and the cited file is not relied upon for admission or promotion. Expanding the token
+  set from an external registry requires a later governed source-ingestion court.
+- The replacement is explicitly a local fail-closed policy over three literal tokens.
+  `MIT` and `Apache-2.0` are the only locally promotable values;
+  `AGPL-3.0-only` is a local negative-policy sentinel and remains blocked. The names do
+  not establish a general legal or SPDX-validity conclusion. Every other token,
+  including `banana`, is rejected until separately governed.
+- This appeal changes no source exhibit, docket entry, deferral verdict, blocker row,
+  or audit schema. Fresh gate, audit, exact-head CI, and independent review evidence
+  must supersede the earlier candidate before delivery.
+
+### Local-policy audit result
+
+Focused licensing regressions, Ruff, and Pyright 1.1.411 passed. Fresh audit
+`evidence/audits/P12-post-local-license-policy.json` is complete with no failures,
+reports 276 pytest tests passed, binds clean implementation commit
+`32734b91eee5050ebd1ab2a02b65c7429a4ea516`, and has canonical digest
+`sha256:faf7c0286e70480edf5fdb0a04b8823eac0c128b7f5a4f92064b586cbc0c75e4`.
+Exact-head CI and fresh independent review remain required.
