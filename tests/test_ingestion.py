@@ -256,6 +256,41 @@ def _case_license_unknown_blocks_and_resolved_spdx_with_exhibit_lifts_blocker(
     assert resolved_docket.audit().machine_blocked_claim_ids == ()
 
 
+def _case_license_promotion_rejects_unbound_invalid_and_incompatible_claims(
+    tmp_path: Path,
+) -> None:
+    unknown_repository = tmp_path / "unknown-override"
+    unknown_store = ExhibitStore(unknown_repository / "evidence" / "sources")
+    unknown = _register(unknown_store, license="unknown")
+    with _raises(ValueError, match="policy-compatible admitted exhibit"):
+        adjudicate_with_exhibit(
+            unknown_store,
+            _source(),
+            _claim(),
+            unknown,
+            participants=PARTICIPANTS,
+            source_updates={
+                "status": SourceStatus.VERIFIED,
+                "provenance_complete": True,
+                "license_spdx": "MIT",
+            },
+        )
+
+    invalid_store = ExhibitStore(tmp_path / "invalid" / "evidence" / "sources")
+    with _raises(ValueError, match="pinned supported SPDX"):
+        _register(invalid_store, license="banana")
+
+    incompatible_repository = tmp_path / "incompatible"
+    incompatible_store = ExhibitStore(
+        incompatible_repository / "evidence" / "sources"
+    )
+    incompatible = _register(incompatible_store, license="AGPL-3.0-only")
+    _adjudicate(incompatible_store, incompatible)
+    incompatible_docket = reconcile_docket(_docket(), incompatible_repository)
+    assert incompatible_docket.sources[0].license_spdx is None
+    assert incompatible_docket.audit().machine_blocked_claim_ids == ("CLM-900",)
+
+
 def _case_adjudication_rejects_metadata_not_bound_to_registered_bytes(
     tmp_path: Path,
 ) -> None:
@@ -396,6 +431,13 @@ class IngestionTests(unittest.TestCase):
     ) -> None:
         self._run_with_temporary_path(
             _case_adjudication_rejects_metadata_not_bound_to_registered_bytes
+        )
+
+    def test_license_promotion_rejects_unbound_invalid_and_incompatible_claims(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_license_promotion_rejects_unbound_invalid_and_incompatible_claims
         )
 
     def test_operations_are_additive_to_docket_counts(self) -> None:

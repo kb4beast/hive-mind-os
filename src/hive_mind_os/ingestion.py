@@ -36,8 +36,13 @@ _SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _MEDIA_TYPE = re.compile(
     r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+(?:\s*;\s*[^,\r\n]+)?\Z"
 )
-_SPDX_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9-.+]*\Z")
 _LICENSE_UNRESOLVED = frozenset({"unknown", "unresolved-pending-review"})
+# Pinned, fail-closed subset of SPDX License List 3.28.0. Identifiers outside this
+# reviewed subset remain unsupported until an additive policy review expands it.
+# Source: https://github.com/spdx/license-list-data/blob/v3.28.0/json/licenses.json
+_PINNED_SPDX_LICENSES = frozenset({"AGPL-3.0-only", "Apache-2.0", "MIT"})
+# This is a Hive Mind OS reuse policy, not an SPDX compatibility conclusion.
+_REUSE_COMPATIBLE_LICENSES = frozenset({"Apache-2.0", "MIT"})
 _SUPPLY_METHODS = frozenset({"human-provided-file", "agent-derived"})
 _SOURCE_FIELDS = frozenset(SourceRecord.__dataclass_fields__)
 
@@ -76,8 +81,11 @@ def _validate_locator(value: str) -> None:
 def _validate_license(value: str) -> None:
     if value in _LICENSE_UNRESOLVED:
         return
-    if _SPDX_ID.fullmatch(value) is None:
-        raise ValueError("license must be an SPDX id, unknown, or unresolved-pending-review")
+    if value not in _PINNED_SPDX_LICENSES:
+        raise ValueError(
+            "license must be a pinned supported SPDX id, unknown, "
+            "or unresolved-pending-review"
+        )
 
 
 def _safe_original_filename(value: str) -> str:
@@ -113,7 +121,7 @@ class LicenseRecord:
 
     @property
     def resolved_spdx(self) -> str | None:
-        return None if self.value in _LICENSE_UNRESOLVED else self.value
+        return self.value if self.value in _REUSE_COMPATIBLE_LICENSES else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -460,8 +468,13 @@ def adjudicate_with_exhibit(
         ),
     )
     license_record = LicenseRecord(exhibit.license, exhibit.content_digest)
-    if license_record.resolved_spdx is not None:
-        updates.setdefault("license_spdx", license_record.resolved_spdx)
+    resolved_spdx = license_record.resolved_spdx
+    if "license_spdx" in updates and updates["license_spdx"] != resolved_spdx:
+        raise ValueError(
+            "license_spdx must match the policy-compatible admitted exhibit license"
+        )
+    if resolved_spdx is not None:
+        updates["license_spdx"] = resolved_spdx
     candidate = replace(source, **updates)
     source_validation = validate_contract("source", candidate.to_contract())
     if not source_validation.valid:
