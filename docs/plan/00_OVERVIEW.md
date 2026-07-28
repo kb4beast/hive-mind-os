@@ -103,6 +103,9 @@ Executors working in parallel must claim different phases and must not edit file
 another in-flight phase (each phase file lists its deliverable paths; overlap = conflict).
 P10 and P11 both integrate with `src/hive_mind_os/cli.py`; develop them on separate
 branches, merge P10 first, then update P11 from `main` and resolve that integration once.
+P05's `done` status is limited to its local/offline phase criteria. `B-OPS-03` remains open
+until a real provider-backed E2E artifact satisfies its original non-substitution burden;
+that evidence obligation does not block the scoped P10/P11 implementation paths.
 
 ## 4. Executor protocol (how any LLM runs a phase)
 
