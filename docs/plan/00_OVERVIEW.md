@@ -69,7 +69,7 @@ Sequencing principles:
 | [P05](P05_VERTICAL_SLICE.md) | End-to-end vertical slice: objective → verified delivery artifact | P02, P03, P04 | done |
 | [P06](P06_DURABLE_MISSIONS.md) | Durable mission state, checkpoints, resume | P05 | done |
 | [P07](P07_GITHUB_DELIVERY.md) | GitHub delivery (push, draft PR, CI receipts, protection verification) | P05 (P06 recommended) | done |
-| [P08](P08_CURATOR_INDEPENDENCE.md) | Structural Curator independence | P05 | pending |
+| [P08](P08_CURATOR_INDEPENDENCE.md) | Structural Curator independence | P05 | done |
 | [P09](P09_POINT_IN_TIME_REPLAY.md) | Physically enforced point-in-time replay | P04 | pending |
 | [P10](P10_LEARNING_LOOP.md) | Champion/challenger learning loop on real artifacts | P05, P09 | pending |
 | [P11](P11_SCHEDULER_AND_OPERATIONS.md) | Durable scheduler, role workers, mission-control projection | P06 | pending |
