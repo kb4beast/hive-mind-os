@@ -1,0 +1,17 @@
+Obtaining file:///tmp/repo
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: hive-mind-os
+  Building editable for hive-mind-os (pyproject.toml): started
+  Building editable for hive-mind-os (pyproject.toml): finished with status 'done'
+  Created wheel for hive-mind-os: filename=hive_mind_os-0.6.0-0.editable-py3-none-any.whl size=8073 sha256=b08f5e5f9a7ecce450483cb1779650b08b84f6a4f5f04e445f3e56a7060dc95c
+  Stored in directory: /tmp/pip-ephem-wheel-cache-f57mg75c/wheels/b5/b9/0a/5da000b833f355a5fb567cb0727c12b4013a1148a0cc96dd95
+Successfully built hive-mind-os
+Installing collected packages: hive-mind-os
+Successfully installed hive-mind-os-0.6.0
