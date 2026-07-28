@@ -283,3 +283,22 @@ under the audit.
 - No source exhibit, docket entry, deferral verdict, blocker row, or audit schema
   changed. The 73 machine-blocked claims and all maintainer evidence requests remain.
   A fresh independent exact-candidate review remains required.
+
+## Provenance appeal — local license-token policy
+
+- The independent Orchestrator blocked exact candidate
+  `8a14c3fbf48d75c91a3908571389eab7b7400fab` because its repair described the local
+  allowlist as a pinned subset of external SPDX 3.28.0 data without capturing and
+  governing that material source. The prior citation and dissent above are preserved.
+- The external-reference approach is dispositioned `defer`: the implementation no
+  longer claims to validate a comprehensive SPDX registry, no external data is copied,
+  and the cited file is not relied upon for admission or promotion. Expanding the token
+  set from an external registry requires a later governed source-ingestion court.
+- The replacement is explicitly a local fail-closed policy over three literal tokens.
+  `MIT` and `Apache-2.0` are the only locally promotable values;
+  `AGPL-3.0-only` is a local negative-policy sentinel and remains blocked. The names do
+  not establish a general legal or SPDX-validity conclusion. Every other token,
+  including `banana`, is rejected until separately governed.
+- This appeal changes no source exhibit, docket entry, deferral verdict, blocker row,
+  or audit schema. Fresh gate, audit, exact-head CI, and independent review evidence
+  must supersede the earlier candidate before delivery.

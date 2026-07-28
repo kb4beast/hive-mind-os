@@ -277,7 +277,7 @@ def _case_license_promotion_rejects_unbound_invalid_and_incompatible_claims(
         )
 
     invalid_store = ExhibitStore(tmp_path / "invalid" / "evidence" / "sources")
-    with _raises(ValueError, match="pinned supported SPDX"):
+    with _raises(ValueError, match="locally supported policy token"):
         _register(invalid_store, license="banana")
 
     incompatible_repository = tmp_path / "incompatible"

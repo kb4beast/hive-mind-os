@@ -37,11 +37,9 @@ _MEDIA_TYPE = re.compile(
     r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+(?:\s*;\s*[^,\r\n]+)?\Z"
 )
 _LICENSE_UNRESOLVED = frozenset({"unknown", "unresolved-pending-review"})
-# Pinned, fail-closed subset of SPDX License List 3.28.0. Identifiers outside this
-# reviewed subset remain unsupported until an additive policy review expands it.
-# Source: https://github.com/spdx/license-list-data/blob/v3.28.0/json/licenses.json
-_PINNED_SPDX_LICENSES = frozenset({"AGPL-3.0-only", "Apache-2.0", "MIT"})
-# This is a Hive Mind OS reuse policy, not an SPDX compatibility conclusion.
+# Local fail-closed policy tokens. This is not a comprehensive SPDX registry or a
+# claim that any token is legally compatible outside this repository's governed use.
+_SUPPORTED_LICENSE_TOKENS = frozenset({"AGPL-3.0-only", "Apache-2.0", "MIT"})
 _REUSE_COMPATIBLE_LICENSES = frozenset({"Apache-2.0", "MIT"})
 _SUPPLY_METHODS = frozenset({"human-provided-file", "agent-derived"})
 _SOURCE_FIELDS = frozenset(SourceRecord.__dataclass_fields__)
@@ -81,9 +79,9 @@ def _validate_locator(value: str) -> None:
 def _validate_license(value: str) -> None:
     if value in _LICENSE_UNRESOLVED:
         return
-    if value not in _PINNED_SPDX_LICENSES:
+    if value not in _SUPPORTED_LICENSE_TOKENS:
         raise ValueError(
-            "license must be a pinned supported SPDX id, unknown, "
+            "license must be a locally supported policy token, unknown, "
             "or unresolved-pending-review"
         )
 

@@ -87,7 +87,7 @@ def build_ingest_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--license",
         required=True,
-        help="SPDX id, unknown, or unresolved-pending-review",
+        help="Locally supported license policy token, unknown, or unresolved-pending-review",
     )
     parser.add_argument(
         "--capturer",
