@@ -15,6 +15,7 @@ from .current_state_audit import (
     create_audit_artifact,
     write_audit_artifact,
 )
+from .experiment_runner import ExperimentRunner, FixtureMissionSurface
 from .ingestion import ExhibitStore, defer_obligation, register_exhibit
 from .ledger import EvidenceLedger
 from .mission import RepositoryMission, ScriptedRepositoryBackend
@@ -29,6 +30,7 @@ from .model_provider import ModelProviderError, provider_from_env
 from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
+from .prompt_registry import PromptRegistry
 from .runtime import HiveKernel
 from .source_docket import load_source_docket
 
@@ -281,6 +283,38 @@ def build_pit_episode_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_experiment_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind experiment run",
+        description="Evaluate one role-prompt challenger against the active champion",
+    )
+    parser.add_argument("action", choices=("run",), help="Experiment action")
+    parser.add_argument(
+        "--role",
+        required=True,
+        choices=tuple(role.value for role in Role),
+    )
+    parser.add_argument("--challenger", required=True, help="Prompt variant file")
+    parser.add_argument(
+        "--surface",
+        required=True,
+        choices=("fixture-missions",),
+        help="Pinned evaluation surface",
+    )
+    parser.add_argument("--repetitions", required=True, type=int)
+    parser.add_argument(
+        "--state-dir",
+        default=".hive-mind-experiments",
+        help="Prompt registry, ledger, and experiment counter state",
+    )
+    parser.add_argument(
+        "--evidence-root",
+        default="evidence/experiments",
+        help="Append-only experiment record directory",
+    )
+    return parser
+
+
 async def _run(args: argparse.Namespace) -> int:
     objective = Objective(
         goal=args.goal,
@@ -529,6 +563,50 @@ def _run_pit_episode(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_experiment(args: argparse.Namespace) -> int:
+    state_dir = Path(args.state_dir).resolve()
+    state_dir.mkdir(parents=True, exist_ok=True)
+    registry = PromptRegistry(state_dir / "prompts")
+    try:
+        registry.bootstrap(Path.cwd() / "prompts")
+        result = ExperimentRunner(
+            registry,
+            args.evidence_root,
+            state_path=state_dir / "runner-state.json",
+        ).run(
+            Role(args.role),
+            Path(args.challenger).read_bytes(),
+            surface=FixtureMissionSurface(),
+            repetitions=args.repetitions,
+        )
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    finally:
+        registry.close()
+    print(
+        json.dumps(
+            {
+                "status": "completed",
+                "experiment_id": result.experiment_id,
+                "verdict": result.decision.verdict.value,
+                "evidence_path": str(result.evidence_path),
+                "champion_before": result.champion_before,
+                "champion_after": result.champion_after,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     if bool(args.signing_key_file) != bool(args.signing_key_id):
         raise SystemExit("--signing-key-file and --signing-key-id must be supplied together")
@@ -668,6 +746,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "pit-episode":
         args = build_pit_episode_parser().parse_args(arguments[1:])
         raise SystemExit(_run_pit_episode(args))
+    if arguments and arguments[0] == "experiment":
+        args = build_experiment_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_experiment(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 

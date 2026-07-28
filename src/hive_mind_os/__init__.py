@@ -40,6 +40,12 @@ from .current_state_audit import (
     verify_audit_artifact,
     write_audit_artifact,
 )
+from .experiment_runner import (
+    ExperimentRun,
+    ExperimentRunner,
+    FixtureMissionSurface,
+    PITEpisodeSurface,
+)
 from .github_adapter import (
     CheckResult,
     GitHubClient,
@@ -68,6 +74,7 @@ from .mission_store import (
     resume_mission,
 )
 from .models import AutonomyLevel, Objective, RiskTier, Role
+from .prompt_registry import PromptRegistry, generation_zero_prompt, prompt_digest
 from .receipts import (
     FileReceiptValidator,
     ReceiptReference,
@@ -122,8 +129,11 @@ __all__ = [
     "ExperimentDecision",
     "ExperimentEvidence",
     "ExperimentVerdict",
+    "ExperimentRun",
+    "ExperimentRunner",
     "FoundingSourceDocket",
     "FileReceiptValidator",
+    "FixtureMissionSurface",
     "HardenedVisionContract",
     "HiveKernel",
     "GovernedSourceAudit",
@@ -138,8 +148,10 @@ __all__ = [
     "MissionReport",
     "MissionStore",
     "Objective",
+    "PITEpisodeSurface",
     "ProtectionReport",
     "PullRequestResult",
+    "PromptRegistry",
     "PushResult",
     "RecursiveImprovementContract",
     "RecursiveImprovementController",
@@ -169,10 +181,12 @@ __all__ = [
     "collect_current_state_audit",
     "create_audit_artifact",
     "defer_obligation",
+    "generation_zero_prompt",
     "load_default_source_docket",
     "load_schema",
     "load_source_docket",
     "register_exhibit",
+    "prompt_digest",
     "resume_mission",
     "sha256_digest",
     "validate_contract",
