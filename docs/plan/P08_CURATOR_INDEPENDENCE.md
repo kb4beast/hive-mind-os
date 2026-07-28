@@ -275,3 +275,12 @@ honest about what it did not evaluate.
   two recorded failures pass after this producer repair, as do the provider-receipt
   regression, Ruff, and Pyright 1.1.411.
 - A clean final audit, exact-head CI, and fresh independent review remain required.
+
+### Role-binding audit result
+
+Clean serial audit `evidence/audits/P08-post-role-binding-final.json` is complete with
+no failures, reports 274 pytest tests passed, and binds clean commit
+`48a110a352e96cb9cfb5e8b78f7b3fa3e79d0299`, which includes the failed audit and
+model-producer repair. Its canonical digest is
+`sha256:0e22116c3fe8d27311d1604597bb1119ca0480f0cc4891aa5984f7ac7adf1122`.
+Exact-head CI and fresh independent review remain required.
