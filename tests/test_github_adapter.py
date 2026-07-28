@@ -606,6 +606,32 @@ class GitHubAdapterTests(unittest.TestCase):
         observed = GitHubClient._ruleset_observation([detail], "main")
         self.assertFalse(observed["enforce_admins"])
 
+        detail = json.loads(_fixture("ruleset-detail.json"))
+        detail["rules"] = [
+            rule
+            for rule in detail["rules"]
+            if rule["type"] == "required_status_checks"
+        ]
+        ruleset_observed = GitHubClient._ruleset_observation([detail], "main")
+        protection = json.loads(_fixture("protection.json"))
+        protection["enforce_admins"]["enabled"] = False
+        branch_observed = GitHubClient._branch_observation(protection)
+        merged = GitHubClient._merge_observations(
+            ruleset_observed,
+            branch_observed,
+        )
+        expected = json.loads(
+            (
+                ROOT / ".github" / "governance" / "required-repository-rules.json"
+            ).read_text(encoding="utf-8")
+        )["rules"]
+        mismatches = GitHubClient._compare(expected, merged, "rules")
+        self.assertTrue(merged["enforce_admins"])
+        self.assertIn(
+            "rules.pull_request.required_approving_review_count: mismatch",
+            mismatches,
+        )
+
     def test_ruleset_branch_exclusion_and_malformed_conditions_fail_closed(
         self,
     ) -> None:

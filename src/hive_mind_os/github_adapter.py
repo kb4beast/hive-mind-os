@@ -988,6 +988,15 @@ class GitHubClient:
         branch: Mapping[str, Any],
     ) -> dict[str, Any]:
         if ruleset.get("active") is True:
+            ruleset_enforced = ruleset.get("enforce_admins") is True
+            branch_enforced = (
+                branch.get("active") is True
+                and branch.get("enforce_admins") is True
+            )
+            if ruleset_enforced and not branch_enforced:
+                return dict(ruleset)
+            if branch_enforced and not ruleset_enforced:
+                return dict(branch)
             merged = json.loads(json.dumps(ruleset))
             branch_pull = branch.get("pull_request")
             merged_pull = merged.get("pull_request")
