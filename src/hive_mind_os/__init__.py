@@ -74,6 +74,7 @@ from .mission_store import (
     resume_mission,
 )
 from .models import AutonomyLevel, Objective, RiskTier, Role
+from .projection import build_projection, projection_html, projection_json
 from .prompt_registry import PromptRegistry, generation_zero_prompt, prompt_digest
 from .receipts import (
     FileReceiptValidator,
@@ -97,12 +98,14 @@ from .recursive_improvement import (
 )
 from .repository_learning import RepositoryLearningCurriculum, RepositoryScout
 from .runtime import HiveKernel
+from .scheduler import Job, ManualClock, Scheduler, StaleLeaseError, SystemClock
 from .source_docket import (
     FoundingSourceDocket,
     load_default_source_docket,
     load_source_docket,
 )
 from .vision import HardenedVisionContract, VisionComplianceGate
+from .workers import Worker, serve
 
 __all__ = [
     "ActionKind",
@@ -136,11 +139,13 @@ __all__ = [
     "FixtureMissionSurface",
     "HardenedVisionContract",
     "HiveKernel",
+    "Job",
     "GovernedSourceAudit",
     "GitHubClient",
     "GitHubDelivery",
     "GitHubDeliveryTarget",
     "LicenseRecord",
+    "ManualClock",
     "MetricDirection",
     "MetricObservation",
     "MetricSpec",
@@ -166,6 +171,7 @@ __all__ = [
     "ReceiptValidation",
     "RiskTier",
     "Role",
+    "Scheduler",
     "SimulatedAction",
     "SimulationPhase",
     "ScriptedRepositoryBackend",
@@ -173,11 +179,15 @@ __all__ = [
     "SourceExhibit",
     "SourceRecord",
     "StepCheckpoint",
+    "StaleLeaseError",
+    "SystemClock",
     "CheckResult",
     "VisionComplianceGate",
+    "Worker",
     "audit_governed_source",
     "adjudicate_with_exhibit",
     "build_audit_verification_context",
+    "build_projection",
     "collect_current_state_audit",
     "create_audit_artifact",
     "defer_obligation",
@@ -187,8 +197,11 @@ __all__ = [
     "load_source_docket",
     "register_exhibit",
     "prompt_digest",
+    "projection_html",
+    "projection_json",
     "resume_mission",
     "sha256_digest",
+    "serve",
     "validate_contract",
     "validate_runtime_state",
     "validate_schema_catalog",
