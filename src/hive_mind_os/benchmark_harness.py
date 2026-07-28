@@ -8,6 +8,7 @@ import os
 import random
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -48,6 +49,19 @@ def _canonical_digest(value: object) -> str:
 
 def _write_json(path: Path, value: object) -> None:
     path.write_bytes(_canonical_bytes(value) + b"\n")
+
+
+def _remove_tree(root: Path) -> None:
+    def make_writable_and_retry(
+        function: object,
+        path: str,
+        _error: object,
+    ) -> None:
+        os.chmod(path, stat.S_IWRITE)
+        assert callable(function)
+        function(path)
+
+    shutil.rmtree(root, onerror=make_writable_and_retry)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -445,7 +459,8 @@ class BenchmarkHarness:
         lane_name: str,
     ) -> dict[str, object]:
         attempt_id = f"{task.manifest.task_id}-r{repetition:02d}-{lane_name}"
-        attempt_root = run_root / "attempts" / attempt_id
+        attempt_key = _canonical_digest(attempt_id).removeprefix("sha256:")[:16]
+        attempt_root = run_root / "attempts" / f"a-{attempt_key}"
         attempt_root.mkdir(parents=True)
         budget = self.budget.create()
         lane = self.lanes[lane_name]
@@ -509,7 +524,7 @@ class BenchmarkHarness:
         _write_json(attempt_root / "budget.json", budget_record)
         for child in attempt_root.iterdir():
             if child.is_dir():
-                shutil.rmtree(child, ignore_errors=True)
+                _remove_tree(child)
         artifact_names = (
             "lane-report.json",
             "receipts-index.json",

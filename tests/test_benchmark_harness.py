@@ -117,24 +117,28 @@ def test_failed_attempts_retain_same_artifacts_as_successes(tmp_path: Path) -> N
     )
     records = _raw_records(output, report)
     assert {record["success"] for record in records} == {True, False}
+    expected_inventory = (
+        "lane-report.json",
+        "receipts-index.json",
+        "success-check.json",
+        "budget.json",
+    )
     inventories = {
         tuple(Path(path).name for path in record["artifacts"])
         for record in records
     }
-    assert inventories == {
-        (
-            "lane-report.json",
-            "receipts-index.json",
-            "success-check.json",
-            "budget.json",
-        )
-    }
+    assert inventories == {expected_inventory}
     run_root = output / str(report["run_id"])
     assert all(
         (run_root / path).is_file()
         for record in records
         for path in record["artifacts"]
     )
+    for record in records:
+        attempt_root = (run_root / record["artifacts"][0]).parent
+        assert sorted(path.name for path in attempt_root.iterdir()) == sorted(
+            expected_inventory
+        )
 
 
 def test_bootstrap_interval_is_seeded_and_rate_is_exact() -> None:
