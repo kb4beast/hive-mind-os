@@ -164,6 +164,8 @@ class GitAdapterTests(unittest.TestCase):
             self.assertIn("SYSTEMROOT", workspace.runner.spec.env_allowlist)
             self.assertIn("GIT_CONFIG_KEY_1", workspace.runner.spec.env_allowlist)
             self.assertIn("GIT_CONFIG_VALUE_1", workspace.runner.spec.env_allowlist)
+            self.assertIn("GIT_CONFIG_KEY_2", workspace.runner.spec.env_allowlist)
+            self.assertIn("GIT_CONFIG_VALUE_2", workspace.runner.spec.env_allowlist)
 
     def test_materialize_ignores_host_global_git_configuration(self) -> None:
         global_config = self.base / "host-global.gitconfig"
