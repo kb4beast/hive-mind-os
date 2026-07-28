@@ -220,6 +220,19 @@ def _atomic_write(path: Path, content: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _normalize_required_check_names(value: object) -> tuple[str, ...]:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError("required check names must be a sequence")
+    required = tuple(value)
+    if (
+        not required
+        or any(not isinstance(name, str) or not name.strip() for name in required)
+        or len(set(required)) != len(required)
+    ):
+        raise ValueError("required check names must be non-empty, unique strings")
+    return required
+
+
 def _required_string(document: Mapping[str, Any], field: str) -> str:
     value = document.get(field)
     if not isinstance(value, str) or not value.strip():
@@ -709,6 +722,7 @@ class GitHubClient:
         self,
         head_sha: str,
         *,
+        required_check_names: Sequence[str],
         max_attempts: int = 20,
         interval_s: float = 15.0,
     ) -> tuple[CheckResult, ...]:
@@ -716,8 +730,11 @@ class GitHubClient:
             raise ValueError("check polling requires a full lowercase head SHA")
         if max_attempts < 1 or interval_s < 0:
             raise ValueError("check polling bounds are invalid")
+        required = _normalize_required_check_names(required_check_names)
         last_raw = b"{}"
         last_checks: list[Any] = []
+        missing_required = sorted(required)
+        nonterminal_required: list[str] = []
         for attempt in range(max_attempts):
             document, last_raw = self._request_json(
                 "GET",
@@ -732,14 +749,30 @@ class GitHubClient:
             if not isinstance(raw_checks, list):
                 raise GitHubResponseError("check-runs response lacks check_runs")
             last_checks = raw_checks
+            if any(not isinstance(check, Mapping) for check in raw_checks):
+                raise GitHubResponseError(
+                    "check-runs response contains a non-object check"
+                )
+            observed_names = {
+                _required_string(check, "name") for check in raw_checks
+            }
+            missing_required = sorted(set(required) - observed_names)
+            nonterminal_required = sorted(
+                name
+                for name in required
+                if any(
+                    check.get("name") == name
+                    and check.get("status") != "completed"
+                    for check in raw_checks
+                )
+            )
             if raw_checks and all(
-                isinstance(check, Mapping) and check.get("status") == "completed"
+                check.get("status") == "completed"
                 for check in raw_checks
             ):
                 results = tuple(
                     self._check_result(check, head_sha=head_sha)
                     for check in raw_checks
-                    if isinstance(check, Mapping)
                 )
                 failures = [
                     result
@@ -749,7 +782,8 @@ class GitHubClient:
                 if failures:
                     names = ", ".join(result.name for result in failures)
                     raise CheckRunFailed(f"GitHub checks failed: {names}")
-                return results
+                if not missing_required:
+                    return results
             if attempt + 1 < max_attempts:
                 self.sleep(interval_s)
         intent = self._intent(
@@ -759,6 +793,8 @@ class GitHubClient:
                 "head_sha": head_sha,
                 "attempts": max_attempts,
                 "observed_check_count": len(last_checks),
+                "missing_required_checks": missing_required,
+                "nonterminal_required_checks": nonterminal_required,
             },
         )
         receipt = self._persist_tool_receipt(
@@ -768,8 +804,19 @@ class GitHubClient:
             verifier="github-actions",
             result="failed",
         )
+        details = []
+        if missing_required:
+            details.append("missing=" + ", ".join(missing_required))
+        if nonterminal_required:
+            details.append(
+                "nonterminal=" + ", ".join(nonterminal_required)
+            )
+        suffix = f" ({'; '.join(details)})" if details else ""
         raise CheckPollingTimeout(
-            f"GitHub checks did not complete after {max_attempts} attempts",
+            (
+                f"GitHub checks did not complete after {max_attempts} attempts"
+                f"{suffix}"
+            ),
             {
                 "path": ReceiptReference(
                     receipt["path"],
@@ -1089,6 +1136,18 @@ class GitHubClient:
         max_check_attempts: int = 20,
         check_interval_s: float = 15.0,
     ) -> GitHubDelivery:
+        desired = json.loads(
+            Path(desired_rules_path).read_text(encoding="utf-8")
+        )
+        rules = desired.get("rules") if isinstance(desired, Mapping) else None
+        required_check_names = (
+            rules.get("required_status_checks")
+            if isinstance(rules, Mapping)
+            else None
+        )
+        required_check_names = _normalize_required_check_names(
+            required_check_names
+        )
         push = self.push_branch(workspace, branch=branch)
         pull_request = self.open_draft_pr(
             branch=branch,
@@ -1099,6 +1158,7 @@ class GitHubClient:
         )
         checks = self.poll_checks(
             push.head_sha,
+            required_check_names=required_check_names,
             max_attempts=max_check_attempts,
             interval_s=check_interval_s,
         )

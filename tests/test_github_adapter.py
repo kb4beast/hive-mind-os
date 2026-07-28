@@ -15,6 +15,7 @@ from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.git_adapter import GitWorkspace, PinViolation
 from hive_mind_os.github_adapter import (
     CheckPollingTimeout,
+    CheckRunFailed,
     GitHubClient,
     GitHubDeliveryTarget,
     GitHubPolicyDenied,
@@ -152,7 +153,30 @@ class LocalDeliveryClient(GitHubClient):
             f"/repos/octocat/hive-mind-os/commits/{result.head_sha}/"
             "check-runs?filter=latest&per_page=100"
         )
-        self.fake_transport.add("GET", checks, _fixture("check-complete.json"))
+        complete = json.loads(_fixture("check-complete.json"))
+        required_names = json.loads(
+            (
+                ROOT
+                / ".github"
+                / "governance"
+                / "required-repository-rules.json"
+            ).read_text(encoding="utf-8")
+        )["rules"]["required_status_checks"]
+        templates = complete["check_runs"]
+        complete["check_runs"] = [
+            {
+                **templates[index % len(templates)],
+                "id": 501 + index,
+                "name": name,
+            }
+            for index, name in enumerate(required_names)
+        ]
+        complete["total_count"] = len(complete["check_runs"])
+        self.fake_transport.add(
+            "GET",
+            checks,
+            json.dumps(complete).encode(),
+        )
         self.fake_transport.add(
             "GET",
             (
@@ -311,7 +335,15 @@ class GitHubAdapterTests(unittest.TestCase):
         results = self.client(
             transport,
             sleep=pauses.append,
-        ).poll_checks(HEAD_SHA, max_attempts=3, interval_s=0.25)
+        ).poll_checks(
+            HEAD_SHA,
+            required_check_names=(
+                "unit-tests (Python 3.12)",
+                "static-and-type-checks",
+            ),
+            max_attempts=3,
+            interval_s=0.25,
+        )
         self.assertEqual(pauses, [0.25])
         self.assertEqual(len(results), 2)
         self.assertEqual({item.workflow_run_id for item in results}, {9001})
@@ -358,6 +390,7 @@ class GitHubAdapterTests(unittest.TestCase):
         transport.add("GET", path, json.dumps(document).encode())
         result = self.client(transport).poll_checks(
             HEAD_SHA,
+            required_check_names=("CodeQL",),
             max_attempts=1,
             interval_s=0,
         )
@@ -377,9 +410,19 @@ class GitHubAdapterTests(unittest.TestCase):
         with self.assertRaises(CheckPollingTimeout) as captured:
             self.client(transport).poll_checks(
                 HEAD_SHA,
+                required_check_names=(
+                    "unit-tests (Python 3.12)",
+                    "static-and-type-checks",
+                    "secret-scan",
+                ),
                 max_attempts=2,
                 interval_s=0,
             )
+        self.assertIn("missing=secret-scan", str(captured.exception))
+        self.assertIn(
+            "nonterminal=static-and-type-checks, unit-tests (Python 3.12)",
+            str(captured.exception),
+        )
         receipt_path = (
             self.root
             / "github-evidence"
@@ -387,6 +430,35 @@ class GitHubAdapterTests(unittest.TestCase):
         )
         document = json.loads(receipt_path.read_text(encoding="utf-8"))
         self.assertEqual(document["result"], "failed")
+        self.assertEqual(len(transport.calls), 2)
+
+    def test_check_polling_waits_for_late_required_check(self) -> None:
+        transport = FakeGitHubTransport()
+        path = (
+            f"/repos/octocat/hive-mind-os/commits/{HEAD_SHA}/"
+            "check-runs?filter=latest&per_page=100"
+        )
+        first = json.loads(_fixture("check-complete.json"))
+        first["check_runs"] = first["check_runs"][:1]
+        first["total_count"] = 1
+        late = json.loads(_fixture("check-complete.json"))
+        late["check_runs"][1]["conclusion"] = "failure"
+        transport.add("GET", path, json.dumps(first).encode())
+        transport.add("GET", path, json.dumps(late).encode())
+
+        with self.assertRaisesRegex(
+            CheckRunFailed,
+            "GitHub checks failed: static-and-type-checks",
+        ):
+            self.client(transport).poll_checks(
+                HEAD_SHA,
+                required_check_names=(
+                    "unit-tests (Python 3.12)",
+                    "static-and-type-checks",
+                ),
+                max_attempts=2,
+                interval_s=0,
+            )
         self.assertEqual(len(transport.calls), 2)
 
     def test_token_never_persists_or_escapes_errors(self) -> None:
