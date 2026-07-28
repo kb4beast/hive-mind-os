@@ -232,3 +232,25 @@ under the audit.
      `SRC-013`, and `SRC-022`.
   5. Supply the `SRC-023` author/custodian attestation, explicit reuse terms, and
      independently reviewable origin and chain-of-custody evidence for `imgo.jpg`.
+
+## CI appeal — constitutional test discovery
+
+- GitHub's six unit-test jobs for exact candidate
+  `db810cb4e79ad296e22a89d0056c3db2175ca245` failed while the other checks passed.
+  The repository installs the package without development dependencies and runs
+  `python -m unittest discover`; `tests/test_ingestion.py` imported unavailable
+  `pytest`. Merely removing that import would have silently skipped its function-style
+  tests under the constitutional runner.
+- Repair commit `8287c2c075ce45221b8ad6e1f6ca6e4940ead5a6` converts the complete ingestion suite
+  into discoverable `unittest.TestCase` methods while retaining pytest compatibility.
+  No product code, source docket, captured exhibit, verdict, blocker disposition,
+  license record, or audit schema changed.
+- The repaired boundary gate passed: 277 standard-library tests with 2 skips, the 10
+  ingestion tests under pytest, Ruff, and Pyright 1.1.411. Fresh audit
+  `evidence/audits/P12-post-ci-repair.json` is complete with no failures, reports 275
+  pytest tests passed, binds implementation commit
+  `8287c2c075ce45221b8ad6e1f6ca6e4940ead5a6`, and has canonical digest
+  `sha256:34ea62a2c077e58a19cadb2483c9dd2308363410214f6bd66ab0f203075f2f3e`.
+- The machine-blocked claim count and maintainer evidence requests in the original
+  completion record remain unchanged. This CI appeal does not claim source
+  completeness, release readiness, or resolution of any licensing obligation.
