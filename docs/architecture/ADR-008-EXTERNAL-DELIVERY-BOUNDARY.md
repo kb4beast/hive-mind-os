@@ -64,7 +64,11 @@ resolve the founding docket.
    network calls and use recorded minimal JSON fixtures.
 2. Read the fine-grained token only from the configured environment variable. Git uses a
    per-process `http.extraheader`; the token is absent from argv, stored remotes, Git
-   configuration, receipts, ledger events, and error text.
+   configuration, receipts, ledger events, and error text. On managed Windows hosts where
+   Schannel cannot reach a revocation service, the same transient configuration disables
+   only Schannel's revocation lookup; certificate-chain and hostname verification remain
+   enabled. The live receipt and this ADR disclose that residual instead of inheriting an
+   unrecorded ambient Git setting.
 3. Push the exact clean workspace `HEAD` to one explicitly named branch. Adopt an existing
    remote branch only when it already resolves to the same SHA; a different SHA fails
    closed.
@@ -95,7 +99,7 @@ resolve the founding docket.
 | Mutable or wrong PR head | Exact SHA checked on create/adoption and every CI receipt | A later force-push is prevented only when host rules are active |
 | Missing checks treated as green | Non-empty completed set required; bounded timeout is a failed receipt | Workflow configuration can still omit a required semantic test |
 | False protection claim | Live normalized comparison and committed mismatch report | Administrator bypasses and single-maintainer independence must be disclosed separately |
-| API/provider forgery | HTTPS, GitHub token, versioned API, raw response digest | No GitHub-signed response or externally authenticated verifier identity; B-GOV-02/03 remain open |
+| API/provider forgery | HTTPS chain and hostname validation, GitHub token, versioned API, raw response digest | The managed Windows live runner cannot perform Schannel revocation lookup; there is no GitHub-signed response or externally authenticated verifier identity; B-GOV-02/03 remain open |
 | Authority expansion | Repository-level push/draft only; no merge method | A human or separately authorized system must merge |
 
 ## Acceptance evidence

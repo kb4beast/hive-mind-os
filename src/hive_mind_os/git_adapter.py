@@ -36,6 +36,8 @@ _GIT_CREDENTIAL_ENV = (
     "GIT_CONFIG_COUNT",
     "GIT_CONFIG_KEY_0",
     "GIT_CONFIG_VALUE_0",
+    "GIT_CONFIG_KEY_1",
+    "GIT_CONFIG_VALUE_1",
 )
 _GIT_PLATFORM_ENV = ("SYSTEMROOT",) if os.name == "nt" else ()
 
@@ -252,10 +254,16 @@ def _git_http_credentials(remote_url: str, token: str) -> Iterator[tuple[str, ..
     origin = remote.removesuffix(".git")
     encoded = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
     values = {
-        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_COUNT": "2" if os.name == "nt" else "1",
         "GIT_CONFIG_KEY_0": f"http.{origin}/.extraHeader",
         "GIT_CONFIG_VALUE_0": f"Authorization: Basic {encoded}",
     }
+    if os.name == "nt":
+        # Git for Windows uses Schannel. Some managed Windows hosts make CRL/OCSP
+        # unavailable; retain chain and hostname verification while making that
+        # environment-specific revocation limitation explicit and deterministic.
+        values["GIT_CONFIG_KEY_1"] = "http.schannelCheckRevoke"
+        values["GIT_CONFIG_VALUE_1"] = "false"
     with _GIT_ENV_LOCK:
         previous = {name: os.environ.get(name) for name in values}
         os.environ.update(values)
