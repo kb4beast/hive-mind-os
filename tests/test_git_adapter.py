@@ -126,6 +126,41 @@ class GitAdapterTests(unittest.TestCase):
         self.assertEqual(symbolic["result"], "failed")
         self.assertFalse((self.fixture.root.parent / "fixture-hook-ran.txt").exists())
 
+    def test_materialize_excludes_local_codex_bookkeeping_refs(self) -> None:
+        bookkeeping = (
+            self.fixture.root
+            / ".git"
+            / "refs"
+            / "codex"
+            / "turn-diffs"
+            / "checkpoints"
+            / ("a" * 16)
+            / ("b" * 16)
+        )
+        bookkeeping.mkdir(parents=True)
+        (bookkeeping / "1785167248210").write_text(
+            COMMIT_TWO_SHA + "\n",
+            encoding="ascii",
+        )
+        workspace = self.workspace()
+        self.assertFalse(
+            (
+                workspace.container_root
+                / "source"
+                / ".git"
+                / "refs"
+                / "codex"
+            ).exists()
+        )
+        self.assertEqual(
+            workspace._git_text(
+                ["rev-parse", "HEAD"],
+                Action.READ_REPOSITORY,
+                "test materialized head without app refs",
+            ),
+            COMMIT_TWO_SHA,
+        )
+
     def test_materialize_ignores_host_global_git_configuration(self) -> None:
         global_config = self.base / "host-global.gitconfig"
         global_config.write_text(

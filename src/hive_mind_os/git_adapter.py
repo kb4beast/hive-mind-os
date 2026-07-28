@@ -174,6 +174,15 @@ def _materialization_source(
     return _github_remote(raw, allowed_hosts=allowed_hosts), True
 
 
+def _ignore_local_app_refs(directory: str, names: list[str]) -> list[str]:
+    """Exclude Codex desktop bookkeeping refs from the staged source copy."""
+
+    path = Path(directory)
+    if path.name == "refs" and path.parent.name == ".git" and "codex" in names:
+        return ["codex"]
+    return []
+
+
 def _full_sha(value: str) -> str:
     if not _FULL_SHA.fullmatch(value):
         raise PinViolation("commit pin must be a full 40-hex SHA")
@@ -357,7 +366,12 @@ class GitWorkspace:
         _atomic_write(staging_config, b"")
         if not remote:
             assert isinstance(source, Path)
-            shutil.copytree(source, staged_source, symlinks=True)
+            shutil.copytree(
+                source,
+                staged_source,
+                symlinks=True,
+                ignore=_ignore_local_app_refs,
+            )
         mission_id = f"git-workspace-{uuid4()}"
         receipts: list[dict[str, Any]] = []
         git_name = Path(shutil.which("git") or "git").name
