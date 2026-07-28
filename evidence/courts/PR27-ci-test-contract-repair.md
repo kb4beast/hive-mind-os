@@ -32,6 +32,7 @@ before beginning the Obsidian or agent-system redesign.
 | Architecture Cross-Examiner and Integrator | `/root/architect_ci_contract` | alternatives, compatibility, installed-wheel boundary, rollback |
 | Curator, Steward, and Expert Witness | `/root/curator_ci_repro` | clean Python 3.11/3.12/3.14 reproduction, GitHub protection inspection, operational dissent |
 | Optimizer | `/root/optimizer_ci_metrics` | discoverability and regression measurements |
+| Exact-candidate Integrator | `/root/integrator_exact` | protection provenance, compatibility, wheel/CI contract, and rollback review |
 | Judge | pending independent identity | final disposition only after exact-candidate evidence |
 
 The Builder may not use its own results as independent verification. The Judge
@@ -204,6 +205,71 @@ textual workflow-command assertion remains defense in depth rather than a YAML
 semantic proof; the exact clean-environment run and GitHub jobs are the
 authoritative execution receipts.
 
+## Adverse exact-candidate reviews and repairs
+
+Independent review rejected two intermediate candidates:
+
+1. The Integrator rejected `1f84e5f` because a missing or null ruleset
+   `bypass_actors` field was treated as proof of administrator enforcement.
+   Candidate `158c556` requires that field to be explicitly list-valued and
+   empty; absent or malformed authority evidence fails closed.
+2. The Curator rejected `158c556` because a partial non-bypassable ruleset
+   could be merged with review or signature controls from bypassable classic
+   branch protection. Candidate `afb0c20` preserves enforcement provenance:
+   observations are combined only when both sources are explicitly
+   non-bypassable; otherwise only the non-bypassable source may satisfy the
+   declared controls. A partial-status-ruleset regression proves that review
+   requirements remain mismatches instead of becoming false green.
+
+These rejected candidates and dissent are retained. The final code candidate
+is `afb0c20d2a618fc33431ca78c50568831f25aa7f`.
+
+## Exact-candidate receipts
+
+- Clean dependency-free Linux CPython 3.14:
+  image
+  `sha256:5f1cdbcab9a50594a79502dd73e885456d2a2fc31f1a1fa18484815b37ee9152`,
+  container
+  `a61a803b8c023e79213bf9a8f754e73ff078fc95b7ec14e0004593b042ed0fd6`,
+  exact no-dependency editable install, and exact unittest discovery;
+  420 tests passed in 176.939 seconds with one expected skip.
+- Retained split unittest logs:
+  stdout
+  `sha256:dbbe035998d6c5fddbd7f42b1b70ff48c4e5ac491f840500e7add7c84b5f6efd`
+  (1,138 bytes) and stderr
+  `sha256:920c7dbfa2ecbf3dd5153382d9f03e2479c2f978b11a35d7197e0f2bde2a440c`
+  (76,000 bytes).
+- Current-state audit:
+  `evidence/audits/PR27-ci-test-contract-repair.json`, bound to `afb0c20`,
+  clean before and after tests, 419 pytest cases passed and one skipped in
+  178.07 seconds, no failures, canonical integrity digest
+  `sha256:ca51fa285fbfbab33b137ce7209036da287a946000cd969f823925032dd60aef`.
+  The first Linux materialization attempt was correctly rejected as dirty
+  because a raw Windows worktree copy changed line-ending representations; the
+  passing receipt came from a clean Git clone.
+- Ruff `0.16.0` and Pyright `1.1.411` independently passed on the exact
+  candidate with zero diagnostics.
+- Exact wheel:
+  `sha256:3cc9890692e705eb524559a3bdc60981ce2c7cb9f9f44c2cb59eeff1542ed3d3`
+  (267,598 bytes). Its retained verification report is
+  `sha256:0a7119a937f65b381fa2280fb25f70d4b9d110468f20f9fca82aa21cd1589876`;
+  it proves an isolated installed import, 20 schemas plus 48 package files,
+  all 68 resource bytes equal to source, 22 components, and quarantined
+  `hive-core` trust.
+- Post-test Windows worktree remained clean. The Windows full run's separately
+  blocked process-survivor failure is preserved under `B-OPS-08` and is not
+  counted as a passing Windows receipt.
+
+## Independent Curator verdict
+
+`/root/curator_ci_repro` independently reproduced the exact `afb0c20` changed
+suite, Ruff, Pyright, installed-wheel bytes and catalog truth, split full-suite
+logs, audit integrity, clean-clone/head guards, and unchanged sandbox blobs.
+The Curator's disposition is `adapt`/accept for this bounded Phase 0 repair,
+contingent on an independent Judge and green GitHub checks. `B-GOV-06`,
+`B-OPS-07`, and `B-OPS-08` remain open; the verdict supports no broader host,
+release, production, source-completeness, autonomy, or superiority claim.
+
 ## Proposed disposition
 
 `adapt` Alternative A, with these conditions:
@@ -250,9 +316,6 @@ autonomy, or superiority claim is made.
 
 ## Pending receipts
 
-- Exact candidate commit and diff digest.
-- Full deterministic gates and clean wheel/resource receipt.
-- Independent post-build Curator verdict.
 - Independent Judge disposition.
 - Green exact-head GitHub checks.
 - Administrator enforcement receipt for `B-GOV-06`.
