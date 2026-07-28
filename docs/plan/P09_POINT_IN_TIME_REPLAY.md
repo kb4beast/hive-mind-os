@@ -179,3 +179,34 @@ pinned self-history curriculum exist; every episode carries honest contamination
 - No scrubbing of the contamination caveat from self-history episodes.
 - Do not modify `repository_learning.py` semantics to fit the oracle; the oracle
   conforms to the existing contracts.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-28T01:01:05Z
+- Executor (model/agent identity): Codex P09 Builder only; independent Curator,
+  Cross-Examiner, Judge, Integrator, and other review identities remain required on the
+  complete exact-SHA pull-request candidate.
+- Branch and audited implementation commit: `phase/P09-pit-oracle`;
+  `df666384adabf77fa18ee6592514fb56b7fcfb6a`. The pull-request head records the final
+  append-only evidence/metadata commit because a commit cannot contain its own SHA.
+- Gates: P09 tests 11 passed with 9 subtests; full pytest 276 passed, 2 skipped, and
+  1,727 subtests passed; Ruff passed; Pyright 1.1.411 passed with 0 errors and 0 warnings
+  via `python -m pyright`.
+- Audit artifact: `evidence/audits/P09-post.json`
+  (canonical digest:
+  `sha256:32ee8a3159284e42f3d5c94a0e9a96fadd96c098c02ac96acb889faa93a84fc3`;
+  complete: true; failures: none; audited implementation commit:
+  `df666384adabf77fa18ee6592514fb56b7fcfb6a`; audit pytest: 276 passed).
+- Self-history episode: `evidence/pit/P09-self-history-episode.json`
+  (file SHA-256:
+  `c7903b8509783379443db89917814dd39786481150fd0e3a2cb8aaa5b0281124`;
+  target `b695110bd7e71a1a2e2f3297fb60677390d981b6`; 9 ancestors; 23 resolvable
+  sandbox receipts; 4 adversarial probes; scripted overlap score 0, preserved as the
+  honest graded outcome without a superiority claim).
+- Deviations from the phase spec: the `pyright` console executable was unavailable in
+  this shell, so the installed Pyright module was invoked as `python -m pyright`; the
+  globally installed `hive-mind` console entry point initially resolved the main
+  checkout, so the literal CLI exit command was rerun with this branch's `src` directory
+  on `PYTHONPATH` and exited 0. No product or acceptance criteria were changed.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none.
