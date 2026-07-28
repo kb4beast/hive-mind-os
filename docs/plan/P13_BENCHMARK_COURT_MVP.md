@@ -233,3 +233,31 @@ until a full multi-comparator court exists.
   consolidated independent Curator, Judge, and Orchestrator review permits the repaired
   exact head. This appeal makes no comparative quality, source-completeness, release-
   readiness, or superiority claim.
+
+### Consolidated-review appeal
+
+- Challenged exact candidate:
+  `d6c99863e132d36cab20b4b0daa9be48a1460561`.
+- The independent Curator issued `BLOCK`, the independent Judge issued `adapt/BLOCK`,
+  and the independent Orchestrator issued `BLOCK`. Each independently reproduced the
+  same controlling counterexample: adding arbitrary text
+  `superiority-verdict: court-123` made the guard accept
+  `Hive Mind OS outperforms the baseline benchmark` without resolving or validating a
+  court artifact, digest, disposition, comparator/family coverage, safety floors, or
+  claim binding. All three dispositions remain preserved.
+- Repair: P13 now rejects every superiority-adjacent claim matched by the guard. Because
+  this one-family, one-comparator phase cannot produce a qualifying superiority verdict,
+  no textual marker can bypass the prohibition. The regression retains the arbitrary
+  marker and requires the claim file to remain reported. A later phase may relax the
+  prohibition only by implementing fail-closed resolution and validation of a genuine
+  qualifying court artifact.
+- Repaired implementation:
+  `365b106a867c0b2d0d7a5878de86fc1be0396d8b`. The focused suite passed all 8 tests
+  under both unittest and pytest; Ruff passed; Pyright passed with 0 errors. Fresh audit
+  `evidence/audits/P13-post-claim-appeal.json` is complete with no failures, passed 273
+  tests, and has canonical digest
+  `sha256:0381ef6af588f5fa22f4e5c17dc0c8d46ff34659314d352b89fe37ff5699c9c2`.
+- The benchmark corpus, raw measurements, lane results, and `measurement-recorded`
+  verdict are unchanged. Delivery remains blocked until a fresh consolidated Curator,
+  Judge, and Orchestrator review permits the repaired exact head. No comparative quality,
+  source-completeness, release-readiness, or superiority claim is made.
