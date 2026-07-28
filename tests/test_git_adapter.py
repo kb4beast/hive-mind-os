@@ -419,15 +419,19 @@ class GitAdapterTests(unittest.TestCase):
             ).exists()
         )
 
-    def test_api_has_no_merge_rebase_push_or_force_surface(self) -> None:
+    def test_api_has_no_merge_rebase_or_force_surface(self) -> None:
         forbidden = [
             name
             for name in dir(GitWorkspace)
             if any(
                 keyword in name.lower()
-                for keyword in ("merge", "rebase", "push", "force")
+                for keyword in ("merge", "rebase", "force")
             )
         ]
         self.assertEqual(forbidden, [])
+        self.assertEqual(
+            [name for name in dir(GitWorkspace) if "push" in name.lower()],
+            ["push_branch"],
+        )
 if __name__ == "__main__":
     unittest.main()

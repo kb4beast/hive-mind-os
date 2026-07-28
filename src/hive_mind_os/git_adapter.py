@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -9,10 +10,11 @@ import shutil
 import sys
 import tempfile
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from .autonomy import EpisodeAllowance
@@ -30,6 +32,11 @@ from .sandbox import ConfinementViolation, SandboxRunner, SandboxSpec
 _FULL_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
 _BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
 _GIT_ENV_LOCK = threading.RLock()
+_GIT_CREDENTIAL_ENV = (
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_KEY_0",
+    "GIT_CONFIG_VALUE_0",
+)
 
 
 class GitOperationFailed(RuntimeError):
@@ -126,6 +133,47 @@ def _local_source(value: str | Path) -> Path:
     return source
 
 
+def _github_remote(
+    value: str,
+    *,
+    allowed_hosts: Sequence[str] = ("github.com",),
+) -> str:
+    parsed = urlsplit(value)
+    hosts = {host.casefold() for host in allowed_hosts}
+    path_parts = tuple(part for part in parsed.path.split("/") if part)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname is None
+        or parsed.hostname.casefold() not in hosts
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.port not in {None, 443}
+        or parsed.query
+        or parsed.fragment
+        or len(path_parts) != 2
+        or not all(re.fullmatch(r"[A-Za-z0-9_.-]+", part) for part in path_parts)
+    ):
+        raise PinViolation("remote must be a credential-free HTTPS GitHub repository URL")
+    repository = path_parts[1].removesuffix(".git")
+    if not repository:
+        raise PinViolation("remote repository name is required")
+    return f"https://{parsed.hostname.casefold()}/{path_parts[0]}/{repository}.git"
+
+
+def _materialization_source(
+    value: str | Path,
+    *,
+    allow_remote: bool,
+    allowed_hosts: Sequence[str],
+) -> tuple[Path | str, bool]:
+    raw = str(value)
+    if "://" not in raw:
+        return _local_source(value), False
+    if not allow_remote:
+        raise PinViolation("repository URLs require explicit allow_remote=True")
+    return _github_remote(raw, allowed_hosts=allowed_hosts), True
+
+
 def _full_sha(value: str) -> str:
     if not _FULL_SHA.fullmatch(value):
         raise PinViolation("commit pin must be a full 40-hex SHA")
@@ -187,6 +235,31 @@ def _isolated_git_config(config_path: Path) -> Iterator[None]:
 
 
 @contextmanager
+def _git_http_credentials(remote_url: str, token: str) -> Iterator[tuple[str, ...]]:
+    if not token:
+        raise GitOperationFailed("GitHub credential is required")
+    remote = _github_remote(remote_url)
+    origin = remote.removesuffix(".git")
+    encoded = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
+    values = {
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": f"http.{origin}/.extraHeader",
+        "GIT_CONFIG_VALUE_0": f"Authorization: Basic {encoded}",
+    }
+    with _GIT_ENV_LOCK:
+        previous = {name: os.environ.get(name) for name in values}
+        os.environ.update(values)
+        try:
+            yield (token, encoded)
+        finally:
+            for name, value in previous.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+
+@contextmanager
 def _scrubbed_git_environment() -> Iterator[None]:
     names = (
         "GIT_AUTHOR_DATE",
@@ -194,6 +267,7 @@ def _scrubbed_git_environment() -> Iterator[None]:
         "GIT_CONFIG_GLOBAL",
         "GIT_CONFIG_NOSYSTEM",
         "GIT_TERMINAL_PROMPT",
+        *_GIT_CREDENTIAL_ENV,
     )
     with _GIT_ENV_LOCK:
         previous = {name: os.environ.pop(name, None) for name in names}
@@ -249,8 +323,14 @@ class GitWorkspace:
         role: Role = Role.BUILDER,
         allowance: EpisodeAllowance = EpisodeAllowance(200, 200.0),
         test_executables: tuple[str, ...] = (Path(sys.executable).name,),
+        allow_remote: bool = False,
+        allowed_hosts: tuple[str, ...] = ("github.com",),
     ) -> GitWorkspace:
-        source = _local_source(source_path_or_url)
+        source, remote = _materialization_source(
+            source_path_or_url,
+            allow_remote=allow_remote,
+            allowed_hosts=allowed_hosts,
+        )
         pin = _full_sha(commit_sha)
         engine = policy or PolicyEngine(AutonomyLevel.REPOSITORY)
         decision = engine.decide(role, Action.READ_REPOSITORY, RiskTier.MODERATE)
@@ -275,7 +355,9 @@ class GitWorkspace:
         hooks.mkdir()
         staging_config = container / "isolated-gitconfig"
         _atomic_write(staging_config, b"")
-        shutil.copytree(source, staged_source, symlinks=True)
+        if not remote:
+            assert isinstance(source, Path)
+            shutil.copytree(source, staged_source, symlinks=True)
         mission_id = f"git-workspace-{uuid4()}"
         receipts: list[dict[str, Any]] = []
         git_name = Path(shutil.which("git") or "git").name
@@ -287,6 +369,7 @@ class GitWorkspace:
                     "GIT_CONFIG_GLOBAL",
                     "GIT_CONFIG_NOSYSTEM",
                     "GIT_TERMINAL_PROMPT",
+                    *_GIT_CREDENTIAL_ENV,
                 ),
                 timeout_s=60.0,
                 max_output_bytes=10_000_000,
@@ -297,7 +380,12 @@ class GitWorkspace:
             role=role,
             runner_identity="git-sandbox-runner-v1",
         )
-        clone_args = ["clone", "--no-hardlinks", "source", "repo"]
+        clone_args = [
+            "clone",
+            "--no-hardlinks",
+            str(source) if remote else "source",
+            "repo",
+        ]
         with _isolated_git_config(staging_config):
             clone_receipt = cls._execute(
                 staging_runner,
@@ -305,7 +393,7 @@ class GitWorkspace:
                 mission_id=mission_id,
                 role=role,
                 description="clone approved local repository snapshot",
-                path_args=[9, 10],
+                path_args=[10] if remote else [9, 10],
             )
         cls._append_receipt(receipts, staging_runner, clone_receipt)
         if clone_receipt["result"] != "succeeded":
@@ -327,6 +415,7 @@ class GitWorkspace:
                     "GIT_CONFIG_GLOBAL",
                     "GIT_CONFIG_NOSYSTEM",
                     "GIT_TERMINAL_PROMPT",
+                    *_GIT_CREDENTIAL_ENV,
                 ),
                 timeout_s=60.0,
                 max_output_bytes=10_000_000,
@@ -454,6 +543,7 @@ class GitWorkspace:
         path_args: list[int] | None = None,
         extra_config: Sequence[str] = (),
         allow_failure: bool = False,
+        credential: tuple[str, str] | None = None,
     ) -> tuple[dict[str, Any], bytes]:
         self._authorize(action)
         argv = self._git_argv(
@@ -465,7 +555,12 @@ class GitWorkspace:
             if path_args
             else []
         )
-        with _isolated_git_config(self.git_config):
+        credential_context = (
+            _git_http_credentials(credential[0], credential[1])
+            if credential is not None
+            else nullcontext(())
+        )
+        with _isolated_git_config(self.git_config), credential_context as secrets:
             receipt = self._execute(
                 self.runner,
                 argv,
@@ -480,6 +575,8 @@ class GitWorkspace:
             raise GitOperationFailed(f"{description} exceeded the Git output limit")
         if receipt["result"] != "succeeded" and not allow_failure:
             stderr = self._artifact(receipt, "stderr").decode("utf-8", "replace").strip()
+            for secret in secrets:
+                stderr = stderr.replace(secret, "[REDACTED]")
             raise GitOperationFailed(f"{description} failed: {stderr}")
         return receipt, stdout
 
@@ -513,6 +610,63 @@ class GitWorkspace:
             "create isolated branch",
         )
         self.branch_name = branch
+
+    def push_branch(
+        self,
+        remote_url: str | Path,
+        token: str,
+        *,
+        branch: str | None = None,
+        allow_local: bool = False,
+    ) -> str:
+        """Push the exact committed head without persisting a remote or credential."""
+
+        self._authorize(Action.OPEN_PULL_REQUEST)
+        target_branch = _branch_name(branch or self.branch_name or "")
+        if not self.status_clean():
+            raise WorkspaceDirty("push requires a clean committed workspace")
+        head_sha = self._git_text(
+            ["rev-parse", "HEAD"],
+            Action.READ_REPOSITORY,
+            "read push head",
+        )
+        raw_remote = str(remote_url)
+        credential: tuple[str, str] | None
+        if "://" in raw_remote:
+            remote = _github_remote(raw_remote)
+            credential = (remote, token)
+        else:
+            if not allow_local:
+                raise PinViolation("push remote must be an HTTPS GitHub repository URL")
+            local = Path(remote_url).resolve()
+            if not local.is_dir():
+                raise PinViolation("local test push remote must be a repository directory")
+            remote = str(local)
+            credential = None
+        _, existing = self._run_git(
+            ["ls-remote", "--heads", remote, f"refs/heads/{target_branch}"],
+            Action.READ_REPOSITORY,
+            "inspect remote branch before push",
+            credential=credential,
+        )
+        if existing.strip():
+            remote_head = existing.decode("utf-8", "strict").split()[0]
+            if remote_head != head_sha:
+                raise GitOperationFailed(
+                    "remote branch already exists at a different commit"
+                )
+            return head_sha
+        self._run_git(
+            [
+                "push",
+                remote,
+                f"{head_sha}:refs/heads/{target_branch}",
+            ],
+            Action.OPEN_PULL_REQUEST,
+            "push exact mission branch",
+            credential=credential,
+        )
+        return head_sha
 
     def write_file(self, relative_path: str, content: bytes) -> Path:
         self._authorize(Action.WRITE_WORKSPACE)
