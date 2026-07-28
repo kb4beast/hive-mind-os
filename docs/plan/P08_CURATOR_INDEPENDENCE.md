@@ -175,3 +175,40 @@ honest about what it did not evaluate.
 - No checklist items that silently pass when their heuristic cannot run.
 - Do not let a same-model configuration masquerade as different-model in receipts.
 - Do not relax P05 assertions while strengthening them.
+
+---
+## Completion record
+
+- Date (UTC): 2026-07-28T01:05:05Z
+- Executor (model/agent identity): Codex P08 Builder only. Independent Curator, Judge,
+  and Orchestrator review remains required on the complete exact-SHA draft pull-request
+  candidate; this record is not self-approval.
+- Branch and audited implementation commit: `phase/P08-curator-independence`;
+  `f7e0249746e95a0bae827bef36402d2ccc329114`.
+- Gates: P08 exit tests 22 passed; full pytest 273 passed, 2 skipped, 1,718 subtests;
+  Ruff passed; Pyright module 1.1.411 passed with 0 errors (the standalone `pyright`
+  executable was not on PATH, so the installed `python -m pyright` entry point was used).
+- Audit artifact: `evidence/audits/P08-post.json`
+  (canonical digest:
+  `sha256:4870335d3c7f4f46be618e7d54598b6c77c343238c513009bf27854b46cd1b16`;
+  complete: true; failures: none; audit pytest: 273 passed; audited implementation
+  commit: `f7e0249746e95a0bae827bef36402d2ccc329114`).
+- Acceptance evidence: the blind seal precedes candidate-head materialization; late
+  checks fail closed; Builder-receipt contamination and Builder-attributed verification
+  append `contaminated-verification`; the P05 sabotage fixture fails both its sealed
+  original criterion and retained-assertion heuristic; tri-state checklist findings
+  preserve `not-evaluated`; provider receipts distinguish role overrides from shared
+  configuration; the golden mission succeeds and the sabotage mission remains
+  unpublished.
+- Deviations from the phase spec:
+  - Added `docs/architecture/ADR-012-BLIND-FIRST-CURATOR-INDEPENDENCE.md` because
+    `AGENTS.md` requires an ADR for operating-kernel semantics. It remains proposed for
+    independent review.
+  - Modified `src/hive_mind_os/model_backend.py` and `src/hive_mind_os/cli.py` in addition
+    to the listed paths so role-scoped provider settings are actually selected and their
+    effective model/provider identity is recorded. The `model-turn` schema is unchanged.
+- New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none.
+- Explicit limits: role identities are not externally authenticated; a distinct Curator
+  model remains recommended rather than mandatory; SAST and automated introduced-code
+  license classification remain out of scope and are recorded as `not-evaluated`; no
+  production-readiness or superiority claim is made.
