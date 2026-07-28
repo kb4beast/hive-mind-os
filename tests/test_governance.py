@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import re
@@ -51,32 +52,95 @@ class RepositoryGovernanceTests(unittest.TestCase):
     def test_required_rules_bind_remote_verification_evidence(self) -> None:
         rules = json.loads(
             (
-                ROOT
-                / ".github"
-                / "governance"
-                / "required-repository-rules.json"
+                ROOT / ".github" / "governance" / "required-repository-rules.json"
             ).read_text()
         )
         self.assertEqual(rules["required_host_enforcement"], "active")
         self.assertEqual(rules["rules"]["deletion"], "blocked")
         self.assertEqual(rules["rules"]["force_push"], "blocked")
+        self.assertTrue(rules["rules"]["enforce_admins"])
         pull_request = rules["rules"]["pull_request"]
         self.assertGreaterEqual(pull_request["required_approving_review_count"], 2)
         self.assertTrue(pull_request["require_code_owner_review"])
         self.assertTrue(pull_request["require_last_push_approval"])
-        self.assertEqual(rules["verification_status"], "verified_on_remote")
+        self.assertEqual(
+            rules["verification_status"],
+            "blocked_on_remote_admin_enforcement",
+        )
         evidence = ROOT / rules["verification_evidence"]
         self.assertTrue(evidence.is_file())
         self.assertEqual(
             rules["verification_evidence_digest"],
             "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest(),
         )
-        self.assertIsNone(rules["blocking_obligation"])
+        self.assertIn("administrator", rules["blocking_obligation"])
+        self.assertIn("enforcement", rules["blocking_obligation"])
         self.assertIn("one-maintainer", rules["verification_residual"])
 
     def test_build_backend_is_exactly_pinned(self) -> None:
         project = (ROOT / "pyproject.toml").read_text()
         self.assertIn('requires = ["setuptools==80.9.0"]', project)
+
+    def test_unittest_contract_has_no_pytest_only_modules_or_silent_cases(
+        self,
+    ) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+        self.assertIn("python -m unittest discover -s tests -v", workflow)
+        self.assertIn(
+            "python -m pip install --disable-pip-version-check --no-deps -e .",
+            workflow,
+        )
+
+        violations: list[str] = []
+        test_paths = sorted((ROOT / "tests").rglob("test_*.py"))
+        for path in test_paths:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in tree.body:
+                if isinstance(
+                    node,
+                    (ast.FunctionDef, ast.AsyncFunctionDef),
+                ) and node.name.startswith("test_"):
+                    violations.append(
+                        f"{path.name}:{node.lineno}: top-level test is not "
+                        "discoverable by unittest"
+                    )
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name == "pytest" or alias.name.startswith("pytest.")
+                    for alias in node.names
+                ):
+                    violations.append(
+                        f"{path.name}:{node.lineno}: pytest import violates "
+                        "the zero-extra-dependency CI contract"
+                    )
+                if isinstance(node, ast.ImportFrom) and (
+                    node.module == "pytest"
+                    or (node.module is not None and node.module.startswith("pytest."))
+                ):
+                    violations.append(
+                        f"{path.name}:{node.lineno}: pytest import violates "
+                        "the zero-extra-dependency CI contract"
+                    )
+        self.assertEqual(violations, [])
+        for path in test_paths:
+            loader = unittest.TestLoader()
+            suite = loader.discover(
+                start_dir=str(ROOT / "tests"),
+                pattern=path.name,
+            )
+            relative_path = path.relative_to(ROOT).as_posix()
+            self.assertEqual(loader.errors, [], relative_path)
+            self.assertGreater(
+                suite.countTestCases(),
+                0,
+                f"{relative_path} exposes no unittest cases",
+            )
+
+    def test_build_job_verifies_the_installed_wheel_resource_contract(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+        self.assertIn("python scripts/verify_installed_wheel.py", workflow)
+        self.assertIn("--source-root src/hive_mind_os", workflow)
+        self.assertIn("--installed-root .wheel-install", workflow)
 
     def test_secret_scan_allowlist_is_narrow_and_extends_defaults(self) -> None:
         config = tomllib.loads((ROOT / ".gitleaks.toml").read_text())

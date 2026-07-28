@@ -452,14 +452,12 @@ class GitHubClient:
         receipt = {
             "schema_version": 1,
             "receipt_id": (
-                "REC-P07-"
-                + str(intent["action_digest"]).removeprefix("sha256:")[:32]
+                "REC-P07-" + str(intent["action_digest"]).removeprefix("sha256:")[:32]
             ),
             "action_id": intent["action_id"],
             "provider": provider,
             "execution_id": (
-                "EXEC-P07-"
-                + str(intent["action_digest"]).removeprefix("sha256:")[:32]
+                "EXEC-P07-" + str(intent["action_digest"]).removeprefix("sha256:")[:32]
             ),
             "mission_id": intent["mission_id"],
             "state_ref": intent["state_ref"],
@@ -489,10 +487,7 @@ class GitHubClient:
         receipt_path = (
             Path("github")
             / "receipts"
-            / (
-                str(intent["action_digest"]).removeprefix("sha256:")
-                + ".json"
-            )
+            / (str(intent["action_digest"]).removeprefix("sha256:") + ".json")
         )
         _atomic_write(self.evidence_root / receipt_path, encoded)
         return {
@@ -698,11 +693,7 @@ class GitHubClient:
             check_bytes,
             provider="github-actions",
             verifier="github-actions",
-            result=(
-                "succeeded"
-                if conclusion in _SUCCESS_CONCLUSIONS
-                else "failed"
-            ),
+            result=("succeeded" if conclusion in _SUCCESS_CONCLUSIONS else "failed"),
             observed_at=completed_at,
         )
         return CheckResult(
@@ -753,26 +744,21 @@ class GitHubClient:
                 raise GitHubResponseError(
                     "check-runs response contains a non-object check"
                 )
-            observed_names = {
-                _required_string(check, "name") for check in raw_checks
-            }
+            observed_names = {_required_string(check, "name") for check in raw_checks}
             missing_required = sorted(set(required) - observed_names)
             nonterminal_required = sorted(
                 name
                 for name in required
                 if any(
-                    check.get("name") == name
-                    and check.get("status") != "completed"
+                    check.get("name") == name and check.get("status") != "completed"
                     for check in raw_checks
                 )
             )
             if raw_checks and all(
-                check.get("status") == "completed"
-                for check in raw_checks
+                check.get("status") == "completed" for check in raw_checks
             ):
                 results = tuple(
-                    self._check_result(check, head_sha=head_sha)
-                    for check in raw_checks
+                    self._check_result(check, head_sha=head_sha) for check in raw_checks
                 )
                 failures = [
                     result
@@ -808,15 +794,10 @@ class GitHubClient:
         if missing_required:
             details.append("missing=" + ", ".join(missing_required))
         if nonterminal_required:
-            details.append(
-                "nonterminal=" + ", ".join(nonterminal_required)
-            )
+            details.append("nonterminal=" + ", ".join(nonterminal_required))
         suffix = f" ({'; '.join(details)})" if details else ""
         raise CheckPollingTimeout(
-            (
-                f"GitHub checks did not complete after {max_attempts} attempts"
-                f"{suffix}"
-            ),
+            (f"GitHub checks did not complete after {max_attempts} attempts{suffix}"),
             {
                 "path": ReceiptReference(
                     receipt["path"],
@@ -854,8 +835,7 @@ class GitHubClient:
             included = target in includes or "~DEFAULT_BRANCH" in includes
             excluded = target in excludes or "~DEFAULT_BRANCH" in excludes
             ambiguous_exclusion = any(
-                any(marker in item for marker in ("*", "?", "["))
-                for item in excludes
+                any(marker in item for marker in ("*", "?", "[")) for item in excludes
             )
             if included and not excluded and not ambiguous_exclusion:
                 candidates.append(ruleset)
@@ -864,9 +844,7 @@ class GitHubClient:
             raw_rules = ruleset.get("rules")
             if not isinstance(raw_rules, list):
                 continue
-            rules.extend(
-                rule for rule in raw_rules if isinstance(rule, Mapping)
-            )
+            rules.extend(rule for rule in raw_rules if isinstance(rule, Mapping))
         by_type = {
             str(rule.get("type")): rule
             for rule in rules
@@ -879,25 +857,23 @@ class GitHubClient:
             if isinstance(status, Mapping)
             else None
         )
-        status_values = (
-            raw_status_values
-            if isinstance(raw_status_values, list)
-            else []
-        )
+        status_values = raw_status_values if isinstance(raw_status_values, list) else []
         contexts = sorted(
             {
                 str(item.get("context"))
                 for item in status_values
-                if isinstance(item, Mapping)
-                and isinstance(item.get("context"), str)
+                if isinstance(item, Mapping) and isinstance(item.get("context"), str)
             }
         )
         return {
             "active": bool(candidates),
-            "deletion": "blocked" if "deletion" in by_type else "unknown",
-            "force_push": (
-                "blocked" if "non_fast_forward" in by_type else "unknown"
+            "enforce_admins": (
+                all(not ruleset.get("bypass_actors") for ruleset in candidates)
+                if candidates
+                else False
             ),
+            "deletion": "blocked" if "deletion" in by_type else "unknown",
+            "force_push": ("blocked" if "non_fast_forward" in by_type else "unknown"),
             "required_linear_history": "required_linear_history" in by_type,
             "required_signed_commits": "required_signatures" in by_type,
             "pull_request": {
@@ -939,6 +915,10 @@ class GitHubClient:
         contexts = status.get("contexts") if isinstance(status, Mapping) else []
         return {
             "active": True,
+            "enforce_admins": (
+                isinstance(protection.get("enforce_admins"), Mapping)
+                and protection["enforce_admins"].get("enabled") is True
+            ),
             "deletion": (
                 "allowed"
                 if isinstance(protection.get("allow_deletions"), Mapping)
@@ -1032,9 +1012,7 @@ class GitHubClient:
             issues: list[str] = []
             for key, value in expected.items():
                 child = f"{path}.{key}" if path else str(key)
-                issues.extend(
-                    GitHubClient._compare(value, observed.get(key), child)
-                )
+                issues.extend(GitHubClient._compare(value, observed.get(key), child))
             return issues
         if isinstance(expected, list):
             if not isinstance(observed, list) or sorted(expected) != sorted(observed):
@@ -1110,9 +1088,7 @@ class GitHubClient:
         encoded = _canonical_bytes(report_document) + b"\n"
         digest = sha256_digest(encoded)
         relative = (
-            Path("github")
-            / "protection"
-            / f"{digest.removeprefix('sha256:')}.json"
+            Path("github") / "protection" / f"{digest.removeprefix('sha256:')}.json"
         )
         _atomic_write(self.evidence_root / relative, encoded)
         return ProtectionReport(
@@ -1136,18 +1112,12 @@ class GitHubClient:
         max_check_attempts: int = 20,
         check_interval_s: float = 15.0,
     ) -> GitHubDelivery:
-        desired = json.loads(
-            Path(desired_rules_path).read_text(encoding="utf-8")
-        )
+        desired = json.loads(Path(desired_rules_path).read_text(encoding="utf-8"))
         rules = desired.get("rules") if isinstance(desired, Mapping) else None
         required_check_names = (
-            rules.get("required_status_checks")
-            if isinstance(rules, Mapping)
-            else None
+            rules.get("required_status_checks") if isinstance(rules, Mapping) else None
         )
-        required_check_names = _normalize_required_check_names(
-            required_check_names
-        )
+        required_check_names = _normalize_required_check_names(required_check_names)
         push = self.push_branch(workspace, branch=branch)
         pull_request = self.open_draft_pr(
             branch=branch,
@@ -1175,9 +1145,7 @@ def validate_github_receipt(
     from .receipts import FileReceiptValidator
 
     try:
-        path = Path(evidence_root) / Path(
-            *portable_path_parts(str(record["path"]))
-        )
+        path = Path(evidence_root) / Path(*portable_path_parts(str(record["path"])))
         if not path.is_file():
             return False
         validation = FileReceiptValidator(evidence_root).validate(

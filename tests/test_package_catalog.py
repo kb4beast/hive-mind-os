@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import tempfile
+import unittest
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
-
-import pytest
+from typing import Any
 
 from hive_mind_os.package_system import (
     AgentManifest,
@@ -18,6 +21,16 @@ from hive_mind_os.package_system import (
     load_package,
 )
 from hive_mind_os.package_system.builtins import hive_core_catalog, hive_core_root
+
+
+def _raises(
+    exception: type[BaseException],
+    match: str | None = None,
+) -> AbstractContextManager[Any]:
+    case = unittest.TestCase()
+    if match is None:
+        return case.assertRaises(exception)
+    return case.assertRaisesRegex(exception, match)
 
 
 def _write_json(path: Path, document: object) -> None:
@@ -92,7 +105,7 @@ def _minimal_package(
     return package_root, content_digest(canonical_json_bytes(manifest))
 
 
-def test_hive_core_is_inert_content_addressed_and_deterministic() -> None:
+def _case_hive_core_is_inert_content_addressed_and_deterministic() -> None:
     catalog = hive_core_catalog()
     snapshot = catalog.snapshot()
     assert [item.package_id for item in snapshot.packages] == ["hive-core"]
@@ -108,50 +121,54 @@ def test_hive_core_is_inert_content_addressed_and_deterministic() -> None:
     assert not hasattr(catalog, "activate")
 
 
-def test_package_requires_an_explicit_absolute_root(tmp_path: Path) -> None:
-    with pytest.raises(PackageValidationError, match="explicit absolute"):
+def _case_package_requires_an_explicit_absolute_root(tmp_path: Path) -> None:
+    with _raises(PackageValidationError, match="explicit absolute"):
         load_package(Path("relative-package"))
     missing = tmp_path / "missing"
-    with pytest.raises(PackageValidationError, match="existing directory"):
+    with _raises(PackageValidationError, match="existing directory"):
         load_package(missing)
 
 
-def test_digest_mismatch_and_unlisted_files_fail_closed(tmp_path: Path) -> None:
+def _case_digest_mismatch_and_unlisted_files_fail_closed(tmp_path: Path) -> None:
     copied = tmp_path / "hive-core"
     shutil.copytree(hive_core_root(), copied)
     (copied / "agents" / "builder.json").write_text("{}", encoding="utf-8")
-    with pytest.raises(PackageValidationError, match="digest mismatch"):
+    with _raises(PackageValidationError, match="digest mismatch"):
         load_package(copied)
 
     shutil.rmtree(copied)
     shutil.copytree(hive_core_root(), copied)
     _write_json(copied / "undeclared.json", {"authority": "invented"})
-    with pytest.raises(PackageValidationError, match="unlisted"):
+    with _raises(PackageValidationError, match="unlisted"):
         load_package(copied)
 
 
-def test_duplicate_json_keys_are_rejected(tmp_path: Path) -> None:
+def _case_duplicate_json_keys_are_rejected(tmp_path: Path) -> None:
     package_root, _ = _minimal_package(tmp_path, "duplicate-json")
     (package_root / "package.json").write_text(
         '{"schema_version":1,"schema_version":1}',
         encoding="utf-8",
     )
-    with pytest.raises(PackageValidationError, match="duplicate JSON key"):
+    with _raises(PackageValidationError, match="duplicate JSON key"):
         load_package(package_root)
 
 
-def test_symlinks_are_rejected_when_platform_allows_them(tmp_path: Path) -> None:
+def _case_symlinks_are_rejected_when_platform_allows_them(
+    tmp_path: Path,
+) -> None:
     package_root, _ = _minimal_package(tmp_path, "symlinked")
     link = package_root / "linked.json"
     try:
         os.symlink(package_root / "prompt.json", link)
     except (NotImplementedError, OSError):
-        pytest.skip("this environment cannot create symlinks")
-    with pytest.raises(PackageValidationError, match="symlink"):
+        raise unittest.SkipTest("this environment cannot create symlinks")
+    with _raises(PackageValidationError, match="symlink"):
         load_package(package_root)
 
 
-def test_exact_dependency_pins_are_verified_and_ordered(tmp_path: Path) -> None:
+def _case_exact_dependency_pins_are_verified_and_ordered(
+    tmp_path: Path,
+) -> None:
     dependency_root, dependency_digest = _minimal_package(
         tmp_path, "dependency", component_id="agent.dependency"
     )
@@ -167,9 +184,10 @@ def test_exact_dependency_pins_are_verified_and_ordered(tmp_path: Path) -> None:
         requires=[required],
     )
     catalog = PackageCatalog.from_roots((consumer_root, dependency_root))
-    assert [
-        item.manifest.package_id for item in catalog.dependency_order()
-    ] == ["dependency", "consumer"]
+    assert [item.manifest.package_id for item in catalog.dependency_order()] == [
+        "dependency",
+        "consumer",
+    ]
 
     incorrect = dict(required, manifest_digest="sha256:" + "0" * 64)
     bad_root, _ = _minimal_package(
@@ -178,11 +196,11 @@ def test_exact_dependency_pins_are_verified_and_ordered(tmp_path: Path) -> None:
         component_id="agent.bad-consumer",
         requires=[incorrect],
     )
-    with pytest.raises(PackageValidationError, match="digest mismatch"):
+    with _raises(PackageValidationError, match="digest mismatch"):
         PackageCatalog.from_roots((dependency_root, bad_root))
 
 
-def test_dependency_cycles_and_nonexact_versions_are_rejected(
+def _case_dependency_cycles_and_nonexact_versions_are_rejected(
     tmp_path: Path,
 ) -> None:
     placeholder = "sha256:" + "0" * 64
@@ -211,14 +229,14 @@ def test_dependency_cycles_and_nonexact_versions_are_rejected(
     first_manifest = json.loads((first_root / "package.json").read_text())
     first_manifest["requires"][0]["manifest_digest"] = second_digest
     _write_json(first_root / "package.json", first_manifest)
-    with pytest.raises(PackageValidationError, match="cycle"):
+    with _raises(PackageValidationError, match="cycle"):
         PackageCatalog.from_roots((first_root, second_root))
 
-    with pytest.raises(ValueError, match="exact semantic version"):
+    with _raises(ValueError, match="exact semantic version"):
         PackagePin("dependency", ">=1.0", placeholder)
 
 
-def test_duplicate_component_ids_across_packages_are_rejected(
+def _case_duplicate_component_ids_across_packages_are_rejected(
     tmp_path: Path,
 ) -> None:
     first_root, _ = _minimal_package(
@@ -227,18 +245,18 @@ def test_duplicate_component_ids_across_packages_are_rejected(
     second_root, _ = _minimal_package(
         tmp_path, "package-two", component_id="agent.shared"
     )
-    with pytest.raises(PackageValidationError, match="duplicate component"):
+    with _raises(PackageValidationError, match="duplicate component"):
         PackageCatalog.from_roots((first_root, second_root))
 
 
-def test_provenance_license_and_trust_fail_closed(tmp_path: Path) -> None:
+def _case_provenance_license_and_trust_fail_closed(tmp_path: Path) -> None:
     pending_root, _ = _minimal_package(
         tmp_path,
         "pending-trusted",
         license_status="pending",
         trust_state="trusted",
     )
-    with pytest.raises(PackageValidationError, match="must remain quarantined"):
+    with _raises(PackageValidationError, match="must remain quarantined"):
         load_package(pending_root)
 
     quarantined_root, _ = _minimal_package(
@@ -254,11 +272,11 @@ def test_provenance_license_and_trust_fail_closed(tmp_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text())
     manifest["source_refs"] = []
     _write_json(manifest_path, manifest)
-    with pytest.raises(PackageValidationError, match="preserve at least one source"):
+    with _raises(PackageValidationError, match="preserve at least one source"):
         load_package(quarantined_root)
 
 
-def test_unresolved_replacement_and_rollback_pins_require_quarantine(
+def _case_unresolved_replacement_and_rollback_pins_require_quarantine(
     tmp_path: Path,
 ) -> None:
     unresolved = {
@@ -271,7 +289,7 @@ def test_unresolved_replacement_and_rollback_pins_require_quarantine(
         "trusted-replacer",
         replaces=[unresolved],
     )
-    with pytest.raises(PackageValidationError, match="must remain quarantined"):
+    with _raises(PackageValidationError, match="must remain quarantined"):
         PackageCatalog.from_roots((trusted_root,))
 
     quarantined_root, _ = _minimal_package(
@@ -293,5 +311,64 @@ def test_unresolved_replacement_and_rollback_pins_require_quarantine(
         "rollback-candidate",
         rollback_to=self_pin,
     )
-    with pytest.raises(PackageValidationError, match="must remain quarantined"):
+    with _raises(PackageValidationError, match="must remain quarantined"):
         PackageCatalog.from_roots((rollback_root,))
+
+
+class PackageCatalogTests(unittest.TestCase):
+    def _run_with_temporary_path(
+        self,
+        test_case: Callable[[Path], None],
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            test_case(Path(temporary_directory))
+
+    def test_hive_core_is_inert_content_addressed_and_deterministic(
+        self,
+    ) -> None:
+        _case_hive_core_is_inert_content_addressed_and_deterministic()
+
+    def test_package_requires_an_explicit_absolute_root(self) -> None:
+        self._run_with_temporary_path(_case_package_requires_an_explicit_absolute_root)
+
+    def test_digest_mismatch_and_unlisted_files_fail_closed(self) -> None:
+        self._run_with_temporary_path(
+            _case_digest_mismatch_and_unlisted_files_fail_closed
+        )
+
+    def test_duplicate_json_keys_are_rejected(self) -> None:
+        self._run_with_temporary_path(_case_duplicate_json_keys_are_rejected)
+
+    def test_symlinks_are_rejected_when_platform_allows_them(self) -> None:
+        self._run_with_temporary_path(
+            _case_symlinks_are_rejected_when_platform_allows_them
+        )
+
+    def test_exact_dependency_pins_are_verified_and_ordered(self) -> None:
+        self._run_with_temporary_path(
+            _case_exact_dependency_pins_are_verified_and_ordered
+        )
+
+    def test_dependency_cycles_and_nonexact_versions_are_rejected(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_dependency_cycles_and_nonexact_versions_are_rejected
+        )
+
+    def test_duplicate_component_ids_across_packages_are_rejected(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_duplicate_component_ids_across_packages_are_rejected
+        )
+
+    def test_provenance_license_and_trust_fail_closed(self) -> None:
+        self._run_with_temporary_path(_case_provenance_license_and_trust_fail_closed)
+
+    def test_unresolved_replacement_and_rollback_pins_require_quarantine(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_unresolved_replacement_and_rollback_pins_require_quarantine
+        )

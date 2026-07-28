@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
+import unittest
+from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
-
-import pytest
 
 from hive_mind_os.contracts import validate_contract
 from hive_mind_os.package_system import (
@@ -19,7 +21,17 @@ from hive_mind_os.package_system import (
 from hive_mind_os.package_system.builtins import hive_core_catalog, hive_core_root
 
 
-def test_capabilities_are_explicit_and_evidence_level_is_not_inflated() -> None:
+def _raises(
+    exception: type[BaseException],
+    match: str | None = None,
+) -> AbstractContextManager[Any]:
+    case = unittest.TestCase()
+    if match is None:
+        return case.assertRaises(exception)
+    return case.assertRaisesRegex(exception, match)
+
+
+def _case_capabilities_are_explicit_and_evidence_level_is_not_inflated() -> None:
     profile = HostCapabilityProfile(
         host_id="codex",
         host_version_ref="docs:2026-07-28",
@@ -36,9 +48,7 @@ def test_capabilities_are_explicit_and_evidence_level_is_not_inflated() -> None:
         evidence_refs=("https://learn.chatgpt.com/docs/customization/overview",),
         evidence_obligations=("source admission pending",),
     )
-    required = frozenset(
-        {HostCapability.SKILL_MD, HostCapability.WORKTREE_ISOLATION}
-    )
+    required = frozenset({HostCapability.SKILL_MD, HostCapability.WORKTREE_ISOLATION})
     assert not profile.supports(required)
     assert not profile.supports(frozenset({HostCapability.SKILL_MD}))
     assert profile.declares(frozenset({HostCapability.SKILL_MD}))
@@ -47,8 +57,8 @@ def test_capabilities_are_explicit_and_evidence_level_is_not_inflated() -> None:
     assert profile.fingerprint.startswith("sha256:")
 
 
-def test_profile_requires_versioned_evidence() -> None:
-    with pytest.raises(ValueError, match="requires evidence"):
+def _case_profile_requires_versioned_evidence() -> None:
+    with _raises(ValueError, match="requires evidence"):
         HostCapabilityProfile(
             host_id="hermes",
             host_version_ref="commit:abc",
@@ -61,8 +71,8 @@ def test_profile_requires_versioned_evidence() -> None:
         )
 
 
-def test_passed_conformance_requires_tested_evidence() -> None:
-    with pytest.raises(ValueError, match="passed conformance requires tested"):
+def _case_passed_conformance_requires_tested_evidence() -> None:
+    with _raises(ValueError, match="passed conformance requires tested"):
         HostCapabilityProfile(
             host_id="codex",
             host_version_ref="evidence:test",
@@ -74,7 +84,7 @@ def test_passed_conformance_requires_tested_evidence() -> None:
             evidence_obligations=(),
         )
 
-    with pytest.raises(ValueError, match="cannot retain evidence obligations"):
+    with _raises(ValueError, match="cannot retain evidence obligations"):
         HostCapabilityProfile(
             host_id="codex",
             host_version_ref="evidence:test",
@@ -99,7 +109,7 @@ def test_passed_conformance_requires_tested_evidence() -> None:
     assert not validate_contract("host-capability-profile", invalid_contract).valid
 
 
-def test_from_contract_rejects_duplicate_capability_and_unknown_status() -> None:
+def _case_from_contract_rejects_duplicate_capability_and_unknown_status() -> None:
     baseline = {
         "schema_version": 1,
         "host_id": "test-host",
@@ -115,8 +125,9 @@ def test_from_contract_rejects_duplicate_capability_and_unknown_status() -> None
     assert not profile.supports(frozenset({HostCapability.SKILL_MD}))
     assert profile.supports(
         frozenset({HostCapability.SKILL_MD}),
-        conformance_verifier=lambda candidate: candidate.fingerprint
-        == profile.fingerprint,
+        conformance_verifier=lambda candidate: (
+            candidate.fingerprint == profile.fingerprint
+        ),
     )
     assert not profile.supports(
         frozenset({HostCapability.SKILL_MD}),
@@ -124,18 +135,16 @@ def test_from_contract_rejects_duplicate_capability_and_unknown_status() -> None
     )
 
     duplicate = dict(baseline, capabilities=["skill_md", "skill_md"])
-    with pytest.raises(ValueError, match="cannot contain duplicates"):
+    with _raises(ValueError, match="cannot contain duplicates"):
         HostCapabilityProfile.from_contract(duplicate)
     unknown = dict(baseline, conformance_status="assumed")
-    with pytest.raises(ValueError, match="invalid host capability"):
+    with _raises(ValueError, match="invalid host capability"):
         HostCapabilityProfile.from_contract(unknown)
 
 
-@pytest.mark.parametrize(
-    "field",
-    ("host_id", "host_version_ref", "adapter_version"),
-)
-def test_formal_schema_and_runtime_reject_whitespace_identifiers(field: str) -> None:
+def _case_formal_schema_and_runtime_reject_whitespace_identifiers(
+    field: str,
+) -> None:
     document = {
         "schema_version": 1,
         "host_id": "test-host",
@@ -149,11 +158,11 @@ def test_formal_schema_and_runtime_reject_whitespace_identifiers(field: str) -> 
     }
     document[field] = "   "
     assert not validate_contract("host-capability-profile", document).valid
-    with pytest.raises(ValueError):
+    with _raises(ValueError):
         HostCapabilityProfile.from_contract(document)
 
 
-def test_formal_schema_and_runtime_reject_whitespace_evidence_refs() -> None:
+def _case_formal_schema_and_runtime_reject_whitespace_evidence_refs() -> None:
     document = {
         "schema_version": 1,
         "host_id": "test-host",
@@ -166,11 +175,11 @@ def test_formal_schema_and_runtime_reject_whitespace_evidence_refs() -> None:
         "evidence_obligations": ["source admission pending"],
     }
     assert not validate_contract("host-capability-profile", document).valid
-    with pytest.raises(ValueError):
+    with _raises(ValueError):
         HostCapabilityProfile.from_contract(document)
 
 
-def test_builtin_profiles_are_declared_evidence_not_support_claims() -> None:
+def _case_builtin_profiles_are_declared_evidence_not_support_claims() -> None:
     profiles = load_builtin_host_profiles()
     assert {profile.host_id for profile in profiles} == {
         "codex",
@@ -185,7 +194,7 @@ def test_builtin_profiles_are_declared_evidence_not_support_claims() -> None:
         assert profile.evidence_obligations
 
 
-def test_builtin_profile_rechecks_digest_at_the_read_boundary(
+def _case_builtin_profile_rechecks_digest_at_the_read_boundary(
     tmp_path: Path,
 ) -> None:
     catalog = hive_core_catalog()
@@ -205,6 +214,47 @@ def test_builtin_profile_rechecks_digest_at_the_read_boundary(
             "hive_mind_os.package_system.builtins.hive_core_root",
             return_value=copied,
         ),
-        pytest.raises(ValueError, match="digest changed"),
+        _raises(ValueError, match="digest changed"),
     ):
         load_builtin_host_profile("codex")
+
+
+class HostCapabilityProfileTests(unittest.TestCase):
+    def test_capabilities_are_explicit_and_evidence_level_is_not_inflated(
+        self,
+    ) -> None:
+        _case_capabilities_are_explicit_and_evidence_level_is_not_inflated()
+
+    def test_profile_requires_versioned_evidence(self) -> None:
+        _case_profile_requires_versioned_evidence()
+
+    def test_passed_conformance_requires_tested_evidence(self) -> None:
+        _case_passed_conformance_requires_tested_evidence()
+
+    def test_from_contract_rejects_duplicate_capability_and_unknown_status(
+        self,
+    ) -> None:
+        _case_from_contract_rejects_duplicate_capability_and_unknown_status()
+
+    def test_formal_schema_and_runtime_reject_whitespace_identifiers(
+        self,
+    ) -> None:
+        for field in ("host_id", "host_version_ref", "adapter_version"):
+            with self.subTest(field=field):
+                _case_formal_schema_and_runtime_reject_whitespace_identifiers(field)
+
+    def test_formal_schema_and_runtime_reject_whitespace_evidence_refs(
+        self,
+    ) -> None:
+        _case_formal_schema_and_runtime_reject_whitespace_evidence_refs()
+
+    def test_builtin_profiles_are_declared_evidence_not_support_claims(
+        self,
+    ) -> None:
+        _case_builtin_profiles_are_declared_evidence_not_support_claims()
+
+    def test_builtin_profile_rechecks_digest_at_the_read_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            _case_builtin_profile_rechecks_digest_at_the_read_boundary(
+                Path(temporary_directory)
+            )

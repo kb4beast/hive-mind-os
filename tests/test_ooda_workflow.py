@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import pytest
+import unittest
+from contextlib import AbstractContextManager
+from typing import Any
 
 from hive_mind_os.package_system import (
     OODAContractValidation,
@@ -11,6 +13,16 @@ from hive_mind_os.package_system import (
     OODATransition,
     validate_ooda_contract,
 )
+
+
+def _raises(
+    exception: type[BaseException],
+    match: str | None = None,
+) -> AbstractContextManager[Any]:
+    case = unittest.TestCase()
+    if match is None:
+        return case.assertRaises(exception)
+    return case.assertRaisesRegex(exception, match)
 
 
 def _transition(
@@ -36,11 +48,9 @@ def _transition(
     return OODATransition(**values)  # type: ignore[arg-type]
 
 
-def test_replay_enforces_the_evidence_bound_cycle() -> None:
+def _case_replay_enforces_the_evidence_bound_cycle() -> None:
     state = OODAState.initial(cycle_id="OODA-1", mission_id="MISSION-1")
-    state = state.apply(
-        _transition(1, OODAPhase.OBSERVE, OODAPhase.ORIENT)
-    )
+    state = state.apply(_transition(1, OODAPhase.OBSERVE, OODAPhase.ORIENT))
     state = state.apply(_transition(2, OODAPhase.ORIENT, OODAPhase.DECIDE))
     state = state.apply(
         _transition(
@@ -67,24 +77,22 @@ def test_replay_enforces_the_evidence_bound_cycle() -> None:
     assert state.to_contract()["last_transition"]["outcome_ref"] == "outcome:4"
 
 
-def test_illegal_act_and_sequence_transitions_fail_closed() -> None:
-    with pytest.raises(ValueError, match="entering act requires"):
+def _case_illegal_act_and_sequence_transitions_fail_closed() -> None:
+    with _raises(ValueError, match="entering act requires"):
         _transition(1, OODAPhase.DECIDE, OODAPhase.ACT)
-    with pytest.raises(ValueError, match="action receipt"):
+    with _raises(ValueError, match="action receipt"):
         _transition(1, OODAPhase.ACT, OODAPhase.OBSERVE)
-    with pytest.raises(ValueError, match="illegal OODA"):
+    with _raises(ValueError, match="illegal OODA"):
         _transition(1, OODAPhase.OBSERVE, OODAPhase.DECIDE)
 
     state = OODAState.initial(cycle_id="OODA-2", mission_id="MISSION-2")
-    with pytest.raises(ValueError, match="exactly one"):
+    with _raises(ValueError, match="exactly one"):
         state.apply(_transition(2, OODAPhase.OBSERVE, OODAPhase.ORIENT))
 
 
-def test_stop_is_terminal_and_records_an_outcome() -> None:
+def _case_stop_is_terminal_and_records_an_outcome() -> None:
     state = OODAState.initial(cycle_id="OODA-3", mission_id="MISSION-3")
-    state = state.apply(
-        _transition(1, OODAPhase.OBSERVE, OODAPhase.ORIENT)
-    )
+    state = state.apply(_transition(1, OODAPhase.OBSERVE, OODAPhase.ORIENT))
     stopped = state.stop(
         status=OODAStatus.BLOCKED,
         actor_id="curator-independent",
@@ -105,11 +113,11 @@ def test_stop_is_terminal_and_records_an_outcome() -> None:
     validation = validate_ooda_contract(contract)
     assert isinstance(validation, OODAContractValidation)
     assert validation.valid, validation.issues
-    with pytest.raises(ValueError, match="stopped"):
+    with _raises(ValueError, match="stopped"):
         stopped.apply(_transition(2, OODAPhase.ORIENT, OODAPhase.DECIDE))
 
 
-def test_initial_state_can_stop_without_losing_terminal_evidence() -> None:
+def _case_initial_state_can_stop_without_losing_terminal_evidence() -> None:
     stopped = OODAState.initial(
         cycle_id="OODA-INITIAL-STOP",
         mission_id="MISSION-INITIAL-STOP",
@@ -128,15 +136,15 @@ def test_initial_state_can_stop_without_losing_terminal_evidence() -> None:
     assert validate_ooda_contract(stopped.to_contract()).valid
 
 
-def test_timestamps_and_terminal_records_fail_closed() -> None:
-    with pytest.raises(ValueError, match="RFC 3339"):
+def _case_timestamps_and_terminal_records_fail_closed() -> None:
+    with _raises(ValueError, match="RFC 3339"):
         _transition(
             1,
             OODAPhase.OBSERVE,
             OODAPhase.ORIENT,
             occurred_at="2026-07-28 12:00:00",
         )
-    with pytest.raises(ValueError, match="must be terminal"):
+    with _raises(ValueError, match="must be terminal"):
         OODATerminalRecord(
             sequence=1,
             status=OODAStatus.RUNNING,
@@ -148,11 +156,9 @@ def test_timestamps_and_terminal_records_fail_closed() -> None:
         )
 
 
-def test_contract_validator_rejects_forged_cross_field_state() -> None:
+def _case_contract_validator_rejects_forged_cross_field_state() -> None:
     state = OODAState.initial(cycle_id="OODA-FORGED", mission_id="MISSION-FORGED")
-    state = state.apply(
-        _transition(1, OODAPhase.OBSERVE, OODAPhase.ORIENT)
-    )
+    state = state.apply(_transition(1, OODAPhase.OBSERVE, OODAPhase.ORIENT))
     forged = state.to_contract()
     forged["phase"] = "decide"
     result = validate_ooda_contract(forged)
@@ -165,3 +171,27 @@ def test_contract_validator_rejects_forged_cross_field_state() -> None:
     result = validate_ooda_contract(forged_terminal)
     assert not result.valid
     assert "terminal state requires a terminal record" in result.issues
+
+
+class OODAWorkflowTests(unittest.TestCase):
+    def test_replay_enforces_the_evidence_bound_cycle(self) -> None:
+        _case_replay_enforces_the_evidence_bound_cycle()
+
+    def test_illegal_act_and_sequence_transitions_fail_closed(self) -> None:
+        _case_illegal_act_and_sequence_transitions_fail_closed()
+
+    def test_stop_is_terminal_and_records_an_outcome(self) -> None:
+        _case_stop_is_terminal_and_records_an_outcome()
+
+    def test_initial_state_can_stop_without_losing_terminal_evidence(
+        self,
+    ) -> None:
+        _case_initial_state_can_stop_without_losing_terminal_evidence()
+
+    def test_timestamps_and_terminal_records_fail_closed(self) -> None:
+        _case_timestamps_and_terminal_records_fail_closed()
+
+    def test_contract_validator_rejects_forged_cross_field_state(
+        self,
+    ) -> None:
+        _case_contract_validator_rejects_forged_cross_field_state()

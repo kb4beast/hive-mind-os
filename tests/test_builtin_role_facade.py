@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import unittest
+from unittest.mock import patch
 
 import hive_mind_os.roles as legacy_roles
 from hive_mind_os.models import Role
@@ -14,7 +16,7 @@ from hive_mind_os.package_system.builtins import hive_core_catalog
 from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 
 
-def test_hive_core_agents_are_lossless_legacy_role_contracts() -> None:
+def _case_hive_core_agents_are_lossless_legacy_role_contracts() -> None:
     catalog = hive_core_catalog()
     for role, contract in ROLE_CONTRACTS.items():
         component = catalog.component(f"agent.{role.value}")
@@ -32,22 +34,22 @@ def test_hive_core_agents_are_lossless_legacy_role_contracts() -> None:
         )
 
 
-def test_legacy_role_facade_does_not_load_optional_extension_resources(
-    monkeypatch,
-) -> None:
+def _case_legacy_role_facade_does_not_load_optional_extension_resources() -> None:
     def fail_if_loaded():
-        raise AssertionError("optional package loader crossed the runtime import boundary")
+        raise AssertionError(
+            "optional package loader crossed the runtime import boundary"
+        )
 
-    monkeypatch.setattr(
+    with patch(
         "hive_mind_os.package_system.builtins.hive_core_catalog",
         fail_if_loaded,
-    )
-    reloaded = importlib.reload(legacy_roles)
-    assert set(reloaded.ROLE_CONTRACTS) == set(Role)
-    assert reloaded.DEFAULT_LIFECYCLE == DEFAULT_LIFECYCLE
+    ):
+        reloaded = importlib.reload(legacy_roles)
+        assert set(reloaded.ROLE_CONTRACTS) == set(Role)
+        assert reloaded.DEFAULT_LIFECYCLE == DEFAULT_LIFECYCLE
 
 
-def test_hive_core_workflow_preserves_default_lifecycle_order() -> None:
+def _case_hive_core_workflow_preserves_default_lifecycle_order() -> None:
     workflow = hive_core_catalog().component("workflow.default-lifecycle")
     assert isinstance(workflow, WorkflowManifest)
     encoded = tuple(
@@ -58,7 +60,7 @@ def test_hive_core_workflow_preserves_default_lifecycle_order() -> None:
     assert encoded == DEFAULT_LIFECYCLE
 
 
-def test_hive_core_tools_are_inert_and_bound_without_escalation() -> None:
+def _case_hive_core_tools_are_inert_and_bound_without_escalation() -> None:
     catalog = hive_core_catalog()
     for component_id, capability_id in (
         ("tool.repository-inspect", "read_repository"),
@@ -73,7 +75,7 @@ def test_hive_core_tools_are_inert_and_bound_without_escalation() -> None:
         assert not tool.rollback_required
 
 
-def test_declarative_workflows_add_no_war_room_or_promotion_authority() -> None:
+def _case_declarative_workflows_add_no_war_room_or_promotion_authority() -> None:
     catalog = hive_core_catalog()
     ooda = catalog.component("workflow.ooda")
     challenger = catalog.component("workflow.challenger-experiment")
@@ -81,9 +83,31 @@ def test_declarative_workflows_add_no_war_room_or_promotion_authority() -> None:
     assert isinstance(challenger, WorkflowManifest)
     assert challenger.terminal_states == ("evaluated", "quarantined")
     assert "workflow.war-room" not in {
-        component.component_id
-        for component in catalog.package("hive-core").components
+        component.component_id for component in catalog.package("hive-core").components
     }
     assert {"activate", "promote", "accept"}.isdisjoint(
         transition.event for transition in challenger.transitions
     )
+
+
+class BuiltinRoleFacadeTests(unittest.TestCase):
+    def test_hive_core_agents_are_lossless_legacy_role_contracts(self) -> None:
+        _case_hive_core_agents_are_lossless_legacy_role_contracts()
+
+    def test_legacy_role_facade_does_not_load_optional_extension_resources(
+        self,
+    ) -> None:
+        _case_legacy_role_facade_does_not_load_optional_extension_resources()
+
+    def test_hive_core_workflow_preserves_default_lifecycle_order(self) -> None:
+        _case_hive_core_workflow_preserves_default_lifecycle_order()
+
+    def test_hive_core_tools_are_inert_and_bound_without_escalation(
+        self,
+    ) -> None:
+        _case_hive_core_tools_are_inert_and_bound_without_escalation()
+
+    def test_declarative_workflows_add_no_war_room_or_promotion_authority(
+        self,
+    ) -> None:
+        _case_declarative_workflows_add_no_war_room_or_promotion_authority()

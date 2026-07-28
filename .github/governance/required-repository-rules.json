@@ -7,6 +7,7 @@
   ],
   "required_host_enforcement": "active",
   "rules": {
+    "enforce_admins": true,
     "deletion": "blocked",
     "force_push": "blocked",
     "required_linear_history": true,
@@ -30,10 +31,10 @@
     ]
   },
   "separation_requirement": "At least one approval must come from an identity that did not author, push, build, or judge the change.",
-  "verification_status": "verified_on_remote",
+  "verification_status": "blocked_on_remote_admin_enforcement",
   "verification_evidence": "evidence/live/P07/github-receipts/github/protection/08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7.json",
   "verification_evidence_digest": "sha256:08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7",
   "verified_at": "2026-07-28",
-  "verification_residual": "The host rules are active, but one-maintainer review independence and administrator bypass are not resolved by configuration alone.",
-  "blocking_obligation": null
+  "verification_residual": "The required checks and review rules are active, but one-maintainer review independence remains unresolved and the live branch protection reports enforce_admins=false. PR #27 was merged with no reviews while required unit checks were pending and later failed.",
+  "blocking_obligation": "A repository administrator must enable enforcement for administrators (GitHub's 'Do not allow bypassing the above settings'), then an independent Integrator must capture a matching ProtectionReport before protected-governance completion is reclaimed."
 }

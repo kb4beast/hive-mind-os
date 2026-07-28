@@ -156,10 +156,7 @@ class LocalDeliveryClient(GitHubClient):
         complete = json.loads(_fixture("check-complete.json"))
         required_names = json.loads(
             (
-                ROOT
-                / ".github"
-                / "governance"
-                / "required-repository-rules.json"
+                ROOT / ".github" / "governance" / "required-repository-rules.json"
             ).read_text(encoding="utf-8")
         )["rules"]["required_status_checks"]
         templates = complete["check_runs"]
@@ -273,9 +270,7 @@ class GitHubAdapterTests(unittest.TestCase):
         self.assertEqual(result.number, 71)
         self.assertTrue(result.draft)
         self.assertEqual(result.head_sha, HEAD_SHA)
-        request = next(
-            call for call in transport.calls if call["method"] == "POST"
-        )
+        request = next(call for call in transport.calls if call["method"] == "POST")
         payload = json.loads(request["body"])  # type: ignore[arg-type]
         self.assertEqual(
             payload,
@@ -362,13 +357,15 @@ class GitHubAdapterTests(unittest.TestCase):
             [item.json_digest for item in results],
             [
                 "sha256:"
-                + __import__("hashlib").sha256(
+                + __import__("hashlib")
+                .sha256(
                     json.dumps(
                         check,
                         sort_keys=True,
                         separators=(",", ":"),
                     ).encode()
-                ).hexdigest()
+                )
+                .hexdigest()
                 for check in expected
             ],
         )
@@ -578,9 +575,7 @@ class GitHubAdapterTests(unittest.TestCase):
 
         detail = json.loads(_fixture("ruleset-detail.json"))
         detail["rules"] = [
-            rule
-            for rule in detail["rules"]
-            if rule["type"] != "required_signatures"
+            rule for rule in detail["rules"] if rule["type"] != "required_signatures"
         ]
         protection = json.loads(_fixture("protection.json"))
         protection["required_signatures"]["enabled"] = False
@@ -600,6 +595,11 @@ class GitHubAdapterTests(unittest.TestCase):
         )
         self.assertFalse(report.matches)
         self.assertIn("rules.required_signed_commits: mismatch", report.mismatches)
+
+        protection = json.loads(_fixture("protection.json"))
+        protection["enforce_admins"]["enabled"] = False
+        observed = GitHubClient._branch_observation(protection)
+        self.assertFalse(observed["enforce_admins"])
 
     def test_ruleset_branch_exclusion_and_malformed_conditions_fail_closed(
         self,
@@ -710,10 +710,7 @@ class GitHubAdapterTests(unittest.TestCase):
                     "main",
                     "P07 offline mission integration",
                     "Draft evidence only.",
-                    ROOT
-                    / ".github"
-                    / "governance"
-                    / "required-repository-rules.json",
+                    ROOT / ".github" / "governance" / "required-repository-rules.json",
                     max_check_attempts=1,
                     check_interval_s=0,
                 ),

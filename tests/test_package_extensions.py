@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import tempfile
+import unittest
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Any, Callable
-
-import pytest
+from typing import Any
 
 from hive_mind_os.package_system import (
     AgentManifest,
@@ -18,6 +20,16 @@ from hive_mind_os.package_system import (
 )
 from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 from hive_mind_os.source_docket import load_default_source_docket
+
+
+def _raises(
+    exception: type[BaseException],
+    match: str | None = None,
+) -> AbstractContextManager[Any]:
+    case = unittest.TestCase()
+    if match is None:
+        return case.assertRaises(exception)
+    return case.assertRaisesRegex(exception, match)
 
 
 def _write_json(path: Path, document: object) -> None:
@@ -167,7 +179,7 @@ def _rewrite_and_rehash(root: Path, relative: str, document: object) -> None:
     _write_json(manifest_path, manifest)
 
 
-def test_third_party_agent_skill_tool_and_workflow_remain_inert(
+def _case_third_party_agent_skill_tool_and_workflow_remain_inert(
     tmp_path: Path,
 ) -> None:
     role_contracts_before = dict(ROLE_CONTRACTS)
@@ -185,15 +197,7 @@ def test_third_party_agent_skill_tool_and_workflow_remain_inert(
     assert DEFAULT_LIFECYCLE == lifecycle_before
 
 
-@pytest.mark.parametrize(
-    ("skill_ids", "tool_ids", "match"),
-    [
-        (["skill.missing"], ["tool.boundary"], "missing component"),
-        (["workflow.boundary"], ["tool.boundary"], "expected .* to be skill"),
-        (["skill.boundary"], ["workflow.boundary"], "expected .* to be tool"),
-    ],
-)
-def test_missing_and_wrong_kind_agent_refs_fail_closed(
+def _case_missing_and_wrong_kind_agent_refs_fail_closed(
     tmp_path: Path,
     skill_ids: list[str],
     tool_ids: list[str],
@@ -205,22 +209,22 @@ def test_missing_and_wrong_kind_agent_refs_fail_closed(
         agent_skill_ids=skill_ids,
         agent_tool_ids=tool_ids,
     )
-    with pytest.raises(PackageValidationError, match=match):
+    with _raises(PackageValidationError, match=match):
         PackageCatalog.from_roots((root,))
 
 
-def test_skill_capability_escalation_fails_closed(tmp_path: Path) -> None:
+def _case_skill_capability_escalation_fails_closed(tmp_path: Path) -> None:
     root, _ = _third_party_package(
         tmp_path,
         "escalation",
         agent_capabilities=["read_repository"],
         skill_capabilities=["read_repository", "network"],
     )
-    with pytest.raises(PackageValidationError, match="escalates agent"):
+    with _raises(PackageValidationError, match="escalates agent"):
         PackageCatalog.from_roots((root,))
 
 
-def test_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed(
+def _case_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed(
     tmp_path: Path,
 ) -> None:
     provider, _ = _third_party_package(tmp_path, "provider")
@@ -230,7 +234,7 @@ def test_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed(
         agent_skill_ids=["skill.provider"],
         agent_tool_ids=["tool.provider"],
     )
-    with pytest.raises(PackageValidationError, match="undeclared package"):
+    with _raises(PackageValidationError, match="undeclared package"):
         PackageCatalog.from_roots((provider, consumer))
 
     dependent_parent = tmp_path / "declared"
@@ -254,21 +258,21 @@ def test_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed(
     assert agent.skill_ids == ("skill.provider",)
 
 
-def test_skill_instruction_and_tool_schema_resources_are_strict(
+def _case_skill_instruction_and_tool_schema_resources_are_strict(
     tmp_path: Path,
 ) -> None:
     root, _ = _third_party_package(tmp_path, "hostile-resource")
     instruction = json.loads((root / "instruction.json").read_text())
     instruction.pop("deferred_obligations")
     _rewrite_and_rehash(root, "instruction.json", instruction)
-    with pytest.raises(PackageValidationError, match="missing fields"):
+    with _raises(PackageValidationError, match="missing fields"):
         PackageCatalog.from_roots((root,))
 
     root, _ = _third_party_package(tmp_path, "hostile-schema")
     schema = json.loads((root / "input.json").read_text())
     schema["additionalProperties"] = True
     _rewrite_and_rehash(root, "input.json", schema)
-    with pytest.raises(PackageValidationError, match="fail closed"):
+    with _raises(PackageValidationError, match="fail closed"):
         PackageCatalog.from_roots((root,))
 
     root, _ = _third_party_package(tmp_path, "referenced-schema")
@@ -276,38 +280,11 @@ def test_skill_instruction_and_tool_schema_resources_are_strict(
     schema["properties"]["path"]["$dynamicRef"] = "#/$defs/path"
     schema["$defs"] = {"path": {"type": "string"}}
     _rewrite_and_rehash(root, "input.json", schema)
-    with pytest.raises(PackageValidationError, match="schema references"):
+    with _raises(PackageValidationError, match="schema references"):
         PackageCatalog.from_roots((root,))
 
 
-@pytest.mark.parametrize(
-    ("mutation", "match"),
-    [
-        (
-            lambda schema: schema["properties"].__setitem__(
-                "path", "not-a-schema"
-            ),
-            "object or boolean schema",
-        ),
-        (
-            lambda schema: schema["properties"]["path"].__setitem__(
-                "minLength", "one"
-            ),
-            "nonnegative integer",
-        ),
-        (
-            lambda schema: schema["properties"]["path"].__setitem__(
-                "enum", "anything"
-            ),
-            "nonempty array",
-        ),
-        (
-            lambda schema: schema.__setitem__("$id", "not a uri"),
-            "absolute HTTP",
-        ),
-    ],
-)
-def test_malformed_tool_schema_keywords_fail_closed(
+def _case_malformed_tool_schema_keywords_fail_closed(
     tmp_path: Path,
     mutation: Callable[[dict[str, Any]], None],
     match: str,
@@ -316,11 +293,11 @@ def test_malformed_tool_schema_keywords_fail_closed(
     schema = json.loads((root / "input.json").read_text())
     mutation(schema)
     _rewrite_and_rehash(root, "input.json", schema)
-    with pytest.raises(PackageValidationError, match=match):
+    with _raises(PackageValidationError, match=match):
         PackageCatalog.from_roots((root,))
 
 
-def test_source_docket_remains_fail_closed_after_extension_packaging() -> None:
+def _case_source_docket_remains_fail_closed_after_extension_packaging() -> None:
     audit = load_default_source_docket().audit()
     assert not audit.release_ready
     blockers = {issue.source_id for issue in audit.issues if issue.source_id}
@@ -333,3 +310,101 @@ def test_source_docket_remains_fail_closed_after_extension_packaging() -> None:
         "SRC-019",
         "SRC-020",
     } <= blockers
+
+
+class PackageExtensionTests(unittest.TestCase):
+    def _run_with_temporary_path(
+        self,
+        test_case: Callable[[Path], None],
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            test_case(Path(temporary_directory))
+
+    def test_third_party_agent_skill_tool_and_workflow_remain_inert(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_third_party_agent_skill_tool_and_workflow_remain_inert
+        )
+
+    def test_missing_and_wrong_kind_agent_refs_fail_closed(self) -> None:
+        cases = (
+            (["skill.missing"], ["tool.boundary"], "missing component"),
+            (
+                ["workflow.boundary"],
+                ["tool.boundary"],
+                "expected .* to be skill",
+            ),
+            (
+                ["skill.boundary"],
+                ["workflow.boundary"],
+                "expected .* to be tool",
+            ),
+        )
+        for skill_ids, tool_ids, match in cases:
+            with self.subTest(
+                skill_ids=skill_ids,
+                tool_ids=tool_ids,
+                match=match,
+            ):
+                with tempfile.TemporaryDirectory() as temporary_directory:
+                    _case_missing_and_wrong_kind_agent_refs_fail_closed(
+                        Path(temporary_directory),
+                        skill_ids,
+                        tool_ids,
+                        match,
+                    )
+
+    def test_skill_capability_escalation_fails_closed(self) -> None:
+        self._run_with_temporary_path(_case_skill_capability_escalation_fails_closed)
+
+    def test_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed
+        )
+
+    def test_skill_instruction_and_tool_schema_resources_are_strict(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_skill_instruction_and_tool_schema_resources_are_strict
+        )
+
+    def test_malformed_tool_schema_keywords_fail_closed(self) -> None:
+        cases: tuple[tuple[Callable[[dict[str, Any]], None], str], ...] = (
+            (
+                lambda schema: schema["properties"].__setitem__("path", "not-a-schema"),
+                "object or boolean schema",
+            ),
+            (
+                lambda schema: schema["properties"]["path"].__setitem__(
+                    "minLength", "one"
+                ),
+                "nonnegative integer",
+            ),
+            (
+                lambda schema: schema["properties"]["path"].__setitem__(
+                    "enum", "anything"
+                ),
+                "nonempty array",
+            ),
+            (
+                lambda schema: schema.__setitem__("$id", "not a uri"),
+                "absolute HTTP",
+            ),
+        )
+        for mutation, match in cases:
+            with self.subTest(match=match):
+                with tempfile.TemporaryDirectory() as temporary_directory:
+                    _case_malformed_tool_schema_keywords_fail_closed(
+                        Path(temporary_directory),
+                        mutation,
+                        match,
+                    )
+
+    def test_source_docket_remains_fail_closed_after_extension_packaging(
+        self,
+    ) -> None:
+        _case_source_docket_remains_fail_closed_after_extension_packaging()

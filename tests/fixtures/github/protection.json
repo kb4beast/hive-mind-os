@@ -23,6 +23,9 @@
   "required_signatures": {
     "enabled": true
   },
+  "enforce_admins": {
+    "enabled": true
+  },
   "allow_force_pushes": {
     "enabled": false
   },
