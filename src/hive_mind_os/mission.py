@@ -18,11 +18,19 @@ import tempfile
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, TypeVar, cast
 from uuid import uuid4
 
 from .autonomy import AutonomyBudget, BudgetExceeded, EpisodeAllowance
 from .contracts import tool_intent_digest
+from .curator import (
+    AcceptanceCheck,
+    CheckOutcome,
+    ContaminationError,
+    CuratorReview,
+    ReviewVerdict,
+    check_context_manifest,
+)
 from .git_adapter import (
     GitPolicyDenied,
     GitWorkspace,
@@ -543,6 +551,7 @@ class RepositoryMission:
         self._missing_workspaces = set(_missing_workspaces or ())
         self._replaying_workspaces: set[str] = set()
         self._recovery_claimed_receipts: set[tuple[str, str]] = set()
+        self._curator_head_access_sequence: int | None = None
         if self.mission_store is not None:
             if not isinstance(self.backend, ScriptedRepositoryBackend):
                 raise ValueError(
@@ -649,6 +658,7 @@ class RepositoryMission:
                 curator_test_passed = False
                 criterion_passed = False
                 delivery_verified = False
+                builder_declared_paths: list[str] = []
 
                 for role in DEFAULT_LIFECYCLE:
                     if self.mission_store is not None:
@@ -675,10 +685,20 @@ class RepositoryMission:
                         role.value,
                         asdict(work_item),
                     )
+                    execution_objective = self.objective
+                    if role is Role.CURATOR:
+                        if explorer is None:
+                            raise MissionFailed(
+                                "Curator blind phase lacks the base workspace"
+                            )
+                        execution_objective = replace(
+                            self.objective,
+                            repository=str(explorer.workspace.root),
+                        )
                     result = await self.backend.execute(
                         ROLE_CONTRACTS[role],
                         work_item,
-                        self.objective,
+                        execution_objective,
                         context,
                     )
                     action_receipts: list[dict[str, Any]] = []
@@ -746,11 +766,13 @@ class RepositoryMission:
                                     raise MissionFailed(
                                         "Builder content must be canonical base64"
                                     ) from None
+                                declared_path = _required_string(action, "path")
                                 _, records = builder.write_file(
-                                    _required_string(action, "path"),
+                                    declared_path,
                                     content,
                                 )
                                 action_receipts.extend(records)
+                                builder_declared_paths.append(declared_path)
                             elif name == "run_tests":
                                 test_argv = self._bound_test_argv(
                                     action,
@@ -805,8 +827,30 @@ class RepositoryMission:
                         )
                         action_receipts.extend(export_records)
                     elif role is Role.CURATOR:
-                        if builder_workspace is None or not candidate.is_dir():
+                        if (
+                            builder_workspace is None
+                            or not candidate.is_dir()
+                            or explorer is None
+                            or explorer_test_argv is None
+                        ):
                             raise MissionFailed("Curator lacks a candidate delivery")
+                        review = CuratorReview(
+                            self.run_id,
+                            self.ledger,
+                            objective=self.objective.goal,
+                            acceptance_criteria=self.objective.acceptance_criteria,
+                            base_workspace=explorer.workspace.root,
+                        )
+                        review.seal(self._blind_acceptance_checks(result))
+                        verification_manifest = self._recorded_verification_manifest(
+                            manifest
+                        )
+                        self._enforce_verification_independence(
+                            result,
+                            verification_manifest,
+                            results,
+                            review,
+                        )
                         curator_workspace = self._materialize_delivery(
                             base_sha,
                             candidate,
@@ -818,37 +862,36 @@ class RepositoryMission:
                             curator_workspace,
                             candidate,
                         )
-                        for action in self._actions(result):
-                            name = action["action"]
-                            if name == "run_tests":
-                                test_argv = self._bound_test_argv(
-                                    action,
-                                    explorer_test_argv,
-                                    Role.CURATOR,
-                                )
-                                receipt, records = curator.run_tests(
-                                    test_argv
-                                )
-                                action_receipts.extend(records)
-                                passed = receipt["result"] == "succeeded"
-                                curator_test_passed = passed
-                            elif name == "run_criterion":
-                                receipt, records = curator.run_tests(
-                                    _string_argv(action.get("argv"))
-                                )
-                                action_receipts.extend(records)
-                                criterion_passed = receipt["result"] == "succeeded"
-                            elif name == "verify_delivery":
-                                delivery_verified, records = curator.verify_delivery()
-                                action_receipts.extend(records)
-                            else:
-                                raise MissionFailed("Curator proposed an unsupported action")
-                        curator_verdict = (
-                            "adopt"
-                            if curator_test_passed
-                            and criterion_passed
-                            and delivery_verified
-                            else "reject"
+                        verdict, review_records = review.reproduce(
+                            head_workspace=curator_workspace.root,
+                            declared_paths=builder_declared_paths,
+                            command_runner=curator.run_tests,
+                            repository_test_argv=explorer_test_argv,
+                            delivery_verifier=curator.verify_delivery,
+                            provenance_resolves=self._provenance_resolves(),
+                        )
+                        action_receipts.extend(
+                            dict(record) for record in review_records
+                        )
+                        self._enforce_verification_independence(
+                            result,
+                            verification_manifest,
+                            results,
+                            review,
+                        )
+                        curator_verdict = verdict.decision
+                        curator_test_passed = self._review_result_matched(
+                            verdict,
+                            "repository-own-tests",
+                        )
+                        criterion_passed = all(
+                            bool(item["matched"])
+                            for item in verdict.acceptance_results
+                            if item["name"] != "repository-own-tests"
+                        )
+                        delivery_verified = self._checklist_passed(
+                            verdict,
+                            "rollback-artifact-verifies",
                         )
                         self.ledger.append_event(
                             self.run_id,
@@ -860,6 +903,12 @@ class RepositoryMission:
                                 "criterion_passed": criterion_passed,
                                 "delivery_verified": delivery_verified,
                                 "workspace": curator_workspace_path,
+                                "acceptance_checks_digest": review.seal_digest,
+                                "checklist_version": (
+                                    verdict.checklist[0].version
+                                    if verdict.checklist
+                                    else None
+                                ),
                             },
                         )
                         if curator_verdict != "adopt":
@@ -1226,7 +1275,7 @@ class RepositoryMission:
             details={"branch": branch, "head_sha": head_sha},
             workspace_key=Role.CURATOR.value,
         )
-        self.ledger.append_event(
+        self._curator_head_access_sequence = self.ledger.append_event(
             self.run_id,
             "curator.workspace.materialized",
             Role.CURATOR.value,
@@ -2053,6 +2102,26 @@ class RepositoryMission:
                     + "; ".join(validation.issues)
                 )
 
+    def _provenance_resolves(self) -> bool:
+        if self._evidence_root is None or not self._receipt_records:
+            return False
+        validator = FileReceiptValidator(self._evidence_root)
+        return all(
+            validator.validate(
+                ReceiptReference(
+                    str(record["path"]),
+                    str(record["digest"]),
+                ),
+                mission_id=str(record["mission_id"]),
+                state_ref=str(record["state_ref"]),
+                actor_id=str(record["actor_id"]),
+                action_id=str(record["action_id"]),
+                action_kind=str(record["action_kind"]),
+                action_digest=str(record["action_digest"]),
+            ).valid
+            for record in self._receipt_records
+        )
+
     @staticmethod
     def _actions(result: AgentResult) -> tuple[dict[str, Any], ...]:
         actions: list[dict[str, Any]] = []
@@ -2123,14 +2192,34 @@ class RepositoryMission:
         results: Sequence[AgentResult],
     ) -> tuple[AgentResult, ...]:
         if role is Role.CURATOR:
-            return tuple(item for item in results if item.role is not Role.BUILDER)
+            return ()
         return tuple(results)
 
-    @staticmethod
     def _context_manifest(
+        self,
         role: Role,
         context: Sequence[AgentResult],
     ) -> dict[str, Any]:
+        provider_identity = getattr(self.backend, "identity_for_role", None)
+        if callable(provider_identity):
+            raw_identity = provider_identity(role)
+            if not isinstance(raw_identity, Mapping):
+                raise MissionFailed("backend provider identity must be an object")
+            identity = {
+                "provider_kind": _required_string(
+                    raw_identity, "provider_kind"
+                ),
+                "model_id": _required_string(raw_identity, "model_id"),
+                "configuration": _required_string(
+                    raw_identity, "configuration"
+                ),
+            }
+        else:
+            identity = {
+                "provider_kind": "scripted",
+                "model_id": "scripted-repository",
+                "configuration": "shared",
+            }
         return {
             "role": role.value,
             "prior_roles": [item.role.value for item in context],
@@ -2142,7 +2231,144 @@ class RepositoryMission:
                 for digest in evidence.payload.get("receipt_digests", [])
                 if isinstance(digest, str)
             ],
+            "provider_kind": str(identity["provider_kind"]),
+            "model_id": str(identity["model_id"]),
+            "provider_configuration": str(identity["configuration"]),
         }
+
+    def _blind_acceptance_checks(
+        self,
+        result: AgentResult,
+    ) -> tuple[AcceptanceCheck, ...]:
+        for evidence in result.evidence:
+            content = evidence.payload.get("content")
+            if not isinstance(content, str):
+                continue
+            try:
+                document = json.loads(content)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(document, Mapping):
+                continue
+            raw_checks = document.get("acceptance_checks")
+            if not isinstance(raw_checks, list):
+                continue
+            checks: list[AcceptanceCheck] = []
+            for raw_check in raw_checks:
+                if not isinstance(raw_check, Mapping):
+                    raise MissionFailed(
+                        "Curator acceptance_checks entries must be objects"
+                    )
+                expected = _required_string(raw_check, "expected")
+                if expected not in {"succeeded", "failed"}:
+                    raise MissionFailed(
+                        "Curator acceptance check expected outcome is invalid"
+                    )
+                checks.append(
+                    AcceptanceCheck(
+                        name=_required_string(raw_check, "name"),
+                        argv=_string_argv(raw_check.get("argv")),
+                        expected=cast(CheckOutcome, expected),
+                    )
+                )
+            return tuple(checks)
+
+        if not isinstance(self.backend, ScriptedRepositoryBackend):
+            raise MissionFailed(
+                "model Curator blind output omitted acceptance_checks JSON"
+            )
+        checks = []
+        for index, action in enumerate(self._actions(result)):
+            name = action["action"]
+            if name == "run_tests":
+                checks.append(
+                    AcceptanceCheck(
+                        f"blind-repository-check-{index}",
+                        _string_argv(action.get("argv")),
+                    )
+                )
+            elif name == "run_criterion":
+                checks.append(
+                    AcceptanceCheck(
+                        f"blind-objective-check-{index}",
+                        _string_argv(action.get("argv")),
+                    )
+                )
+            elif name != "verify_delivery":
+                raise MissionFailed("Curator blind phase proposed an unsupported action")
+        return tuple(checks)
+
+    def _recorded_verification_manifest(
+        self,
+        scripted_manifest: Mapping[str, Any],
+    ) -> Mapping[str, object]:
+        for event in reversed(self.ledger.events(self.run_id)):
+            if (
+                event["event_type"] == "model.call"
+                and event["actor"] == Role.CURATOR.value
+            ):
+                recorded = event["payload"].get("context_manifest")
+                if not isinstance(recorded, Mapping):
+                    raise ContaminationError(
+                        "Curator model receipt lacks its context manifest"
+                    )
+                return recorded
+        return scripted_manifest
+
+    def _enforce_verification_independence(
+        self,
+        result: AgentResult,
+        manifest: Mapping[str, object],
+        prior_results: Sequence[AgentResult],
+        review: CuratorReview,
+    ) -> None:
+        builder_results = [
+            item for item in prior_results if item.role is Role.BUILDER
+        ]
+        builder_digests = [
+            str(record["digest"])
+            for record in self._receipt_records
+            if record["actor_id"] == Role.BUILDER.value
+        ]
+        try:
+            check_context_manifest(
+                manifest,
+                acting_identity=Role.BUILDER.value,
+                verifying_identity=result.role.value,
+                builder_receipt_digests=builder_digests,
+                builder_rationales=[item.summary for item in builder_results],
+                seal_sequence=review.seal_sequence,
+                head_access_sequence=self._curator_head_access_sequence,
+            )
+        except ContaminationError as error:
+            self.ledger.append_event(
+                self.run_id,
+                "contaminated-verification",
+                Role.ORCHESTRATOR.value,
+                {
+                    "acting_identity": Role.BUILDER.value,
+                    "verifying_identity": result.role.value,
+                    "manifest": dict(manifest),
+                    "seal_sequence": review.seal_sequence,
+                    "head_access_sequence": self._curator_head_access_sequence,
+                    "reason": str(error),
+                },
+            )
+            raise
+
+    @staticmethod
+    def _review_result_matched(verdict: ReviewVerdict, name: str) -> bool:
+        return any(
+            item["name"] == name and bool(item["matched"])
+            for item in verdict.acceptance_results
+        )
+
+    @staticmethod
+    def _checklist_passed(verdict: ReviewVerdict, key: str) -> bool:
+        return any(
+            item.key == key and item.finding == "pass"
+            for item in verdict.checklist
+        )
 
     @staticmethod
     def _instruction_for(role: Role) -> str:
@@ -2155,8 +2381,10 @@ class RepositoryMission:
                 "(portable path plus base64 content), run_tests, and commit."
             ),
             Role.CURATOR: (
-                "Use only JSON-string proposed actions run_tests, run_criterion, "
-                "and verify_delivery. Builder rationale and receipts are withheld."
+                "Blindly define acceptance_checks before candidate access. Put a JSON "
+                "string shaped as {\"acceptance_checks\":[{\"name\":...,\"argv\":"
+                "[...],\"expected\":\"succeeded\"}]} in the verification report "
+                "output. Builder rationale, receipts, diff, and head are withheld."
             ),
         }
         return (

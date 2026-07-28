@@ -23,7 +23,7 @@ from .mission_store import (
 )
 from .model_backend import ModelBackend
 from .model_provider import ModelProviderError, provider_from_env
-from .models import AutonomyLevel, Objective
+from .models import AutonomyLevel, Objective, Role
 from .policy import PolicyEngine
 from .runtime import HiveKernel
 
@@ -158,7 +158,13 @@ async def _run(args: argparse.Namespace) -> int:
     backend = None
     if args.backend == "model":
         try:
-            backend = ModelBackend(provider_from_env(), ledger=ledger)
+            backend = ModelBackend(
+                provider_from_env(),
+                ledger=ledger,
+                role_providers={
+                    Role.CURATOR: provider_from_env(role=Role.CURATOR)
+                },
+            )
         except (ModelProviderError, ValueError) as error:
             raise SystemExit(f"model backend configuration failed: {error}") from None
     report = await HiveKernel(backend=backend, ledger=ledger).run_objective(objective)
@@ -196,6 +202,9 @@ async def _run_deliver(args: argparse.Namespace) -> int:
                 provider_from_env(),
                 ledger=ledger,
                 budget=budget,
+                role_providers={
+                    Role.CURATOR: provider_from_env(role=Role.CURATOR)
+                },
             )
         except (ModelProviderError, ValueError) as error:
             print(

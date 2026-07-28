@@ -116,7 +116,36 @@ class _RepositoryProvider:
             {
                 "summary": f"{role.value} model repository turn",
                 "outputs": {
-                    name: f"model evidence for {name}"
+                    name: (
+                        json.dumps(
+                            {
+                                "acceptance_checks": [
+                                    {
+                                        "name": "repository-regression",
+                                        "argv": test_argv,
+                                        "expected": "succeeded",
+                                    },
+                                    {
+                                        "name": "objective-criterion",
+                                        "argv": [
+                                            sys.executable,
+                                            "-B",
+                                            "-c",
+                                            (
+                                                "from tiny_pkg.maths import increment; "
+                                                "assert increment(1) == 2"
+                                            ),
+                                        ],
+                                        "expected": "succeeded",
+                                    },
+                                ]
+                            },
+                            sort_keys=True,
+                        )
+                        if role is Role.CURATOR
+                        and name == "verification report"
+                        else f"model evidence for {name}"
+                    )
                     for name in ROLE_CONTRACTS[role].required_outputs
                 },
                 "proposed_actions": actions,
@@ -317,6 +346,14 @@ class RepositoryMissionTests(unittest.TestCase):
         self.assertTrue(
             builder_digests.isdisjoint(set(manifest["receipt_digests"]))
         )
+        self.assertEqual(manifest["prior_roles"], [])
+        self.assertEqual(manifest["provider_kind"], "scripted")
+        self.assertEqual(manifest["model_id"], "scripted-repository")
+        self.assertNotIn("contaminated-verification", report.event_types)
+        self.assertLess(
+            report.event_types.index("curator.acceptance.sealed"),
+            report.event_types.index("curator.workspace.materialized"),
+        )
         self.assertIn("curator.workspace.materialized", report.event_types)
 
     def test_curator_rejects_test_weakening_without_export(self) -> None:
@@ -388,6 +425,16 @@ class RepositoryMissionTests(unittest.TestCase):
             if event["event_type"] == "model.call"
         ]
         self.assertEqual(len(model_calls), len(DEFAULT_LIFECYCLE))
+        curator_call = next(
+            event
+            for event in model_calls
+            if event["payload"]["role"] == Role.CURATOR.value
+        )
+        self.assertEqual(curator_call["payload"]["model_id"], "fixture-model")
+        self.assertEqual(
+            curator_call["payload"]["context_manifest"]["prior_roles"],
+            [],
+        )
         self.assertEqual(report.objective_id, report.run_id)
         self.assertEqual(
             report.budget_consumption["tool_calls"],
