@@ -868,7 +868,11 @@ class GitHubClient:
         return {
             "active": bool(candidates),
             "enforce_admins": (
-                all(not ruleset.get("bypass_actors") for ruleset in candidates)
+                all(
+                    isinstance(ruleset.get("bypass_actors"), list)
+                    and not ruleset["bypass_actors"]
+                    for ruleset in candidates
+                )
                 if candidates
                 else False
             ),

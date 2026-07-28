@@ -601,6 +601,11 @@ class GitHubAdapterTests(unittest.TestCase):
         observed = GitHubClient._branch_observation(protection)
         self.assertFalse(observed["enforce_admins"])
 
+        detail = json.loads(_fixture("ruleset-detail.json"))
+        del detail["bypass_actors"]
+        observed = GitHubClient._ruleset_observation([detail], "main")
+        self.assertFalse(observed["enforce_admins"])
+
     def test_ruleset_branch_exclusion_and_malformed_conditions_fail_closed(
         self,
     ) -> None:
