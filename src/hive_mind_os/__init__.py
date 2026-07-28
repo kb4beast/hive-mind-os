@@ -40,6 +40,15 @@ from .current_state_audit import (
     verify_audit_artifact,
     write_audit_artifact,
 )
+from .github_adapter import (
+    CheckResult,
+    GitHubClient,
+    GitHubDelivery,
+    GitHubDeliveryTarget,
+    ProtectionReport,
+    PullRequestResult,
+    PushResult,
+)
 from .governed_sources import GovernedSourceAudit, audit_governed_source
 from .ingestion import (
     AdjudicationRecord,
@@ -118,6 +127,9 @@ __all__ = [
     "HardenedVisionContract",
     "HiveKernel",
     "GovernedSourceAudit",
+    "GitHubClient",
+    "GitHubDelivery",
+    "GitHubDeliveryTarget",
     "LicenseRecord",
     "MetricDirection",
     "MetricObservation",
@@ -126,6 +138,9 @@ __all__ = [
     "MissionReport",
     "MissionStore",
     "Objective",
+    "ProtectionReport",
+    "PullRequestResult",
+    "PushResult",
     "RecursiveImprovementContract",
     "RecursiveImprovementController",
     "RecursiveImprovementGate",
@@ -146,6 +161,7 @@ __all__ = [
     "SourceExhibit",
     "SourceRecord",
     "StepCheckpoint",
+    "CheckResult",
     "VisionComplianceGate",
     "audit_governed_source",
     "adjudicate_with_exhibit",
