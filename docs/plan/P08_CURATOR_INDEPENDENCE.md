@@ -232,3 +232,23 @@ honest about what it did not evaluate.
 - The original identity-authentication, optional distinct-model, SAST, and licensing
   limits remain unchanged. A fresh independent exact-candidate review is still
   required; this appeal is Builder evidence, not approval.
+
+## Post-review appeal — unsupported manifest channels
+
+- The next consolidated review of exact candidate
+  `db07abad6b0b34cd87a2612f7269c1f6216dac2a` preserved the Curator and Judge permits,
+  but the independent Orchestrator reproduced a remaining fail-open: an unknown
+  manifest field could carry `diff --git` bytes because only known summary values and
+  suspicious field names were examined. The Orchestrator blocked delivery.
+- Repair commit `eb1c8a6dc13ddbc9c74b9de229a1577ee9691d3b` defines the accepted manifest field
+  schema, rejects every unknown field, validates optional scalar fields, and scans all
+  allowed recorded strings for diff bytes and Builder rationale. Mission-path
+  regressions cover both an unknown `notes` channel and a contaminated allowed
+  `model_id` channel.
+- The repaired boundary gate passed: 276 standard-library tests with 2 skips, Ruff, and
+  Pyright 1.1.411. Fresh audit `evidence/audits/P08-post-schema-appeal.json` is complete
+  with no failures, reports 274 pytest tests passed, binds implementation commit
+  `eb1c8a6dc13ddbc9c74b9de229a1577ee9691d3b`, and has canonical digest
+  `sha256:e6a2176236348fe15c9ff7dfe2bba3ee4820f74fb5f778f22535d46e085ae36d`.
+- All prior dissent and limits remain preserved. A fresh independent exact-candidate
+  review remains required.
