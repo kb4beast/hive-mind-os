@@ -131,7 +131,15 @@ class CuratorReviewTests(unittest.TestCase):
         )
         self.assertIsNotNone(review.seal_sequence)
         check_context_manifest(
-            {"prior_roles": [], "summaries": [], "receipt_digests": []},
+            {
+                "role": "curator",
+                "prior_roles": [],
+                "summaries": [],
+                "receipt_digests": [],
+                "provider_kind": "scripted",
+                "model_id": "curator-model",
+                "provider_configuration": "shared",
+            },
             acting_identity="builder",
             verifying_identity="curator",
             seal_sequence=review.seal_sequence,
@@ -139,7 +147,15 @@ class CuratorReviewTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ContaminationError, "after candidate-head"):
             check_context_manifest(
-                {"prior_roles": [], "summaries": [], "receipt_digests": []},
+                {
+                    "role": "curator",
+                    "prior_roles": [],
+                    "summaries": [],
+                    "receipt_digests": [],
+                    "provider_kind": "scripted",
+                    "model_id": "curator-model",
+                    "provider_configuration": "shared",
+                },
                 acting_identity="builder",
                 verifying_identity="curator",
                 seal_sequence=review.seal_sequence,
@@ -227,6 +243,10 @@ class CuratorReviewTests(unittest.TestCase):
             ("receipt_digests", None, True),
             ("notes", "diff --git a/file b/file", False),
             ("model_id", "diff --git a/file b/file", False),
+            ("role", "builder", False),
+            ("role", None, True),
+            ("provider_kind", None, True),
+            ("provider_configuration", 3, False),
         )
         for field, value, remove in malformed_cases:
             with self.subTest(field=field):

@@ -117,6 +117,12 @@ def check_context_manifest(
             "verification context contains unsupported fields: "
             + ", ".join(unsupported_fields)
         )
+    missing_fields = sorted(supported_fields - set(manifest))
+    if missing_fields:
+        raise ContaminationError(
+            "verification context is missing required manifest fields: "
+            + ", ".join(missing_fields)
+        )
     if not acting_identity or not verifying_identity:
         raise ContaminationError("verification identities must be recorded")
     if acting_identity == verifying_identity:
@@ -140,10 +146,14 @@ def check_context_manifest(
         "provider_configuration",
     )
     for field in scalar_fields:
-        if field in manifest and not isinstance(manifest[field], str):
+        if not isinstance(manifest[field], str) or not str(manifest[field]).strip():
             raise ContaminationError(
-                f"verification context {field} must be a string"
+                f"verification context {field} must be a non-empty string"
             )
+    if manifest["role"] != verifying_identity:
+        raise ContaminationError(
+            "verification context manifest role must equal the verifying identity"
+        )
     forbidden_fields = sorted(
         str(key)
         for key, value in manifest.items()
