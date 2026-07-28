@@ -241,10 +241,10 @@ until a full multi-comparator court exists.
 - The independent Curator issued `BLOCK`, the independent Judge issued `adapt/BLOCK`,
   and the independent Orchestrator issued `BLOCK`. Each independently reproduced the
   same controlling counterexample: adding arbitrary text
-  `superiority-verdict: court-123` made the guard accept
-  `Hive Mind OS outperforms the baseline benchmark` without resolving or validating a
-  court artifact, digest, disposition, comparator/family coverage, safety floors, or
-  claim binding. All three dispositions remain preserved.
+  `superiority-verdict: court-123` made the guard accept the deliberately prohibited
+  comparative sentence from the phase test without resolving or validating a court
+  artifact, digest, disposition, comparator/family coverage, safety floors, or claim
+  binding. All three dispositions remain preserved.
 - Repair: P13 now rejects every superiority-adjacent claim matched by the guard. Because
   this one-family, one-comparator phase cannot produce a qualifying superiority verdict,
   no textual marker can bypass the prohibition. The regression retains the arbitrary
@@ -261,3 +261,20 @@ until a full multi-comparator court exists.
   verdict are unchanged. Delivery remains blocked until a fresh consolidated Curator,
   Judge, and Orchestrator review permits the repaired exact head. No comparative quality,
   source-completeness, release-readiness, or superiority claim is made.
+
+### Consolidated-review appeal 2
+
+- Challenged exact candidate:
+  `ea045c39db46087647b75c46617b31feec3d4f6a`.
+- The fresh Curator, Judge, and Orchestrator each issued `BLOCK`. The repaired guard
+  correctly rejected the appeal document because it repeated the deliberately
+  prohibited comparative sentence verbatim. Exact-head Python 3.11, 3.12, and 3.14 CI
+  failed on the repository-wide claim scan. All three findings remain preserved.
+- Documentation-only repair: the appeal now identifies the counterexample by its role
+  in the phase test without embedding the prohibited marketing pattern. No exemption or
+  weakening was added to the guard. The complete focused suite passes all 8 tests and
+  the repository-wide scan returns no findings.
+- Audited implementation `365b106a867c0b2d0d7a5878de86fc1be0396d8b` and audit
+  `sha256:0381ef6af588f5fa22f4e5c17dc0c8d46ff34659314d352b89fe37ff5699c9c2`
+  remain unchanged. Delivery remains blocked until a fresh consolidated Curator, Judge,
+  and Orchestrator review permits the final exact head.
