@@ -210,3 +210,30 @@ pinned self-history curriculum exist; every episode carries honest contamination
   checkout, so the literal CLI exit command was rerun with this branch's `src` directory
   on `PYTHONPATH` and exited 0. No product or acceptance criteria were changed.
 - New blockers discovered (mirrored into `docs/plan/BLOCKERS.md`): none.
+
+## Post-review appeal — reveal and target binding
+
+- The first consolidated review of exact candidate
+  `2c3a0e8b18aa8e65918d587beabb9ca81dd671ea` reproduced two fail-open paths. Grading
+  accepted caller-forged or unrecorded reveal data, and mutating the target SHA on a
+  previously sealed environment allowed a different target to be revealed under the
+  original prediction seal. Both the Curator and Judge blocked delivery.
+- Repair commit `575306db44d8ca569a4c08179efcbf42366d1e7d` binds the target SHA and environment
+  digest into the sealed prediction document, records a canonical digest of the
+  oracle-produced reveal, rejects altered, foreign, or unrecorded reveals, and records
+  violations before grading. Regressions cover forged reveal content, absence of a
+  grading event after rejection, and target mutation before reveal.
+- The repaired boundary gate passed: 280 standard-library tests with 2 skips, the 13
+  P09 tests plus 9 subtests under pytest, Ruff, and Pyright 1.1.411.
+- Two incomplete audit attempts are intentionally preserved. The first,
+  `evidence/audits/P09-post-reveal-repair.json`
+  (`sha256:bbeec89943b116016eda63fd34cf1fed2f56cb55b9fdfe899ed7a3bbae2cf9b9`),
+  recorded one unrelated mission-resume test failure while three full audits competed
+  concurrently; pytest's last-failure replay then passed that test in isolation. The
+  second, `evidence/audits/P09-post-reveal-repair-retry.json`
+  (`sha256:13545aaabccc0473732be332d43314a6873b4967021a9a67156f826df4120f83`),
+  correctly refused to bind results because the first adverse artifact was still
+  untracked. These attempts are evidence, not successful audits.
+- A clean final audit and fresh independent exact-candidate review remain required.
+  Existing contamination caveats and the absence of any superiority or release claim
+  remain unchanged.
