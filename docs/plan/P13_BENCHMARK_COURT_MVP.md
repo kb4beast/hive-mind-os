@@ -279,3 +279,26 @@ until a full multi-comparator court exists.
   `sha256:0381ef6af588f5fa22f4e5c17dc0c8d46ff34659314d352b89fe37ff5699c9c2`
   remain unchanged. Delivery remains blocked until a fresh consolidated Curator, Judge,
   and Orchestrator review permits the final exact head.
+
+### Consolidated-review appeal 3
+
+- Challenged exact candidate:
+  `39a39d15829fb0d2c525df2415b0794a3e26effe`.
+- The independent Curator issued `BLOCK` after reproducing a filename-and-substring
+  exemption that removed every P13 plan line containing `planting ` before the claim
+  scan. The independent Judge issued `adopt/PERMIT`, and the independent Orchestrator
+  issued `READY/PERMIT`; the Curator's concrete fail-open counterexample controls and
+  all three dispositions remain preserved.
+- Repair: the P13 filename receives no special treatment. The phase test description is
+  claim-safe, the exemption is removed, and the regression creates a temporary P13 plan
+  containing both the old trigger word and prohibited comparative content and requires
+  that file to be reported. The complete focused suite passes all 8 tests under unittest
+  and pytest; the repository-wide scan returns no findings; Ruff and Pyright pass.
+- Repaired implementation:
+  `6ba60d7bc2c0eac06fc8bedafe54d4228d9f4c4e`. Fresh audit
+  `evidence/audits/P13-post-exemption-appeal.json` is complete with no failures, passed
+  273 tests, and has canonical digest
+  `sha256:ade5926cfe33f31b2ada1b55691d1d38090863aceef5c53d14c793583d30db49`.
+- Benchmark measurements and the measurement-only verdict remain unchanged. Delivery
+  remains blocked until a fresh consolidated Curator, Judge, and Orchestrator review
+  permits the final exact head.
