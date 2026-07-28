@@ -212,3 +212,23 @@ honest about what it did not evaluate.
   model remains recommended rather than mandatory; SAST and automated introduced-code
   license classification remain out of scope and are recorded as `not-evaluated`; no
   production-readiness or superiority claim is made.
+
+## Post-review appeal — malformed context manifests
+
+- The first consolidated review of exact candidate
+  `32e3fd8394a1e0899a72348a7d5713449a8556c7` reproduced a fail-open: scalar or missing
+  `prior_roles`, `summaries`, and `receipt_digests` values were silently treated as
+  empty collections. The Curator blocked delivery; the Judge's earlier permit is
+  preserved as dissent against that later counterexample.
+- Repair commit `96efccd0efa4258d68911cae0b7e4dc2620c94eb` requires all three fields to exist as
+  lists containing only strings. Mission-path regressions cover scalar contaminated
+  roles, scalar diff summaries, and a missing receipt-digest field.
+- The repaired boundary gate passed: 276 standard-library tests with 2 skips, Ruff, and
+  Pyright 1.1.411. Fresh audit
+  `evidence/audits/P08-post-manifest-repair.json` is complete with no failures, reports
+  274 pytest tests passed, binds implementation commit
+  `96efccd0efa4258d68911cae0b7e4dc2620c94eb`, and has canonical digest
+  `sha256:77fe5d78cb025708416e378dcfa067fb47f7414f1c9ca541ad32091bbeabd649`.
+- The original identity-authentication, optional distinct-model, SAST, and licensing
+  limits remain unchanged. A fresh independent exact-candidate review is still
+  required; this appeal is Builder evidence, not approval.
