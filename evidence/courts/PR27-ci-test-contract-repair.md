@@ -37,9 +37,9 @@ before beginning the Obsidian or agent-system redesign.
 | Exact-candidate Integrator | `/root/integrator_exact` | protection provenance, compatibility, wheel/CI contract, and rollback review |
 | Judge and Appeals Judge | `/root/judge_phase0` | initial adverse disposition, remand, exact evidence-head appeal, and delivery boundary |
 
-The Builder may not use its own results as independent verification. The Judge
-receipt remains pending until it reviews the exact committed candidate and the
-independent Curator evidence.
+The Builder may not use its own results as independent verification. The
+Judge condition was satisfied by the retained initial `defer` and final appeal
+`adapt` after exact-candidate Curator, Integrator, and Steward evidence.
 
 ## Frozen atomic claims
 
@@ -332,7 +332,7 @@ gate. `B-OPS-07` and `B-OPS-08` remain deferred blockers. No broader host,
 release, production, source-completeness, autonomy, or superiority claim is
 adopted.
 
-## Proposed disposition
+## Disposition conditions
 
 `adapt` Alternative A, with these conditions:
 
@@ -368,9 +368,10 @@ autonomy, or superiority claim is made.
 - Integrity: tests do not modify the Git worktree.
 - Outcome metric: required unit jobs pass on Python 3.11, 3.12, and 3.14 on the
   exact pull-request head.
-- Owners: Builder `/root`; independent verification and maintenance evidence
-  `/root/curator_ci_repro`; integration contract
-  `/root/architect_ci_contract`; remote setting repository administrator.
+- Owners: Builder `/root`; independent verification
+  `/root/curator_ci_repro`; maintenance evidence `/root/steward_exact`;
+  integration contract `/root/architect_ci_contract`; remote setting
+  repository administrator.
 - Rollback: revert the bounded test conversion and governance-contract changes
   only in favor of an equal-or-stronger discoverable runner contract. Never
   restore the known import-red or silent-zero-discovery state as an accepted
