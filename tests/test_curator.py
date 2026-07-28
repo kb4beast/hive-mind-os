@@ -220,6 +220,37 @@ class CuratorReviewTests(unittest.TestCase):
         self.assertEqual(report.failure["type"], "ContaminationError")
         self.assertIn("contaminated-verification", report.event_types)
 
+    def test_malformed_context_manifest_fields_fail_mission_closed(self) -> None:
+        malformed_cases = (
+            ("prior_roles", "builder", False),
+            ("summaries", "diff --git a/file b/file", False),
+            ("receipt_digests", None, True),
+        )
+        for field, value, remove in malformed_cases:
+            with self.subTest(field=field):
+                class MalformedManifestMission(RepositoryMission):
+                    def _context_manifest(self, role, context):
+                        manifest = super()._context_manifest(role, context)
+                        if role is Role.CURATOR:
+                            if remove:
+                                manifest.pop(field)
+                            else:
+                                manifest[field] = value
+                        return manifest
+
+                report, output = self.run_mission(
+                    mission_type=MalformedManifestMission
+                )
+                self.assertIs(report.status, WorkStatus.FAILED)
+                self.assertFalse(output.exists())
+                failure = report.failure
+                self.assertIsNotNone(failure)
+                if failure is None:
+                    self.fail("failed mission did not record its failure")
+                self.assertEqual(failure["type"], "ContaminationError")
+                self.assertIn(field, failure["message"])
+                self.assertIn("contaminated-verification", report.event_types)
+
     def test_same_identity_verification_is_rejected(self) -> None:
         class SameIdentityBackend(ScriptedRepositoryBackend):
             async def execute(self, contract, work_item, objective, context):

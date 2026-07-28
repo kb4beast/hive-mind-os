@@ -115,9 +115,9 @@ def check_context_manifest(
             "acceptance checks were sealed after candidate-head access"
         )
 
-    prior_roles = _string_sequence(manifest.get("prior_roles"))
-    summaries = _string_sequence(manifest.get("summaries"))
-    receipt_digests = set(_string_sequence(manifest.get("receipt_digests")))
+    prior_roles = _required_string_list(manifest, "prior_roles")
+    summaries = _required_string_list(manifest, "summaries")
+    receipt_digests = set(_required_string_list(manifest, "receipt_digests"))
     forbidden_fields = sorted(
         str(key)
         for key, value in manifest.items()
@@ -378,10 +378,20 @@ class CuratorReview:
         )
 
 
-def _string_sequence(value: object) -> tuple[str, ...]:
-    if not isinstance(value, (list, tuple)):
-        return ()
-    return tuple(item for item in value if isinstance(item, str))
+def _required_string_list(
+    manifest: Mapping[str, object],
+    field: str,
+) -> tuple[str, ...]:
+    if field not in manifest:
+        raise ContaminationError(f"verification context is missing required {field}")
+    value = manifest[field]
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) for item in value
+    ):
+        raise ContaminationError(
+            f"verification context {field} must be a list of strings"
+        )
+    return tuple(value)
 
 
 def _text_digest(value: str) -> str:
