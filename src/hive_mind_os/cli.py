@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Sequence
+from uuid import uuid4
 
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
@@ -30,9 +31,12 @@ from .model_provider import ModelProviderError, provider_from_env
 from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
+from .projection import build_projection, projection_json, write_projection_html
 from .prompt_registry import PromptRegistry
 from .runtime import HiveKernel
+from .scheduler import Scheduler
 from .source_docket import load_source_docket
+from .workers import serve
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -312,6 +316,46 @@ def build_experiment_parser() -> argparse.ArgumentParser:
         default="evidence/experiments",
         help="Append-only experiment record directory",
     )
+    return parser
+
+
+def build_enqueue_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind enqueue",
+        description="Enqueue one durable local repository mission",
+    )
+    parser.add_argument("--repository", required=True)
+    parser.add_argument("--objective", required=True)
+    parser.add_argument("--criterion", action="append", default=[])
+    parser.add_argument("--backend", choices=("scripted",), default="scripted")
+    parser.add_argument("--pin")
+    parser.add_argument("--max-attempts", type=int, default=3)
+    parser.add_argument("--state-dir", default=".hive-mind-state")
+    return parser
+
+
+def build_serve_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind serve",
+        description="Run durable local mission workers",
+    )
+    parser.add_argument("--workers", type=int, default=1)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--once", action="store_true")
+    mode.add_argument("--forever", action="store_true")
+    parser.add_argument("--state-dir", default=".hive-mind-state")
+    return parser
+
+
+def build_status_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind status",
+        description="Project scheduler, mission-store, and ledger truth",
+    )
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true", dest="json_output")
+    output.add_argument("--html", help="Write a self-contained static status page")
+    parser.add_argument("--state-dir", default=".hive-mind-state")
     return parser
 
 
@@ -607,6 +651,72 @@ def _run_experiment(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_enqueue(args: argparse.Namespace) -> int:
+    repository = Path(args.repository).resolve()
+    if not repository.is_dir():
+        raise SystemExit("repository must be an existing directory")
+    mission_id = f"M-{uuid4().hex[:16]}"
+    scheduler = Scheduler(args.state_dir)
+    try:
+        job = scheduler.enqueue(
+            "repository-mission",
+            {
+                "mission_id": mission_id,
+                "repository": str(repository),
+                "objective": args.objective,
+                "acceptance_criteria": list(args.criterion),
+                "backend": args.backend,
+                "scripted_variant": "good",
+                "pin": args.pin,
+            },
+            max_attempts=args.max_attempts,
+            mission_id=mission_id,
+        )
+    finally:
+        scheduler.close()
+    print(
+        json.dumps(
+            {
+                "status": "enqueued",
+                "job_id": job.id,
+                "mission_id": mission_id,
+                "deduplication_digest": job.payload_digest,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def _run_serve(args: argparse.Namespace) -> int:
+    try:
+        return serve(
+            args.state_dir,
+            worker_count=args.workers,
+            once=args.once,
+        )
+    except (OSError, RuntimeError, ValueError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+
+def _run_status(args: argparse.Namespace) -> int:
+    model = build_projection(args.state_dir)
+    if args.html:
+        output = write_projection_html(model, args.html)
+        print(json.dumps({"status": "written", "html": str(output)}, indent=2))
+    else:
+        print(projection_json(model), end="")
+    return 0
+
+
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     if bool(args.signing_key_file) != bool(args.signing_key_id):
         raise SystemExit("--signing-key-file and --signing-key-id must be supplied together")
@@ -749,6 +859,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "experiment":
         args = build_experiment_parser().parse_args(arguments[1:])
         raise SystemExit(_run_experiment(args))
+    if arguments and arguments[0] == "enqueue":
+        args = build_enqueue_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_enqueue(args))
+    if arguments and arguments[0] == "serve":
+        args = build_serve_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_serve(args))
+    if arguments and arguments[0] == "status":
+        args = build_status_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_status(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 
