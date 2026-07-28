@@ -1,0 +1,12 @@
+{
+  "error": "MissionFailed: failed-run receipt failed validation: artifact 0 path is not a regular file; artifact 1 path is not a regular file",
+  "experiment_id": "EXP-f0346c51-f094-4617-91fc-d41b80ce4ec3",
+  "recorded_at": "2026-07-28T14:12:00.2512976Z",
+  "retained_artifact_roots": [
+    "evidence/experiments/_failed/f034-prompts",
+    "evidence/experiments/_failed/f034-surface"
+  ],
+  "schema_version": 1,
+  "status": "failed-before-verdict",
+  "surface": "fixture-missions"
+}

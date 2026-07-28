@@ -621,7 +621,7 @@ def _run_experiment(args: argparse.Namespace) -> int:
             Role(args.role),
             Path(args.challenger).read_bytes(),
             surface=FixtureMissionSurface(
-                Path(args.evidence_root) / "_artifacts" / "fixture-missions"
+                Path(args.evidence_root) / "_artifacts" / "f"
             ),
             repetitions=args.repetitions,
         )

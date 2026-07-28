@@ -19,3 +19,4 @@ evidence/benchmarks/** -text -diff
 # Prompt-experiment artifacts are retained evidence, including JSON reports and command
 # streams generated on Windows. Git must preserve their pre-commit bytes exactly.
 evidence/experiments/_artifacts/** -text -diff
+evidence/experiments/_failed/** -text -diff

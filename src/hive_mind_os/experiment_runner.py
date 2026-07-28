@@ -68,7 +68,7 @@ class FixtureMissionSurface:
         self,
         artifact_root: str | Path = ".hive-mind-experiments/fixture-missions",
     ) -> None:
-        self.artifact_root = Path(artifact_root).resolve() / uuid4().hex
+        self.artifact_root = Path(artifact_root).resolve() / uuid4().hex[:12]
         self.artifact_root.mkdir(parents=True, exist_ok=False)
         self._mission_cache: dict[
             int,
@@ -112,9 +112,9 @@ class FixtureMissionSurface:
         cached = self._mission_cache.get(repetition)
         if cached is not None:
             return cached
-        episode_root = self.artifact_root / f"r{repetition}"
+        episode_root = self.artifact_root / str(repetition)
         episode_root.mkdir(parents=True, exist_ok=False)
-        output_root = episode_root / "delivery"
+        output_root = episode_root / "d"
         with tempfile.TemporaryDirectory(prefix="hmos-p10-") as temporary:
             repository, pin = _build_fixture_repository(Path(temporary))
             report = asyncio.run(

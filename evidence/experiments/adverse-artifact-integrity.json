@@ -29,6 +29,10 @@
         {"expected": "sha256:722f7001839ea3ce999463e8fc8c1b68eee9dbab4c6856c9b216780b2a318c94", "kind": "nested", "observed": "sha256:7060f7cf74a5e8ab0042bdb3c6bb5f06cb9b2cb6e49d2a8fadaa5241b86aa9e5", "path": "evidence/experiments/_artifacts/fixture-missions/1d917e869d804586a83d916fe4453753/r2/delivery/mission-evidence/artifacts/722f7001839ea3ce999463e8fc8c1b68eee9dbab4c6856c9b216780b2a318c94.stderr"},
         {"expected": "sha256:99083280fb771966ae2ed32e109f25c6e009c178ff071850d1911e4b2e265f75", "kind": "nested", "observed": "sha256:911c6f0232e466836c05918cf2e259b8d078a517eac9a2408fae9216eb388280", "path": "evidence/experiments/_artifacts/fixture-missions/1d917e869d804586a83d916fe4453753/r2/delivery/mission-evidence/artifacts/99083280fb771966ae2ed32e109f25c6e009c178ff071850d1911e4b2e265f75.stderr"}
       ]
+    },
+    "EXP-98c64c11-bd9c-47a5-a376-d39fad641332": {
+      "disposition": "validated",
+      "mismatches": []
     }
   },
   "schema_version": 1
