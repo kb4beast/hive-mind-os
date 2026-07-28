@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import tempfile
+import unittest
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
-
-import pytest
+from typing import Any
 
 from hive_mind_os.cli import build_defer_parser, build_ingest_parser
 from hive_mind_os.courtroom import (
@@ -34,6 +37,16 @@ PARTICIPANTS = CaseParticipants(
     "ingestion-cross-examiner",
     ("ingestion-judge",),
 )
+
+
+def _raises(
+    exception: type[BaseException],
+    match: str | None = None,
+) -> AbstractContextManager[Any]:
+    case = unittest.TestCase()
+    if match is None:
+        return case.assertRaises(exception)
+    return case.assertRaisesRegex(exception, match)
 
 
 def _source() -> SourceRecord:
@@ -126,7 +139,7 @@ def _adjudicate(
     )
 
 
-def test_exhibit_registration_is_content_addressed_and_tamper_fails_closed(
+def _case_exhibit_registration_is_content_addressed_and_tamper_fails_closed(
     tmp_path: Path,
 ) -> None:
     store = ExhibitStore(tmp_path / "evidence" / "sources")
@@ -141,17 +154,17 @@ def test_exhibit_registration_is_content_addressed_and_tamper_fails_closed(
     assert exhibit.byte_count == len(b"primary exhibit")
 
     blob.write_bytes(b"tampered")
-    with pytest.raises(ValueError, match="stored exhibit digest mismatch"):
+    with _raises(ValueError, match="stored exhibit digest mismatch"):
         store.read(exhibit.source_id, exhibit.content_digest)
 
 
-def test_derived_artifact_requires_an_existing_parent(tmp_path: Path) -> None:
+def _case_derived_artifact_requires_an_existing_parent(tmp_path: Path) -> None:
     store = ExhibitStore(tmp_path / "sources")
-    with pytest.raises(ValueError, match="require a parent"):
+    with _raises(ValueError, match="require a parent"):
         _register(store, supply_method="agent-derived")
 
     missing_digest = "sha256:" + "1" * 64
-    with pytest.raises(FileNotFoundError):
+    with _raises(FileNotFoundError):
         _register(
             store,
             supply_method="agent-derived",
@@ -168,7 +181,7 @@ def test_derived_artifact_requires_an_existing_parent(tmp_path: Path) -> None:
     assert derived.parent_exhibit_digest == parent.content_digest
 
 
-def test_unblocking_requires_both_exhibit_and_promoting_verdict(tmp_path: Path) -> None:
+def _case_unblocking_requires_both_exhibit_and_promoting_verdict(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     store = ExhibitStore(repository / "evidence" / "sources")
     exhibit = _register(store)
@@ -191,7 +204,7 @@ def test_unblocking_requires_both_exhibit_and_promoting_verdict(tmp_path: Path) 
         locator="https://example.invalid/absent",
         license="MIT",
     )
-    with pytest.raises(FileNotFoundError):
+    with _raises(FileNotFoundError):
         _adjudicate(store, absent)
 
     _adjudicate(store, exhibit)
@@ -200,12 +213,12 @@ def test_unblocking_requires_both_exhibit_and_promoting_verdict(tmp_path: Path) 
     assert reconciled.sources[0].content_digest == exhibit.content_digest
 
 
-def test_adjudication_driver_enforces_court_identity_separation() -> None:
-    with pytest.raises(ValueError, match="independent identities"):
+def _case_adjudication_driver_enforces_court_identity_separation() -> None:
+    with _raises(ValueError, match="independent identities"):
         CaseParticipants("same", "cross", ("same",))
 
 
-def test_defer_obligation_records_review_date_and_keeps_claim_blocked(
+def _case_defer_obligation_records_review_date_and_keeps_claim_blocked(
     tmp_path: Path,
 ) -> None:
     store = ExhibitStore(tmp_path / "evidence" / "sources")
@@ -223,7 +236,7 @@ def test_defer_obligation_records_review_date_and_keeps_claim_blocked(
     assert _docket().audit().machine_blocked_claim_ids == ("CLM-900",)
 
 
-def test_license_unknown_blocks_and_resolved_spdx_with_exhibit_lifts_blocker(
+def _case_license_unknown_blocks_and_resolved_spdx_with_exhibit_lifts_blocker(
     tmp_path: Path,
 ) -> None:
     unknown_repository = tmp_path / "unknown"
@@ -243,7 +256,7 @@ def test_license_unknown_blocks_and_resolved_spdx_with_exhibit_lifts_blocker(
     assert resolved_docket.audit().machine_blocked_claim_ids == ()
 
 
-def test_adjudication_rejects_metadata_not_bound_to_registered_bytes(
+def _case_adjudication_rejects_metadata_not_bound_to_registered_bytes(
     tmp_path: Path,
 ) -> None:
     store = ExhibitStore(tmp_path / "evidence" / "sources")
@@ -251,11 +264,11 @@ def test_adjudication_rejects_metadata_not_bound_to_registered_bytes(
     forged_license = SourceExhibit(
         **{**registered.to_record(), "license": "MIT"},
     )
-    with pytest.raises(ValueError, match="metadata was not registered"):
+    with _raises(ValueError, match="metadata was not registered"):
         _adjudicate(store, forged_license)
 
 
-def test_operations_are_additive_to_docket_counts(tmp_path: Path) -> None:
+def _case_operations_are_additive_to_docket_counts(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     store = ExhibitStore(repository / "evidence" / "sources")
     baseline = _docket()
@@ -285,10 +298,10 @@ def test_operations_are_additive_to_docket_counts(tmp_path: Path) -> None:
     )
 
 
-def test_fabricated_digest_is_rejected_and_ledgered(tmp_path: Path) -> None:
+def _case_fabricated_digest_is_rejected_and_ledgered(tmp_path: Path) -> None:
     ledger = EvidenceLedger()
     store = ExhibitStore(tmp_path / "sources", ledger=ledger)
-    with pytest.raises(ValueError, match="claimed digest"):
+    with _raises(ValueError, match="claimed digest"):
         register_exhibit(
             store,
             "SRC-900",
@@ -307,7 +320,7 @@ def test_fabricated_digest_is_rejected_and_ledgered(tmp_path: Path) -> None:
     assert events[0]["payload"]["reason"] == "digest mismatch"
 
 
-def test_cli_parsers_cover_ingest_and_defer_contracts() -> None:
+def _case_cli_parsers_cover_ingest_and_defer_contracts() -> None:
     ingest = build_ingest_parser().parse_args(
         [
             "--source",
@@ -334,3 +347,64 @@ def test_cli_parsers_cover_ingest_and_defer_contracts() -> None:
         ]
     )
     assert deferred.source == ["SRC-005"]
+
+
+class IngestionTests(unittest.TestCase):
+    def _run_with_temporary_path(
+        self,
+        test_case: Callable[[Path], None],
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            test_case(Path(temporary_directory))
+
+    def test_exhibit_registration_is_content_addressed_and_tamper_fails_closed(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_exhibit_registration_is_content_addressed_and_tamper_fails_closed
+        )
+
+    def test_derived_artifact_requires_an_existing_parent(self) -> None:
+        self._run_with_temporary_path(
+            _case_derived_artifact_requires_an_existing_parent
+        )
+
+    def test_unblocking_requires_both_exhibit_and_promoting_verdict(self) -> None:
+        self._run_with_temporary_path(
+            _case_unblocking_requires_both_exhibit_and_promoting_verdict
+        )
+
+    def test_adjudication_driver_enforces_court_identity_separation(self) -> None:
+        _case_adjudication_driver_enforces_court_identity_separation()
+
+    def test_defer_obligation_records_review_date_and_keeps_claim_blocked(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_defer_obligation_records_review_date_and_keeps_claim_blocked
+        )
+
+    def test_license_unknown_blocks_and_resolved_spdx_with_exhibit_lifts_blocker(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_license_unknown_blocks_and_resolved_spdx_with_exhibit_lifts_blocker
+        )
+
+    def test_adjudication_rejects_metadata_not_bound_to_registered_bytes(
+        self,
+    ) -> None:
+        self._run_with_temporary_path(
+            _case_adjudication_rejects_metadata_not_bound_to_registered_bytes
+        )
+
+    def test_operations_are_additive_to_docket_counts(self) -> None:
+        self._run_with_temporary_path(_case_operations_are_additive_to_docket_counts)
+
+    def test_fabricated_digest_is_rejected_and_ledgered(self) -> None:
+        self._run_with_temporary_path(
+            _case_fabricated_digest_is_rejected_and_ledgered
+        )
+
+    def test_cli_parsers_cover_ingest_and_defer_contracts(self) -> None:
+        _case_cli_parsers_cover_ingest_and_defer_contracts()
