@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import ssl
 import subprocess
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ from hive_mind_os.github_adapter import (
     GitHubPolicyDenied,
     GitHubResponse,
     GitHubTransportError,
+    UrllibGitHubTransport,
     validate_github_receipt,
 )
 from hive_mind_os.ledger import EvidenceLedger
@@ -268,6 +270,14 @@ class GitHubAdapterTests(unittest.TestCase):
                 result.receipt,
             )
         )
+
+    def test_default_transport_keeps_tls_chain_and_hostname_validation(self) -> None:
+        transport = UrllibGitHubTransport()
+        self.assertTrue(transport.context.check_hostname)
+        self.assertEqual(transport.context.verify_mode, ssl.CERT_REQUIRED)
+        strict = getattr(ssl, "VERIFY_X509_STRICT", 0)
+        if strict:
+            self.assertEqual(transport.context.verify_flags & strict, 0)
 
     def test_pr_creation_is_durable_and_idempotent(self) -> None:
         transport = FakeGitHubTransport()

@@ -68,7 +68,9 @@ resolve the founding docket.
    Schannel cannot reach a revocation service, the same transient configuration disables
    only Schannel's revocation lookup; certificate-chain and hostname verification remain
    enabled. The live receipt and this ADR disclose that residual instead of inheriting an
-   unrecorded ambient Git setting.
+   unrecorded ambient Git setting. Python 3.14's OpenSSL transport likewise clears only
+   `VERIFY_X509_STRICT` so the managed host's legacy CA encoding is accepted; certificate
+   chain validation, trusted-root validation, and hostname checking remain required.
 3. Push the exact clean workspace `HEAD` to one explicitly named branch. Adopt an existing
    remote branch only when it already resolves to the same SHA; a different SHA fails
    closed.
@@ -99,7 +101,7 @@ resolve the founding docket.
 | Mutable or wrong PR head | Exact SHA checked on create/adoption and every CI receipt | A later force-push is prevented only when host rules are active |
 | Missing checks treated as green | Non-empty completed set required; bounded timeout is a failed receipt | Workflow configuration can still omit a required semantic test |
 | False protection claim | Live normalized comparison and committed mismatch report | Administrator bypasses and single-maintainer independence must be disclosed separately |
-| API/provider forgery | HTTPS chain and hostname validation, GitHub token, versioned API, raw response digest | The managed Windows live runner cannot perform Schannel revocation lookup; there is no GitHub-signed response or externally authenticated verifier identity; B-GOV-02/03 remain open |
+| API/provider forgery | HTTPS chain and hostname validation, GitHub token, versioned API, raw response digest | The managed Windows live runner cannot perform Schannel revocation lookup and its trusted interception CA requires legacy non-strict X.509 parsing; there is no GitHub-signed response or externally authenticated verifier identity; B-GOV-02/03 remain open |
 | Authority expansion | Repository-level push/draft only; no merge method | A human or separately authorized system must merge |
 
 ## Acceptance evidence

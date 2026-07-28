@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import ssl
 import tempfile
 import time
 import urllib.error
@@ -80,6 +81,14 @@ class GitHubTransport(Protocol):
 
 
 class UrllibGitHubTransport:
+    def __init__(self, context: ssl.SSLContext | None = None) -> None:
+        if context is None:
+            context = ssl.create_default_context()
+            strict = getattr(ssl, "VERIFY_X509_STRICT", 0)
+            if strict:
+                context.verify_flags &= ~strict
+        self.context = context
+
     def request(
         self,
         method: str,
@@ -95,7 +104,11 @@ class UrllibGitHubTransport:
             method=method,
         )
         try:
-            with urllib.request.urlopen(request, timeout=timeout_s) as response:
+            with urllib.request.urlopen(
+                request,
+                timeout=timeout_s,
+                context=self.context,
+            ) as response:
                 return GitHubResponse(
                     int(response.status),
                     response.read(),
