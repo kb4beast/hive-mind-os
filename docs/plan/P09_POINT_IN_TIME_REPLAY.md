@@ -237,3 +237,13 @@ pinned self-history curriculum exist; every episode carries honest contamination
 - A clean final audit and fresh independent exact-candidate review remain required.
   Existing contamination caveats and the absence of any superiority or release claim
   remain unchanged.
+
+### Clean audit result
+
+After the adverse attempts were committed, the clean audit
+`evidence/audits/P09-post-reveal-repair-final.json` completed with no failures, reported
+278 pytest tests passed, and bound clean commit
+`73bd07bf647ad6ff2e974ed0ff408d2b828dda3a`. Its canonical digest is
+`sha256:d3d4d11b53d1ef672621a429d834436111d30c863a2d76685ab28d2e4e2b6589`.
+This result satisfies the audit prerequisite but remains subject to the fresh
+independent exact-candidate review.
