@@ -267,6 +267,11 @@ evidence.
   at most `10**9`.
 - Direct tests forge the same mutated object and mutate the canonical contract;
   recorder admission and schema validation both fail closed.
+- Remediated implementation commit:
+  `144e943d6cf830734e40d89d4cee41e4f15de714`.
+- Focused Phase 2 plus exact Generation Zero: 33 tests passed. Deterministic
+  generation verified 9 artifacts. Ruff passed. Pyright 1.1.411: 0 errors, 0
+  warnings, 0 information. Inventory regeneration and patch-integrity checks passed.
 
 ## Open entries after fourth remand
 

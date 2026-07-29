@@ -130,3 +130,9 @@ preserved one adverse Python 3.12 seeded worker-recovery failure despite the sam
 suite passing on the push event. The Builder accepted the boundary finding and did
 not waive or conceal the adverse CI receipt. Remediation is recorded in
 `P2-AUDIT-015`; fresh exact-head review remains required.
+
+Fourth-remand remediation implementation
+`144e943d6cf830734e40d89d4cee41e4f15de714` is the next review candidate. An
+evidence-only descendant may be reviewed as the exact PR head only if its source,
+tests, scripts, and project configuration remain byte-identical. No acceptance is
+asserted before fresh Curator and Steward reconstruction.
