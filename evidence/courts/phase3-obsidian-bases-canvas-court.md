@@ -205,3 +205,40 @@ runtime/render/refresh claims, federation, plugins, retrieval, cleanup, encrypti
 full CI/supply-chain promotion, usefulness, or superiority. Any change to the bound
 implementation, schema catalog, source interface, publication protocol, capability
 claim, or evidence requires renewed independent review and judgment.
+
+## Cross-platform CI appeal
+
+The first complete hosted-CI execution exposed three verification defects that were
+not product failures:
+
+- the installed-wheel verifier still expected the pre-item-4 totals of `9`
+  foundation-generated resources and `112` total resources instead of the
+  independently inventoried item-4 totals of `17` and `120`;
+- a Windows-path test patched `os.name` before constructing its fixture paths,
+  causing Linux to attempt an unsupported `WindowsPath`; and
+- a documented Windows-only no-delete junction regression was invoked on POSIX,
+  where the item-3 ADR and dissent already preserve the uncooperative-writer
+  limitation.
+
+Repair candidate `19b933beb8c0008652d543567198b0e776595bfa` changes only
+verification expectations and platform setup. It does not change production code,
+generated vault bytes, schemas, interfaces, protocols, persistence, capabilities,
+or authority. Local review reproduced all `566` deterministic tests with `3`
+documented skips, Ruff, Pyright, and a clean isolated-wheel install containing the
+exact `17` foundation-generated and `120` total resources. Hosted Constitutional CI
+then passed both the
+[push run](https://github.com/kb4beast/hive-mind-os/actions/runs/30497161901)
+and the
+[pull-request run](https://github.com/kb4beast/hive-mind-os/actions/runs/30497163529)
+for the exact candidate.
+
+Independent Cross-Examiner/Integrator `Einstein`, Curator/Expert Witness `Locke`,
+and Steward `/root/item4_explorer/steward` each returned `PASS` on exact candidates
+`19b933beb8c0008652d543567198b0e776595bfa` and
+`0b1529a91dd86be211128375b9771a1b64caef02`. They independently confirmed the
+wheel totals, path-construction correction, Windows-only regression boundary,
+remaining POSIX coverage and dissent, fail-closed linked-evidence handling,
+inventory equality, and unchanged sealed item-5 production/runtime evidence.
+
+This appeal records reviewer testimony only. Renewed independent judgment is still
+required before the repaired draft delivery can be treated as court-approved.
