@@ -125,3 +125,62 @@ evidence.
   Steward reconstruction.
 - Obtain a different Judge disposition on the accepted exact candidate.
 - Run the complete exact-head local/remote matrix and record final PR/head receipts.
+
+## `P2-AUDIT-010` — second independent remand
+
+- Exact reviewed candidate:
+  `b881f75dbc4a23062511fed8c90a2e107ddda8f8`.
+- Curator `Kuhn` and Steward `Planck` independently returned `remand` despite 26
+  focused/Generation Zero tests, Ruff, Pyright, deterministic generation, exact
+  131/33/13/304 compatibility, and a fully green push run `30425316778` plus PR
+  run `30425319854`.
+- Curator blockers: incomplete canonical memory kinds; unscoped outbox reads and
+  delivery; unenforced agent content digests; missing generator version on agent
+  projections; unconstrained nested agent contracts; missing committed per-axis
+  double-count/conflict evidence.
+- Steward blockers: uncaught oversized JSON integers; unbounded provider IDs and
+  traces; top-level accounting not propagating axis conflicts; nonrecoverable
+  interrupted initialization; untyped/unstaged semantic classification; explicit
+  observed time absent from idempotency; non-attributable/unscoped public release;
+  incomplete opportunity-key integrity.
+- The green CI receipts remain valid evidence for the remanded SHA only. They do not
+  override either independent remand.
+
+## `P2-AUDIT-011` — second-remand remediation
+
+- Memory records cover working, episodic, semantic, procedural, prospective,
+  decision, opportunity, counterfactual, social, evaluation, resource, governance,
+  and not-applicable classes, plus a strict nullable retrieval receipt for selected,
+  omitted, ordering, purpose, policy, and critical-context coverage.
+- Every authority decision is scoped to tenant/repository/actor and carries decision
+  and lease identity. Safe-public additionally requires an independent decider and
+  decision bound to the exact subject digest; all provenance is stored.
+- Explicit observed time joins full-command idempotency. Outbox reads, attempts, and
+  acknowledgements require tenant/repository scope and store actor/decision/lease
+  provenance.
+- Initial schema creation, triggers, ownership marker, schema digest, and user version
+  now commit or roll back together. An injected interruption leaves no user table and
+  reinitializes successfully.
+- Opportunity semantic candidates must be typed opportunity records; classification
+  requires the staged relation. Integrity binds opportunity keys to scoped type and
+  normalization/exact/structured payload digests.
+- Canonical agent self-digests are checked before generation. Generated agents carry
+  generator version. Memory, usage, portability, and governance nested agent
+  contracts are strict and complete.
+- Provider parsing converts oversized integer JSON to explicit unknown, bounds
+  provider identities, preserves strict native paths/provenance, and propagates
+  direction/cache/reasoning conflicts. Traces and OpenTelemetry provider/outcome
+  vocabulary are bounded.
+- Per-axis reconciliation compares like dimensions only and returns the explicit
+  `orthogonal-axes-never-summed` guard. Direction, cache, reasoning, and deliberate
+  cross-axis regressions are committed.
+- Focused Phase 2: 28 tests passed. Phase 2 plus exact Generation Zero: 32 tests
+  passed. Ruff passed. Pyright 1.1.411: 0 errors, 0 warnings, 0 information.
+
+## Open entries after second remand
+
+- Commit and independently reconstruct the new exact candidate through Curator and
+  Steward.
+- Obtain a separate Judge verdict only after both accept.
+- Repeat the exact-head full Python/security/supply-chain/wheel/provenance matrix and
+  update the PR/evidence-only checkpoint.

@@ -2,8 +2,8 @@
 
 - Branch: `codex/phase2-additive-memory-telemetry-foundation`
 - Stack base: PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`
-- Current state: remediated implementation candidate; not activated; independent
-  re-review pending
+- Current state: twice-remediated implementation candidate; not activated;
+  independent re-review pending
 - Governing ADR: ADR-021
 - Court: `evidence/courts/phase2-additive-foundation-court.md`
 - Inventory: `evidence/phase2/phase2_foundation_inventory.json`
@@ -25,6 +25,11 @@ Implemented:
 - self-identifying store admission, full-command idempotency, canonical integrity,
   destination-bound delivery, bounded provider observations, and retry-preserving
   physical-attempt receipts.
+- complete canonical memory-kind/retrieval coverage, scoped outbox access, atomic
+  initialization, subject-bound release provenance, typed semantic staging,
+  opportunity-key integrity, strict agent subcontracts, enforced canonical
+  self-digests/generator versions, bounded traces, and explicit per-axis
+  reconciliation without cross-axis totals.
 
 Unchanged:
 

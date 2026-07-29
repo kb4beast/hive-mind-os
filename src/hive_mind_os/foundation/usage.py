@@ -41,13 +41,15 @@ class ProviderUsageAdapter:
     @staticmethod
     def parse(provider_kind: str, raw_body: bytes) -> dict[str, Any]:
         if len(raw_body) > 1_000_000:
-            return ProviderUsageAdapter._unknown_observation("response-size-limit")
+            return ProviderUsageAdapter._unknown_observation(
+                "response-size-limit", raw_body
+            )
         try:
             body = json.loads(raw_body)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return ProviderUsageAdapter._unknown_observation("invalid-json")
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            return ProviderUsageAdapter._unknown_observation("invalid-json", raw_body)
         if not isinstance(body, dict):
-            return ProviderUsageAdapter._unknown_observation("non-object")
+            return ProviderUsageAdapter._unknown_observation("non-object", raw_body)
         usage = body.get("usage")
         if not isinstance(usage, dict):
             usage = {}
@@ -92,21 +94,47 @@ class ProviderUsageAdapter:
             input_tokens = None
             output_tokens = None
             axes = ProviderUsageAdapter._unknown_axes()
+        axis_statuses = {
+            str(axis.get("status"))
+            for axis in axes.values()
+            if isinstance(axis, Mapping)
+        }
         accounting_status = (
-            "reported" if input_tokens is not None and output_tokens is not None else "unknown"
+            "conflicting"
+            if "conflicting" in axis_statuses
+            else "reported"
+            if input_tokens is not None and output_tokens is not None
+            else "unknown"
+        )
+        provider_request_id = ProviderUsageAdapter._bounded_identifier(body.get("id"))
+        served_model_id = ProviderUsageAdapter._bounded_identifier(body.get("model"))
+        identity_failure = (
+            "provider-identity-size-limit"
+            if (
+                isinstance(body.get("id"), str) and provider_request_id is None
+            )
+            or (
+                isinstance(body.get("model"), str) and served_model_id is None
+            )
+            else None
         )
         return {
             "adapter_version": NORMALIZATION_VERSION,
             "accounting_status": accounting_status,
             "native": native,
-            "normalized_axes": axes,
-            "provider_request_id": body.get("id") if isinstance(body.get("id"), str) else None,
-            "served_model_id": (
-                body.get("model") if isinstance(body.get("model"), str) else None
+            "native_provenance": ProviderUsageAdapter._provenance(
+                raw_body, "response-body"
             ),
+            "normalized_axes": axes,
+            "provider_request_id": provider_request_id,
+            "served_model_id": served_model_id,
             "unmapped_path_count": unmapped_count,
-            "observation_failure": None,
+            "observation_failure": identity_failure,
         }
+
+    @staticmethod
+    def _bounded_identifier(value: Any) -> str | None:
+        return value if isinstance(value, str) and 0 < len(value) <= 256 else None
 
     @staticmethod
     def _numeric_usage(
@@ -167,16 +195,39 @@ class ProviderUsageAdapter:
         return native, max(0, leaf_count - mapped_count)
 
     @staticmethod
-    def _unknown_observation(reason: str) -> dict[str, Any]:
+    def _unknown_observation(
+        reason: str,
+        raw_body: bytes | None = None,
+    ) -> dict[str, Any]:
         return {
             "adapter_version": NORMALIZATION_VERSION,
             "accounting_status": "unknown",
             "native": {},
+            "native_provenance": ProviderUsageAdapter._provenance(
+                raw_body, "response-body" if raw_body is not None else "no-response"
+            ),
             "normalized_axes": ProviderUsageAdapter._unknown_axes(),
             "provider_request_id": None,
             "served_model_id": None,
             "unmapped_path_count": 0,
             "observation_failure": reason,
+        }
+
+    @staticmethod
+    def _provenance(raw_body: bytes | None, source: str) -> dict[str, Any]:
+        return {
+            "source": source,
+            "unit": "tokens",
+            "semantics_status": (
+                "fixture-adapter-unverified"
+                if source == "response-body"
+                else "unknown"
+            ),
+            "raw_body_digest": (
+                f"sha256:{sha256(raw_body).hexdigest()}"
+                if raw_body is not None
+                else None
+            ),
         }
 
     @staticmethod
@@ -268,7 +319,13 @@ class UsageRecorder:
         self.repository_id = repository_id
         if recorder_id != "foundation-usage-recorder-v1":
             raise ValueError("usage recorder identity is fixed and cannot self-declare")
-        store._require_authority(authority, "foundation.telemetry.write")
+        store._require_authority(
+            authority,
+            "foundation.telemetry.write",
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            actor_id=recorder_id,
+        )
         self.recorder_id = recorder_id
         self.authority = authority
         self._id_factory = id_factory or (lambda: str(uuid4()))
@@ -302,6 +359,16 @@ class UsageRecorder:
             "budget_lease_id": budget_lease_id,
             "trace_id": trace_id,
             "accounting_status": "pending",
+            "adapter_version": NORMALIZATION_VERSION,
+            "native": {},
+            "native_provenance": ProviderUsageAdapter._provenance(
+                None, "no-response"
+            ),
+            "normalized_axes": ProviderUsageAdapter._unknown_axes(),
+            "provider_request_id": None,
+            "served_model_id": None,
+            "unmapped_path_count": 0,
+            "observation_failure": "pending",
         }
         payload.update(
             self._canonical_families(
@@ -384,6 +451,9 @@ class UsageRecorder:
                 "adapter_version": NORMALIZATION_VERSION,
                 "accounting_status": "unknown",
                 "native": {},
+                "native_provenance": ProviderUsageAdapter._provenance(
+                    None, "no-response"
+                ),
                 "normalized_axes": ProviderUsageAdapter._unknown_axes(),
                 "provider_request_id": None,
                 "served_model_id": None,
@@ -543,6 +613,9 @@ class UsageRecorder:
             },
             "resources": {
                 "elapsed_ms": duration_ms,
+                "compute_ms": None,
+                "peak_memory_bytes": None,
+                "energy_joules": None,
                 "budget_lease_id": budget_lease_id,
                 "reservation": None,
                 "consumption": None,
@@ -575,6 +648,8 @@ class UsageRecorder:
                 "exporter": "disabled",
                 "deletion_status": "retained",
                 "reconciliation_status": "pending",
+                "access_purpose": purpose,
+                "access_audit_ref": None,
             },
         }
 
@@ -680,6 +755,78 @@ class ReceiptedModelProvider:
             f"model transport failed after {self.config.max_retries + 1} "
             f"attempts: {last_error}"
         ) from None
+
+
+@dataclass(frozen=True, slots=True)
+class AxisReconciliationResult:
+    axes: tuple[dict[str, Any], ...]
+    double_count_guard: str = "orthogonal-axes-never-summed"
+
+
+def reconcile_usage_axes(
+    observations: list[Mapping[str, Any]],
+) -> AxisReconciliationResult:
+    """Compare like-for-like dimensions without creating a cross-axis total."""
+
+    allowed_sources = {
+        "estimate",
+        "host-report",
+        "invoice",
+        "provider-report",
+    }
+    allowed_dimensions = {
+        "direction": {"input", "output", "reported_total"},
+        "cache_input": {"read", "total", "uncached", "write"},
+        "modality": {"audio", "image", "text", "unknown"},
+        "output_kind": {"reasoning_subset", "total"},
+        "billable": {"status"},
+    }
+    grouped: dict[tuple[str, str], dict[str, int | None]] = {}
+    for observation in observations:
+        if set(observation) != {"source", "axis", "dimension", "value"}:
+            raise ValueError("axis observations require exact source/axis/dimension/value")
+        source = observation["source"]
+        axis = observation["axis"]
+        dimension = observation["dimension"]
+        value = observation["value"]
+        if source not in allowed_sources:
+            raise ValueError("unknown reconciliation source")
+        if (
+            not isinstance(axis, str)
+            or not isinstance(dimension, str)
+            or dimension not in allowed_dimensions.get(axis, set())
+        ):
+            raise ValueError("unknown reconciliation axis or dimension")
+        if value is not None and (
+            type(value) is not int or not 0 <= value <= 10**15
+        ):
+            raise ValueError("axis value must be unknown or a bounded integer")
+        key = (axis, dimension)
+        sources = grouped.setdefault(key, {})
+        if source in sources:
+            raise ValueError("duplicate source observation for an axis dimension")
+        sources[str(source)] = value
+    axes: list[dict[str, Any]] = []
+    for (axis, dimension), sources in sorted(grouped.items()):
+        known = {value for value in sources.values() if value is not None}
+        status = (
+            "unknown"
+            if not known
+            else "complete"
+            if len(known) == 1 and all(value is not None for value in sources.values())
+            else "conflicting"
+            if len(known) > 1
+            else "partial"
+        )
+        axes.append(
+            {
+                "axis": axis,
+                "dimension": dimension,
+                "observations": dict(sorted(sources.items())),
+                "status": status,
+            }
+        )
+    return AxisReconciliationResult(tuple(axes))
 
 
 @dataclass(frozen=True, slots=True)

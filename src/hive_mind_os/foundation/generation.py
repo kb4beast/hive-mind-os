@@ -23,7 +23,9 @@ def compile_generation_zero_candidates() -> dict[str, bytes]:
     }
     source_digest = digest(source)
     outputs: dict[str, bytes] = {
-        f"agents/{role}.json": canonical_bytes(document)
+        f"agents/{role}.json": canonical_bytes(
+            {**document, "generator_version": GENERATOR_VERSION}
+        )
         for role, document in sorted(definitions.items())
     }
     manifest = {
@@ -53,6 +55,17 @@ def _load_canonical_definitions() -> dict[str, dict[str, Any]]:
         role_id = document.get("role_id")
         if not isinstance(role_id, str) or resource.name != f"{role_id}.json":
             raise ValueError(f"canonical agent source identity mismatch: {resource.name}")
+        expected_content_digest = digest(
+            {
+                key: value
+                for key, value in document.items()
+                if key != "content_digest"
+            }
+        )
+        if document.get("content_digest") != expected_content_digest:
+            raise ValueError(
+                f"canonical agent source content digest mismatch: {resource.name}"
+            )
         definitions[role_id] = document
     expected_roles = [role.value for role in DEFAULT_LIFECYCLE]
     if sorted(definitions) != sorted(expected_roles):

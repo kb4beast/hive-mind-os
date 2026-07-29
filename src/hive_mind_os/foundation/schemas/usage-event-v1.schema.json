@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hive-mind-os.invalid/contracts/usage-event/v1",
   "type": "object",
-  "required": ["record_type", "schema_version", "event_kind", "attempt_id", "logical_request_id", "provider_kind", "accounting_status", "correlation", "identity", "inputs", "resources", "cost", "result", "governance"],
+  "required": ["record_type", "schema_version", "event_kind", "attempt_id", "logical_request_id", "provider_kind", "accounting_status", "adapter_version", "native", "native_provenance", "normalized_axes", "provider_request_id", "served_model_id", "unmapped_path_count", "observation_failure", "correlation", "identity", "inputs", "resources", "cost", "result", "governance"],
   "properties": {
     "record_type": {"const": "usage-event"},
     "schema_version": {"const": 1},
@@ -16,13 +16,77 @@
     "actor_id": {"type": "string", "minLength": 1},
     "request_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "requested_model_id": {"type": ["string", "null"]},
-    "served_model_id": {"type": ["string", "null"]},
-    "provider_request_id": {"type": ["string", "null"]},
+    "served_model_id": {"type": ["string", "null"], "minLength": 1},
+    "provider_request_id": {"type": ["string", "null"], "minLength": 1},
     "outcome": {"type": ["string", "null"]},
     "duration_ms": {"type": "number"},
     "error_class": {"type": ["string", "null"]},
-    "native": {"type": "object"},
-    "normalized_axes": {"type": "object"},
+    "native": {
+      "type": "object",
+      "properties": {
+        "completion_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "completion_tokens_details.reasoning_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "prompt_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "prompt_tokens_details.cached_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "total_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "cache_creation_input_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "cache_read_input_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "input_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "output_tokens": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "native_provenance": {
+      "type": "object",
+      "required": ["source", "unit", "semantics_status", "raw_body_digest"],
+      "properties": {
+        "source": {"type": "string", "enum": ["response-body", "no-response"]},
+        "unit": {"const": "tokens"},
+        "semantics_status": {"type": "string", "enum": ["fixture-adapter-unverified", "unknown"]},
+        "raw_body_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "normalized_axes": {
+      "type": "object",
+      "required": ["direction", "cache_input", "modality", "output_kind", "billable"],
+      "properties": {
+        "direction": {
+          "type": "object", "required": ["input", "output", "reported_total", "status"],
+          "properties": {
+            "input": {"type": ["integer", "null"], "minimum": 0}, "output": {"type": ["integer", "null"], "minimum": 0},
+            "reported_total": {"type": ["integer", "null"], "minimum": 0},
+            "status": {"type": "string", "enum": ["complete", "unknown", "conflicting"]}
+          }, "additionalProperties": false
+        },
+        "cache_input": {
+          "type": "object", "required": ["total", "read", "write", "uncached", "status"],
+          "properties": {
+            "total": {"type": ["integer", "null"], "minimum": 0}, "read": {"type": ["integer", "null"], "minimum": 0},
+            "write": {"type": ["integer", "null"], "minimum": 0}, "uncached": {"type": ["integer", "null"], "minimum": 0},
+            "status": {"type": "string", "enum": ["complete", "unknown", "conflicting"]}
+          }, "additionalProperties": false
+        },
+        "modality": {
+          "type": "object", "required": ["status"],
+          "properties": {"status": {"type": "string", "enum": ["unknown"]}},
+          "additionalProperties": false
+        },
+        "output_kind": {
+          "type": "object", "required": ["total", "reasoning_subset", "status"],
+          "properties": {
+            "total": {"type": ["integer", "null"], "minimum": 0}, "reasoning_subset": {"type": ["integer", "null"], "minimum": 0},
+            "status": {"type": "string", "enum": ["partial", "unknown", "conflicting"]}
+          }, "additionalProperties": false
+        },
+        "billable": {
+          "type": "object", "required": ["status"],
+          "properties": {"status": {"type": "string", "enum": ["unknown"]}},
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "unmapped_path_count": {"type": "integer", "minimum": 0},
     "observation_failure": {"type": ["string", "null"]},
     "adapter_version": {"type": ["string", "null"]},
@@ -65,9 +129,11 @@
     },
     "resources": {
       "type": "object",
-      "required": ["elapsed_ms", "budget_lease_id", "reservation", "consumption", "retry_index", "loop_signal_id", "tool_id"],
+      "required": ["elapsed_ms", "compute_ms", "peak_memory_bytes", "energy_joules", "budget_lease_id", "reservation", "consumption", "retry_index", "loop_signal_id", "tool_id"],
       "properties": {
         "elapsed_ms": {"type": ["number", "null"], "minimum": 0}, "budget_lease_id": {"type": ["string", "null"]},
+        "compute_ms": {"type": ["number", "null"], "minimum": 0}, "peak_memory_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "energy_joules": {"type": ["number", "null"], "minimum": 0},
         "reservation": {"type": ["string", "null"]}, "consumption": {"type": ["string", "null"]},
         "retry_index": {"type": "integer", "minimum": 0}, "loop_signal_id": {"type": ["string", "null"]},
         "tool_id": {"type": ["string", "null"]}
@@ -93,12 +159,13 @@
     },
     "governance": {
       "type": "object",
-      "required": ["sensitivity", "retention", "consent_policy", "quarantine_state", "exporter", "deletion_status", "reconciliation_status"],
+      "required": ["sensitivity", "retention", "consent_policy", "quarantine_state", "exporter", "deletion_status", "reconciliation_status", "access_purpose", "access_audit_ref"],
       "properties": {
         "sensitivity": {"const": "private"}, "retention": {"type": "string", "minLength": 1},
         "consent_policy": {"type": "string", "minLength": 1}, "quarantine_state": {"type": "string", "minLength": 1},
         "exporter": {"const": "disabled"}, "deletion_status": {"type": "string", "minLength": 1},
-        "reconciliation_status": {"type": "string", "minLength": 1}
+        "reconciliation_status": {"type": "string", "minLength": 1},
+        "access_purpose": {"type": "string", "minLength": 1}, "access_audit_ref": {"type": ["string", "null"]}
       }, "additionalProperties": false
     }
   },

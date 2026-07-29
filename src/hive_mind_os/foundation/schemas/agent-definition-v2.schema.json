@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hive-mind-os.invalid/contracts/agent-definition/v2",
   "type": "object",
-  "required": ["record_type", "schema_version", "agent_id", "definition_id", "role_id", "version", "content_digest", "status", "supersedes_ref", "rollback_ref", "mission", "non_delegable_duties", "forbidden_actions", "lifecycle_stages", "failure_conditions", "stop_conditions", "input_contract_refs", "required_outputs", "output_contract_refs", "quality_gates", "acceptance_refs", "behavioral_evaluation_refs", "prompt_layers", "skill_refs", "tool_refs", "workflow_refs", "requested_capabilities", "constitutional_ceiling_ref", "policy_action_mapping_version", "lease_requirements", "risk_ceiling", "memory_contract", "usage_contract", "portability", "governance", "activation", "authority"],
+  "required": ["record_type", "schema_version", "agent_id", "definition_id", "role_id", "version", "generator_version", "content_digest", "status", "supersedes_ref", "rollback_ref", "mission", "non_delegable_duties", "forbidden_actions", "lifecycle_stages", "failure_conditions", "stop_conditions", "input_contract_refs", "required_outputs", "output_contract_refs", "quality_gates", "acceptance_refs", "behavioral_evaluation_refs", "prompt_layers", "skill_refs", "tool_refs", "workflow_refs", "requested_capabilities", "constitutional_ceiling_ref", "policy_action_mapping_version", "lease_requirements", "risk_ceiling", "memory_contract", "usage_contract", "portability", "governance", "activation", "authority"],
   "properties": {
     "record_type": {"const": "agent-definition"},
     "schema_version": {"const": 2},
@@ -10,6 +10,7 @@
     "definition_id": {"type": "string", "minLength": 1},
     "role_id": {"type": "string", "enum": ["orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer"]},
     "version": {"const": "2-candidate"},
+    "generator_version": {"const": "phase2-foundation-generator-v1"},
     "content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "status": {"const": "candidate"},
     "supersedes_ref": {"type": ["string", "null"]},
@@ -50,10 +51,57 @@
     "policy_action_mapping_version": {"type": "string", "minLength": 1},
     "lease_requirements": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
     "risk_ceiling": {"type": "string", "minLength": 1},
-    "memory_contract": {"type": "object"},
-    "usage_contract": {"type": "object"},
-    "portability": {"type": "object"},
-    "governance": {"type": "object"},
+    "memory_contract": {
+      "type": "object",
+      "required": ["schema", "allowed_record_classes", "read_purposes", "write_purposes", "sensitivity_default", "retention", "retrieval_policy", "contamination_policy"],
+      "properties": {
+        "schema": {"const": "memory-record-v1"},
+        "allowed_record_classes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "read_purposes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "write_purposes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "sensitivity_default": {"const": "private"},
+        "retention": {"type": "string", "minLength": 1},
+        "retrieval_policy": {"type": "string", "minLength": 1},
+        "contamination_policy": {"const": "fail-closed"}
+      },
+      "additionalProperties": false
+    },
+    "usage_contract": {
+      "type": "object",
+      "required": ["schema", "budget_dimensions", "unknown_accounting", "reconciliation"],
+      "properties": {
+        "schema": {"const": "usage-event-v1"},
+        "budget_dimensions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "unknown_accounting": {"const": "explicit"},
+        "reconciliation": {"const": "per-axis"}
+      },
+      "additionalProperties": false
+    },
+    "portability": {
+      "type": "object",
+      "required": ["projection_target", "host_evidence_version", "unsupported_capabilities", "conformance_status"],
+      "properties": {
+        "projection_target": {"const": "none-phase2"},
+        "host_evidence_version": {"type": ["string", "null"]},
+        "unsupported_capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "conformance_status": {"const": "unverified"}
+      },
+      "additionalProperties": false
+    },
+    "governance": {
+      "type": "object",
+      "required": ["source_refs", "court_refs", "dissent_ref", "owner", "activation_prerequisites", "rollback", "quarantine"],
+      "properties": {
+        "source_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "court_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "dissent_ref": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 1},
+        "activation_prerequisites": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "rollback": {"type": "string", "minLength": 1},
+        "quarantine": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
     "activation": {"const": "inert"},
     "authority": {"const": "none"}
   },

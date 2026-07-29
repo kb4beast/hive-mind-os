@@ -75,6 +75,10 @@ ALLOWED_METRIC_NAMES = frozenset(
 )
 _METRIC_NAME = re.compile(r"hive\.foundation\.[a-z0-9_.]{1,48}\Z")
 _MAX_METRIC_VALUE = 10**15
+_MAX_TRACE_ATTRIBUTES = 32
+_MAX_TRACE_IDENTIFIER = 256
+_MAX_TRACE_NAME = 128
+_MAX_TRACE_KEY = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +134,16 @@ def project_trace(
     span_id: str,
     attributes: Mapping[str, Any],
 ) -> TraceRecord:
+    if (
+        not name
+        or len(name) > _MAX_TRACE_NAME
+        or not trace_id
+        or len(trace_id) > _MAX_TRACE_IDENTIFIER
+        or not span_id
+        or len(span_id) > _MAX_TRACE_IDENTIFIER
+        or len(attributes) > _MAX_TRACE_ATTRIBUTES
+    ):
+        raise ValueError("trace identity or attribute count is unbounded")
     prohibited_fragments = {
         "api_key",
         "authorization",
@@ -155,7 +169,12 @@ def project_trace(
         raise ValueError("trace attributes cannot contain body or free-text fields")
     normalized: list[tuple[str, str]] = []
     for key, value in sorted(attributes.items()):
-        if not isinstance(value, (str, int, bool)) or len(str(value)) > 256:
+        if (
+            not key
+            or len(key) > _MAX_TRACE_KEY
+            or not isinstance(value, (str, int, bool))
+            or len(str(value)) > 256
+        ):
             raise ValueError(f"trace attribute {key} is unsupported or unbounded")
         normalized.append((key, str(value)))
     return TraceRecord(name, trace_id, span_id, tuple(normalized))
@@ -167,6 +186,11 @@ def project_otel_envelope(
     provider_kind: str,
     outcome: str,
 ) -> OTelEnvelope:
+    if (
+        provider_kind not in METRIC_LABEL_VALUES["provider_kind"]
+        or outcome not in METRIC_LABEL_VALUES["outcome"]
+    ):
+        raise ValueError("OpenTelemetry provider/outcome is outside fixed vocabulary")
     attributes = {
         **dict(trace.attributes),
         "gen_ai.operation.name": trace.name,

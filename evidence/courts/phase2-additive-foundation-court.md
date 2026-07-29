@@ -84,3 +84,17 @@ accepted every finding. The append-only remediation record is
 Implementation promotion remains pending fresh Curator/Steward reconstruction and a
 different Judge on the remediated exact committed candidate. Until that disposition,
 Generation Zero remains the only selected runtime.
+
+Second implementation candidate
+`b881f75dbc4a23062511fed8c90a2e107ddda8f8`: `remand`.
+
+Its full declared CI matrix passed, but Curator `Kuhn` and Steward `Planck`
+independently found incomplete memory kinds, outbox scope, canonical digest/generator
+binding, nested contract strictness, per-axis evidence, provider/trace bounds,
+conflict propagation, initialization recovery, semantic staging, observed-time
+idempotency, public-release provenance, and opportunity-key integrity. CI success did
+not displace the court burden. The Builder accepted every finding; remediation is
+recorded append-only in `P2-AUDIT-011`.
+
+Implementation promotion remains pending fresh Curator/Steward reconstruction and a
+different Judge on the next exact committed candidate.

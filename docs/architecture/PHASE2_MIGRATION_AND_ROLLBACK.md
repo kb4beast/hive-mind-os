@@ -11,7 +11,8 @@
 4. Write records and local outbox atomically. Do not enable a consumer or network
    exporter by default.
 5. Require a matching allowed authority decision at every write boundary. Require a
-   separate public-release decision for safe-public sensitivity.
+   separate subject-digest-bound, independently attributable public-release decision
+   for safe-public sensitivity; retain decision and lease references.
 6. For model shadowing, wrap a provider explicitly. Record the start before I/O and
    terminal usage before returning.
 7. Reconcile legacy events read-only. Any missing tenant, repository, attempt,
@@ -44,10 +45,13 @@ an external destination acknowledged a message.
 - Replay an identical idempotency key and obtain the same record.
 - Reject a conflicting idempotency replay.
 - Reject a legacy or malformed same-version database without changing its schema.
+- Roll back an interrupted first initialization so a later initialization can retry.
 - Reject a mismatched authority action, cross-scope relation, or unapproved
   safe-public write.
 - Convert started/nonterminal attempts to interrupted/unknown exactly once.
 - Replay delivery to its immutable destination until an append-only acknowledgement
   follows a successful attempt.
+- Reconcile like usage dimensions per axis and verify that cache and reasoning subsets
+  are never added to direction totals.
 - Run deterministic generation check and the complete Generation Zero regression
   suite.

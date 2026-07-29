@@ -2,23 +2,23 @@
   "activation": "inert-opt-in",
   "additive_surface": {
     "current_event_sink_count": 48,
-    "current_module_definition_count": 334,
+    "current_module_definition_count": 336,
     "unclassified_candidate_count": 0
   },
   "base_head": "3298078c41ce69103eb2bdce61960a69dc6aab93",
   "canonical_agent_sources": {
     "count": 8,
     "resource_digests": {
-      "architect.json": "sha256:b2814673e91372576538ac08b0f90512d47cc99885db57ac80bee462913a0893",
-      "builder.json": "sha256:bdfbe9767c9cb546936be5501df941012682e38ad755895c3831a3a4ef130dd8",
-      "curator.json": "sha256:fc76ad2cdd02c4d79d267a6b311f0c16fb739627060e546503be81920a566244",
-      "explorer.json": "sha256:03ca54b0659eee2caddc52db8b71a436e8ba920de44876104e714fefb1c68b60",
-      "integrator.json": "sha256:00778262a8a051fe68d22eb36f641ce80c1ae5d840a9517b6efc5beb97d56357",
-      "optimizer.json": "sha256:835b31089db8c17e1e454aeaa49585f38f6d3879b25c0e68c96a767b23c46c20",
-      "orchestrator.json": "sha256:7e0e2310080f726eaa27bf93ea1a84c8a2eddc5b8396bc8b607f48c95fa5f8ff",
-      "steward.json": "sha256:795aee3ec187d38b09d982b0019e0195823183f5d8d4d7a4394dfa8114011ae2"
+      "architect.json": "sha256:5afba0d6950a95c38331f36b9aa6ca6739ac9cb34a076cb82dd71f71d0fe303f",
+      "builder.json": "sha256:054b264fadeee808ac64165852408cbc2b1b122b4a6992afa4567fe93399ac3a",
+      "curator.json": "sha256:e9b12bce0b6b8ebabb117309bd9a05390bf470ee4fd473eddd61ed0636a4860c",
+      "explorer.json": "sha256:d20ac6051f772aecd25e4215eafac57c82da51f4a12eda3a7c20d0316112258a",
+      "integrator.json": "sha256:2b31f121190f7cf6b42f4698e21de4ebcac34a19bba44c9c4b8d86afa4e0b8c0",
+      "optimizer.json": "sha256:2314f6163c5383ee1b47a4c960bd46e1469b1420324395cb5fa6827d34287474",
+      "orchestrator.json": "sha256:c0658b7a28af19bfb2f202dae21a79fe0d09dcbae97be14879780c1ad6f4132d",
+      "steward.json": "sha256:212b3e38036230256672ecf07a6f2fa83d5d45f32d937ffc2fdf42846437b603"
     },
-    "resource_set_digest": "sha256:a2169f63e23f0e3b44fac9661c3c456713458aad846ddc4c0928672b9277dca2"
+    "resource_set_digest": "sha256:b344cb4e93aaff5e04d15bf21e947c76448d8385bf42f56899e39193b93ef674"
   },
   "foundation_contracts": {
     "catalog_valid": true,
@@ -43,12 +43,12 @@
       "usage-reconciliation-v1"
     ],
     "resource_digests": {
-      "agent-definition-v2.schema.json": "sha256:38131e98775defaf291ae5291b45e416d0537d2c29b885100cc85b70314e7944",
+      "agent-definition-v2.schema.json": "sha256:10dbe87a449e6bf906778094b852bd124215ef2936691ebcc26e6c1a97df9012",
       "budget-lease-record-v1.schema.json": "sha256:dc9c06c068399060d0a865a2ca168e64c705dd9a989fb1b2b29006e1ef3f8e39",
       "decision-record-v1.schema.json": "sha256:93a00ef826355561c888705c76d172187a5164c814c6511d53349080708ca523",
       "idea-encounter-v1.schema.json": "sha256:8e61eaba73859c789791cafbe4f5204f9b0ad1e4ecfe9f8a2be715a25ba3ff6a",
       "loop-signal-v1.schema.json": "sha256:7772bf04a9a71d82f0172074fe316eb71b6d1e3becbaf5aaa20612e3bd2de3e6",
-      "memory-record-v1.schema.json": "sha256:cda7df1b704de746df4ddaadece0ab4b8086ffa13408ce61daf1caa0fa882742",
+      "memory-record-v1.schema.json": "sha256:a94398adc9568de6c422cb5ac97aa97ad8a267290ee5c3b5ff3d14b45ca08c1c",
       "opportunity-record-v1.schema.json": "sha256:99282bb1b386ad5ef75f2670487da7617d11952795575642ec9cefb0fdfd71b4",
       "outbox-record-v1.schema.json": "sha256:ba1e3741fcbad1c92b5d66c1c26939898e27bba45fa38d9b5ed9e392ed4ca256",
       "outcome-attribution-record-v1.schema.json": "sha256:3fee3a050183db619fc803af03a148262eb8503d5890c30b9e281a0194aacf3d",
@@ -58,14 +58,14 @@
       "role-constitution-v2.schema.json": "sha256:5127f5344f01202e41d2174d0ad4c534bb003e47dd62bf0a4a1ccbb697d1f840",
       "skill-definition-v2.schema.json": "sha256:cbc9611e9e0bf6fd6f41795c0edf9daad5ca67c61e88ed292c77fc2650e3f5a2",
       "typed-output-v1.schema.json": "sha256:a9248cc4aad95e9c20d89a88d4733cbcf2e6a92559deadc7ae6e84e51ffc813e",
-      "usage-event-v1.schema.json": "sha256:17e3ba66977017b07e362b36d75dc210901053a2080e194e222b7b032fa7fd86",
+      "usage-event-v1.schema.json": "sha256:bfe2a0246198510f6e041bd6b48503c60528ab965cd6945c34688603c74c2b3c",
       "usage-reconciliation-v1.schema.json": "sha256:00595bdfe0088cc36aeff192a87f08870d8fbac72a752800d817c2c1d59e9acd"
     },
-    "resource_set_digest": "sha256:b84c3f2d39363cb5307262b40ff1b43544170933f806458f7c7512f6aecc8762"
+    "resource_set_digest": "sha256:93e4c030181e1aa5b881ad2f3ad5ba2f211dbf1d5c186f16715bcba361558407"
   },
   "foundation_store": {
     "journal_mode": "wal",
-    "schema_digest": "sha256:0fd51703ef5a6f16e45d3087ee9e76d9501a99d1b2138a188feb6ff2f29073bf",
+    "schema_digest": "sha256:5c23e27f1c32831a4d01a01dc3488726f6ec4a0c1d98fdabd65d870bb0e2ca8b",
     "schema_version": 1,
     "tables": [
       "foundation_metadata",
@@ -99,15 +99,15 @@
   "generated_candidates": {
     "count": 9,
     "resource_digests": {
-      "agents/architect.json": "sha256:b2814673e91372576538ac08b0f90512d47cc99885db57ac80bee462913a0893",
-      "agents/builder.json": "sha256:bdfbe9767c9cb546936be5501df941012682e38ad755895c3831a3a4ef130dd8",
-      "agents/curator.json": "sha256:fc76ad2cdd02c4d79d267a6b311f0c16fb739627060e546503be81920a566244",
-      "agents/explorer.json": "sha256:03ca54b0659eee2caddc52db8b71a436e8ba920de44876104e714fefb1c68b60",
-      "agents/integrator.json": "sha256:00778262a8a051fe68d22eb36f641ce80c1ae5d840a9517b6efc5beb97d56357",
-      "agents/optimizer.json": "sha256:835b31089db8c17e1e454aeaa49585f38f6d3879b25c0e68c96a767b23c46c20",
-      "agents/orchestrator.json": "sha256:7e0e2310080f726eaa27bf93ea1a84c8a2eddc5b8396bc8b607f48c95fa5f8ff",
-      "agents/steward.json": "sha256:795aee3ec187d38b09d982b0019e0195823183f5d8d4d7a4394dfa8114011ae2",
-      "manifest.json": "sha256:d1a9d938d4c3f5ce5c84638f774b5ce8047cf51e3aa9eac062a284708abdec7f"
+      "agents/architect.json": "sha256:10c346ada208a9c4bd13b1f69ebc28741d6beb4536654a70005b25642732d21c",
+      "agents/builder.json": "sha256:f51c05e902cdc3c417e992b2b29a670eed533a71f78be4b34b2eb191f71e4f05",
+      "agents/curator.json": "sha256:ffa45a3bea2edecd008c2b4788ff9ecf8cec66620fd293a77b980ea2de7ea312",
+      "agents/explorer.json": "sha256:a9c3758f4a64d486c72e389871e4ea06521ea74b46b64969f881d0b05880308a",
+      "agents/integrator.json": "sha256:94740af9bbc32b3afc8e1e9903eb0bd7c4c728344aec652dc3ece9ec642295a9",
+      "agents/optimizer.json": "sha256:eb7e4c39622136d8cf49ea0b0dce3225c74b1573cd76093a16e6b15f499344c5",
+      "agents/orchestrator.json": "sha256:38a6d6f8da8cced427f1618190eb5dc78a2597481f8df4c56d80784bc8fbffc2",
+      "agents/steward.json": "sha256:5e881838a556038c5c3f278504379e33949f6ff7a81d53845d2e1fa54b3ca66e",
+      "manifest.json": "sha256:e652f81353af4d0abe41b656ff0a16d71368510b4b3efe985eed99976376659d"
     }
   },
   "generation_zero": {
@@ -121,7 +121,7 @@
     "package_api_count": 33,
     "root_api_count": 131
   },
-  "inventory_digest": "sha256:0062abc939598954bf01aa31ecd69320926f815188017a13a558ccc09457d951",
+  "inventory_digest": "sha256:197407a9333322a234d2e3655437acdfba25161f086aff28cf72c2636715523e",
   "phase": 2,
   "provider_fixtures": {
     "anthropic_usage.json": "sha256:38f55f99a43f36a75a08444c4b8057bab12812466161e43838e7ca10791d6f55",

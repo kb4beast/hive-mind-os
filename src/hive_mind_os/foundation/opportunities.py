@@ -104,7 +104,11 @@ class OpportunityLedger:
             )
         with self.store._lock, self.store._transaction():
             self.store._require_authority(
-                self.authority, "foundation.opportunity.write"
+                self.authority,
+                "foundation.opportunity.write",
+                tenant_id=tenant_id,
+                repository_id=repository_id,
+                actor_id=actor_id,
             )
             encounter = self.store._append_record_in_transaction(
                 tenant_id=tenant_id,
@@ -115,6 +119,12 @@ class OpportunityLedger:
                 payload=encounter_payload,
                 actor_id=actor_id,
                 idempotency_key=f"encounter:{encounter_id}",
+                command_observed_at=None,
+                authority_decision_id=str(self.authority.decision_id),
+                lease_id=str(self.authority.lease_id),
+                public_release_decision_id=None,
+                public_release_decided_by=None,
+                public_release_subject_digest=None,
                 observed_at=self.store._clock(),
                 correlation_id=encounter_id,
                 causation_id=None,
@@ -131,6 +141,12 @@ class OpportunityLedger:
                     payload=encounter_payload,
                     actor_id=actor_id,
                     idempotency_key=f"encounter:{encounter_id}",
+                    command_observed_at=None,
+                    authority_decision_id=str(self.authority.decision_id),
+                    lease_id=str(self.authority.lease_id),
+                    public_release_decision_id=None,
+                    public_release_decided_by=None,
+                    public_release_subject_digest=None,
                     correlation_id=encounter_id,
                     causation_id=None,
                     sensitivity="private",
@@ -170,6 +186,7 @@ class OpportunityLedger:
                     opportunity_id,
                     "duplicate",
                     encounter_payload,
+                    actor_id,
                 )
                 return OpportunityResult(
                     encounter["record_id"], opportunity_id, "duplicate"
@@ -196,6 +213,7 @@ class OpportunityLedger:
                 reject_private_content(semantic_evidence)
                 scoped_count = self.store._connection.execute(
                     "SELECT COUNT(*) FROM records WHERE tenant_id=? AND repository_id=? "
+                    "AND record_type='opportunity-record' "
                     f"AND record_id IN ({','.join('?' for _ in candidates)})",
                     (tenant_id, repository_id, *candidates),
                 ).fetchone()[0]
@@ -209,6 +227,7 @@ class OpportunityLedger:
                         candidate_id,
                         "semantic-candidate",
                         semantic_evidence,
+                        actor_id,
                     )
                 return OpportunityResult(
                     encounter["record_id"],
@@ -250,6 +269,12 @@ class OpportunityLedger:
                 payload=opportunity_payload,
                 actor_id=actor_id,
                 idempotency_key=f"opportunity:{exact_digest}",
+                command_observed_at=None,
+                authority_decision_id=str(self.authority.decision_id),
+                lease_id=str(self.authority.lease_id),
+                public_release_decision_id=None,
+                public_release_decided_by=None,
+                public_release_subject_digest=None,
                 observed_at=self.store._clock(),
                 correlation_id=encounter_id,
                 causation_id=encounter["record_id"],
@@ -266,6 +291,12 @@ class OpportunityLedger:
                     payload=opportunity_payload,
                     actor_id=actor_id,
                     idempotency_key=f"opportunity:{exact_digest}",
+                    command_observed_at=None,
+                    authority_decision_id=str(self.authority.decision_id),
+                    lease_id=str(self.authority.lease_id),
+                    public_release_decision_id=None,
+                    public_release_decided_by=None,
+                    public_release_subject_digest=None,
                     correlation_id=encounter_id,
                     causation_id=encounter["record_id"],
                     sensitivity="private",
@@ -293,6 +324,7 @@ class OpportunityLedger:
                 opportunity["record_id"],
                 "originates",
                 encounter_payload,
+                actor_id,
             )
             return OpportunityResult(
                 encounter["record_id"], opportunity["record_id"], "new"
@@ -307,9 +339,30 @@ class OpportunityLedger:
         opportunity_record_id: str,
         relationship: str,
         evidence: Mapping[str, Any],
+        actor_id: str,
     ) -> int:
         if relationship not in RELATIONSHIPS - {"semantic-candidate"}:
             raise ValueError("unsupported semantic classification")
+        staged = self.store._connection.execute(
+            "SELECT 1 FROM record_relations AS relation "
+            "JOIN records AS source ON source.record_id=relation.source_record_id "
+            "JOIN records AS target ON target.record_id=relation.target_record_id "
+            "WHERE relation.tenant_id=? AND relation.repository_id=? "
+            "AND relation.source_record_id=? AND relation.target_record_id=? "
+            "AND relation.relation='semantic-candidate' "
+            "AND source.record_type='idea-encounter' "
+            "AND target.record_type='opportunity-record' LIMIT 1",
+            (
+                tenant_id,
+                repository_id,
+                encounter_record_id,
+                opportunity_record_id,
+            ),
+        ).fetchone()
+        if staged is None:
+            raise ValueError(
+                "semantic classification requires a staged typed candidate"
+            )
         return self.store.add_relation(
             authority=self.authority,
             foundation_action="foundation.opportunity.write",
@@ -319,6 +372,7 @@ class OpportunityLedger:
             target_record_id=opportunity_record_id,
             relation=relationship,
             evidence=evidence,
+            actor_id=actor_id,
         )
 
     def _insert_relation(
@@ -329,12 +383,14 @@ class OpportunityLedger:
         target_record_id: str,
         relation: str,
         evidence: Mapping[str, Any],
+        actor_id: str,
     ) -> None:
         reject_private_content(evidence)
         self.store._connection.execute(
             "INSERT INTO record_relations("
             "tenant_id,repository_id,source_record_id,target_record_id,"
-            "relation,evidence_digest,evidence_json,created_at) VALUES(?,?,?,?,?,?,?,?)",
+            "relation,evidence_digest,evidence_json,actor_id,authority_decision_id,"
+            "lease_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             (
                 tenant_id,
                 repository_id,
@@ -343,6 +399,9 @@ class OpportunityLedger:
                 relation,
                 digest(evidence),
                 canonical_bytes(evidence).decode("utf-8").rstrip("\n"),
+                actor_id,
+                self.authority.decision_id,
+                self.authority.lease_id,
                 self.store._clock(),
             ),
         )

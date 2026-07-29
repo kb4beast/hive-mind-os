@@ -26,7 +26,7 @@ effect. It is not re-exported by either frozen facade and no CLI selects it.
 Callers register explicit opaque tenant, project-lineage, repository-instance, and
 controller identities. Remote/path evidence is represented by digests. Mutable
 paths, branches, titles, and remote URLs are not canonical identity. Every query
-requires tenant and repository.
+requires tenant and repository, including pending-outbox reads and delivery receipts.
 
 ## Record and transaction invariants
 
@@ -35,7 +35,8 @@ version, prior digest, semantic digest, actor, observed/recorded times, correlat
 causation, sensitivity, retention, status, and idempotency key. Replaying the same key
 and full semantic command returns the original; changing payload, actor, destination,
 scope, schema/type, stream, status, sensitivity, retention, correlation, or causation
-fails closed.
+fails closed. Explicit observed time and authority/lease/release provenance are part
+of that command.
 
 Each record and outbox message share a single transaction. Domain and outbox tables
 reject update and delete. Delivery attempts and acknowledgements append. WAL reopen
@@ -45,6 +46,7 @@ an acknowledgement requires a prior successful attempt and a nonempty sink recei
 The store will create tables only in an empty, unversioned database. A versioned
 foundation database must carry the expected ownership marker, exact columns, and
 schema-object digest. It never adopts or migrates a Generation Zero database.
+Interrupted first initialization rolls back to a reusable empty database.
 
 ## Opportunity invariants
 
@@ -53,7 +55,9 @@ digests are distinct. Exact and structured uniqueness is scoped to tenant/reposi
 and enforced inside an immediate transaction. A duplicate adds a relation and keeps
 both encounters. Semantic candidates require explicit later classification as
 duplicate, reinforcement, refinement, variant, contradiction, complement, appeal, or
-not-duplicate.
+not-duplicate. Candidate endpoints must be typed opportunity records; direct or
+unstaged classification fails closed. Integrity verification binds opportunity keys
+to the scoped typed record and its normalization/exact/structured digests.
 
 ## Usage invariants
 
@@ -66,6 +70,9 @@ Provider-native numeric paths are preserved independently of normalized axes.
 Malformed or missing fields are unknown. Cache and reasoning values are subsets;
 there is no cross-axis total. Invoice reconciliation reports matched, missing,
 duplicate, residual, conflicting, partial, or unavailable observations.
+Per-axis reconciliation compares only like dimensions from separately identified
+estimate, provider, host, and invoice observations. It never emits a cross-axis
+aggregate.
 
 ## Privacy and observability
 
@@ -75,7 +82,7 @@ reconciliation status, and sensitivity labels. IDs stay in governed records or t
 attributes. OpenTelemetry-shaped local envelopes are dependency-free and outbound
 export remains disabled. Metric names and values are bounded. Trace attributes reject
 body, request, response, credential, authorization, password, and reserved
-provider/outcome keys.
+provider/outcome keys; trace names, IDs, attribute count, keys, and values are bounded.
 
 ## Phase boundary
 

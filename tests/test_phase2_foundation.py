@@ -6,6 +6,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import hive_mind_os
 from hive_mind_os.foundation.authority import AuthorityDecision, decide_foundation_write
@@ -16,6 +17,7 @@ from hive_mind_os.foundation.contracts import (
     validate_foundation_catalog,
 )
 from hive_mind_os.foundation.generation import (
+    _load_canonical_definitions,
     compile_generation_zero_candidates,
     verify_generated_candidates,
 )
@@ -35,6 +37,7 @@ from hive_mind_os.foundation.usage import (
     ReceiptedModelProvider,
     UsageRecorder,
     reconcile_invoice,
+    reconcile_usage_axes,
 )
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.model_provider import (
@@ -70,7 +73,16 @@ def allowed_authority(
     *,
     role: Role = Role.BUILDER,
     public_release_allowed: bool = False,
+    tenant_id: str = "tenant:test",
+    repository_id: str = "repository:test",
+    actor_id: str | None = None,
+    public_release_subject_digest: str | None = None,
 ) -> AuthorityDecision:
+    authority_actor = actor_id or (
+        "foundation-usage-recorder-v1"
+        if action == "foundation.telemetry.write"
+        else role.value
+    )
     decision = decide_foundation_write(
         role=role,
         action=action,
@@ -84,7 +96,20 @@ def allowed_authority(
             if action == "foundation.telemetry.write"
             else None
         ),
-        public_release_allowed=public_release_allowed,
+        tenant_id=tenant_id,
+        repository_id=repository_id,
+        actor_id=authority_actor,
+        decision_id=f"decision:{action}:{authority_actor}",
+        lease_id=f"lease:{action}:{authority_actor}",
+        public_release_decision_id=(
+            "release:curator-approved" if public_release_allowed else None
+        ),
+        public_release_decided_by=(
+            "curator" if public_release_allowed else None
+        ),
+        public_release_subject_digest=(
+            public_release_subject_digest if public_release_allowed else None
+        ),
     )
     if not decision.allowed:
         raise AssertionError(decision)
@@ -112,10 +137,15 @@ class FoundationContractAndGenerationTests(unittest.TestCase):
             / "agents"
         )
         self.assertEqual(len(tuple(canonical_root.glob("*.json"))), 8)
-        self.assertEqual(
-            first["agents/architect.json"],
-            (canonical_root / "architect.json").read_bytes(),
+        projected_architect = json.loads(first["agents/architect.json"])
+        canonical_architect = json.loads(
+            (canonical_root / "architect.json").read_bytes()
         )
+        self.assertEqual(
+            projected_architect.pop("generator_version"),
+            "phase2-foundation-generator-v1",
+        )
+        self.assertEqual(projected_architect, canonical_architect)
         architect = json.loads(first["agents/architect.json"])
         self.assertTrue(validate_foundation("agent-definition-v2", architect).valid)
         manifest = json.loads(first["manifest.json"])
@@ -126,6 +156,24 @@ class FoundationContractAndGenerationTests(unittest.TestCase):
             verify_generated_candidates(mutated),
             ("generated artifact drift: agents/architect.json",),
         )
+        with tempfile.TemporaryDirectory() as temporary:
+            package_root = Path(temporary) / "foundation"
+            temporary_agents = package_root / "canonical" / "agents"
+            temporary_agents.mkdir(parents=True)
+            for source in canonical_root.glob("*.json"):
+                (temporary_agents / source.name).write_bytes(source.read_bytes())
+            stale = json.loads(
+                (temporary_agents / "explorer.json").read_text(encoding="utf-8")
+            )
+            stale["mission"] = "mutated without refreshing the content digest"
+            (temporary_agents / "explorer.json").write_text(
+                json.dumps(stale), encoding="utf-8"
+            )
+            with patch(
+                "hive_mind_os.foundation.generation.files",
+                return_value=package_root,
+            ), self.assertRaisesRegex(ValueError, "content digest mismatch"):
+                _load_canonical_definitions()
 
     def test_contracts_fail_closed_on_unknown_fields(self) -> None:
         candidate = json.loads(
@@ -135,6 +183,20 @@ class FoundationContractAndGenerationTests(unittest.TestCase):
         result = validate_foundation("agent-definition-v2", candidate)
         self.assertFalse(result.valid)
         self.assertIn("unknown properties", result.issues[0])
+        for field in (
+            "memory_contract",
+            "usage_contract",
+            "portability",
+            "governance",
+        ):
+            malformed = json.loads(
+                compile_generation_zero_candidates()["agents/explorer.json"]
+            )
+            malformed[field] = {}
+            self.assertFalse(
+                validate_foundation("agent-definition-v2", malformed).valid,
+                field,
+            )
         attribution = {
             "record_type": "attribution-record",
             "schema_version": 1,
@@ -185,6 +247,11 @@ class FoundationContractAndGenerationTests(unittest.TestCase):
             adapter_actions={"foundation.memory.write"},
             mission_risk_allowed=True,
             budget_available=True,
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            actor_id="builder",
+            decision_id="decision:fixture",
+            lease_id="lease:fixture",
         )
         self.assertTrue(allowed.allowed)
         self.assertIs(allowed.mapped_action, Action.WRITE_WORKSPACE)
@@ -235,13 +302,15 @@ class FoundationStoreTests(unittest.TestCase):
         destination: str = "local",
         actor_id: str = "builder",
         repository_id: str = "repository:test",
+        observed_at: str | None = None,
+        approve_public_release: bool = False,
     ) -> dict:
         content_digest = digest("safe-reference")
         document = {
             "record_type": "memory-record",
             "schema_version": 1,
             "memory_id": key,
-            "memory_kind": "learning",
+            "memory_kind": "semantic",
             "repository_id": repository_id,
             "tenant_id": "tenant:test",
             "mission_id": None,
@@ -275,11 +344,21 @@ class FoundationStoreTests(unittest.TestCase):
             "appeal_state": "available",
             "content_digest": content_digest,
             "protected_content_ref": None,
+            "retrieval_receipt": None,
         }
         if payload:
             document.update(payload)
+        selected_authority = authority or allowed_authority(
+                "foundation.memory.write",
+                repository_id=repository_id,
+                actor_id=actor_id,
+                public_release_allowed=approve_public_release,
+                public_release_subject_digest=(
+                    digest(document) if approve_public_release else None
+                ),
+            )
         return self.store.append_record(
-            authority=authority or allowed_authority("foundation.memory.write"),
+            authority=selected_authority,
             foundation_action="foundation.memory.write",
             tenant_id="tenant:test",
             repository_id=repository_id,
@@ -291,12 +370,15 @@ class FoundationStoreTests(unittest.TestCase):
             idempotency_key=key,
             sensitivity=sensitivity,
             destination=destination,
+            observed_at=observed_at,
         )
 
     def test_wal_record_and_outbox_are_atomic_append_only_and_recoverable(self) -> None:
         record = self._append()
         self.assertEqual(self.store.journal_mode().casefold(), "wal")
-        pending = self.store.pending_outbox()
+        pending = self.store.pending_outbox(
+            tenant_id="tenant:test", repository_id="repository:test"
+        )
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0]["source_record_id"], record["record_id"])
         for statement in (
@@ -309,7 +391,14 @@ class FoundationStoreTests(unittest.TestCase):
                     self.store._connection.execute(statement)
         self.store.close()
         self.store = FoundationStore(self.path)
-        self.assertEqual(len(self.store.pending_outbox()), 1)
+        self.assertEqual(
+            len(
+                self.store.pending_outbox(
+                    tenant_id="tenant:test", repository_id="repository:test"
+                )
+            ),
+            1,
+        )
 
     def test_idempotency_scope_and_privacy_fail_closed(self) -> None:
         original = self._append()
@@ -348,12 +437,15 @@ class FoundationStoreTests(unittest.TestCase):
         public = self._append(
             "memory:public",
             {"sensitivity": "safe-public"},
-            authority=allowed_authority(
-                "foundation.memory.write", public_release_allowed=True
-            ),
             sensitivity="safe-public",
+            approve_public_release=True,
         )
         self.assertEqual(public["sensitivity"], "safe-public")
+        self.assertEqual(public["public_release_decision_id"], "release:curator-approved")
+        self.assertEqual(public["public_release_decided_by"], "curator")
+        self.assertEqual(
+            public["public_release_subject_digest"], public["semantic_digest"]
+        )
         original = self._append("memory:full-command")
         self.assertEqual(
             self._append("memory:full-command")["record_id"],
@@ -365,6 +457,18 @@ class FoundationStoreTests(unittest.TestCase):
         ):
             with self.assertRaises(IdempotencyConflict):
                 self._append("memory:full-command", **command)
+        explicit = self._append(
+            "memory:observed-command",
+            observed_at="2000-01-01T00:00:00+00:00",
+        )
+        self.assertEqual(
+            explicit["command_observed_at"], "2000-01-01T00:00:00+00:00"
+        )
+        with self.assertRaises(IdempotencyConflict):
+            self._append(
+                "memory:observed-command",
+                observed_at="2099-01-01T00:00:00+00:00",
+            )
         with self.assertRaises(ScopeError):
             self._append(
                 "memory:wrong-scope",
@@ -432,6 +536,44 @@ class FoundationStoreTests(unittest.TestCase):
             finally:
                 after.close()
 
+    def test_all_canonical_memory_kinds_and_retrieval_receipts_validate(self) -> None:
+        kinds = (
+            "working",
+            "episodic",
+            "semantic",
+            "procedural",
+            "prospective",
+            "decision",
+            "opportunity",
+            "counterfactual",
+            "social",
+            "evaluation",
+            "resource",
+            "governance",
+            "not-applicable",
+        )
+        for kind in kinds:
+            with self.subTest(kind=kind):
+                record = self._append(
+                    f"memory:kind:{kind}",
+                    {
+                        "memory_kind": kind,
+                        "retrieval_receipt": (
+                            {
+                                "selected_memory_ids": ["memory:selected"],
+                                "omitted_memory_ids": ["memory:omitted"],
+                                "ordering": ["memory:selected"],
+                                "purpose": "mission-context",
+                                "policy_result": "allowed",
+                                "critical_context_coverage": "complete",
+                            }
+                            if kind == "working"
+                            else None
+                        ),
+                    },
+                )
+                self.assertEqual(record["payload"]["memory_kind"], kind)
+
     def test_same_version_shape_and_cross_scope_self_relation_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             malformed_path = Path(temporary) / "malformed.sqlite3"
@@ -463,7 +605,10 @@ class FoundationStoreTests(unittest.TestCase):
         }
         self.store.register_repository(
             other_identity,
-            authority=allowed_authority("foundation.repository.register"),
+            authority=allowed_authority(
+                "foundation.repository.register",
+                repository_id="repository:other",
+            ),
         )
         other = self._append(
             "memory:other",
@@ -479,25 +624,100 @@ class FoundationStoreTests(unittest.TestCase):
                 target_record_id=other["record_id"],
                 relation="self",
                 evidence={"receipt": digest("cross-scope")},
+                actor_id="builder",
+            )
+
+    def test_interrupted_initialization_rolls_back_and_reopens(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "interrupted.sqlite3"
+
+            def interrupt() -> str:
+                raise RuntimeError("fixture initialization interruption")
+
+            with self.assertRaisesRegex(RuntimeError, "interruption"):
+                FoundationStore(path, clock=interrupt)
+            connection = sqlite3.connect(path)
+            try:
+                tables = connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' "
+                    "AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+                self.assertEqual(tables, [])
+                self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 0)
+            finally:
+                connection.close()
+            reopened = FoundationStore(path)
+            reopened.close()
+
+    def test_outbox_reads_and_delivery_authority_are_repository_scoped(self) -> None:
+        other_identity = {
+            **REPOSITORY_IDENTITY,
+            "repository_id": "repository:other",
+            "instance_id": "instance:other-outbox",
+        }
+        self.store.register_repository(
+            other_identity,
+            authority=allowed_authority(
+                "foundation.repository.register",
+                repository_id="repository:other",
+            ),
+        )
+        local = self._append("memory:local-scope")
+        other = self._append(
+            "memory:other-scope", repository_id="repository:other"
+        )
+        local_pending = self.store.pending_outbox(
+            tenant_id="tenant:test", repository_id="repository:test"
+        )
+        other_pending = self.store.pending_outbox(
+            tenant_id="tenant:test", repository_id="repository:other"
+        )
+        self.assertIn(local["record_id"], {item["source_record_id"] for item in local_pending})
+        self.assertNotIn(other["record_id"], {item["source_record_id"] for item in local_pending})
+        self.assertIn(other["record_id"], {item["source_record_id"] for item in other_pending})
+        with self.assertRaises(PermissionError):
+            self.store.record_delivery_attempt(
+                other_pending[0]["message_id"],
+                "local",
+                "succeeded",
+                authority=allowed_authority("foundation.outbox.deliver"),
+                tenant_id="tenant:test",
+                repository_id="repository:other",
+                actor_id="builder",
             )
 
     def test_delivery_replay_uses_append_only_attempt_and_ack_receipts(self) -> None:
         self._append()
-        message = self.store.pending_outbox()[0]
+        message = self.store.pending_outbox(
+            tenant_id="tenant:test", repository_id="repository:test"
+        )[0]
         self.store.record_delivery_attempt(
             message["message_id"],
             "local",
             "failed",
             authority=allowed_authority("foundation.outbox.deliver"),
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            actor_id="builder",
             error_class="SinkUnavailable",
         )
-        self.assertEqual(len(self.store.pending_outbox()), 1)
+        self.assertEqual(
+            len(
+                self.store.pending_outbox(
+                    tenant_id="tenant:test", repository_id="repository:test"
+                )
+            ),
+            1,
+        )
         with self.assertRaises(ScopeError):
             self.store.record_delivery_attempt(
                 message["message_id"],
                 "wrong-destination",
                 "succeeded",
                 authority=allowed_authority("foundation.outbox.deliver"),
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                actor_id="builder",
             )
         with self.assertRaises(ValueError):
             self.store.acknowledge(
@@ -505,6 +725,9 @@ class FoundationStoreTests(unittest.TestCase):
                 "local",
                 "",
                 authority=allowed_authority("foundation.outbox.deliver"),
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                actor_id="builder",
             )
         with self.assertRaises(RuntimeError):
             self.store.acknowledge(
@@ -512,32 +735,52 @@ class FoundationStoreTests(unittest.TestCase):
                 "local",
                 "sink:receipt",
                 authority=allowed_authority("foundation.outbox.deliver"),
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                actor_id="builder",
             )
         self.store.record_delivery_attempt(
             message["message_id"],
             "local",
             "succeeded",
             authority=allowed_authority("foundation.outbox.deliver"),
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            actor_id="builder",
         )
         self.store.acknowledge(
             message["message_id"],
             "local",
             "sink:receipt",
             authority=allowed_authority("foundation.outbox.deliver"),
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            actor_id="builder",
         )
         self.store.acknowledge(
             message["message_id"],
             "local",
             "sink:receipt",
             authority=allowed_authority("foundation.outbox.deliver"),
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            actor_id="builder",
         )
-        self.assertEqual(self.store.pending_outbox(), [])
+        self.assertEqual(
+            self.store.pending_outbox(
+                tenant_id="tenant:test", repository_id="repository:test"
+            ),
+            [],
+        )
         with self.assertRaises(IdempotencyConflict):
             self.store.acknowledge(
                 message["message_id"],
                 "local",
                 "sink:conflicting-receipt",
                 authority=allowed_authority("foundation.outbox.deliver"),
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                actor_id="builder",
             )
         self.assertEqual(
             self.store.verify_integrity(
@@ -693,6 +936,91 @@ class OpportunityLedgerTests(unittest.TestCase):
                 opportunity_record_id=str(first.opportunity_record_id),
                 relationship="not-duplicate",
                 evidence={"review_digest": digest("independent")},
+                actor_id="explorer",
+            )
+            store.close()
+
+    def test_semantic_candidates_require_typed_targets_and_prior_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            store = FoundationStore(Path(temporary) / "foundation.sqlite3")
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
+            memory_store_test = FoundationStoreTests("_append")
+            memory_store_test.store = store
+            memory = memory_store_test._append("memory:not-an-opportunity")
+            ledger = OpportunityLedger(
+                store,
+                authority=allowed_authority(
+                    "foundation.opportunity.write", role=Role.EXPLORER
+                ),
+            )
+            semantic_evidence = {
+                "algorithm_id": "fixture-neighbor-search",
+                "algorithm_version": "1",
+                "index_digest": digest("fixture-index"),
+                "threshold_ppm": 800_000,
+                "neighbor_scores_ppm": {memory["record_id"]: 900_000},
+            }
+            with self.assertRaises(ScopeError):
+                ledger.register(
+                    tenant_id="tenant:test",
+                    repository_id="repository:test",
+                    encounter_id="encounter:wrong-type",
+                    problem="wrong type",
+                    proposal="must fail",
+                    structured_key={"key": "wrong-type"},
+                    actor_id="explorer",
+                    evidence_digests=[digest("wrong-type")],
+                    semantic_candidate_ids=[memory["record_id"]],
+                    semantic_evidence=semantic_evidence,
+                )
+            with self.assertRaisesRegex(ValueError, "staged typed candidate"):
+                ledger.classify_semantic_candidate(
+                    tenant_id="tenant:test",
+                    repository_id="repository:test",
+                    encounter_record_id=memory["record_id"],
+                    opportunity_record_id=memory["record_id"],
+                    relationship="duplicate",
+                    evidence={"review_digest": digest("unstaged")},
+                    actor_id="explorer",
+                )
+            store.close()
+
+    def test_integrity_binds_opportunity_keys_to_typed_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            store = FoundationStore(Path(temporary) / "foundation.sqlite3")
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
+            ledger = OpportunityLedger(
+                store,
+                authority=allowed_authority(
+                    "foundation.opportunity.write", role=Role.EXPLORER
+                ),
+            )
+            ledger.register(
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                encounter_id="encounter:integrity",
+                problem="integrity",
+                proposal="bind keys",
+                structured_key={"key": "integrity"},
+                actor_id="explorer",
+                evidence_digests=[digest("integrity")],
+            )
+            store._connection.execute("DROP TRIGGER opportunity_keys_no_update")
+            store._connection.execute(
+                "UPDATE opportunity_keys SET exact_digest=?",
+                (digest("tampered-key"),),
+            )
+            issues = store.verify_integrity(
+                tenant_id="tenant:test", repository_id="repository:test"
+            )
+            self.assertTrue(
+                any("opportunity key" in issue and "target mismatch" in issue for issue in issues)
             )
             store.close()
 
@@ -1010,6 +1338,83 @@ class UsageAndObservabilityTests(unittest.TestCase):
         self.assertEqual(observation["native"], {})
         self.assertGreater(observation["unmapped_path_count"], 128)
         self.assertNotIn("api_key", json.dumps(observation))
+        oversized_integer = ProviderUsageAdapter.parse(
+            "openai_compatible",
+            (
+                b'{"usage":{"prompt_tokens":'
+                + (b"9" * 5_000)
+                + b',"completion_tokens":1}}'
+            ),
+        )
+        self.assertEqual(oversized_integer["accounting_status"], "unknown")
+        self.assertEqual(oversized_integer["observation_failure"], "invalid-json")
+        oversized_id = ProviderUsageAdapter.parse(
+            "openai_compatible",
+            json.dumps(
+                {
+                    "id": "x" * 900_000,
+                    "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+                }
+            ).encode(),
+        )
+        self.assertIsNone(oversized_id["provider_request_id"])
+        self.assertEqual(
+            oversized_id["observation_failure"],
+            "provider-identity-size-limit",
+        )
+
+    def test_axis_conflicts_propagate_and_cross_axes_are_never_summed(self) -> None:
+        direction = ProviderUsageAdapter.parse(
+            "openai_compatible",
+            b'{"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":99}}',
+        )
+        cache = ProviderUsageAdapter.parse(
+            "anthropic",
+            b'{"usage":{"input_tokens":10,"output_tokens":5,'
+            b'"cache_read_input_tokens":11}}',
+        )
+        reasoning = ProviderUsageAdapter.parse(
+            "openai_compatible",
+            b'{"usage":{"prompt_tokens":10,"completion_tokens":5,'
+            b'"completion_tokens_details":{"reasoning_tokens":6}}}',
+        )
+        for observation in (direction, cache, reasoning):
+            self.assertEqual(observation["accounting_status"], "conflicting")
+        reconciled = reconcile_usage_axes(
+            [
+                {
+                    "source": "provider-report",
+                    "axis": "direction",
+                    "dimension": "input",
+                    "value": 100,
+                },
+                {
+                    "source": "host-report",
+                    "axis": "direction",
+                    "dimension": "input",
+                    "value": 100,
+                },
+                {
+                    "source": "provider-report",
+                    "axis": "cache_input",
+                    "dimension": "read",
+                    "value": 25,
+                },
+                {
+                    "source": "provider-report",
+                    "axis": "output_kind",
+                    "dimension": "reasoning_subset",
+                    "value": 10,
+                },
+            ]
+        )
+        self.assertEqual(
+            reconciled.double_count_guard, "orthogonal-axes-never-summed"
+        )
+        self.assertEqual(len(reconciled.axes), 3)
+        self.assertFalse(
+            any("aggregate" in key for axis in reconciled.axes for key in axis)
+        )
 
     def test_invoice_reconciliation_never_manufactures_equality(self) -> None:
         usage = [
@@ -1080,6 +1485,24 @@ class UsageAndObservabilityTests(unittest.TestCase):
                     span_id="span:one",
                     attributes={field: "untrusted"},
                 )
+        with self.assertRaises(ValueError):
+            project_trace(
+                "x" * 100_000,
+                trace_id="trace:one",
+                span_id="span:one",
+                attributes={},
+            )
+        with self.assertRaises(ValueError):
+            project_trace(
+                "model.attempt",
+                trace_id="trace:one",
+                span_id="span:one",
+                attributes={f"field_{index}": index for index in range(10_000)},
+            )
+        with self.assertRaises(ValueError):
+            project_otel_envelope(
+                trace, provider_kind="x" * 1_000, outcome="succeeded"
+            )
 
 
 if __name__ == "__main__":

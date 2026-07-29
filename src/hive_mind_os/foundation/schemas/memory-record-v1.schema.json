@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hive-mind-os.invalid/contracts/memory-record/v1",
   "type": "object",
-  "required": ["record_type", "schema_version", "memory_id", "memory_kind", "repository_id", "tenant_id", "mission_id", "run_id", "step_id", "actor_id", "payload_digest", "previous_record_id", "supersedes_record_id", "observed_at", "recorded_at", "causation_id", "correlation_id", "source_refs", "claim_refs", "evidence_refs", "court_refs", "code_receipt_refs", "generation_refs", "status", "confidence_ppm", "freshness_expires_at", "contradiction_refs", "relation_refs", "owner_id", "sensitivity", "access_purpose", "retention", "deletion_policy", "quarantine_state", "appeal_state", "content_digest", "protected_content_ref"],
+  "required": ["record_type", "schema_version", "memory_id", "memory_kind", "repository_id", "tenant_id", "mission_id", "run_id", "step_id", "actor_id", "payload_digest", "previous_record_id", "supersedes_record_id", "observed_at", "recorded_at", "causation_id", "correlation_id", "source_refs", "claim_refs", "evidence_refs", "court_refs", "code_receipt_refs", "generation_refs", "status", "confidence_ppm", "freshness_expires_at", "contradiction_refs", "relation_refs", "owner_id", "sensitivity", "access_purpose", "retention", "deletion_policy", "quarantine_state", "appeal_state", "content_digest", "protected_content_ref", "retrieval_receipt"],
   "properties": {
     "record_type": {"const": "memory-record"},
     "schema_version": {"const": 1},
     "memory_id": {"type": "string", "minLength": 1},
-    "memory_kind": {"type": "string", "enum": ["action", "decision", "handoff", "failure", "learning", "not-applicable"]},
+    "memory_kind": {"type": "string", "enum": ["working", "episodic", "semantic", "procedural", "prospective", "decision", "opportunity", "counterfactual", "social", "evaluation", "resource", "governance", "not-applicable"]},
     "repository_id": {"type": "string", "minLength": 1},
     "tenant_id": {"type": "string", "minLength": 1},
     "mission_id": {"type": ["string", "null"]},
@@ -34,6 +34,19 @@
     "owner_id": {"type": "string", "minLength": 1},
     "content_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
     "protected_content_ref": {"type": ["string", "null"]},
+    "retrieval_receipt": {
+      "type": ["object", "null"],
+      "required": ["selected_memory_ids", "omitted_memory_ids", "ordering", "purpose", "policy_result", "critical_context_coverage"],
+      "properties": {
+        "selected_memory_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "omitted_memory_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "ordering": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "purpose": {"type": "string", "minLength": 1},
+        "policy_result": {"type": "string", "minLength": 1},
+        "critical_context_coverage": {"type": "string", "enum": ["complete", "partial", "unknown"]}
+      },
+      "additionalProperties": false
+    },
     "sensitivity": {"type": "string", "enum": ["private", "internal", "safe-public"]},
     "access_purpose": {"type": "string", "minLength": 1},
     "retention": {"type": "string", "minLength": 1},

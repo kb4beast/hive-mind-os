@@ -91,6 +91,7 @@ class FoundationStore:
                 PRAGMA foreign_keys=ON;
                 PRAGMA synchronous=FULL;
                 PRAGMA busy_timeout=5000;
+                BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS foundation_metadata (
                     store_kind TEXT PRIMARY KEY CHECK(store_kind='hive-foundation'),
                     schema_version INTEGER NOT NULL,
@@ -102,6 +103,9 @@ class FoundationStore:
                     repository_id TEXT NOT NULL,
                     identity_digest TEXT NOT NULL,
                     identity_json TEXT NOT NULL,
+                    registered_by TEXT NOT NULL,
+                    authority_decision_id TEXT NOT NULL,
+                    lease_id TEXT NOT NULL,
                     registered_at TEXT NOT NULL,
                     PRIMARY KEY(tenant_id, repository_id)
                 ) WITHOUT ROWID;
@@ -117,8 +121,14 @@ class FoundationStore:
                     previous_digest TEXT,
                     semantic_digest TEXT NOT NULL,
                     command_digest TEXT NOT NULL,
+                    command_observed_at TEXT,
                     payload_json TEXT NOT NULL,
                     actor_id TEXT NOT NULL,
+                    authority_decision_id TEXT NOT NULL,
+                    lease_id TEXT NOT NULL,
+                    public_release_decision_id TEXT,
+                    public_release_decided_by TEXT,
+                    public_release_subject_digest TEXT,
                     observed_at TEXT NOT NULL,
                     recorded_at TEXT NOT NULL,
                     correlation_id TEXT,
@@ -141,6 +151,9 @@ class FoundationStore:
                     relation TEXT NOT NULL,
                     evidence_digest TEXT NOT NULL,
                     evidence_json TEXT NOT NULL,
+                    actor_id TEXT NOT NULL,
+                    authority_decision_id TEXT NOT NULL,
+                    lease_id TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY(source_record_id) REFERENCES records(record_id),
                     FOREIGN KEY(target_record_id) REFERENCES records(record_id)
@@ -183,6 +196,11 @@ class FoundationStore:
                     destination TEXT NOT NULL,
                     outcome TEXT NOT NULL,
                     error_class TEXT,
+                    tenant_id TEXT NOT NULL,
+                    repository_id TEXT NOT NULL,
+                    actor_id TEXT NOT NULL,
+                    authority_decision_id TEXT NOT NULL,
+                    lease_id TEXT NOT NULL,
                     attempted_at TEXT NOT NULL,
                     FOREIGN KEY(message_id) REFERENCES outbox_messages(message_id)
                 );
@@ -191,6 +209,11 @@ class FoundationStore:
                     message_id TEXT NOT NULL,
                     destination TEXT NOT NULL,
                     sink_receipt_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    repository_id TEXT NOT NULL,
+                    actor_id TEXT NOT NULL,
+                    authority_decision_id TEXT NOT NULL,
+                    lease_id TEXT NOT NULL,
                     acknowledged_at TEXT NOT NULL,
                     FOREIGN KEY(message_id) REFERENCES outbox_messages(message_id),
                     UNIQUE(message_id, destination)
@@ -207,27 +230,27 @@ class FoundationStore:
                 ON outbox_messages(destination, sequence);
                 """
             )
-            for table in (
-                "repositories",
-                "foundation_metadata",
-                "records",
-                "record_relations",
-                "opportunity_keys",
-                "outbox_messages",
-                "outbox_attempts",
-                "outbox_acknowledgements",
-            ):
-                self._connection.executescript(
-                    f"""
-                    CREATE TRIGGER IF NOT EXISTS {table}_no_update
-                    BEFORE UPDATE ON {table}
-                    BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;
-                    CREATE TRIGGER IF NOT EXISTS {table}_no_delete
-                    BEFORE DELETE ON {table}
-                    BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;
-                    """
-                )
-            if version == 0:
+            try:
+                for table in (
+                    "repositories",
+                    "foundation_metadata",
+                    "records",
+                    "record_relations",
+                    "opportunity_keys",
+                    "outbox_messages",
+                    "outbox_attempts",
+                    "outbox_acknowledgements",
+                ):
+                    self._connection.execute(
+                        f"CREATE TRIGGER IF NOT EXISTS {table}_no_update "
+                        f"BEFORE UPDATE ON {table} BEGIN SELECT "
+                        f"RAISE(ABORT, '{table} is append-only'); END"
+                    )
+                    self._connection.execute(
+                        f"CREATE TRIGGER IF NOT EXISTS {table}_no_delete "
+                        f"BEFORE DELETE ON {table} BEGIN SELECT "
+                        f"RAISE(ABORT, '{table} is append-only'); END"
+                    )
                 schema_digest = self._schema_digest()
                 self._connection.execute(
                     "INSERT INTO foundation_metadata VALUES(?,?,?,?)",
@@ -238,7 +261,14 @@ class FoundationStore:
                         self._clock(),
                     ),
                 )
-            self._connection.execute(f"PRAGMA user_version={FOUNDATION_SCHEMA_VERSION}")
+                self._connection.execute(
+                    f"PRAGMA user_version={FOUNDATION_SCHEMA_VERSION}"
+                )
+                self._connection.execute("COMMIT")
+            except BaseException:
+                if self._connection.in_transaction:
+                    self._connection.execute("ROLLBACK")
+                raise
         self._validate_shape()
 
     def _validate_shape(self) -> None:
@@ -254,6 +284,9 @@ class FoundationStore:
                 "repository_id",
                 "identity_digest",
                 "identity_json",
+                "registered_by",
+                "authority_decision_id",
+                "lease_id",
                 "registered_at",
             },
             "records": {
@@ -268,8 +301,14 @@ class FoundationStore:
                 "previous_digest",
                 "semantic_digest",
                 "command_digest",
+                "command_observed_at",
                 "payload_json",
                 "actor_id",
+                "authority_decision_id",
+                "lease_id",
+                "public_release_decision_id",
+                "public_release_decided_by",
+                "public_release_subject_digest",
                 "observed_at",
                 "recorded_at",
                 "correlation_id",
@@ -288,6 +327,9 @@ class FoundationStore:
                 "relation",
                 "evidence_digest",
                 "evidence_json",
+                "actor_id",
+                "authority_decision_id",
+                "lease_id",
                 "created_at",
             },
             "opportunity_keys": {
@@ -316,6 +358,11 @@ class FoundationStore:
                 "destination",
                 "outcome",
                 "error_class",
+                "tenant_id",
+                "repository_id",
+                "actor_id",
+                "authority_decision_id",
+                "lease_id",
                 "attempted_at",
             },
             "outbox_acknowledgements": {
@@ -323,6 +370,11 @@ class FoundationStore:
                 "message_id",
                 "destination",
                 "sink_receipt_id",
+                "tenant_id",
+                "repository_id",
+                "actor_id",
+                "authority_decision_id",
+                "lease_id",
                 "acknowledged_at",
             },
         }
@@ -378,6 +430,10 @@ class FoundationStore:
     def _require_authority(
         authority: AuthorityDecision,
         foundation_action: str,
+        *,
+        tenant_id: str | None = None,
+        repository_id: str | None = None,
+        actor_id: str | None = None,
     ) -> None:
         if (
             not authority.allowed
@@ -388,6 +444,15 @@ class FoundationStore:
                 f"foundation authority denied for {foundation_action}: "
                 f"{authority.reason}"
             )
+        for field, expected in (
+            ("tenant_id", tenant_id),
+            ("repository_id", repository_id),
+            ("actor_id", actor_id),
+        ):
+            if expected is not None and getattr(authority, field) != expected:
+                raise PermissionError(
+                    f"foundation authority {field} does not match the command"
+                )
 
     def register_repository(
         self,
@@ -395,7 +460,14 @@ class FoundationStore:
         *,
         authority: AuthorityDecision,
     ) -> str:
-        self._require_authority(authority, "foundation.repository.register")
+        tenant_id = str(identity.get("tenant_id", ""))
+        repository_id = str(identity.get("repository_id", ""))
+        self._require_authority(
+            authority,
+            "foundation.repository.register",
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+        )
         from .contracts import validate_foundation
 
         validation = validate_foundation("repository-identity-v1", identity)
@@ -403,8 +475,6 @@ class FoundationStore:
             raise ValueError(
                 "invalid repository identity: " + "; ".join(validation.issues)
             )
-        tenant_id = str(identity.get("tenant_id", ""))
-        repository_id = str(identity.get("repository_id", ""))
         self._require_scope(tenant_id, repository_id)
         reject_private_content(identity)
         encoded = canonical_bytes(identity).decode("utf-8").rstrip("\n")
@@ -420,8 +490,17 @@ class FoundationStore:
                     raise IdempotencyConflict("repository identity is immutable")
                 return identity_digest
             self._connection.execute(
-                "INSERT INTO repositories VALUES(?,?,?,?,?)",
-                (tenant_id, repository_id, identity_digest, encoded, self._clock()),
+                "INSERT INTO repositories VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    tenant_id,
+                    repository_id,
+                    identity_digest,
+                    encoded,
+                    authority.actor_id,
+                    authority.decision_id,
+                    authority.lease_id,
+                    self._clock(),
+                ),
             )
         return identity_digest
 
@@ -448,7 +527,13 @@ class FoundationStore:
     ) -> dict[str, Any]:
         from .contracts import PHASE2_SCHEMA_NAMES, validate_foundation
 
-        self._require_authority(authority, foundation_action)
+        self._require_authority(
+            authority,
+            foundation_action,
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            actor_id=actor_id,
+        )
         self._require_scope(tenant_id, repository_id)
         if not all(
             item.strip()
@@ -464,7 +549,11 @@ class FoundationStore:
             raise ValueError("record identity fields cannot be empty")
         if sensitivity not in {"private", "internal", "safe-public"}:
             raise ValueError("unsupported sensitivity")
-        if sensitivity == "safe-public" and not authority.public_release_allowed:
+        if sensitivity == "safe-public" and (
+            authority.public_release_decision_id is None
+            or authority.public_release_decided_by is None
+            or authority.public_release_subject_digest != digest(payload)
+        ):
             raise PermissionError(
                 "safe-public requires an independent public-release decision"
             )
@@ -503,6 +592,14 @@ class FoundationStore:
                 payload=payload,
                 actor_id=actor_id,
                 idempotency_key=idempotency_key,
+                command_observed_at=observed_at,
+                authority_decision_id=str(authority.decision_id),
+                lease_id=str(authority.lease_id),
+                public_release_decision_id=authority.public_release_decision_id,
+                public_release_decided_by=authority.public_release_decided_by,
+                public_release_subject_digest=(
+                    authority.public_release_subject_digest
+                ),
                 observed_at=observed_at or self._clock(),
                 correlation_id=correlation_id,
                 causation_id=causation_id,
@@ -519,6 +616,18 @@ class FoundationStore:
                     payload=payload,
                     actor_id=actor_id,
                     idempotency_key=idempotency_key,
+                    command_observed_at=observed_at,
+                    authority_decision_id=str(authority.decision_id),
+                    lease_id=str(authority.lease_id),
+                    public_release_decision_id=(
+                        authority.public_release_decision_id
+                    ),
+                    public_release_decided_by=(
+                        authority.public_release_decided_by
+                    ),
+                    public_release_subject_digest=(
+                        authority.public_release_subject_digest
+                    ),
                     correlation_id=correlation_id,
                     causation_id=causation_id,
                     sensitivity=sensitivity,
@@ -585,6 +694,12 @@ class FoundationStore:
         payload: Mapping[str, Any],
         actor_id: str,
         idempotency_key: str,
+        command_observed_at: str | None,
+        authority_decision_id: str,
+        lease_id: str,
+        public_release_decision_id: str | None,
+        public_release_decided_by: str | None,
+        public_release_subject_digest: str | None,
         observed_at: str,
         correlation_id: str | None,
         causation_id: str | None,
@@ -637,10 +752,12 @@ class FoundationStore:
             INSERT INTO records(
                 record_id,record_type,schema_name,tenant_id,repository_id,
                 stream_id,stream_version,previous_digest,semantic_digest,command_digest,
-                payload_json,
-                actor_id,observed_at,recorded_at,correlation_id,causation_id,
+                command_observed_at,payload_json,
+                actor_id,authority_decision_id,lease_id,public_release_decision_id,
+                public_release_decided_by,public_release_subject_digest,
+                observed_at,recorded_at,correlation_id,causation_id,
                 sensitivity,retention,status,idempotency_key
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 record_id,
@@ -653,8 +770,14 @@ class FoundationStore:
                 previous_digest,
                 semantic_digest,
                 command_digest,
+                command_observed_at,
                 payload_json,
                 actor_id,
+                authority_decision_id,
+                lease_id,
+                public_release_decision_id,
+                public_release_decided_by,
+                public_release_subject_digest,
                 observed_at,
                 recorded_at,
                 correlation_id,
@@ -718,6 +841,12 @@ class FoundationStore:
         payload: Mapping[str, Any],
         actor_id: str,
         idempotency_key: str,
+        command_observed_at: str | None,
+        authority_decision_id: str,
+        lease_id: str,
+        public_release_decision_id: str | None,
+        public_release_decided_by: str | None,
+        public_release_subject_digest: str | None,
         correlation_id: str | None,
         causation_id: str | None,
         sensitivity: str,
@@ -735,6 +864,12 @@ class FoundationStore:
                 "payload": payload,
                 "actor_id": actor_id,
                 "idempotency_key": idempotency_key,
+                "observed_at": command_observed_at,
+                "authority_decision_id": authority_decision_id,
+                "lease_id": lease_id,
+                "public_release_decision_id": public_release_decision_id,
+                "public_release_decided_by": public_release_decided_by,
+                "public_release_subject_digest": public_release_subject_digest,
                 "correlation_id": correlation_id,
                 "causation_id": causation_id,
                 "sensitivity": sensitivity,
@@ -778,8 +913,15 @@ class FoundationStore:
         target_record_id: str,
         relation: str,
         evidence: Mapping[str, Any],
+        actor_id: str,
     ) -> int:
-        self._require_authority(authority, foundation_action)
+        self._require_authority(
+            authority,
+            foundation_action,
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            actor_id=actor_id,
+        )
         self._require_scope(tenant_id, repository_id)
         reject_private_content(evidence)
         with self._lock, self._transaction():
@@ -794,8 +936,9 @@ class FoundationStore:
             cursor = self._connection.execute(
                 "INSERT INTO record_relations("
                 "tenant_id,repository_id,source_record_id,target_record_id,"
-                "relation,evidence_digest,evidence_json,created_at) "
-                "VALUES(?,?,?,?,?,?,?,?)",
+                "relation,evidence_digest,evidence_json,actor_id,"
+                "authority_decision_id,lease_id,created_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     tenant_id,
                     repository_id,
@@ -804,19 +947,32 @@ class FoundationStore:
                     relation,
                     digest(evidence),
                     canonical_bytes(evidence).decode("utf-8").rstrip("\n"),
+                    actor_id,
+                    authority.decision_id,
+                    authority.lease_id,
                     self._clock(),
                 ),
             )
             assert cursor.lastrowid is not None
             return int(cursor.lastrowid)
 
-    def pending_outbox(self, destination: str = "local", limit: int = 100) -> list[dict[str, Any]]:
+    def pending_outbox(
+        self,
+        *,
+        tenant_id: str,
+        repository_id: str,
+        destination: str = "local",
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        self._require_scope(tenant_id, repository_id)
         if limit < 1:
             raise ValueError("limit must be positive")
         rows = self._connection.execute(
             """
             SELECT message.* FROM outbox_messages AS message
+            JOIN records AS source ON source.record_id=message.source_record_id
             WHERE message.destination=?
+            AND source.tenant_id=? AND source.repository_id=?
             AND NOT EXISTS(
                 SELECT 1 FROM outbox_acknowledgements AS acknowledgement
                 WHERE acknowledgement.message_id=message.message_id
@@ -824,7 +980,7 @@ class FoundationStore:
             )
             ORDER BY message.sequence LIMIT ?
             """,
-            (destination, limit),
+            (destination, tenant_id, repository_id, limit),
         ).fetchall()
         return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
 
@@ -835,9 +991,19 @@ class FoundationStore:
         outcome: str,
         *,
         authority: AuthorityDecision,
+        tenant_id: str,
+        repository_id: str,
+        actor_id: str,
         error_class: str | None = None,
     ) -> int:
-        self._require_authority(authority, "foundation.outbox.deliver")
+        self._require_authority(
+            authority,
+            "foundation.outbox.deliver",
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            actor_id=actor_id,
+        )
+        self._require_scope(tenant_id, repository_id)
         if outcome not in {"failed", "succeeded"}:
             raise ValueError("outbox attempt outcome must be failed or succeeded")
         if error_class is not None and (
@@ -846,16 +1012,31 @@ class FoundationStore:
             raise ValueError("error_class must be a bounded symbolic value")
         with self._lock, self._transaction():
             message = self._connection.execute(
-                "SELECT destination FROM outbox_messages WHERE message_id=?",
-                (message_id,),
+                "SELECT message.destination FROM outbox_messages AS message "
+                "JOIN records AS source ON source.record_id=message.source_record_id "
+                "WHERE message.message_id=? AND source.tenant_id=? "
+                "AND source.repository_id=?",
+                (message_id, tenant_id, repository_id),
             ).fetchone()
             if message is None or message["destination"] != destination:
                 raise ScopeError("outbox destination does not match immutable message")
             cursor = self._connection.execute(
                 "INSERT INTO outbox_attempts("
-                "message_id,destination,outcome,error_class,attempted_at) "
-                "VALUES(?,?,?,?,?)",
-                (message_id, destination, outcome, error_class, self._clock()),
+                "message_id,destination,outcome,error_class,tenant_id,repository_id,"
+                "actor_id,authority_decision_id,lease_id,attempted_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (
+                    message_id,
+                    destination,
+                    outcome,
+                    error_class,
+                    tenant_id,
+                    repository_id,
+                    actor_id,
+                    authority.decision_id,
+                    authority.lease_id,
+                    self._clock(),
+                ),
             )
             assert cursor.lastrowid is not None
             return int(cursor.lastrowid)
@@ -867,21 +1048,34 @@ class FoundationStore:
         sink_receipt_id: str,
         *,
         authority: AuthorityDecision,
+        tenant_id: str,
+        repository_id: str,
+        actor_id: str,
     ) -> None:
-        self._require_authority(authority, "foundation.outbox.deliver")
+        self._require_authority(
+            authority,
+            "foundation.outbox.deliver",
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            actor_id=actor_id,
+        )
+        self._require_scope(tenant_id, repository_id)
         if not sink_receipt_id.strip():
             raise ValueError("sink_receipt_id is required")
         with self._lock, self._transaction():
             message = self._connection.execute(
-                "SELECT destination FROM outbox_messages WHERE message_id=?",
-                (message_id,),
+                "SELECT message.destination FROM outbox_messages AS message "
+                "JOIN records AS source ON source.record_id=message.source_record_id "
+                "WHERE message.message_id=? AND source.tenant_id=? "
+                "AND source.repository_id=?",
+                (message_id, tenant_id, repository_id),
             ).fetchone()
             if message is None or message["destination"] != destination:
                 raise ScopeError("outbox destination does not match immutable message")
             succeeded = self._connection.execute(
                 "SELECT 1 FROM outbox_attempts WHERE message_id=? AND destination=? "
-                "AND outcome='succeeded' LIMIT 1",
-                (message_id, destination),
+                "AND tenant_id=? AND repository_id=? AND outcome='succeeded' LIMIT 1",
+                (message_id, destination, tenant_id, repository_id),
             ).fetchone()
             if succeeded is None:
                 raise RuntimeError(
@@ -900,8 +1094,20 @@ class FoundationStore:
                 return
             self._connection.execute(
                 "INSERT INTO outbox_acknowledgements("
-                "message_id,destination,sink_receipt_id,acknowledged_at) VALUES(?,?,?,?)",
-                (message_id, destination, sink_receipt_id, self._clock()),
+                "message_id,destination,sink_receipt_id,tenant_id,repository_id,"
+                "actor_id,authority_decision_id,lease_id,acknowledged_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    message_id,
+                    destination,
+                    sink_receipt_id,
+                    tenant_id,
+                    repository_id,
+                    actor_id,
+                    authority.decision_id,
+                    authority.lease_id,
+                    self._clock(),
+                ),
             )
 
     def verify_integrity(
@@ -943,6 +1149,14 @@ class FoundationStore:
                 payload=payload,
                 actor_id=str(row["actor_id"]),
                 idempotency_key=str(row["idempotency_key"]),
+                command_observed_at=row["command_observed_at"],
+                authority_decision_id=str(row["authority_decision_id"]),
+                lease_id=str(row["lease_id"]),
+                public_release_decision_id=row["public_release_decision_id"],
+                public_release_decided_by=row["public_release_decided_by"],
+                public_release_subject_digest=row[
+                    "public_release_subject_digest"
+                ],
                 correlation_id=row["correlation_id"],
                 causation_id=row["causation_id"],
                 sensitivity=str(row["sensitivity"]),
@@ -1016,6 +1230,29 @@ class FoundationStore:
             ):
                 issues.append(f"relation {row['sequence']}: cross-scope endpoint")
         for row in self._connection.execute(
+            "SELECT key.*,record.record_type,record.payload_json "
+            "FROM opportunity_keys AS key "
+            "LEFT JOIN records AS record "
+            "ON record.record_id=key.opportunity_record_id "
+            "WHERE key.tenant_id=? AND key.repository_id=?",
+            (tenant_id, repository_id),
+        ):
+            try:
+                payload = json.loads(row["payload_json"])
+            except (json.JSONDecodeError, TypeError):
+                issues.append("opportunity key target is missing or invalid")
+                continue
+            if (
+                row["record_type"] != "opportunity-record"
+                or payload.get("normalization_version")
+                != row["normalization_version"]
+                or payload.get("exact_digest") != row["exact_digest"]
+                or payload.get("structured_digest") != row["structured_digest"]
+            ):
+                issues.append(
+                    f"opportunity key {row['exact_digest']}: target mismatch"
+                )
+        for row in self._connection.execute(
             "SELECT * FROM outbox_messages ORDER BY sequence"
         ):
             try:
@@ -1063,6 +1300,19 @@ class FoundationStore:
                     issues.append(
                         f"{table} {row['sequence']}: destination mismatch"
                     )
+                source_scope = self._connection.execute(
+                    "SELECT source.tenant_id,source.repository_id "
+                    "FROM outbox_messages AS message JOIN records AS source "
+                    "ON source.record_id=message.source_record_id "
+                    "WHERE message.message_id=?",
+                    (row["message_id"],),
+                ).fetchone()
+                if (
+                    source_scope is None
+                    or source_scope["tenant_id"] != row["tenant_id"]
+                    or source_scope["repository_id"] != row["repository_id"]
+                ):
+                    issues.append(f"{table} {row['sequence']}: scope mismatch")
                 if table == "outbox_acknowledgements":
                     succeeded = self._connection.execute(
                         "SELECT 1 FROM outbox_attempts WHERE message_id=? "
