@@ -162,7 +162,11 @@ def _validate_fixture(
         for name in file_names:
             clone_object = directory_path / name
             metadata = clone_object.lstat()
-            if not stat.S_ISREG(metadata.st_mode) or _is_reparse(metadata):
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or _is_reparse(metadata)
+                or metadata.st_nlink != 1
+            ):
                 raise SystemExit("fixture Git object is not a regular file")
             clone_objects.append(clone_object)
             if len(clone_objects) > MAX_GIT_OBJECT_FILES:
@@ -190,8 +194,6 @@ def _validate_fixture(
         ):
             raise SystemExit(f"hardlinked Git fixture object: {relative.as_posix()}")
         common_objects_checked += 1
-    if not common_objects_checked:
-        raise SystemExit("fixture Git-object independence checked no common objects")
     registration_path = state / FIXTURE_REGISTRATION
     registration = {
         "schema_version": 1,
@@ -202,7 +204,7 @@ def _validate_fixture(
         "tracked_file_count": len(tracked),
         "no_hardlink_file_count": checked,
         "git_object_file_count": len(clone_objects),
-        "no_hardlink_git_object_count": common_objects_checked,
+        "no_hardlink_git_object_count": len(clone_objects),
     }
     if command == "initialize":
         if registration_path.exists():
