@@ -78,7 +78,7 @@ behavior exercised directly by tests. No external production dependency is added
 
 ## Threat and privacy examination
 
-The court requires and tests:
+The court requires verification of:
 
 - missing/wrong/corrupted database and repository scope;
 - private/internal/quarantined exclusion and release-subject binding;
@@ -89,7 +89,7 @@ The court requires and tests:
 - missing, changed, renamed, or manually edited managed paths;
 - process locking, interruption, partial replacement, manifest-last commit, and
   restart;
-- immutable/check mode without canonical logical writes;
+- normally coordinated read-only/check mode without canonical logical writes;
 - no canonical record or outbox mutation/acknowledgement; and
 - exact Generation Zero and Phase 2 compatibility.
 

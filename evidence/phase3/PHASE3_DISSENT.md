@@ -4,9 +4,9 @@
   filesystem compare-and-swap against a malicious uncooperative writer.
 - Publication is atomic per file, not for the whole directory. Readers must treat the
   valid manifest as the commit marker.
-- A live nonempty SQLite WAL uses ordinary read-only SQLite coordination and may use
-  existing sidecar files. The projector claims no logical canonical write, not zero
-  operating-system coordination.
+- Normal read-only SQLite coordination may create or use empty WAL/SHM sidecars. The
+  projector claims no logical canonical write, not zero operating-system
+  coordination.
 - Private projection receipts are protected by location, exact-content validation,
   and protocol. They do not have append-only SQLite triggers.
 - Safe-public release can still expose approved low-entropy identifiers or digests.
@@ -16,6 +16,10 @@
   the later item 3 cognitive notes.
 - Whole-plan conflict handling preserves one coherent manifest but delays unrelated
   updates.
+- Ignored private completion receipts are the ownership anchor for future mutation.
+  A clone without them can recognize an exact desired tree but must conflict rather
+  than update a differing generated tree until a separately adjudicated adoption or
+  migration path exists.
 - Item 1 does not consume or acknowledge the Phase 2 outbox because existing messages
   were not routed to a brain projection destination.
 - No Obsidian refresh, query, Graph, Bases, Canvas, federation, self-host, retrieval,

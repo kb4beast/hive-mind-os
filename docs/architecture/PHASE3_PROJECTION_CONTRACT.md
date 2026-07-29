@@ -18,7 +18,7 @@ dependency.
 | Memory truth | append-only Phase 2 Foundation database | generated Markdown |
 | Repository scope | immutable registered repository identity | identity digest in manifest |
 | Public release | independent release decision bound to payload digest | sensitivity decision digest |
-| Pack ownership | last valid Phase 3 manifest | managed path/digest set |
+| Pack ownership | exact manifest plus matching private completion receipt | managed path/digest set |
 | Write permission | authentic `foundation.projection.write` intersection | private transaction receipt |
 | Human input | none in item 1 | files outside generated namespace are untouched |
 
@@ -30,7 +30,8 @@ grant authority or mutate canonical memory.
 The database path must already exist as a regular non-link file. The output root is
 fixed at `<resolved-repository>/hive-mind` and cannot contain the database.
 
-One SQLite read transaction validates store ownership and integrity, reads the exact
+One normally coordinated read-only SQLite transaction validates store ownership and
+integrity, reads the exact
 repository identity, counts local omissions, and exposes to the compiler only records
 meeting:
 
@@ -84,19 +85,23 @@ The allowlisted memory fields exclude `protected_content_ref` and
 | `projected` | desired tree verified and manifest committed | 0 |
 | `unchanged` | current tree exactly matches the desired tree | 0 |
 | `drift` | read-only `check` found a difference | 1 |
-| `conflict` | managed/unowned bytes differ; no public write occurred | 1 |
+| `conflict` | managed/unowned bytes differ; conflicting bytes were not overwritten | 1 |
 | `failed` | scope, integrity, schema, authority, path, bound, I/O, or recovery failure | 2 |
 
 `project` stages every desired byte on the same filesystem, records expected prior
-digests and authority references, validates staging, rechecks before `os.replace`,
-replaces notes, and publishes the manifest last. A process lock serializes
-projectors. After interruption, exact desired files are recognized and the remaining
+digests and authority references, validates staging, rechecks the exact namespace and
+non-link roots under the process lock before `os.replace`, replaces notes, and
+publishes the manifest last. A prior manifest authorizes mutation only when a private
+completion receipt binds its exact digest. After interruption, exact desired files
+are recognized, stale completed transaction state is removed, and the remaining
 transaction resumes; any third digest conflicts.
 
-On conflict, existing public bytes are never copied or overwritten. The desired
-generated tree and a digest-only conflict receipt are preserved under ignored
-protected projection state. No source record or Phase 2 outbox message is changed or
-acknowledged.
+On conflict, observed public bytes are never copied into protected state or
+overwritten. The desired generated tree and a digest-only conflict receipt are
+preserved under ignored protected projection state. An uncooperative writer racing
+between atomic replacements can leave already-published exact desired note bytes
+under the prior manifest; restart treats those bytes as resumable state. No source
+record or Phase 2 outbox message is changed or acknowledged.
 
 ## Verification and rollback
 

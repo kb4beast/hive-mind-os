@@ -22,7 +22,13 @@ performed by this item.
   projection resumes only when every observed digest is either the expected prior or
   exact desired digest.
 - Manual edit, delete, rename, unmanaged file, link/reparse target, or stale manifest
-  produces a conflict. Existing public bytes and the prior manifest remain.
+  produces a conflict. Conflicting public bytes are not overwritten.
+- A manifest is mutation authority only with its matching private completion receipt.
+  A cloned unreceipted tree that exactly matches desired bytes is read safely as
+  unchanged; if desired bytes later differ, projection preserves a conflict instead
+  of claiming ownership.
+- A stale transaction directory left after a completion receipt is verified and
+  removed before subsequent runs can report unchanged.
 - A committed manifest is the only new-tree commit marker.
 - The projector never guesses that a partial tree succeeded and never acknowledges
   Phase 2 outbox delivery.

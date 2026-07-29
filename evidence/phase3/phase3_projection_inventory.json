@@ -23,12 +23,12 @@
   },
   "implementation": {
     "src/hive_mind_os/foundation/authority.py": "sha256:bc57189477b5b793d7ee4b9e3b8d40bea50c0d3042a0e658aa670c081e35d478",
-    "src/hive_mind_os/foundation/brain.py": "sha256:edaf4cd893fd82ffc4177381bf9f3ccf3cfe2d8ced68fce4a3647f6768a76a1c",
-    "src/hive_mind_os/foundation/brain_contracts.py": "sha256:a8f52d8219913546737e77a07f09ca4b78dafde367dc249937b1f0effe0fd55e",
+    "src/hive_mind_os/foundation/brain.py": "sha256:139f01b5ca379d21fe3567aa88ea74bea50712ea3387498c430302e7ea3d62b8",
+    "src/hive_mind_os/foundation/brain_contracts.py": "sha256:c01d5a15909ae45d8e2afca079224c3e4221c17f022667dbf8904d52ea112d6f",
     "src/hive_mind_os/foundation/contracts.py": "sha256:a9f2916e8fa46139248f1a12ccf184977f35325f487b12892fa8bd2dbc14decf",
-    "src/hive_mind_os/foundation/store.py": "sha256:e3dc857467e9b173918abbca21d1fc1013c22694d4c97334735eb858f3eba65b"
+    "src/hive_mind_os/foundation/store.py": "sha256:fb274535a4875b866b80def0fd5321fe2bf775174b5fa82a8b2d0dd8541be3c6"
   },
-  "inventory_digest": "sha256:115c4705659fb4bb413ccf58677eba7e76ee58c1004885ff44f1d216acefa28e",
+  "inventory_digest": "sha256:b6b86de960f988899f5adb2e1b7c4610ebb66c345684c1b835e6b07f0fa1a2d4",
   "obsidian_runtime_required": false,
   "phase": 3,
   "phase2_input": {
@@ -41,9 +41,10 @@
   "phase_item": 1,
   "projection_contracts": {
     "catalog_valid": true,
-    "count": 6,
+    "count": 7,
     "names": [
       "brain-conflict-v1",
+      "brain-failure-v1",
       "brain-manifest-v1",
       "brain-note-v1",
       "brain-receipt-v1",
@@ -52,13 +53,14 @@
     ],
     "resource_digests": {
       "brain-conflict-v1.schema.json": "sha256:fa574d47e9342cc2b466078b6cf5a7dde2caa64c206001770a61a62b37a1de56",
+      "brain-failure-v1.schema.json": "sha256:4756d42112fec64f8cdc3b785fe2cf62cbffb78dac6693347627043dc45318e9",
       "brain-manifest-v1.schema.json": "sha256:ace183022081542f5bbb83be2f847d9edea7e743d4f67a3557b70d3ddce78785",
       "brain-note-v1.schema.json": "sha256:a94af6cb40b73db26c8cf4096380d270e6013fa5838980642e5b0b3b0371e873",
       "brain-receipt-v1.schema.json": "sha256:0d447982cc0e273cf5585ec94c161edb6eeedffda1dff570e8a85e8f78f5f30c",
       "brain-result-v1.schema.json": "sha256:c60cfe6c02f4904de0c80ca5e532da98f3a405619bd98cbc91f37fcdfa446d37",
       "brain-transaction-v1.schema.json": "sha256:7fcf5645d1c3aaa13d9243a6d8f85cd373c7b54b37658142a782b1ab6100ecb0"
     },
-    "resource_set_digest": "sha256:b6fc29a351ae8a7942c640f444872bc4a86bdfba759b36048c49d707cd117f5a"
+    "resource_set_digest": "sha256:a64da095b0de48e68783d9c513cb8a6bb7de7207f326be865c846755e9e1ec34"
   },
   "schema_version": 1
 }

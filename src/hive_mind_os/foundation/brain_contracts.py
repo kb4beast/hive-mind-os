@@ -8,6 +8,7 @@ from .contracts import FoundationValidation, validate_document_against_schema
 
 PROJECTION_SCHEMA_NAMES = (
     "brain-conflict-v1",
+    "brain-failure-v1",
     "brain-manifest-v1",
     "brain-note-v1",
     "brain-receipt-v1",

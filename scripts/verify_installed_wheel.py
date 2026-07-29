@@ -128,10 +128,10 @@ def main() -> int:
         "foundation_schema_count": 17,
         "foundation_generated_count": 9,
         "foundation_canonical_count": 8,
-        "projection_schema_count": 6,
+        "projection_schema_count": 7,
         "package_file_count": 48,
         "legacy_resource_count": 68,
-        "resource_count": 108,
+        "resource_count": 109,
         "component_count": 22,
         "trust_state": "quarantined",
     }

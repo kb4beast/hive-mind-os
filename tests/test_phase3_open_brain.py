@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
+import shutil
+import subprocess
 import tempfile
 import unittest
+from contextlib import contextmanager, redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 import hive_mind_os
 import hive_mind_os.package_system as package_system
 from hive_mind_os import cli
+from hive_mind_os.foundation import brain
 from hive_mind_os.foundation.authority import decide_foundation_write
 from hive_mind_os.foundation.brain import (
     MANIFEST_PATH,
@@ -131,6 +138,23 @@ def _memory_payload(
         "protected_content_ref": None,
         "retrieval_receipt": None,
     }
+
+
+def _create_directory_link(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+        return
+    except OSError:
+        if os.name != "nt":
+            raise
+    completed = subprocess.run(
+        ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise OSError(completed.stderr or completed.stdout)
 
 
 class PortableOpenBrainProjectionTests(unittest.TestCase):
@@ -335,6 +359,163 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertIn("generated/manual-edit.md", result.conflict_paths)
         self.assertEqual(unmanaged.read_text(encoding="utf-8"), "not managed\n")
 
+    def test_unmanaged_file_created_at_lock_entry_is_a_preserved_conflict(self) -> None:
+        self._append("memory:editor-race", sensitivity="safe-public")
+        original_lock = brain._projection_lock
+
+        @contextmanager
+        def injecting_lock(state_root):
+            with original_lock(state_root):
+                unmanaged = (
+                    self.repository
+                    / PACK_DIRECTORY
+                    / "generated"
+                    / "editor-race.md"
+                )
+                unmanaged.parent.mkdir(parents=True, exist_ok=True)
+                unmanaged.write_text("human race\n", encoding="utf-8")
+                yield
+
+        with patch.object(brain, "_projection_lock", injecting_lock):
+            result = self._project()
+        self.assertEqual(result.status, "conflict")
+        self.assertEqual(result.conflict_paths, ("generated/editor-race.md",))
+        self.assertFalse(
+            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists()
+        )
+
+    def test_manifest_edits_conflict_with_and_without_private_state(self) -> None:
+        self._append("memory:manifest-conflict", sensitivity="safe-public")
+        self._project()
+        manifest_path = self.repository / PACK_DIRECTORY / MANIFEST_PATH
+        manifest = json.loads(manifest_path.read_bytes())
+        manifest["source_cursor"] = f"memory-set:{'0' * 64}"
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        with_state = self._project()
+        self.assertEqual(with_state.status, "conflict")
+        self.assertIn(MANIFEST_PATH, with_state.conflict_paths)
+
+        shutil.rmtree(self.repository / ".hive-mind-projection-state")
+        without_state = self._project()
+        self.assertEqual(without_state.status, "conflict")
+        self.assertIn(MANIFEST_PATH, without_state.conflict_paths)
+        self.assertEqual(
+            json.loads(manifest_path.read_bytes())["source_cursor"],
+            f"memory-set:{'0' * 64}",
+        )
+
+    def test_completed_receipt_cleans_stale_transaction_state(self) -> None:
+        self._append("memory:receipt-cleanup", sensitivity="safe-public")
+        first = self._project()
+        self.assertIsNotNone(first.receipt_path)
+        receipt = json.loads(
+            (self.repository / str(first.receipt_path)).read_bytes()
+        )
+        transaction_id = receipt["transaction_id"]
+        transaction_root = (
+            self.repository
+            / ".hive-mind-projection-state"
+            / "transactions"
+            / transaction_id
+        )
+        transaction_root.mkdir(parents=True)
+        (transaction_root / "transaction.json").write_text(
+            "{}\n",
+            encoding="utf-8",
+        )
+        recovered = self._project()
+        self.assertEqual(recovered.recovery_status, "already-committed")
+        self.assertFalse(transaction_root.exists())
+        self.assertEqual(self._project().status, "unchanged")
+
+    def test_hardlinked_store_inside_pack_is_rejected(self) -> None:
+        linked = self.repository / PACK_DIRECTORY / "human" / "foundation.sqlite3"
+        linked.parent.mkdir(parents=True)
+        self.store.close()
+        try:
+            try:
+                os.link(self.store_path, linked)
+            except OSError as error:
+                self.skipTest(f"hard links unavailable: {error}")
+            self.assertTrue(linked.samefile(self.store_path))
+            with self.assertRaisesRegex(ProjectionError, "overlap"):
+                project_memory_pack(
+                    self.store_path,
+                    self.repository,
+                    tenant_id=TENANT_ID,
+                    repository_id=REPOSITORY_ID,
+                    check=True,
+                )
+        finally:
+            self.store = FoundationStore(self.store_path)
+
+    def test_linked_state_subtree_cannot_redirect_staging(self) -> None:
+        self._append("memory:linked-state", sensitivity="safe-public")
+        state_root = self.repository / ".hive-mind-projection-state"
+        outside = self.root / "outside-state"
+        state_root.mkdir()
+        outside.mkdir()
+        try:
+            _create_directory_link(state_root / "transactions", outside)
+        except OSError as error:
+            self.skipTest(f"directory links unavailable: {error}")
+        try:
+            with self.assertRaisesRegex(ProjectionError, "linked or reparse"):
+                self._project()
+            self.assertEqual(list(outside.rglob("*")), [])
+        finally:
+            (state_root / "transactions").rmdir()
+
+    def test_pack_link_swap_at_lock_entry_cannot_escape_repository(self) -> None:
+        self._append("memory:pack-link-race", sensitivity="safe-public")
+        outside = self.root / "outside-pack"
+        outside.mkdir()
+        pack_root = self.repository / PACK_DIRECTORY
+        original_lock = brain._projection_lock
+
+        @contextmanager
+        def injecting_lock(state_root):
+            with original_lock(state_root):
+                _create_directory_link(pack_root, outside)
+                yield
+
+        try:
+            with (
+                patch.object(brain, "_projection_lock", injecting_lock),
+                self.assertRaisesRegex(ProjectionError, "memory pack path"),
+            ):
+                self._project()
+            self.assertEqual(list(outside.rglob("*")), [])
+        finally:
+            if pack_root.exists():
+                pack_root.rmdir()
+
+    def test_missing_or_renamed_managed_note_is_a_conflict(self) -> None:
+        public = self._append("memory:rename", sensitivity="safe-public")
+        self._project()
+        manifest = json.loads(
+            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).read_bytes()
+        )
+        relative = next(
+            entry["path"]
+            for entry in manifest["files"]
+            if entry["record_id"] == public["record_id"]
+        )
+        original = self.repository / PACK_DIRECTORY / relative
+        renamed = original.with_name("human-renamed.md")
+        original.rename(renamed)
+        result = self._project()
+        self.assertEqual(result.status, "conflict")
+        self.assertIn(relative, result.conflict_paths)
+        self.assertIn(
+            renamed.relative_to(self.repository / PACK_DIRECTORY).as_posix(),
+            result.conflict_paths,
+        )
+        self.assertTrue(renamed.is_file())
+
     def test_scope_paths_and_check_mode_fail_closed_without_writes(self) -> None:
         self._append("memory:public", sensitivity="safe-public")
         self.store.close()
@@ -365,7 +546,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         finally:
             self.store = FoundationStore(self.store_path)
 
-    def test_read_snapshot_does_not_change_canonical_database_or_sidecars(self) -> None:
+    def test_read_snapshot_does_not_change_canonical_database_bytes(self) -> None:
         self._append("memory:readonly", sensitivity="safe-public")
         self.store.close()
         before = {
@@ -387,7 +568,9 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
                 for path in self.store_path.parent.glob(f"{self.store_path.name}*")
                 if path.is_file()
             }
-            self.assertEqual(after, before)
+            self.assertEqual(after[self.store_path.name], before[self.store_path.name])
+            wal = Path(f"{self.store_path}-wal")
+            self.assertFalse(wal.exists() and wal.stat().st_size)
         finally:
             self.store = FoundationStore(self.store_path)
 
@@ -481,6 +664,26 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
                 check=True,
             )
 
+    def test_failure_exit_is_typed_by_a_strict_contract(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            exit_code = run(
+                [
+                    "check",
+                    "--store",
+                    str(self.root / "missing.sqlite3"),
+                    "--repo",
+                    str(self.repository),
+                    "--tenant",
+                    TENANT_ID,
+                    "--repository-id",
+                    REPOSITORY_ID,
+                ]
+            )
+        self.assertEqual(exit_code, 2)
+        failure = json.loads(stderr.getvalue())
+        self.assertTrue(validate_projection("brain-failure-v1", failure).valid)
+
     def test_dedicated_module_cli_preserves_frozen_facades_and_parsers(self) -> None:
         self._append("memory:cli", sensitivity="safe-public")
         self.store.close()
@@ -509,7 +712,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertFalse(hasattr(cli, "build_brain_parser"))
 
     def test_phase3_contract_catalog_and_inventory_are_separate_and_strict(self) -> None:
-        self.assertEqual(len(PROJECTION_SCHEMA_NAMES), 6)
+        self.assertEqual(len(PROJECTION_SCHEMA_NAMES), 7)
         self.assertTrue(validate_projection_catalog().valid)
         malformed = {
             "schema_version": "hive-brain-pack/v1",
@@ -540,7 +743,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
             ),
             (131, 33, 13, 304),
         )
-        self.assertEqual(inventory["projection_contracts"]["count"], 6)
+        self.assertEqual(inventory["projection_contracts"]["count"], 7)
         self.assertTrue(inventory["projection_contracts"]["catalog_valid"])
         self.assertEqual(
             inventory["deterministic_fixture"]["projected_record_count"],

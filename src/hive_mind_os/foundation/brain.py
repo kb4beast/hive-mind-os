@@ -103,6 +103,17 @@ class ProjectionError(RuntimeError):
     """Raised when a projection cannot proceed without weakening its contract."""
 
 
+class ProjectionConflictError(ProjectionError):
+    """Raised when the generated namespace changes during publication."""
+
+    def __init__(self, conflict_paths: Sequence[str]) -> None:
+        self.conflict_paths = tuple(sorted(set(conflict_paths)))
+        super().__init__(
+            "projection conflict during publication: "
+            + ", ".join(self.conflict_paths)
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ProjectionResult:
     schema_version: str
@@ -130,6 +141,23 @@ class ProjectionResult:
         if not validation.valid:
             raise ProjectionError(
                 "projection result contract failed: "
+                + "; ".join(validation.issues)
+            )
+        return document
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionFailure:
+    schema_version: str
+    status: str
+    error: str
+
+    def to_dict(self) -> dict[str, str]:
+        document = asdict(self)
+        validation = validate_projection("brain-failure-v1", document)
+        if not validation.valid:
+            raise ProjectionError(
+                "projection failure contract failed: "
                 + "; ".join(validation.issues)
             )
         return document
@@ -175,6 +203,8 @@ def _json_bytes(value: Any) -> bytes:
 
 
 def _write_durable(path: Path, content: bytes) -> None:
+    if path.exists() and (not path.is_file() or _is_linklike(path)):
+        raise ProjectionError(f"durable write target is unsafe: {path.name}")
     with path.open("wb") as handle:
         handle.write(content)
         handle.flush()
@@ -479,10 +509,91 @@ def _path_from_relative(root: Path, relative_path: str) -> Path:
     relative = Path(relative_path)
     if relative.is_absolute() or ".." in relative.parts:
         raise ProjectionError(f"unsafe projection path: {relative_path}")
+    absolute_root = root.absolute()
+    resolved_root = root.resolve(strict=False)
+    if resolved_root != absolute_root:
+        raise ProjectionError("projection root is linked or escaped")
     candidate = root.joinpath(*relative.parts)
-    if candidate.resolve(strict=False).is_relative_to(root.resolve(strict=False)) is False:
+    if candidate.resolve(strict=False).is_relative_to(resolved_root) is False:
         raise ProjectionError(f"projection path escapes pack: {relative_path}")
     return candidate
+
+
+def _validate_projection_roots(
+    repository_root: Path,
+    *,
+    pack_root: Path,
+    state_root: Path | None = None,
+) -> None:
+    if (
+        not repository_root.is_dir()
+        or _is_linklike(repository_root)
+        or repository_root.resolve(strict=True) != repository_root
+    ):
+        raise ProjectionError("repository root changed during projection")
+    for label, root in (("memory pack", pack_root), ("projection state", state_root)):
+        if root is None or not root.exists():
+            continue
+        if not root.is_dir() or _is_linklike(root):
+            raise ProjectionError(f"{label} path must be a regular directory")
+        if root.resolve(strict=True) != root:
+            raise ProjectionError(f"{label} path escaped the repository")
+
+
+def _reject_source_overlap(source: Path, pack_root: Path) -> None:
+    if not pack_root.exists():
+        return
+    for directory, directory_names, file_names in os.walk(
+        pack_root,
+        followlinks=False,
+    ):
+        current = Path(directory)
+        safe_directories: list[str] = []
+        for name in directory_names:
+            child = current / name
+            if not _is_linklike(child):
+                safe_directories.append(name)
+        directory_names[:] = safe_directories
+        for name in file_names:
+            candidate = current / name
+            if _is_linklike(candidate) or not candidate.is_file():
+                continue
+            try:
+                overlaps = candidate.samefile(source)
+            except OSError:
+                overlaps = False
+            if overlaps:
+                raise ProjectionError(
+                    "foundation store cannot overlap the public memory pack"
+                )
+
+
+def _validate_state_tree(state_root: Path) -> None:
+    if not state_root.exists():
+        return
+    for directory, directory_names, file_names in os.walk(
+        state_root,
+        followlinks=False,
+    ):
+        current = Path(directory)
+        for name in (*directory_names, *file_names):
+            candidate = current / name
+            if _is_linklike(candidate):
+                raise ProjectionError(
+                    "projection state contains a linked or reparse path"
+                )
+
+
+def _expected_generated_directories(
+    desired_files: Mapping[str, bytes],
+) -> set[str]:
+    expected = {GENERATED_DIRECTORY}
+    for relative_path in desired_files:
+        parent = Path(relative_path).parent
+        while parent.as_posix() not in {".", ""}:
+            expected.add(parent.as_posix())
+            parent = parent.parent
+    return expected
 
 
 def _read_manifest(pack_root: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -550,42 +661,82 @@ def _manifest_files(
     return observed
 
 
+def _manifest_has_receipt(
+    state_root: Path,
+    manifest_digest: str | None,
+) -> bool:
+    if manifest_digest is None:
+        return False
+    transaction_id = manifest_digest.removeprefix("sha256:")
+    receipt_path = _path_from_relative(
+        state_root,
+        f"receipts/{transaction_id}.json",
+    )
+    if not receipt_path.exists():
+        return False
+    if not receipt_path.is_file() or _is_linklike(receipt_path):
+        raise ProjectionError("projection ownership receipt is unsafe")
+    try:
+        receipt = json.loads(receipt_path.read_bytes())
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ProjectionError("projection ownership receipt is invalid") from error
+    validation = validate_projection("brain-receipt-v1", receipt)
+    if not validation.valid:
+        raise ProjectionError(
+            "projection ownership receipt contract failed: "
+            + "; ".join(validation.issues)
+        )
+    if (
+        receipt.get("transaction_id") != transaction_id
+        or receipt.get("desired_manifest_digest") != manifest_digest
+        or receipt.get("verified_manifest_digest") != manifest_digest
+    ):
+        raise ProjectionError("projection ownership receipt does not match manifest")
+    return True
+
+
 def _find_conflicts(
     pack_root: Path,
     desired_files: Mapping[str, bytes],
     prior_files: Mapping[str, str],
     *,
-    manifest_exists: bool,
+    manifest_owned: bool,
+    prior_manifest_digest: str | None,
 ) -> tuple[str, ...]:
     conflicts: set[str] = set()
     generated_root = pack_root / GENERATED_DIRECTORY
     if generated_root.exists() and _is_linklike(generated_root):
         raise ProjectionError("generated namespace cannot be a symbolic link")
     if generated_root.exists():
+        expected_directories = _expected_generated_directories(desired_files)
         for path in generated_root.rglob("*"):
             if _is_linklike(path):
                 conflicts.add(path.relative_to(pack_root).as_posix())
+            elif path.is_dir():
+                relative = path.relative_to(pack_root).as_posix()
+                if relative not in expected_directories:
+                    conflicts.add(relative)
             elif path.is_file():
                 relative = path.relative_to(pack_root).as_posix()
-                if relative != MANIFEST_PATH and relative not in prior_files:
+                expected_digest = (
+                    prior_manifest_digest
+                    if relative == MANIFEST_PATH and manifest_owned
+                    else prior_files.get(relative)
+                )
+                if expected_digest is None:
                     desired = desired_files.get(relative)
                     if desired is None or _digest_bytes(path.read_bytes()) != _digest_bytes(
                         desired
                     ):
                         conflicts.add(relative)
-    if not manifest_exists and generated_root.exists():
-        unmanaged = [
-            path
-            for path in generated_root.rglob("*")
-            if path.is_file() or path.is_symlink()
-        ]
-        for path in unmanaged:
-            relative = path.relative_to(pack_root).as_posix()
-            desired = desired_files.get(relative)
-            if desired is None or _is_linklike(path):
-                conflicts.add(relative)
-            elif _digest_bytes(path.read_bytes()) != _digest_bytes(desired):
-                conflicts.add(relative)
+                else:
+                    desired = desired_files.get(relative)
+                    desired_digest = (
+                        None if desired is None else _digest_bytes(desired)
+                    )
+                    actual_digest = _digest_bytes(path.read_bytes())
+                    if actual_digest not in {expected_digest, desired_digest}:
+                        conflicts.add(relative)
     for relative_path, expected_digest in prior_files.items():
         destination = _path_from_relative(pack_root, relative_path)
         if not destination.is_file() or _is_linklike(destination):
@@ -601,10 +752,72 @@ def _find_conflicts(
     return tuple(sorted(conflicts))
 
 
+def _prior_projection_state(
+    *,
+    pack_root: Path,
+    state_root: Path,
+    desired_files: Mapping[str, bytes],
+    tenant_id: str,
+    repository_id: str,
+    repository_identity_digest: str,
+) -> tuple[dict[str, str], str | None, tuple[str, ...]]:
+    try:
+        prior_manifest, prior_manifest_digest = _read_manifest(pack_root)
+    except ProjectionError:
+        manifest_path = _path_from_relative(pack_root, MANIFEST_PATH)
+        observed_digest = (
+            _digest_bytes(manifest_path.read_bytes())
+            if manifest_path.is_file() and not _is_linklike(manifest_path)
+            else None
+        )
+        return {}, observed_digest, (MANIFEST_PATH,)
+    manifest_owned = _manifest_has_receipt(state_root, prior_manifest_digest)
+    prior_files = (
+        _manifest_files(
+            prior_manifest,
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            repository_identity_digest=repository_identity_digest,
+        )
+        if manifest_owned
+        else {}
+    )
+    conflicts = _find_conflicts(
+        pack_root,
+        desired_files,
+        prior_files,
+        manifest_owned=manifest_owned,
+        prior_manifest_digest=prior_manifest_digest,
+    )
+    return prior_files, prior_manifest_digest, conflicts
+
+
 def _pack_matches(
     pack_root: Path,
     desired_files: Mapping[str, bytes],
 ) -> bool:
+    generated_root = pack_root / GENERATED_DIRECTORY
+    if not generated_root.is_dir() or _is_linklike(generated_root):
+        return False
+    expected_files = set(desired_files)
+    expected_directories = _expected_generated_directories(desired_files)
+    observed_files: set[str] = set()
+    observed_directories = {GENERATED_DIRECTORY}
+    for path in generated_root.rglob("*"):
+        relative = path.relative_to(pack_root).as_posix()
+        if _is_linklike(path):
+            return False
+        if path.is_file():
+            observed_files.add(relative)
+        elif path.is_dir():
+            observed_directories.add(relative)
+        else:
+            return False
+    if (
+        observed_files != expected_files
+        or not observed_directories.issubset(expected_directories)
+    ):
+        return False
     for relative_path, desired in desired_files.items():
         destination = _path_from_relative(pack_root, relative_path)
         if (
@@ -639,13 +852,15 @@ def _require_projection_authority(
 
 def _staged_path(staged_root: Path, relative_path: str) -> Path:
     name = sha256(relative_path.encode("utf-8")).hexdigest()
-    return staged_root / f"{name}.tmp"
+    return _path_from_relative(staged_root, f"{name}.tmp")
 
 
 @contextmanager
 def _projection_lock(state_root: Path) -> Iterator[None]:
     state_root.mkdir(parents=True, exist_ok=True)
-    lock_path = state_root / "projection.lock"
+    if not state_root.is_dir() or _is_linklike(state_root):
+        raise ProjectionError("projection state path must be a regular directory")
+    lock_path = _path_from_relative(state_root, "projection.lock")
     handle = lock_path.open("a+b")
     try:
         handle.seek(0)
@@ -694,12 +909,28 @@ def _write_transaction(
 ) -> tuple[str, str]:
     state_root = repository_root / STATE_DIRECTORY
     transaction_id = desired_manifest_digest.removeprefix("sha256:")
-    transaction_root = state_root / "transactions" / transaction_id
-    staged_root = transaction_root / "files"
-    receipt_root = state_root / "receipts"
-    receipt_path = receipt_root / f"{transaction_id}.json"
+    transaction_root = _path_from_relative(
+        state_root,
+        f"transactions/{transaction_id}",
+    )
+    staged_root = _path_from_relative(
+        state_root,
+        f"transactions/{transaction_id}/files",
+    )
+    receipt_root = _path_from_relative(state_root, "receipts")
+    receipt_path = _path_from_relative(
+        state_root,
+        f"receipts/{transaction_id}.json",
+    )
     if receipt_path.exists():
         if _pack_matches(pack_root, desired_files):
+            if transaction_root.exists():
+                if not transaction_root.is_dir() or _is_linklike(transaction_root):
+                    raise ProjectionError("stale transaction path is unsafe")
+                shutil.rmtree(transaction_root)
+            transactions_root = _path_from_relative(state_root, "transactions")
+            if transactions_root.exists() and not any(transactions_root.iterdir()):
+                transactions_root.rmdir()
             return (
                 receipt_path.relative_to(repository_root).as_posix(),
                 "already-committed",
@@ -727,7 +958,10 @@ def _write_transaction(
             for relative_path, content in sorted(desired_files.items())
         ],
     }
-    journal_path = transaction_root / "transaction.json"
+    journal_path = _path_from_relative(
+        state_root,
+        f"transactions/{transaction_id}/transaction.json",
+    )
     recovering = journal_path.exists()
     if recovering:
         try:
@@ -758,7 +992,26 @@ def _write_transaction(
         desired_files,
         key=lambda path: (path == MANIFEST_PATH, path),
     )
+    late_conflicts = _find_conflicts(
+        pack_root,
+        desired_files,
+        prior_files,
+        manifest_owned=prior_manifest_digest is not None,
+        prior_manifest_digest=prior_manifest_digest,
+    )
+    if late_conflicts:
+        raise ProjectionConflictError(late_conflicts)
     for relative_path in ordered_paths:
+        if relative_path == MANIFEST_PATH:
+            late_conflicts = _find_conflicts(
+                pack_root,
+                desired_files,
+                prior_files,
+                manifest_owned=prior_manifest_digest is not None,
+                prior_manifest_digest=prior_manifest_digest,
+            )
+            if late_conflicts:
+                raise ProjectionConflictError(late_conflicts)
         desired = desired_files[relative_path]
         desired_digest = _digest_bytes(desired)
         destination = _path_from_relative(pack_root, relative_path)
@@ -789,6 +1042,15 @@ def _write_transaction(
         if fail_after_replacements is not None and replacements >= fail_after_replacements:
             raise InterruptedError("injected projection interruption")
     if not _pack_matches(pack_root, desired_files):
+        late_conflicts = _find_conflicts(
+            pack_root,
+            desired_files,
+            prior_files,
+            manifest_owned=prior_manifest_digest is not None,
+            prior_manifest_digest=prior_manifest_digest,
+        )
+        if late_conflicts:
+            raise ProjectionConflictError(late_conflicts)
         raise ProjectionError("projection verification failed after replacement")
     receipt = {
         **journal,
@@ -803,11 +1065,14 @@ def _write_transaction(
             "projection receipt contract failed: " + "; ".join(validation.issues)
         )
     receipt_root.mkdir(parents=True, exist_ok=True)
-    temporary_receipt = transaction_root / "receipt.json"
+    temporary_receipt = _path_from_relative(
+        state_root,
+        f"transactions/{transaction_id}/receipt.json",
+    )
     _write_durable(temporary_receipt, _json_bytes(receipt))
     os.replace(temporary_receipt, receipt_path)
     shutil.rmtree(transaction_root)
-    transactions_root = state_root / "transactions"
+    transactions_root = _path_from_relative(state_root, "transactions")
     if transactions_root.exists() and not any(transactions_root.iterdir()):
         transactions_root.rmdir()
     return (
@@ -860,8 +1125,10 @@ def _preserve_conflict(
         "conflicts": observations,
     }
     conflict_id = _digest_document(stable_body).removeprefix("sha256:")
-    conflict_root = state_root / "conflicts" / conflict_id
-    receipt_path = conflict_root / "receipt.json"
+    receipt_path = _path_from_relative(
+        state_root,
+        f"conflicts/{conflict_id}/receipt.json",
+    )
     if receipt_path.exists():
         try:
             body = json.loads(receipt_path.read_bytes())
@@ -879,7 +1146,10 @@ def _preserve_conflict(
             "projection conflict contract failed: "
             + "; ".join(validation.issues)
         )
-    staged_root = conflict_root / "desired"
+    staged_root = _path_from_relative(
+        state_root,
+        f"conflicts/{conflict_id}/desired",
+    )
     staged_root.mkdir(parents=True, exist_ok=True)
     for relative_path, desired in desired_files.items():
         staged = _staged_path(staged_root, relative_path)
@@ -890,7 +1160,10 @@ def _preserve_conflict(
                 raise ProjectionError("existing desired conflict bytes are inconsistent")
         else:
             _write_durable(staged, desired)
-    temporary_receipt = conflict_root / "receipt.tmp"
+    temporary_receipt = _path_from_relative(
+        state_root,
+        f"conflicts/{conflict_id}/receipt.tmp",
+    )
     _write_durable(temporary_receipt, _json_bytes(body))
     os.replace(temporary_receipt, receipt_path)
     return receipt_path.relative_to(repository_root).as_posix()
@@ -919,10 +1192,15 @@ def project_memory_pack(
     if not repository.is_dir():
         raise ProjectionError("repository root must be an existing regular directory")
     pack_root = repository / PACK_DIRECTORY
-    if pack_root.exists() and (not pack_root.is_dir() or _is_linklike(pack_root)):
-        raise ProjectionError("memory pack path must be a regular directory")
+    state_root = repository / STATE_DIRECTORY
+    _validate_projection_roots(
+        repository,
+        pack_root=pack_root,
+        state_root=state_root,
+    )
     if source.is_relative_to(pack_root.resolve(strict=False)):
         raise ProjectionError("foundation store cannot overlap the public memory pack")
+    _reject_source_overlap(source, pack_root)
     snapshot = FoundationStore.read_public_memory_snapshot(
         source,
         tenant_id=tenant_id,
@@ -949,18 +1227,13 @@ def project_memory_pack(
             for path, content in sorted(desired_files.items())
         }
     )
-    prior_manifest, prior_manifest_digest = _read_manifest(pack_root)
-    prior_files = _manifest_files(
-        prior_manifest,
+    prior_files, prior_manifest_digest, conflicts = _prior_projection_state(
+        pack_root=pack_root,
+        state_root=state_root,
+        desired_files=desired_files,
         tenant_id=tenant_id,
         repository_id=repository_id,
         repository_identity_digest=snapshot.repository_identity_digest,
-    )
-    conflicts = _find_conflicts(
-        pack_root,
-        desired_files,
-        prior_files,
-        manifest_exists=prior_manifest is not None,
     )
     common = {
         "schema_version": "hive-brain-projection-result/v1",
@@ -977,43 +1250,16 @@ def project_memory_pack(
         "omitted_unsupported_count": snapshot.omitted_unsupported_count,
         "omitted_quarantined_count": excluded,
     }
-    if conflicts:
-        receipt_path = None
-        if not check:
-            verified_authority = _require_projection_authority(
-                authority,
-                tenant_id=tenant_id,
-                repository_id=repository_id,
-            )
-            state_root = repository / STATE_DIRECTORY
-            if state_root.exists() and (
-                not state_root.is_dir() or _is_linklike(state_root)
-            ):
-                raise ProjectionError(
-                    "projection state path must be a regular directory"
-                )
-            with _projection_lock(state_root):
-                receipt_path = _preserve_conflict(
-                    repository_root=repository,
-                    pack_root=pack_root,
-                    desired_files=desired_files,
-                    prior_files=prior_files,
-                    prior_manifest_digest=prior_manifest_digest,
-                    desired_manifest_digest=desired_manifest_digest,
-                    conflict_paths=conflicts,
-                    authority=verified_authority,
-                )
-        return ProjectionResult(
-            status="conflict",
-            conflict_paths=conflicts,
-            receipt_path=receipt_path,
-            recovery_status="conflict-preserved" if receipt_path else "read-only",
-            **common,
-        )
-    matches = _pack_matches(pack_root, desired_files)
     if check:
+        if conflicts:
+            return ProjectionResult(
+                status="conflict",
+                conflict_paths=conflicts,
+                recovery_status="read-only",
+                **common,
+            )
         return ProjectionResult(
-            status="unchanged" if matches else "drift",
+            status="unchanged" if _pack_matches(pack_root, desired_files) else "drift",
             recovery_status="read-only",
             **common,
         )
@@ -1022,36 +1268,86 @@ def project_memory_pack(
         tenant_id=tenant_id,
         repository_id=repository_id,
     )
-    state_root = repository / STATE_DIRECTORY
-    if state_root.exists() and (not state_root.is_dir() or _is_linklike(state_root)):
-        raise ProjectionError("projection state path must be a regular directory")
-    transaction_id = desired_manifest_digest.removeprefix("sha256:")
-    pending_transaction = (
-        state_root / "transactions" / transaction_id / "transaction.json"
-    ).is_file()
-    if matches and not pending_transaction:
+    with _projection_lock(state_root):
+        _validate_projection_roots(
+            repository,
+            pack_root=pack_root,
+            state_root=state_root,
+        )
+        _validate_state_tree(state_root)
+        _reject_source_overlap(source, pack_root)
+        prior_files, prior_manifest_digest, conflicts = _prior_projection_state(
+            pack_root=pack_root,
+            state_root=state_root,
+            desired_files=desired_files,
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            repository_identity_digest=snapshot.repository_identity_digest,
+        )
+        if conflicts:
+            receipt_path = _preserve_conflict(
+                repository_root=repository,
+                pack_root=pack_root,
+                desired_files=desired_files,
+                prior_files=prior_files,
+                prior_manifest_digest=prior_manifest_digest,
+                desired_manifest_digest=desired_manifest_digest,
+                conflict_paths=conflicts,
+                authority=verified_authority,
+            )
+            return ProjectionResult(
+                status="conflict",
+                conflict_paths=conflicts,
+                receipt_path=receipt_path,
+                recovery_status="conflict-preserved",
+                **common,
+            )
+        transaction_id = desired_manifest_digest.removeprefix("sha256:")
+        pending_transaction = _path_from_relative(
+            state_root,
+            f"transactions/{transaction_id}/transaction.json",
+        ).is_file()
+        if _pack_matches(pack_root, desired_files) and not pending_transaction:
+            return ProjectionResult(
+                status="unchanged",
+                recovery_status="not-required",
+                **common,
+            )
+        try:
+            receipt_path, recovery_status = _write_transaction(
+                repository_root=repository,
+                pack_root=pack_root,
+                desired_files=desired_files,
+                prior_files=prior_files,
+                prior_manifest_digest=prior_manifest_digest,
+                desired_manifest_digest=desired_manifest_digest,
+                authority=verified_authority,
+                fail_after_replacements=fail_after_replacements,
+            )
+        except ProjectionConflictError as error:
+            receipt_path = _preserve_conflict(
+                repository_root=repository,
+                pack_root=pack_root,
+                desired_files=desired_files,
+                prior_files=prior_files,
+                prior_manifest_digest=prior_manifest_digest,
+                desired_manifest_digest=desired_manifest_digest,
+                conflict_paths=error.conflict_paths,
+                authority=verified_authority,
+            )
+            return ProjectionResult(
+                status="conflict",
+                conflict_paths=error.conflict_paths,
+                receipt_path=receipt_path,
+                recovery_status="conflict-preserved",
+                **common,
+            )
         return ProjectionResult(
-            status="unchanged",
-            recovery_status="not-required",
+            status="projected",
+            receipt_path=receipt_path,
+            recovery_status=recovery_status,
             **common,
         )
-    with _projection_lock(state_root):
-        receipt_path, recovery_status = _write_transaction(
-            repository_root=repository,
-            pack_root=pack_root,
-            desired_files=desired_files,
-            prior_files=prior_files,
-            prior_manifest_digest=prior_manifest_digest,
-            desired_manifest_digest=desired_manifest_digest,
-            authority=verified_authority,
-            fail_after_replacements=fail_after_replacements,
-        )
-    return ProjectionResult(
-        status="projected",
-        receipt_path=receipt_path,
-        recovery_status=recovery_status,
-        **common,
-    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1098,16 +1394,13 @@ def run(argv: Sequence[str] | None = None) -> int:
             authority=authority,
         )
     except (OSError, ProjectionError, ValueError) as error:
+        failure = ProjectionFailure(
+            schema_version="hive-brain-projection-failure/v1",
+            status="failed",
+            error=f"{type(error).__name__}: {error}"[:8192],
+        )
         print(
-            json.dumps(
-                {
-                    "schema_version": "hive-brain-projection-result/v1",
-                    "status": "failed",
-                    "error": f"{type(error).__name__}: {error}",
-                },
-                indent=2,
-                sort_keys=True,
-            ),
+            json.dumps(failure.to_dict(), indent=2, sort_keys=True),
             file=sys.stderr,
         )
         return 2

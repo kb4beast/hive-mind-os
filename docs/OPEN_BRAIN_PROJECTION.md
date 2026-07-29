@@ -30,6 +30,11 @@ file, or stale manifest causes a visible conflict and is never silently overwrit
 Human notes may live outside that generated namespace. There is no Inbox, import, or
 write-back path in this item.
 
+Preserve the ignored `.hive-mind-projection-state` directory when you want later
+updates to an existing pack. Its completion receipt is the ownership proof for a
+future mutation. A clone without that state can verify or recognize an exact tree,
+but a differing tree fails closed as a conflict instead of overwriting files.
+
 The generated pack is not memory authority. The Foundation database remains canonical
 and must live outside the public pack. Private/internal/quarantined memory and
 protected content references are not projected.

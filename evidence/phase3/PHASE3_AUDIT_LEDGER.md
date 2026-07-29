@@ -106,3 +106,60 @@ This is a real cross-platform typing defect, not a waived runner difference. The
 candidate is remanded. Remediation uses portable `getattr` access for both the
 Windows stat attribute and reparse flag while retaining runtime reparse detection.
 Fresh exact-head CI and independent reconstruction remain required.
+
+## `P3-AUDIT-007` — repaired-head CI receipt before independent runtime remand
+
+Candidate `3aa3a8a3c7f311eadec8885e04c908f6f71ac787` repaired the portable
+Windows reparse typing defect. Exact push run `30460118148` and pull-request run
+`30460123065` both completed successfully:
+
+- Python 3.11, 3.12, and 3.14 complete suites: pass;
+- Ruff and Pyright: pass;
+- CodeQL and secret scan: pass;
+- pull-request dependency/license review: pass; the push-context copy was expected
+  to skip;
+- wheel build and isolated resource verification: pass;
+- SPDX SBOM generation and push provenance attestation: pass.
+
+The push artifact `8727206074` contained wheel SHA-256
+`88452ab4267c73ee48a94692f6b0d05c9b510c4505f67b3234117d3dd75ccec6`
+and SBOM SHA-256
+`447fc9c5a0e41587608d8936c475d67187d654c49f5dd4e39cacdbb5dc9d14ea`.
+This green receipt did not promote the candidate because independent runtime review
+remained a separate burden.
+
+## `P3-AUDIT-008` — independent Curator and Steward runtime remand
+
+Curator `Kuhn` and Steward `Planck` independently reconstructed exact candidate
+`3aa3a8a3c7f311eadec8885e04c908f6f71ac787` without edits. Their probes remanded:
+
+- momentary empty-WAL inference selecting SQLite immutable mode;
+- an unmanaged file created after preflight but before the process lock;
+- a pack-root junction swap and nested protected-state junction redirecting writes;
+- stale transaction state after an already-published completion receipt;
+- a hardlink to the canonical database inside the output root;
+- valid, invalid, and forged unreceipted manifest ownership;
+- untyped exit-2 command output; and
+- court language that overstated committed adversarial test coverage.
+
+These were reproduced contract failures, not waived recommendations. The adverse
+candidate and its otherwise-green CI remain preserved.
+
+## `P3-AUDIT-009` — runtime remand remediation
+
+The remediation:
+
+- always uses normally coordinated SQLite read-only mode;
+- revalidates exact generated namespace, pack/state roots, nested state paths, and
+  database same-file overlap under the process lock;
+- requires a private completion receipt to use a prior manifest as mutation
+  authority while allowing an unreceipted exact tree to remain unchanged;
+- treats manifest edits and forged ownership as conflicts;
+- cleans stale transaction state after verifying a completed receipt;
+- adds a seventh strict schema for exit-2 failure results; and
+- adds regression tests for editor races, manifest ownership, stale-receipt cleanup,
+  hardlinks, linked state, and missing/renamed managed paths.
+
+The architecture, migration, operator documentation, dissent, and court wording were
+corrected to match the narrower implementation. Fresh exact-head inventory, complete
+verification, independent reconstruction, and Judge disposition remain required.

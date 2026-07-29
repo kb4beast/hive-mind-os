@@ -935,11 +935,10 @@ class FoundationStore:
         if source.is_symlink() or not source.is_file():
             raise RuntimeError("foundation store must be an existing regular file")
         resolved_source = source.resolve()
-        wal_path = Path(f"{resolved_source}-wal")
-        immutable = not wal_path.exists() or wal_path.stat().st_size == 0
-        uri = resolved_source.as_uri() + (
-            "?mode=ro&immutable=1" if immutable else "?mode=ro"
-        )
+        # A missing or empty WAL is only a momentary observation while another
+        # already-open writer may still commit.  Normal read-only coordination is
+        # required unless quiescence is established by a stronger external lease.
+        uri = resolved_source.as_uri() + "?mode=ro"
         connection = sqlite3.connect(
             uri,
             uri=True,
