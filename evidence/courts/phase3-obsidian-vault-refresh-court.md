@@ -78,3 +78,39 @@ production bytes remain controlling evidence.
 A stacked draft PR may be published but must remain open, unmerged, and inactive.
 Any relevant byte, schema, interface, capability, protocol, or evidence change
 requires renewed independent review and judgment.
+
+## Cross-platform CI appeal
+
+The item-4 appeal records the inherited wheel-count, Windows-path-fixture, and
+Windows-only junction-test repairs in exact base candidate
+`19b933beb8c0008652d543567198b0e776595bfa`. Item-5 candidate
+`0b1529a91dd86be211128375b9771a1b64caef02` additionally permits its Linux
+linked-evidence regression to accept either truthful fail-closed classification:
+`linked evidence` or `escapes run directory`. Both classifications reject the
+symlink before evidence is admitted.
+
+Regenerating the deterministic item-5 inventory was required because it binds the
+changed test-file hash. Its resulting digest is
+`sha256:a19b0f105a6109afb8ecedf43ed7de879238962d5a071475d40b488b0d60592f`.
+The sealed runtime subject
+`ee09e4cb9a4bc5fd0711e738249039507a194e43` remains an ancestor, and its
+production renderer, fixture, runtime receipts, screenshots, and surviving-vault
+bytes are unchanged.
+
+Local verification passed the `147`-test Phase 2+3 matrix with `57` subtests,
+Ruff, Pyright, exact inventory validation, and an isolated-wheel install with `17`
+foundation-generated and `120` total resources. Hosted Constitutional CI passed
+both the
+[push run](https://github.com/kb4beast/hive-mind-os/actions/runs/30497243483)
+and the
+[pull-request run](https://github.com/kb4beast/hive-mind-os/actions/runs/30497247010)
+for exact candidate `0b1529a91dd86be211128375b9771a1b64caef02`.
+
+Cross-Examiner/Integrator `Einstein`, Curator/Expert Witness `Locke`, and Steward
+`/root/item4_explorer/steward` each returned `PASS` on the exact base and item-5
+repair candidates. Their testimony confirms that the changes preserve the original
+narrow runtime judgment, rejection behavior, rollback, Windows/POSIX claim
+boundaries, and absence of any usefulness, generalization, or superiority claim.
+
+This appeal records reviewer testimony only. The repaired stacked draft remains
+open, unmerged, inactive, and subject to renewed independent judgment.

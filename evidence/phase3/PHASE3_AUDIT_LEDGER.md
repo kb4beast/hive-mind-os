@@ -986,3 +986,30 @@ unproved or rejected.
 Publication as a stacked draft PR is permitted. The PR must remain open, unmerged,
 and inactive. Any relevant byte, schema, interface, capability, protocol, or
 evidence change requires renewed independent review and judgment.
+
+## `P3-ITEM5-AUDIT-008` — cross-platform CI repair review
+
+Hosted CI exposed stale item-4 wheel totals, two platform-assumption defects in
+tests, and an item-5 assertion that recognized only one of two truthful fail-closed
+symlink classifications. Base repair
+`19b933beb8c0008652d543567198b0e776595bfa` and item-5 repair
+`0b1529a91dd86be211128375b9771a1b64caef02` correct only verification
+expectations and platform setup.
+
+The regenerated item-5 inventory digest is
+`sha256:a19b0f105a6109afb8ecedf43ed7de879238962d5a071475d40b488b0d60592f`.
+The sealed runtime subject
+`ee09e4cb9a4bc5fd0711e738249039507a194e43` remains an ancestor with
+unchanged production and runtime-evidence bytes.
+
+Local verification passed `566` deterministic tests with `3` documented skips on
+the base, the `147`-test Phase 2+3 matrix with `57` subtests on the child, Ruff,
+Pyright, deterministic inventories, and isolated-wheel installation with exact
+resource totals of `17` foundation-generated and `120` overall. Hosted push and
+pull-request Constitutional CI passed for both exact repair candidates.
+
+Cross-Examiner/Integrator `Einstein`, Curator/Expert Witness `Locke`, and Steward
+`/root/item4_explorer/steward` independently returned `PASS`. They found no
+production, schema, interface, protocol, capability, persistence, authority, or
+claim expansion. The repaired draft still requires a distinct renewed Judge
+disposition.
