@@ -91,6 +91,31 @@ The registry exposes rather than repairs generation-zero defects:
 - projections can write during nominal reads; and
 - crash, privacy, migration, and concurrency properties remain unproven.
 
+## Curator remand 1 — interpreter-dependent evidence
+
+The Curator remanded candidate
+`83e9e2ca16c34d118e86ec85acd44afeadbd6107`. Python 3.14 reproduced the
+artifact, while Python 3.12 produced different public-API, CLI, and observable
+AST digests. Runtime-effect receipts were identical, but the supported CI
+matrix would have failed.
+
+The causes were version-sensitive `argparse` help formatting, `ast.dump`/
+`ast.unparse` forms, the runtime representation of a union type alias, and a
+public default containing `sys.executable`.
+
+The repair:
+
+- removes formatted help text while retaining semantic CLI actions;
+- derives observable signatures and constant expressions from exact source
+  segments;
+- canonicalizes union aliases independently of `typing.Union` versus
+  `types.UnionType`; and
+- records interpreter-path defaults as the semantic value `sys.executable`.
+
+The Python 3.12 and 3.14 generators must now produce structurally identical
+artifacts and the same inventory digest. The supported GitHub Python 3.11 job
+remains an exact-head publication gate.
+
 ## Acceptance evidence
 
 The candidate must provide:

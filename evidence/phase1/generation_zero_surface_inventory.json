@@ -1,7 +1,7 @@
 {
   "cli": {
     "console_script": "hive-mind=hive_mind_os.cli:main",
-    "digest": "sha256:779f7a0b4140b7a19eb0e866defd669d5800920ea6a068ee9e5e074269fcaa9a",
+    "digest": "sha256:9b82d1f19b056a218082d2dd51b117e25655343be3eedaa051717d82bb8443c4",
     "parser_count": 13,
     "parsers": {
       "audit": {
@@ -80,7 +80,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:f68581ef12423c8326a05c0c40acc5220eae716dc97d415b11d8200900eaf31d",
         "prog": "hive-mind audit"
       },
       "benchmark": {
@@ -173,7 +172,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:079c22da338372ddb2495b698ccdd56c563b25fa2da88019bfc2f2d4eb491723",
         "prog": "hive-mind benchmark run"
       },
       "default": {
@@ -243,7 +241,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:b5036eb4024f74ddff920a3e59c649787c80a62f62a49672e1be7c374d8b2785",
         "prog": "hive-mind"
       },
       "defer": {
@@ -358,7 +355,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:59e596c46849f79a71056d06a779bd7cdfa1adbc868e2d9fe927113980c89f8b",
         "prog": "hive-mind defer"
       },
       "deliver": {
@@ -481,7 +477,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:7c0778c7ff188a9e9e9163026f954866dfa6cd87f74c4342df5d67061d4fb7e6",
         "prog": "hive-mind deliver"
       },
       "enqueue": {
@@ -588,7 +583,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:6b2c7549d73f59df723c3de78cbd025fc4d00e60e0318e51a654e6aa74153054",
         "prog": "hive-mind enqueue"
       },
       "experiment": {
@@ -702,7 +696,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:943b65056d629f29e6d8b04656b51df75666d9653f2e081576eeab87a0651fd7",
         "prog": "hive-mind experiment run"
       },
       "ingest": {
@@ -844,7 +837,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:0e672801e4f018fedf97d05819447905bed3fee069e07b8db6965f81dca9a71c",
         "prog": "hive-mind ingest"
       },
       "missions": {
@@ -875,7 +867,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:b61d9c8d58951e2a30bb372a6395796c1fe88ba8a89cce6dc9cd20af393bd395",
         "prog": "hive-mind missions"
       },
       "pit-episode": {
@@ -944,7 +935,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:cfff4c3e08f2df9f6a900dc667514ac2109b2e3b1c961c55abdbf03495df7b21",
         "prog": "hive-mind pit-episode"
       },
       "resume": {
@@ -985,7 +975,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:2bb871d1e0a5f0bad429fd5b4ec6b9192a9e994f562121cb01149becdf4c5eeb",
         "prog": "hive-mind resume"
       },
       "serve": {
@@ -1052,7 +1041,6 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:7af5152f98c3848a24284b424daad3c47e1d50055c5ada4dcd512462c70d9b51",
         "prog": "hive-mind serve"
       },
       "status": {
@@ -1107,252 +1095,251 @@
             "type": null
           }
         ],
-        "help_digest": "sha256:0125bfb84f02854d809a6a98cc7d48261422285c163fcc1249d2a2b7497ae121",
         "prog": "hive-mind status"
       }
     }
   },
-  "inventory_digest": "sha256:ca386d16c8f29b848116fac495a5c319ec009d226d9f9f62cd839067ef9e7bee",
+  "inventory_digest": "sha256:f551d93964f13a01327efb6cb1481c88f90883454b77df2c7ee9b67ed36e1401",
   "observable_module_surface": {
     "classification": "de-facto-observable-not-promised-supported",
     "constant_count": 40,
     "constants": [
       {
-        "expression_digest": "sha256:e977eda94d8bbdd513ad63e624eb1aecece6654bc0ae386f59576e6c0e4d8d4b",
+        "expression_digest": "sha256:cf83de0bcd628a29685af5d5428801f80421c341975cd4a3ea6384c260909940",
         "line": 12,
         "name": "ADDITIONAL_SOURCES",
         "path": "src/hive_mind_os/additional_video_docket.py"
       },
       {
-        "expression_digest": "sha256:5c6d6204d55d56ae6c1eeb8954bc3906bc9cc8830b7f2cfe2b51f4413e3ea222",
+        "expression_digest": "sha256:ba3a5e702ad3f7df7ce29d0e3e87f05d234a7702f5b2d9ebbc56d0a10a5f1966",
         "line": 60,
         "name": "ADDITIONAL_CLAIMS",
         "path": "src/hive_mind_os/additional_video_docket.py"
       },
       {
-        "expression_digest": "sha256:d4a5f86e4bb17b0c3eccfcefc2265dfca9341b6d4909cb4ebeaf8fc0211ea934",
+        "expression_digest": "sha256:0c291a3a5f7d184cf19f83e5f03cbe4d557035a78dca16706d697a2376314421",
         "line": 32,
         "name": "MEASUREMENT_DISPOSITION",
         "path": "src/hive_mind_os/benchmark_harness.py"
       },
       {
-        "expression_digest": "sha256:d5356eaec3e34a8b263ac9076e5c7ef86c4b84c352e4442a986ef0ba733feea7",
+        "expression_digest": "sha256:b6108f5d278b0a6cfe77c53e4c89792f3f9e09cb54a27c08be5e786d3d0abba7",
         "line": 33,
         "name": "DEFAULT_JUDGE_ID",
         "path": "src/hive_mind_os/benchmark_harness.py"
       },
       {
-        "expression_digest": "sha256:75bb32edba63278bae8607bd9307f35c5cad14a8bab762ef41ed8a8b2febd351",
+        "expression_digest": "sha256:3defe82d53123a4d787d3535667155c95268babbd212ded3d0fe56b1a7432530",
         "line": 39,
         "name": "SIDE_EFFECTING_ACTIONS",
         "path": "src/hive_mind_os/classic_gpt.py"
       },
       {
-        "expression_digest": "sha256:ab31954730fca0867e4820510099cd8ac8afca8fe5a8b0f7a1f9fdd4ed416b5d",
+        "expression_digest": "sha256:21eeb5019363e90160475f19a5e23cf31194cb6ed8ea2adbce135834b132062d",
         "line": 99,
         "name": "DEFAULT_CLASSIC_GPT_FILES",
         "path": "src/hive_mind_os/classic_gpt.py"
       },
       {
-        "expression_digest": "sha256:535b26d223e9b13b4057a9d4cf0930dfdbec6ebcc0498a47cd6815a239d89b38",
+        "expression_digest": "sha256:a766047a74e29c660d32fc846e0364ffc0809254f6d5894db06443ae2c1c9953",
         "line": 12,
         "name": "CLASSIC_GPT_SOURCES",
         "path": "src/hive_mind_os/classic_gpt_docket.py"
       },
       {
-        "expression_digest": "sha256:fd773f40345ec349aac10dd6d57a189c25f31f5bc991e301006efb4ae33a9e01",
+        "expression_digest": "sha256:c632be76feb6766a63284081d873b97d756836cd486ecd58de2ba1ac22af9a4f",
         "line": 28,
         "name": "CLASSIC_GPT_CLAIMS",
         "path": "src/hive_mind_os/classic_gpt_docket.py"
       },
       {
-        "expression_digest": "sha256:35064c0d195e67caa53fff3c97d793fb6c49e45ede3d254451dff068570e8fed",
+        "expression_digest": "sha256:bfb93757d401956b1ee55271fc6c68282c26d431df36865099da7516d2648ea9",
         "line": 15,
         "name": "LEGACY_SCHEMA_NAMES",
         "path": "src/hive_mind_os/contracts.py"
       },
       {
-        "expression_digest": "sha256:5244d7ed403ed817dcc4655845ec8352639cc5cf027318f662697c7b9ea1d57e",
+        "expression_digest": "sha256:35dd0efd663d4941949fa188a6f35bec683b9ba2908f8ade00bb3fec22594b20",
         "line": 29,
         "name": "EXTENSION_SCHEMA_NAMES",
         "path": "src/hive_mind_os/contracts.py"
       },
       {
-        "expression_digest": "sha256:2502ec03033ab7485ed42e49e55608abe20e74ad6dce724c5fe7c50e029d37b5",
+        "expression_digest": "sha256:dc47d6f56d458a89e1f6181d7066ddfdc8a347c01b032b853e671dd95f295580",
         "line": 39,
         "name": "SCHEMA_NAMES",
         "path": "src/hive_mind_os/contracts.py"
       },
       {
-        "expression_digest": "sha256:c28660dcd607b0987196332f013ac1b8539bafc3c2c9dbcc047e349908e0ce87",
+        "expression_digest": "sha256:8376af4c9b3223f4ffd22235484d6a5590a70fdbe44c6aad05b6f6045df2d477",
         "line": 40,
         "name": "ROLE_NAMES",
         "path": "src/hive_mind_os/contracts.py"
       },
       {
-        "expression_digest": "sha256:d11fc09be715761b1bbfa52ed11e4c5cf592e47fee853ac69045deb6b6508496",
+        "expression_digest": "sha256:90cf4e0798f95b7febd0ea4e07c41a9c6b0bfa460e7be7ba5d80a570b214ebae",
         "line": 52,
         "name": "SIDE_EFFECTING_ACTIONS",
         "path": "src/hive_mind_os/contracts.py"
       },
       {
-        "expression_digest": "sha256:54ba8f3f2abee00186cfb3a988dd3596e48f1354ca7df81dbc777b9c57b6911b",
+        "expression_digest": "sha256:670be1e07b328ebae0371790515e627827d7a4901eb91fd4aa24f4b38f160fb0",
         "line": 23,
         "name": "CHECKLIST_VERSION",
         "path": "src/hive_mind_os/curator.py"
       },
       {
-        "expression_digest": "sha256:9ea9627938bc961af479f119a22f37a17cd218ba037b7972bab83cdb64fabb38",
+        "expression_digest": "sha256:321e0768dc93e102d18fa762ed4521377c93bccd88dcbce93835df9540e595fd",
         "line": 24,
         "name": "AUDITED_BASELINE",
         "path": "src/hive_mind_os/current_state_audit.py"
       },
       {
-        "expression_digest": "sha256:a1a89025e1142baa2b8a9ecacbb61db246897b35e2fba55c09d9e482cb2bc05a",
+        "expression_digest": "sha256:e3e30ff44cec2e3ee22c32e59fac81efb80d456f88d10a7e69c87498bdbe933e",
         "line": 36,
         "name": "COMMAND_TIMEOUT_SECONDS",
         "path": "src/hive_mind_os/current_state_audit.py"
       },
       {
-        "expression_digest": "sha256:101dab981280903b9b2c1675685952c01084be55a51ef75c4255e833ff4f9bc2",
+        "expression_digest": "sha256:2558cc4bdd217b792e3df2a3a2745ff31e3f2b905e8abb42f0700519bb4f318c",
         "line": 37,
         "name": "MAX_COMMAND_OUTPUT_BYTES",
         "path": "src/hive_mind_os/current_state_audit.py"
       },
       {
-        "expression_digest": "sha256:bafd72cff3246a670b671c498c6b92b72b099f3242d462ea7b9e18bc2cc2950b",
+        "expression_digest": "sha256:a51162aeeb057ca4e3df627977231de20b581f0d0d418ca3a111bc0e408ac6cc",
         "line": 38,
         "name": "OUTPUT_DRAIN_TIMEOUT_SECONDS",
         "path": "src/hive_mind_os/current_state_audit.py"
       },
       {
-        "expression_digest": "sha256:80982eb2f110591f4e81f8e30509867eec5de8aca8b5ecfc57843e03d3a5e3a1",
+        "expression_digest": "sha256:6f7e5d9fdb3ff50cf15ba3236749485ab4cf6ef207d84132360ea00bc1694b35",
         "line": 39,
         "name": "MAX_ARTIFACT_NESTING_DEPTH",
         "path": "src/hive_mind_os/current_state_audit.py"
       },
       {
-        "expression_digest": "sha256:a9b04c9134ac7788b971e16a1f7181e3ca1ffedafe3a2dc1fe2ecd7e502c6989",
+        "expression_digest": "sha256:d461167cae6e4783fe692398efec6e465788462dda8f2b7968c475e62afff2ce",
         "line": 34,
         "name": "SCRIPTED_EVALUATOR_ID",
         "path": "src/hive_mind_os/experiment_runner.py"
       },
       {
-        "expression_digest": "sha256:0927be8fad5b82ee55732638091376da2d12c5264028f7ac732f627e9f919e5f",
+        "expression_digest": "sha256:0fc377b0b3f53075df959407e4f3505b8f38ac30d621265a34344d8ce0aebc34",
         "line": 35,
         "name": "SCRIPTED_JUDGE_ID",
         "path": "src/hive_mind_os/experiment_runner.py"
       },
       {
-        "expression_digest": "sha256:024a14b55c6aa6c29c0e46df17785e358b2c23bacafd6971b9b3b6427b9c6232",
+        "expression_digest": "sha256:b63b475d46dc638aa69c9b52cae381164c98f25b71ad26dc5068d2e624838827",
         "line": 32,
         "name": "SOURCES",
         "path": "src/hive_mind_os/founding_docket.py"
       },
       {
-        "expression_digest": "sha256:5720f6a520d99298f5a99a82235bd1ff7a82e7ae54d8f24e2915f0dfc0258c80",
+        "expression_digest": "sha256:8efc1026c91a83aace67556d57053c4f52e19388d1955cda63f1398c6c769db3",
         "line": 126,
         "name": "CLAIMS",
         "path": "src/hive_mind_os/founding_docket.py"
       },
       {
-        "expression_digest": "sha256:e3e2fefaf210b4f909532cd2f1d6d76ac8b94f386ab9f069fdb2ba9e3c55dd94",
+        "expression_digest": "sha256:391552c099c101b131feaf24c5795a6a15bc8ec82015424e0d2b4274a369a0bf",
         "line": 28,
         "name": "STORE_SCHEMA_VERSION",
         "path": "src/hive_mind_os/mission_store.py"
       },
       {
-        "expression_digest": "sha256:a8be587b783ffa2ce9a3863a8466298218d5a894f4f0c8fb86491c23fc3b1b06",
+        "expression_digest": "sha256:0a580a77452368d233358bcaba89c27825faa75feb9a8be997c780e5a7b22746",
         "line": 36,
         "name": "ACTION_LEVEL",
         "path": "src/hive_mind_os/policy.py"
       },
       {
-        "expression_digest": "sha256:048b709b72d59a9dba7ea8bc9ab1aab5dccd2cca859bcc7e29b676b48058e8d5",
+        "expression_digest": "sha256:e25c95ca03a2050961f3d73fd375dce4b338da464f5cff9bec2f034360a41690",
         "line": 54,
         "name": "PROHIBITED_ACTIONS",
         "path": "src/hive_mind_os/policy.py"
       },
       {
-        "expression_digest": "sha256:0bd4809ef6587da0ebcfe0bfa7364e3ec3b34689d5718d5802a75e0f81d97765",
+        "expression_digest": "sha256:c81afea73a1e4681dda76be9045c9c2a42e46fe6201edc2c51bc66d654e0ad3a",
         "line": 63,
         "name": "EXTERNAL_GRANT_ACTIONS",
         "path": "src/hive_mind_os/policy.py"
       },
       {
-        "expression_digest": "sha256:e3e2fefaf210b4f909532cd2f1d6d76ac8b94f386ab9f069fdb2ba9e3c55dd94",
+        "expression_digest": "sha256:391552c099c101b131feaf24c5795a6a15bc8ec82015424e0d2b4274a369a0bf",
         "line": 29,
         "name": "DEFAULT_PROJECTION_SCHEMA_VERSION",
         "path": "src/hive_mind_os/projection.py"
       },
       {
-        "expression_digest": "sha256:c4ccde7f878e81225e38e757ac9c17ca03d4fc3b32e0dea9cb62ba2ed08535c7",
+        "expression_digest": "sha256:cc11310c456c3690d5a74c23aa31cc25b4e74cdae146c71e54ad9dbc1d109fde",
         "line": 30,
         "name": "WAR_ROOM_PROJECTION_SCHEMA_VERSION",
         "path": "src/hive_mind_os/projection.py"
       },
       {
-        "expression_digest": "sha256:f485112618a0bc4ac4c826d1456e5f469162834a896cd94b8afa318778307209",
+        "expression_digest": "sha256:14dd4922fb93e39b41c4b4e759aead27aa2d1b23a9d4a7b394de012ab9a6f9a4",
         "line": 12,
         "name": "RECURSIVE_IMPROVEMENT_SOURCES",
         "path": "src/hive_mind_os/recursive_improvement_docket.py"
       },
       {
-        "expression_digest": "sha256:1c40589f0c605ce40e2520d80194e2254f714e75ef8bb23aeac96c0217938214",
+        "expression_digest": "sha256:ed0dca7e3b2a88a7b19b4c8cf55c90b93778ec92c95ccf18149c3a69888add6e",
         "line": 38,
         "name": "RECURSIVE_IMPROVEMENT_CLAIMS",
         "path": "src/hive_mind_os/recursive_improvement_docket.py"
       },
       {
-        "expression_digest": "sha256:c68568df8129eb16aa575097f10a0d63959f7d7f95a1dd2d53689615a7e8d1c0",
+        "expression_digest": "sha256:218cff2e87543b73366da1db4e6e6b14f8acb3c616372592190d416ab6990f24",
         "line": 21,
         "name": "ROLE_CONTRACTS",
         "path": "src/hive_mind_os/roles.py"
       },
       {
-        "expression_digest": "sha256:d535d71c2e6b1066be9d50668c8bae24eb519916d66b53cd73d9032832250e67",
+        "expression_digest": "sha256:a4c38759df575184c36a9a6ef4dae0a673baab0e465011d27cba97da24355001",
         "line": 80,
         "name": "DEFAULT_LIFECYCLE",
         "path": "src/hive_mind_os/roles.py"
       },
       {
-        "expression_digest": "sha256:45a53f2e98e67a74daf59ba359fabc90c2f065b8078edd9753596c18c9bf3224",
+        "expression_digest": "sha256:22988e9859ecaf436f0b334a09c4a990785f1677573f6d592f3e46fa2cdb3da9",
         "line": 12,
         "name": "SIBLING_GPT_SOURCES",
         "path": "src/hive_mind_os/sibling_gpt_docket.py"
       },
       {
-        "expression_digest": "sha256:33a33a6119c1669f51ca06826f579c949de2809f065f291c652600d7236d5505",
+        "expression_digest": "sha256:2ac059377d6a937ca19a95e9862b03d2d2c4bbf5d2594ff768999eb99897fd49",
         "line": 31,
         "name": "SIBLING_GPT_CLAIMS",
         "path": "src/hive_mind_os/sibling_gpt_docket.py"
       },
       {
-        "expression_digest": "sha256:5db23829db59f65cdc8b2e1ead6320da58cfd25ee3f7d2412aad945653ca06e6",
+        "expression_digest": "sha256:6ae58fabed89618c280d2d9976847bb542b82ef5c70f108321a1e6c4f6a2e9f3",
         "line": 29,
         "name": "SOURCES",
         "path": "src/hive_mind_os/source_docket.py"
       },
       {
-        "expression_digest": "sha256:bf5572644a47166630c4d87494cd013b07c42399c35e91c1c9d56b57b835bd1e",
+        "expression_digest": "sha256:1ad8bfd00513947f99e5706d9f198e47eee9dbd7576276cc9dd4a2f3df80c2fc",
         "line": 36,
         "name": "CLAIMS",
         "path": "src/hive_mind_os/source_docket.py"
       },
       {
-        "expression_digest": "sha256:d535d71c2e6b1066be9d50668c8bae24eb519916d66b53cd73d9032832250e67",
+        "expression_digest": "sha256:a4c38759df575184c36a9a6ef4dae0a673baab0e465011d27cba97da24355001",
         "line": 49,
         "name": "REQUIRED_ROLES",
         "path": "src/hive_mind_os/vision.py"
       },
       {
-        "expression_digest": "sha256:eeea5bf1c36340660988a60b93e91a8a5abbc0cf0ed3e69d502e5cceba8ee180",
+        "expression_digest": "sha256:b20c39bb527f28dbef3df35587bb6ff524bbdedb42e6ccb79d32b24d2c160d76",
         "line": 60,
         "name": "REQUIRED_STAGES",
         "path": "src/hive_mind_os/vision.py"
       },
       {
-        "expression_digest": "sha256:6bb408a0ccc6eeb866dcdd45c1a28bc0e7a780b6abaf2630f65b0f187de4762a",
+        "expression_digest": "sha256:b20fc5495d50f6acc78887aee8eb665f3cfa59a84732025778b22c09ab105830",
         "line": 61,
         "name": "REQUIRED_CAPABILITIES",
         "path": "src/hive_mind_os/vision.py"
@@ -1519,7 +1506,7 @@
         "path": "src/hive_mind_os/benchmark_corpus.py"
       },
       {
-        "arguments_digest": "sha256:85df9e7f841123b2d9dec55a966d43bb0bdd5e795bb48962f825b9d466c5e43b",
+        "arguments_digest": "sha256:ca2bdb9f210edd70d4c14d5c3964daac830dd19c6b0924ffa5d7fe064f316ae5",
         "kind": "function",
         "line": 257,
         "name": "build_corpus",
@@ -1557,7 +1544,7 @@
         "path": "src/hive_mind_os/benchmark_harness.py"
       },
       {
-        "arguments_digest": "sha256:4d384becac33a1a06f82660e492cf9f0b4b2c8343d6851f6fe69adf2f5aa900f",
+        "arguments_digest": "sha256:d242f0c2b3fc648fb64ecc685ecdcb379801bc84fd32ffdddc35b808952f054b",
         "kind": "function",
         "line": 235,
         "name": "bootstrap_interval",
@@ -1579,7 +1566,7 @@
         "path": "src/hive_mind_os/benchmark_harness.py"
       },
       {
-        "arguments_digest": "sha256:8fc069fa133755e592279ba0cdaf5f124208fa459c68f67d4585bcb22e220b0e",
+        "arguments_digest": "sha256:0239918a93c6e92ff46d19aed86861aba47d8596c92b08b5dc5c4e6325c7ea54",
         "kind": "function",
         "line": 601,
         "name": "find_unauthorized_claims",
@@ -1587,7 +1574,7 @@
         "returns": "tuple[str, ...]"
       },
       {
-        "arguments_digest": "sha256:3d88bba4ed7d1906d456457b9afe27e48c603b73d765dd1f0f4c5f019007f928",
+        "arguments_digest": "sha256:78dfc4b5c668f1cb4e4fcf9aeb4101566c78b0c7d06150405f42e062c9c66146",
         "kind": "function",
         "line": 619,
         "name": "render_results",
@@ -1634,7 +1621,7 @@
         "path": "src/hive_mind_os/classic_gpt.py"
       },
       {
-        "arguments_digest": "sha256:81a362f1ff327b145aedd0dc8f6880d02c0dc9d54397b48f261b5e5b5a06a66a",
+        "arguments_digest": "sha256:fb7cdaaef1e3db9811d7d9eb71fec4189d14dda9dbbf6e1bf4eb4a871e475501",
         "kind": "function",
         "line": 91,
         "name": "re_full_sha256",
@@ -1677,7 +1664,7 @@
         "path": "src/hive_mind_os/classic_gpt.py"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 42,
         "name": "build_parser",
@@ -1685,7 +1672,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 56,
         "name": "build_audit_parser",
@@ -1693,7 +1680,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 86,
         "name": "build_ingest_parser",
@@ -1701,7 +1688,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 120,
         "name": "build_defer_parser",
@@ -1709,7 +1696,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 145,
         "name": "build_deliver_parser",
@@ -1717,7 +1704,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 194,
         "name": "build_resume_parser",
@@ -1725,7 +1712,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 208,
         "name": "build_missions_parser",
@@ -1733,7 +1720,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 221,
         "name": "build_benchmark_parser",
@@ -1741,7 +1728,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 262,
         "name": "build_pit_episode_parser",
@@ -1749,7 +1736,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 290,
         "name": "build_experiment_parser",
@@ -1757,7 +1744,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 322,
         "name": "build_enqueue_parser",
@@ -1765,7 +1752,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 337,
         "name": "build_serve_parser",
@@ -1773,7 +1760,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 350,
         "name": "build_status_parser",
@@ -1781,7 +1768,7 @@
         "returns": "argparse.ArgumentParser"
       },
       {
-        "arguments_digest": "sha256:fdb9cbbf9e138155b18e19fbbefa1613a2575f818fea3e4d7cf44f2af9d50816",
+        "arguments_digest": "sha256:e7440089508b606d8f92db759776b2064ede67bc8b9b77895e4107d24026c7a7",
         "kind": "function",
         "line": 836,
         "name": "main",
@@ -1796,7 +1783,7 @@
         "path": "src/hive_mind_os/contracts.py"
       },
       {
-        "arguments_digest": "sha256:433bcab244331fd06e0f47829f0da9b691bc5c44d54bac4e43d2486057f22b6b",
+        "arguments_digest": "sha256:e36aece38a0fee3c67fbc8dc87d78bd5b502fc5ee2c3a74e549c7bbc6a80c8a2",
         "kind": "function",
         "line": 66,
         "name": "load_schema",
@@ -1804,7 +1791,7 @@
         "returns": "dict[str, Any]"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 76,
         "name": "validate_schema_catalog",
@@ -1812,7 +1799,7 @@
         "returns": "ContractValidation"
       },
       {
-        "arguments_digest": "sha256:0a6f3d581ea2addcd3d4787e41f715600e6ad9605c141ac34aa75d73ceaed166",
+        "arguments_digest": "sha256:088b967be2e333715ae68ba003fa8829dea616b291aee633fcfbaa7198f406f3",
         "kind": "function",
         "line": 251,
         "name": "validate_contract",
@@ -1820,7 +1807,7 @@
         "returns": "ContractValidation"
       },
       {
-        "arguments_digest": "sha256:ec2f85ecf50de064a08324a04ec9ea49f8caf6927ae491b5e95892b95fc6158b",
+        "arguments_digest": "sha256:4a338b0da3d1fe7660d97101f144045224d6409ee66bbe3ce2f9183b1a80ae38",
         "kind": "function",
         "line": 268,
         "name": "tool_intent_digest",
@@ -1828,7 +1815,7 @@
         "returns": "str"
       },
       {
-        "arguments_digest": "sha256:334b9a5bc2f75108f57e91e358cc4db3a16551a52ca1ae7176c8c0e17b25fe54",
+        "arguments_digest": "sha256:660a6facb978b85ae96b6c2d7f2a079f9bef4123f9fef5d7973faf7ace00ff1e",
         "kind": "function",
         "line": 282,
         "name": "validate_runtime_state",
@@ -2022,7 +2009,7 @@
         "path": "src/hive_mind_os/curator.py"
       },
       {
-        "arguments_digest": "sha256:56d178f8362969b0e229b3fe56c0303ef7d84d44be7a71697e470768f4d00c47",
+        "arguments_digest": "sha256:b985a7e14b3c3e5ec60cadcf640aea8664488d293f17cb8393fa6dec70f86347",
         "kind": "function",
         "line": 80,
         "name": "acceptance_checks_digest",
@@ -2030,7 +2017,7 @@
         "returns": "str"
       },
       {
-        "arguments_digest": "sha256:76f011830410dd95bd13c5e716416c151ac4bcda51e68624b85565fd55945da7",
+        "arguments_digest": "sha256:b7976e95d1be66ca2639525e2c87ef3190c5074d47d7c7c287863495648e94af",
         "kind": "function",
         "line": 93,
         "name": "check_context_manifest",
@@ -2059,7 +2046,7 @@
         "path": "src/hive_mind_os/current_state_audit.py"
       },
       {
-        "arguments_digest": "sha256:cac2fcec3e25532a96db8d469eab79d3e269c4830c8c2ba7554d15f239e770da",
+        "arguments_digest": "sha256:358d5296df77dce5f45e4a2cafb23565dd2deb9f6e83584646246372da41d2ed",
         "kind": "function",
         "line": 298,
         "name": "execute_command",
@@ -2067,7 +2054,7 @@
         "returns": "CommandObservation"
       },
       {
-        "arguments_digest": "sha256:8d35e441f019358ee181aaed1805290c92fdbfa955a8a8d36bd5e66dd35f8e22",
+        "arguments_digest": "sha256:8b1263c1105837f69d578e0a8513a24e39f856e459808617546ce180200fc810",
         "kind": "function",
         "line": 569,
         "name": "build_audit_verification_context",
@@ -2075,7 +2062,7 @@
         "returns": "AuditVerificationContext"
       },
       {
-        "arguments_digest": "sha256:e50037abf37f1d8dcc9b820dff4eef7f8376e064ba7818bcdc869dc93e6e181c",
+        "arguments_digest": "sha256:c4a5773e30fdb8a1d4126b9d8b6f53f04482f62b656884c9efaedde421e66c9d",
         "kind": "function",
         "line": 787,
         "name": "collect_current_state_audit",
@@ -2083,7 +2070,7 @@
         "returns": "dict[str, object]"
       },
       {
-        "arguments_digest": "sha256:e70f91a1ac830c298f611162ef6e13339b66ee01d8394fc223e807f4626f17c4",
+        "arguments_digest": "sha256:0b0d7be0c55c6a851e8669e5898505b1fb4c07704c87ca119a66dfbe8b113032",
         "kind": "function",
         "line": 1183,
         "name": "create_audit_artifact",
@@ -2091,7 +2078,7 @@
         "returns": "dict[str, object]"
       },
       {
-        "arguments_digest": "sha256:196e287aaec746195e4f05886d84cf6f2e79a471217ddf38a33851950601033f",
+        "arguments_digest": "sha256:f019c75ea514f4849b3488c67780bbb1801b61a68252959b1f69bb3c0037d326",
         "kind": "function",
         "line": 1537,
         "name": "verify_audit_artifact",
@@ -2099,7 +2086,7 @@
         "returns": "tuple[bool, tuple[str, ...]]"
       },
       {
-        "arguments_digest": "sha256:70c5a87c0676747f9f1e0098b117d860f097c1735ebd8381027acb8ca518e430",
+        "arguments_digest": "sha256:4a81906363379391fcc015a8098955416e3e47d37d34126e1905b087b08ab061",
         "kind": "function",
         "line": 1816,
         "name": "write_audit_artifact",
@@ -2137,7 +2124,7 @@
         "path": "src/hive_mind_os/experiment_runner.py"
       },
       {
-        "arguments_digest": "sha256:ca877a93a2cf06c090f090db2b78eab74730b7845c0b80f71f67eb633fac9e5d",
+        "arguments_digest": "sha256:2520f7febff13194dbbdba0485522c4bb18ac75892eec39c4697f5c15af9d2f6",
         "kind": "function",
         "line": 228,
         "name": "default_prompt_contract",
@@ -2216,7 +2203,7 @@
         "path": "src/hive_mind_os/git_adapter.py"
       },
       {
-        "arguments_digest": "sha256:1764816cb3074cf943d5efdbf394d7a7b4e96d14545a662fee2fa66823594157",
+        "arguments_digest": "sha256:80098a0c3400611952cc5d73e93809a4139ece739fde0fe0f2230357c55c2eac",
         "kind": "function",
         "line": 1015,
         "name": "verify_delivery",
@@ -2359,7 +2346,7 @@
         "path": "src/hive_mind_os/github_adapter.py"
       },
       {
-        "arguments_digest": "sha256:7a5101cf2331486f464e2f6fd76faec09f5694aa30e529f2175c9004a81f93cd",
+        "arguments_digest": "sha256:4c32526142b1fd82ee7bf0f2b4a5516016ff7ccd98beb04d451c049be8505b2a",
         "kind": "function",
         "line": 1152,
         "name": "validate_github_receipt",
@@ -2374,7 +2361,7 @@
         "path": "src/hive_mind_os/governed_sources.py"
       },
       {
-        "arguments_digest": "sha256:5e70b2399d542644ecd35dbb82e9cb8bcaae5c8c4798c8e700c335dd5bba3c96",
+        "arguments_digest": "sha256:a245ea3ad9eccd2e6ce3a4b49ed64fbafb9b6dba57c76e555b3cc5b7feb26dd9",
         "kind": "function",
         "line": 27,
         "name": "inventory_digest",
@@ -2382,7 +2369,7 @@
         "returns": "str"
       },
       {
-        "arguments_digest": "sha256:bd327094dc0df3191fbdfdc861eb9f6c8e6d7ecb65268c00ecd4ba9b65b98dcf",
+        "arguments_digest": "sha256:1001f454b9c6b47157961b7bb91730b2f22802fb22ea0ca5afd28bfb56b465da",
         "kind": "function",
         "line": 31,
         "name": "governance_digest",
@@ -2390,7 +2377,7 @@
         "returns": "str"
       },
       {
-        "arguments_digest": "sha256:5e443ea16f33ef53ad87f96a55a11a7f8ca6023154366345a0e6554e2a0f9130",
+        "arguments_digest": "sha256:3d96ee6f5e537828dfea287332dc9ac559100afb8d7b81789a6fe3202883a6d4",
         "kind": "function",
         "line": 36,
         "name": "generate_classic_gpt_all_in_one",
@@ -2398,7 +2385,7 @@
         "returns": "bytes"
       },
       {
-        "arguments_digest": "sha256:d8d89e29d96d2e029c83d700b876c66ad2108b5833457f9b0c5ab68426f2309c",
+        "arguments_digest": "sha256:fcf6c949d13d757aaa4fe077851030f761652f249b1a5b45ff91c0f8fbcf72a5",
         "kind": "function",
         "line": 62,
         "name": "audit_governed_source",
@@ -2441,7 +2428,7 @@
         "path": "src/hive_mind_os/ingestion.py"
       },
       {
-        "arguments_digest": "sha256:0b543ec5c667a32c1af43852ae67f5a658d40e75b2594b8d40e8a2f5530f1447",
+        "arguments_digest": "sha256:f0624e827b3c21cd65947d77fd47318aa161083060148941b406dbf3b0e74961",
         "kind": "function",
         "line": 384,
         "name": "register_exhibit",
@@ -2449,7 +2436,7 @@
         "returns": "SourceExhibit"
       },
       {
-        "arguments_digest": "sha256:66325b3c4a59e9679163e82a840499f7b0eb04dfa959962f026e1c3b59e0e1e5",
+        "arguments_digest": "sha256:6252aa06182d87d6c32df841c021020a8d8210e1d21d2bbaac0a0d9123818e3b",
         "kind": "function",
         "line": 430,
         "name": "adjudicate_with_exhibit",
@@ -2457,7 +2444,7 @@
         "returns": "AdjudicationRecord"
       },
       {
-        "arguments_digest": "sha256:2fb3374dc6a6f68fa9402c9d3ebce314577d8b4a46d379a508c3ab97938a73c9",
+        "arguments_digest": "sha256:9c594eee273d29e1fd63bbf20aff2647d33e55494c44d9a81761aecd4b489fb6",
         "kind": "function",
         "line": 549,
         "name": "defer_obligation",
@@ -2465,7 +2452,7 @@
         "returns": "DeferredObligation"
       },
       {
-        "arguments_digest": "sha256:55c6bada613aa81289297c090c18573f97ffa569de7fe6938d44a3c5df9f0010",
+        "arguments_digest": "sha256:1351e9bc32dd61ddc890329e1c27d6b995f1b5dafdf8e29d1e52fc2fe711ec5f",
         "kind": "function",
         "line": 725,
         "name": "reconcile_docket",
@@ -2640,7 +2627,7 @@
         "path": "src/hive_mind_os/mission_store.py"
       },
       {
-        "arguments_digest": "sha256:be6d15789109d2da30b1c83b9345427a15907b6f7d7e0e447301b8681b6db473",
+        "arguments_digest": "sha256:c7ab628424110e79627224239cab9cf1ef73c95c426eb7c874541076ea0040ae",
         "kind": "function",
         "line": 110,
         "name": "workspace_snapshot",
@@ -2648,7 +2635,7 @@
         "returns": "dict[str, str]"
       },
       {
-        "arguments_digest": "sha256:54b8c99e351016e72890186d6ee9dba4f02100654a4141c76a3ced33f8539535",
+        "arguments_digest": "sha256:4f1e31b1ff8762c993f968214e8811ef89b0938b8144c8613eb0854a5f35acf1",
         "kind": "function",
         "line": 150,
         "name": "reopen_workspace",
@@ -2663,7 +2650,7 @@
         "path": "src/hive_mind_os/mission_store.py"
       },
       {
-        "arguments_digest": "sha256:54fed6ff7a98887db75456a955e3a5e59b18a2723ad063d105a3c662e893daa9",
+        "arguments_digest": "sha256:7eb949c68bd633f526ade2cc64223ca3e683af64ee3ad0caf9442fdde2646f68",
         "kind": "async-function",
         "line": 975,
         "name": "resume_mission",
@@ -2778,7 +2765,7 @@
         "path": "src/hive_mind_os/model_provider.py"
       },
       {
-        "arguments_digest": "sha256:8fd8fe6d518d510ec1cebb929694f77dcbaf73d55cf274a2299bc9b35b24cd69",
+        "arguments_digest": "sha256:3b959e0b6bd1552eb7ca5c3462b4120c7fbe99b2e44e8dc8ee2b2434480dc381",
         "kind": "function",
         "line": 117,
         "name": "redact",
@@ -2804,7 +2791,7 @@
         "path": "src/hive_mind_os/model_provider.py"
       },
       {
-        "arguments_digest": "sha256:f19711b2fbcb50b49fe044cc23053475c9fd13ba25bd8853d4888768977efa3f",
+        "arguments_digest": "sha256:2455d2901d611ceb077527fca685ec069ffa94f3d5056957a2538fea9d515bb0",
         "kind": "function",
         "line": 370,
         "name": "provider_from_env",
@@ -2812,7 +2799,7 @@
         "returns": "OpenAICompatibleProvider | AnthropicProvider"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 10,
         "name": "utc_now",
@@ -2893,7 +2880,7 @@
         "path": "src/hive_mind_os/models.py"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 8,
         "name": "hive_core_root",
@@ -2901,7 +2888,7 @@
         "returns": "Path"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 14,
         "name": "hive_core_catalog",
@@ -2918,7 +2905,7 @@
         "path": "src/hive_mind_os/package_system/catalog.py"
       },
       {
-        "arguments_digest": "sha256:8fc069fa133755e592279ba0cdaf5f124208fa459c68f67d4585bcb22e220b0e",
+        "arguments_digest": "sha256:0239918a93c6e92ff46d19aed86861aba47d8596c92b08b5dc5c4e6325c7ea54",
         "kind": "function",
         "line": 731,
         "name": "load_package",
@@ -2967,7 +2954,7 @@
         "path": "src/hive_mind_os/package_system/host_profiles.py"
       },
       {
-        "arguments_digest": "sha256:ea58a18b9846b01cdb59e8deb43010a816b18003cf0b40f183686bdd225bde16",
+        "arguments_digest": "sha256:ed080e8bb8adabaa55bf081245a1c8469fc8c4f55325037619fffb5ac2c3cf3d",
         "kind": "function",
         "line": 216,
         "name": "load_builtin_host_profile",
@@ -2975,7 +2962,7 @@
         "returns": "HostCapabilityProfile"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 239,
         "name": "load_builtin_host_profiles",
@@ -2983,7 +2970,7 @@
         "returns": "tuple[HostCapabilityProfile, ...]"
       },
       {
-        "arguments_digest": "sha256:65e019f5114a16202db54c6b17f149230def570beb54bc9dcc216a502637d7de",
+        "arguments_digest": "sha256:6711d3fa1f630f17f27c05fbee336f10bbbdcad1e663ecf57be7fd076a5fcb77",
         "kind": "function",
         "line": 68,
         "name": "canonical_json_bytes",
@@ -2991,7 +2978,7 @@
         "returns": "bytes"
       },
       {
-        "arguments_digest": "sha256:821b1ab0d57ec126bf933849a764ef87a028619bb832fdf779e98dfa94edf5ba",
+        "arguments_digest": "sha256:e8ce63a19069a3102b7f5d525efba5e8f25f10ae2a305dbd6594b4fce5a467fc",
         "kind": "function",
         "line": 80,
         "name": "content_digest",
@@ -3142,7 +3129,7 @@
         "path": "src/hive_mind_os/package_system/ooda.py"
       },
       {
-        "arguments_digest": "sha256:6e325d448c9dde4edcb89548f7d5f1d80c9256545587a00f28f0a70064d213e0",
+        "arguments_digest": "sha256:cf56b8f06f93eb14fb67be725e826e083f2a57adfbf2d3caa81140fb33c83046",
         "kind": "function",
         "line": 193,
         "name": "validate_ooda_contract",
@@ -3196,7 +3183,7 @@
         "path": "src/hive_mind_os/pit_oracle.py"
       },
       {
-        "arguments_digest": "sha256:f18679f5f9c8a2fde4cf977ad870af184692bfd14082eb0ec3ecac08d2e47994",
+        "arguments_digest": "sha256:8ce72865262757c14fcb90e91dc9a7df89bcca54edf022913b71c6635c3f6c97",
         "kind": "function",
         "line": 219,
         "name": "build_self_curriculum",
@@ -3243,7 +3230,7 @@
         "path": "src/hive_mind_os/policy.py"
       },
       {
-        "arguments_digest": "sha256:0a0253b92bc2674b8667f4feb5881939ebf2c64e0818de8ddc0f6665890a5ade",
+        "arguments_digest": "sha256:1abee635a0dd9cf4fe0d11e5ab512ebd2fc793113870622a9b54af6c85e83615",
         "kind": "function",
         "line": 44,
         "name": "build_projection",
@@ -3251,7 +3238,7 @@
         "returns": "dict[str, Any]"
       },
       {
-        "arguments_digest": "sha256:638e06c1b2913abf4ec1058769d205b44564ec8049e6199f9ff58f3a33daff3a",
+        "arguments_digest": "sha256:34dfc2a2ddb4c19f4d95caf1c420f45244e5d2c43dfc84a18e4ec7caf59b114d",
         "kind": "function",
         "line": 266,
         "name": "build_war_room_projection",
@@ -3259,7 +3246,7 @@
         "returns": "dict[str, Any]"
       },
       {
-        "arguments_digest": "sha256:aecd35c2f0c0ef44a148ff22d8141136c3e892a0d40259b69f6b84632feffb5a",
+        "arguments_digest": "sha256:53ca80bbc49d2bcd6fa7402a62376246c89f31ba15550bfe7cb5160b338ff9d3",
         "kind": "function",
         "line": 378,
         "name": "projection_json",
@@ -3267,7 +3254,7 @@
         "returns": "str"
       },
       {
-        "arguments_digest": "sha256:aecd35c2f0c0ef44a148ff22d8141136c3e892a0d40259b69f6b84632feffb5a",
+        "arguments_digest": "sha256:53ca80bbc49d2bcd6fa7402a62376246c89f31ba15550bfe7cb5160b338ff9d3",
         "kind": "function",
         "line": 382,
         "name": "projection_html",
@@ -3275,7 +3262,7 @@
         "returns": "str"
       },
       {
-        "arguments_digest": "sha256:b35988c9c5c29bd3053db977367425586077a256cc4a9c155ec684657ed01234",
+        "arguments_digest": "sha256:8f79b9ddec8bfc5f75130e2c55b069f0bd94f5a2f68e181828ada31be3c88e41",
         "kind": "function",
         "line": 422,
         "name": "write_projection_html",
@@ -3283,7 +3270,7 @@
         "returns": "Path"
       },
       {
-        "arguments_digest": "sha256:b30cf559d464b514b1cb2b8e957b3f4ac52afa530e84ed7ef71e146a7efd811e",
+        "arguments_digest": "sha256:6a0a399cce5ec543fe77428d44c6e42a23743862548335b0616550505c64786a",
         "kind": "function",
         "line": 64,
         "name": "canonical_prompt_bytes",
@@ -3291,7 +3278,7 @@
         "returns": "bytes"
       },
       {
-        "arguments_digest": "sha256:b30cf559d464b514b1cb2b8e957b3f4ac52afa530e84ed7ef71e146a7efd811e",
+        "arguments_digest": "sha256:6a0a399cce5ec543fe77428d44c6e42a23743862548335b0616550505c64786a",
         "kind": "function",
         "line": 76,
         "name": "prompt_digest",
@@ -3299,7 +3286,7 @@
         "returns": "str"
       },
       {
-        "arguments_digest": "sha256:e3cb319f7e57ce10293dbb858991acca279ae99e3babe6be7ae65ce6a30d9ac2",
+        "arguments_digest": "sha256:6de338754db2c5f7739e5729cae53bd92529e1a7e7796739d24777be828a9e71",
         "kind": "function",
         "line": 80,
         "name": "generation_zero_prompt",
@@ -3314,7 +3301,7 @@
         "path": "src/hive_mind_os/prompt_registry.py"
       },
       {
-        "arguments_digest": "sha256:4bf7e85cb284850e04d6eb98a73c07631a22ef31f479effb0ae03ba3585d05a0",
+        "arguments_digest": "sha256:11e27b8dbeee2bdc1935433f02d2c9a2757c85e43ab2662efbfa695080bf7529",
         "kind": "function",
         "line": 24,
         "name": "portable_path_parts",
@@ -3345,7 +3332,7 @@
         "path": "src/hive_mind_os/receipts.py"
       },
       {
-        "arguments_digest": "sha256:821b1ab0d57ec126bf933849a764ef87a028619bb832fdf779e98dfa94edf5ba",
+        "arguments_digest": "sha256:e8ce63a19069a3102b7f5d525efba5e8f25f10ae2a305dbd6594b4fce5a467fc",
         "kind": "function",
         "line": 76,
         "name": "sha256_digest",
@@ -3632,7 +3619,7 @@
         "path": "src/hive_mind_os/source_docket.py"
       },
       {
-        "arguments_digest": "sha256:9921bdb3ab3e647f7a1c079e1067e69b92a075a0046c4936253be99bb6475c65",
+        "arguments_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "kind": "function",
         "line": 154,
         "name": "load_default_source_docket",
@@ -3640,7 +3627,7 @@
         "returns": "FoundingSourceDocket"
       },
       {
-        "arguments_digest": "sha256:90ee0d002997e6c7e586997764a137faa225f567bd099ca946e3e4095390c06a",
+        "arguments_digest": "sha256:359d068f96a5473b79f3bb6484034ff6ceac5e71b8b985b0472dfe85c6db102b",
         "kind": "function",
         "line": 163,
         "name": "load_source_docket",
@@ -3694,7 +3681,7 @@
         "path": "src/hive_mind_os/vision.py"
       },
       {
-        "arguments_digest": "sha256:9e7fac79babc8a3c9a17cba8fd9575dd85cfd53f16116e1eb0a9d21ba8d3b317",
+        "arguments_digest": "sha256:8186f41a16c9ed35052f1c585e5f388ff5a7d18456b3ce26b5d60834dc1bc5ad",
         "kind": "function",
         "line": 21,
         "name": "execute_mission_job",
@@ -3709,7 +3696,7 @@
         "path": "src/hive_mind_os/workers.py"
       },
       {
-        "arguments_digest": "sha256:15fae521adac63d5cca83c842e39a7533cea6e054306eae70b301218fbd09202",
+        "arguments_digest": "sha256:51e4a5e4d66739401950aeff51ca4e273522bbe05db917a64b95981f04c85ae1",
         "kind": "function",
         "line": 149,
         "name": "serve",
@@ -3717,7 +3704,7 @@
         "returns": "int"
       }
     ],
-    "digest": "sha256:0ae0930966651d6e93a0d9ad5bd827308d63d6a0840f2b741becfe882a050d02",
+    "digest": "sha256:2b3964a9079736ade215ec33c4d51b9fefe6f5285781a3c64b38edecfe9bbcc2",
     "module_count": 48
   },
   "public_api": {
@@ -3859,7 +3846,7 @@
         "AgentManifest": "hive_mind_os.package_system.models:AgentManifest:class",
         "CatalogSnapshot": "hive_mind_os.package_system.models:CatalogSnapshot:class",
         "ComponentKind": "hive_mind_os.package_system.models:ComponentKind:class",
-        "ComponentManifest": "typing:Union:constant",
+        "ComponentManifest": "hive_mind_os.package_system:ComponentManifest:constant",
         "ComponentRef": "hive_mind_os.package_system.models:ComponentRef:class",
         "ConformanceStatus": "hive_mind_os.package_system.host_profiles:ConformanceStatus:class",
         "EvidenceLevel": "hive_mind_os.package_system.host_profiles:EvidenceLevel:class",
@@ -8172,7 +8159,9 @@
             {
               "annotation": "Sequence[str]",
               "default": [
-                "C:\\Python314\\python.exe",
+                {
+                  "runtime": "sys.executable"
+                },
                 "-B",
                 "-m",
                 "unittest",
@@ -8187,7 +8176,9 @@
             {
               "annotation": "Sequence[str]",
               "default": [
-                "C:\\Python314\\python.exe",
+                {
+                  "runtime": "sys.executable"
+                },
                 "-B",
                 "-c",
                 "from tiny_pkg.maths import increment; assert increment(1) == 2, 'increment acceptance criterion failed'"
@@ -9190,7 +9181,11 @@
             },
             {
               "annotation": "RiskTier",
-              "default": 2,
+              "default": {
+                "enum": "hive_mind_os.models.RiskTier",
+                "name": "MODERATE",
+                "value": 2
+              },
               "kind": "positional_or_keyword",
               "name": "risk"
             },
@@ -11536,6 +11531,22 @@
           "return": "OODAContractValidation"
         }
       },
+      "hive_mind_os.package_system:ComponentManifest:constant": {
+        "defined_in": "hive_mind_os.package_system",
+        "kind": "constant",
+        "qualname": "ComponentManifest",
+        "value": {
+          "type_expression": {
+            "arguments": [
+              "hive_mind_os.package_system.models.AgentManifest",
+              "hive_mind_os.package_system.models.SkillManifest",
+              "hive_mind_os.package_system.models.ToolManifest",
+              "hive_mind_os.package_system.models.WorkflowManifest"
+            ],
+            "kind": "union"
+          }
+        }
+      },
       "hive_mind_os.projection:build_projection:function": {
         "defined_in": "hive_mind_os.projection",
         "kind": "function",
@@ -13314,14 +13325,46 @@
             {
               "annotation": "tuple[Role, ...]",
               "default": [
-                "orchestrator",
-                "explorer",
-                "architect",
-                "builder",
-                "curator",
-                "integrator",
-                "steward",
-                "optimizer"
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "ORCHESTRATOR",
+                  "value": "orchestrator"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "EXPLORER",
+                  "value": "explorer"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "ARCHITECT",
+                  "value": "architect"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "BUILDER",
+                  "value": "builder"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "CURATOR",
+                  "value": "curator"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "INTEGRATOR",
+                  "value": "integrator"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "STEWARD",
+                  "value": "steward"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "OPTIMIZER",
+                  "value": "optimizer"
+                }
               ],
               "kind": "positional_or_keyword",
               "name": "lifecycle"
@@ -14087,14 +14130,46 @@
             {
               "annotation": "tuple[Role, ...]",
               "default": [
-                "orchestrator",
-                "explorer",
-                "architect",
-                "builder",
-                "curator",
-                "integrator",
-                "steward",
-                "optimizer"
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "ORCHESTRATOR",
+                  "value": "orchestrator"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "EXPLORER",
+                  "value": "explorer"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "ARCHITECT",
+                  "value": "architect"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "BUILDER",
+                  "value": "builder"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "CURATOR",
+                  "value": "curator"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "INTEGRATOR",
+                  "value": "integrator"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "STEWARD",
+                  "value": "steward"
+                },
+                {
+                  "enum": "hive_mind_os.models.Role",
+                  "name": "OPTIMIZER",
+                  "value": "optimizer"
+                }
               ],
               "kind": "positional_or_keyword",
               "name": "required_roles"
@@ -14102,13 +14177,41 @@
             {
               "annotation": "tuple[LifecycleStage, ...]",
               "default": [
-                "discover",
-                "design",
-                "build",
-                "validate",
-                "grow",
-                "maintain",
-                "integrate"
+                {
+                  "enum": "hive_mind_os.vision.LifecycleStage",
+                  "name": "DISCOVER",
+                  "value": "discover"
+                },
+                {
+                  "enum": "hive_mind_os.vision.LifecycleStage",
+                  "name": "DESIGN",
+                  "value": "design"
+                },
+                {
+                  "enum": "hive_mind_os.vision.LifecycleStage",
+                  "name": "BUILD",
+                  "value": "build"
+                },
+                {
+                  "enum": "hive_mind_os.vision.LifecycleStage",
+                  "name": "VALIDATE",
+                  "value": "validate"
+                },
+                {
+                  "enum": "hive_mind_os.vision.LifecycleStage",
+                  "name": "GROW",
+                  "value": "grow"
+                },
+                {
+                  "enum": "hive_mind_os.vision.LifecycleStage",
+                  "name": "MAINTAIN",
+                  "value": "maintain"
+                },
+                {
+                  "enum": "hive_mind_os.vision.LifecycleStage",
+                  "name": "INTEGRATE",
+                  "value": "integrate"
+                }
               ],
               "kind": "positional_or_keyword",
               "name": "required_stages"
@@ -14118,7 +14221,7 @@
               "default": {
                 "collection": "tuple",
                 "count": 26,
-                "digest": "sha256:6862ff9d841b5cdd757e79e5d17525bc6c113e0031aa9a938723347e142ea9b3"
+                "digest": "sha256:ca624653842b250cca8ba454f60e7c2e143be0892b64839666a409fcc8d51441"
               },
               "kind": "positional_or_keyword",
               "name": "required_capabilities"
@@ -14403,17 +14506,9 @@
         "kind": "constant",
         "qualname": "WAR_ROOM_PROJECTION_SCHEMA_VERSION",
         "value": 2
-      },
-      "typing:Union:constant": {
-        "defined_in": "typing",
-        "kind": "constant",
-        "qualname": "Union",
-        "value": {
-          "type": "typing.Union"
-        }
       }
     },
-    "digest": "sha256:fad5d70069dc2a7a2db62ddfd52d5f2240585122e1def3452b11e5b3db478466",
+    "digest": "sha256:d230e9d458297e67e85a1560273ef71bd7b91c0ebb10d20f658cfbfe2901d0e4",
     "entry_count": 164,
     "facades": {
       "hive_mind_os": {

@@ -6,10 +6,21 @@ import dataclasses
 import hashlib
 import inspect
 import json
+import sys
+import types
 from enum import Enum
 from pathlib import Path
 from types import FunctionType
-from typing import Any, Callable, Iterable, Mapping, cast
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Mapping,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
 import hive_mind_os
 import hive_mind_os.package_system as package_system
@@ -110,19 +121,21 @@ def _stable_value(value: object) -> object:
         return {"state": "missing"}
     if repr(value) == "<factory>":
         return {"state": "factory"}
+    if isinstance(value, Enum):
+        return {
+            "enum": _qualified_name(type(value)),
+            "name": value.name,
+            "value": _stable_value(value.value),
+        }
     if value is None or isinstance(value, (bool, int, float, str)):
+        if isinstance(value, str) and Path(value) == Path(sys.executable):
+            return {"runtime": "sys.executable"}
         return value
     if isinstance(value, bytes):
         return {
             "type": "builtins.bytes",
             "digest": f"sha256:{hashlib.sha256(value).hexdigest()}",
             "length": len(value),
-        }
-    if isinstance(value, Enum):
-        return {
-            "enum": _qualified_name(type(value)),
-            "name": value.name,
-            "value": _stable_value(value.value),
         }
     if isinstance(value, Path):
         return {"path": value.as_posix()}
@@ -158,6 +171,23 @@ def _stable_value(value: object) -> object:
         return {
             "dataclass": _qualified_name(type(value)),
             "fields_digest": _digest_json(fields),
+        }
+    type_arguments = get_args(value)
+    if type_arguments:
+        return {
+            "type_expression": {
+                "arguments": [
+                    _qualified_name(item)
+                    if isinstance(item, type)
+                    else str(item).replace("typing.", "")
+                    for item in type_arguments
+                ],
+                "kind": (
+                    "union"
+                    if get_origin(value) in {types.UnionType, Union}
+                    else "generic"
+                ),
+            }
         }
     return {"type": _qualified_name(type(value))}
 
@@ -262,7 +292,9 @@ def _facade_entries(
             entry["kind"] = "function"
             entry["signature"] = _signature(value)
         else:
+            entry["defined_in"] = facade_name
             entry["kind"] = "constant"
+            entry["qualname"] = name
             entry["value"] = _stable_value(value)
         entries.append(entry)
     return entries
@@ -352,10 +384,6 @@ def cli_inventory() -> dict[str, object]:
             )
         parsers[name] = {
             "actions": actions,
-            "help_digest": (
-                "sha256:"
-                + hashlib.sha256(parser.format_help().encode("utf-8")).hexdigest()
-            ),
             "prog": parser.prog,
         }
     return {
@@ -366,6 +394,59 @@ def cli_inventory() -> dict[str, object]:
     }
 
 
+def _source_arguments_contract(
+    source: str,
+    arguments: ast.arguments,
+) -> list[dict[str, object]]:
+    parameters: list[dict[str, object]] = []
+    positional = [
+        *(("positional_only", item) for item in arguments.posonlyargs),
+        *(("positional_or_keyword", item) for item in arguments.args),
+    ]
+    defaults: list[ast.expr | None] = [
+        *([None] * (len(positional) - len(arguments.defaults))),
+        *arguments.defaults,
+    ]
+
+    def parameter(
+        kind: str,
+        item: ast.arg,
+        default: ast.expr | None,
+    ) -> dict[str, object]:
+        return {
+            "annotation": (
+                ast.get_source_segment(source, item.annotation)
+                if item.annotation is not None
+                else None
+            ),
+            "default": (
+                ast.get_source_segment(source, default)
+                if default is not None
+                else {"state": "absent"}
+            ),
+            "kind": kind,
+            "name": item.arg,
+        }
+
+    parameters.extend(
+        parameter(kind, item, default)
+        for (kind, item), default in zip(positional, defaults, strict=True)
+    )
+    if arguments.vararg is not None:
+        parameters.append(parameter("var_positional", arguments.vararg, None))
+    parameters.extend(
+        parameter("keyword_only", item, default)
+        for item, default in zip(
+            arguments.kwonlyargs,
+            arguments.kw_defaults,
+            strict=True,
+        )
+    )
+    if arguments.kwarg is not None:
+        parameters.append(parameter("var_keyword", arguments.kwarg, None))
+    return parameters
+
+
 def observable_module_inventory(repository: Path) -> dict[str, object]:
     source_root = repository / "src" / "hive_mind_os"
     definitions: list[dict[str, object]] = []
@@ -373,7 +454,8 @@ def observable_module_inventory(repository: Path) -> dict[str, object]:
     module_count = 0
     for path in _source_files(source_root):
         relative = path.relative_to(repository).as_posix()
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=relative)
         module_count += 1
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -392,13 +474,16 @@ def observable_module_inventory(repository: Path) -> dict[str, object]:
                     "path": relative,
                 }
                 if isinstance(node, ast.ClassDef):
-                    entry["bases"] = [ast.unparse(base) for base in node.bases]
+                    entry["bases"] = [
+                        ast.get_source_segment(source, base)
+                        for base in node.bases
+                    ]
                 else:
                     entry["arguments_digest"] = _digest_json(
-                        ast.dump(node.args, include_attributes=False)
+                        _source_arguments_contract(source, node.args)
                     )
                     entry["returns"] = (
-                        ast.unparse(node.returns)
+                        ast.get_source_segment(source, node.returns)
                         if node.returns is not None
                         else None
                     )
@@ -420,7 +505,9 @@ def observable_module_inventory(repository: Path) -> dict[str, object]:
                     constants.append(
                         {
                             "expression_digest": (
-                                _digest_json(ast.dump(value, include_attributes=False))
+                                _digest_json(
+                                    ast.get_source_segment(source, value)
+                                )
                                 if value is not None
                                 else None
                             ),

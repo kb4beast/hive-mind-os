@@ -21,7 +21,7 @@ implementation details.
 | --- | --- | --- |
 | supported | `hive_mind_os.__all__` | 131 bindings, package version, callable signatures, class bases, declared public member signatures, enum values, and stable defaults |
 | supported | `hive_mind_os.package_system.__all__` | 33 bindings resolved to the same deduplicated definition registry |
-| supported | `hive-mind` console script | 13 parser contracts with action names, options, destinations, requirements, defaults, choices, types, and help digests |
+| supported | `hive-mind` console script | 13 semantic parser contracts with action names, options, destinations, requirements, defaults, choices, and types |
 | de-facto | non-underscore top-level module definitions | 304 definitions across the source tree; inventoried for migration risk but not represented as a new support promise |
 | de-facto data | public upper-case module assignments | source-expression digests retained without claiming each constant is stable API |
 | data contract | schemas, package resources, roles, prompts, databases, model-call envelope, and docket | retained in fixture version 2 and the existing resource/state receipts |
@@ -29,6 +29,12 @@ implementation details.
 A signature failure is a compatibility event. Regenerating the artifact and
 fixture without a court disposition, migration, rollback, and independent
 review is prohibited.
+
+The canonical form deliberately excludes interpreter-formatted help text,
+normalizes `sys.executable` defaults, canonicalizes union aliases, and derives
+observable source expressions from source segments. This keeps the evidence
+contract stable across the supported Python matrix without hiding semantic
+parameter, default, annotation, return, option, or binding changes.
 
 ## Event path result
 
