@@ -183,3 +183,17 @@ Post-change focused receipts on Python 3.14:
 
 The generated inventory was refreshed. Fresh exact-head CI and independent review
 supersede all prior candidate-level promotion receipts.
+
+## `P3-AUDIT-011` — first boundary-remediation CI test-portability remand
+
+Exact candidate `e2e5e8456c726fe2f1b0cc476ece1565330f1c0f` passed static/type,
+CodeQL, secret, dependency/license, wheel/resource, SBOM, and provenance jobs in
+push run `30461723209` and pull-request run `30461726608`, but all Python
+3.11/3.12/3.14 jobs failed.
+
+The new linked-path regressions correctly proved that no redirected write occurred.
+Their cleanup used `Path.rmdir()`, which removes a Windows directory junction but
+raises `NotADirectoryError` for a POSIX directory symlink. This is a portable-test
+defect and remains an exact-candidate remand. Cleanup now uses `unlink()` for
+symlinks and `rmdir()` for Windows junctions. Fresh exact-head matrix evidence is
+required.

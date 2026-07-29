@@ -157,6 +157,13 @@ def _create_directory_link(link: Path, target: Path) -> None:
         raise OSError(completed.stderr or completed.stdout)
 
 
+def _remove_directory_link(link: Path) -> None:
+    if link.is_symlink():
+        link.unlink()
+    else:
+        link.rmdir()
+
+
 class PortableOpenBrainProjectionTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -467,7 +474,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
                 self._project()
             self.assertEqual(list(outside.rglob("*")), [])
         finally:
-            (state_root / "transactions").rmdir()
+            _remove_directory_link(state_root / "transactions")
 
     def test_pack_link_swap_at_lock_entry_cannot_escape_repository(self) -> None:
         self._append("memory:pack-link-race", sensitivity="safe-public")
@@ -491,7 +498,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
             self.assertEqual(list(outside.rglob("*")), [])
         finally:
             if pack_root.exists():
-                pack_root.rmdir()
+                _remove_directory_link(pack_root)
 
     def test_missing_or_renamed_managed_note_is_a_conflict(self) -> None:
         public = self._append("memory:rename", sensitivity="safe-public")
