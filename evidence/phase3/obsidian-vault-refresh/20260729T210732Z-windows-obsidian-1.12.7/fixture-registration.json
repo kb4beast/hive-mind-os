@@ -1,0 +1,12 @@
+{
+  "git_object_file_count": 3401,
+  "local_paths_omitted": true,
+  "no_hardlink_file_count": 1463,
+  "no_hardlink_git_object_count": 3401,
+  "origin_matches_source_repository": true,
+  "schema_version": 1,
+  "separate_clone": true,
+  "shared_git_object_alternate": false,
+  "subject_commit": "ee09e4cb9a4bc5fd0711e738249039507a194e43",
+  "tracked_file_count": 1463
+}

@@ -15,13 +15,13 @@
   "external_dependencies_added": 0,
   "generation_zero_activated": false,
   "implementation": {
-    "scripts/phase3_obsidian_refresh_fixture.py": "sha256:7449bb320c819add556fe214a2d46637e691f705b249b57a66b3538c591fa091",
-    "scripts/phase3_obsidian_vault_refresh_inventory.py": "sha256:63207cf297ac29c6ee4e27c6ccd7f91a686083e0a529a579dccaae1f7c6d72ee",
-    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:d841bc13d33e64b71a3e6a26aa6d1ecdea5c6f0fd8464d28bf3965e751988149",
-    "tests/test_phase3_cognitive_views.py": "sha256:4dd1a9b6cc47d69e022b42da6d5ab7a81bcabdc095d9e12d332b0b6cbbcddac3",
-    "tests/test_phase3_obsidian_vault_refresh.py": "sha256:22d2fdff1841c01385e40fd6235acadbbafa7965162ebb4307760b1b1f068e1d"
+    "scripts/phase3_obsidian_refresh_fixture.py": "sha256:8d9a545df51fcf546dc0841819cd285e5263c5b39aea0df01b709029b6ab7b26",
+    "scripts/phase3_obsidian_vault_refresh_inventory.py": "sha256:0dc00fdd39cab5234de61ed33b0557f1558baecbd8c17518f96ef715db52d2a5",
+    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:76e8a011ed71f98a6fe00f23768a8fb889331ad62ec28f8c0293438d8e4224d0",
+    "tests/test_phase3_cognitive_views.py": "sha256:56b927d278f21f7da035a51e18c4c307609f3025948f3a721b9ffca2ee217ce6",
+    "tests/test_phase3_obsidian_vault_refresh.py": "sha256:34bfc113383962fb09e1ddf2b5c35861f27b17aceb2f2ae6953b93ef0fc182f1"
   },
-  "inventory_digest": "sha256:f69eb9cc26c7dbab95a18a159ac8b7551122ef3eae4c61ddec9c5c22ca5dd758",
+  "inventory_digest": "sha256:e7925594ad3078d930601022ec6cb889b00753508d34b8159e49fe4af719e6e6",
   "obsidian_configuration": {
     "gitignore_rule": ".obsidian/",
     "global_profile_registration_side_effect_recorded": true,
@@ -29,7 +29,7 @@
   },
   "phase": 3,
   "phase_item": 5,
-  "prior_item4_inventory_digest": "sha256:2666e658e617895c349cbb60886989e319352e35388d53941ce41563af73ae67",
+  "prior_item4_inventory_digest": "sha256:dd30205d356d68916ca8c7f328155e1d96cead7062094c2c97f8ca3ec3b02991",
   "runs": {
     "20260729T201251Z-windows-obsidian-1.12.7": {
       "failed_cases": [
@@ -46,10 +46,15 @@
       "verdict": "fail"
     },
     "20260729T203709Z-windows-obsidian-1.12.7": {
+      "promotion_disposition": "superseded-non-promotable-production-subject",
+      "receipt_digest": "sha256:d5572c61a972766147546be864f28acdf443af5ae08a1161e2bb40d9c4a22ac4",
+      "verdict": "pass"
+    },
+    "20260729T210732Z-windows-obsidian-1.12.7": {
       "case_count": 5,
       "item4_check_status": "unchanged",
-      "maximum_refresh_latency_seconds": 5.975783,
-      "receipt_digest": "sha256:d5572c61a972766147546be864f28acdf443af5ae08a1161e2bb40d9c4a22ac4",
+      "maximum_refresh_latency_seconds": 8.940211,
+      "receipt_digest": "sha256:734472232ffec253df0d439a458095ffd3bcc928e4a6e218460b0b327e44007b",
       "verdict": "pass"
     }
   },
@@ -64,7 +69,7 @@
     "signer": "Dynalist Inc",
     "signer_thumbprint": "69b4a9ab8355237555686ca7cd67f6763b0f7eaf",
     "version": "1.12.7",
-    "window_handle": 50402192
+    "window_handle": 70067470
   },
   "schema_version": 1,
   "source_pins": {
@@ -72,5 +77,5 @@
     "obsidian_help_license": "NOASSERTION",
     "obsidian_release": "1.12.7"
   },
-  "subject_commit": "fadf6e1b386eba61168c753b3cdab3d94503430f"
+  "subject_commit": "ee09e4cb9a4bc5fd0711e738249039507a194e43"
 }

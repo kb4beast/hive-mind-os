@@ -912,3 +912,36 @@ derives Git HEAD, checks origin/source separation, tracked cleanliness, bounded
 no-hardlink identity, ignored `.obsidian/`, and persistent initialization identity.
 Root verification passed `42` tests with `16` subtests, Ruff, and Pyright. Independent
 current-byte review and judgment remain pending.
+
+## `P3-ITEM5-AUDIT-005` — sealed-subject runtime evidence
+
+Cross-examination correctly found that the preceding passing run predated final YAML
+hardening. It remains a truthful pass for its own subject but is explicitly
+non-promotable. Root sealed production and fixture commit
+`ee09e4cb9a4bc5fd0711e738249039507a194e43` before creating the fourth clone.
+
+The hardened fixture derived and matched Git HEAD/origin, rejected shared-object
+storage, verified `1463/1463` tracked files and `3401/3401` clone Git-object files as
+single-link regular files, rejected alternates, and kept protected state outside the
+vault. Its committed registration is sanitized; workstation paths remain omitted.
+
+The exact-subject run observed:
+
+- item 1: `6 -> 7` records in `4.315128s`;
+- item 3: `7 -> 8` total notes in `4.185468s`;
+- Ideas Base: `1 -> 2` rows in `8.940211s`; and
+- Canvas: disclosure plus two embedded idea rows rendered.
+
+After Canvas unload, the vault remained open for `321.151072s`. The final sanitized
+projector receipt records item 1, item 2, item 3, and item 4 `unchanged`; item 4 had
+no conflicts. Evidence preserves and hash-binds both observed item-1/item-3 targets,
+all four Bases, Canvas, the item-4 manifest, seven screenshots, the fixture
+registration, and the final projector receipt.
+
+The validator now enforces bounded single-handle reads, directory confinement,
+regular single-link files, exact runtime/case/fixture schemas, visible transitions,
+timestamp arithmetic, sanitized registration fields, complete target snapshots, and
+cross-field final-projector identity. Root verification passed `147` tests with `57`
+subtests; Ruff and Pyright passed. The original item-5 byte-freeze conflicts with
+the runtime-required Base/Canvas serialization repair; only a distinct Judge may
+authorize that minimal `adapt`.

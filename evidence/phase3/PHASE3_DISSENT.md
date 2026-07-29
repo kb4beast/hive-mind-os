@@ -157,6 +157,9 @@ or superiority claim.
 - The second run's immediate integrity check was false reassurance: Obsidian rewrote
   the Canvas about four minutes later. It is preserved as a second failed receipt,
   and future evidence must unload Canvas and survive a 300-second stability interval.
+- The third run survived that interval but became non-promotable when subsequent
+  YAML hardening changed production bytes. It remains a truthful passing receipt for
+  its own subject, not evidence for the sealed final subject.
 - Any repaired passing run covers only Obsidian Desktop `1.12.7` on Windows build
   `26200`.
 - The run reused an existing Obsidian process and user profile. It does not prove
@@ -168,6 +171,9 @@ or superiority claim.
   resolution.
 - Base and Canvas panes expose interactive UI. Item 5 does not authorize editing,
   write-back, command execution, plugins, or Obsidian as an execution host.
+- Fixture authority and `curator:item5-runtime` labels are synthetic test inputs.
+  They do not prove independent Curator approval or grant production release
+  authority.
 - `.obsidian` and vault registration are local side effects. They remain outside
   product ownership and are not evidence of secure cleanup or deletion.
 - No production-readiness, usefulness, user-value, cost, or superiority claim is

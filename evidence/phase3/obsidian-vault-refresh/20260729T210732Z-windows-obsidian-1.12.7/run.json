@@ -1,0 +1,183 @@
+{
+  "schema_version": "hive-obsidian-refresh-run/v1",
+  "run_id": "20260729T210732Z-windows-obsidian-1.12.7",
+  "subject_commit": "ee09e4cb9a4bc5fd0711e738249039507a194e43",
+  "verdict": "pass",
+  "test_window_seconds": 15,
+  "runtime": {
+    "application": "Obsidian Desktop",
+    "version": "1.12.7",
+    "executable_sha256": "fb6b2133c21ef7051c41f66d5c06f0e69162febfbb3f838a3556d54d13304b69",
+    "asar_sha256": "2b2483b2e1246772e0d25367ec055cbc5047ea2f0091b667c35656678f86d712",
+    "authenticode_status": "Valid",
+    "signer": "Dynalist Inc",
+    "signer_thumbprint": "69b4a9ab8355237555686ca7cd67f6763b0f7eaf",
+    "os": "Microsoft Windows 11 Home 10.0.26200 x64",
+    "process_id": 80216,
+    "window_handle": 70067470,
+    "restarted_during_run": false
+  },
+  "fixture": {
+    "vault_kind": "disposable Git clone with non-hardlinked tracked files and common Git objects",
+    "vault_head": "ee09e4cb9a4bc5fd0711e738249039507a194e43",
+    "source_repository_head": "ee09e4cb9a4bc5fd0711e738249039507a194e43",
+    "tenant_id": "tenant:phase3-item5-refresh",
+    "repository_id": "repository:phase3-item5-refresh",
+    "protected_state_outside_vault": true,
+    "safe_public_synthetic_records_only": true,
+    "source_repository_worktree_opened": false,
+    "source_repository_obsidian_directory_absent": true,
+    "clone_obsidian_directory_present": true,
+    "global_profile_vault_registration_side_effect": true,
+    "fixture_registration_digest": "sha256:a474ea354544b464a87c82dacf46b884d13f8a2f7479ce7a7e55061f4dfef8d7",
+    "fixture_registration": {
+      "git_object_file_count": 3401,
+      "local_paths_omitted": true,
+      "no_hardlink_file_count": 1463,
+      "no_hardlink_git_object_count": 3401,
+      "origin_matches_source_repository": true,
+      "schema_version": 1,
+      "separate_clone": true,
+      "shared_git_object_alternate": false,
+      "subject_commit": "ee09e4cb9a4bc5fd0711e738249039507a194e43",
+      "tracked_file_count": 1463
+    }
+  },
+  "cases": [
+    {
+      "case_id": "item1-open-note-replacement",
+      "target": "hive-mind/generated/README.md",
+      "before_observed_at": "2026-07-29T21:09:14.188Z",
+      "projector_completed_at": "2026-07-29T21:09:26.735872+00:00",
+      "after_observed_at": "2026-07-29T21:09:31.051Z",
+      "latency_seconds": 4.315128,
+      "before": "safe_public_record_count=6",
+      "after": "safe_public_record_count=7",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item3-open-home-replacement",
+      "target": "hive-mind/generated-cognitive/HOME.md",
+      "before_observed_at": "2026-07-29T21:09:42.367Z",
+      "projector_completed_at": "2026-07-29T21:09:50.592532+00:00",
+      "after_observed_at": "2026-07-29T21:09:54.778Z",
+      "latency_seconds": 4.185468,
+      "before": "evidence_count=2,court_count=1,total_count=7",
+      "after": "evidence_count=2,court_count=2,total_count=8",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-open-base-recomputation",
+      "target": "hive-mind/generated-cognitive-views/bases/ideas.base",
+      "before_observed_at": "2026-07-29T21:10:18.552Z",
+      "projector_completed_at": "2026-07-29T21:10:32.211789+00:00",
+      "after_observed_at": "2026-07-29T21:10:41.152Z",
+      "latency_seconds": 8.940211,
+      "before": "ideas=1",
+      "after": "ideas=2",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-canvas-render",
+      "target": "hive-mind/generated-cognitive-views/canvases/war-room.canvas",
+      "observed_at": "2026-07-29T21:10:52.601Z",
+      "visible_disclosure": "Released cognitive views",
+      "embedded_ideas": "2 results",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-generated-byte-integrity",
+      "canvas_unloaded_at": "2026-07-29T21:11:12.470Z",
+      "stability_interval_seconds": 300,
+      "final_checked_at": "2026-07-29T16:16:33.621072-05:00",
+      "actual_stability_seconds": 321.151072,
+      "item4_check_status": "unchanged",
+      "manifest_digest": "sha256:e809b8462b1172bdcbf8fd600fbc72165c25bb1acb8610e18eda0966012ff8a0",
+      "tree_digest": "sha256:92b50fc68232664636694e2dda630d76a0482a48c568774396e88a08b72ea4ef",
+      "tree_digest_role": "expected manifest identity; not observed-byte proof",
+      "conflict_paths": [],
+      "baseline_targets": {
+        "hive-mind/generated/README.md": "sha256:a455cf1ac741b75cd0d7fd97c184bf7052ff1717934f6820fb9deb7543cc0ee6",
+        "hive-mind/generated-cognitive/HOME.md": "sha256:6d5604ebd7359a7ea467258fa49ee7493a7dda206efe114f6e28def5ecc8e3ac",
+        "hive-mind/generated-cognitive-views/bases/agent-records.base": "sha256:9e545e3276e5913e050302469c377d2581004c85373fbe3bd493e21effe64cab",
+        "hive-mind/generated-cognitive-views/bases/ideas.base": "sha256:38e7cbf5991711294e524580cc736e0c2911cba290dd552219b3ce180e8fcafe",
+        "hive-mind/generated-cognitive-views/bases/released-war-room.base": "sha256:a42e60ffe4d80fcfbffbe703156b5fea8d16d1f3232569fdd00312743fc755e3",
+        "hive-mind/generated-cognitive-views/bases/telemetry-metadata.base": "sha256:602075040e47f7a944049e5b7c014f8fedbb1e1eb6df6c63999c60c4143ef9e3",
+        "hive-mind/generated-cognitive-views/canvases/war-room.canvas": "sha256:38e2032fffe8a53742b2fd064124ee31759ce2bc567597df28d4e4e2cec62df3",
+        "hive-mind/generated-cognitive-views/manifest.json": "sha256:e809b8462b1172bdcbf8fd600fbc72165c25bb1acb8610e18eda0966012ff8a0"
+      },
+      "verdict": "pass"
+    }
+  ],
+  "final_projection_digest": "sha256:3f8d07ca58d61ea034799c40c8c7ee6c20d61cb5ac186bda2edbad964e65901f",
+  "final_targets": {
+    "hive-mind/generated/README.md": "sha256:a455cf1ac741b75cd0d7fd97c184bf7052ff1717934f6820fb9deb7543cc0ee6",
+    "hive-mind/generated-cognitive/HOME.md": "sha256:6d5604ebd7359a7ea467258fa49ee7493a7dda206efe114f6e28def5ecc8e3ac",
+    "hive-mind/generated-cognitive-views/bases/agent-records.base": "sha256:9e545e3276e5913e050302469c377d2581004c85373fbe3bd493e21effe64cab",
+    "hive-mind/generated-cognitive-views/bases/ideas.base": "sha256:38e7cbf5991711294e524580cc736e0c2911cba290dd552219b3ce180e8fcafe",
+    "hive-mind/generated-cognitive-views/bases/released-war-room.base": "sha256:a42e60ffe4d80fcfbffbe703156b5fea8d16d1f3232569fdd00312743fc755e3",
+    "hive-mind/generated-cognitive-views/bases/telemetry-metadata.base": "sha256:602075040e47f7a944049e5b7c014f8fedbb1e1eb6df6c63999c60c4143ef9e3",
+    "hive-mind/generated-cognitive-views/canvases/war-room.canvas": "sha256:38e2032fffe8a53742b2fd064124ee31759ce2bc567597df28d4e4e2cec62df3",
+    "hive-mind/generated-cognitive-views/manifest.json": "sha256:e809b8462b1172bdcbf8fd600fbc72165c25bb1acb8610e18eda0966012ff8a0"
+  },
+  "final_target_metadata": {
+    "hive-mind/generated/README.md": {
+      "length_bytes": 829,
+      "last_write_at": "2026-07-29T21:10:31.8609702Z"
+    },
+    "hive-mind/generated-cognitive/HOME.md": {
+      "length_bytes": 935,
+      "last_write_at": "2026-07-29T21:10:32.0251950Z"
+    },
+    "hive-mind/generated-cognitive-views/bases/agent-records.base": {
+      "length_bytes": 1177,
+      "last_write_at": "2026-07-29T21:07:32.4435021Z"
+    },
+    "hive-mind/generated-cognitive-views/bases/ideas.base": {
+      "length_bytes": 1232,
+      "last_write_at": "2026-07-29T21:07:32.4464987Z"
+    },
+    "hive-mind/generated-cognitive-views/bases/released-war-room.base": {
+      "length_bytes": 1221,
+      "last_write_at": "2026-07-29T21:07:32.4504982Z"
+    },
+    "hive-mind/generated-cognitive-views/bases/telemetry-metadata.base": {
+      "length_bytes": 1202,
+      "last_write_at": "2026-07-29T21:07:32.4546612Z"
+    },
+    "hive-mind/generated-cognitive-views/canvases/war-room.canvas": {
+      "length_bytes": 2033,
+      "last_write_at": "2026-07-29T21:07:32.4596665Z"
+    },
+    "hive-mind/generated-cognitive-views/manifest.json": {
+      "length_bytes": 1879,
+      "last_write_at": "2026-07-29T21:10:32.2004020Z"
+    }
+  },
+  "screenshots": {
+    "01-item1-before.jpg": "sha256:bfbefa2e430b22a83412633a58108864a8584eddb7bfd8fbd938d9554b56cc63",
+    "02-item1-after.jpg": "sha256:d744b84253cbda188d3ea0086cc01b8988f4ee8e9c005ebc1f1ead34b0a50cf5",
+    "03-item3-before.jpg": "sha256:5d674315d40aac82c830fcec9a5794e815a5f793a4f399d189c8ebe86ba6244f",
+    "04-item3-after.jpg": "sha256:f84ff1460bd9f4fe800172e2072de0ab7c8211026197ea5867f4164488ad22ea",
+    "05-item4-base-before.jpg": "sha256:05ffef43f4e8453af28f3574c2f2cb44cee03f6d16b48b9fa3167e590c676456",
+    "06-item4-base-after.jpg": "sha256:b68f29115055e1e4a607c9a38a9bc8931bc03f153a97dbe0fc0cfa3ea4843373",
+    "07-item4-canvas-render.jpg": "sha256:d677acbac07df2ca0459e530cc8843615adfe2c2e8b2b11027419b8fc54396f5"
+  },
+  "prohibited_actions": {
+    "manual_refresh": false,
+    "application_restart": false,
+    "cache_rebuild": false,
+    "community_plugin": false,
+    "sync": false,
+    "importer": false,
+    "external_watcher": false,
+    "network_git_action": false
+  },
+  "claim_limits": [
+    "The evidence covers Obsidian Desktop 1.12.7 on the recorded Windows build only.",
+    "The test used an existing Obsidian process and profile; clean-profile isolation is not proved.",
+    "Opening the clone registered a vault in the global Obsidian profile.",
+    "Fixture authority and curator labels are synthetic test inputs, not production release authority.",
+    "No remote Git, Sync, multi-device, production-readiness, usefulness, or superiority claim is made."
+  ]
+}

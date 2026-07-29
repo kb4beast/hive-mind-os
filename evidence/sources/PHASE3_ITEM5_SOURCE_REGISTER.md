@@ -40,6 +40,11 @@ The help repository has no detected root reuse license. License remains
   `69b4a9ab8355237555686ca7cd67f6763b0f7eaf`
 - Host: Microsoft Windows 11 Home `10.0.26200`, x64
 
+The release page, changelog, and installed runtime are reference/execution-only
+evidence. No page text or application binary is redistributed. Their reuse license
+is recorded as `NOASSERTION`; only factual version, signature, and observed behavior
+are used.
+
 ## Atomic claims and limits
 
 1. Official documentation supports an expectation of automatic local-file refresh,
@@ -52,6 +57,6 @@ The help repository has no detected root reuse license. License remains
 4. Any passing run is version-, host-, and fixture-specific. It does not establish
    remote Git synchronization, Sync behavior, other Obsidian versions, production
    readiness, usefulness, or superiority.
-5. The third run is the only passing receipt. It preserves all four final target
-   files, seven screenshots, runtime pins, timestamps, and the delayed item-4
-   `unchanged` result. The two preceding failed receipts remain controlling dissent.
+5. The fourth run is the only promotable passing receipt. The earlier passing run is
+   retained as superseded because its subject predates final production hardening.
+   The two failed receipts remain controlling regression evidence.

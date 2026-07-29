@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import unittest
+from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -12,7 +13,10 @@ from scripts.phase3_obsidian_vault_refresh_inventory import (
     FAILED_RUNS,
     PASSING_RUN,
     RUN_ROOT,
+    SUPERSEDED_RUNS,
     TARGET_PATHS,
+    _bounded_file,
+    _validate_passing_run,
     build_phase3_item5_inventory,
 )
 
@@ -72,6 +76,27 @@ class ObsidianVaultRefreshEvidenceTests(unittest.TestCase):
         self.assertEqual(tuple(run["final_targets"]), TARGET_PATHS)
         self.assertFalse(any(run["prohibited_actions"].values()))
 
+    def test_prior_pass_is_preserved_as_superseded(self) -> None:
+        for run_id in SUPERSEDED_RUNS:
+            with self.subTest(run_id=run_id):
+                run = json.loads(
+                    (
+                        self.repository / RUN_ROOT / run_id / "run.json"
+                    ).read_text(encoding="utf-8")
+                )
+                self.assertEqual(run["verdict"], "pass")
+                self.assertNotEqual(
+                    run["subject_commit"],
+                    json.loads(
+                        (
+                            self.repository
+                            / RUN_ROOT
+                            / PASSING_RUN
+                            / "run.json"
+                        ).read_text(encoding="utf-8")
+                    )["subject_commit"],
+                )
+
     def test_inventory_matches_current_evidence(self) -> None:
         committed = json.loads(
             (
@@ -85,6 +110,89 @@ class ObsidianVaultRefreshEvidenceTests(unittest.TestCase):
             build_phase3_item5_inventory(self.repository),
             committed,
         )
+
+    def test_validator_rejects_semantic_and_privacy_forgery(self) -> None:
+        original = json.loads(
+            (
+                self.repository / RUN_ROOT / PASSING_RUN / "run.json"
+            ).read_text(encoding="utf-8")
+        )
+        mutations = {
+            "wrong target": lambda run: run["cases"][0].__setitem__(
+                "target", "private/secret.md"
+            ),
+            "blank Canvas disclosure": lambda run: run["cases"][3].__setitem__(
+                "visible_disclosure", ""
+            ),
+            "unsafe fixture": lambda run: run["fixture"].__setitem__(
+                "safe_public_synthetic_records_only", False
+            ),
+            "false duration": lambda run: run["cases"][4].__setitem__(
+                "actual_stability_seconds", 999
+            ),
+            "local registration path": lambda run: run["fixture"][
+                "fixture_registration"
+            ].__setitem__("repository", "C:\\private"),
+            "invalid process": lambda run: run["runtime"].__setitem__(
+                "process_id", 0
+            ),
+            "cross-case chronology": lambda run: run["cases"][1].__setitem__(
+                "before_observed_at", "2026-07-29T21:00:00Z"
+            ),
+            "private root field": lambda run: run.__setitem__(
+                "debug_path", "C:\\private"
+            ),
+            "false tree role": lambda run: run["cases"][4].__setitem__(
+                "tree_digest_role", "observed-byte proof"
+            ),
+            "manifest mismatch": lambda run: run["cases"][4].__setitem__(
+                "manifest_digest", "sha256:" + ("0" * 64)
+            ),
+            "weakened claim limits": lambda run: run.__setitem__(
+                "claim_limits", []
+            ),
+            "target metadata extension": lambda run: run[
+                "final_target_metadata"
+            ]["hive-mind/generated/README.md"].__setitem__(
+                "local_path", "relative-but-undisclosed"
+            ),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                candidate = deepcopy(original)
+                mutate(candidate)
+                with self.assertRaises(ValueError):
+                    _validate_passing_run(self.repository, candidate)
+
+    def test_bounded_evidence_reader_rejects_unsafe_files(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "run"
+            root.mkdir()
+            safe = root / "safe.bin"
+            safe.write_bytes(b"bounded")
+            self.assertEqual(_bounded_file(root, safe, 7), b"bounded")
+
+            with self.assertRaisesRegex(ValueError, "bounded evidence"):
+                _bounded_file(root, safe, 6)
+
+            hardlink = root / "hardlink.bin"
+            os.link(safe, hardlink)
+            with self.assertRaisesRegex(ValueError, "bounded evidence"):
+                _bounded_file(root, hardlink, 7)
+
+            outside = root.parent / "outside.bin"
+            outside.write_bytes(b"outside")
+            with self.assertRaisesRegex(ValueError, "escapes run directory"):
+                _bounded_file(root, outside, 7)
+
+            symlink = root / "symlink.bin"
+            try:
+                symlink.symlink_to(outside)
+            except OSError:
+                pass
+            else:
+                with self.assertRaisesRegex(ValueError, "linked evidence"):
+                    _bounded_file(root, symlink, 7)
 
 
 class ObsidianRefreshFixtureBoundaryTests(unittest.TestCase):
@@ -152,6 +260,15 @@ class ObsidianRefreshFixtureBoundaryTests(unittest.TestCase):
         self.assertEqual(repeated, registration)
         self.assertEqual(registration["subject_commit"], self.subject)
         self.assertGreater(registration["no_hardlink_file_count"], 0)
+        self.assertEqual(
+            registration["no_hardlink_file_count"],
+            registration["tracked_file_count"],
+        )
+        self.assertGreater(registration["git_object_file_count"], 0)
+        self.assertEqual(
+            registration["no_hardlink_git_object_count"],
+            registration["git_object_file_count"],
+        )
 
     def test_fixture_rejects_source_worktree_and_hardlinks(self) -> None:
         with self.assertRaisesRegex(SystemExit, "separate clone"):
@@ -166,6 +283,36 @@ class ObsidianRefreshFixtureBoundaryTests(unittest.TestCase):
         clone_file.unlink()
         os.link(self.source / "tracked.txt", clone_file)
         with self.assertRaisesRegex(SystemExit, "hardlinked"):
+            fixture._validate_fixture(
+                self.clone,
+                self.source,
+                self.state,
+                command="initialize",
+                claimed_subject_commit=self.subject,
+            )
+
+    def test_fixture_rejects_shared_objects_and_alternates(self) -> None:
+        shared = self.root / "shared"
+        subprocess.run(
+            ("git", "clone", str(self.source), str(shared)),
+            check=True,
+            capture_output=True,
+        )
+        with self.assertRaisesRegex(SystemExit, "Git object"):
+            fixture._validate_fixture(
+                shared,
+                self.source,
+                self.state,
+                command="initialize",
+                claimed_subject_commit=self.subject,
+            )
+
+        alternates = self.clone / ".git" / "objects" / "info" / "alternates"
+        alternates.write_text(
+            str(self.source / ".git" / "objects") + "\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(SystemExit, "shared Git object alternate"):
             fixture._validate_fixture(
                 self.clone,
                 self.source,

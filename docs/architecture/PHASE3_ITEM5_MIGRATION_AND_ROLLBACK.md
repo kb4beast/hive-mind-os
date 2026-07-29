@@ -15,8 +15,9 @@ content are unchanged.
 
 ## Rollback
 
-Revert ADR-026, item-5 evidence/scripts/tests, and the scalar-rendering change.
-Restore the preceding item-4 inventory. Stop running the conformance fixture.
+Revert ADR-026, item-5 evidence/scripts/tests, the Base scalar quoting change, and
+the Canvas serialization change. Restore the preceding item-4 inventory. Stop
+running the conformance fixture.
 
 Rollback does not delete user vaults, local Obsidian state, failed-run evidence, or
 projector protected state. Those require separate, explicitly scoped cleanup.

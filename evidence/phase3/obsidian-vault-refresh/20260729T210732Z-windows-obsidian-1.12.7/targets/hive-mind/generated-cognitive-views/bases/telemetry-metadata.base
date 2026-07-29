@@ -1,0 +1,42 @@
+filters:
+  and:
+    - file.inFolder("hive-mind/generated-cognitive/telemetry")
+    - schema_version == "hive-cognitive-note/v1"
+    - generator_version == "hive-cognitive-projector/v1"
+    - mapping_version == "hive-cognitive-mapping/v1"
+    - sensitivity == "safe-public"
+    - is_generated == true
+    - is_authoritative == false
+    - repository_identity_digest == "sha256:bb57656445b8670e8a951de8546fbe2c6204f62a22215180b8d43b623071e4c1"
+properties:
+  note_id:
+    displayName: Generated note ID
+  subject_id:
+    displayName: Released subject ID
+  memory_kind:
+    displayName: Released memory kind
+  mission_id:
+    displayName: Recorded mission ID
+  run_id:
+    displayName: Recorded run ID
+  status:
+    displayName: Released record status
+  observed_at:
+    displayName: Observed time (display only)
+  content_digest:
+    displayName: Released content digest
+  source_record_id:
+    displayName: Released source record ID
+views:
+  - type: table
+    name: Released telemetry metadata — accounting unavailable
+    order:
+      - note_id
+      - subject_id
+      - memory_kind
+      - mission_id
+      - run_id
+      - status
+      - observed_at
+      - content_digest
+      - source_record_id

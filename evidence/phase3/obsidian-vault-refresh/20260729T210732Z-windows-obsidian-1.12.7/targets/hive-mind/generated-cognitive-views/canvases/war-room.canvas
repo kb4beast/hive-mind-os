@@ -1,0 +1,14 @@
+{
+	"edges":[],
+	"nodes":[
+		{"height":180,"id":"6fba69759ebe90f4052e135c354bd980f7749d5507fe66c28097b8aeca688ff8","text":"# Released cognitive views\n\nStatic, safe-public, generated, nonauthoritative metadata. This is not live operational state.","type":"text","width":720,"x":0,"y":0},
+		{"height":160,"id":"1451c4311c47e1c7d0b3c7b0c5fc2cdfa23dd6004795ee8f671f59ff4ca56061","text":"Agent scores and health are unavailable. Released agent-related records are not scorecards.","type":"text","width":340,"x":0,"y":220},
+		{"height":160,"id":"9ecb9747744205f5a985c4d1918e5b3635a6369529a830235c32434d59cf56de","text":"Token and value accounting are unavailable. Unknown does not imply zero.","type":"text","width":340,"x":380,"y":220},
+		{"height":160,"id":"32017b39f455f868d81793e765370d9559004d8d0e9a103dc4f5c38dfff36d34","text":"Loop state is unavailable because the released cognitive source exposes no loop signal.","type":"text","width":340,"x":0,"y":420},
+		{"height":160,"id":"007eb94df8bbb684220914db9757b657d2beefe3b954ee414f59160e32922fc1","text":"Quarantine inventory is unavailable because the source admits only nonquarantined public memory. No all-clear is implied.","type":"text","width":340,"x":380,"y":420},
+		{"file":"hive-mind/generated-cognitive-views/bases/agent-records.base","height":140,"id":"b95c8e743f1f75f7da0a23ce7d0369af8a09da6ef242f3237e0b13587b49d1ca","type":"file","width":420,"x":800,"y":0},
+		{"file":"hive-mind/generated-cognitive-views/bases/ideas.base","height":140,"id":"30d32b2d2b909da7b5abf287d6cc71975f8dff7bf3fbfbfc87e8f05991a49531","type":"file","width":420,"x":800,"y":180},
+		{"file":"hive-mind/generated-cognitive-views/bases/released-war-room.base","height":140,"id":"ffc57c8c4c4b62996555c58bf107ae409536b36914db5cc1d4eef5912868dcee","type":"file","width":420,"x":800,"y":360},
+		{"file":"hive-mind/generated-cognitive-views/bases/telemetry-metadata.base","height":140,"id":"5183a41664eadf6aa4180ba26c7f58ad540a2d16aeed9e6b9d8e6fadb36ad462","type":"file","width":420,"x":800,"y":540}
+	]
+}
