@@ -240,5 +240,18 @@ wheel totals, path-construction correction, Windows-only regression boundary,
 remaining POSIX coverage and dissent, fail-closed linked-evidence handling,
 inventory equality, and unchanged sealed item-5 production/runtime evidence.
 
-This appeal records reviewer testimony only. Renewed independent judgment is still
-required before the repaired draft delivery can be treated as court-approved.
+## Renewed appeal judgment
+
+Distinct Judge `/root/item5_judge` reviewed exact record
+`fdefc1b5b6146b4fdf4e8a9317ebd23801e089a3`, covering repair
+`19b933beb8c0008652d543567198b0e776595bfa`, and issued `adapt` with no
+remand. The Judge independently reproduced the four directly affected regressions,
+deterministic inventory generation, Ruff, Pyright, and exact resource totals.
+
+The judgment admits the wheel totals and platform-test corrections as truthful
+verification repairs. The existing Windows/POSIX limitations and dissent remain
+controlling. No production, schema, interface, protocol, capability, authority,
+runtime-evidence, activation, merge, generalization, usefulness, value, or
+superiority claim is admitted. The draft PR may remain published, open, unmerged,
+and inactive; any change in those protected surfaces requires renewed review and
+judgment.
