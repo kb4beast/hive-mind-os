@@ -433,7 +433,30 @@ def _base_document(
 
 
 def _yaml_scalar(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)
+    ambiguous = {
+        "",
+        "~",
+        "null",
+        "true",
+        "false",
+        ".nan",
+        ".inf",
+        "-.inf",
+    }
+    if (
+        value != value.strip()
+        or value.casefold() in ambiguous
+        or value[0] in "-?:,[]{}#&*!|>'\"%@`"
+        or "\n" in value
+        or "\r" in value
+        or ": " in value
+        or " #" in value
+        or re.fullmatch(
+            r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?", value, re.I
+        )
+    ):
+        return json.dumps(value, ensure_ascii=False)
+    return value
 
 
 def _render_base(document: Mapping[str, Any]) -> bytes:

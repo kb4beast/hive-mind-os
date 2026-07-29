@@ -105,9 +105,12 @@ class CognitiveViewProjectionTests(unittest.TestCase):
             content = files[path]
             filter_block = content.split(b"properties:", 1)[0]
             self.assertEqual(filter_block.count(b"    - "), 8)
-            self.assertIn(b"file.inFolder", content)
+            self.assertIn(b'    - file.inFolder("', content)
             self.assertIn(b"is_generated == true", content)
             self.assertIn(b"is_authoritative == false", content)
+            self.assertNotIn(b'    - "file.inFolder', content)
+            self.assertNotIn(b'displayName: "', content)
+            self.assertNotIn(b'    name: "', content)
             for forbidden in (
                 b"formula",
                 b"summary",
@@ -144,6 +147,18 @@ class CognitiveViewProjectionTests(unittest.TestCase):
     def test_view_projection_never_opens_private_or_public_sqlite(self) -> None:
         with patch("sqlite3.connect", side_effect=AssertionError("SQLite opened")):
             self.assertEqual(self._project().status, "projected")
+
+    def test_base_scalars_are_obsidian_stable_and_yaml_safe(self) -> None:
+        self.assertEqual(
+            cognitive_views._yaml_scalar('file.inFolder("generated")'),
+            'file.inFolder("generated")',
+        )
+        self.assertEqual(
+            cognitive_views._yaml_scalar("Released idea metadata"),
+            "Released idea metadata",
+        )
+        self.assertEqual(cognitive_views._yaml_scalar("true"), '"true"')
+        self.assertEqual(cognitive_views._yaml_scalar("unsafe: value"), '"unsafe: value"')
 
     def test_repeat_and_check_are_unchanged(self) -> None:
         first = self._project()

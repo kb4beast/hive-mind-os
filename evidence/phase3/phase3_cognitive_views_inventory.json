@@ -53,17 +53,17 @@
       "canvases/war-room.canvas",
       "manifest.json"
     ],
-    "manifest_digest": "sha256:f4714f000e2d47192cef510edc45415e0c7c0d446b5c6a45790f5b0cdcae73f6",
+    "manifest_digest": "sha256:4ebc1ab4328cb895a61ec8fa3735e59fd722c222b95ac31130aaf81c60233d08",
     "private_foundation_available_during_view_projection": false,
     "public_store_read_by_view_projection": false,
     "source_cursor": "memory-set:fc877ad10b0e147dc0ce3ab3afc2cce052e2a5f7859f2571cfe4793bba204a44",
     "source_manifest_digest": "sha256:8268e835f98eac2de3e8daa2be204d4b212843cfb64329fe0a9aa1599ad7ded9",
     "source_namespace": "hive-mind/generated-cognitive",
     "stable_artifact_digests": {
-      "bases/agent-records.base": "sha256:8f48218d94257bc3fbfe5729b8d1fd8d0a1d58de2fd6264a962f1a94fba2ea29",
-      "bases/ideas.base": "sha256:ac371b131f37832e9b0873da39c378b095e229b74cb9f1dbbab62fc824bafff6",
-      "bases/released-war-room.base": "sha256:49002a2b14c9f26ef37c175add4b2fae2958aeb4a833d8b1de498be1e35fde28",
-      "bases/telemetry-metadata.base": "sha256:7f8137934f4760840aa572ab8eac2b8efe3daa28206e21fc210c81facc1111bd",
+      "bases/agent-records.base": "sha256:67a9a8332482ae193533b34d8b35157f2d1317275665c47ee060672d02676d56",
+      "bases/ideas.base": "sha256:38aa6d3ccd174e72b98df65231afb279cd70fd3e5bf2973bd28cbbd7c8fea331",
+      "bases/released-war-room.base": "sha256:01c65b0554ddb0d0f905e57baf5c1b6274d630c06a94156af306580e7075b4c1",
+      "bases/telemetry-metadata.base": "sha256:5b489861c89d08158515ad836fd50adb70bbeed3dd2864cea8b3289ae3de0686",
       "canvases/war-room.canvas": "sha256:8a6a262bf5cc1ddb4f8aa22cebb0c35b32629eef16dd771f637e18e6dc950aa0"
     },
     "status": "projected",
@@ -73,7 +73,7 @@
       "released-static-war-room-metadata",
       "released-telemetry-metadata"
     ],
-    "tree_digest": "sha256:ec62203feb4e08e8e7f09f8bcc6dad29fd6c1dbea89d77bad2630dda721aca89",
+    "tree_digest": "sha256:60b050e85f2be358b4a00d1fa1f28c78af39c8f12b656828e89f98970ce84779",
     "unavailable_capabilities": [
       "agent-score-and-health",
       "loop-state",
@@ -94,9 +94,9 @@
   "implementation": {
     "pyproject.toml": "sha256:1757eeb16442cb24d713e277f6279056dccf873e7c498e5470b25b63e555ea09",
     "src/hive_mind_os/foundation/cognitive_view_contracts.py": "sha256:718dcf06b186851054bafd94dbda827c04f4c97f4231f04577ce30e66f392b0b",
-    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:4469e8e1382f29d52eff197eda007cb518c1f8c183d88335685c3d75d25e143c"
+    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:1c7d822ffafb76fb6acd5402d1b3e14b89b969c2b93db14a81a4c03e5a946400"
   },
-  "inventory_digest": "sha256:b4756ba77fe349e67fde2d7c8c8ccafc78c66ab186266dacc490400a25b6b7f3",
+  "inventory_digest": "sha256:baa13520fe8cd0ff1539c4f1144e6e8e94eec2bf7e69def7c035ef154ee490a4",
   "obsidian_runtime_required": false,
   "official_source_pins": {
     "bases_license": "NOASSERTION",
