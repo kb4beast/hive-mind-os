@@ -7,8 +7,8 @@
 - Base branch: `codex/repair-ci-test-contract`
 - Base commit:
   `0948f7ec385238f5825ce7c39dd25de2e9a1035d`
-- Status: merits candidate; independent exact-candidate Curator and Judge
-  required before the completion verdict is final
+- Status: exact candidate accepted by independent Curator; independent Judge
+  and exact-published-head delivery gates required before final completion
 
 ## Court continuity and identities
 
@@ -125,6 +125,16 @@ The independent Curator/security/privacy Expert must reconstruct:
 - Phase 2 implementation authorization: `defer to a new additive branch/PR`
 - Host support, production redesign, and superiority: `reject as unproven`
 - Armory semantics and AgentTelemetry claims: `quarantine`
+
+## Independent Curator continuation
+
+The separate `/root/phase1_completion_curator` identity independently
+reconstructed exact candidate
+`0d44b1665d9775b5b889e99c2d56e63db9a010b9` and issued `accept` in
+`evidence/courts/P1-COMPLETION-CURATOR.md`. The receipt preserves adverse
+isolation and environment evidence and conditions final delivery on a
+different Judge plus fresh exact-published-head matrix, security, dependency,
+SBOM, wheel, provenance, and resource gates.
 
 ## Rollback and appeal
 
