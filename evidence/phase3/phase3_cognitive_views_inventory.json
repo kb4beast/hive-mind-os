@@ -1,0 +1,120 @@
+{
+  "activation": "opt-in-item3-derived-module-command",
+  "automatic_refresh_started": false,
+  "base_head": "7e26a56eab5fe79f075cccc57a6ff0a01fb9ef9a",
+  "cognitive_view_contracts": {
+    "catalog_valid": true,
+    "count": 8,
+    "names": [
+      "cognitive-view-base-v1",
+      "cognitive-view-canvas-v1",
+      "cognitive-view-conflict-v1",
+      "cognitive-view-failure-v1",
+      "cognitive-view-manifest-v1",
+      "cognitive-view-receipt-v1",
+      "cognitive-view-result-v1",
+      "cognitive-view-transaction-v1"
+    ],
+    "resource_digests": {
+      "cognitive-view-base-v1.schema.json": "sha256:60374882f544d833640bd3556e62dc18d0d179c34d424b3c5b6afe6d9b9f6860",
+      "cognitive-view-canvas-v1.schema.json": "sha256:5a376e31d376eb7e5eb472954b9daeae1e1a42590be45f1cdf6b830089cb269c",
+      "cognitive-view-conflict-v1.schema.json": "sha256:fb3cb052dd56cf65122d1651920cb5c210feb2a7e336f981197669073e18a7dc",
+      "cognitive-view-failure-v1.schema.json": "sha256:9e8bf76580184c2609fe03e7ddd3322f31ae72f5c69eb98e7fd4c609568696ac",
+      "cognitive-view-manifest-v1.schema.json": "sha256:035adbe761bb1a678b97c1f618b54d48bafc970b7e6243eede7ab07ae79d8eff",
+      "cognitive-view-receipt-v1.schema.json": "sha256:b6c76227712422e7a0d08bb3a2bdcb79e95d7e8008c260cda865e19e98f0630f",
+      "cognitive-view-result-v1.schema.json": "sha256:f0690991e5ccc20dc9e55a9757f18c09485c79a150adf647d91d9993ed6f2938",
+      "cognitive-view-transaction-v1.schema.json": "sha256:708291fb3bb297f616608291c50268f467323b695ba816bc0e68f8d753d22865"
+    },
+    "resource_set_digest": "sha256:b8a484599cf9412c826bbe1086da8fbabca62e600fd3107d137505c6e9df1b05"
+  },
+  "deterministic_fixture": {
+    "base_count": 4,
+    "canvas_count": 1,
+    "canvas_edge_count": 0,
+    "canvas_node_count": 9,
+    "canvas_node_ids": [
+      "4c63a851de768826b342329a5a850410c65c84ac38ac6b42e518d442ff944573",
+      "deb0a0b07b324dd4197dd1344d7188ecd0a2da9f0a0cc873e4728ed66c1021ff",
+      "0aec11ea36c0ba70447a529977dce488723e42998611b48f5bfe8e1a689ec9fa",
+      "6dea123cfbaef3a4bf3771b39fc785f0976f9f1fe124f26fab628c6e22f26c1b",
+      "cd2f804f012e3037bf7515ff26defdb54179602d7a64d9b9dc0ac63987a205c3",
+      "0a4c342df7f5522daaa98be8cf0fd7f15d5104b3320ee68aa6a1d82b3bee127a",
+      "5b1cd4b650b271e79f68902e06f132eab8963d5007ff4fa2de8e99927d8816e4",
+      "0cc051c83d0b40490dc9e1149d162ca72928a65bd4b8e173dc7fe191778d1872",
+      "610cfb2a6f98eaf7109063466dce1ae8837fc974b4f7abc8d4d239087de4955f"
+    ],
+    "cognitive_source_tree_unchanged": true,
+    "generated_namespace": "hive-mind/generated-cognitive-views",
+    "generated_paths": [
+      "bases/agent-records.base",
+      "bases/ideas.base",
+      "bases/released-war-room.base",
+      "bases/telemetry-metadata.base",
+      "canvases/war-room.canvas",
+      "manifest.json"
+    ],
+    "manifest_digest": "sha256:f4714f000e2d47192cef510edc45415e0c7c0d446b5c6a45790f5b0cdcae73f6",
+    "private_foundation_available_during_view_projection": false,
+    "public_store_read_by_view_projection": false,
+    "source_cursor": "memory-set:fc877ad10b0e147dc0ce3ab3afc2cce052e2a5f7859f2571cfe4793bba204a44",
+    "source_manifest_digest": "sha256:8268e835f98eac2de3e8daa2be204d4b212843cfb64329fe0a9aa1599ad7ded9",
+    "source_namespace": "hive-mind/generated-cognitive",
+    "stable_artifact_digests": {
+      "bases/agent-records.base": "sha256:8f48218d94257bc3fbfe5729b8d1fd8d0a1d58de2fd6264a962f1a94fba2ea29",
+      "bases/ideas.base": "sha256:ac371b131f37832e9b0873da39c378b095e229b74cb9f1dbbab62fc824bafff6",
+      "bases/released-war-room.base": "sha256:49002a2b14c9f26ef37c175add4b2fae2958aeb4a833d8b1de498be1e35fde28",
+      "bases/telemetry-metadata.base": "sha256:7f8137934f4760840aa572ab8eac2b8efe3daa28206e21fc210c81facc1111bd",
+      "canvases/war-room.canvas": "sha256:8a6a262bf5cc1ddb4f8aa22cebb0c35b32629eef16dd771f637e18e6dc950aa0"
+    },
+    "status": "projected",
+    "supported_capabilities": [
+      "released-agent-related-memory-metadata",
+      "released-idea-metadata",
+      "released-static-war-room-metadata",
+      "released-telemetry-metadata"
+    ],
+    "tree_digest": "sha256:ec62203feb4e08e8e7f09f8bcc6dad29fd6c1dbea89d77bad2630dda721aca89",
+    "unavailable_capabilities": [
+      "agent-score-and-health",
+      "loop-state",
+      "quarantine-inventory",
+      "token-and-value-accounting"
+    ]
+  },
+  "external_dependencies_added": 0,
+  "federation_started": false,
+  "generation_zero": {
+    "baseline_definition_count": 304,
+    "cli_parser_count": 13,
+    "definition_count": 304,
+    "package_api_count": 33,
+    "root_api_count": 131
+  },
+  "generation_zero_activated": false,
+  "implementation": {
+    "pyproject.toml": "sha256:1757eeb16442cb24d713e277f6279056dccf873e7c498e5470b25b63e555ea09",
+    "src/hive_mind_os/foundation/cognitive_view_contracts.py": "sha256:718dcf06b186851054bafd94dbda827c04f4c97f4231f04577ce30e66f392b0b",
+    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:4469e8e1382f29d52eff197eda007cb518c1f8c183d88335685c3d75d25e143c"
+  },
+  "inventory_digest": "sha256:b4756ba77fe349e67fde2d7c8c8ccafc78c66ab186266dacc490400a25b6b7f3",
+  "obsidian_runtime_required": false,
+  "official_source_pins": {
+    "bases_license": "NOASSERTION",
+    "json_canvas_commit": "456f843cb293df4f4ab1763e22ccb46a80b307c8",
+    "json_canvas_license": "MIT",
+    "json_canvas_version": "1.0",
+    "obsidian_help_commit": "29e89022c6aeb0a9e9971b6f0c98733dbc2eb716"
+  },
+  "phase": 3,
+  "phase3_item3_input": {
+    "historical_inventory_digest": "sha256:a50c164d0c5c324a653cac31f315409b9c42e4a921a5687693b1772f5f517321"
+  },
+  "phase_item": 4,
+  "prior_contracts": {
+    "item1_count": 7,
+    "item2_count": 3,
+    "item3_count": 8,
+    "phase2_count": 17
+  },
+  "schema_version": 1
+}

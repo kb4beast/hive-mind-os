@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/cognitive-view-failure/v1",
+  "type": "object",
+  "required": ["schema_version", "status", "error"],
+  "properties": {
+    "schema_version": {"const": "hive-cognitive-view-failure/v1"},
+    "status": {"const": "failed"},
+    "error": {"type": "string", "minLength": 1, "maxLength": 8192}
+  },
+  "additionalProperties": false
+}

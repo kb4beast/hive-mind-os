@@ -591,3 +591,251 @@ current-byte Curator PASS, renewed Cross-Examiner PASS, Steward PASS, and preser
 dissent. Acceptance is limited to draft delivery of the opt-in public-store-only
 metadata projection. Activation, rich content, usefulness, production readiness,
 superiority, and final-system security/supply-chain evidence remain unjudged.
+
+## `P3-ITEM4-AUDIT-001` — supplied base, source court, and bounded architecture
+
+Phase 3 item 4 began on `codex/phase3-obsidian-bases-canvas` from the supplied PR #34
+branch tip `7e26a56eab5fe79f075cccc57a6ff0a01fb9ef9a`. The user-owned edit to
+`docs/NEXT_SESSION_HANDOFF_PUBLIC_PRIVATE_MEMORY.md` remains preserved and is not
+treated as Builder work. `main` was not checked out or modified.
+
+Court `P3-OBSIDIAN-VIEWS-004` and the item-4 source register opened before code.
+Official Obsidian help and JSON Canvas heads matched the already pinned Phase 1
+commits. Bases documentation remains `NOASSERTION` for reuse; JSON Canvas 1.0 is MIT.
+
+Independent Explorer, Architect, and Integrator/Optimizer testimony selected a
+separate `generated-cognitive-views` namespace, verified receipt-owned item-3 input,
+four strict metadata Bases, one constant-size disclosure/navigation Canvas, no
+loop/quarantine Base, a separate eight-schema protocol, and explicit no-runtime/
+no-refresh/no-accounting/no-score limits.
+
+## `P3-ITEM4-AUDIT-002` — bounded implementation
+
+Builder `/root/item4_builder` added the separate eight-schema catalog and package
+resources. `Codex-root` materialized and repaired the module implementation, focused
+tests, deterministic inventory, and evidence. The module reads only the exact
+receipt-owned item-3 tree and external item-3 protected evidence. It accepts no
+private Foundation or public SQLite path.
+
+The exact generated set is four Bases, one nine-node/zero-edge Canvas, and one
+manifest under `hive-mind/generated-cognitive-views`. Base/Canvas bytes and full
+domain-separated Canvas node IDs remain stable across source-cursor changes for the
+same repository identity. The manifest alone records current item-3 source identity.
+The output contains explicit released/static/safe-public/generated/nonauthoritative/
+not-live disclosure and unavailable-not-zero statements for scores/health,
+token/value accounting, loops, and quarantine.
+
+Implementation digest:
+`sha256:4b31182ced6d94b058180ae083f75c05c3afed5fdf7ba72a6117bc3b2c2d1e82`.
+Inventory digest:
+`sha256:61a6c27578e7cb4df97dfc9466cf39f5f485ddfa96ada0cdada25e098ce867ab`.
+
+## `P3-ITEM4-AUDIT-003` — independent cross-examination and repairs
+
+Distinct Cross-Examiner `/root/item4_explorer/cross_examiner` remanded the initial
+runnable candidate. It reproduced an unverified reserved-sibling deletion and a
+forged pending journal that could write an arbitrary file before failing ownership
+verification. It also found incomplete source receipt binding, post-commit source
+reporting, insufficient junction/parent defenses, weak conflict evidence,
+self-denying history bounds, non-total Canvas semantics, and absent inventory
+characterization.
+
+Repairs validate the complete transaction and staged manifest before mutation;
+preflight all reserved siblings; preserve mismatches; use ancestry, parent-identity,
+same-file, and Windows no-delete checks; bind every current/historical receipt to
+exact item-3 source evidence; check source immediately before manifest install;
+validate measurable conflict evidence; separate history/transaction/conflict bounds;
+make Base/Canvas semantic validation total; and check inventory equality.
+
+The Cross-Examiner's requested raw tenant/repository expressions were rejected
+because untrusted identifiers are prohibited in generated query structure. Exact
+receipt-owned folder membership plus repository-identity digest binds scope. The
+remaining runtime-vault spoof/property-type concern is preserved as dissent.
+
+## `P3-ITEM4-AUDIT-004` — Curator remands and current-byte reproduction
+
+Distinct Curator `/root/item4_architect/curator` issued three material remands:
+
+1. a post-receipt source check could report failure after a valid commit;
+2. arbitrary malformed evidence under authorized protected directories was ignored;
+3. a schema-valid forged receipt side branch was not required to be reachable.
+
+The final boundary checks source immediately before manifest install under the held
+item-3 lock and makes the later uncooperative-writer window explicit dissent. Every
+protected receipt/conflict is now canonical, schema-valid, identity-consistent, and
+semantically valid; after recovery, every receipt must be on the single chain
+reachable from the installed manifest head. Curator reproduced rejection of
+malformed and schema-valid forged evidence, the adversarial repair subset, focused
+suite, combined suite, inventory, lint, and type checks on current bytes.
+
+## `P3-ITEM4-AUDIT-005` — exact verification
+
+On the final pre-Steward candidate:
+
+- item-4 focused suite: `24 passed`;
+- Phase 2 plus Phase 3 items 1–4: `125 passed, 23 subtests passed`;
+- independent Curator adversarial subset: `13 passed, 11 deselected`;
+- Pyright: `0 errors, 0 warnings, 0 informations`;
+- Ruff: passed;
+- exact deterministic inventory: passed;
+- installed-wheel eight-resource catalog: passed; and
+- diff whitespace check: passed.
+
+The suite covers item-1/item-3 byte parity, no SQLite access, check-mode nonmutation,
+cursor-stable Base/Canvas bytes and node IDs, exact schemas/artifacts/bounds,
+unavailable-not-zero language, corrupt source evidence, pending source recovery,
+manual/missing/unmanaged state, interruption recovery, sealed-old-then-current
+publication, forged staged plans and arbitrary paths, reserved siblings, source
+change before manifest, current/historical receipt binding, malformed conflict
+evidence, schema-valid unreachable receipts, frozen public surfaces, and CLI
+behavior.
+
+## `P3-ITEM4-AUDIT-006` — Steward remand and repaired candidate
+
+Distinct Steward `/root/item4_explorer/steward` issued a five-finding remand for the
+post-hardlink two-name crash window, pre-seal interruption without a recoverable
+journal, restart dependence on the historical authority identity, unsafe source
+transaction-root traversal, and repeated receipt-history traversal.
+
+The repaired candidate:
+
+- recognizes only an exact desired-digest next/destination hardlink pair and
+  completes that interrupted install;
+- writes the journal before staging in a preparation directory and atomically seals
+  only complete plans;
+- preserves incomplete preparation bytes under a path-bounded content identity plus
+  canonical receipt binding the full original transaction ID and file digests;
+- uses fresh authentic same-tenant/repository authority for recovery while
+  preserving the original authority tuple as historical evidence;
+- checks the item-3 transaction root before enumeration; and
+- caches already proven source-chain nodes within one bounded validation pass while
+  revalidating every direct source receipt head.
+
+Root reproduction after repair passed `29` focused tests and `130` Phase 2 plus
+Phase 3 items 1–4 tests with `23` inherited subtests. Ruff and Pyright passed. The
+superseding current implementation digest is
+`sha256:edebb8053a70923264bce1d4dec8b87d48e1af2c2dd13e6000faec581f98ae40`;
+the deterministic inventory body digest is
+`sha256:f83985b403c835e9bacf49bc5c42e8ba072ccd482b9d533e3fdcb7a0f69a3d67`.
+Independent Steward reproduction and final judgment remain required.
+
+## `P3-ITEM4-AUDIT-007` — final Curator abandonment-evidence remand
+
+The renewed Curator reproduced two semantic inconsistencies in the first Steward
+repair. A content-addressed abandonment receipt could be recomputed and renamed with
+a different transaction ID while its readable preserved journal retained the
+original ID. An unexpected nested preparation path could also be quarantined on one
+run even though the next admission rejected that same evidence.
+
+The repair requires a readable preserved journal's transaction ID to match its
+abandonment receipt, restricts preservable preparation shape to the journal plus the
+single hashed staging directory, and fails closed in place on every unexpected path.
+Targeted regressions re-address both receipt and evidence directory while preserving
+file digests, and inject an unexpected nested payload. Both now fail closed before
+ordinary projection can report success.
+
+The current implementation digest is
+`sha256:f2d0b8704830e22cfeb64aee97a3a163b6ce54b1602a1e440019b61174cb8c51`;
+the inventory body digest is
+`sha256:b4d22570079ec49db3945fc4f10f8e3e8e3c1d3caed077038192177da8b5453a`.
+Root focused reproduction passed `30` tests. The final root Phase 2 plus Phase 3
+items 1–4 matrix passed `131` tests with `23` inherited subtests. Independent
+rereproduction remains pending.
+
+## `P3-ITEM4-AUDIT-008` — atomic evidence and no-clobber seal repair
+
+The Steward's renewed review confirmed its original five findings closed, then
+remanded four adjacent boundaries: partial writes at final evidence names,
+uncatalogued abandonment `schema_version`, directory check-then-rename clobber
+semantics on POSIX, and an unenforced Windows path budget.
+
+The second reliability repair:
+
+- writes final completion, conflict, and abandonment evidence to fsynced
+  content-digest temporaries and installs them with native atomic no-replace rename;
+- finishes complete temporaries on restart and discards only incomplete unsealed
+  temporaries before the originating operation is replayed;
+- defines abandonment as an internal canonical `record_kind`, preserving the exact
+  installed eight-schema catalog;
+- uses Windows no-replace rename, Linux `renameat2`, or macOS `renamex_np` for file
+  and directory seals and fails closed elsewhere; and
+- rejects Windows protected-state roots above 110 characters before mutation.
+
+Targeted tests interrupt all three final evidence kinds, inject a late seal
+destination, preserve its bytes and the original preparation, and check the
+Windows 110/111-character boundary. Root focused verification passed `34` tests,
+Ruff passed, Pyright reported zero errors/warnings/information, inventory equality
+passed, and diff whitespace passed.
+
+The current implementation digest is
+`sha256:c3554ee83627407bef457f958abdc5176ddf1e0ba76e1f0ba361dde2bb50a965`;
+the inventory body digest is
+`sha256:609dd6764a67b3cc0b237c5241691828236f0092139b6d0db585ea1adeebae6e`.
+The final root Phase 2 plus Phase 3 items 1–4 matrix passed `135` tests with `23`
+inherited subtests. Independent Steward/Curator rereproduction remains pending.
+
+## `P3-ITEM4-AUDIT-009` — truthful complete-temporary recovery
+
+The Curator independently interrupted after a full canonical completion-receipt
+temporary was fsynced but before atomic installation. Restart installed the receipt
+and removed the completed transaction correctly, but the result incorrectly said
+`unchanged/not-required`.
+
+Completed-transaction cleanup now returns the exact installed receipt reference so
+the result reports `projected/recovered`. The new full-temporary regression verifies
+canonical pending bytes, restart installation, transaction cleanup, no remaining
+temporary, and truthful recovery status.
+
+Root focused verification passed `35` tests, Ruff and Pyright passed, exact inventory
+equality and diff whitespace passed. The superseding implementation digest is
+`sha256:4469e8e1382f29d52eff197eda007cb518c1f8c183d88335685c3d75d25e143c`;
+the inventory body digest is
+`sha256:b4756ba77fe349e67fde2d7c8c8ccafc78c66ab186266dacc490400a25b6b7f3`.
+The final root combined matrix passed `136` tests with `23` inherited subtests.
+Final independent rereproduction remains pending.
+
+## `P3-ITEM4-AUDIT-010` — final independent PASS receipts
+
+Steward `/root/item4_explorer/steward` issued PASS on implementation
+`sha256:4469e8e1382f29d52eff197eda007cb518c1f8c183d88335685c3d75d25e143c`
+and inventory body
+`sha256:b4756ba77fe349e67fde2d7c8c8ccafc78c66ab186266dacc490400a25b6b7f3`.
+It confirmed all original and renewed recovery, no-clobber, authority, source-root,
+history-cost, internal-evidence, and Windows path-budget findings closed.
+
+Curator `/root/item4_architect/curator` issued PASS on the same bytes. Its receipts
+are:
+
+- item-4 focused suite: `35 passed`;
+- selected adversarial subset: `22 passed, 13 deselected`;
+- Phase 2 plus Phase 3 items 1–4: `136 passed, 23 subtests passed`;
+- Ruff: passed;
+- Pyright: `0 errors, 0 warnings, 0 informations`;
+- exact inventory equality: passed; and
+- diff whitespace: passed.
+
+The Curator separately reproduced canonical full-temporary recovery as
+`projected/recovered`, all three partial-final-evidence recoveries, journal/receipt
+binding rejection, invalid-shape in-place rejection, late seal-destination
+preservation, the Windows 110/111 boundary, and the exact eight-schema boundary.
+Distinct final judgment remains pending.
+
+## `P3-ITEM4-AUDIT-011` — distinct final judgment
+
+Distinct Judge `/root/item4_architect/judge` issued `adapt` for reversible stacked
+draft delivery on exact implementation
+`sha256:4469e8e1382f29d52eff197eda007cb518c1f8c183d88335685c3d75d25e143c`
+and inventory body
+`sha256:b4756ba77fe349e67fde2d7c8c8ccafc78c66ab186266dacc490400a25b6b7f3`.
+
+The Judge admitted only the opt-in separate view namespace, four truthful metadata
+Bases, one fixed disclosure/navigation Canvas, manifest/eight schemas, exact item-3
+source admission, bounded recovery/evidence, read-only check, stable identities,
+frozen prior surfaces, and reversible stop-invoking rollback.
+
+Unavailable agent score/health, token/value accounting, loop state, and quarantine
+inventory remain disclosures rather than fabricated dashboards. Merge, activation,
+production, Obsidian runtime/rendering/refresh, federation, plugins, retrieval,
+cleanup, encryption, full CI/security/supply-chain promotion, usefulness, and
+superiority remain unjudged. Any byte, schema, protocol, interface, capability, or
+evidence change requires renewed review and judgment.

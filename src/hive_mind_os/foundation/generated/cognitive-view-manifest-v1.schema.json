@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/cognitive-view-manifest/v1",
+  "type": "object",
+  "required": ["schema_version", "projection_contract", "projector_version", "mapping_version", "tenant_id", "repository_id", "repository_identity_digest", "source_cursor", "source_manifest_digest", "generated_namespace", "base_count", "canvas_count", "supported_capabilities", "unavailable_capabilities", "files"],
+  "properties": {
+    "schema_version": {"const": "hive-cognitive-view-manifest/v1"},
+    "projection_contract": {"const": "hive-cognitive-views-projection/v1"},
+    "projector_version": {"const": "hive-cognitive-views-projector/v1"},
+    "mapping_version": {"const": "hive-cognitive-views-mapping/v1"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "source_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "generated_namespace": {"const": "hive-mind/generated-cognitive-views"},
+    "base_count": {"const": 4},
+    "canvas_count": {"const": 1},
+    "supported_capabilities": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "unavailable_capabilities": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "files": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["path", "kind", "semantic_role", "content_digest"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 240},
+          "kind": {"type": "string", "enum": ["base", "canvas"]},
+          "semantic_role": {"type": "string", "minLength": 1, "maxLength": 128},
+          "content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

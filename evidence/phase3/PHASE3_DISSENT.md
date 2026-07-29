@@ -103,3 +103,48 @@ or superiority claim.
 - No Bases/Canvas, Obsidian refresh or support, federation, self-host recursion,
   Inbox, watcher, plugin, Sync, retrieval, encryption/KMS, cleanup, deletion,
   activation, usefulness, production readiness, or superiority claim is made.
+
+## Phase 3 item 4 — Obsidian view projection
+
+- Bases implement a repository-owned subset of mutable, unversioned official
+  documentation. No runtime Obsidian compatibility or refresh claim is made.
+- The official Obsidian help repository has no detected reuse license. Only abstract
+  format facts are used; no expressive example or template is copied.
+- A Base can expose editable generated note properties. It is not a read-only or
+  authoritative UI, and human edits correctly create item-3 drift/conflict.
+- The released source supports agent-related and telemetry metadata, not agent
+  scores/health or token/cost/value accounting. Unknown is not zero.
+- Loop signals and quarantine inventory are absent from the admitted source.
+  Item 4 emits no empty Base, count, or all-clear claim for either.
+- The Canvas is fixed navigation and disclosure, not a causal graph, live War Room,
+  playback, command surface, or completeness proof.
+- File nodes targeting `.base` files are structurally valid JSON Canvas; how a
+  pinned Obsidian build renders them remains an open evidence obligation.
+- File-at-a-time publication and the malicious uncooperative-writer limitation
+  remain the same dissent as item 3.
+- The held item-3 lock excludes cooperating writers, and source identity is checked
+  immediately before the item-4 manifest commit marker. An uncooperative writer can
+  still mutate source after that final check; item 4 does not claim detection,
+  rollback, or a cross-process filesystem transaction for that window.
+- Base folder plus provenance filters rely on the receipt-owned item-3 namespace.
+  Raw tenant/repository strings are intentionally excluded from expressions; the
+  validated repository-identity digest is the scope binding. A separately spoofed
+  vault file cannot enter that exact owned tree without item-3 drift, but runtime
+  vault property-type behavior remains untested.
+- Protected history has explicit finite bounds. At the 200,100-path ceiling the
+  projector fails closed; no cleanup or compaction policy is authorized in item 4.
+- Interrupted incomplete preparations are retained as content-addressed evidence.
+  This avoids silent evidence loss but can consume protected-state capacity until a
+  separately authorized retention/cleanup policy exists.
+- Recovery with a fresh authentic same-scope authority preserves the original
+  decision/actor/lease only as historical journal evidence. This proves restart
+  liveness inside the current scope; it does not renew an expired lease or authorize
+  a different tenant or repository.
+- Partial content-digest evidence temporaries are explicitly unsealed bytes, not
+  append-only evidence. Project recovery may discard them after proving their digest
+  does not match their reserved name; check mode never does. The originating sealed
+  transaction, preparation, or observed conflict remains the retry authority.
+- Atomic directory no-replace support is limited to the tested Windows primitive and
+  native Linux/macOS no-replace syscalls. Other operating systems fail closed.
+- The Windows protected-state root limit is a conservative classic-path boundary,
+  not a general long-path capability claim.

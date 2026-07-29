@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/cognitive-view-base/v1",
+  "type": "object",
+  "required": ["filters", "properties", "views"],
+  "properties": {
+    "filters": {
+      "type": "object",
+      "required": ["and"],
+      "properties": {
+        "and": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 512}
+        }
+      },
+      "additionalProperties": false
+    },
+    "properties": {
+      "type": "object",
+      "properties": {
+        "note_id": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "subject_id": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "memory_kind": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "status": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "confidence_ppm": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "observed_at": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "source_record_id": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "mission_id": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "run_id": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "actor_id": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "owner_id": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "recorded_at": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false},
+        "content_digest": {"type": "object", "required": ["displayName"], "properties": {"displayName": {"type": "string", "minLength": 1, "maxLength": 64}}, "additionalProperties": false}
+      },
+      "additionalProperties": false
+    },
+    "views": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type", "name", "order"],
+        "properties": {
+          "type": {"const": "table"},
+          "name": {"type": "string", "minLength": 1, "maxLength": 64},
+          "order": {"type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
