@@ -69,6 +69,12 @@
     "path": "evidence/courts/P1-COMPLETION-CURATOR.md",
     "verdict": "accept"
   },
+  "independent_judge": {
+    "candidate_sha": "a7c67c34f2986ea64732f2a75073d258a90c8ad6",
+    "identity": "/root/phase1_completion_judge",
+    "path": "evidence/courts/P1-COMPLETION-JUDGE.md",
+    "verdict": "adopt-phase1-architecture-and-evidence"
+  },
   "next_eligible_objective": {
     "base": "final-head-of-pr-29",
     "branch": "codex/phase2-additive-memory-telemetry-foundation",
@@ -103,5 +109,5 @@
     "path": "evidence/courts/P1-SOURCE-ADMISSION.md",
     "sha256": "c9b62d2be91fa0669f54e70317b5033ad6e29a7140e4ae7c6eb0f10665214f7a"
   },
-  "status": "curator-accepted-pending-independent-judge-and-exact-head-delivery"
+  "status": "judge-adopted-pending-exact-head-delivery"
 }

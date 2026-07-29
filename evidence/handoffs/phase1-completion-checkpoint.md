@@ -1,7 +1,7 @@
 # Phase 1 Completion Portable Checkpoint
 
-- Checkpoint status: independently accepted by Curator; Judge and exact-head
-  delivery gates pending
+- Checkpoint status: independently accepted by Curator and adopted by Judge;
+  exact-published-head delivery gates pending
 - Date: 2026-07-28
 - Draft PR: `kb4beast/hive-mind-os#29`
 - Branch: `codex/phase1-redesign-characterization`
@@ -43,8 +43,9 @@ changed by the completion candidate.
 3. Re-run the focused Generation Zero and Phase 1 tests on Python 3.11, 3.12,
    and 3.14.
 4. Preserve the accepted independent Curator receipt at
-   `evidence/courts/P1-COMPLETION-CURATOR.md` and obtain a separately
-   identified Judge disposition. A Builder statement cannot satisfy either.
+   `evidence/courts/P1-COMPLETION-CURATOR.md` and adopted independent Judge
+   disposition at `evidence/courts/P1-COMPLETION-JUDGE.md`. A Builder
+   statement cannot satisfy either.
 5. Repair any remand without weakening the frozen surfaces or evidence gates.
 6. Push only to PR #29's branch and require its exact-head Python matrix,
    Ruff, Pyright, CodeQL, secret scan, dependency review, SBOM, wheel,
@@ -69,8 +70,10 @@ exact-head GitHub matrix must supply the qualifying complete-suite receipt.
 
 Independent Curator, Judge, and exact-published-head security/provenance gates
 were required at the initial checkpoint. The Curator subsequently accepted
-the exact candidate `0d44b1665d9775b5b889e99c2d56e63db9a010b9`;
-Judge and exact-published-head security/provenance gates remain pending.
+exact candidate `0d44b1665d9775b5b889e99c2d56e63db9a010b9`, and the
+separate Judge adopted the Phase 1 architecture/evidence candidate
+`a7c67c34f2986ea64732f2a75073d258a90c8ad6`. Exact-published-head
+security/provenance gates remain pending.
 
 ## Deferred work and next eligible objective
 

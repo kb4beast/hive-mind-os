@@ -7,8 +7,9 @@
 - Base branch: `codex/repair-ci-test-contract`
 - Base commit:
   `0948f7ec385238f5825ce7c39dd25de2e9a1035d`
-- Status: exact candidate accepted by independent Curator; independent Judge
-  and exact-published-head delivery gates required before final completion
+- Status: exact candidate accepted by independent Curator and adopted by
+  independent Judge; exact-published-head delivery gates required before
+  final completion
 
 ## Court continuity and identities
 
@@ -135,6 +136,18 @@ reconstructed exact candidate
 isolation and environment evidence and conditions final delivery on a
 different Judge plus fresh exact-published-head matrix, security, dependency,
 SBOM, wheel, provenance, and resource gates.
+
+## Independent Judge continuation
+
+The separate `/root/phase1_completion_judge` identity independently
+reconstructed evidence candidate
+`a7c67c34f2986ea64732f2a75073d258a90c8ad6` and adopted the Phase 1
+architecture and evidence obligations in
+`evidence/courts/P1-COMPLETION-JUDGE.md`. Final delivery remains conditional
+on fresh exact-published-head Python, quality, CodeQL, secret, dependency,
+SBOM, clean-wheel, provenance, and resource gates. The ruling defers Phase 2
+implementation in PR #29, rejects unsupported host/production/superiority
+claims, and preserves Armory and AgentTelemetry quarantine.
 
 ## Rollback and appeal
 
