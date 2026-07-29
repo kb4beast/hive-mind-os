@@ -1,6 +1,7 @@
 # Phase 1 Surface and Effect Characterization
 
-- Status: generation-zero evidence candidate
+- Status: generation-zero evidence accepted within the published bounded
+  static scope
 - Baseline production commit:
   `b032a9f32f48889e0889fae8d6dd04eb03f46b63`
 - Verified Phase 0 repair head:

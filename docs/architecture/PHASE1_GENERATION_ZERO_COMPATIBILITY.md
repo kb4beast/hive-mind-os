@@ -67,3 +67,21 @@ The change must provide:
 6. independent Curator and Judge evidence.
 
 Phase 1 itself changes no captured production surface.
+
+## Phase 1 completion regeneration
+
+The completion candidate must regenerate both JSON artifacts under Python
+3.11, 3.12, and 3.14 and reproduce:
+
+- 131 root-facade bindings;
+- 33 package-facade bindings;
+- 13 CLI parser contracts;
+- inventory digest
+  `sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037`;
+  and
+- artifact SHA-256
+  `2977cc4e7f2b30b63c5dcf55d3d86cd3a1f648049d8872f1a599131899d48919`.
+
+ADR adoption, court evidence, `.obsidian/` ignore policy, and the portable
+checkpoint are outside the Generation Zero runtime surface. Any change to the
+values above is a remand, not a fixture refresh.

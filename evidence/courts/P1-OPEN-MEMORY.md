@@ -72,3 +72,16 @@ two remands strengthened database, append-only, and telemetry fixtures. That
 acceptance does not adopt ADR-019 or activate a memory migration.
 The independent Judge adapted this characterization for stacked draft
 publication and deferred ADR-019 and Phase 2 authorization.
+
+## Phase 1 merits continuation
+
+The prior deferral remains historical evidence for the earlier candidate.
+`PHASE1_CANONICAL_CONTRACTS.md` now fixes repository/tenant identity,
+record-envelope, retrieval-manifest, deletion/tombstone, privacy, federation,
+outbox, projection, self-host recursion, evaluation, migration, and rollback
+requirements. `P1-SOURCE-ADMISSION.md` explicitly decides every memory-related
+source without relying on unavailable content.
+
+ADR-019 is now an adopted architecture candidate pending the new independent
+Curator and Judge record in `P1-MERITS-COMPLETION.md`. No memory writer,
+migration, federation, or projector is implemented in Phase 1.

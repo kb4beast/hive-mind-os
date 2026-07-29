@@ -1,7 +1,7 @@
 # Phase 1 Primary-Source Register
 
-- Register status: candidate intake; no source is silently admitted to the
-  constitutional source docket
+- Register status: intake complete; every source group has an explicit Phase 1
+  disposition in `evidence/courts/P1-SOURCE-ADMISSION.md`
 - Retrieval instant: `2026-07-29T00:36:27.865Z`
 - Explorer/Clerk: `/root/phase1_sources`
 - Originating mission brief SHA-256:
@@ -9,10 +9,11 @@
 - Availability result: 37 of 38 distinct URL strings returned HTTP 200 or an
   official redirect; the AgentTelemetry OpenReview PDF returned HTTP 403
 
-This register preserves locators and verified pins where available. A
-successful HTTP response is not source admission. Mutable documentation,
+This register preserves locators and verified pins where available. The source
+court, not HTTP availability, decides admission. Mutable documentation,
 unknown documentation licenses, unavailable bytes, and unreviewed reuse terms
-remain explicit obligations.
+remain explicit obligations under narrowed `defer`, `reject`, or `quarantine`
+dispositions.
 
 ## `P1SRC-OBSIDIAN-HELP`
 
@@ -57,8 +58,8 @@ remain explicit obligations.
   `1544d5de218c9a84bb44666c6a19e35b6635532c0a853cd3721f2f6912207c75`
 - License: unresolved. The official help repository has no root license file.
   The application license page is not a documentation reuse grant.
-- Status: pinned bytes, admission blocked on license/reuse and independent
-  source court
+- Status: `adapt`; factual interoperability claims admitted by reference only;
+  documentation copying/redistribution remains blocked
 
 ## `P1SRC-OBSIDIAN-LICENSE`
 
@@ -66,8 +67,8 @@ remain explicit obligations.
 - Publisher: Obsidian
 - Version/digest: mutable page; immutable publisher version not supplied
 - Use: application-use context only
-- Status: locator preserved; content pin and documentation-use interpretation
-  required
+- Status: `reject` as documentation-reuse or architecture authority; locator
+  retained for application-use context
 
 ## `P1SRC-JSON-CANVAS`
 
@@ -79,7 +80,7 @@ remain explicit obligations.
 - `LICENSE` SHA-256:
   `5dc8a82e5f93308e31b729297b027d1aafbaae3b9b73696371a975a3b4a2cd5d`
 - License: MIT
-- Status: pin and license captured; claim extraction and adjudication pending
+- Status: `adapt`; optional projection-format claims admitted
 
 ## `P1SRC-OTEL-GENAI`
 
@@ -98,7 +99,8 @@ remain explicit obligations.
   `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4`
 - Limitation: the pinned GenAI conventions label themselves `Development`.
   They are an observability reference, not accounting authority.
-- Status: pinned candidate; independent claim extraction/adjudication pending
+- Status: `adapt`; vocabulary admitted as a replaceable development reference,
+  not accounting authority
 
 ## `P1SRC-PROMETHEUS`
 
@@ -107,8 +109,7 @@ remain explicit obligations.
 - Official source commit observed:
   `406d17b1625f4f30182c06e28c6bec83c66f40ad`
 - License: Apache-2.0
-- Status: locator and repository pin preserved; exact document-path byte
-  receipts and claim adjudication pending
+- Status: `defer`; no Phase 1 architecture claim depends on this source
 
 ## `P1SRC-PROVIDER-DOCS`
 
@@ -122,8 +123,7 @@ remain explicit obligations.
 - Publishers: OpenAI, Anthropic, and Google
 - Version/digest/license: mutable publisher pages without immutable publisher
   version in the handoff; documentation-terms review required
-- Status: locators preserved; retrieved-byte receipts, version policy, license,
-  atomic claim extraction, and independent adjudication pending
+- Status: `quarantine`; locators remain discovery evidence only
 
 ## `P1SRC-MLFLOW`
 
@@ -133,8 +133,7 @@ remain explicit obligations.
 - Official source commit observed:
   `1a8e76c4956c122e8246f8867486b16efcc2e9ec`
 - License: Apache-2.0
-- Status: mutable `latest` locators preserved; exact document pins/digests and
-  claim adjudication pending
+- Status: `defer`; no MLflow-specific implementation or threshold is adopted
 
 ## `P1SRC-LM-EVAL-HARNESS`
 
@@ -145,7 +144,7 @@ remain explicit obligations.
   `b16a131beac02ef7a2569494a7f45f13763fa60d459ef8343910f4d418e79cf9`
 - License: MIT; license SHA-256
   `a806e42547620dffbc2ec0333322c8b3523b4af11e059be14ef81aa5b1ae021f`
-- Status: pinned candidate; claim adjudication pending
+- Status: `adapt`; reproducible evaluation-design claims admitted
 
 ## `P1SRC-LIVEBENCH`
 
@@ -155,16 +154,16 @@ remain explicit obligations.
   `38207db0331896e9558cc803d04188f32dddda1709139c53f985680d1b78e06c`
 - License: arXiv non-exclusive distribution license; not an implementation-code
   license
-- Status: pinned paper candidate; external validity and application claims
-  require expert testimony and adjudication
+- Status: `adapt`; freshness/contamination concern admitted while external
+  validity and superiority remain unproven
 
 ## `P1SRC-AGENTTELEMETRY`
 
 - Locator: `https://openreview.net/pdf?id=owdmAYFk6k`
 - Retrieval: HTTP 403
 - Version/digest/license: unavailable
-- Status: blocking evidence obligation. Search snippets are not admissible
-  source content and no claim is inferred.
+- Status: `quarantine`; title discovery is retained, while content, numeric
+  claims, authorship, review state, code, and license remain unadmitted
 
 ## `P1SRC-W3C-PROV-O`
 
@@ -175,8 +174,7 @@ remain explicit obligations.
 - SHA-256:
   `6b96671ab84faf12ce3f041aca12c3f93a6df2ed242348810743179a68e69555`
 - License: W3C document-use rules
-- Status: pinned candidate; internal-model complexity and claim adjudication
-  pending
+- Status: `adapt`; optional provenance-export reference only
 
 ## `P1SRC-W3C-JSON-LD`
 
@@ -187,7 +185,7 @@ remain explicit obligations.
 - SHA-256:
   `9e2c9972d0f60bc744e975731643a9a63d410afc6b682eb8898ad2720e452866`
 - License: W3C document-use rules
-- Status: pinned candidate; need and claim adjudication pending
+- Status: `defer`; no demonstrated Phase 2 internal-format need
 
 ## `P1SRC-PR27-PROCESS-EVIDENCE`
 
@@ -196,20 +194,21 @@ remain explicit obligations.
 - Exact merge commit:
   `b032a9f32f48889e0889fae8d6dd04eb03f46b63`
 - Governing court: `evidence/courts/PR27-ci-test-contract-repair.md`
-- Status: retained here to account for every URL string in the mission brief;
-  Phase 0 already adjudicated its bounded repair and preserved the external
-  governance obligations.
+- Status: `adopt` as internal baseline/process evidence only; Phase 0 already
+  adjudicated its bounded repair and preserved external governance obligations
 
-## Retained blockers
+## Retained obligations after disposition
 
-- `P1-SRC-B01`: Obsidian help documentation reuse terms are unresolved.
-- `P1-SRC-B02`: Provider documentation is mutable and lacks a retained
-  immutable version/content/license bundle.
-- `P1-SRC-B03`: AgentTelemetry bytes, version, authorship, and license are
-  unavailable in this environment.
-- `P1-SRC-B04`: Prometheus and MLflow exact cited document-path digests are not
-  yet captured.
-- `P1-SRC-B05`: The exact intended “Armory” source remains unidentified. No
-  semantics may be assigned to it.
-- `P1-SRC-B06`: Source registration does not itself adopt any architecture or
-  implementation claim.
+- `P1-SRC-B01`: Obsidian help copying/redistribution remains prohibited unless
+  reuse terms are resolved; factual citation and independent implementation
+  are adapted.
+- `P1-SRC-B02`: Mutable provider pages remain quarantined until a provider
+  conformance implementation pins exact versions, bytes, and terms.
+- `P1-SRC-B03`: AgentTelemetry remains quarantined; no adopted contract depends
+  on it.
+- `P1-SRC-B04`: Prometheus and MLflow remain deferred; no adopted contract
+  depends on their unpinned pages.
+- `P1-SRC-B05`: Exact Armory semantics remain quarantined and cannot be claimed
+  without an exact source.
+- `P1-SRC-B06`: Registration alone remains nonauthoritative; the source court
+  records the bounded dispositions.

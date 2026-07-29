@@ -1,6 +1,6 @@
 # ADR-019: Open Memory Authority and Obsidian Brain Projection
 
-- Status: Phase 1 candidate; implementation deferred pending independent judgment
+- Status: adopted as the Phase 1 architecture contract; additive memory implementation begins in Phase 2 and projection in Phase 3
 - Date: 2026-07-28
 - Constitutional impact: yes
 
@@ -15,13 +15,14 @@ Opening the repository root as an Obsidian vault already provides a useful
 read-only Markdown workbench. Obsidian is not required as a Python execution
 host and its presence does not close the durable-memory gap.
 
-At Phase 1 capture, the clean repository has no `.obsidian/` directory and does
-not ignore it. The candidate initial policy is local-only configuration with
-the whole directory ignored. Any later curated team settings require a
+At Phase 1 capture, the clean repository had no `.obsidian/` directory. The
+adopted initial policy is local-only configuration with the whole directory
+ignored. Phase 1 adds `.obsidian/` to `.gitignore`; it does not install,
+configure, or require Obsidian. Any later curated team settings require a
 separate source/security/update review and must exclude workspace layouts,
 machine paths, plugin state, caches, and secrets.
 
-## Decision candidate
+## Decision
 
 Adopt an open, local-first append-only memory authority with explicit
 repository/tenant scope, stable record IDs, type/schema version, provenance,
@@ -32,6 +33,12 @@ Build a deterministic Markdown brain projection over that authority. Generated
 notes are nonauthoritative, labeled, safe to regenerate, and isolated from a
 separate governed human-intake namespace. The OS remains usable without
 Obsidian.
+
+The normative Phase 1 envelopes and authority boundaries are
+`hive-memory/v1` and `hive-obsidian-projection/v1` in
+`docs/architecture/PHASE1_CANONICAL_CONTRACTS.md`. Adoption does not create a
+memory store, projector, watcher, Inbox, plugin, Sync dependency, or executable
+Obsidian host in Phase 1.
 
 ## Threat and privacy model
 

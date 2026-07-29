@@ -1,6 +1,6 @@
 # ADR-018: Canonical Agent Definitions and Nonauthoritative Projections
 
-- Status: Phase 1 candidate; implementation deferred pending independent judgment
+- Status: adopted as the Phase 1 architecture contract; additive implementation begins in Phase 2
 - Date: 2026-07-28
 - Constitutional impact: yes
 - Extends: ADR-016 and ADR-017
@@ -12,9 +12,9 @@ Generation zero uses `models.Role`, `roles.ROLE_CONTRACTS`, and
 values across vision checks, schemas, package manifests, prompts, skills, and
 workflows. The redundancy audit proves that parity is only partially enforced.
 
-## Decision candidate
+## Decision
 
-Phase 2 should introduce an additive, versioned canonical agent definition
+Phase 2 will introduce an additive, versioned canonical agent definition
 whose records own role identity, mission, typed inputs/outputs, requested
 capabilities, quality gates, prompt-layer references, skill/tool bindings,
 memory boundaries, usage compatibility, evaluation contract, and deferred
@@ -32,6 +32,23 @@ artifacts become deterministic projections. A projection:
 
 Skills remain independently versioned and reusable. Reuse does not merge
 acting, verification, approval, or judgment identities.
+
+The normative Phase 1 field, authority, projection, migration, and
+Generation Zero boundaries are frozen in
+`docs/architecture/PHASE1_CANONICAL_CONTRACTS.md` as
+`hive-agent-definition/v2`. Adoption of this ADR does not select a v2 runtime
+champion, activate `hive-core`, or change any of the 131 root APIs, 33 package
+APIs, or 13 CLI contracts.
+
+## Authority boundary
+
+A definition may request capabilities, but effective authority is always the
+intersection of the constitutional role ceiling, the versioned policy action
+mapping, an explicit lease or external grant where required, the selected
+tool adapter's enforced scope, and the mission risk boundary. Missing or
+unknown mappings deny execution. Generated prompts, skills, packages, host
+profiles, projections, evaluation scores, and successful outcomes cannot
+grant authority.
 
 ## Threats and cross-examination
 

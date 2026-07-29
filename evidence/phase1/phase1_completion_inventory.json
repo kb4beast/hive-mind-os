@@ -1,0 +1,101 @@
+{
+  "adrs": {
+    "ADR-018": {
+      "implementation_phase": 2,
+      "status": "adopted-architecture"
+    },
+    "ADR-019": {
+      "implementation_phase": "2-memory-foundation-and-3-projection",
+      "status": "adopted-architecture"
+    },
+    "ADR-020": {
+      "implementation_phase": 2,
+      "status": "adopted-architecture"
+    }
+  },
+  "authority_contract": {
+    "effective_authority": [
+      "constitutional-role-ceiling",
+      "versioned-policy-action",
+      "explicit-lease-or-required-external-grant",
+      "adapter-enforcement",
+      "mission-risk",
+      "resource-budget"
+    ],
+    "fail_closed_on_missing_intersection": true,
+    "projection_can_grant_authority": false
+  },
+  "claim_register": {
+    "count": 100,
+    "path": "evidence/courts/P1-ATOMIC-CLAIM-REGISTER.md",
+    "sha256": "f6a7c3056fa12790758d38683b9d252d61290fd899f3a0daf069cc22b7ff3051"
+  },
+  "contracts": [
+    {
+      "id": "hive-agent-definition/v2",
+      "implementation_phase": 2
+    },
+    {
+      "id": "hive-memory/v1",
+      "implementation_phase": 2
+    },
+    {
+      "id": "hive-obsidian-projection/v1",
+      "implementation_phase": 3
+    },
+    {
+      "id": "hive-usage-event/v1",
+      "implementation_phase": 2
+    }
+  ],
+  "generation_zero": {
+    "cli_parser_count": 13,
+    "fixture_path": "tests/fixtures/phase1/generation_zero.json",
+    "fixture_sha256": "b679d4dd105df0a4efdd6cbf79b86d2a4aa1ca6255f36982d6a40004d58dd407",
+    "inventory_digest": "sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037",
+    "package_api_count": 33,
+    "production_runtime_changed": false,
+    "root_api_count": 131,
+    "surface_inventory_path": "evidence/phase1/generation_zero_surface_inventory.json",
+    "surface_inventory_sha256": "2977cc4e7f2b30b63c5dcf55d3d86cd3a1f648049d8872f1a599131899d48919"
+  },
+  "handoff": {
+    "path": "docs/NEXT_SESSION_HANDOFF_OBSIDIAN_AGENT_REDESIGN.md",
+    "sha256": "dbd73add9f47aa98a30d19f1538179e5e961c1452a70b9ce54b7403b4e387a46"
+  },
+  "next_eligible_objective": {
+    "base": "final-head-of-pr-29",
+    "branch": "codex/phase2-additive-memory-telemetry-foundation",
+    "objective": "Phase 2 - Additive memory and telemetry foundation"
+  },
+  "phase": 1,
+  "previous_head": "ee00967610df9e7d0ec4a5150bac751cc6880105",
+  "pr": {
+    "base_branch": "codex/repair-ci-test-contract",
+    "base_sha": "0948f7ec385238f5825ce7c39dd25de2e9a1035d",
+    "draft": true,
+    "number": 29
+  },
+  "schema_version": 1,
+  "source_admission": {
+    "dispositions": {
+      "P1SRC-AGENTTELEMETRY": "quarantine",
+      "P1SRC-ARMORY-UNIDENTIFIED": "quarantine",
+      "P1SRC-JSON-CANVAS": "adapt",
+      "P1SRC-LIVEBENCH": "adapt",
+      "P1SRC-LM-EVAL-HARNESS": "adapt",
+      "P1SRC-MLFLOW": "defer",
+      "P1SRC-OBSIDIAN-HELP": "adapt",
+      "P1SRC-OBSIDIAN-LICENSE": "reject",
+      "P1SRC-OTEL-GENAI": "adapt",
+      "P1SRC-PR27-PROCESS-EVIDENCE": "adopt",
+      "P1SRC-PROMETHEUS": "defer",
+      "P1SRC-PROVIDER-DOCS": "quarantine",
+      "P1SRC-W3C-JSON-LD": "defer",
+      "P1SRC-W3C-PROV-O": "adapt"
+    },
+    "path": "evidence/courts/P1-SOURCE-ADMISSION.md",
+    "sha256": "c9b62d2be91fa0669f54e70317b5033ad6e29a7140e4ae7c6eb0f10665214f7a"
+  },
+  "status": "merits-candidate-pending-independent-curator-and-judge"
+}

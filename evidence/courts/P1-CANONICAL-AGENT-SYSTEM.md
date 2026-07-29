@@ -73,3 +73,16 @@ canonical, promote `hive-core`, admit host support, or authorize Phase 2.
 The independent Judge `/root/phase1_judge` adapted this characterization for
 stacked draft publication and deferred ADR-018, source admission, host claims,
 and Phase 2 authorization.
+
+## Phase 1 merits continuation
+
+The prior deferral is preserved as the correct decision for its earlier
+candidate. The new merits candidate closes child-claim extraction through
+`P1-ATOMIC-CLAIM-REGISTER.md`, adopts the capability/authority intersection
+and host-degradation boundaries in `PHASE1_CANONICAL_CONTRACTS.md`, and gives
+every source an explicit disposition in `P1-SOURCE-ADMISSION.md`.
+
+ADR-018 is now an adopted architecture candidate pending the new independent
+Curator and Judge record in `P1-MERITS-COMPLETION.md`. Runtime activation,
+host support, exact Armory semantics, and Phase 2 implementation remain outside
+this Phase 1 delivery.

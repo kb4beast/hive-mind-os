@@ -357,6 +357,10 @@ build/
 dist/
 *.egg-info/
 
+# Obsidian vault configuration is local-only; repository Markdown remains the
+# portable workbench and no plugin or account is required.
+.obsidian/
+
 # Local durable runtime state; content-addressed live receipts remain tracked.
 evidence/live/**/state/
 evidence/live/**/evidence-ledger.sqlite3

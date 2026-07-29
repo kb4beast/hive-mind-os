@@ -67,3 +67,18 @@ repaired generation-zero telemetry characterization. Provider-source
 admission, ADR-020 adoption, and Phase 2 implementation remain blocked. The
 independent Judge `/root/phase1_judge` adapted this characterization for
 stacked draft publication and deferred all of those merits.
+
+## Phase 1 merits continuation
+
+The earlier merits deferral is preserved. The completion candidate now
+specifies `hive-usage-event/v1`, native/normalized provenance, orthogonal
+axes, retry identity, price/invoice separation, unknown semantics, privacy,
+bounded metric labels, local outbox authority, sealed evaluation resources,
+absolute fitness gates, loop measurement, quarantine, migration, and rollback.
+Mutable provider documents and unavailable AgentTelemetry content are
+quarantined rather than used as authority.
+
+ADR-020 is now an adopted architecture candidate pending the new independent
+Curator and Judge record in `P1-MERITS-COMPLETION.md`. Provider fixtures,
+events, exporters, budget enforcement, loop detectors, and learning activation
+remain Phase 2/6 implementation work.

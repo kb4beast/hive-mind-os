@@ -77,3 +77,16 @@ canonical memory, conflicts, receipts, and dissent.
 Curator accepted the accuracy of this characterization. The independent Judge
 adapted it for stacked draft publication while deferring ADR-019, source
 admission, and implementation.
+
+## Phase 1 merits continuation
+
+The earlier candidate correctly deferred these merits. The completion
+candidate now adopts local-only `.obsidian/` policy in `.gitignore`, narrows
+official-help use to factual citation without copying, and specifies
+safe-public allowlisting, deterministic bytes, expected-prior-digest
+conflicts, namespace separation, interruption recovery, no re-ingestion, and
+operation without Obsidian in `hive-obsidian-projection/v1`.
+
+Multi-writer behavior remains an executable Phase 3 gate rather than an
+unresolved Phase 1 design choice. No plugin, watcher, Inbox, Sync dependency,
+or executable host is admitted.

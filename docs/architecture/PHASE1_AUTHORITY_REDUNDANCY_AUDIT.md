@@ -1,6 +1,7 @@
 # Phase 1 Authority and Redundancy Audit
 
-- Status: generation-zero characterization; no authority migration performed
+- Status: generation-zero characterization complete; Phase 1 authority design
+  adopted and no runtime authority migration performed
 - Captured from: `b032a9f32f48889e0889fae8d6dd04eb03f46b63`
 - Repair base: `0948f7ec385238f5825ce7c39dd25de2e9a1035d`
 - Mission brief:
@@ -35,9 +36,11 @@ This audit does not promote `hive-core`. It remains inert and quarantined.
 | Role-bearing schemas | Contract validation | Role enums and role-bearing field names | `identity`, `mission-state`, `handoff`, agent, and workflow schemas embed role vocabulary independently. |
 | Host capability profiles | Unverified declarations | Host ID/version, capability observations, obligations | Not executable adapters and cannot satisfy `supports()` while conformance is unverified. |
 
-## Field-level disposition candidates
+## Adopted field-level dispositions
 
-These are architecture candidates pending the independent Phase 1 Judge.
+These are the Phase 1 design authorities governed by ADR-018 and
+`PHASE1_CANONICAL_CONTRACTS.md`. Their additive runtime implementation remains
+Phase 2 work.
 
 | Field family | Candidate authority | Projection consumers | Compatibility requirement |
 | --- | --- | --- | --- |
@@ -101,3 +104,15 @@ An additive canonical definition is admissible only if:
 - rollback restores the prior canonical pointer without deleting challengers,
   dissent, receipts, or fixtures; and
 - a separate Curator and Judge reproduce parity before any champion switches.
+
+## Phase 1 authority result
+
+The effective authority formula is the intersection of constitutional role
+ceiling, versioned policy action, explicit lease or required external grant,
+adapter enforcement, mission risk, and resource budget. A capability,
+manifest, skill, prompt, workflow, host projection, memory record, Obsidian
+note, telemetry event, score, or successful outcome is never a grant.
+
+The contradictions above remain Generation Zero defects and Phase 2
+acceptance obligations. Phase 1 resolves their design disposition without
+claiming that production already enforces the v2 mapping.

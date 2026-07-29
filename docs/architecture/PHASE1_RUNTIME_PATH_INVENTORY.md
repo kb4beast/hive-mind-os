@@ -1,6 +1,7 @@
 # Phase 1 Memory, Usage, Model, Event, and Host Path Inventory
 
-- Status: generation-zero characterization
+- Status: generation-zero characterization complete; canonical Phase 1 target
+  envelopes adopted without production activation
 - Scope: repository state at
   `b032a9f32f48889e0889fae8d6dd04eb03f46b63`
 - Truth boundary: an existing field or file path is not proof of completeness,
@@ -125,3 +126,16 @@ conditions, and measurement version. Either side may fail absolute gates.
 Relative improvement cannot excuse a privacy, trust, leakage, authority,
 rollback, or minimum-customer-value failure. An inconclusive result cannot
 promote.
+
+## Canonical target mapping
+
+Generation Zero paths remain unchanged. ADR-019 maps durable memory and
+projection work to `hive-memory/v1` and
+`hive-obsidian-projection/v1`. ADR-020 maps attempt, usage, cost, budget,
+loop, and evaluation work to `hive-usage-event/v1`. The full field and
+authority contracts are in `PHASE1_CANONICAL_CONTRACTS.md`.
+
+The missing transactional outbox, repository identity, privacy policy,
+provider conformance, replay, deletion, federation, concurrency, and recovery
+behaviors are Phase 2/3 implementation gates rather than unresolved Phase 1
+architecture choices.

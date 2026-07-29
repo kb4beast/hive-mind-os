@@ -1,6 +1,6 @@
 # ADR-020: Provider-Native Usage, Privacy, and Fair Learning
 
-- Status: Phase 1 candidate; implementation deferred pending independent judgment
+- Status: adopted as the Phase 1 architecture contract; additive implementation begins in Phase 2
 - Date: 2026-07-28
 - Constitutional impact: yes
 
@@ -11,9 +11,9 @@ compute/token costs, selected durations, and disconnected budget counters.
 Provider semantics, retries, host telemetry, prices, invoices, memory use, and
 court purpose are not completely attributable or reconcilable.
 
-## Decision candidate
+## Decision
 
-Phase 2 should add an append-only usage event that retains provider-native
+Phase 2 will add an append-only usage event that retains provider-native
 dimensions and separately derives versioned normalized dimensions. Every
 model/tool attempt must bind to repository, mission, run, step, role, work
 item, acting/court purpose, provider/model/version, budget lease, prompt/context
@@ -21,6 +21,12 @@ digests, outcome, retry, and trace identifiers.
 
 The local transactional outbox is authoritative for emission. Metrics and
 traces are projections. No outbound telemetry service is required.
+
+The normative Phase 1 envelope is `hive-usage-event/v1` in
+`docs/architecture/PHASE1_CANONICAL_CONTRACTS.md`. Adoption does not change
+`ModelResponse`, `model.call`, provider parsing, budget behavior, or any
+Generation Zero API. It does not enable an exporter, learning policy,
+quarantine action, or champion switch.
 
 ## Normalization and reconciliation invariants
 
