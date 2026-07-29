@@ -37,3 +37,36 @@ Final Curator `Aquinas`, Steward `Cicero`, and Judge `Ohm` reviewed exact candid
 only while expressly retaining every constraint above. No dissent was resolved by
 deletion, and none is converted into a support, completeness, production-readiness,
 or superiority claim.
+
+## Phase 3 item 2 preserved dissent
+
+- Physical public/private files reduce read authority but do not provide encryption,
+  operating-system access control, safe backups, or resistance to an attacker who can
+  rewrite both code and files.
+- The authentic release capability uses a process-local integrity seal. Persisted
+  decision, actor, and lease references are durable provenance, not cross-process or
+  external human identity authentication.
+- Public record IDs, tenant/repository identities, timestamps, release references,
+  and unkeyed source digests may allow correlation or membership inference even after
+  an independent release.
+- A safe-public disclosure cannot be made secret again in Git history, clones,
+  caches, artifacts, or recipient systems. Supersession and tombstones preserve later
+  truth; they do not prove revocation, deletion, or crypto-erasure.
+- The private Foundation transaction and public release-store transaction are not one
+  distributed atomic commit. Protected journaling and deterministic idempotency
+  recover the tested crash window but do not create exactly-once external delivery.
+- The public SQLite file is deterministic in logical released content, not guaranteed
+  byte-for-byte identical across SQLite versions or filesystems. The generated open
+  pack remains the deterministic byte artifact.
+- Existing item-1 direct projection remains compatible but still requires read access
+  to the mixed Foundation store. Only the new release-store path satisfies the item-2
+  separation claim.
+- Item 2 forbids non-null protected content and retrieval receipts instead of
+  implementing an encrypted content vault or governed retrieval.
+- One public store is bound to one tenant/repository. Broader tenant-key isolation,
+  federation, portfolio memory, and self-host recursion remain deferred.
+- No automated move, raw SQLite copy, withdrawal, cleanup, deletion, backup, or
+  erasure command is provided.
+- No HOME/domain notes, richer cognitive content, Bases/Canvas, Obsidian refresh or
+  support, Inbox, watcher, plugin, Sync, usefulness, production-readiness, or
+  superiority claim is made.

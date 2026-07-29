@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/public-memory-release-receipt/v1",
+  "type": "object",
+  "required": ["schema_version", "status", "batch_id", "tenant_id", "repository_id", "repository_identity_digest", "source_foundation_schema_version", "source_foundation_schema_digest", "release_policy", "release_policy_digest", "source_cursor", "source_record_count", "omitted_sensitive_count", "omitted_unsupported_count", "release_entries", "release_ids", "public_envelope_digests", "public_store_logical_digest", "authority_decision_id", "authority_actor_id", "authority_lease_id", "committed_at"],
+  "properties": {
+    "schema_version": {"const": "hive-public-memory-release-receipt/v1"},
+    "status": {"const": "committed"},
+    "batch_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_foundation_schema_version": {"type": "integer", "minimum": 1},
+    "source_foundation_schema_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "release_policy": {"const": "hive-safe-public-memory-release/v1"},
+    "release_policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "source_record_count": {"type": "integer", "minimum": 0},
+    "omitted_sensitive_count": {"type": "integer", "minimum": 0},
+    "omitted_unsupported_count": {"type": "integer", "minimum": 0},
+    "release_entries": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "required": ["release_id", "source_record_id", "source_digest", "envelope_digest"],
+        "properties": {
+          "release_id": {"type": "string", "pattern": "^release:[0-9a-f]{64}$"},
+          "source_record_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "envelope_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "release_ids": {"type": "array", "uniqueItems": true, "maxItems": 100000, "items": {"type": "string", "pattern": "^release:[0-9a-f]{64}$"}},
+    "public_envelope_digests": {"type": "array", "uniqueItems": true, "maxItems": 100000, "items": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}},
+    "public_store_logical_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "authority_decision_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "authority_actor_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "authority_lease_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "committed_at": {"type": "string", "minLength": 1, "maxLength": 4096}
+  },
+  "additionalProperties": false
+}

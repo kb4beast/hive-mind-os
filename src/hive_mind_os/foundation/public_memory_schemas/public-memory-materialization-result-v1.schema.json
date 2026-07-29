@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/public-memory-materialization-result/v1",
+  "type": "object",
+  "required": ["schema_version", "status", "tenant_id", "repository_id", "source_cursor", "released_record_count", "existing_record_count", "public_store_logical_digest", "receipt_locator"],
+  "properties": {
+    "schema_version": {"const": "hive-public-memory-materialization-result/v1"},
+    "status": {"type": "string", "enum": ["materialized", "unchanged"]},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "source_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "released_record_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "existing_record_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "public_store_logical_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "receipt_locator": {"type": "string", "pattern": "^protected-state:receipts/[0-9a-f]{64}\\.json$"}
+  },
+  "additionalProperties": false
+}

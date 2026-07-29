@@ -22,13 +22,13 @@
     "root_api_count": 131
   },
   "implementation": {
-    "src/hive_mind_os/foundation/authority.py": "sha256:bc57189477b5b793d7ee4b9e3b8d40bea50c0d3042a0e658aa670c081e35d478",
-    "src/hive_mind_os/foundation/brain.py": "sha256:cf0f4e7943bbb382a83cbeca3493e1f8062fdc0e9bea8d21fd48d1701f262951",
+    "src/hive_mind_os/foundation/authority.py": "sha256:2040da0cadbfdeb7b48a020fb5a8ae0db0ff0a38b186743f4d4d1ad892f49994",
+    "src/hive_mind_os/foundation/brain.py": "sha256:7919db183c2b376c5d9dc92a1a692dca1d6ab094df76587da37f47f8f5b50bb3",
     "src/hive_mind_os/foundation/brain_contracts.py": "sha256:c01d5a15909ae45d8e2afca079224c3e4221c17f022667dbf8904d52ea112d6f",
     "src/hive_mind_os/foundation/contracts.py": "sha256:a9f2916e8fa46139248f1a12ccf184977f35325f487b12892fa8bd2dbc14decf",
     "src/hive_mind_os/foundation/store.py": "sha256:822f7e0b2ffcc31e055d84ec8e849edc691541556165dc3b6ac82639e55e9afb"
   },
-  "inventory_digest": "sha256:5ecae209c32b6460f1e1935512c90d44fe2ab96c1de217fcc4e5857137701e74",
+  "inventory_digest": "sha256:0e66c13d0d78afde5bd7e28997fe0f637cf6d8e2d45913d949516339469f5533",
   "obsidian_runtime_required": false,
   "phase": 3,
   "phase2_input": {

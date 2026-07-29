@@ -1,4 +1,4 @@
-# Phase 3 item 1 append-only audit ledger
+# Phase 3 append-only audit ledger
 
 ## `P3-AUDIT-001` — exact base and eligibility
 
@@ -363,3 +363,101 @@ remand.
 
 All dissent remains preserved. Phase 3 items 2–8 remain deferred by sequence and
 scope. No PR was merged, no runtime was activated, and `main` was not modified.
+
+## `P3-ITEM2-AUDIT-001` — exact base, stack, and pre-change reconstruction
+
+Phase 3 item 2 began on
+`codex/phase3-public-private-memory-separation` at exact PR #32 head
+`7f7013c99d86bbd34f966b902bb873cf5c10d740`. PR #32 remained open, draft,
+and based on exact PR #31 head
+`94e67cde15fa8a75d92561384241f0419c9f589b`. PRs #28, #29, #31, and #32
+remained open and unmerged; remote `main` remained
+`b032a9f32f48889e0889fae8d6dd04eb03f46b63`.
+
+The actual stacked PR metadata, ancestry, file lists, and complete item-1 code diff
+were inspected. Parent push run `30466001604` and PR run `30466010066` were
+independently confirmed successful at exact `7f7013c` across Python 3.11/3.12/3.14,
+Ruff, Pyright, CodeQL, secret scan, dependency/license review, wheel/resource
+verification, SBOM, and provenance.
+
+Before item-2 code, 16 focused Generation Zero, Phase 1, Phase 2, and Phase 3
+characterization tests passed from the exact source tree. The frozen
+`131/33/13/304`, 17 Phase 2 schemas, seven item-1 schemas, item-1 fixture tree, and
+committed inventories were reproduced.
+
+## `P3-ITEM2-AUDIT-002` — separate court and independent design remand
+
+Court `P3-MEMORY-SEPARATION-002` was opened before implementation.
+
+- Explorer/Clerk `/root/item2_explorer` proved item 1 was a logical filter over one
+  physically mixed private database and selected a separate public persistence
+  artifact as the smallest missing capability.
+- Architect/Cross-Examiner `/root/item2_architect` rejected path-only separation and
+  selected a one-scope append-only public release store plus a projector that never
+  opens Foundation.
+- Privacy/security Expert `/root/item2_privacy_expert` independently remanded the
+  initial path-only proposal. External placement was necessary but insufficient;
+  public-only envelopes, split receipts, correlation controls, migration evidence,
+  and honest deletion limits were required.
+
+No external source or dependency was admitted. Encryption, secure deletion,
+crypto-erasure, ACL, backup destruction, and malicious-writer claims remain blocked
+without separately pinned sources and tests.
+
+## `P3-ITEM2-AUDIT-003` — bounded implementation candidate
+
+The initial item-2 slice adds:
+
+- three separately catalogued strict item-2 schemas;
+- an immutable one-scope `PublicMemoryReleaseStore` with independent ownership,
+  schema digest, append-only triggers, and deterministic release identities;
+- a one-way `foundation.public-memory.release` transformation from one verified
+  Foundation snapshot;
+- strict public envelopes with protected content and retrieval receipts denied;
+- private external release journals and completion receipts with post-public-commit
+  restart recovery;
+- separated projection from the public store with external private projection state;
+- dedicated `release`, `project-separated`, and `check-separated` module commands;
+  and
+- an item-2 inventory proving exact item-1 tree parity and no in-repository private
+  projection state.
+
+The Phase 2 database/schema, 17 Phase 2 schemas, seven item-1 schemas, Generation
+Zero selectors/facades/prompts/stores, and 13 `hive-mind` parser contracts are
+unchanged.
+
+Development receipts before exact-candidate sealing:
+
+- item-2 focused suite: `10 passed`;
+- combined item-1/item-2 focused suite after the brain-state refactor:
+  `39 tests` with only the expected stale-inventory failure;
+- regenerated item-1 inventory check plus item-2 suite: `11 passed`;
+- compileall and diff whitespace checks: pass.
+
+These development receipts are not final delivery evidence. Full multi-version,
+security/supply-chain, independent reconstruction, and judgment remain required.
+
+## `P3-ITEM2-AUDIT-004` — independent remand and bounded repair
+
+Independent pre-commit Curator and Steward reviews both returned `REMAND`. Their
+reproductions found a generic envelope-append admission bypass, a changed-snapshot
+recovery gap, unsupported newer-store admission, unbounded public-store enumeration,
+and public/protected persistence overlap.
+
+No finding was waived and no policy or test was weakened. The repaired candidate:
+
+- removes the public append API and requires the verified Foundation
+  materialization path;
+- uses bounded self-contained journals to finish older pending releases before a
+  newer snapshot;
+- binds source record/digest entries and the exact allowlist policy in protected
+  receipts;
+- rejects unsupported store versions before read admission;
+- bounds row enumeration before allocation; and
+- rejects bidirectional public/protected persistence overlap.
+
+Sixteen item-2 regressions cover the original slice plus the remands. The latest
+focused item-2 run passed 15 functional tests with only the intentionally stale
+inventory characterization, and the regenerated inventory characterization then
+passed. Full end-to-end, multi-version, supply-chain, and final independent verdicts
+are explicitly deferred to the later final-system check at user direction.

@@ -38,3 +38,19 @@ but a differing tree fails closed as a conflict instead of overwriting files.
 The generated pack is not memory authority. The Foundation database remains canonical
 and must live outside the public pack. Private/internal/quarantined memory and
 protected content references are not projected.
+
+## Strict public/private separation profile
+
+The original `project` and `check` commands remain the compatible item-1 path and read
+the mixed private Foundation store through a safe-public filter. Phase 3 item 2 adds
+an opt-in physical read boundary:
+
+1. `release` materializes already approved safe-public memory into a separately
+   owned, single-scope append-only public release store;
+2. `project-separated` reads only that public store; and
+3. private release/projection journals and receipts use explicit protected roots
+   outside the repository.
+
+See `PHASE3_ITEM2_MIGRATION_AND_ROLLBACK.md` for commands and recovery. The release
+store remains nonauthoritative. This is not encryption, secure deletion, federation,
+or a claim that a prior public disclosure can be revoked.

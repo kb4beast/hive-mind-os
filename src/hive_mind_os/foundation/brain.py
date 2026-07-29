@@ -41,6 +41,7 @@ MAX_STRING_LENGTH = 4_096
 MAX_NOTE_BYTES = 1_048_576
 MAX_PACK_BYTES = 268_435_456
 MAX_MANIFEST_BYTES = 16_777_216
+_VERIFIED_PUBLIC_RELEASE_SNAPSHOT_SEAL = object()
 
 _SAFE_COMPONENT = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -642,7 +643,66 @@ def _validate_projection_roots(
         if not root.is_dir() or _is_linklike(root):
             raise ProjectionError(f"{label} path must be a regular directory")
         if root.resolve(strict=True) != root:
-            raise ProjectionError(f"{label} path escaped the repository")
+            raise ProjectionError(f"{label} path is linked or escaped")
+
+
+def _external_projection_state_root(
+    supplied_root: str | Path,
+    repository_root: Path,
+    source: Path,
+) -> Path:
+    supplied = Path(supplied_root).absolute()
+    if supplied.parent == supplied:
+        raise ProjectionError("protected projection state cannot be a filesystem root")
+    if supplied.exists():
+        if not supplied.is_dir() or _is_linklike(supplied):
+            raise ProjectionError(
+                "protected projection state must be a regular directory"
+            )
+        resolved = supplied.resolve(strict=True)
+        if resolved != supplied:
+            raise ProjectionError("protected projection state is linked or escaped")
+    else:
+        parent = supplied.parent
+        if not parent.is_dir() or _is_linklike(parent):
+            raise ProjectionError(
+                "protected projection state parent must be a regular directory"
+            )
+        if parent.resolve(strict=True) != parent:
+            raise ProjectionError(
+                "protected projection state parent is linked or escaped"
+            )
+        resolved = supplied
+    if resolved.is_relative_to(repository_root) or repository_root.is_relative_to(
+        resolved
+    ):
+        raise ProjectionError(
+            "protected projection state and repository must be disjoint"
+        )
+    source_parent = source.parent
+    if (
+        resolved == source_parent
+        or resolved.is_relative_to(source_parent)
+        or source_parent.is_relative_to(resolved)
+    ):
+        raise ProjectionError(
+            "protected projection state and source persistence must be disjoint"
+        )
+    return resolved
+
+
+def _receipt_locator(
+    receipt_path: Path,
+    *,
+    state_root: Path,
+    repository_root: Path,
+) -> str:
+    if receipt_path.is_relative_to(repository_root):
+        return receipt_path.relative_to(repository_root).as_posix()
+    return (
+        "protected-state:"
+        + receipt_path.relative_to(state_root).as_posix()
+    )
 
 
 def _reject_source_overlap(source: Path, pack_root: Path) -> None:
@@ -1026,6 +1086,7 @@ def _write_transaction(
     *,
     repository_root: Path,
     pack_root: Path,
+    state_root: Path,
     desired_files: Mapping[str, bytes],
     prior_files: Mapping[str, str],
     prior_manifest_digest: str | None,
@@ -1033,7 +1094,6 @@ def _write_transaction(
     authority: AuthorityDecision,
     fail_after_replacements: int | None,
 ) -> tuple[str, str]:
-    state_root = repository_root / STATE_DIRECTORY
     transaction_id = desired_manifest_digest.removeprefix("sha256:")
     transaction_root = _path_from_relative(
         state_root,
@@ -1058,7 +1118,11 @@ def _write_transaction(
             if transactions_root.exists() and not any(transactions_root.iterdir()):
                 transactions_root.rmdir()
             return (
-                receipt_path.relative_to(repository_root).as_posix(),
+                _receipt_locator(
+                    receipt_path,
+                    state_root=state_root,
+                    repository_root=repository_root,
+                ),
                 "already-committed",
             )
         raise ProjectionError("completed projection receipt disagrees with the pack")
@@ -1255,7 +1319,11 @@ def _write_transaction(
     if transactions_root.exists() and not any(transactions_root.iterdir()):
         transactions_root.rmdir()
     return (
-        receipt_path.relative_to(repository_root).as_posix(),
+        _receipt_locator(
+            receipt_path,
+            state_root=state_root,
+            repository_root=repository_root,
+        ),
         "recovered" if recovering else "committed",
     )
 
@@ -1264,6 +1332,7 @@ def _preserve_conflict(
     *,
     repository_root: Path,
     pack_root: Path,
+    state_root: Path,
     desired_files: Mapping[str, bytes],
     prior_files: Mapping[str, str],
     prior_manifest_digest: str | None,
@@ -1271,7 +1340,6 @@ def _preserve_conflict(
     conflict_paths: Sequence[str],
     authority: AuthorityDecision,
 ) -> str:
-    state_root = repository_root / STATE_DIRECTORY
     observations = []
     for relative_path in conflict_paths:
         destination = _path_from_relative(pack_root, relative_path)
@@ -1326,7 +1394,11 @@ def _preserve_conflict(
         comparable.pop("attempted_at", None)
         if comparable != stable_body:
             raise ProjectionError("existing conflict receipt is inconsistent")
-        return receipt_path.relative_to(repository_root).as_posix()
+        return _receipt_locator(
+            receipt_path,
+            state_root=state_root,
+            repository_root=repository_root,
+        )
     if conflict_root.exists():
         if not conflict_root.is_dir() or _is_linklike(conflict_root):
             raise ProjectionError("abandoned conflict path is unsafe")
@@ -1359,7 +1431,11 @@ def _preserve_conflict(
     )
     _write_durable(temporary_receipt, _json_bytes(body))
     os.replace(temporary_receipt, receipt_path)
-    return receipt_path.relative_to(repository_root).as_posix()
+    return _receipt_locator(
+        receipt_path,
+        state_root=state_root,
+        repository_root=repository_root,
+    )
 
 
 def project_memory_pack(
@@ -1370,7 +1446,10 @@ def project_memory_pack(
     repository_id: str,
     check: bool = False,
     authority: AuthorityDecision | None = None,
+    protected_state_root: str | Path | None = None,
     fail_after_replacements: int | None = None,
+    _verified_snapshot: PublicMemorySnapshot | None = None,
+    _verified_snapshot_seal: object | None = None,
 ) -> ProjectionResult:
     supplied_source = Path(store_path)
     if _is_linklike(supplied_source):
@@ -1385,7 +1464,15 @@ def project_memory_pack(
     if not repository.is_dir():
         raise ProjectionError("repository root must be an existing regular directory")
     pack_root = repository / PACK_DIRECTORY
-    state_root = repository / STATE_DIRECTORY
+    state_root = (
+        repository / STATE_DIRECTORY
+        if protected_state_root is None
+        else _external_projection_state_root(
+            protected_state_root,
+            repository,
+            source,
+        )
+    )
     _validate_projection_roots(
         repository,
         pack_root=pack_root,
@@ -1394,16 +1481,25 @@ def project_memory_pack(
     if source.is_relative_to(pack_root.resolve(strict=False)):
         raise ProjectionError("foundation store cannot overlap the public memory pack")
     _reject_source_overlap(source, pack_root)
-    try:
-        snapshot = FoundationStore.read_public_memory_snapshot(
-            source,
-            tenant_id=tenant_id,
-            repository_id=repository_id,
-        )
-    except ProjectionError:
-        raise
-    except RuntimeError as error:
-        raise ProjectionError(f"foundation snapshot failed: {error}") from error
+    if _verified_snapshot is None:
+        if _verified_snapshot_seal is not None:
+            raise ProjectionError("unexpected public release snapshot seal")
+        try:
+            snapshot = FoundationStore.read_public_memory_snapshot(
+                source,
+                tenant_id=tenant_id,
+                repository_id=repository_id,
+            )
+        except ProjectionError:
+            raise
+        except RuntimeError as error:
+            raise ProjectionError(f"foundation snapshot failed: {error}") from error
+    else:
+        if _verified_snapshot_seal is not _VERIFIED_PUBLIC_RELEASE_SNAPSHOT_SEAL:
+            raise ProjectionError(
+                "public release snapshot lacks a verified admission seal"
+            )
+        snapshot = _verified_snapshot
     if snapshot.integrity_issues:
         raise ProjectionError(
             "foundation integrity failed: " + "; ".join(snapshot.integrity_issues)
@@ -1486,6 +1582,7 @@ def project_memory_pack(
             receipt_path = _preserve_conflict(
                 repository_root=repository,
                 pack_root=pack_root,
+                state_root=state_root,
                 desired_files=desired_files,
                 prior_files=prior_files,
                 prior_manifest_digest=prior_manifest_digest,
@@ -1515,6 +1612,7 @@ def project_memory_pack(
             receipt_path, recovery_status = _write_transaction(
                 repository_root=repository,
                 pack_root=pack_root,
+                state_root=state_root,
                 desired_files=desired_files,
                 prior_files=prior_files,
                 prior_manifest_digest=prior_manifest_digest,
@@ -1526,6 +1624,7 @@ def project_memory_pack(
             receipt_path = _preserve_conflict(
                 repository_root=repository,
                 pack_root=pack_root,
+                state_root=state_root,
                 desired_files=desired_files,
                 prior_files=prior_files,
                 prior_manifest_digest=prior_manifest_digest,
@@ -1548,6 +1647,46 @@ def project_memory_pack(
         )
 
 
+def project_released_memory_pack(
+    public_store_path: str | Path,
+    repository_root: str | Path,
+    protected_state_root: str | Path,
+    *,
+    tenant_id: str,
+    repository_id: str,
+    check: bool = False,
+    authority: AuthorityDecision | None = None,
+    fail_after_replacements: int | None = None,
+) -> ProjectionResult:
+    """Project only from a separately materialized safe-public release store."""
+
+    from .public_memory import (
+        PublicMemorySeparationError,
+        read_public_memory_release_snapshot,
+    )
+
+    try:
+        snapshot = read_public_memory_release_snapshot(
+            public_store_path,
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+        )
+    except PublicMemorySeparationError as error:
+        raise ProjectionError(f"public release snapshot failed: {error}") from error
+    return project_memory_pack(
+        public_store_path,
+        repository_root,
+        tenant_id=tenant_id,
+        repository_id=repository_id,
+        check=check,
+        authority=authority,
+        protected_state_root=protected_state_root,
+        fail_after_replacements=fail_after_replacements,
+        _verified_snapshot=snapshot,
+        _verified_snapshot_seal=_VERIFIED_PUBLIC_RELEASE_SNAPSHOT_SEAL,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m hive_mind_os.foundation.brain",
@@ -1560,13 +1699,74 @@ def build_parser() -> argparse.ArgumentParser:
         command_parser.add_argument("--repo", required=True)
         command_parser.add_argument("--tenant", required=True)
         command_parser.add_argument("--repository-id", required=True)
+    release_parser = subparsers.add_parser("release")
+    release_parser.add_argument("--store", required=True)
+    release_parser.add_argument("--public-store", required=True)
+    release_parser.add_argument("--repo", required=True)
+    release_parser.add_argument("--protected-state", required=True)
+    release_parser.add_argument("--tenant", required=True)
+    release_parser.add_argument("--repository-id", required=True)
+    for command in ("project-separated", "check-separated"):
+        command_parser = subparsers.add_parser(command)
+        command_parser.add_argument("--public-store", required=True)
+        command_parser.add_argument("--repo", required=True)
+        command_parser.add_argument("--protected-state", required=True)
+        command_parser.add_argument("--tenant", required=True)
+        command_parser.add_argument("--repository-id", required=True)
     return parser
 
 
 def run(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
-    check = arguments.command == "check"
+    check = arguments.command in {"check", "check-separated"}
     authority = None
+    if arguments.command == "release":
+        from .public_memory import (
+            PUBLIC_MEMORY_RELEASE_ACTION,
+            PUBLIC_MEMORY_RELEASER,
+            materialize_public_memory,
+        )
+
+        authority = decide_foundation_write(
+            role=Role.BUILDER,
+            action=PUBLIC_MEMORY_RELEASE_ACTION,
+            policy_decision=PolicyDecision(
+                True,
+                "explicit local public-memory release command",
+            ),
+            lease_actions={PUBLIC_MEMORY_RELEASE_ACTION},
+            adapter_actions={PUBLIC_MEMORY_RELEASE_ACTION},
+            mission_risk_allowed=True,
+            budget_available=True,
+            tenant_id=arguments.tenant,
+            repository_id=arguments.repository_id,
+            actor_id=PUBLIC_MEMORY_RELEASER,
+            decision_id="decision:explicit-local-public-memory-release",
+            lease_id="lease:single-local-public-memory-release",
+        )
+        try:
+            result = materialize_public_memory(
+                arguments.store,
+                arguments.public_store,
+                arguments.repo,
+                arguments.protected_state,
+                tenant_id=arguments.tenant,
+                repository_id=arguments.repository_id,
+                authority=authority,
+            )
+        except (OSError, RuntimeError, ValueError, sqlite3.Error) as error:
+            failure = ProjectionFailure(
+                schema_version="hive-brain-projection-failure/v1",
+                status="failed",
+                error=f"{type(error).__name__}: {error}"[:8192],
+            )
+            print(
+                json.dumps(failure.to_dict(), indent=2, sort_keys=True),
+                file=sys.stderr,
+            )
+            return 2
+        print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+        return 0
     if not check:
         authority = decide_foundation_write(
             role=Role.BUILDER,
@@ -1583,14 +1783,25 @@ def run(argv: Sequence[str] | None = None) -> int:
             lease_id="lease:single-local-projection",
         )
     try:
-        result = project_memory_pack(
-            arguments.store,
-            arguments.repo,
-            tenant_id=arguments.tenant,
-            repository_id=arguments.repository_id,
-            check=check,
-            authority=authority,
-        )
+        if arguments.command in {"project-separated", "check-separated"}:
+            result = project_released_memory_pack(
+                arguments.public_store,
+                arguments.repo,
+                arguments.protected_state,
+                tenant_id=arguments.tenant,
+                repository_id=arguments.repository_id,
+                check=check,
+                authority=authority,
+            )
+        else:
+            result = project_memory_pack(
+                arguments.store,
+                arguments.repo,
+                tenant_id=arguments.tenant,
+                repository_id=arguments.repository_id,
+                check=check,
+                authority=authority,
+            )
     except (OSError, ProjectionError, ValueError, sqlite3.Error) as error:
         failure = ProjectionFailure(
             schema_version="hive-brain-projection-failure/v1",
