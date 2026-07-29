@@ -29,3 +29,11 @@
 
 These dissenting constraints remain part of the implementation verdict and later
 appeal record.
+
+## Final preservation receipt
+
+Final Curator `Aquinas`, Steward `Cicero`, and Judge `Ohm` reviewed exact candidate
+`24e48933d7e4098002944b2cc5d73bfe9e3f1e3b`. The Judge adopted Phase 3 item 1
+only while expressly retaining every constraint above. No dissent was resolved by
+deletion, and none is converted into a support, completeness, production-readiness,
+or superiority claim.

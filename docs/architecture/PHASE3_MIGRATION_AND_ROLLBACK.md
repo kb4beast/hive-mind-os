@@ -50,3 +50,11 @@ Item 1 intentionally provides no recursive delete command. If removal is require
 validate the exact repository root, manifest schema/identity, every managed path, and
 every current digest before a separately authorized cleanup. Never remove unknown
 files, human notes, canonical state, or conflict evidence.
+
+## Accepted rollback binding
+
+The independently judged implementation candidate is
+`24e48933d7e4098002944b2cc5d73bfe9e3f1e3b`. Its rollback remains the additive,
+non-destructive procedure above: stop invoking the opt-in module command and preserve
+canonical, public, private-evidence, and human-authored bytes. The adoption verdict
+does not authorize cleanup, activation, merging, or any Phase 3 item 2–8 migration.

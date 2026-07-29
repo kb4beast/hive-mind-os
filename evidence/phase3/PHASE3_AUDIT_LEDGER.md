@@ -315,3 +315,51 @@ truncated journal that was indistinguishable from a published journal. Transacti
 journals now use a durable temporary file followed by atomic replacement. A partial
 temporary journal is covered by the already-adopted unjournaled-staging rebuild
 rule; a regression proves retry commits and then becomes unchanged.
+
+## `P3-AUDIT-018` — exact-candidate delivery judgment
+
+Implementation candidate
+`24e48933d7e4098002944b2cc5d73bfe9e3f1e3b` remained a clean, draft, open,
+mergeable PR #32 head based exactly on PR #31 head
+`94e67cde15fa8a75d92561384241f0419c9f589b`. PRs #28, #29, and #31 remained
+open and unmerged.
+
+Builder local verification:
+
+- complete repository suite: `490 passed, 3 skipped, 1781 subtests passed`;
+- focused Generation Zero plus Phase 1–3: `69 passed, 23 subtests passed`;
+- Ruff: pass;
+- Pyright: 0 errors and 0 warnings.
+
+Exact push run `30465040651` and pull-request run `30465050020` both completed
+successfully. Together they verified Python 3.11, 3.12, and 3.14, Ruff, Pyright,
+CodeQL, secret scan, dependency/license review, wheel installation and packaged
+resources, SPDX SBOM generation, and provenance. Push artifact `8729181702`
+contained:
+
+- `hive_mind_os-0.6.0-py3-none-any.whl`,
+  SHA-256 `c2db874c61be52233e1edac6dfdcbc500390cca71196c08009a0bd3952c08256`;
+- `hive-mind-os.spdx.json`,
+  SHA-256 `0014ac9cfe8155eecc52df446c99a1a9a5e94fecf4984bf037ed37f27f684872`.
+
+Sigstore/SLSA verification named both subjects and bound the source, workflow, and
+build configuration to the exact candidate SHA.
+
+Final Curator `Aquinas` independently reconstructed `73 passed, 27 subtests`, Ruff,
+Pyright, corrupt and valid-but-invalid store failures, hostile sparse-file bounds,
+determinism, inventory, stack, privacy, compatibility, and both exact CI runs, then
+returned `ACCEPT`. Final Steward `Cicero` separately reconstructed `73 passed, 27
+subtests`, the Phase 2–3 focused set, recovery, confinement, conflict preservation,
+typed failures, stack, compatibility, and both exact CI runs, then returned `ACCEPT`.
+
+Judge `Ohm` independently inspected the actual 27-file diff and governing evidence,
+reconstructed `75 passed`, Ruff, Pyright, inventory
+`sha256:5ecae209c32b6460f1e1935512c90d44fe2ab96c1de217fcc4e5857137701e74`,
+fixture tree
+`sha256:758b20b66c095ac37bfd38e7ac4cd6d5b4dbd20ed4f9e0eed8fd210cd57dbb58`,
+frozen `131/33/13/304` compatibility, seven packaged projection schemas, exact CI,
+artifact hashes, and provenance, then issued `ADOPT` for Phase 3 item 1 only with no
+remand.
+
+All dissent remains preserved. Phase 3 items 2–8 remain deferred by sequence and
+scope. No PR was merged, no runtime was activated, and `main` was not modified.

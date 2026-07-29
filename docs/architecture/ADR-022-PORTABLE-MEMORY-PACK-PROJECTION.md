@@ -1,7 +1,8 @@
 # ADR-022: Portable safe-public memory pack projection
 
-- Status: architecture adopted for Phase 3 item 1; implementation promotion requires
-  the exact-candidate delivery court
+- Status: adopted for Phase 3 item 1 at independently judged implementation
+  candidate `24e48933d7e4098002944b2cc5d73bfe9e3f1e3b`; activation and merge remain
+  prohibited
 - Date: 2026-07-29
 - Base: `94e67cde15fa8a75d92561384241f0419c9f589b`
 - Governing records: ADR-019, ADR-021, `P3-BRAIN-PACK-001`

@@ -11,10 +11,11 @@
 | Function | Identity | Independence |
 | --- | --- | --- |
 | Clerk, Orchestrator, Advocate | `Codex-root` | coordinates and presents |
-| Architect, Cross-Examiner, Steward | `Planck` | no implementation edits |
+| Architect, Cross-Examiner | `Planck` | no implementation edits |
 | Builder | `Codex-root` | cannot curate or judge itself |
-| Curator, privacy/security Expert | `Kuhn` | independent reconstruction; no edits |
-| Judge | `Ohm` | reserved for exact committed candidate |
+| Final Curator, privacy/security Expert | `Aquinas` | independent reconstruction; no edits |
+| Final Steward, reliability/recovery Expert | `Cicero` | independent reconstruction; no edits |
+| Judge | `Ohm` | independent exact-candidate judgment; no edits |
 
 ## Scope finding
 
@@ -106,11 +107,19 @@ These limits block broader support, completeness, usefulness, or superiority cla
 They do not block the narrow opt-in item 1 candidate if exact recovery and
 compatibility evidence passes.
 
-## Preliminary disposition
+## Final disposition
 
 Architecture: `adopt with narrow adaptations`.
 
-Implementation: `pending exact committed candidate, full verification, independent
-Curator/Steward reconstruction, and Judge verdict`.
+Implementation: `adopt` for Phase 3 item 1 only at exact candidate
+`24e48933d7e4098002944b2cc5d73bfe9e3f1e3b`, based exactly on
+`94e67cde15fa8a75d92561384241f0419c9f589b`.
 
-No PR is merged and no runtime is activated by this preliminary disposition.
+Final Curator `Aquinas` and Steward `Cicero` independently returned `ACCEPT`.
+Judge `Ohm` independently inspected the 27-file candidate diff, architecture,
+contracts, implementation, tests, inventories, dissent, rollback, source
+disposition, PR stack, exact-head CI, wheel, SBOM, and provenance, then issued
+`ADOPT` with no item-1 remand.
+
+The disposition does not merge or activate the runtime. It expressly preserves every
+dissent above and defers Phase 3 items 2–8.
