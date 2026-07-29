@@ -264,6 +264,39 @@ one. A regression proves a hardlinked external lock remains byte-identical and n
 manifest is published. Fresh inventory, exact-head CI, and independent reconstruction
 remain required.
 
+## `P3-AUDIT-017` — bounded hostile-file inspection remand
+
+Independent Steward review of `de36437e7a3dd1289d2227bc423ab55233a8bd26`
+showed that the existing-manifest size check followed an unbounded `read_bytes()`,
+and that generated-file comparisons had the same allocation weakness. A hostile or
+sparse file in the public pack could therefore consume memory before the projector
+classified it as a conflict.
+
+All private state documents now use a stat-first bounded reader that verifies a
+single-link regular file through the open handle. Public generated files use
+constant-memory streaming SHA-256 with pre-read and post-read identity and size
+checks. Manifest reads are bounded to `MAX_MANIFEST_BYTES`; every other generated
+file is bounded to `MAX_NOTE_BYTES`. Regressions create sparse over-limit manifest
+and note files while making every `Path.read_bytes()` call fail, proving the
+projector reports typed conflicts without an unbounded read. Fresh inventory,
+exact-head CI, and independent reconstruction remain required.
+
+## `P3-AUDIT-016` — corrupt and invalid-store typed-command remand
+
+Independent Curator review of `de36437e7a3dd1289d2227bc423ab55233a8bd26`
+showed that an existing non-SQLite store raised an uncaught
+`sqlite3.DatabaseError`. The module command therefore emitted no strict failure
+document even though the adopted command contract assigns integrity failures typed
+status `failed` and exit 2.
+
+The CLI boundary now normalizes `sqlite3.Error` alongside the already handled
+operational projection failures. The public snapshot boundary also normalizes its
+expected plain `RuntimeError` shape, ownership, and schema-integrity failures into
+`ProjectionError`, preserving a single library contract. Corrupt-store and
+valid-SQLite/wrong-schema-digest regressions validate emitted documents against
+`brain-failure-v1`, confirm exit 2, and preserve the diagnosed class or cause in the
+bounded error field. Fresh exact-head evidence remains required.
+
 ## `P3-AUDIT-015` — conflict-staging recovery remand
 
 Independent Steward review of `b2aff7361d1fd849a1f55bdfe5eec3705e7097ca`

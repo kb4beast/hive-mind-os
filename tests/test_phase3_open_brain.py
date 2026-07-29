@@ -5,6 +5,7 @@ import io
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import tempfile
 import unittest
@@ -231,7 +232,9 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
             self.store = FoundationStore(self.store_path)
 
     def test_projection_is_deterministic_portable_and_safe_public_only(self) -> None:
-        public = self._append("memory:public:with:windows:unsafe:id", sensitivity="safe-public")
+        public = self._append(
+            "memory:public:with:windows:unsafe:id", sensitivity="safe-public"
+        )
         self._append("memory:private", sensitivity="private")
         human_note = self.repository / PACK_DIRECTORY / "human" / "notes.md"
         human_note.parent.mkdir(parents=True)
@@ -327,7 +330,9 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertEqual(result.conflict_paths, (relative,))
         self.assertEqual(note_path.read_bytes(), edited)
 
-    def test_interrupted_conflict_staging_is_rebuilt_without_human_overwrite(self) -> None:
+    def test_interrupted_conflict_staging_is_rebuilt_without_human_overwrite(
+        self,
+    ) -> None:
         public = self._append("memory:conflict-restart", sensitivity="safe-public")
         self._project()
         manifest = json.loads(
@@ -346,11 +351,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
 
         def interrupting_write(path, content):
             nonlocal interrupted
-            if (
-                not interrupted
-                and "conflicts" in path.parts
-                and path.suffix == ".tmp"
-            ):
+            if not interrupted and "conflicts" in path.parts and path.suffix == ".tmp":
                 interrupted = True
                 original_write(path, b"truncated")
                 raise InterruptedError("injected conflict staging interruption")
@@ -377,7 +378,9 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertTrue((self.repository / str(recovered.receipt_path)).is_file())
         self.assertEqual(self._project(check=True).status, "unchanged")
 
-    def test_interruption_after_manifest_commit_resumes_and_publishes_receipt(self) -> None:
+    def test_interruption_after_manifest_commit_resumes_and_publishes_receipt(
+        self,
+    ) -> None:
         self._append("memory:manifest-crash-one", sensitivity="safe-public")
         self._append("memory:manifest-crash-two", sensitivity="safe-public")
         with self.assertRaisesRegex(InterruptedError, "injected"):
@@ -436,11 +439,49 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
             self.assertRaisesRegex(ProjectionError, "manifest exceeds"),
         ):
             self._project()
-        self.assertFalse(
-            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists()
-        )
+        self.assertFalse((self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists())
 
-    def test_tombstone_is_projected_and_unmanaged_generated_files_fail_closed(self) -> None:
+    def test_oversized_existing_manifest_is_rejected_without_unbounded_read(
+        self,
+    ) -> None:
+        manifest = self.repository / PACK_DIRECTORY / MANIFEST_PATH
+        manifest.parent.mkdir(parents=True)
+        with manifest.open("wb") as handle:
+            handle.seek(brain.MAX_MANIFEST_BYTES)
+            handle.write(b"x")
+        with patch.object(
+            Path,
+            "read_bytes",
+            side_effect=AssertionError("unbounded read attempted"),
+        ):
+            result = self._project(check=True)
+        self.assertEqual(result.status, "conflict")
+        self.assertEqual(result.conflict_paths, (MANIFEST_PATH,))
+
+    def test_oversized_generated_file_conflicts_without_unbounded_read(self) -> None:
+        self._append("memory:generated-bound", sensitivity="safe-public")
+        self._project()
+        unmanaged = (
+            self.repository
+            / PACK_DIRECTORY
+            / brain.GENERATED_DIRECTORY
+            / "oversized.md"
+        )
+        with unmanaged.open("wb") as handle:
+            handle.seek(brain.MAX_NOTE_BYTES)
+            handle.write(b"x")
+        with patch.object(
+            Path,
+            "read_bytes",
+            side_effect=AssertionError("unbounded read attempted"),
+        ):
+            result = self._project(check=True)
+        self.assertEqual(result.status, "conflict")
+        self.assertIn("generated/oversized.md", result.conflict_paths)
+
+    def test_tombstone_is_projected_and_unmanaged_generated_files_fail_closed(
+        self,
+    ) -> None:
         tombstone = self._append(
             "memory:tombstone",
             sensitivity="safe-public",
@@ -455,13 +496,9 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
             for entry in manifest["files"]
             if entry["record_id"] == tombstone["record_id"]
         )
-        note = (self.repository / PACK_DIRECTORY / relative).read_text(
-            encoding="utf-8"
-        )
+        note = (self.repository / PACK_DIRECTORY / relative).read_text(encoding="utf-8")
         self.assertIn('status: "tombstoned"', note)
-        unmanaged = (
-            self.repository / PACK_DIRECTORY / "generated" / "manual-edit.md"
-        )
+        unmanaged = self.repository / PACK_DIRECTORY / "generated" / "manual-edit.md"
         unmanaged.write_text("not managed\n", encoding="utf-8")
         result = self._project()
         self.assertEqual(result.status, "conflict")
@@ -476,10 +513,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         def injecting_lock(state_root):
             with original_lock(state_root):
                 unmanaged = (
-                    self.repository
-                    / PACK_DIRECTORY
-                    / "generated"
-                    / "editor-race.md"
+                    self.repository / PACK_DIRECTORY / "generated" / "editor-race.md"
                 )
                 unmanaged.parent.mkdir(parents=True, exist_ok=True)
                 unmanaged.write_text("human race\n", encoding="utf-8")
@@ -489,9 +523,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
             result = self._project()
         self.assertEqual(result.status, "conflict")
         self.assertEqual(result.conflict_paths, ("generated/editor-race.md",))
-        self.assertFalse(
-            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists()
-        )
+        self.assertFalse((self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists())
 
     def test_third_digest_during_replacement_is_a_preserved_conflict(self) -> None:
         self._append("memory:replacement-race-one", sensitivity="safe-public")
@@ -548,9 +580,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self._append("memory:receipt-cleanup", sensitivity="safe-public")
         first = self._project()
         self.assertIsNotNone(first.receipt_path)
-        receipt = json.loads(
-            (self.repository / str(first.receipt_path)).read_bytes()
-        )
+        receipt = json.loads((self.repository / str(first.receipt_path)).read_bytes())
         transaction_id = receipt["transaction_id"]
         transaction_root = (
             self.repository
@@ -619,9 +649,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ProjectionError, "lock path is unsafe"):
             self._project()
         self.assertEqual(outside.read_bytes(), b"")
-        self.assertFalse(
-            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists()
-        )
+        self.assertFalse((self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists())
 
     def test_pack_link_swap_at_lock_entry_cannot_escape_repository(self) -> None:
         self._append("memory:pack-link-race", sensitivity="safe-public")
@@ -758,9 +786,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
                     repository_id=REPOSITORY_ID,
                 )
             self.assertFalse((self.repository / PACK_DIRECTORY).exists())
-            self.assertFalse(
-                (self.repository / ".hive-mind-projection-state").exists()
-            )
+            self.assertFalse((self.repository / ".hive-mind-projection-state").exists())
         finally:
             self.store = FoundationStore(self.store_path)
 
@@ -789,9 +815,7 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
             for entry in manifest["files"]
             if entry["record_id"] == hostile["record_id"]
         )
-        note = (self.repository / PACK_DIRECTORY / relative).read_text(
-            encoding="utf-8"
-        )
+        note = (self.repository / PACK_DIRECTORY / relative).read_text(encoding="utf-8")
         self.assertEqual(note.splitlines().count("---"), 2)
         self.assertIn(r"![[embed]]\n<script>alert(1)</script>", note)
         self.assertNotIn("protected_content_ref", note)
@@ -838,6 +862,78 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         failure = json.loads(stderr.getvalue())
         self.assertTrue(validate_projection("brain-failure-v1", failure).valid)
 
+    def test_corrupt_store_failure_exit_is_typed_by_strict_contract(self) -> None:
+        corrupt = self.root / "corrupt.sqlite3"
+        corrupt.write_bytes(b"not-a-sqlite-database")
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            exit_code = run(
+                [
+                    "check",
+                    "--store",
+                    str(corrupt),
+                    "--repo",
+                    str(self.repository),
+                    "--tenant",
+                    TENANT_ID,
+                    "--repository-id",
+                    REPOSITORY_ID,
+                ]
+            )
+        self.assertEqual(exit_code, 2)
+        failure = json.loads(stderr.getvalue())
+        self.assertTrue(validate_projection("brain-failure-v1", failure).valid)
+        self.assertIn("DatabaseError", failure["error"])
+
+    def test_schema_integrity_failure_exit_is_typed_by_strict_contract(self) -> None:
+        self.store.close()
+        try:
+            connection = sqlite3.connect(self.store_path)
+            try:
+                trigger_rows = connection.execute(
+                    "SELECT name,sql FROM sqlite_master WHERE type='trigger' "
+                    "AND name IN (?,?) ORDER BY name",
+                    (
+                        "foundation_metadata_no_delete",
+                        "foundation_metadata_no_update",
+                    ),
+                ).fetchall()
+                self.assertEqual(len(trigger_rows), 2)
+                for name, _sql in trigger_rows:
+                    connection.execute(f"DROP TRIGGER {name}")
+                connection.execute(
+                    "UPDATE foundation_metadata SET schema_digest=?",
+                    ("sha256:" + ("0" * 64),),
+                )
+                for _name, sql in trigger_rows:
+                    connection.execute(sql)
+                connection.commit()
+            finally:
+                connection.close()
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = run(
+                    [
+                        "check",
+                        "--store",
+                        str(self.store_path),
+                        "--repo",
+                        str(self.repository),
+                        "--tenant",
+                        TENANT_ID,
+                        "--repository-id",
+                        REPOSITORY_ID,
+                    ]
+                )
+            self.assertEqual(exit_code, 2)
+            failure = json.loads(stderr.getvalue())
+            self.assertTrue(validate_projection("brain-failure-v1", failure).valid)
+            self.assertIn("ProjectionError", failure["error"])
+            self.assertIn("schema digest", failure["error"])
+        finally:
+            # The deliberately invalid store remains closed for tearDown.
+            pass
+
     def test_dedicated_module_cli_preserves_frozen_facades_and_parsers(self) -> None:
         self._append("memory:cli", sensitivity="safe-public")
         self.store.close()
@@ -865,7 +961,9 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertEqual(cli_inventory()["parser_count"], 13)
         self.assertFalse(hasattr(cli, "build_brain_parser"))
 
-    def test_phase3_contract_catalog_and_inventory_are_separate_and_strict(self) -> None:
+    def test_phase3_contract_catalog_and_inventory_are_separate_and_strict(
+        self,
+    ) -> None:
         self.assertEqual(len(PROJECTION_SCHEMA_NAMES), 7)
         self.assertTrue(validate_projection_catalog().valid)
         malformed = {

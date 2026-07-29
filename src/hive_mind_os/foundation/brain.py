@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import stat
 import sys
 import unicodedata
@@ -109,8 +110,7 @@ class ProjectionConflictError(ProjectionError):
     def __init__(self, conflict_paths: Sequence[str]) -> None:
         self.conflict_paths = tuple(sorted(set(conflict_paths)))
         super().__init__(
-            "projection conflict during publication: "
-            + ", ".join(self.conflict_paths)
+            "projection conflict during publication: " + ", ".join(self.conflict_paths)
         )
 
 
@@ -140,8 +140,7 @@ class ProjectionResult:
         validation = validate_projection("brain-result-v1", document)
         if not validation.valid:
             raise ProjectionError(
-                "projection result contract failed: "
-                + "; ".join(validation.issues)
+                "projection result contract failed: " + "; ".join(validation.issues)
             )
         return document
 
@@ -157,8 +156,7 @@ class ProjectionFailure:
         validation = validate_projection("brain-failure-v1", document)
         if not validation.valid:
             raise ProjectionError(
-                "projection failure contract failed: "
-                + "; ".join(validation.issues)
+                "projection failure contract failed: " + "; ".join(validation.issues)
             )
         return document
 
@@ -169,6 +167,92 @@ def _digest_bytes(value: bytes) -> str:
 
 def _digest_document(value: Any) -> str:
     return _digest_bytes(canonical_bytes(value))
+
+
+def _read_bounded(path: Path, max_bytes: int, description: str) -> bytes:
+    """Read a small contract document without following a swapped unsafe path."""
+
+    try:
+        before = path.stat(follow_symlinks=False)
+    except OSError as error:
+        raise ProjectionError(f"{description} cannot be inspected") from error
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or _is_linklike(path):
+        raise ProjectionError(f"{description} is not a safe regular file")
+    if before.st_size > max_bytes:
+        raise ProjectionError(f"{description} exceeds the size bound")
+    try:
+        with path.open("rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                or opened.st_size > max_bytes
+            ):
+                raise ProjectionError(f"{description} changed during inspection")
+            content = handle.read(max_bytes + 1)
+            after = os.fstat(handle.fileno())
+            path_after = path.stat(follow_symlinks=False)
+    except OSError as error:
+        raise ProjectionError(f"{description} cannot be read") from error
+    if (
+        len(content) > max_bytes
+        or after.st_size != len(content)
+        or (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)
+        or not stat.S_ISREG(path_after.st_mode)
+        or (path_after.st_dev, path_after.st_ino) != (opened.st_dev, opened.st_ino)
+        or _is_linklike(path)
+    ):
+        raise ProjectionError(f"{description} changed during inspection")
+    return content
+
+
+def _digest_file_bounded(path: Path, max_bytes: int) -> str | None:
+    """Return a digest only for a stable, single-link regular file within bounds."""
+
+    try:
+        before = path.stat(follow_symlinks=False)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_size > max_bytes
+            or _is_linklike(path)
+        ):
+            return None
+        digest = sha256()
+        total = 0
+        with path.open("rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                or opened.st_size > max_bytes
+            ):
+                return None
+            while chunk := handle.read(65_536):
+                total += len(chunk)
+                if total > max_bytes:
+                    return None
+                digest.update(chunk)
+            after = os.fstat(handle.fileno())
+            path_after = path.stat(follow_symlinks=False)
+    except OSError:
+        return None
+    if (
+        total != opened.st_size
+        or after.st_size != total
+        or (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)
+        or not stat.S_ISREG(path_after.st_mode)
+        or (path_after.st_dev, path_after.st_ino) != (opened.st_dev, opened.st_ino)
+        or _is_linklike(path)
+    ):
+        return None
+    return f"sha256:{digest.hexdigest()}"
+
+
+def _generated_file_limit(relative_path: str) -> int:
+    return MAX_MANIFEST_BYTES if relative_path == MANIFEST_PATH else MAX_NOTE_BYTES
 
 
 def _is_linklike(path: Path) -> bool:
@@ -212,9 +296,7 @@ def _json_bytes(value: Any) -> bytes:
 
 def _write_durable(path: Path, content: bytes) -> None:
     if path.exists() and (
-        not path.is_file()
-        or _is_linklike(path)
-        or _is_multilink_file(path)
+        not path.is_file() or _is_linklike(path) or _is_multilink_file(path)
     ):
         raise ProjectionError(f"durable write target is unsafe: {path.name}")
     with path.open("wb") as handle:
@@ -255,8 +337,13 @@ def _validate_render_value(value: Any, path: str) -> Any:
 
 
 def _public_memory_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
-    if set(payload) - set(_PUBLIC_MEMORY_FIELDS) != {"protected_content_ref", "retrieval_receipt"}:
-        raise ProjectionError("memory payload fields differ from the projection allowlist")
+    if set(payload) - set(_PUBLIC_MEMORY_FIELDS) != {
+        "protected_content_ref",
+        "retrieval_receipt",
+    }:
+        raise ProjectionError(
+            "memory payload fields differ from the projection allowlist"
+        )
     projected = {
         field: _validate_render_value(payload[field], f"payload.{field}")
         for field in _PUBLIC_MEMORY_FIELDS
@@ -423,7 +510,10 @@ def _desired_pack(
         payload = record["payload"]
         if not isinstance(payload, Mapping):
             raise ProjectionError(f"{record['record_id']}: payload is not an object")
-        if payload.get("status") == "quarantined" or payload.get("quarantine_state") != "none":
+        if (
+            payload.get("status") == "quarantined"
+            or payload.get("quarantine_state") != "none"
+        ):
             omitted_quarantined += 1
             continue
         source_digest = str(record["semantic_digest"])
@@ -615,11 +705,7 @@ def _read_manifest(pack_root: Path) -> tuple[dict[str, Any] | None, str | None]:
     path = _path_from_relative(pack_root, MANIFEST_PATH)
     if not path.exists():
         return None, None
-    if not path.is_file() or _is_linklike(path):
-        raise ProjectionError("projection manifest is not a regular file")
-    content = path.read_bytes()
-    if len(content) > MAX_MANIFEST_BYTES:
-        raise ProjectionError("projection manifest exceeds the size bound")
+    content = _read_bounded(path, MAX_MANIFEST_BYTES, "projection manifest")
     try:
         manifest = json.loads(content)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -696,7 +782,13 @@ def _manifest_has_receipt(
     ):
         raise ProjectionError("projection ownership receipt is unsafe")
     try:
-        receipt = json.loads(receipt_path.read_bytes())
+        receipt = json.loads(
+            _read_bounded(
+                receipt_path,
+                MAX_MANIFEST_BYTES,
+                "projection ownership receipt",
+            )
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ProjectionError("projection ownership receipt is invalid") from error
     validation = validate_projection("brain-receipt-v1", receipt)
@@ -744,16 +836,18 @@ def _find_conflicts(
                 )
                 if expected_digest is None:
                     desired = desired_files.get(relative)
-                    if desired is None or _digest_bytes(path.read_bytes()) != _digest_bytes(
-                        desired
-                    ):
+                    if desired is None or _digest_file_bounded(
+                        path,
+                        _generated_file_limit(relative),
+                    ) != _digest_bytes(desired):
                         conflicts.add(relative)
                 else:
                     desired = desired_files.get(relative)
-                    desired_digest = (
-                        None if desired is None else _digest_bytes(desired)
+                    desired_digest = None if desired is None else _digest_bytes(desired)
+                    actual_digest = _digest_file_bounded(
+                        path,
+                        _generated_file_limit(relative),
                     )
-                    actual_digest = _digest_bytes(path.read_bytes())
                     if actual_digest not in {expected_digest, desired_digest}:
                         conflicts.add(relative)
     for relative_path, expected_digest in prior_files.items():
@@ -761,7 +855,10 @@ def _find_conflicts(
         if not destination.is_file() or _is_linklike(destination):
             conflicts.add(relative_path)
         else:
-            actual_digest = _digest_bytes(destination.read_bytes())
+            actual_digest = _digest_file_bounded(
+                destination,
+                _generated_file_limit(relative_path),
+            )
             desired = desired_files.get(relative_path)
             desired_digest = None if desired is None else _digest_bytes(desired)
             if actual_digest not in {expected_digest, desired_digest}:
@@ -784,10 +881,9 @@ def _prior_projection_state(
         prior_manifest, prior_manifest_digest = _read_manifest(pack_root)
     except ProjectionError:
         manifest_path = _path_from_relative(pack_root, MANIFEST_PATH)
-        observed_digest = (
-            _digest_bytes(manifest_path.read_bytes())
-            if manifest_path.is_file() and not _is_linklike(manifest_path)
-            else None
+        observed_digest = _digest_file_bounded(
+            manifest_path,
+            MAX_MANIFEST_BYTES,
         )
         return {}, observed_digest, (MANIFEST_PATH,)
     manifest_owned = _manifest_has_receipt(state_root, prior_manifest_digest)
@@ -832,9 +928,8 @@ def _pack_matches(
             observed_directories.add(relative)
         else:
             return False
-    if (
-        observed_files != expected_files
-        or not observed_directories.issubset(expected_directories)
+    if observed_files != expected_files or not observed_directories.issubset(
+        expected_directories
     ):
         return False
     for relative_path, desired in desired_files.items():
@@ -842,7 +937,11 @@ def _pack_matches(
         if (
             not destination.is_file()
             or _is_linklike(destination)
-            or _digest_bytes(destination.read_bytes()) != _digest_bytes(desired)
+            or _digest_file_bounded(
+                destination,
+                _generated_file_limit(relative_path),
+            )
+            != _digest_bytes(desired)
         ):
             return False
     return True
@@ -904,7 +1003,9 @@ def _projection_lock(state_root: Path) -> Iterator[None]:
 
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as error:
-            raise ProjectionError("another projector holds the repository lock") from error
+            raise ProjectionError(
+                "another projector holds the repository lock"
+            ) from error
         yield
     finally:
         try:
@@ -990,7 +1091,13 @@ def _write_transaction(
     recovering = journal_path.exists()
     if recovering:
         try:
-            journal = json.loads(journal_path.read_bytes())
+            journal = json.loads(
+                _read_bounded(
+                    journal_path,
+                    MAX_MANIFEST_BYTES,
+                    "pending projection journal",
+                )
+            )
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise ProjectionError("pending projection journal is invalid") from error
     else:
@@ -1002,8 +1109,7 @@ def _write_transaction(
     validation = validate_projection("brain-transaction-v1", journal)
     if not validation.valid:
         raise ProjectionError(
-            "projection transaction contract failed: "
-            + "; ".join(validation.issues)
+            "projection transaction contract failed: " + "; ".join(validation.issues)
         )
     if recovering:
         expected_recovery = {
@@ -1088,7 +1194,10 @@ def _write_transaction(
         if destination.exists():
             if not destination.is_file() or _is_linklike(destination):
                 raise ProjectionError(f"projection target is unsafe: {relative_path}")
-            actual_digest = _digest_bytes(destination.read_bytes())
+            actual_digest = _digest_file_bounded(
+                destination,
+                _generated_file_limit(relative_path),
+            )
         else:
             actual_digest = None
         expected_digest = expected_prior_by_path[relative_path]
@@ -1097,11 +1206,19 @@ def _write_transaction(
         if actual_digest != expected_digest:
             raise ProjectionConflictError((relative_path,))
         staged = _staged_path(staged_root, relative_path)
-        if not staged.is_file() or _digest_bytes(staged.read_bytes()) != desired_digest:
-            raise ProjectionError(f"staged projection content is invalid: {relative_path}")
+        if (
+            not staged.is_file()
+            or _digest_file_bounded(staged, len(desired)) != desired_digest
+        ):
+            raise ProjectionError(
+                f"staged projection content is invalid: {relative_path}"
+            )
         os.replace(staged, destination)
         replacements += 1
-        if fail_after_replacements is not None and replacements >= fail_after_replacements:
+        if (
+            fail_after_replacements is not None
+            and replacements >= fail_after_replacements
+        ):
             raise InterruptedError("injected projection interruption")
     if not _pack_matches(pack_root, desired_files):
         late_conflicts = _find_conflicts(
@@ -1158,10 +1275,9 @@ def _preserve_conflict(
     observations = []
     for relative_path in conflict_paths:
         destination = _path_from_relative(pack_root, relative_path)
-        observed_digest = (
-            _digest_bytes(destination.read_bytes())
-            if destination.is_file() and not _is_linklike(destination)
-            else None
+        observed_digest = _digest_file_bounded(
+            destination,
+            _generated_file_limit(relative_path),
         )
         desired = desired_files.get(relative_path)
         observations.append(
@@ -1197,7 +1313,13 @@ def _preserve_conflict(
     )
     if receipt_path.exists():
         try:
-            body = json.loads(receipt_path.read_bytes())
+            body = json.loads(
+                _read_bounded(
+                    receipt_path,
+                    MAX_MANIFEST_BYTES,
+                    "existing conflict receipt",
+                )
+            )
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise ProjectionError("existing conflict receipt is invalid") from error
         comparable = dict(body) if isinstance(body, dict) else {}
@@ -1213,8 +1335,7 @@ def _preserve_conflict(
     validation = validate_projection("brain-conflict-v1", body)
     if not validation.valid:
         raise ProjectionError(
-            "projection conflict contract failed: "
-            + "; ".join(validation.issues)
+            "projection conflict contract failed: " + "; ".join(validation.issues)
         )
     staged_root = _path_from_relative(
         state_root,
@@ -1224,10 +1345,12 @@ def _preserve_conflict(
     for relative_path, desired in desired_files.items():
         staged = _staged_path(staged_root, relative_path)
         if staged.exists():
-            if not staged.is_file() or _digest_bytes(staged.read_bytes()) != _digest_bytes(
-                desired
-            ):
-                raise ProjectionError("existing desired conflict bytes are inconsistent")
+            if not staged.is_file() or _digest_file_bounded(
+                staged, len(desired)
+            ) != _digest_bytes(desired):
+                raise ProjectionError(
+                    "existing desired conflict bytes are inconsistent"
+                )
         else:
             _write_durable(staged, desired)
     temporary_receipt = _path_from_relative(
@@ -1271,11 +1394,16 @@ def project_memory_pack(
     if source.is_relative_to(pack_root.resolve(strict=False)):
         raise ProjectionError("foundation store cannot overlap the public memory pack")
     _reject_source_overlap(source, pack_root)
-    snapshot = FoundationStore.read_public_memory_snapshot(
-        source,
-        tenant_id=tenant_id,
-        repository_id=repository_id,
-    )
+    try:
+        snapshot = FoundationStore.read_public_memory_snapshot(
+            source,
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+        )
+    except ProjectionError:
+        raise
+    except RuntimeError as error:
+        raise ProjectionError(f"foundation snapshot failed: {error}") from error
     if snapshot.integrity_issues:
         raise ProjectionError(
             "foundation integrity failed: " + "; ".join(snapshot.integrity_issues)
@@ -1463,7 +1591,7 @@ def run(argv: Sequence[str] | None = None) -> int:
             check=check,
             authority=authority,
         )
-    except (OSError, ProjectionError, ValueError) as error:
+    except (OSError, ProjectionError, ValueError, sqlite3.Error) as error:
         failure = ProjectionFailure(
             schema_version="hive-brain-projection-failure/v1",
             status="failed",
