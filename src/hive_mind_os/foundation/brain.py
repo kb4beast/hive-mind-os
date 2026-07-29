@@ -497,7 +497,10 @@ def _desired_pack(
         raise ProjectionError(
             "projection manifest contract failed: " + "; ".join(validation.issues)
         )
-    files[MANIFEST_PATH] = _json_bytes(manifest)
+    manifest_bytes = _json_bytes(manifest)
+    if len(manifest_bytes) > MAX_MANIFEST_BYTES:
+        raise ProjectionError("projection manifest exceeds the size bound")
+    files[MANIFEST_PATH] = manifest_bytes
     if sum(len(content) for content in files.values()) > MAX_PACK_BYTES:
         raise ProjectionError("memory pack exceeds projection bound")
     return files, manifest, omitted_quarantined
@@ -968,11 +971,11 @@ def _write_transaction(
             journal = json.loads(journal_path.read_bytes())
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise ProjectionError("pending projection journal is invalid") from error
-        comparable = dict(journal) if isinstance(journal, dict) else {}
-        comparable.pop("attempted_at", None)
-        if comparable != stable_journal:
-            raise ProjectionError("pending projection transaction is inconsistent")
     else:
+        if transaction_root.exists():
+            if not transaction_root.is_dir() or _is_linklike(transaction_root):
+                raise ProjectionError("abandoned transaction path is unsafe")
+            shutil.rmtree(transaction_root)
         journal = {**stable_journal, "attempted_at": utc_now()}
     validation = validate_projection("brain-transaction-v1", journal)
     if not validation.valid:
@@ -980,6 +983,45 @@ def _write_transaction(
             "projection transaction contract failed: "
             + "; ".join(validation.issues)
         )
+    if recovering:
+        expected_recovery = {
+            key: value
+            for key, value in stable_journal.items()
+            if key not in {"prior_manifest_digest", "operations"}
+        }
+        observed_recovery = {
+            key: value
+            for key, value in journal.items()
+            if key
+            not in {
+                "attempted_at",
+                "prior_manifest_digest",
+                "operations",
+            }
+        }
+        expected_operations = [
+            {
+                "path": operation["path"],
+                "desired_digest": operation["desired_digest"],
+            }
+            for operation in stable_journal["operations"]
+        ]
+        observed_operations = [
+            {
+                "path": operation["path"],
+                "desired_digest": operation["desired_digest"],
+            }
+            for operation in journal["operations"]
+        ]
+        if (
+            observed_recovery != expected_recovery
+            or observed_operations != expected_operations
+        ):
+            raise ProjectionError("pending projection transaction is inconsistent")
+    expected_prior_by_path = {
+        str(operation["path"]): operation["expected_prior_digest"]
+        for operation in journal["operations"]
+    }
     journal_bytes = _json_bytes(journal)
     if not recovering:
         staged_root.mkdir(parents=True, exist_ok=False)
@@ -1022,18 +1064,11 @@ def _write_transaction(
             actual_digest = _digest_bytes(destination.read_bytes())
         else:
             actual_digest = None
-        expected_digest = (
-            prior_manifest_digest
-            if relative_path == MANIFEST_PATH
-            else prior_files.get(relative_path)
-        )
+        expected_digest = expected_prior_by_path[relative_path]
         if actual_digest == desired_digest:
             continue
         if actual_digest != expected_digest:
-            raise ProjectionError(
-                f"projection conflict at {relative_path}: expected "
-                f"{expected_digest}, observed {actual_digest}"
-            )
+            raise ProjectionConflictError((relative_path,))
         staged = _staged_path(staged_root, relative_path)
         if not staged.is_file() or _digest_bytes(staged.read_bytes()) != desired_digest:
             raise ProjectionError(f"staged projection content is invalid: {relative_path}")

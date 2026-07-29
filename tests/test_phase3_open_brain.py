@@ -338,6 +338,46 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertTrue((self.repository / str(recovered.receipt_path)).is_file())
         self.assertEqual(self._project(check=True).status, "unchanged")
 
+    def test_interruption_after_manifest_commit_resumes_and_publishes_receipt(self) -> None:
+        self._append("memory:manifest-crash-one", sensitivity="safe-public")
+        self._append("memory:manifest-crash-two", sensitivity="safe-public")
+        with self.assertRaisesRegex(InterruptedError, "injected"):
+            self._project(fail_after_replacements=4)
+        recovered = self._project()
+        self.assertEqual(recovered.status, "projected")
+        self.assertEqual(recovered.recovery_status, "recovered")
+        self.assertIsNotNone(recovered.receipt_path)
+        self.assertEqual(self._project().status, "unchanged")
+
+    def test_prejournal_staging_interruption_is_rebuilt_safely(self) -> None:
+        self._append("memory:prejournal-crash", sensitivity="safe-public")
+        checked = self._project(check=True)
+        transaction_id = checked.manifest_digest.removeprefix("sha256:")
+        abandoned = (
+            self.repository
+            / ".hive-mind-projection-state"
+            / "transactions"
+            / transaction_id
+        )
+        staged = abandoned / "files"
+        staged.mkdir(parents=True)
+        (staged / "abandoned.tmp").write_bytes(b"incomplete")
+        recovered = self._project()
+        self.assertEqual(recovered.status, "projected")
+        self.assertEqual(recovered.recovery_status, "committed")
+        self.assertFalse(abandoned.exists())
+
+    def test_generated_manifest_size_bound_is_enforced_before_publication(self) -> None:
+        self._append("memory:manifest-bound", sensitivity="safe-public")
+        with (
+            patch.object(brain, "MAX_MANIFEST_BYTES", 128),
+            self.assertRaisesRegex(ProjectionError, "manifest exceeds"),
+        ):
+            self._project()
+        self.assertFalse(
+            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists()
+        )
+
     def test_tombstone_is_projected_and_unmanaged_generated_files_fail_closed(self) -> None:
         tombstone = self._append(
             "memory:tombstone",
@@ -390,6 +430,34 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertFalse(
             (self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists()
         )
+
+    def test_third_digest_during_replacement_is_a_preserved_conflict(self) -> None:
+        self._append("memory:replacement-race-one", sensitivity="safe-public")
+        self._project()
+        self._append("memory:replacement-race-two", sensitivity="safe-public")
+        readme = self.repository / PACK_DIRECTORY / "generated" / "README.md"
+        human_bytes = readme.read_bytes() + b"\nlate human edit\n"
+        original_find_conflicts = brain._find_conflicts
+        calls = 0
+
+        def injecting_find_conflicts(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            conflicts = original_find_conflicts(*args, **kwargs)
+            if calls == 3:
+                readme.write_bytes(human_bytes)
+            return conflicts
+
+        with patch.object(
+            brain,
+            "_find_conflicts",
+            injecting_find_conflicts,
+        ):
+            result = self._project()
+        self.assertEqual(result.status, "conflict")
+        self.assertIn("generated/README.md", result.conflict_paths)
+        self.assertEqual(readme.read_bytes(), human_bytes)
+        self.assertIsNotNone(result.receipt_path)
 
     def test_manifest_edits_conflict_with_and_without_private_state(self) -> None:
         self._append("memory:manifest-conflict", sensitivity="safe-public")

@@ -219,3 +219,33 @@ still compared with that source. Separate generic checks retain fail-closed hand
 for orphaned delivery rows without identifier disclosure. Focused Phase 2 plus Phase
 3 verification after both repairs: `52 passed, 23 subtests passed`; Ruff and Pyright
 pass.
+
+## `P3-AUDIT-013` — recovery-window and generated-bound remand
+
+Independent Steward review of `126c3e48f9374224aa8e8c8c356877fe3d385f24`
+reproduced two uncovered interruption windows:
+
+- failure immediately after manifest replacement left a valid desired manifest but
+  no receipt, and restart rejected the persisted journal because it recomputed a new
+  prior-manifest digest;
+- failure after staging-directory creation but before journal publication left
+  unrecognized staging that could not be rebuilt.
+
+Independent Curator review also found that the 16 MiB manifest bound was checked only
+when reading an existing manifest, not before first publication.
+
+The remediation validates a recovering journal's immutable transaction identity,
+authority, desired paths, and desired digests while retaining its original
+expected-prior digests for replay. A safe unjournaled transaction subtree is treated
+as abandoned private staging and rebuilt. Generated manifest bytes are now bounded
+before entering the desired tree. Focused regressions cover all three cases; Phase 3
+now has `23 passed` locally. Fresh inventory, exact-head CI, and independent
+reconstruction remain required.
+
+The Steward additionally found that a third digest appearing between the final
+namespace scan and one file replacement raised a generic failure instead of the
+contracted conflict. That branch now raises the internal typed conflict signal; the
+caller preserves desired bytes and a conflict receipt without overwriting the late
+human edit. A deterministic regression injects that exact replacement window.
+Combined Phase 2 plus Phase 3 focused verification is now `56 passed, 23 subtests
+passed`.
