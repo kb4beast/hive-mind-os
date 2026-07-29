@@ -28,3 +28,6 @@
 12. The schema-object digest detects malformed or drifted local databases. It is an
     integrity/admission receipt, not cryptographic protection against an attacker who
     can rewrite both schema and metadata.
+13. The authority decision seal is process-local tamper evidence, not durable
+    cryptographic identity, cross-process delegation, or an external authorization
+    service. Only decision and lease references are persisted.

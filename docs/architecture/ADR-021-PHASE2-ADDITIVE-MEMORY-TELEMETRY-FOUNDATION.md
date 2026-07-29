@@ -39,10 +39,13 @@ Every material foundation write is bounded by:
 
 Missing input denies. A generated file, memory, usage event, outcome, or apparent
 success cannot grant authority. Usage collection requires the fixed trusted-recorder
-identity. Store entry points enforce the decision and action/type boundary. A
-safe-public record additionally requires an explicit independent public-release
-decision bound to tenant, repository, actor, lease, subject digest, and an
-independently attributable decider. Those references are stored with the record.
+identity. Authority decisions are process-local, issuer-sealed capabilities over the
+complete resulting decision; store entry points verify that seal before enforcing the
+decision and action/type boundary. Direct construction or mutation cannot create a
+valid capability. A safe-public record additionally requires an explicit independent
+public-release decision bound to tenant, repository, actor, lease, subject digest,
+and an independently attributable decider. Those references are stored with the
+record; the ephemeral process seal is not persisted as external authentication.
 
 Idea handling is encounter-first. Exact and structured matches are transactional.
 Semantic matches are candidates only and cannot merge. Relationships and appeals are

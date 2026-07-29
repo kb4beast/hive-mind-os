@@ -87,6 +87,12 @@ schema independently enforces identifier lengths, digest syntax, and count maxim
 ## Privacy and observability
 
 Sensitivity defaults to private. Safe-public requires an independent policy decision.
+Every store write requires a process-local tamper-evident `AuthorityDecision` issued
+by the authority intersection function. The store verifies the decision seal before
+examining allowed/action/scope fields, so direct construction, dataclass replacement,
+or post-construction mutation fails closed. The seal authenticates only this
+in-process decision boundary; durable decision/lease/public-release references remain
+the provenance record and no external identity or authorization protocol is claimed.
 Metrics accept only schema version, record type, provider kind, outcome,
 reconciliation status, and sensitivity labels. IDs stay in governed records or trace
 attributes. OpenTelemetry-shaped local envelopes are dependency-free and outbound

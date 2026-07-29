@@ -9,7 +9,7 @@ from typing import Any, Callable, Iterator, Mapping
 
 from hive_mind_os.models import utc_now
 
-from .authority import AuthorityDecision
+from .authority import AuthorityDecision, authority_decision_is_authentic
 from .canonical import canonical_bytes, digest, reject_private_content, stable_id
 
 FOUNDATION_SCHEMA_VERSION = 1
@@ -435,6 +435,8 @@ class FoundationStore:
         repository_id: str | None = None,
         actor_id: str | None = None,
     ) -> None:
+        if not authority_decision_is_authentic(authority):
+            raise PermissionError("foundation authority decision is not authentic")
         if (
             not authority.allowed
             or authority.foundation_action != foundation_action

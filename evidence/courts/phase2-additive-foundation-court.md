@@ -136,3 +136,13 @@ Fourth-remand remediation implementation
 evidence-only descendant may be reviewed as the exact PR head only if its source,
 tests, scripts, and project configuration remain byte-identical. No acceptance is
 asserted before fresh Curator and Steward reconstruction.
+
+Fifth implementation candidate
+`36535f136cbebc553af7693fb6ae5f5dba75c0f2`: `remand`.
+
+Curator `Kuhn` and Steward `Planck` independently constructed and mutated authority
+decisions that bypassed the claimed role/policy/lease/adapter/risk/budget
+intersection and durably registered a repository. The Builder accepted the finding.
+The PR workflow passed, while the push workflow retained an adverse Python 3.14
+seeded worker-recovery receipt; the earlier Python 3.12 adverse receipt also remains
+in the ledger. Remediation is recorded in `P2-AUDIT-017`; no acceptance is asserted.

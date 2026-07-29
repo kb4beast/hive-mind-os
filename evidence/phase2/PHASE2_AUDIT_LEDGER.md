@@ -280,3 +280,44 @@ evidence.
 - Obtain a different Judge disposition only after both accept.
 - Require a clean exact-head full matrix; preserve but do not waive the Python 3.12
   adverse receipt from run `30427537379`.
+
+## `P2-AUDIT-016` — fifth independent remand
+
+- Exact reviewed candidate:
+  `36535f136cbebc553af7693fb6ae5f5dba75c0f2`; source, tests, scripts, and project
+  configuration were byte-identical to implementation commit
+  `144e943d6cf830734e40d89d4cee41e4f15de714`.
+- Curator `Kuhn` and Steward `Planck` independently returned `remand`: both a
+  directly fabricated allowed `AuthorityDecision` and a genuine budget-denied
+  decision mutated to allowed were accepted by `FoundationStore` and produced a
+  durable repository registration. The store trusted asserted dataclass fields
+  without authenticating the role/policy/lease/adapter/risk/budget intersection.
+- Both independently confirmed the fourth-remand attribution repair and every
+  earlier adversarial path, exact 131/33/13/304 compatibility, inventories,
+  deterministic generation, Ruff, Pyright, stacking, rollback, and dissent.
+- PR run `30428086796` passed fully. Push run `30428084962` passed all jobs except
+  Python 3.14, where the unchanged seeded worker-recovery test produced the same
+  adverse state previously seen on Python 3.12. Both failures remain recorded; no
+  assertion, API, or frozen Generation Zero source is weakened.
+
+## `P2-AUDIT-017` — fifth-remand remediation
+
+- The issuing authority module now places a process-local HMAC seal over every
+  allowed or denied decision field. `FoundationStore._require_authority` verifies
+  that seal before reading allowed/action/scope.
+- Directly constructed decisions with fabricated seals and genuine denied decisions
+  mutated after issuance fail closed before any repository row is inserted.
+- The seal is deliberately scoped as in-process tamper evidence. It is not persisted,
+  does not claim external identity, and does not replace the durable decision, lease,
+  and release references stored with each write.
+- Focused Phase 2 plus exact Generation Zero: 34 tests passed. Deterministic
+  generation verified 9 artifacts. Ruff passed. Pyright 1.1.411: 0 errors, 0
+  warnings, 0 information. Inventory regeneration and patch-integrity checks passed.
+
+## Open entries after fifth remand
+
+- Seal and push a fresh exact candidate.
+- Obtain fresh Curator and Steward acceptance, then an independent Judge disposition.
+- Require a completely green exact-head matrix. If the unchanged seeded worker test
+  fails, rerun only from the same immutable SHA and retain every adverse receipt; do
+  not modify frozen Generation Zero behavior or weaken the test.

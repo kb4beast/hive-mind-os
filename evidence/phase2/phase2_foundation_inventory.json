@@ -2,7 +2,7 @@
   "activation": "inert-opt-in",
   "additive_surface": {
     "current_event_sink_count": 48,
-    "current_module_definition_count": 337,
+    "current_module_definition_count": 338,
     "unclassified_candidate_count": 0
   },
   "base_head": "3298078c41ce69103eb2bdce61960a69dc6aab93",
@@ -121,7 +121,7 @@
     "package_api_count": 33,
     "root_api_count": 131
   },
-  "inventory_digest": "sha256:2b19c5fe53175fa4214cb0a367ca96d1edd8d75d2308d35a7eb5ff08109c4e68",
+  "inventory_digest": "sha256:b580758174cb05979d4a2dcf814bbde6d09ebd08b8d443326bb42fb3e238c75b",
   "phase": 2,
   "provider_fixtures": {
     "anthropic_usage.json": "sha256:38f55f99a43f36a75a08444c4b8057bab12812466161e43838e7ca10791d6f55",

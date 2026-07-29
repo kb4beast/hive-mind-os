@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import hmac
+import json
 from dataclasses import dataclass
+from hashlib import sha256
+from secrets import token_bytes
 from typing import AbstractSet
 
 from hive_mind_os.models import Role
@@ -21,6 +25,7 @@ ROLE_CEILINGS[Role.EXPLORER] = frozenset(
     {"foundation.memory.write", "foundation.opportunity.write", "foundation.telemetry.write"}
 )
 TRUSTED_RECORDER = "foundation-usage-recorder-v1"
+_AUTHORITY_SIGNING_KEY = token_bytes(32)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +42,91 @@ class AuthorityDecision:
     public_release_decision_id: str | None
     public_release_decided_by: str | None
     public_release_subject_digest: str | None
+    _integrity_seal: str
+
+
+def _decision_content(decision: AuthorityDecision) -> bytes:
+    return json.dumps(
+        {
+            "allowed": decision.allowed,
+            "reason": decision.reason,
+            "mapped_action": (
+                decision.mapped_action.value
+                if decision.mapped_action is not None
+                else None
+            ),
+            "foundation_action": decision.foundation_action,
+            "tenant_id": decision.tenant_id,
+            "repository_id": decision.repository_id,
+            "actor_id": decision.actor_id,
+            "decision_id": decision.decision_id,
+            "lease_id": decision.lease_id,
+            "public_release_decision_id": decision.public_release_decision_id,
+            "public_release_decided_by": decision.public_release_decided_by,
+            "public_release_subject_digest": decision.public_release_subject_digest,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+
+
+def _issue_decision(
+    *,
+    allowed: bool,
+    reason: str,
+    mapped_action: Action | None,
+    foundation_action: str | None,
+    tenant_id: str | None,
+    repository_id: str | None,
+    actor_id: str | None,
+    decision_id: str | None,
+    lease_id: str | None,
+    public_release_decision_id: str | None,
+    public_release_decided_by: str | None,
+    public_release_subject_digest: str | None,
+) -> AuthorityDecision:
+    decision = AuthorityDecision(
+        allowed,
+        reason,
+        mapped_action,
+        foundation_action,
+        tenant_id,
+        repository_id,
+        actor_id,
+        decision_id,
+        lease_id,
+        public_release_decision_id,
+        public_release_decided_by,
+        public_release_subject_digest,
+        "",
+    )
+    object.__setattr__(
+        decision,
+        "_integrity_seal",
+        hmac.new(
+            _AUTHORITY_SIGNING_KEY,
+            _decision_content(decision),
+            sha256,
+        ).hexdigest(),
+    )
+    return decision
+
+
+def authority_decision_is_authentic(decision: AuthorityDecision) -> bool:
+    if (
+        not isinstance(decision, AuthorityDecision)
+        or not isinstance(decision._integrity_seal, str)
+    ):
+        return False
+    try:
+        expected = hmac.new(
+            _AUTHORITY_SIGNING_KEY,
+            _decision_content(decision),
+            sha256,
+        ).hexdigest()
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return hmac.compare_digest(decision._integrity_seal, expected)
 
 
 def decide_foundation_write(
@@ -63,19 +153,19 @@ def decide_foundation_write(
     mapped = FOUNDATION_ACTION_MAP.get(action)
 
     def deny(reason: str) -> AuthorityDecision:
-        return AuthorityDecision(
-            False,
-            reason,
-            mapped,
-            action if mapped is not None else None,
-            tenant_id,
-            repository_id,
-            actor_id,
-            decision_id,
-            lease_id,
-            public_release_decision_id,
-            public_release_decided_by,
-            public_release_subject_digest,
+        return _issue_decision(
+            allowed=False,
+            reason=reason,
+            mapped_action=mapped,
+            foundation_action=action if mapped is not None else None,
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            actor_id=actor_id,
+            decision_id=decision_id,
+            lease_id=lease_id,
+            public_release_decision_id=public_release_decision_id,
+            public_release_decided_by=public_release_decided_by,
+            public_release_subject_digest=public_release_subject_digest,
         )
 
     if mapped is None:
@@ -120,17 +210,17 @@ def decide_foundation_write(
         and public_release_decided_by == actor_id
     ):
         return deny("public release must be independently decided")
-    return AuthorityDecision(
-        True,
-        "all authority dimensions allowed",
-        mapped,
-        action,
-        tenant_id,
-        repository_id,
-        actor_id,
-        decision_id,
-        lease_id,
-        public_release_decision_id,
-        public_release_decided_by,
-        public_release_subject_digest,
+    return _issue_decision(
+        allowed=True,
+        reason="all authority dimensions allowed",
+        mapped_action=mapped,
+        foundation_action=action,
+        tenant_id=tenant_id,
+        repository_id=repository_id,
+        actor_id=actor_id,
+        decision_id=decision_id,
+        lease_id=lease_id,
+        public_release_decision_id=public_release_decision_id,
+        public_release_decided_by=public_release_decided_by,
+        public_release_subject_digest=public_release_subject_digest,
     )

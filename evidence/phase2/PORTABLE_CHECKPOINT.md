@@ -2,9 +2,9 @@
 
 - Branch: `codex/phase2-additive-memory-telemetry-foundation`
 - Stack base: PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`
-- Current implementation candidate:
-  `144e943d6cf830734e40d89d4cee41e4f15de714`; fourth-remand attribution-boundary
-  remediation sealed; fresh independent review pending; not activated
+- Latest reviewed head:
+  `36535f136cbebc553af7693fb6ae5f5dba75c0f2`; independently remanded;
+  fifth-remand authority-seal remediation not yet sealed; not activated
 - Governing ADR: ADR-021
 - Court: `evidence/courts/phase2-additive-foundation-court.md`
 - Inventory: `evidence/phase2/phase2_foundation_inventory.json`
@@ -35,6 +35,8 @@ Implemented:
   receipts; bounded normalized integers; fixed billable-status reconciliation;
   direct/OTel trace boundary validation; and cross-repository opportunity-key
   integrity.
+- process-local issuer-sealed authority decisions verified at every store boundary;
+  direct fabrication and post-issuance mutation fail closed.
 
 Unchanged:
 

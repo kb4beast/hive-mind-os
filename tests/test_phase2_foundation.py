@@ -294,6 +294,55 @@ class FoundationStoreTests(unittest.TestCase):
         self.store.close()
         self.temporary.cleanup()
 
+    def test_store_rejects_fabricated_and_mutated_authority_decisions(self) -> None:
+        identity = {
+            **REPOSITORY_IDENTITY,
+            "repository_id": "repository:forged",
+            "instance_id": "instance:forged",
+        }
+        fabricated = AuthorityDecision(
+            True,
+            "fabricated",
+            Action.WRITE_WORKSPACE,
+            "foundation.repository.register",
+            "tenant:test",
+            "repository:forged",
+            "builder",
+            "decision:fabricated",
+            "lease:fabricated",
+            None,
+            None,
+            None,
+            "not-an-authentic-seal",
+        )
+        with self.assertRaisesRegex(PermissionError, "not authentic"):
+            self.store.register_repository(identity, authority=fabricated)
+        denied = decide_foundation_write(
+            role=Role.BUILDER,
+            action="foundation.repository.register",
+            policy_decision=PolicyDecision(True, "fixture"),
+            lease_actions={"foundation.repository.register"},
+            adapter_actions={"foundation.repository.register"},
+            mission_risk_allowed=True,
+            budget_available=False,
+            tenant_id="tenant:test",
+            repository_id="repository:forged",
+            actor_id="builder",
+            decision_id="decision:denied",
+            lease_id="lease:denied",
+        )
+        self.assertFalse(denied.allowed)
+        object.__setattr__(denied, "allowed", True)
+        with self.assertRaisesRegex(PermissionError, "not authentic"):
+            self.store.register_repository(identity, authority=denied)
+        self.assertEqual(
+            self.store._connection.execute(
+                "SELECT COUNT(*) FROM repositories WHERE repository_id=?",
+                ("repository:forged",),
+            ).fetchone()[0],
+            0,
+        )
+
     def _append(
         self,
         key: str = "memory:one",

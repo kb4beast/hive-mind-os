@@ -12,7 +12,9 @@
    exporter by default.
 5. Require a matching allowed authority decision at every write boundary. Require a
    separate subject-digest-bound, independently attributable public-release decision
-   for safe-public sensitivity; retain decision and lease references.
+   for safe-public sensitivity; retain decision and lease references. Re-evaluate
+   authority after every process start: the tamper-evident decision seal is
+   intentionally process-local and never serialized as a reusable capability.
 6. For model shadowing, wrap a provider explicitly. Record the start before I/O and
    terminal usage before returning.
 7. Reconcile legacy events read-only. Any missing tenant, repository, attempt,
