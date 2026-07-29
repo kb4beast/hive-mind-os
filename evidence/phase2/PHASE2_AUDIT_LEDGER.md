@@ -313,6 +313,8 @@ evidence.
 - Focused Phase 2 plus exact Generation Zero: 34 tests passed. Deterministic
   generation verified 9 artifacts. Ruff passed. Pyright 1.1.411: 0 errors, 0
   warnings, 0 information. Inventory regeneration and patch-integrity checks passed.
+- Remediated implementation commit:
+  `ace73253cdd61ef870ed4e2caacb2f4d91b1ef57`.
 
 ## Open entries after fifth remand
 

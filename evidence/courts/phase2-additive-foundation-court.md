@@ -146,3 +146,9 @@ intersection and durably registered a repository. The Builder accepted the findi
 The PR workflow passed, while the push workflow retained an adverse Python 3.14
 seeded worker-recovery receipt; the earlier Python 3.12 adverse receipt also remains
 in the ledger. Remediation is recorded in `P2-AUDIT-017`; no acceptance is asserted.
+
+Fifth-remand remediation implementation
+`ace73253cdd61ef870ed4e2caacb2f4d91b1ef57` is the next review candidate. An
+evidence-only descendant may be reviewed as the exact PR head only if its source,
+tests, scripts, and project configuration remain byte-identical. Fresh Curator and
+Steward acceptance remains required.
