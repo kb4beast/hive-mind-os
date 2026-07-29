@@ -20,3 +20,7 @@ evidence/benchmarks/** -text -diff
 # streams generated on Windows. Git must preserve their pre-commit bytes exactly.
 evidence/experiments/_artifacts/** -text -diff
 evidence/experiments/_failed/** -text -diff
+
+# Runtime target snapshots bind exact projector bytes, including Base and Canvas
+# serialization that applications may otherwise normalize.
+evidence/phase3/obsidian-vault-refresh/**/targets/** -text -diff

@@ -1,0 +1,127 @@
+{
+  "schema_version": "hive-obsidian-refresh-run/v1",
+  "run_id": "20260729T202104Z-windows-obsidian-1.12.7",
+  "subject_commit": "bed1c28e3b6abd1eaa72c138b99e5dc7997b229a",
+  "verdict": "fail",
+  "claimed_observation_window_seconds": 15,
+  "observation_window_predeclared_in_preserved_evidence": false,
+  "runtime": {
+    "application": "Obsidian Desktop",
+    "version": "1.12.7",
+    "executable_sha256": "fb6b2133c21ef7051c41f66d5c06f0e69162febfbb3f838a3556d54d13304b69",
+    "asar_sha256": "2b2483b2e1246772e0d25367ec055cbc5047ea2f0091b667c35656678f86d712",
+    "authenticode_status": "Valid",
+    "signer": "Dynalist Inc",
+    "signer_thumbprint": "69b4a9ab8355237555686ca7cd67f6763b0f7eaf",
+    "os": "Microsoft Windows 11 Home 10.0.26200 x64",
+    "process_id": 80216,
+    "window_handle": 22295906,
+    "restarted_during_run": false
+  },
+  "fixture": {
+    "vault_kind": "disposable no-hardlink Git clone",
+    "vault_head": "bed1c28e3b6abd1eaa72c138b99e5dc7997b229a",
+    "tenant_id": "tenant:phase3-item5-refresh",
+    "repository_id": "repository:phase3-item5-refresh",
+    "protected_state_outside_vault": true,
+    "safe_public_synthetic_records_only": true,
+    "source_repository_worktree_opened": false,
+    "obsidian_directory_confined_to_disposable_clone": true,
+    "global_profile_vault_registration_side_effect": true
+  },
+  "cases": [
+    {
+      "case_id": "item1-open-note-replacement",
+      "target": "hive-mind/generated/README.md",
+      "before_observed_at": "2026-07-29T20:20:53.758Z",
+      "projector_completed_at": "2026-07-29T20:21:04.555245+00:00",
+      "after_observed_at": "2026-07-29T20:21:10.309Z",
+      "latency_seconds": 5.753755,
+      "before": "safe_public_record_count=6",
+      "after": "safe_public_record_count=7",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item3-open-home-replacement",
+      "target": "hive-mind/generated-cognitive/HOME.md",
+      "before_observed_at": "2026-07-29T20:21:37.943Z",
+      "projector_completed_at": "2026-07-29T20:21:46.765836+00:00",
+      "after_observed_at": "2026-07-29T20:21:52.927Z",
+      "latency_seconds": 6.161164,
+      "before": "evidence_count=1,total_count=7",
+      "after": "evidence_count=2,total_count=8",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-open-base-recomputation",
+      "target": "hive-mind/generated-cognitive-views/bases/ideas.base",
+      "before_observed_at": "2026-07-29T20:22:27.073Z",
+      "projector_completed_at": "2026-07-29T20:22:40.175057+00:00",
+      "after_observed_at": "2026-07-29T20:22:47.141Z",
+      "latency_seconds": 6.965943,
+      "before": "ideas=2",
+      "after": "ideas=3",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-canvas-render",
+      "target": "hive-mind/generated-cognitive-views/canvases/war-room.canvas",
+      "observed_at": "2026-07-29T20:23:23.017Z",
+      "visible_disclosure": "Released cognitive views",
+      "embedded_ideas": "3 results",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-immediate-generated-byte-check",
+      "checked_after_canvas_at": "2026-07-29T20:23:23.017Z",
+      "item4_check_status": "unchanged",
+      "manifest_digest": "sha256:f65a5a4ba215e37528292e9e46a90cd8e42e1cfa0aa464b2111c93703c505fc4",
+      "tree_digest": "sha256:3ecfe73252295079a7c5f44889208ace9a4d8d88ddc12d8fe898d702d1558fe4",
+      "conflict_paths": [],
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-delayed-generated-byte-integrity",
+      "canvas_last_write_at": "2026-07-29T20:27:26Z",
+      "projector_sha256": "sha256:0922fb0be54882189093b12767a99fa6c2d9ca14561fe3543fb1f6608cdc7bdf",
+      "after_obsidian_sha256": "sha256:ac172a176ba5fd68412952865bb1d0d916f641c4db263df8ede7166590fb3dec",
+      "projector_length_bytes": 2000,
+      "after_obsidian_length_bytes": 2033,
+      "item4_check_status": "conflict",
+      "conflict_paths": [
+        "canvases/war-room.canvas"
+      ],
+      "verdict": "fail"
+    }
+  ],
+  "final_targets": {
+    "hive-mind/generated/README.md": "sha256:5a58f8594567296574a0e97f2d2fc916d2d4873bbd84bcb7402036abbe8cb9e2",
+    "hive-mind/generated-cognitive/HOME.md": "sha256:e997cd5e4f558c8908658b3fdbba6bc3323a2de604c9d12a489271c908cf3671",
+    "hive-mind/generated-cognitive-views/bases/ideas.base": "sha256:0904fcd039b3cca729461553362a66948265e0fe3a27a0d89d22b9c05b4cb1e5",
+    "hive-mind/generated-cognitive-views/canvases/war-room.canvas": "sha256:ac172a176ba5fd68412952865bb1d0d916f641c4db263df8ede7166590fb3dec"
+  },
+  "screenshots": {
+    "01-item1-before.jpg": "sha256:236146d83dcbd535e87f678f43439ffbe97f64017667a72857cc3c99801182c0",
+    "02-item1-after.jpg": "sha256:6eb3a3613aad21334ad872eb4e2e1ed1100e2192885906b69f4b0181e5a2ed20",
+    "03-item3-before.jpg": "sha256:e1625d48047e6e2bdb0e79c296dfbf28f7eb2b1a538125715f8eef7e5f5fe26d",
+    "04-item3-after.jpg": "sha256:5f4ab4468d0b7768a8f52f141d23a7bcc80b74d693afa6486723d62aef62aada",
+    "05-item4-base-before.jpg": "sha256:2b0d465dc96492a7ceca6f82e8c86abfa9594aac001148612cab36db589f6419",
+    "06-item4-base-after.jpg": "sha256:333bcc339bae458196a9a47915ba98d9eac97000e9201af59310fd3489447f11",
+    "07-item4-canvas-render.jpg": "sha256:ddf3f9f3e917ac14cf8d45efe4cd5f4ceab7f4f5f7c4d229646d55d8a5851589"
+  },
+  "prohibited_actions": {
+    "manual_refresh": false,
+    "application_restart": false,
+    "cache_rebuild": false,
+    "community_plugin": false,
+    "sync": false,
+    "importer": false,
+    "external_watcher": false,
+    "network_git_action": false
+  },
+  "claim_limits": [
+    "The evidence covers Obsidian Desktop 1.12.7 on the recorded Windows build only.",
+    "The test used an existing Obsidian process and does not prove clean-profile isolation.",
+    "No remote Git, Sync, multi-device, production-readiness, usefulness, or superiority claim is made."
+  ]
+}

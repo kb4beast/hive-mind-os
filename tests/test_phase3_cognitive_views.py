@@ -168,6 +168,12 @@ class CognitiveViewProjectionTests(unittest.TestCase):
             "1_000",
             "-12",
             ".5",
+            "key:",
+            "tab\tvalue",
+            "---",
+            "...",
+            "flow[value]",
+            "comma,value",
         ):
             with self.subTest(value=value):
                 self.assertEqual(

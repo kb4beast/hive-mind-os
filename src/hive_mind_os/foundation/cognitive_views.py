@@ -467,8 +467,14 @@ def _yaml_scalar(value: str) -> str:
         or value[0] in "-?:,[]{}#&*!|>'\"%@`"
         or "\n" in value
         or "\r" in value
+        or "\t" in value
+        or any(ord(character) < 0x20 for character in value)
         or ": " in value
+        or value.endswith(":")
         or " #" in value
+        or value in {"---", "..."}
+        or any(character in "[]{},"
+               for character in value)
     ):
         return json.dumps(value, ensure_ascii=False)
     return value

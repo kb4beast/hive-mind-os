@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import subprocess
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +26,8 @@ from hive_mind_os.policy import PolicyDecision
 
 TENANT_ID = "tenant:phase3-item5-refresh"
 REPOSITORY_ID = "repository:phase3-item5-refresh"
+FIXTURE_REGISTRATION = "fixture-registration.json"
+MAX_TRACKED_FILES = 5_000
 
 
 def _utc_now() -> str:
@@ -32,6 +36,105 @@ def _utc_now() -> str:
 
 def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _git(repository: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ("git", "-C", str(repository), *args),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if completed.returncode:
+        raise SystemExit(
+            f"Git fixture validation failed: {' '.join(args)}: "
+            f"{completed.stderr.strip()}"
+        )
+    return completed.stdout.strip()
+
+
+def _validate_fixture(
+    repository: Path,
+    source_repository: Path,
+    state: Path,
+    *,
+    command: str,
+    claimed_subject_commit: str | None,
+) -> dict[str, Any]:
+    if (
+        repository == source_repository
+        or repository in source_repository.parents
+        or source_repository in repository.parents
+    ):
+        raise SystemExit("fixture repository must be a separate clone")
+    if any(
+        left == right or left in right.parents or right in left.parents
+        for left, right in (
+            (repository, state),
+            (source_repository, state),
+        )
+    ):
+        raise SystemExit("repository, source repository, and state must be disjoint")
+    subject_commit = _git(repository, "rev-parse", "--verify", "HEAD")
+    if (
+        len(subject_commit) != 40
+        or any(character not in "0123456789abcdef" for character in subject_commit)
+    ):
+        raise SystemExit("fixture HEAD is not a full Git commit")
+    if claimed_subject_commit is not None and claimed_subject_commit != subject_commit:
+        raise SystemExit("claimed subject commit does not match fixture HEAD")
+    if _git(source_repository, "rev-parse", "--verify", "HEAD") != subject_commit:
+        raise SystemExit("source repository and fixture clone HEAD differ")
+    origin = Path(_git(repository, "remote", "get-url", "origin")).resolve()
+    if origin != source_repository:
+        raise SystemExit("fixture clone origin does not match source repository")
+    if _git(repository, "status", "--porcelain", "--untracked-files=no"):
+        raise SystemExit("fixture clone has tracked changes")
+    ignored = {
+        line.strip()
+        for line in (repository / ".gitignore").read_text(encoding="utf-8").splitlines()
+    }
+    if ".obsidian/" not in ignored or (source_repository / ".obsidian").exists():
+        raise SystemExit("source repository Obsidian-state boundary is invalid")
+    tracked = _git(repository, "ls-files").splitlines()
+    if not tracked or len(tracked) > MAX_TRACKED_FILES:
+        raise SystemExit("fixture tracked-file bound failed")
+    checked = 0
+    for relative in tracked:
+        clone_path = repository / relative
+        source_path = source_repository / relative
+        if not clone_path.is_file() or not source_path.is_file():
+            continue
+        clone_stat = os.stat(clone_path)
+        source_stat = os.stat(source_path)
+        if (
+            clone_stat.st_dev == source_stat.st_dev
+            and clone_stat.st_ino == source_stat.st_ino
+        ):
+            raise SystemExit(f"hardlinked tracked fixture file: {relative}")
+        checked += 1
+    if not checked:
+        raise SystemExit("fixture no-hardlink validation checked no files")
+    registration_path = state / FIXTURE_REGISTRATION
+    registration = {
+        "schema_version": 1,
+        "repository": str(repository),
+        "source_repository": str(source_repository),
+        "subject_commit": subject_commit,
+        "origin": str(origin),
+        "tracked_file_count": len(tracked),
+        "no_hardlink_file_count": checked,
+    }
+    if command == "initialize":
+        if registration_path.exists():
+            raise SystemExit("fixture registration already exists")
+    else:
+        if not registration_path.is_file():
+            raise SystemExit("fixture registration is unavailable")
+        if json.loads(registration_path.read_text(encoding="utf-8")) != registration:
+            raise SystemExit("fixture identity changed after initialization")
+    return registration
 
 
 def _result_document(value: Any) -> dict[str, Any]:
@@ -177,7 +280,12 @@ def _append(source: Path, index: int, subject_commit: str) -> None:
         store.close()
 
 
-def _project(repository: Path, state: Path, subject_commit: str) -> dict[str, Any]:
+def _project(
+    repository: Path,
+    state: Path,
+    subject_commit: str,
+    fixture_validation: dict[str, Any],
+) -> dict[str, Any]:
     source = state / "private" / "foundation.sqlite3"
     public_store = state / "public" / "released.sqlite3"
     public_store.parent.mkdir(parents=True, exist_ok=True)
@@ -237,6 +345,7 @@ def _project(repository: Path, state: Path, subject_commit: str) -> dict[str, An
         "schema_version": 1,
         "completed_at": _utc_now(),
         "subject_commit": subject_commit,
+        "fixture_validation": fixture_validation,
         "item1": _result_document(item1),
         "item2": _result_document(item2),
         "item3": _result_document(item3),
@@ -252,25 +361,37 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("initialize", "append"))
     parser.add_argument("--repository", type=Path, required=True)
+    parser.add_argument("--source-repository", type=Path, required=True)
     parser.add_argument("--state", type=Path, required=True)
-    parser.add_argument("--subject-commit", required=True)
+    parser.add_argument("--subject-commit")
     parser.add_argument("--index", type=int)
     args = parser.parse_args()
     repository = args.repository.resolve()
+    source_repository = args.source_repository.resolve()
     state = args.state.resolve()
-    if repository == state or repository in state.parents or state in repository.parents:
-        raise SystemExit("repository and protected state must be disjoint")
+    validation = _validate_fixture(
+        repository,
+        source_repository,
+        state,
+        command=args.command,
+        claimed_subject_commit=args.subject_commit,
+    )
+    subject_commit = validation["subject_commit"]
     source = state / "private" / "foundation.sqlite3"
     if args.command == "initialize":
         if source.exists():
             raise SystemExit("fixture is already initialized")
         for index in range(6):
-            _append(source, index, args.subject_commit)
+            _append(source, index, subject_commit)
+        (state / FIXTURE_REGISTRATION).write_text(
+            json.dumps(validation, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     else:
         if args.index is None or args.index < 6:
             raise SystemExit("append requires --index >= 6")
-        _append(source, args.index, args.subject_commit)
-    receipt = _project(repository, state, args.subject_commit)
+        _append(source, args.index, subject_commit)
+    receipt = _project(repository, state, subject_commit, validation)
     receipt["command"] = args.command
     receipt["index"] = args.index
     print(json.dumps(receipt, sort_keys=True, separators=(",", ":")))

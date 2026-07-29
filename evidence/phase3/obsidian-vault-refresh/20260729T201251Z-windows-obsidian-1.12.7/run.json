@@ -1,0 +1,78 @@
+{
+  "schema_version": "hive-obsidian-refresh-run/v1",
+  "run_id": "20260729T201251Z-windows-obsidian-1.12.7",
+  "subject_commit": "bc08d77492bb32833948ea32f1e778407d76e2b0",
+  "verdict": "fail",
+  "reason": "Obsidian rendered and refreshed the generated Base but rewrote its YAML scalars, invalidating the item-4 ownership digest.",
+  "runtime": {
+    "application": "Obsidian Desktop",
+    "version": "1.12.7",
+    "executable_sha256": "fb6b2133c21ef7051c41f66d5c06f0e69162febfbb3f838a3556d54d13304b69",
+    "asar_sha256": "2b2483b2e1246772e0d25367ec055cbc5047ea2f0091b667c35656678f86d712",
+    "authenticode_status": "Valid",
+    "signer": "Dynalist Inc",
+    "signer_thumbprint": "69b4a9ab8355237555686ca7cd67f6763b0f7eaf",
+    "os": "Microsoft Windows 11 Home 10.0.26200 x64",
+    "process_id": 80216,
+    "restarted_during_run": false
+  },
+  "cases": [
+    {
+      "case_id": "item1-open-note-replacement",
+      "projector_completed_at": "2026-07-29T20:12:51.086966+00:00",
+      "observed_at": "2026-07-29T20:12:55.646Z",
+      "latency_seconds": 4.559034,
+      "deadline_seconds": 15,
+      "before": "safe_public_record_count=8",
+      "after": "safe_public_record_count=9",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item3-open-home-replacement",
+      "projector_completed_at": "2026-07-29T20:13:32.521791+00:00",
+      "observed_at": "2026-07-29T20:13:36.292Z",
+      "latency_seconds": 3.770209,
+      "deadline_seconds": 15,
+      "before": "run_count=1,total_count=9",
+      "after": "run_count=2,total_count=10",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-open-base-recomputation",
+      "projector_completed_at": "2026-07-29T20:14:14.526783+00:00",
+      "observed_at": "2026-07-29T20:14:20.614Z",
+      "latency_seconds": 6.087217,
+      "deadline_seconds": 15,
+      "before": "ideas=2",
+      "after": "ideas=3",
+      "verdict": "pass"
+    },
+    {
+      "case_id": "item4-generated-byte-integrity",
+      "path": "hive-mind/generated-cognitive-views/bases/ideas.base",
+      "projector_sha256": "53d560ba621911a994a887b3f883833bf7ccf99259e7c9f0789b5d54d2900609",
+      "after_obsidian_sha256": "db73a3e71a881baa3a00e46546f070c043b60babf72415ac9a213495206d6f99",
+      "projector_bytes": 1282,
+      "after_obsidian_bytes": 1232,
+      "item4_check_status": "conflict",
+      "item4_conflict_paths": [
+        "bases/ideas.base"
+      ],
+      "mutation": "Obsidian removed unnecessary YAML double quotes from filters, displayName values, and the view name.",
+      "verdict": "fail"
+    }
+  ],
+  "screenshots": {
+    "01-item1-before.jpg": "sha256:193030ff491dc640ebc617d0c6c37c2633d4dc319bbe01686dd8b9547fb5420e",
+    "02-item1-after.jpg": "sha256:6667bbd76e3b535c45aaa8f0742d6774b909382d5b4dd06c501cfb1592e565cd",
+    "03-item3-before.jpg": "sha256:b8008aa003a5ebfcdfcecee941258d225a74087796d7606a76141ee7f350b4e8",
+    "04-item3-after.jpg": "sha256:c53ada9e19c5fe7053239778f5ed56375dbaaa0f00b760e88c1967aaeb00996d",
+    "05-item4-base-before.jpg": "sha256:3b7cfff5ab9cf0b4c0779eba16b6dd00aefaba1b7160b503f133f18eb7fb7fad",
+    "06-item4-base-after.jpg": "sha256:6baa337fe9430b77b6c88d8e2e4330623d2912134e548b48f953f324228cfaa9",
+    "07-item4-canvas-render.jpg": "sha256:e545d2c65abd79dfd17cc33a55b9ab9111723f509c8173d8b3582abf642ca227"
+  },
+  "claim_limits": [
+    "This failed run is preserved as dissent and regression evidence.",
+    "Its successful refresh observations do not cure the managed-byte mutation."
+  ]
+}

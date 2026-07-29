@@ -23,6 +23,7 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-023` | [Public/private memory release-store separation](ADR-023-PUBLIC-PRIVATE-MEMORY-SEPARATION.md) | Phase 3 item 2 | adopted architecture candidate; implementation judgment and activation pending |
 | `ADR-024` | [Stable-ID cognitive note projection](ADR-024-STABLE-ID-COGNITIVE-NOTES.md) | Phase 3 item 3 | adapted for bounded draft delivery; activation and final-system promotion pending |
 | `ADR-025` | [Bounded Obsidian Bases and JSON Canvas views](ADR-025-OBSIDIAN-BASES-CANVAS-VIEWS.md) | Phase 3 item 4 | adapted for bounded stacked draft delivery; activation and final-system promotion pending |
+| `ADR-026` | [Pinned Obsidian vault refresh conformance](ADR-026-OBSIDIAN-VAULT-REFRESH-CONFORMANCE.md) | Phase 3 item 5 | proposed; final exact-build evidence and independent judgment pending |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-026; it must be unique at creation time.
+is ADR-027; it must be unique at creation time.

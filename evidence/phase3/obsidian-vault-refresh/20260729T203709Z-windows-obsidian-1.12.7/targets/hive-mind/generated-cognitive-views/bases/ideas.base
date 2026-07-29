@@ -1,0 +1,45 @@
+filters:
+  and:
+    - file.inFolder("hive-mind/generated-cognitive/ideas")
+    - schema_version == "hive-cognitive-note/v1"
+    - generator_version == "hive-cognitive-projector/v1"
+    - mapping_version == "hive-cognitive-mapping/v1"
+    - sensitivity == "safe-public"
+    - is_generated == true
+    - is_authoritative == false
+    - repository_identity_digest == "sha256:b0ed4c4751249134788c8ff5529b718d7e9c55404cd47ad5aa7a4fa1561e649d"
+properties:
+  note_id:
+    displayName: Generated note ID
+  subject_id:
+    displayName: Released subject ID
+  memory_kind:
+    displayName: Released memory kind
+  mission_id:
+    displayName: Recorded mission ID
+  run_id:
+    displayName: Recorded run ID
+  owner_id:
+    displayName: Recorded owner ID
+  status:
+    displayName: Released record status
+  confidence_ppm:
+    displayName: Released confidence (ppm)
+  observed_at:
+    displayName: Observed time (display only)
+  source_record_id:
+    displayName: Released source record ID
+views:
+  - type: table
+    name: Released idea metadata
+    order:
+      - note_id
+      - subject_id
+      - memory_kind
+      - mission_id
+      - run_id
+      - owner_id
+      - status
+      - confidence_ppm
+      - observed_at
+      - source_record_id

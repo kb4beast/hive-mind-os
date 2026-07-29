@@ -839,3 +839,76 @@ production, Obsidian runtime/rendering/refresh, federation, plugins, retrieval,
 cleanup, encryption, full CI/security/supply-chain promotion, usefulness, and
 superiority remain unjudged. Any byte, schema, protocol, interface, capability, or
 evidence change requires renewed review and judgment.
+
+## `P3-ITEM5-AUDIT-001` — real-runtime remand
+
+Root opened a disposable no-hardlink clone in the installed, signed Obsidian Desktop
+`1.12.7` runtime and drove the real item 1–4 projectors from externally placed
+protected state. Item-1 README, item-3 HOME, and the Ideas Base refreshed inside the
+predeclared 15-second observation window, and the Canvas rendered.
+
+The post-observation integrity check failed: Obsidian removed unnecessary double
+quotes from `bases/ideas.base`, changing its SHA-256 from
+`53d560ba621911a994a887b3f883833bf7ccf99259e7c9f0789b5d54d2900609`
+to
+`db73a3e71a881baa3a00e46546f070c043b60babf72415ac9a213495206d6f99`.
+Item 4 correctly reported `conflict`. The run remains a failed receipt.
+
+## `P3-ITEM5-AUDIT-002` — Base repair and provisionally passing rerun
+
+The Base renderer now emits plain YAML scalars only when unambiguous and keeps
+unsafe or YAML-ambiguous values quoted. Focused item-4 verification passed `36`
+tests; Ruff passed. Commit
+`bed1c28e3b6abd1eaa72c138b99e5dc7997b229a` was cloned without hardlinks for a
+fresh exact-commit rerun.
+
+The immediate observations appeared to pass:
+
+- item 1: `6 -> 7` records in `5.753755s`;
+- item 3: `7 -> 8` total notes in `6.161164s`;
+- Ideas Base: `2 -> 3` rows in `6.965943s`;
+- Canvas: disclosure and embedded Bases rendered; and
+- immediate item-4 check: `unchanged`, no conflicts, expected tree identity
+  `sha256:3ecfe73252295079a7c5f44889208ace9a4d8d88ddc12d8fe898d702d1558fe4`.
+
+Independent Curator and Cross-Examiner review later invalidated the run. Obsidian
+rewrote `canvases/war-room.canvas` about four minutes after the immediate check,
+changing SHA-256 from
+`0922fb0be54882189093b12767a99fa6c2d9ca14561fe3543fb1f6608cdc7bdf`
+to
+`ac172a176ba5fd68412952865bb1d0d916f641c4db263df8ede7166590fb3dec`.
+A reproduced item-4 check returned `conflict`. The tree digest above is expected
+manifest identity, not observed-byte attestation. This run is preserved as failed.
+
+## `P3-ITEM5-AUDIT-003` — scalar and delayed-Canvas remand
+
+The Cross-Examiner also found YAML implicit-type gaps for date/time-like, numeric-like,
+and legacy boolean values. Root repaired scalar quoting and added adversarial tests.
+The Canvas renderer now matches the exact tab-indented, compact-node, no-terminal-
+newline bytes written by Obsidian `1.12.7`. Focused item-4 verification passed `37`
+tests with `8` subtests; Ruff and Pyright passed. Exact candidate
+`fadf6e1b386eba61168c753b3cdab3d94503430f` is undergoing a fresh disposable-clone
+run with a Canvas unload and a declared 300-second stability interval. No final
+conformance verdict or court judgment is yet recorded.
+
+## `P3-ITEM5-AUDIT-004` — delayed-stability run and hardened evidence boundary
+
+The third run used exact production candidate
+`fadf6e1b386eba61168c753b3cdab3d94503430f`. Same-pane observations completed in
+`5.601962s`, `5.975783s`, and `5.145992s`; Canvas rendered with two embedded idea
+rows. Root then switched away from Canvas and held the vault open for `329.74131s`,
+exceeding the declared 300-second interval. An idempotent final projection returned
+item 1, item 3, and item 4 `unchanged` with no conflicts.
+
+All four final targets are copied under the run receipt and independently hash-bound.
+The Canvas remained 2033 bytes at
+`sha256:7377a6e7bce06eb7bccbcc3c27b9429bccb0af0b202954ecfa7abc371bd9c814`;
+its modification time remained the projector time, before Canvas was opened.
+
+The evidence validator now requires exact cases, timestamps, finite recalculated
+latencies, runtime pins, prohibited-action keys, screenshots, delayed stability,
+per-file target snapshots, and internal identity consistency. The fixture now
+derives Git HEAD, checks origin/source separation, tracked cleanliness, bounded
+no-hardlink identity, ignored `.obsidian/`, and persistent initialization identity.
+Root verification passed `42` tests with `16` subtests, Ruff, and Pyright. Independent
+current-byte review and judgment remain pending.

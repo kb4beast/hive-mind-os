@@ -94,9 +94,9 @@
   "implementation": {
     "pyproject.toml": "sha256:1757eeb16442cb24d713e277f6279056dccf873e7c498e5470b25b63e555ea09",
     "src/hive_mind_os/foundation/cognitive_view_contracts.py": "sha256:718dcf06b186851054bafd94dbda827c04f4c97f4231f04577ce30e66f392b0b",
-    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:6e5b24895067988c91c8ab79e38ae0f06e8de7a8ab56a408ee81dc5fcaa1c04d"
+    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:d841bc13d33e64b71a3e6a26aa6d1ecdea5c6f0fd8464d28bf3965e751988149"
   },
-  "inventory_digest": "sha256:d6bae79890ce8b22109cab55cf3512891911ec68cc0f2814a614d30b056529e5",
+  "inventory_digest": "sha256:2903ccd907b23779fe04f173f4ada08930d7e4d5e87d0ba99ab660e34a183400",
   "obsidian_runtime_required": false,
   "official_source_pins": {
     "bases_license": "NOASSERTION",
