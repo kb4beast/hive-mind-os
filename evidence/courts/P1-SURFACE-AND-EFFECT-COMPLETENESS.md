@@ -1,8 +1,9 @@
 # P1 Surface and Effect Characterization Court
 
 - Case ID: `P1-SURFACE-AND-EFFECT-COMPLETENESS`
-- Status: independent Curator accepted; Judge adapted stacked-draft
-  publication and closed the two prior obligations within declared scope
+- Status: repaired candidate independently accepted; Judge adapted
+  stacked-draft publication and kept the two prior obligations closed within
+  declared scope; exact-head GitHub green delivery pending
 - Originating requirement:
   `evidence/courts/P1-CHARACTERIZATION-JUDGE.md`
 - Baseline production commit:
@@ -171,8 +172,41 @@ and inventory digest
 `sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037`.
 
 This failure and repair do not weaken the matrix or create a version-specific
-fixture. The repaired head requires fresh Curator and Judge review and a new
-exact-head GitHub run.
+fixture.
+
+## Final Curator acceptance and Judge disposition
+
+The Curator accepted exact repaired candidate
+`2585e112e0e6876ff70124b65e8cb5fd70670059` after independently reproducing
+the artifact under Python 3.11, 3.12, and 3.14:
+
+- all three interpreters passed 4 of 4 focused tests;
+- all three produced structurally identical, byte-exact artifacts and passed
+  JSON round-trip;
+- inventory digest:
+  `sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037`;
+- artifact SHA-256:
+  `2977cc4e7f2b30b63c5dcf55d3d86cd3a1f648049d8872f1a599131899d48919`;
+- Ruff passed and Pyright reported 0 errors and 0 warnings;
+- counts remained 48 sinks, 53 producers, 47 literal event types, 224
+  bounded effect sites, and zero unknown matched candidates; and
+- no production source changed.
+
+The independent Judge then issued:
+
+- stacked draft publication: `adapt`;
+- public-signature obligation:
+  `adapt — remains closed within declared scope`;
+- machine writer/event obligation:
+  `adapt — remains closed within declared scope`;
+- exact-head green delivery: `defer pending a new GitHub run`; and
+- Phase 1 completion, ADR-018/019/020, source admission, Phase 2, host
+  support, and superiority claims: `defer`.
+
+The superseding publication-eligibility receipt is
+`evidence/courts/P1-SURFACE-AND-EFFECT-JUDGE-FINAL.md`. The earlier judgment
+and GitHub run `30415956672`, Python 3.11 job `90462402862`, remain preserved
+adverse evidence.
 
 ## Acceptance evidence
 
@@ -188,8 +222,9 @@ The candidate must provide:
 8. no `src/hive_mind_os` production change; and
 9. independent exact-head Curator and Judge receipts before publication.
 
-All nine are satisfied for exact candidate `49cccc4`; Python 3.11 exact-head
-GitHub CI remains a separate green-delivery condition.
+All nine are satisfied for exact candidate
+`2585e112e0e6876ff70124b65e8cb5fd70670059`. A fresh exact-head GitHub
+matrix, including Python 3.11, remains the green-delivery condition.
 
 ## Rollback and appeal
 

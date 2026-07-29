@@ -70,6 +70,25 @@ completion, ADR adoption, source admission, Phase 2, host support, and
 superiority remain deferred. The complete receipt is
 `evidence/courts/P1-SURFACE-AND-EFFECT-JUDGE.md`.
 
+GitHub then remanded exact evidence head `784264b` because both Python 3.11
+unit-test jobs exposed interpreter-dependent enum metaclass signatures. Run
+`30415956672`, job `90462402862`, is preserved adverse evidence: all 423
+pre-existing tests passed and only the new inventory comparison failed.
+
+Repaired candidate
+`2585e112e0e6876ff70124b65e8cb5fd70670059` records the portable supported
+contract as `enum-value-lookup(value)` while retaining canonical member names
+and values. The Curator reproduced one byte-exact artifact under Python 3.11,
+3.12, and 3.14, with all 4 focused tests passing on each interpreter. The
+inventory digest is
+`sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037`.
+
+The final Judge disposition in
+`evidence/courts/P1-SURFACE-AND-EFFECT-JUDGE-FINAL.md` adapts stacked-draft
+publication and keeps both bounded characterization obligations closed.
+Exact-head green delivery remains deferred until a fresh GitHub matrix,
+including Python 3.11, passes.
+
 ## Curator verification receipt
 
 - Exact imported module:
