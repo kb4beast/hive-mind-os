@@ -447,6 +447,7 @@ def _yaml_scalar(value: str) -> str:
         "false",
         ".nan",
         ".inf",
+        "+.inf",
         "-.inf",
     }
     looks_typed = bool(
@@ -468,7 +469,11 @@ def _yaml_scalar(value: str) -> str:
         or "\n" in value
         or "\r" in value
         or "\t" in value
-        or any(ord(character) < 0x20 for character in value)
+        or any(
+            ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
+            or ord(character) in {0x2028, 0x2029}
+            for character in value
+        )
         or ": " in value
         or value.endswith(":")
         or " #" in value
@@ -476,7 +481,7 @@ def _yaml_scalar(value: str) -> str:
         or any(character in "[]{},"
                for character in value)
     ):
-        return json.dumps(value, ensure_ascii=False)
+        return json.dumps(value, ensure_ascii=True)
     return value
 
 

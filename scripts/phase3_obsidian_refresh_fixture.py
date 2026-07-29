@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import subprocess
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
@@ -28,6 +29,8 @@ TENANT_ID = "tenant:phase3-item5-refresh"
 REPOSITORY_ID = "repository:phase3-item5-refresh"
 FIXTURE_REGISTRATION = "fixture-registration.json"
 MAX_TRACKED_FILES = 5_000
+MAX_GIT_OBJECT_FILES = 20_000
+MAX_GIT_OBJECT_DIRECTORIES = 1_000
 
 
 def _utc_now() -> str:
@@ -36,6 +39,13 @@ def _utc_now() -> str:
 
 def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _is_reparse(metadata: os.stat_result) -> bool:
+    return bool(
+        getattr(metadata, "st_file_attributes", 0)
+        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    )
 
 
 def _git(repository: Path, *args: str) -> str:
@@ -104,10 +114,15 @@ def _validate_fixture(
     for relative in tracked:
         clone_path = repository / relative
         source_path = source_repository / relative
-        if not clone_path.is_file() or not source_path.is_file():
-            continue
-        clone_stat = os.stat(clone_path)
-        source_stat = os.stat(source_path)
+        clone_stat = clone_path.lstat()
+        source_stat = source_path.lstat()
+        if (
+            not stat.S_ISREG(clone_stat.st_mode)
+            or not stat.S_ISREG(source_stat.st_mode)
+            or _is_reparse(clone_stat)
+            or _is_reparse(source_stat)
+        ):
+            raise SystemExit(f"tracked fixture path is not a regular file: {relative}")
         if (
             clone_stat.st_dev == source_stat.st_dev
             and clone_stat.st_ino == source_stat.st_ino
@@ -116,6 +131,67 @@ def _validate_fixture(
         checked += 1
     if not checked:
         raise SystemExit("fixture no-hardlink validation checked no files")
+    clone_git_dir_value = Path(_git(repository, "rev-parse", "--git-dir"))
+    source_git_dir_value = Path(_git(source_repository, "rev-parse", "--git-dir"))
+    clone_git_dir = (
+        clone_git_dir_value
+        if clone_git_dir_value.is_absolute()
+        else repository / clone_git_dir_value
+    ).resolve()
+    source_git_dir = (
+        source_git_dir_value
+        if source_git_dir_value.is_absolute()
+        else source_repository / source_git_dir_value
+    ).resolve()
+    if (clone_git_dir / "objects" / "info" / "alternates").exists():
+        raise SystemExit("fixture clone uses a shared Git object alternate")
+    clone_objects: list[Path] = []
+    directory_count = 0
+    object_root = clone_git_dir / "objects"
+    for directory, directory_names, file_names in os.walk(
+        object_root, followlinks=False
+    ):
+        directory_count += 1
+        if directory_count > MAX_GIT_OBJECT_DIRECTORIES:
+            raise SystemExit("fixture Git-object directory bound failed")
+        directory_path = Path(directory)
+        for name in directory_names:
+            metadata = (directory_path / name).lstat()
+            if not stat.S_ISDIR(metadata.st_mode) or _is_reparse(metadata):
+                raise SystemExit("fixture Git-object directory is not regular")
+        for name in file_names:
+            clone_object = directory_path / name
+            metadata = clone_object.lstat()
+            if not stat.S_ISREG(metadata.st_mode) or _is_reparse(metadata):
+                raise SystemExit("fixture Git object is not a regular file")
+            clone_objects.append(clone_object)
+            if len(clone_objects) > MAX_GIT_OBJECT_FILES:
+                raise SystemExit("fixture Git-object file bound failed")
+    if not clone_objects:
+        raise SystemExit("fixture Git-object bound failed")
+    common_objects_checked = 0
+    for clone_object in clone_objects:
+        relative = clone_object.relative_to(clone_git_dir / "objects")
+        source_object = source_git_dir / "objects" / relative
+        if not source_object.exists():
+            continue
+        clone_stat = clone_object.lstat()
+        source_stat = source_object.lstat()
+        if (
+            not stat.S_ISREG(clone_stat.st_mode)
+            or not stat.S_ISREG(source_stat.st_mode)
+            or _is_reparse(clone_stat)
+            or _is_reparse(source_stat)
+        ):
+            raise SystemExit("fixture Git object is not a regular file")
+        if (
+            clone_stat.st_dev == source_stat.st_dev
+            and clone_stat.st_ino == source_stat.st_ino
+        ):
+            raise SystemExit(f"hardlinked Git fixture object: {relative.as_posix()}")
+        common_objects_checked += 1
+    if not common_objects_checked:
+        raise SystemExit("fixture Git-object independence checked no common objects")
     registration_path = state / FIXTURE_REGISTRATION
     registration = {
         "schema_version": 1,
@@ -125,6 +201,8 @@ def _validate_fixture(
         "origin": str(origin),
         "tracked_file_count": len(tracked),
         "no_hardlink_file_count": checked,
+        "git_object_file_count": len(clone_objects),
+        "no_hardlink_git_object_count": common_objects_checked,
     }
     if command == "initialize":
         if registration_path.exists():
@@ -135,6 +213,25 @@ def _validate_fixture(
         if json.loads(registration_path.read_text(encoding="utf-8")) != registration:
             raise SystemExit("fixture identity changed after initialization")
     return registration
+
+
+def _sanitized_fixture_validation(
+    registration: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema_version": registration["schema_version"],
+        "subject_commit": registration["subject_commit"],
+        "separate_clone": True,
+        "origin_matches_source_repository": True,
+        "tracked_file_count": registration["tracked_file_count"],
+        "no_hardlink_file_count": registration["no_hardlink_file_count"],
+        "git_object_file_count": registration["git_object_file_count"],
+        "no_hardlink_git_object_count": registration[
+            "no_hardlink_git_object_count"
+        ],
+        "shared_git_object_alternate": False,
+        "local_paths_omitted": True,
+    }
 
 
 def _result_document(value: Any) -> dict[str, Any]:
@@ -338,14 +435,20 @@ def _project(
     targets = (
         "hive-mind/generated/README.md",
         "hive-mind/generated-cognitive/HOME.md",
+        "hive-mind/generated-cognitive-views/bases/agent-records.base",
         "hive-mind/generated-cognitive-views/bases/ideas.base",
+        "hive-mind/generated-cognitive-views/bases/released-war-room.base",
+        "hive-mind/generated-cognitive-views/bases/telemetry-metadata.base",
         "hive-mind/generated-cognitive-views/canvases/war-room.canvas",
+        "hive-mind/generated-cognitive-views/manifest.json",
     )
     return {
         "schema_version": 1,
         "completed_at": _utc_now(),
         "subject_commit": subject_commit,
-        "fixture_validation": fixture_validation,
+        "fixture_validation": _sanitized_fixture_validation(
+            fixture_validation
+        ),
         "item1": _result_document(item1),
         "item2": _result_document(item2),
         "item3": _result_document(item3),

@@ -174,11 +174,23 @@ class CognitiveViewProjectionTests(unittest.TestCase):
             "...",
             "flow[value]",
             "comma,value",
+            "+.inf",
+            "del\x7fvalue",
+            "c1\x85value",
+            "line\u2028separator",
+            "paragraph\u2029separator",
         ):
             with self.subTest(value=value):
-                self.assertEqual(
-                    cognitive_views._yaml_scalar(value),
-                    json.dumps(value),
+                rendered = cognitive_views._yaml_scalar(value)
+                self.assertEqual(rendered, json.dumps(value))
+                self.assertEqual(json.loads(rendered), value)
+                self.assertFalse(
+                    any(
+                        ord(character) < 0x20
+                        or 0x7F <= ord(character) <= 0x9F
+                        or ord(character) in {0x2028, 0x2029}
+                        for character in rendered
+                    )
                 )
 
     def test_canvas_bytes_match_obsidian_stable_serialization(self) -> None:
