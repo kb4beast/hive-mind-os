@@ -10,7 +10,8 @@
 - Migration/rollback:
   `docs/architecture/PHASE3_ITEM3_MIGRATION_AND_ROLLBACK.md`
 - Inventory: `evidence/phase3/phase3_cognitive_notes_inventory.json`
-- Draft delivery: pending
+- Draft delivery: PR #34, implementation head
+  `5922fee688cc5ee4a0058fe84a004badb8ba957f`
 
 ## Adapted capability
 
