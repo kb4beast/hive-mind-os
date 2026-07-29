@@ -1,7 +1,8 @@
 # P1 Surface and Effect Characterization Court
 
 - Case ID: `P1-SURFACE-AND-EFFECT-COMPLETENESS`
-- Status: candidate awaiting independent Curator and Judge disposition
+- Status: independent Curator accepted; Judge adapted stacked-draft
+  publication and closed the two prior obligations within declared scope
 - Originating requirement:
   `evidence/courts/P1-CHARACTERIZATION-JUDGE.md`
 - Baseline production commit:
@@ -16,8 +17,8 @@
 | Orchestrator and Builder | `/root` |
 | Architect and Advocate | `/root/phase1_architecture` |
 | Integrator, Steward, Optimizer, and Cross-Examiner | `/root/phase1_runtime` |
-| Curator and Expert Witness | pending `/root/phase1_curator` |
-| Judge | pending `/root/phase1_judge` |
+| Curator and Expert Witness | `/root/phase1_curator` |
+| Judge | `/root/phase1_judge` |
 
 No Builder finding is an independent verification or judgment.
 
@@ -116,6 +117,40 @@ The Python 3.12 and 3.14 generators must now produce structurally identical
 artifacts and the same inventory digest. The supported GitHub Python 3.11 job
 remains an exact-head publication gate.
 
+## Independent Curator acceptance
+
+The Curator accepted exact repaired head
+`49cccc4ef9181e0d2df3ef4b4a261eb21d264915`:
+
+- Python 3.12 and 3.14 each passed all four focused tests;
+- both produced structurally identical, byte-exact artifacts;
+- JSON round-trip passed on both;
+- inventory digest:
+  `sha256:f551d93964f13a01327efb6cb1481c88f90883454b77df2c7ee9b67ed36e1401`;
+- artifact SHA-256:
+  `ea2424207d0432936497f81e277cd8b26b9d49308c01ba0119cc6207a4749993`;
+- Ruff passed and Pyright reported 0 errors;
+- no `src/hive_mind_os` production change; and
+- the remand, causes, repair, and bounded truth claim were preserved.
+
+Python 3.11 remains the GitHub publication gate. Curator acceptance does not
+authorize architecture adoption, source admission, or Phase 2.
+
+## Judge disposition
+
+The independent Judge issued:
+
+- stacked draft publication: `adapt`;
+- public-signature obligation: `adapt — closed within declared scope`;
+- machine path/event obligation: `adapt — closed within declared scope`;
+- Phase 1 completion: `defer`;
+- ADR-018/019/020 adoption: `defer`;
+- source admission: `defer`; and
+- Phase 2 implementation, host-support, and superiority claims: `defer`.
+
+The full disposition, conditions, dissent, rollback, and appeal boundary are
+preserved in `evidence/courts/P1-SURFACE-AND-EFFECT-JUDGE.md`.
+
 ## Acceptance evidence
 
 The candidate must provide:
@@ -129,6 +164,9 @@ The candidate must provide:
 7. focused tests, Ruff, and Pyright passing;
 8. no `src/hive_mind_os` production change; and
 9. independent exact-head Curator and Judge receipts before publication.
+
+All nine are satisfied for exact candidate `49cccc4`; Python 3.11 exact-head
+GitHub CI remains a separate green-delivery condition.
 
 ## Rollback and appeal
 

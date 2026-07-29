@@ -46,6 +46,30 @@ index origin/unique/partial/column/table receipts.
 The Curator then issued `ACCEPT` for characterization accuracy with no residual
 defect in that scope.
 
+## Surface/effect continuation
+
+Judge record `P1-CHARACTERIZATION-JUDGE.md` left public signatures and a
+machine-enforced writer/event path inventory open. Follow-up candidate
+`83e9e2c` added those artifacts but was independently remanded because Python
+3.12 and 3.14 produced different API, CLI, and AST receipts.
+
+Repaired exact candidate `49cccc4ef9181e0d2df3ef4b4a261eb21d264915`
+canonicalized source signatures, union aliases, CLI semantics, and
+interpreter-path defaults. The Curator independently accepted it after:
+
+- 4 of 4 focused tests passed under Python 3.12;
+- 4 of 4 focused tests passed under Python 3.14;
+- both interpreters produced the byte-exact same artifact;
+- Ruff passed;
+- Pyright reported 0 errors; and
+- no production source changed.
+
+The independent Judge adapted stacked-draft publication and closed both prior
+characterization obligations within their declared bounded scope. Phase 1
+completion, ADR adoption, source admission, Phase 2, host support, and
+superiority remain deferred. The complete receipt is
+`evidence/courts/P1-SURFACE-AND-EFFECT-JUDGE.md`.
+
 ## Curator verification receipt
 
 - Exact imported module:
