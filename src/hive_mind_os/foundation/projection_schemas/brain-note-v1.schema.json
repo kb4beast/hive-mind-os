@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/brain-note/v1",
+  "type": "object",
+  "required": ["schema_version", "note_id", "record_id", "record_type", "tenant_id", "repository_id", "run_id", "actor_id", "observed_at", "recorded_at", "status", "source_event_status", "sensitivity", "source_schema", "source_digest", "source_previous_digest", "public_release_decision_id", "public_release_decided_by", "sensitivity_decision_digest", "redaction_receipt_digest", "projection_cursor", "generator_version", "is_generated", "is_authoritative"],
+  "properties": {
+    "schema_version": {"const": "hive-obsidian-projection/v1"},
+    "note_id": {"type": "string", "pattern": "^brain-note:[0-9a-f]{64}$"},
+    "record_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "record_type": {"const": "memory-record"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "run_id": {"type": ["string", "null"], "maxLength": 4096},
+    "actor_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "observed_at": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "recorded_at": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "status": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "source_event_status": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "sensitivity": {"const": "safe-public"},
+    "source_schema": {"const": "memory-record-v1"},
+    "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_previous_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "public_release_decision_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "public_release_decided_by": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "sensitivity_decision_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "redaction_receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "projection_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "generator_version": {"const": "hive-brain-projection/v1"},
+    "is_generated": {"const": true},
+    "is_authoritative": {"const": false}
+  },
+  "additionalProperties": false
+}

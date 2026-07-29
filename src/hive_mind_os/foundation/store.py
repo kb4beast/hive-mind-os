@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Iterator, Mapping
@@ -27,6 +28,21 @@ class IdempotencyConflict(RuntimeError):
 
 class ScopeError(ValueError):
     """Raised when tenant/repository scope is absent or inconsistent."""
+
+
+@dataclass(frozen=True, slots=True)
+class PublicMemorySnapshot:
+    """One consistent, read-only safe-public memory view for a projector."""
+
+    repository_identity: dict[str, Any] | None
+    repository_identity_digest: str | None
+    schema_version: int
+    schema_digest: str
+    records: tuple[dict[str, Any], ...]
+    source_record_count: int
+    omitted_sensitive_count: int
+    omitted_unsupported_count: int
+    integrity_issues: tuple[str, ...]
 
 
 class FoundationStore:
@@ -903,6 +919,117 @@ class FoundationStore:
             self._decode_record(row)
             for row in self._connection.execute(query, parameters).fetchall()
         ]
+
+    @classmethod
+    def read_public_memory_snapshot(
+        cls,
+        path: str | Path,
+        *,
+        tenant_id: str,
+        repository_id: str,
+    ) -> PublicMemorySnapshot:
+        """Read one verified projection snapshot without exposing private payloads."""
+
+        cls._require_scope(tenant_id, repository_id)
+        source = Path(path)
+        if source.is_symlink() or not source.is_file():
+            raise RuntimeError("foundation store must be an existing regular file")
+        resolved_source = source.resolve()
+        wal_path = Path(f"{resolved_source}-wal")
+        immutable = not wal_path.exists() or wal_path.stat().st_size == 0
+        uri = resolved_source.as_uri() + (
+            "?mode=ro&immutable=1" if immutable else "?mode=ro"
+        )
+        connection = sqlite3.connect(
+            uri,
+            uri=True,
+            isolation_level=None,
+            timeout=5.0,
+        )
+        connection.row_factory = sqlite3.Row
+        reader = cls.__new__(cls)
+        reader.path = str(source.resolve())
+        reader._clock = utc_now
+        reader._lock = RLock()
+        reader._connection = connection
+        try:
+            connection.execute("PRAGMA query_only=ON")
+            connection.execute("BEGIN")
+            reader._validate_shape()
+            metadata = connection.execute(
+                "SELECT schema_version,schema_digest FROM foundation_metadata "
+                "WHERE store_kind='hive-foundation'"
+            ).fetchone()
+            if metadata is None:
+                raise RuntimeError("foundation ownership marker is missing")
+            identity_row = connection.execute(
+                "SELECT identity_digest,identity_json FROM repositories "
+                "WHERE tenant_id=? AND repository_id=?",
+                (tenant_id, repository_id),
+            ).fetchone()
+            identity: dict[str, Any] | None = None
+            identity_digest: str | None = None
+            if identity_row is not None:
+                decoded = json.loads(identity_row["identity_json"])
+                if not isinstance(decoded, dict):
+                    raise RuntimeError("repository identity is not an object")
+                identity = decoded
+                identity_digest = str(identity_row["identity_digest"])
+            source_record_count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM records "
+                    "WHERE tenant_id=? AND repository_id=?",
+                    (tenant_id, repository_id),
+                ).fetchone()[0]
+            )
+            omitted_sensitive_count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM records "
+                    "WHERE tenant_id=? AND repository_id=? "
+                    "AND sensitivity!='safe-public'",
+                    (tenant_id, repository_id),
+                ).fetchone()[0]
+            )
+            omitted_unsupported_count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM records "
+                    "WHERE tenant_id=? AND repository_id=? "
+                    "AND sensitivity='safe-public' "
+                    "AND (record_type!='memory-record' "
+                    "OR schema_name!='memory-record-v1')",
+                    (tenant_id, repository_id),
+                ).fetchone()[0]
+            )
+            records = tuple(
+                reader._decode_record(row)
+                for row in connection.execute(
+                    "SELECT * FROM records WHERE tenant_id=? AND repository_id=? "
+                    "AND sensitivity='safe-public' "
+                    "AND record_type='memory-record' "
+                    "AND schema_name='memory-record-v1' "
+                    "ORDER BY sequence",
+                    (tenant_id, repository_id),
+                ).fetchall()
+            )
+            issues = reader.verify_integrity(
+                tenant_id=tenant_id,
+                repository_id=repository_id,
+            )
+            return PublicMemorySnapshot(
+                repository_identity=identity,
+                repository_identity_digest=identity_digest,
+                schema_version=int(metadata["schema_version"]),
+                schema_digest=str(metadata["schema_digest"]),
+                records=records,
+                source_record_count=source_record_count,
+                omitted_sensitive_count=omitted_sensitive_count,
+                omitted_unsupported_count=omitted_unsupported_count,
+                integrity_issues=issues,
+            )
+        finally:
+            if connection.in_transaction:
+                connection.execute("ROLLBACK")
+            connection.close()
 
     def add_relation(
         self,

@@ -365,6 +365,7 @@ dist/
 evidence/live/**/state/
 evidence/live/**/evidence-ledger.sqlite3
 .hive-mind-experiments*/
+.hive-mind-projection-state/
 !evidence/experiments/_artifacts/
 !evidence/experiments/_artifacts/**
 

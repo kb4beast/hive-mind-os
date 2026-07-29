@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/brain-result/v1",
+  "type": "object",
+  "required": ["schema_version", "status", "tenant_id", "repository_id", "repository_identity_digest", "pack_path", "manifest_digest", "source_cursor", "tree_digest", "source_record_count", "projected_record_count", "omitted_sensitive_count", "omitted_unsupported_count", "omitted_quarantined_count", "recovery_status", "conflict_paths", "receipt_path"],
+  "properties": {
+    "schema_version": {"const": "hive-brain-projection-result/v1"},
+    "status": {"type": "string", "enum": ["projected", "unchanged", "drift", "conflict"]},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_path": {"type": "string", "minLength": 1, "maxLength": 32767},
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "tree_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_record_count": {"type": "integer", "minimum": 0},
+    "projected_record_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "omitted_sensitive_count": {"type": "integer", "minimum": 0},
+    "omitted_unsupported_count": {"type": "integer", "minimum": 0},
+    "omitted_quarantined_count": {"type": "integer", "minimum": 0},
+    "recovery_status": {"type": "string", "enum": ["committed", "recovered", "already-committed", "not-required", "read-only", "conflict-preserved"]},
+    "conflict_paths": {"type": "array", "uniqueItems": true, "maxItems": 100001, "items": {"type": "string", "minLength": 1, "maxLength": 240}},
+    "receipt_path": {"type": ["string", "null"], "maxLength": 32767}
+  },
+  "additionalProperties": false
+}

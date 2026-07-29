@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/brain-manifest/v1",
+  "type": "object",
+  "required": ["schema_version", "projection_contract", "projector_version", "tenant_id", "repository_id", "repository_identity_digest", "foundation_schema_version", "foundation_schema_digest", "source_cursor", "source_digest", "source_recorded_through", "safe_public_record_count", "generated_namespace", "files"],
+  "properties": {
+    "schema_version": {"const": "hive-brain-pack/v1"},
+    "projection_contract": {"const": "hive-obsidian-projection/v1"},
+    "projector_version": {"const": "hive-brain-projection/v1"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "foundation_schema_version": {"const": 1},
+    "foundation_schema_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_recorded_through": {"type": ["string", "null"], "maxLength": 4096},
+    "safe_public_record_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "generated_namespace": {"const": "generated"},
+    "files": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 100001,
+      "items": {
+        "type": "object",
+        "required": ["path", "record_id", "source_digest", "content_digest"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 240},
+          "record_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

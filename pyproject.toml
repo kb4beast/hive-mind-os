@@ -22,6 +22,7 @@ where = ["src"]
 hive_mind_os = [
     "schemas/*.json",
     "foundation/schemas/*.json",
+    "foundation/projection_schemas/*.json",
     "foundation/generated/*.json",
     "foundation/generated/agents/*.json",
     "foundation/canonical/agents/*.json",

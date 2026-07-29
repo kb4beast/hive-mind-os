@@ -1,0 +1,64 @@
+{
+  "activation": "opt-in-module-command",
+  "base_head": "94e67cde15fa8a75d92561384241f0419c9f589b",
+  "deterministic_fixture": {
+    "generated_paths": [
+      "generated/README.md",
+      "generated/records/memory-record/a2363634b585df3911781c9381f5e4bd38d33ecde8d42906692dc6d10cb454ec.md",
+      "generated/manifest.json"
+    ],
+    "manifest_digest": "sha256:33164fd5a7ba471245a12e9a4ac4fb5233362ae74bf54f757a4ade1ca5351200",
+    "projected_record_count": 1,
+    "source_cursor": "memory-set:6abb8ebd5df03a2bd173b9ddecbb1d1631996fb22c100cb7467f5b4f39205c52",
+    "tree_digest": "sha256:758b20b66c095ac37bfd38e7ac4cd6d5b4dbd20ed4f9e0eed8fd210cd57dbb58"
+  },
+  "external_dependencies_added": 0,
+  "generation_zero": {
+    "baseline_definition_count": 304,
+    "baseline_inventory_digest": "sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037",
+    "cli_parser_count": 13,
+    "definition_count": 304,
+    "package_api_count": 33,
+    "root_api_count": 131
+  },
+  "implementation": {
+    "src/hive_mind_os/foundation/authority.py": "sha256:bc57189477b5b793d7ee4b9e3b8d40bea50c0d3042a0e658aa670c081e35d478",
+    "src/hive_mind_os/foundation/brain.py": "sha256:1174559e3f444e624735a58c825b311e2fee6e615324e4e4fd6f69bd0c52aa9b",
+    "src/hive_mind_os/foundation/brain_contracts.py": "sha256:a8f52d8219913546737e77a07f09ca4b78dafde367dc249937b1f0effe0fd55e",
+    "src/hive_mind_os/foundation/contracts.py": "sha256:a9f2916e8fa46139248f1a12ccf184977f35325f487b12892fa8bd2dbc14decf",
+    "src/hive_mind_os/foundation/store.py": "sha256:e3dc857467e9b173918abbca21d1fc1013c22694d4c97334735eb858f3eba65b"
+  },
+  "inventory_digest": "sha256:ea4e1323dba0ea76111f5008805d69bf08d22d5e1ae45f664a1dbc45ac4fe563",
+  "obsidian_runtime_required": false,
+  "phase": 3,
+  "phase2_input": {
+    "canonical_agent_count": 8,
+    "exact_head": "94e67cde15fa8a75d92561384241f0419c9f589b",
+    "foundation_schema_count": 17,
+    "generated_candidate_count": 9,
+    "historical_inventory_digest": "sha256:954495ac8506404267bd13df58f3d8bb3140a6057965f8b68c0a352984120370"
+  },
+  "phase_item": 1,
+  "projection_contracts": {
+    "catalog_valid": true,
+    "count": 6,
+    "names": [
+      "brain-conflict-v1",
+      "brain-manifest-v1",
+      "brain-note-v1",
+      "brain-receipt-v1",
+      "brain-result-v1",
+      "brain-transaction-v1"
+    ],
+    "resource_digests": {
+      "brain-conflict-v1.schema.json": "sha256:fa574d47e9342cc2b466078b6cf5a7dde2caa64c206001770a61a62b37a1de56",
+      "brain-manifest-v1.schema.json": "sha256:ace183022081542f5bbb83be2f847d9edea7e743d4f67a3557b70d3ddce78785",
+      "brain-note-v1.schema.json": "sha256:a94af6cb40b73db26c8cf4096380d270e6013fa5838980642e5b0b3b0371e873",
+      "brain-receipt-v1.schema.json": "sha256:0d447982cc0e273cf5585ec94c161edb6eeedffda1dff570e8a85e8f78f5f30c",
+      "brain-result-v1.schema.json": "sha256:c60cfe6c02f4904de0c80ca5e532da98f3a405619bd98cbc91f37fcdfa446d37",
+      "brain-transaction-v1.schema.json": "sha256:7fcf5645d1c3aaa13d9243a6d8f85cd373c7b54b37658142a782b1ab6100ecb0"
+    },
+    "resource_set_digest": "sha256:b6fc29a351ae8a7942c640f444872bc4a86bdfba759b36048c49d707cd117f5a"
+  },
+  "schema_version": 1
+}

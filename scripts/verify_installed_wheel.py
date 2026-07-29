@@ -17,6 +17,7 @@ def _digest(path: Path) -> str:
 def _resource_paths(root: Path) -> tuple[Path, ...]:
     schema_root = root / "schemas"
     foundation_schema_root = root / "foundation" / "schemas"
+    projection_schema_root = root / "foundation" / "projection_schemas"
     foundation_generated_root = root / "foundation" / "generated"
     foundation_canonical_root = root / "foundation" / "canonical"
     package_root = root / "builtin_packages" / "hive-core"
@@ -27,6 +28,11 @@ def _resource_paths(root: Path) -> tuple[Path, ...]:
                 *(
                     path
                     for path in foundation_schema_root.glob("*.json")
+                    if path.is_file()
+                ),
+                *(
+                    path
+                    for path in projection_schema_root.glob("*.json")
                     if path.is_file()
                 ),
                 *(
@@ -99,6 +105,10 @@ def main() -> int:
     foundation_canonical_count = sum(
         name.startswith("foundation/canonical/") for name in source_digests
     )
+    projection_schema_count = sum(
+        name.startswith("foundation/projection_schemas/")
+        for name in source_digests
+    )
     catalog = hive_core_catalog()
     package = catalog.package("hive-core")
     observed = {
@@ -106,6 +116,7 @@ def main() -> int:
         "foundation_schema_count": foundation_schema_count,
         "foundation_generated_count": foundation_generated_count,
         "foundation_canonical_count": foundation_canonical_count,
+        "projection_schema_count": projection_schema_count,
         "package_file_count": package_file_count,
         "legacy_resource_count": schema_count + package_file_count,
         "resource_count": len(source_digests),
@@ -117,9 +128,10 @@ def main() -> int:
         "foundation_schema_count": 17,
         "foundation_generated_count": 9,
         "foundation_canonical_count": 8,
+        "projection_schema_count": 6,
         "package_file_count": 48,
         "legacy_resource_count": 68,
-        "resource_count": 102,
+        "resource_count": 108,
         "component_count": 22,
         "trust_state": "quarantined",
     }

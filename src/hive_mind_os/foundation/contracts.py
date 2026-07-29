@@ -95,6 +95,8 @@ def _validate(value: Any, schema: Mapping[str, Any], path: str, issues: list[str
     if isinstance(value, list):
         if isinstance(schema.get("minItems"), int) and len(value) < schema["minItems"]:
             issues.append(f"{path}: array has too few items")
+        if isinstance(schema.get("maxItems"), int) and len(value) > schema["maxItems"]:
+            issues.append(f"{path}: array has too many items")
         if schema.get("uniqueItems") is True:
             encoded = [json.dumps(item, sort_keys=True, separators=(",", ":")) for item in value]
             if len(encoded) != len(set(encoded)):
@@ -125,8 +127,8 @@ def validate_foundation(name: str, document: Any) -> FoundationValidation:
         schema = load_foundation_schema(name)
     except (KeyError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         return FoundationValidation(False, (f"schema unavailable: {type(error).__name__}: {error}",))
-    issues: list[str] = []
-    _validate(document, schema, "$", issues)
+    result = validate_document_against_schema(document, schema)
+    issues = list(result.issues)
     if name == "outcome-attribution-record-v1" and isinstance(document, Mapping):
         for field in ("purpose_allocations_ppm", "resource_allocations_ppm"):
             allocations = document.get(field)
@@ -144,6 +146,15 @@ def validate_foundation(name: str, document: Any) -> FoundationValidation:
             "reviewed_by"
         ):
             issues.append("$: avoidable-waste requires independent review")
+    return FoundationValidation(not issues, tuple(dict.fromkeys(issues)))
+
+
+def validate_document_against_schema(
+    document: Any,
+    schema: Mapping[str, Any],
+) -> FoundationValidation:
+    issues: list[str] = []
+    _validate(document, schema, "$", issues)
     return FoundationValidation(not issues, tuple(dict.fromkeys(issues)))
 
 
