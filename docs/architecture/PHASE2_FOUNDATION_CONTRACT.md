@@ -67,12 +67,20 @@ as interrupted with unknown accounting. No raw prompt, response, header, credent
 tool body, hidden reasoning, or raw error is persisted.
 
 Provider-native numeric paths are preserved independently of normalized axes.
-Malformed or missing fields are unknown. Cache and reasoning values are subsets;
-there is no cross-axis total. Invoice reconciliation reports matched, missing,
-duplicate, residual, conflicting, partial, or unavailable observations.
+Malformed, missing, or out-of-range fields are unknown; all accepted numeric values
+are bounded at `10**15`. Cache and reasoning values are subsets; there is no
+cross-axis total. Invoice reconciliation reports matched, missing, duplicate,
+residual, conflicting, partial, or unavailable observations.
 Per-axis reconciliation compares only like dimensions from separately identified
 estimate, provider, host, and invoice observations. It never emits a cross-axis
-aggregate.
+aggregate. Billable status uses only `billable`, `non-billable`, `unavailable`, or
+`unknown`, and conflicting sources remain conflicting.
+
+The optional recorder accepts bounded caller attribution for mission, run, step,
+role, work item, idea, court case, experiment, span, prompt layers, context, memory
+selection, model revision, host, and access audit. The same attribution is copied
+from the durable start into normal terminal and restart-recovery receipts; omitted
+attribution remains explicit null rather than being inferred.
 
 ## Privacy and observability
 
@@ -83,6 +91,9 @@ attributes. OpenTelemetry-shaped local envelopes are dependency-free and outboun
 export remains disabled. Metric names and values are bounded. Trace attributes reject
 body, request, response, credential, authorization, password, and reserved
 provider/outcome keys; trace names, IDs, attribute count, keys, and values are bounded.
+The exported immutable trace record enforces the same checks at construction, and
+the OpenTelemetry projection revalidates them so callers cannot bypass privacy or
+bounds by skipping the convenience projector.
 
 ## Phase boundary
 

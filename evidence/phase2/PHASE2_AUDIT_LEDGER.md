@@ -184,3 +184,49 @@ evidence.
 - Obtain a separate Judge verdict only after both accept.
 - Repeat the exact-head full Python/security/supply-chain/wheel/provenance matrix and
   update the PR/evidence-only checkpoint.
+
+## `P2-AUDIT-012` — third independent remand
+
+- Exact reviewed candidate:
+  `d20ee1a469b716f1a62d8d4a24c338fe66dda066`.
+- Push run `30426478133` and PR run `30426479580` both passed on that exact SHA.
+  Together they cover Python 3.11/3.12/3.14, Ruff, Pyright, CodeQL, secret scan,
+  dependency/license review, SBOM, wheel build/install, packaged resources, and push
+  provenance. These are valid receipts for the remanded SHA only.
+- Curator `Kuhn` independently returned `remand`: the recorder/provider exposed no
+  caller path for required mission/run/step/role/work-item/court/experiment and
+  prompt/context/memory-selection attribution, and the declared billable
+  reconciliation axis rejected its string-valued status vocabulary.
+- Steward `Planck` independently returned `remand`: a valid 4,000-digit token integer
+  bypassed the numeric ceiling; direct exported `TraceRecord` construction bypassed
+  trace privacy/bounds; and integrity verification missed an opportunity key
+  retargeted across repositories while the schema shape remained valid.
+- Both independently reconfirmed exact 131 root APIs, 33 package APIs, 13 CLI
+  contracts, 304 Generation Zero definitions, correct PR stacking, and closure of
+  every earlier remand. No finding was suppressed by the green matrix.
+
+## `P2-AUDIT-013` — third-remand remediation
+
+- Provider normalization now applies the same `10**15` ceiling to every normalized
+  integer path; valid JSON below the interpreter digit limit cannot bypass it. The
+  strict schema and local validator enforce the same maximum.
+- `TraceRecord` validates bounds/privacy on direct construction, and the
+  OpenTelemetry boundary independently revalidates the record.
+- Opportunity-key integrity compares the joined target's tenant and repository with
+  the key scope, not only its type and payload digests.
+- `UsageAttribution` provides a bounded caller path for mission/run/step/role/work
+  item, idea/case/experiment/span, prompt/context/memory-selection, model/host, and
+  access-audit lineage. Normal terminal and restart-recovery receipts preserve it
+  from the durable start.
+- Billable reconciliation accepts only the fixed `billable`, `non-billable`,
+  `unavailable`, and `unknown` vocabulary and reports cross-source conflict.
+- Direct regressions cover 4,000- and 5,000-digit integers, direct and forged traces,
+  cross-repository opportunity retargeting with restored schema shape, normal and
+  recovered attribution, every billable status, and billable conflict.
+
+## Open entries after third remand
+
+- Seal and push the new exact candidate.
+- Obtain fresh independent Curator and Steward reconstruction.
+- Appoint a different Judge only after both accept.
+- Repeat and record the complete exact-head matrix and final PR/checkpoint receipts.

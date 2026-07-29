@@ -24,15 +24,15 @@
     "native": {
       "type": "object",
       "properties": {
-        "completion_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "completion_tokens_details.reasoning_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "prompt_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "prompt_tokens_details.cached_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "total_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "cache_creation_input_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "cache_read_input_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "input_tokens": {"type": ["integer", "null"], "minimum": 0},
-        "output_tokens": {"type": ["integer", "null"], "minimum": 0}
+        "completion_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "completion_tokens_details.reasoning_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "prompt_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "prompt_tokens_details.cached_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "total_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "cache_creation_input_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "cache_read_input_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "input_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+        "output_tokens": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000}
       },
       "additionalProperties": false
     },
@@ -54,16 +54,16 @@
         "direction": {
           "type": "object", "required": ["input", "output", "reported_total", "status"],
           "properties": {
-            "input": {"type": ["integer", "null"], "minimum": 0}, "output": {"type": ["integer", "null"], "minimum": 0},
-            "reported_total": {"type": ["integer", "null"], "minimum": 0},
+            "input": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000}, "output": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+            "reported_total": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
             "status": {"type": "string", "enum": ["complete", "unknown", "conflicting"]}
           }, "additionalProperties": false
         },
         "cache_input": {
           "type": "object", "required": ["total", "read", "write", "uncached", "status"],
           "properties": {
-            "total": {"type": ["integer", "null"], "minimum": 0}, "read": {"type": ["integer", "null"], "minimum": 0},
-            "write": {"type": ["integer", "null"], "minimum": 0}, "uncached": {"type": ["integer", "null"], "minimum": 0},
+            "total": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000}, "read": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
+            "write": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000}, "uncached": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
             "status": {"type": "string", "enum": ["complete", "unknown", "conflicting"]}
           }, "additionalProperties": false
         },
@@ -75,7 +75,7 @@
         "output_kind": {
           "type": "object", "required": ["total", "reasoning_subset", "status"],
           "properties": {
-            "total": {"type": ["integer", "null"], "minimum": 0}, "reasoning_subset": {"type": ["integer", "null"], "minimum": 0},
+            "total": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000}, "reasoning_subset": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000000000},
             "status": {"type": "string", "enum": ["partial", "unknown", "conflicting"]}
           }, "additionalProperties": false
         },

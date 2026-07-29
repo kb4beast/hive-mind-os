@@ -51,8 +51,11 @@ append-only.
 Usage keeps logical-request, physical-attempt, provider-request, and receipt identity
 separate. Provider-shaped fixture fields are preserved as bounded numeric native
 paths. Normalization is versioned and keeps direction, cache, modality, output kind,
-and billing axes separate. Missing is unknown, never zero. Decisions, outcomes,
-attribution, corrections, and invoices are late-bound append-only records.
+and billing axes separate. Caller-supplied mission, run, step, role, work item,
+court/experiment, prompt-layer, context, and memory-selection attribution is bounded
+and survives start, terminal, and restart-recovery receipts. Missing is unknown,
+never zero. Decisions, outcomes, attribution, corrections, and invoices are
+late-bound append-only records.
 
 Observability is local-only. Metrics use a fixed low-cardinality label vocabulary.
 Correlated trace and OpenTelemetry-shaped envelopes may carry governed identifiers,
@@ -70,12 +73,15 @@ transaction.
   `ReceiptedModelProvider`; no default constructor, selector, or CLI changes.
 - A started attempt is durable before I/O and a terminal usage record is durable
   before the wrapper returns or re-raises. Restart converts a nonterminal attempt to
-  interrupted/unknown without inventing usage.
+  interrupted/unknown without inventing usage and preserves the durable caller
+  attribution.
 - Atomicity is claimed only inside the foundation database. No exactly-once external
   side effect or cross-database transaction is claimed.
 - Provider fixtures prove parser behavior, not live provider billing conformance.
-  Provider observations, trace identities, trace attribute counts, names, keys, and
-  values are bounded. Axis conflicts propagate to top-level accounting state.
+  Provider observations and numeric values are bounded. Trace identities, attribute
+  counts, names, keys, and values are validated both when constructed and when
+  projected to the local OpenTelemetry envelope. Axis conflicts propagate to
+  top-level accounting state, including fixed-vocabulary billable status.
 - Obsidian, role activation, active leases/loop control/quarantine, host adapters, and
   champion promotion remain in later phases.
 

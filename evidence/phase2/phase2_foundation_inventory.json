@@ -2,7 +2,7 @@
   "activation": "inert-opt-in",
   "additive_surface": {
     "current_event_sink_count": 48,
-    "current_module_definition_count": 336,
+    "current_module_definition_count": 337,
     "unclassified_candidate_count": 0
   },
   "base_head": "3298078c41ce69103eb2bdce61960a69dc6aab93",
@@ -58,10 +58,10 @@
       "role-constitution-v2.schema.json": "sha256:5127f5344f01202e41d2174d0ad4c534bb003e47dd62bf0a4a1ccbb697d1f840",
       "skill-definition-v2.schema.json": "sha256:cbc9611e9e0bf6fd6f41795c0edf9daad5ca67c61e88ed292c77fc2650e3f5a2",
       "typed-output-v1.schema.json": "sha256:a9248cc4aad95e9c20d89a88d4733cbcf2e6a92559deadc7ae6e84e51ffc813e",
-      "usage-event-v1.schema.json": "sha256:bfe2a0246198510f6e041bd6b48503c60528ab965cd6945c34688603c74c2b3c",
+      "usage-event-v1.schema.json": "sha256:3cd4a7d8f5794f703446a80883b8a06db5b192df41727ae6e0b9eb78836bd34b",
       "usage-reconciliation-v1.schema.json": "sha256:00595bdfe0088cc36aeff192a87f08870d8fbac72a752800d817c2c1d59e9acd"
     },
-    "resource_set_digest": "sha256:93e4c030181e1aa5b881ad2f3ad5ba2f211dbf1d5c186f16715bcba361558407"
+    "resource_set_digest": "sha256:58e375b11287a1df86408efb929ef3efe45b82b3a470030a624883ab931c0625"
   },
   "foundation_store": {
     "journal_mode": "wal",
@@ -121,7 +121,7 @@
     "package_api_count": 33,
     "root_api_count": 131
   },
-  "inventory_digest": "sha256:197407a9333322a234d2e3655437acdfba25161f086aff28cf72c2636715523e",
+  "inventory_digest": "sha256:b825ffbf9c6589763576cb1a2eca6a4e5b1e496f2ab61eae11d9ad8eaf7c21cd",
   "phase": 2,
   "provider_fixtures": {
     "anthropic_usage.json": "sha256:38f55f99a43f36a75a08444c4b8057bab12812466161e43838e7ca10791d6f55",

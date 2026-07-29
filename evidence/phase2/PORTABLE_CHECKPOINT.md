@@ -2,8 +2,8 @@
 
 - Branch: `codex/phase2-additive-memory-telemetry-foundation`
 - Stack base: PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`
-- Current state: twice-remediated implementation candidate; not activated;
-  independent re-review pending
+- Current state: exact candidate `d20ee1a469b716f1a62d8d4a24c338fe66dda066`
+  independently remanded; third-remand remediation is not yet sealed; not activated
 - Governing ADR: ADR-021
 - Court: `evidence/courts/phase2-additive-foundation-court.md`
 - Inventory: `evidence/phase2/phase2_foundation_inventory.json`
@@ -30,6 +30,10 @@ Implemented:
   opportunity-key integrity, strict agent subcontracts, enforced canonical
   self-digests/generator versions, bounded traces, and explicit per-axis
   reconciliation without cross-axis totals.
+- bounded caller-supplied usage attribution preserved through terminal and recovery
+  receipts; bounded normalized integers; fixed billable-status reconciliation;
+  direct/OTel trace boundary validation; and cross-repository opportunity-key
+  integrity.
 
 Unchanged:
 

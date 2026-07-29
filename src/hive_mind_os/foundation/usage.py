@@ -28,7 +28,7 @@ TERMINAL_OUTCOMES = frozenset(
 
 
 def _nonnegative_int(value: Any) -> int | None:
-    return value if type(value) is int and value >= 0 else None
+    return value if type(value) is int and 0 <= value <= 10**15 else None
 
 
 class ProviderUsageAdapter:
@@ -301,6 +301,73 @@ class ProviderUsageAdapter:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class UsageAttribution:
+    """Bounded caller-supplied lineage for an opt-in physical model attempt."""
+
+    mission_id: str | None = None
+    run_id: str | None = None
+    step_id: str | None = None
+    role: str | None = None
+    work_item_id: str | None = None
+    idea_id: str | None = None
+    case_id: str | None = None
+    experiment_id: str | None = None
+    span_id: str | None = None
+    prompt_layer_digest: str | None = None
+    context_digest: str | None = None
+    memory_selection_digest: str | None = None
+    selected_count: int | None = None
+    omitted_count: int | None = None
+    model_revision: str | None = None
+    host_id: str | None = None
+    access_audit_ref: str | None = None
+
+    def __post_init__(self) -> None:
+        identifiers = (
+            self.mission_id,
+            self.run_id,
+            self.step_id,
+            self.role,
+            self.work_item_id,
+            self.idea_id,
+            self.case_id,
+            self.experiment_id,
+            self.span_id,
+            self.model_revision,
+            self.host_id,
+            self.access_audit_ref,
+        )
+        if any(
+            value is not None
+            and (
+                not isinstance(value, str)
+                or not value
+                or len(value) > 256
+            )
+            for value in identifiers
+        ):
+            raise ValueError("usage attribution identifiers must be bounded")
+        for value in (
+            self.prompt_layer_digest,
+            self.context_digest,
+            self.memory_selection_digest,
+        ):
+            if value is not None and (
+                not isinstance(value, str)
+                or len(value) != 71
+                or not value.startswith("sha256:")
+                or any(character not in "0123456789abcdef" for character in value[7:])
+            ):
+                raise ValueError("usage attribution digests must be sha256 digests")
+        if any(
+            value is not None
+            and (type(value) is not int or not 0 <= value <= 10**9)
+            for value in (self.selected_count, self.omitted_count)
+        ):
+            raise ValueError("usage attribution counts must be bounded integers")
+
+
 class UsageRecorder:
     """Durable opt-in attempt recorder; Generation Zero remains unchanged."""
 
@@ -342,7 +409,9 @@ class UsageRecorder:
         request_digest: str,
         budget_lease_id: str | None,
         trace_id: str,
+        attribution: UsageAttribution | None = None,
     ) -> str:
+        attempt_attribution = attribution or UsageAttribution()
         attempt_id = f"attempt:{self._id_factory()}"
         payload = {
             "record_type": "usage-event",
@@ -387,6 +456,7 @@ class UsageRecorder:
                 duration_ms=None,
                 outcome=None,
                 error_class=None,
+                attribution=attempt_attribution,
             )
         )
         validation = validate_foundation("usage-event-v1", payload)
@@ -496,6 +566,7 @@ class UsageRecorder:
                 duration_ms=duration_ms,
                 outcome=outcome,
                 error_class=error_class,
+                attribution=self._attribution_from_started(started),
             )
         )
         validation = validate_foundation("usage-event-v1", payload)
@@ -571,21 +642,22 @@ class UsageRecorder:
         duration_ms: int | float | None,
         outcome: str | None,
         error_class: str | None,
+        attribution: UsageAttribution,
     ) -> dict[str, Any]:
         return {
             "correlation": {
                 "repository_id": self.repository_id,
                 "tenant_id": self.tenant_id,
-                "mission_id": None,
-                "run_id": None,
-                "step_id": None,
-                "role": None,
-                "work_item_id": None,
-                "idea_id": None,
-                "case_id": None,
-                "experiment_id": None,
+                "mission_id": attribution.mission_id,
+                "run_id": attribution.run_id,
+                "step_id": attribution.step_id,
+                "role": attribution.role,
+                "work_item_id": attribution.work_item_id,
+                "idea_id": attribution.idea_id,
+                "case_id": attribution.case_id,
+                "experiment_id": attribution.experiment_id,
                 "trace_id": trace_id,
-                "span_id": None,
+                "span_id": attribution.span_id,
                 "logical_request_id": logical_request_id,
                 "attempt_id": attempt_id,
                 "provider_request_id": provider_request_id,
@@ -598,17 +670,17 @@ class UsageRecorder:
                 "provider_kind": provider_kind,
                 "requested_model_id": requested_model_id,
                 "served_model_id": served_model_id,
-                "model_revision": None,
-                "host_id": None,
+                "model_revision": attribution.model_revision,
+                "host_id": attribution.host_id,
                 "adapter_version": NORMALIZATION_VERSION,
             },
             "inputs": {
                 "request_digest": request_digest,
-                "prompt_layer_digest": None,
-                "context_digest": None,
-                "memory_selection_digest": None,
-                "selected_count": None,
-                "omitted_count": None,
+                "prompt_layer_digest": attribution.prompt_layer_digest,
+                "context_digest": attribution.context_digest,
+                "memory_selection_digest": attribution.memory_selection_digest,
+                "selected_count": attribution.selected_count,
+                "omitted_count": attribution.omitted_count,
                 "bodies_persisted": False,
             },
             "resources": {
@@ -649,9 +721,40 @@ class UsageRecorder:
                 "deletion_status": "retained",
                 "reconciliation_status": "pending",
                 "access_purpose": purpose,
-                "access_audit_ref": None,
+                "access_audit_ref": attribution.access_audit_ref,
             },
         }
+
+    @staticmethod
+    def _attribution_from_started(started: Mapping[str, Any]) -> UsageAttribution:
+        correlation = started["correlation"]
+        identity = started["identity"]
+        inputs = started["inputs"]
+        governance = started["governance"]
+        if not all(
+            isinstance(value, Mapping)
+            for value in (correlation, identity, inputs, governance)
+        ):
+            raise ValueError("durable usage attribution is invalid")
+        return UsageAttribution(
+            mission_id=correlation.get("mission_id"),
+            run_id=correlation.get("run_id"),
+            step_id=correlation.get("step_id"),
+            role=correlation.get("role"),
+            work_item_id=correlation.get("work_item_id"),
+            idea_id=correlation.get("idea_id"),
+            case_id=correlation.get("case_id"),
+            experiment_id=correlation.get("experiment_id"),
+            span_id=correlation.get("span_id"),
+            prompt_layer_digest=inputs.get("prompt_layer_digest"),
+            context_digest=inputs.get("context_digest"),
+            memory_selection_digest=inputs.get("memory_selection_digest"),
+            selected_count=inputs.get("selected_count"),
+            omitted_count=inputs.get("omitted_count"),
+            model_revision=identity.get("model_revision"),
+            host_id=identity.get("host_id"),
+            access_audit_ref=governance.get("access_audit_ref"),
+        )
 
 
 class ReceiptedModelProvider:
@@ -669,6 +772,7 @@ class ReceiptedModelProvider:
         actor_id: str,
         trace_id: str,
         budget_lease_id: str | None = None,
+        attribution: UsageAttribution | None = None,
     ) -> None:
         self.provider = provider
         self.recorder = recorder
@@ -676,6 +780,7 @@ class ReceiptedModelProvider:
         self.actor_id = actor_id
         self.trace_id = trace_id
         self.budget_lease_id = budget_lease_id
+        self.attribution = attribution or UsageAttribution()
         self.config = provider.config
         self.kind = provider.kind
 
@@ -711,6 +816,7 @@ class ReceiptedModelProvider:
             request_digest=request_digest,
             budget_lease_id=self.budget_lease_id,
             trace_id=self.trace_id,
+            attribution=self.attribution,
         )
         started = time.perf_counter()
         try:
@@ -781,7 +887,7 @@ def reconcile_usage_axes(
         "output_kind": {"reasoning_subset", "total"},
         "billable": {"status"},
     }
-    grouped: dict[tuple[str, str], dict[str, int | None]] = {}
+    grouped: dict[tuple[str, str], dict[str, int | str | None]] = {}
     for observation in observations:
         if set(observation) != {"source", "axis", "dimension", "value"}:
             raise ValueError("axis observations require exact source/axis/dimension/value")
@@ -797,7 +903,10 @@ def reconcile_usage_axes(
             or dimension not in allowed_dimensions.get(axis, set())
         ):
             raise ValueError("unknown reconciliation axis or dimension")
-        if value is not None and (
+        if axis == "billable":
+            if value not in {None, "billable", "non-billable", "unavailable", "unknown"}:
+                raise ValueError("billable status is outside the fixed vocabulary")
+        elif value is not None and (
             type(value) is not int or not 0 <= value <= 10**15
         ):
             raise ValueError("axis value must be unknown or a bounded integer")

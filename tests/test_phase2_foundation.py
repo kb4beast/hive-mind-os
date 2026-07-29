@@ -22,6 +22,7 @@ from hive_mind_os.foundation.generation import (
     verify_generated_candidates,
 )
 from hive_mind_os.foundation.observability import (
+    TraceRecord,
     project_metric,
     project_otel_envelope,
     project_trace,
@@ -35,6 +36,7 @@ from hive_mind_os.foundation.store import (
 from hive_mind_os.foundation.usage import (
     ProviderUsageAdapter,
     ReceiptedModelProvider,
+    UsageAttribution,
     UsageRecorder,
     reconcile_invoice,
     reconcile_usage_axes,
@@ -1024,6 +1026,79 @@ class OpportunityLedgerTests(unittest.TestCase):
             )
             store.close()
 
+    def test_integrity_rejects_cross_repository_opportunity_key_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            store = FoundationStore(Path(temporary) / "foundation.sqlite3")
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
+            other_identity = {
+                **REPOSITORY_IDENTITY,
+                "repository_id": "repository:other",
+                "instance_id": "instance:other",
+            }
+            store.register_repository(
+                other_identity,
+                authority=allowed_authority(
+                    "foundation.repository.register",
+                    repository_id="repository:other",
+                ),
+            )
+            first = OpportunityLedger(
+                store,
+                authority=allowed_authority(
+                    "foundation.opportunity.write", role=Role.EXPLORER
+                ),
+            ).register(
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                encounter_id="encounter:first-scope",
+                problem="first scope",
+                proposal="keep first scope",
+                structured_key={"key": "first"},
+                actor_id="explorer",
+                evidence_digests=[digest("first-scope")],
+            )
+            second = OpportunityLedger(
+                store,
+                authority=allowed_authority(
+                    "foundation.opportunity.write",
+                    role=Role.EXPLORER,
+                    repository_id="repository:other",
+                ),
+            ).register(
+                tenant_id="tenant:test",
+                repository_id="repository:other",
+                encounter_id="encounter:second-scope",
+                problem="second scope",
+                proposal="keep second scope",
+                structured_key={"key": "second"},
+                actor_id="explorer",
+                evidence_digests=[digest("second-scope")],
+            )
+            self.assertNotEqual(
+                first.opportunity_record_id, second.opportunity_record_id
+            )
+            store._connection.execute("DROP TRIGGER opportunity_keys_no_update")
+            store._connection.execute(
+                "UPDATE opportunity_keys SET opportunity_record_id=? "
+                "WHERE repository_id=?",
+                (second.opportunity_record_id, "repository:test"),
+            )
+            store._connection.execute(
+                "CREATE TRIGGER opportunity_keys_no_update "
+                "BEFORE UPDATE ON opportunity_keys BEGIN SELECT "
+                "RAISE(ABORT, 'opportunity_keys is append-only'); END"
+            )
+            issues = store.verify_integrity(
+                tenant_id="tenant:test", repository_id="repository:test"
+            )
+            self.assertTrue(
+                any("opportunity key" in issue and "target mismatch" in issue for issue in issues)
+            )
+            store.close()
+
 
 class UsageAndObservabilityTests(unittest.TestCase):
     def _fixture(self, name: str) -> bytes:
@@ -1109,6 +1184,18 @@ class UsageAndObservabilityTests(unittest.TestCase):
                 request_digest=digest("request-two"),
                 budget_lease_id=None,
                 trace_id="trace:two",
+                attribution=UsageAttribution(
+                    mission_id="mission:recover",
+                    run_id="run:recover",
+                    step_id="step:recover",
+                    role="curator",
+                    work_item_id="work:recover",
+                    prompt_layer_digest=digest("recover-prompt"),
+                    context_digest=digest("recover-context"),
+                    memory_selection_digest=digest("recover-memory"),
+                    selected_count=5,
+                    omitted_count=1,
+                ),
             )
             store.close()
             reopened = FoundationStore(path)
@@ -1134,6 +1221,19 @@ class UsageAndObservabilityTests(unittest.TestCase):
                 {terminal["accounting_status"] for terminal in terminals},
                 {"reported", "unknown"},
             )
+            recovered_terminal = next(
+                terminal
+                for terminal in terminals
+                if terminal["attempt_id"] == interrupted
+            )
+            self.assertEqual(
+                recovered_terminal["correlation"]["mission_id"], "mission:recover"
+            )
+            self.assertEqual(
+                recovered_terminal["inputs"]["memory_selection_digest"],
+                digest("recover-memory"),
+            )
+            self.assertEqual(recovered_terminal["inputs"]["selected_count"], 5)
             reopened.close()
 
     def test_terminal_without_durable_start_is_rejected(self) -> None:
@@ -1205,6 +1305,19 @@ class UsageAndObservabilityTests(unittest.TestCase):
                 purpose="fixture",
                 actor_id="builder",
                 trace_id="trace:provider",
+                attribution=UsageAttribution(
+                    mission_id="mission:one",
+                    run_id="run:one",
+                    step_id="step:one",
+                    role="builder",
+                    work_item_id="work:one",
+                    prompt_layer_digest=digest("prompt-layers"),
+                    context_digest=digest("context"),
+                    memory_selection_digest=digest("memory-selection"),
+                    selected_count=3,
+                    omitted_count=2,
+                    access_audit_ref="access:one",
+                ),
             )
             response = provider.complete_once(ModelRequest("system", "user"))
             self.assertEqual(response.prompt_tokens, 100)
@@ -1218,6 +1331,27 @@ class UsageAndObservabilityTests(unittest.TestCase):
                 ["attempt-started", "attempt-terminal"],
             )
             self.assertEqual(records[-1]["payload"]["accounting_status"], "reported")
+            unbounded_contract = json.loads(json.dumps(records[-1]["payload"]))
+            unbounded_contract["normalized_axes"]["direction"]["input"] = 10**15 + 1
+            self.assertFalse(
+                validate_foundation("usage-event-v1", unbounded_contract).valid
+            )
+            for record in records:
+                self.assertEqual(
+                    record["payload"]["correlation"]["mission_id"], "mission:one"
+                )
+                self.assertEqual(
+                    record["payload"]["correlation"]["work_item_id"], "work:one"
+                )
+                self.assertEqual(
+                    record["payload"]["inputs"]["memory_selection_digest"],
+                    digest("memory-selection"),
+                )
+                self.assertEqual(record["payload"]["inputs"]["selected_count"], 3)
+                self.assertEqual(
+                    record["payload"]["governance"]["access_audit_ref"],
+                    "access:one",
+                )
             store.close()
 
     def test_physical_attempt_ids_are_unique_and_retry_semantics_are_preserved(
@@ -1348,6 +1482,19 @@ class UsageAndObservabilityTests(unittest.TestCase):
         )
         self.assertEqual(oversized_integer["accounting_status"], "unknown")
         self.assertEqual(oversized_integer["observation_failure"], "invalid-json")
+        bounded_parser_integer = ProviderUsageAdapter.parse(
+            "openai_compatible",
+            (
+                b'{"usage":{"prompt_tokens":'
+                + (b"9" * 4_000)
+                + b',"completion_tokens":1}}'
+            ),
+        )
+        self.assertEqual(bounded_parser_integer["accounting_status"], "unknown")
+        self.assertIsNone(
+            bounded_parser_integer["normalized_axes"]["direction"]["input"]
+        )
+        self.assertNotIn("prompt_tokens", bounded_parser_integer["native"])
         oversized_id = ProviderUsageAdapter.parse(
             "openai_compatible",
             json.dumps(
@@ -1406,15 +1553,79 @@ class UsageAndObservabilityTests(unittest.TestCase):
                     "dimension": "reasoning_subset",
                     "value": 10,
                 },
+                {
+                    "source": "provider-report",
+                    "axis": "billable",
+                    "dimension": "status",
+                    "value": "billable",
+                },
+                {
+                    "source": "invoice",
+                    "axis": "billable",
+                    "dimension": "status",
+                    "value": "billable",
+                },
             ]
         )
         self.assertEqual(
             reconciled.double_count_guard, "orthogonal-axes-never-summed"
         )
-        self.assertEqual(len(reconciled.axes), 3)
+        self.assertEqual(len(reconciled.axes), 4)
+        self.assertEqual(
+            next(axis for axis in reconciled.axes if axis["axis"] == "billable")[
+                "status"
+            ],
+            "complete",
+        )
         self.assertFalse(
             any("aggregate" in key for axis in reconciled.axes for key in axis)
         )
+        for billable_status in (
+            "billable",
+            "non-billable",
+            "unavailable",
+            "unknown",
+        ):
+            with self.subTest(billable_status=billable_status):
+                billable = reconcile_usage_axes(
+                    [
+                        {
+                            "source": "provider-report",
+                            "axis": "billable",
+                            "dimension": "status",
+                            "value": billable_status,
+                        }
+                    ]
+                )
+                self.assertEqual(billable.axes[0]["status"], "complete")
+        conflicting_billable = reconcile_usage_axes(
+            [
+                {
+                    "source": "provider-report",
+                    "axis": "billable",
+                    "dimension": "status",
+                    "value": "billable",
+                },
+                {
+                    "source": "invoice",
+                    "axis": "billable",
+                    "dimension": "status",
+                    "value": "non-billable",
+                },
+            ]
+        )
+        self.assertEqual(conflicting_billable.axes[0]["status"], "conflicting")
+        with self.assertRaises(ValueError):
+            reconcile_usage_axes(
+                [
+                    {
+                        "source": "provider-report",
+                        "axis": "billable",
+                        "dimension": "status",
+                        "value": "invented",
+                    }
+                ]
+            )
 
     def test_invoice_reconciliation_never_manufactures_equality(self) -> None:
         usage = [
@@ -1502,6 +1713,25 @@ class UsageAndObservabilityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             project_otel_envelope(
                 trace, provider_kind="x" * 1_000, outcome="succeeded"
+            )
+        with self.assertRaises(ValueError):
+            TraceRecord(
+                "x" * 100_000,
+                "trace" * 1_000,
+                "span" * 1_000,
+                (("request_body", "SECRET"),),
+            )
+        forged = TraceRecord("model.attempt", "trace:one", "span:one", ())
+        object.__setattr__(
+            forged,
+            "attributes",
+            (("request_body", "SECRET"),),
+        )
+        with self.assertRaises(ValueError):
+            project_otel_envelope(
+                forged,
+                provider_kind="openai_compatible",
+                outcome="succeeded",
             )
 
 

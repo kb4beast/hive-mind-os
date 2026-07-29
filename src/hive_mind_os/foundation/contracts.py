@@ -83,6 +83,13 @@ def _validate(value: Any, schema: Mapping[str, Any], path: str, issues: list[str
             and value < minimum
         ):
             issues.append(f"{path}: number is below minimum {minimum}")
+        maximum = schema.get("maximum")
+        if (
+            isinstance(maximum, (int, float))
+            and not isinstance(maximum, bool)
+            and value > maximum
+        ):
+            issues.append(f"{path}: number is above maximum {maximum}")
     if isinstance(value, list):
         if isinstance(schema.get("minItems"), int) and len(value) < schema["minItems"]:
             issues.append(f"{path}: array has too few items")

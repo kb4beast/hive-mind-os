@@ -98,3 +98,18 @@ recorded append-only in `P2-AUDIT-011`.
 
 Implementation promotion remains pending fresh Curator/Steward reconstruction and a
 different Judge on the next exact committed candidate.
+
+Third implementation candidate
+`d20ee1a469b716f1a62d8d4a24c338fe66dda066`: `remand`.
+
+Its full declared CI matrix passed and every earlier remand was closed. Curator
+`Kuhn` nevertheless reproduced missing caller paths for required usage attribution
+and an unusable string-valued billable reconciliation axis. Steward `Planck`
+independently reproduced acceptance of a 4,000-digit token integer, direct
+`TraceRecord` construction bypassing projection privacy/bounds, and undetected
+cross-repository opportunity-key retargeting. The Builder accepted all five
+findings. CI success did not displace the court burden; remediation is recorded
+append-only in `P2-AUDIT-013`.
+
+Implementation promotion remains pending fresh exact-candidate Curator/Steward
+reconstruction and a different Judge.

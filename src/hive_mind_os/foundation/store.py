@@ -1230,7 +1230,9 @@ class FoundationStore:
             ):
                 issues.append(f"relation {row['sequence']}: cross-scope endpoint")
         for row in self._connection.execute(
-            "SELECT key.*,record.record_type,record.payload_json "
+            "SELECT key.*,record.record_type,record.payload_json,"
+            "record.tenant_id AS target_tenant_id,"
+            "record.repository_id AS target_repository_id "
             "FROM opportunity_keys AS key "
             "LEFT JOIN records AS record "
             "ON record.record_id=key.opportunity_record_id "
@@ -1244,6 +1246,8 @@ class FoundationStore:
                 continue
             if (
                 row["record_type"] != "opportunity-record"
+                or row["target_tenant_id"] != row["tenant_id"]
+                or row["target_repository_id"] != row["repository_id"]
                 or payload.get("normalization_version")
                 != row["normalization_version"]
                 or payload.get("exact_digest") != row["exact_digest"]

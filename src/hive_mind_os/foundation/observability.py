@@ -79,6 +79,28 @@ _MAX_TRACE_ATTRIBUTES = 32
 _MAX_TRACE_IDENTIFIER = 256
 _MAX_TRACE_NAME = 128
 _MAX_TRACE_KEY = 64
+_MAX_TRACE_VALUE = 256
+_PROHIBITED_TRACE_FRAGMENTS = frozenset(
+    {
+        "api_key",
+        "authorization",
+        "body",
+        "content",
+        "credential",
+        "error_message",
+        "header",
+        "password",
+        "prompt",
+        "raw",
+        "request",
+        "response",
+        "secret",
+        "token",
+    }
+)
+_RESERVED_TRACE_ATTRIBUTES = frozenset(
+    {"gen_ai.operation.name", "gen_ai.provider.name", "hive.outcome"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +117,9 @@ class TraceRecord:
     span_id: str
     attributes: tuple[tuple[str, str], ...]
 
+    def __post_init__(self) -> None:
+        _validate_trace_record(self)
+
 
 @dataclass(frozen=True, slots=True)
 class OTelEnvelope:
@@ -105,6 +130,47 @@ class OTelEnvelope:
     span_id: str
     attributes: tuple[tuple[str, str], ...]
     export_enabled: bool = False
+
+
+def _validate_trace_record(trace: TraceRecord) -> None:
+    if (
+        not isinstance(trace.name, str)
+        or not trace.name
+        or len(trace.name) > _MAX_TRACE_NAME
+        or not isinstance(trace.trace_id, str)
+        or not trace.trace_id
+        or len(trace.trace_id) > _MAX_TRACE_IDENTIFIER
+        or not isinstance(trace.span_id, str)
+        or not trace.span_id
+        or len(trace.span_id) > _MAX_TRACE_IDENTIFIER
+        or not isinstance(trace.attributes, tuple)
+        or len(trace.attributes) > _MAX_TRACE_ATTRIBUTES
+    ):
+        raise ValueError("trace identity or attribute count is unbounded")
+    seen: set[str] = set()
+    for item in trace.attributes:
+        if (
+            not isinstance(item, tuple)
+            or len(item) != 2
+            or not isinstance(item[0], str)
+            or not isinstance(item[1], str)
+        ):
+            raise ValueError("trace attributes must be string pairs")
+        key, value = item
+        normalized_key = key.casefold().replace("-", "_")
+        if (
+            not key
+            or len(key) > _MAX_TRACE_KEY
+            or len(value) > _MAX_TRACE_VALUE
+            or key in seen
+            or key in _RESERVED_TRACE_ATTRIBUTES
+            or any(
+                fragment in normalized_key
+                for fragment in _PROHIBITED_TRACE_FRAGMENTS
+            )
+        ):
+            raise ValueError(f"trace attribute {key} is unsupported or unbounded")
+        seen.add(key)
 
 
 def project_metric(
@@ -144,27 +210,10 @@ def project_trace(
         or len(attributes) > _MAX_TRACE_ATTRIBUTES
     ):
         raise ValueError("trace identity or attribute count is unbounded")
-    prohibited_fragments = {
-        "api_key",
-        "authorization",
-        "body",
-        "content",
-        "credential",
-        "error_message",
-        "header",
-        "password",
-        "prompt",
-        "raw",
-        "request",
-        "response",
-        "secret",
-        "token",
-    }
-    reserved = {"gen_ai.operation.name", "gen_ai.provider.name", "hive.outcome"}
-    if set(attributes) & reserved or any(
+    if set(attributes) & _RESERVED_TRACE_ATTRIBUTES or any(
         fragment in key.casefold().replace("-", "_")
         for key in attributes
-        for fragment in prohibited_fragments
+        for fragment in _PROHIBITED_TRACE_FRAGMENTS
     ):
         raise ValueError("trace attributes cannot contain body or free-text fields")
     normalized: list[tuple[str, str]] = []
@@ -173,7 +222,7 @@ def project_trace(
             not key
             or len(key) > _MAX_TRACE_KEY
             or not isinstance(value, (str, int, bool))
-            or len(str(value)) > 256
+            or len(str(value)) > _MAX_TRACE_VALUE
         ):
             raise ValueError(f"trace attribute {key} is unsupported or unbounded")
         normalized.append((key, str(value)))
@@ -186,6 +235,7 @@ def project_otel_envelope(
     provider_kind: str,
     outcome: str,
 ) -> OTelEnvelope:
+    _validate_trace_record(trace)
     if (
         provider_kind not in METRIC_LABEL_VALUES["provider_kind"]
         or outcome not in METRIC_LABEL_VALUES["outcome"]
