@@ -614,6 +614,8 @@ class StableIdCognitiveNoteTests(unittest.TestCase):
         self.assertTrue(conflict_path.is_file())
 
     def test_late_junction_swap_is_rolled_back_as_typed_conflict(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows no-delete junction regression")
         self._append("memory:late-junction", "opportunity")
         self._release()
         namespace = self.repository / MANAGED_NAMESPACE
