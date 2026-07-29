@@ -189,6 +189,14 @@ def _is_linklike(path: Path) -> bool:
     return bool(attributes & reparse_flag)
 
 
+def _is_multilink_file(path: Path) -> bool:
+    try:
+        details = path.stat(follow_symlinks=False)
+    except (FileNotFoundError, OSError):
+        return False
+    return path.is_file() and details.st_nlink != 1
+
+
 def _json_bytes(value: Any) -> bytes:
     return (
         json.dumps(
@@ -203,7 +211,11 @@ def _json_bytes(value: Any) -> bytes:
 
 
 def _write_durable(path: Path, content: bytes) -> None:
-    if path.exists() and (not path.is_file() or _is_linklike(path)):
+    if path.exists() and (
+        not path.is_file()
+        or _is_linklike(path)
+        or _is_multilink_file(path)
+    ):
         raise ProjectionError(f"durable write target is unsafe: {path.name}")
     with path.open("wb") as handle:
         handle.write(content)
@@ -581,9 +593,9 @@ def _validate_state_tree(state_root: Path) -> None:
         current = Path(directory)
         for name in (*directory_names, *file_names):
             candidate = current / name
-            if _is_linklike(candidate):
+            if _is_linklike(candidate) or _is_multilink_file(candidate):
                 raise ProjectionError(
-                    "projection state contains a linked or reparse path"
+                    "projection state contains a linked, reparse, or multi-link path"
                 )
 
 
@@ -677,7 +689,11 @@ def _manifest_has_receipt(
     )
     if not receipt_path.exists():
         return False
-    if not receipt_path.is_file() or _is_linklike(receipt_path):
+    if (
+        not receipt_path.is_file()
+        or _is_linklike(receipt_path)
+        or _is_multilink_file(receipt_path)
+    ):
         raise ProjectionError("projection ownership receipt is unsafe")
     try:
         receipt = json.loads(receipt_path.read_bytes())
@@ -864,6 +880,12 @@ def _projection_lock(state_root: Path) -> Iterator[None]:
     if not state_root.is_dir() or _is_linklike(state_root):
         raise ProjectionError("projection state path must be a regular directory")
     lock_path = _path_from_relative(state_root, "projection.lock")
+    if lock_path.exists() and (
+        not lock_path.is_file()
+        or _is_linklike(lock_path)
+        or _is_multilink_file(lock_path)
+    ):
+        raise ProjectionError("projection lock path is unsafe")
     handle = lock_path.open("a+b")
     try:
         handle.seek(0)
@@ -1028,7 +1050,12 @@ def _write_transaction(
         for relative_path, content in desired_files.items():
             staged = _staged_path(staged_root, relative_path)
             _write_durable(staged, content)
-        _write_durable(journal_path, journal_bytes)
+        temporary_journal = _path_from_relative(
+            state_root,
+            f"transactions/{transaction_id}/transaction.tmp",
+        )
+        _write_durable(temporary_journal, journal_bytes)
+        os.replace(temporary_journal, journal_path)
     replacements = 0
     ordered_paths = sorted(
         desired_files,
@@ -1160,6 +1187,10 @@ def _preserve_conflict(
         "conflicts": observations,
     }
     conflict_id = _digest_document(stable_body).removeprefix("sha256:")
+    conflict_root = _path_from_relative(
+        state_root,
+        f"conflicts/{conflict_id}",
+    )
     receipt_path = _path_from_relative(
         state_root,
         f"conflicts/{conflict_id}/receipt.json",
@@ -1174,6 +1205,10 @@ def _preserve_conflict(
         if comparable != stable_body:
             raise ProjectionError("existing conflict receipt is inconsistent")
         return receipt_path.relative_to(repository_root).as_posix()
+    if conflict_root.exists():
+        if not conflict_root.is_dir() or _is_linklike(conflict_root):
+            raise ProjectionError("abandoned conflict path is unsafe")
+        shutil.rmtree(conflict_root)
     body = {**stable_body, "attempted_at": utc_now()}
     validation = validate_projection("brain-conflict-v1", body)
     if not validation.valid:

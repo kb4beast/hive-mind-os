@@ -73,7 +73,7 @@ marker and owns exactly the listed generated files.
 - at most 100,000 records, 256 list items, 4,096 characters per string,
   1 MiB per note, 256 MiB per pack, and 16 MiB per manifest;
 - portable relative paths only, full hashed filenames, and no symlink, junction,
-  reparse, absolute, traversal, or linked managed target.
+  reparse, hard-linked state file, absolute, traversal, or linked managed target.
 
 The allowlisted memory fields exclude `protected_content_ref` and
 `retrieval_receipt`. Later fields fail closed until this contract is versioned.

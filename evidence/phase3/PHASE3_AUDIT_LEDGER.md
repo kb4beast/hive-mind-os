@@ -249,3 +249,36 @@ caller preserves desired bytes and a conflict receipt without overwriting the la
 human edit. A deterministic regression injects that exact replacement window.
 Combined Phase 2 plus Phase 3 focused verification is now `56 passed, 23 subtests
 passed`.
+
+## `P3-AUDIT-014` — protected-state hardlink remand
+
+Independent Curator review of `b2aff7361d1fd849a1f55bdfe5eec3705e7097ca`
+hardlinked an external regular file to the protected projection lock. The projector
+treated it as an ordinary file and changed the external bytes while acquiring the
+lock. This violated repository confinement even though all symlink, junction, and
+reparse probes passed.
+
+Protected-state traversal, ownership-receipt admission, lock acquisition, and
+durable writes now reject an existing regular file whose link count is not exactly
+one. A regression proves a hardlinked external lock remains byte-identical and no
+manifest is published. Fresh inventory, exact-head CI, and independent reconstruction
+remain required.
+
+## `P3-AUDIT-015` — conflict-staging recovery remand
+
+Independent Steward review of `b2aff7361d1fd849a1f55bdfe5eec3705e7097ca`
+interrupted private desired-byte preservation before the conflict receipt was
+published. A truncated staged file then made every identical retry fail instead of
+rebuilding the deterministic conflict evidence.
+
+A conflict identity without its receipt is now treated as abandoned private staging:
+after link/path validation, that conflict subtree is removed and rebuilt from the
+already compiled desired bytes. The observed human file remains untouched. A focused
+regression interrupts the staging write, retries, verifies a typed conflict receipt,
+and proves the human bytes remain exact. Fresh exact-head evidence is required.
+
+The Steward also interrupted direct `transaction.json` publication, leaving a
+truncated journal that was indistinguishable from a published journal. Transaction
+journals now use a durable temporary file followed by atomic replacement. A partial
+temporary journal is covered by the already-adopted unjournaled-staging rebuild
+rule; a regression proves retry commits and then becomes unchanged.

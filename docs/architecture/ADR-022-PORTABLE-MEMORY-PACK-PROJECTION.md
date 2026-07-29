@@ -113,8 +113,9 @@ be recognized without writing, but it cannot authorize a later overwrite. This
 makes a cloned pack safe by default even when ignored private state is absent.
 
 All managed file digests and the complete generated namespace are checked again
-under the process lock. Pack and protected-state roots, every state subtree, and
-same-file database overlap are revalidated before staging or publication. Notes are
+under the process lock. Pack and protected-state roots, every state subtree,
+multi-linked protected-state files, and same-file database overlap are revalidated
+before staging or publication. Notes are
 atomically replaced from staging and `manifest.json` is published last. Restart
 accepts only prior or exact desired digests, cleans stale completed transaction
 state, and resumes the same transaction. An unexpected, missing, renamed, manually

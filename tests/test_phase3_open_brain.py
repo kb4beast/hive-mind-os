@@ -327,6 +327,45 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertEqual(result.conflict_paths, (relative,))
         self.assertEqual(note_path.read_bytes(), edited)
 
+    def test_interrupted_conflict_staging_is_rebuilt_without_human_overwrite(self) -> None:
+        public = self._append("memory:conflict-restart", sensitivity="safe-public")
+        self._project()
+        manifest = json.loads(
+            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).read_bytes()
+        )
+        relative = next(
+            entry["path"]
+            for entry in manifest["files"]
+            if entry["record_id"] == public["record_id"]
+        )
+        note = self.repository / PACK_DIRECTORY / relative
+        human_bytes = note.read_bytes() + b"\nhuman conflict survives\n"
+        note.write_bytes(human_bytes)
+        original_write = brain._write_durable
+        interrupted = False
+
+        def interrupting_write(path, content):
+            nonlocal interrupted
+            if (
+                not interrupted
+                and "conflicts" in path.parts
+                and path.suffix == ".tmp"
+            ):
+                interrupted = True
+                original_write(path, b"truncated")
+                raise InterruptedError("injected conflict staging interruption")
+            original_write(path, content)
+
+        with (
+            patch.object(brain, "_write_durable", interrupting_write),
+            self.assertRaisesRegex(InterruptedError, "conflict staging"),
+        ):
+            self._project()
+        recovered = self._project()
+        self.assertEqual(recovered.status, "conflict")
+        self.assertIsNotNone(recovered.receipt_path)
+        self.assertEqual(note.read_bytes(), human_bytes)
+
     def test_interrupted_projection_resumes_from_transaction_receipt(self) -> None:
         self._append("memory:one", sensitivity="safe-public")
         self._append("memory:two", sensitivity="safe-public")
@@ -366,6 +405,29 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         self.assertEqual(recovered.status, "projected")
         self.assertEqual(recovered.recovery_status, "committed")
         self.assertFalse(abandoned.exists())
+
+    def test_partial_journal_publication_is_rebuilt_safely(self) -> None:
+        self._append("memory:journal-crash", sensitivity="safe-public")
+        original_write = brain._write_durable
+        interrupted = False
+
+        def interrupting_write(path, content):
+            nonlocal interrupted
+            if not interrupted and path.name == "transaction.tmp":
+                interrupted = True
+                original_write(path, b"{")
+                raise InterruptedError("injected journal publication interruption")
+            original_write(path, content)
+
+        with (
+            patch.object(brain, "_write_durable", interrupting_write),
+            self.assertRaisesRegex(InterruptedError, "journal publication"),
+        ):
+            self._project()
+        recovered = self._project()
+        self.assertEqual(recovered.status, "projected")
+        self.assertEqual(recovered.recovery_status, "committed")
+        self.assertEqual(self._project().status, "unchanged")
 
     def test_generated_manifest_size_bound_is_enforced_before_publication(self) -> None:
         self._append("memory:manifest-bound", sensitivity="safe-public")
@@ -538,11 +600,28 @@ class PortableOpenBrainProjectionTests(unittest.TestCase):
         except OSError as error:
             self.skipTest(f"directory links unavailable: {error}")
         try:
-            with self.assertRaisesRegex(ProjectionError, "linked or reparse"):
+            with self.assertRaisesRegex(ProjectionError, "linked.*reparse"):
                 self._project()
             self.assertEqual(list(outside.rglob("*")), [])
         finally:
             _remove_directory_link(state_root / "transactions")
+
+    def test_hardlinked_state_file_cannot_modify_external_bytes(self) -> None:
+        self._append("memory:state-hardlink", sensitivity="safe-public")
+        state_root = self.repository / ".hive-mind-projection-state"
+        state_root.mkdir()
+        outside = self.root / "outside-lock"
+        outside.write_bytes(b"")
+        try:
+            os.link(outside, state_root / "projection.lock")
+        except OSError as error:
+            self.skipTest(f"hard links unavailable: {error}")
+        with self.assertRaisesRegex(ProjectionError, "lock path is unsafe"):
+            self._project()
+        self.assertEqual(outside.read_bytes(), b"")
+        self.assertFalse(
+            (self.repository / PACK_DIRECTORY / MANIFEST_PATH).exists()
+        )
 
     def test_pack_link_swap_at_lock_entry_cannot_escape_repository(self) -> None:
         self._append("memory:pack-link-race", sensitivity="safe-public")
