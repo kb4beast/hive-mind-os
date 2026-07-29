@@ -178,3 +178,8 @@ or superiority claim.
   product ownership and are not evidence of secure cleanup or deletion.
 - No production-readiness, usefulness, user-value, cost, or superiority claim is
   made.
+- The Judge's `adapt` permits only the two runtime-required interoperability-byte
+  repairs. It does not relax item-4 semantics, namespace, filters, schemas,
+  protocols, capabilities, authority, or future evidence burdens.
+- Any relevant byte or evidence change invalidates the current review boundary and
+  requires renewed independent verification and judgment.

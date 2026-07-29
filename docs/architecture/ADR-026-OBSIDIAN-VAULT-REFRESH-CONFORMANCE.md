@@ -1,6 +1,7 @@
 # ADR-026: Pinned Obsidian vault refresh conformance
 
-- Status: proposed; independent judgment pending
+- Status: adapted for bounded stacked draft delivery; activation and final-system
+  promotion remain pending
 - Date: 2026-07-29
 - Scope: Phase 3 item 5
 - Depends on: ADR-019, ADR-022, ADR-023, ADR-024, ADR-025
@@ -35,8 +36,9 @@ The second run appeared to pass an immediate check, but Obsidian rewrote the Can
 about four minutes later. That run is also preserved as failed. The Canvas renderer
 now emits the exact tab-indented, compact-node form observed from Obsidian `1.12.7`.
 The earlier passing run was superseded after further production hardening. The
-sealed exact-commit fourth run is the promotion candidate; independent review and
-judgment remain the final gate.
+sealed exact-commit fourth run passed independent review. A distinct Judge adapted
+the original byte freeze only for these two runtime-required interoperability-byte
+repairs.
 
 ## Invariants
 
@@ -60,8 +62,9 @@ judgment remain the final gate.
 
 ## Consequences and limits
 
-If independent judgment adopts it, the result closes only the item-5 local-runtime
-obligation for this exact build and host. It does not activate Obsidian as an
-execution host and does not prove clean-profile, remote Git, multi-device, Sync,
-production-readiness, usefulness, or superiority. The test reused an already-running
-Obsidian process, which remains explicit dissent.
+The judgment closes only the item-5 local-runtime obligation for this exact build
+and host. It does not activate Obsidian as an execution host and does not prove
+clean-profile, remote Git, multi-device, Sync, production-readiness, usefulness, or
+superiority. The test reused an already-running Obsidian process, which remains
+explicit dissent. Any relevant byte, schema, interface, capability, protocol, or
+evidence change requires renewed independent review and judgment.

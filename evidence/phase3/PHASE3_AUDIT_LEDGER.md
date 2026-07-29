@@ -968,3 +968,21 @@ byte-identical production renderer and fixture files.
 
 No reviewer remand remains. A separate Judge must still decide the narrow
 byte-freeze conflict; reviewer approval cannot substitute for that disposition.
+
+## `P3-ITEM5-AUDIT-007` — final narrow adaptation
+
+Distinct Judge `/root/item5_judge` reviewed exact candidate
+`b53175ffbd5d85e73ffc2ce6773560a999545170` and issued `adapt`. The Judge
+independently reproduced `147` tests with `57` subtests, Ruff, and Pyright.
+
+The judgment admits only the pinned local-runtime observations and narrowly permits
+the Base scalar quoting and Canvas serialization changes required to keep generated
+bytes stable under Obsidian `1.12.7`. It does not permit semantic, namespace, filter,
+schema, protocol, capability, or authority redesign. Other hosts, versions,
+profiles, Git remotes, Sync, multi-device behavior, production activation, merge,
+usefulness, value, latency guarantees, generalization, and superiority remain
+unproved or rejected.
+
+Publication as a stacked draft PR is permitted. The PR must remain open, unmerged,
+and inactive. Any relevant byte, schema, interface, capability, protocol, or
+evidence change requires renewed independent review and judgment.

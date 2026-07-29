@@ -1,7 +1,7 @@
 # Court record: Phase 3 item 5 Obsidian vault refresh
 
 - Case: `P3-OBSIDIAN-REFRESH-001`
-- Disposition: pending
+- Disposition: `adapt`
 - Subject implementation: `ee09e4cb9a4bc5fd0711e738249039507a194e43`
 - Review candidate: `8b0b0a029b8ef52b1ef75a64961234466f860dc2`
 - Runtime: Obsidian Desktop `1.12.7`, Windows `10.0.26200`
@@ -10,11 +10,11 @@
 
 | Claim | Evidence | Disposition |
 |---|---|---|
-| Core Obsidian reflects item-1 external replacement in an already-open pane. | Fourth run, count `6 -> 7`, `4.315128s`. | pending |
-| Core Obsidian reflects item-3 external replacement in an already-open pane. | Fourth run, total `7 -> 8`, `4.185468s`. | pending |
-| Core Bases recomputes after a new generated idea note appears. | Fourth run, `1 -> 2` rows, `8.940211s`. | pending |
-| The generated Canvas parses and renders embedded Bases. | Fourth-run Canvas screenshot and preserved target bytes. | pending |
-| Generated item-4 bytes remain owned after runtime observation. | Fourth run unloads Canvas, waits at least 300 seconds, preserves both observed targets plus the complete item-4 namespace, and requires final item-4 `unchanged`. | pending |
+| Core Obsidian reflects item-1 external replacement in an already-open pane. | Fourth run, count `6 -> 7`, `4.315128s`. | adopt |
+| Core Obsidian reflects item-3 external replacement in an already-open pane. | Fourth run, total `7 -> 8`, `4.185468s`. | adopt |
+| Core Bases recomputes after a new generated idea note appears. | Fourth run, `1 -> 2` rows, `8.940211s`. | adopt |
+| The generated Canvas parses and renders embedded Bases. | Fourth-run Canvas screenshot and preserved target bytes. | adopt |
+| Generated item-4 bytes remain owned after runtime observation. | Fourth run unloads Canvas, waits at least 300 seconds, preserves both observed targets plus the complete item-4 namespace, and requires final item-4 `unchanged`. | adapt: minimal stable serialization |
 | The behavior generalizes to other hosts, versions, profiles, Git remotes, or Sync. | No evidence. | defer |
 
 ## Advocate
@@ -50,13 +50,31 @@ Remaining weaknesses:
 | Curator / Expert Witness | `Locke` (`/root/item5_curator`) | Passed exact candidate `8b0b0a0`; reproduced all 147 tests with 57 subtests, focused tests, hashes, runtime-subject ancestry, and claim boundaries. |
 | Steward | `/root/item4_explorer/steward` | Passed exact candidate `8b0b0a0`; reproduced focused and item 2–5 matrices, recovery-boundary tests, deterministic inventory, rollback, and operational limits. |
 | Optimizer | `/root/item5_optimizer` | Passed exact candidate `8b0b0a0`; independently reconciled all three latencies, the `321.151072s` interval, comparator classification, and absence of a superiority claim. |
+| Judge | `/root/item5_judge` | Independently reproduced 147 tests with 57 subtests, Ruff, and Pyright on `b53175f`, then issued the final narrow `adapt`. |
 
 Discover, design, build, validate, integrate, maintain, grow/outcome measurement,
 and orchestration are covered. All technical and evidentiary reviewers returned
-`PASS`; judgment alone remains pending, so no final passing disposition is yet
-admitted.
+`PASS`.
 
 The original item-5 byte-freeze instruction conflicts with runtime-discovered Base
-and Canvas canonicalization. Any final `adapt` disposition must explicitly authorize
-only the minimal serialization changes, preserve the preceding item-4 inventory and
-rollback, and reject any semantic, namespace, filter, schema, or authority redesign.
+and Canvas canonicalization. The Judge considered that conflict explicitly and
+limited the remedy to the two serialization changes described below.
+
+## Final judgment
+
+Judge `/root/item5_judge` issued `adapt` on review-record candidate
+`b53175ffbd5d85e73ffc2ce6773560a999545170`. The original byte freeze is changed
+only enough to admit the runtime-required Base scalar quoting and Canvas
+serialization repairs. This is not authority for a semantic, namespace, filter,
+schema, protocol, capability, or authority redesign.
+
+The admitted result is limited to Obsidian Desktop `1.12.7` on the recorded Windows
+build and fixture. Other hosts, versions, profiles, clean-profile isolation, Git
+remotes, Sync, multi-device behavior, production activation, merge, usefulness,
+value, latency guarantees, generalization, and superiority remain deferred or
+rejected. Failed and superseded runs, dissent, rollback, and the exact sealed
+production bytes remain controlling evidence.
+
+A stacked draft PR may be published but must remain open, unmerged, and inactive.
+Any relevant byte, schema, interface, capability, protocol, or evidence change
+requires renewed independent review and judgment.
