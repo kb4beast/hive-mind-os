@@ -112,5 +112,21 @@ repair candidates. Their testimony confirms that the changes preserve the origin
 narrow runtime judgment, rejection behavior, rollback, Windows/POSIX claim
 boundaries, and absence of any usefulness, generalization, or superiority claim.
 
-This appeal records reviewer testimony only. The repaired stacked draft remains
-open, unmerged, inactive, and subject to renewed independent judgment.
+## Renewed appeal judgment
+
+Distinct Judge `/root/item5_judge` reviewed exact record
+`ac0d55a7d4ce9eea45e47efe822f3375d8532824`, covering repair
+`0b1529a91dd86be211128375b9771a1b64caef02`, and issued `adapt` with no
+remand. The Judge independently reproduced the four directly affected regressions,
+deterministic inventory generation, Ruff, Pyright, and exact resource totals.
+
+The two accepted symlink diagnostics remain rejection paths reached before the
+evidence file is opened or admitted. The inventory update is admitted only as
+test-hash bookkeeping. The sealed runtime subject, production bytes, screenshots,
+receipts, preserved targets, Windows/POSIX limitations, dissent, and the prior
+narrow item-5 `adapt` remain unchanged.
+
+No activation, merge, generalization, usefulness, value, or superiority claim is
+admitted. Both stacked draft PRs may remain published, open, unmerged, and inactive.
+Any production, schema, interface, protocol, capability, authority, runtime-evidence,
+or claim change requires renewed review and judgment.

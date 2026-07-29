@@ -1011,5 +1011,16 @@ pull-request Constitutional CI passed for both exact repair candidates.
 Cross-Examiner/Integrator `Einstein`, Curator/Expert Witness `Locke`, and Steward
 `/root/item4_explorer/steward` independently returned `PASS`. They found no
 production, schema, interface, protocol, capability, persistence, authority, or
-claim expansion. The repaired draft still requires a distinct renewed Judge
-disposition.
+claim expansion.
+
+Distinct Judge `/root/item5_judge` reviewed exact base record
+`fdefc1b5b6146b4fdf4e8a9317ebd23801e089a3` and exact item-5 record
+`ac0d55a7d4ce9eea45e47efe822f3375d8532824`, independently reproduced
+the four affected regressions, inventory generation, Ruff, Pyright, and exact
+resource totals, and issued `adapt` with no remand.
+
+The verdict admits only truthful verification/platform corrections and inventory
+test-hash bookkeeping. The prior narrow runtime judgment, fail-closed symlink
+handling, platform limitations, dissent, and protected bytes remain unchanged.
+Both draft PRs may remain published, open, unmerged, and inactive; protected-surface
+or claim changes require renewed review and judgment.
