@@ -1,7 +1,7 @@
 # Phase 1 Court: Usage Telemetry and Fair Learning
 
 - Case ID: `P1-USAGE-TELEMETRY-FAIR-LEARNING`
-- Status: hearing open; independent testimony and verdict pending
+- Status: characterization adapted for draft publication; architecture deferred
 - Original request SHA-256:
   `dbd73add9f47aa98a30d19f1538179e5e961c1452a70b9ce54b7403b4e387a46`
 
@@ -60,9 +60,10 @@ versions, reconciliation gaps, failures, and dissent.
 
 `P1-SRC-B02` through `P1-SRC-B04`, provider fixture coverage, price/version and
 invoice policy, privacy/security expert testimony, held-out evaluation design,
- loop benchmark, and a distinct Judge receipt remain blocking.
+loop benchmark and architecture-merits judgment remain blocking.
 
 The independent Curator `/root/phase1_curator` accepted the accuracy of the
 repaired generation-zero telemetry characterization. Provider-source
-admission, ADR-020 adoption, Phase 2 implementation, and the distinct Judge
-receipt remain blocked.
+admission, ADR-020 adoption, and Phase 2 implementation remain blocked. The
+independent Judge `/root/phase1_judge` adapted this characterization for
+stacked draft publication and deferred all of those merits.

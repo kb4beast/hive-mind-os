@@ -1,7 +1,7 @@
 # Phase 1 Court: Obsidian Open Brain
 
 - Case ID: `P1-OBSIDIAN-OPEN-BRAIN`
-- Status: hearing open; independent testimony and verdict pending
+- Status: characterization adapted for draft publication; architecture deferred
 - Original request SHA-256:
   `dbd73add9f47aa98a30d19f1538179e5e961c1452a70b9ce54b7403b4e387a46`
 - Source register:
@@ -15,7 +15,7 @@
 | Architect, Cross-Examiner | `/root/phase1_architecture` |
 | Builder | `/root` |
 | Curator, security/privacy Expert Witness | `/root/phase1_curator` |
-| Judge | pending independent assignment |
+| Judge | `/root/phase1_judge` |
 
 ## Frozen parent claims
 
@@ -73,7 +73,7 @@ canonical memory, conflicts, receipts, and dissent.
 ## Open obligations
 
 `P1-SRC-B01`, privacy classification, a final repository policy for
-`.obsidian`, multi-writer conflict tests, and a distinct Judge disposition
-remain blocking. The independent Curator accepted the accuracy of this
-characterization but did not adopt the candidate architecture or authorize
-implementation.
+`.obsidian`, and multi-writer conflict tests remain blocking. The independent
+Curator accepted the accuracy of this characterization. The independent Judge
+adapted it for stacked draft publication while deferring ADR-019, source
+admission, and implementation.

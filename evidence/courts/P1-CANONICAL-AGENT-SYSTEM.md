@@ -1,7 +1,7 @@
 # Phase 1 Court: Canonical Agent System
 
 - Case ID: `P1-CANONICAL-AGENT-SYSTEM`
-- Status: hearing open; independent testimony and verdict pending
+- Status: characterization adapted for draft publication; architecture deferred
 - Original request SHA-256:
   `dbd73add9f47aa98a30d19f1538179e5e961c1452a70b9ce54b7403b4e387a46`
 
@@ -64,9 +64,12 @@ its projections; losing challengers, dissent, fixtures, and receipts remain.
 
 Complete child-claim extraction for sections 4–17 of the mission brief,
 capability-to-policy mapping, host degradation contract, Explorer behavioral
-benchmark, exact Armory identification, source admission, independent security
-and compatibility testimony, and a distinct Judge verdict remain blocking.
+benchmark, exact Armory identification, source admission, and independent
+security and compatibility testimony remain blocking.
 
 The independent Curator `/root/phase1_curator` accepted the repaired
 characterization artifacts only. It did not declare the candidate definitions
 canonical, promote `hive-core`, admit host support, or authorize Phase 2.
+The independent Judge `/root/phase1_judge` adapted this characterization for
+stacked draft publication and deferred ADR-018, source admission, host claims,
+and Phase 2 authorization.

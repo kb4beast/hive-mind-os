@@ -15,6 +15,9 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-015` | [Post-P13 production and trust program](ADR-015-POST-P13-PRODUCTION-AND-TRUST-PROGRAM.md) | P14–P20 | proposed; independent adoption review required |
 | `ADR-016` | [Governed extension packages and portable host projections](ADR-016-GOVERNED-EXTENSION-PACKAGES.md) | Slice 1 | bounded structural candidate accepted/adapted; promotion deferred |
 | `ADR-017` | [Inert constitutional skills, read-only tools, and host evidence](ADR-017-INERT-SKILLS-TOOLS-AND-HOST-EVIDENCE.md) | Slice 2 | adapted bounded candidate; promotion and host support blocked |
+| `ADR-018` | [Canonical agent definitions and nonauthoritative projections](ADR-018-CANONICAL-AGENT-DEFINITIONS-AND-PROJECTIONS.md) | Phase 1 | characterization retained; architecture adoption deferred |
+| `ADR-019` | [Open memory authority and Obsidian brain projection](ADR-019-OPEN-MEMORY-AND-OBSIDIAN-BRAIN.md) | Phase 1 | characterization retained; architecture adoption deferred |
+| `ADR-020` | [Provider-native usage, privacy, and fair learning](ADR-020-USAGE-TELEMETRY-PRIVACY-AND-FAIR-LEARNING.md) | Phase 1 | characterization retained; architecture adoption deferred |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-018; it must be unique at creation time.
+is ADR-021; it must be unique at creation time.

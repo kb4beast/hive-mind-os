@@ -1,6 +1,6 @@
 # Phase 1 Characterization Review
 
-- Review status: independent Curator accepted; Judge pending
+- Review status: independent Curator accepted; Judge adapted draft publication
 - Scope: Phase 1 characterization artifacts only
 - Baseline production commit:
   `b032a9f32f48889e0889fae8d6dd04eb03f46b63`
@@ -17,7 +17,7 @@
 | Architect, Cross-Examiner | `/root/phase1_architecture` | redundancy/reachability audit, contradictions, threats, migration/rollback |
 | Integrator, Steward, Optimizer | `/root/phase1_runtime` | memory/event/model/usage/host path inventory, recovery and metric analysis |
 | Curator, security/privacy Expert | `/root/phase1_curator` | independent adversarial review and exact focused reproduction |
-| Judge | pending distinct assignment | disposition and delivery boundary |
+| Judge | `/root/phase1_judge` | disposition and delivery boundary |
 
 The Builder did not use its own checks as independent verification.
 
@@ -81,4 +81,5 @@ Curator acceptance:
 - does not promote quarantined `hive-core`;
 - does not claim host support, source completeness, release readiness,
   autonomy, production fitness, or superiority; and
-- does not replace the required distinct Judge disposition.
+- is followed by the distinct Judge disposition in
+  `evidence/courts/P1-CHARACTERIZATION-JUDGE.md`.

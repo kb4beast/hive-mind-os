@@ -1,7 +1,7 @@
 # Phase 1 Court: Open Memory
 
 - Case ID: `P1-OPEN-MEMORY`
-- Status: hearing open; independent testimony and verdict pending
+- Status: characterization adapted for draft publication; architecture deferred
 - Original request SHA-256:
   `dbd73add9f47aa98a30d19f1538179e5e961c1452a70b9ce54b7403b4e387a46`
 
@@ -11,7 +11,7 @@ Explorer/Clerk/Advocate is `/root/phase1_sources`;
 Architect/Cross-Examiner is `/root/phase1_architecture`;
 Integrator/Steward/Optimizer is `/root/phase1_runtime`; Builder is `/root`.
 Independent Curator and security/privacy Expert is `/root/phase1_curator`.
-The distinct Judge remains unassigned in this open record.
+The distinct Judge is `/root/phase1_judge`.
 
 ## Frozen parent claims
 
@@ -65,8 +65,10 @@ records and the generation-zero stores.
 
 Source admission, privacy/legal expert testimony, deletion model,
 repository/tenant identity, semantic-dedup benchmark, complete event taxonomy,
-and independent judgment remain blocking.
+and architecture-merits judgment remain blocking.
 
 The independent Curator accepted the repaired characterization boundary after
 two remands strengthened database, append-only, and telemetry fixtures. That
 acceptance does not adopt ADR-019 or activate a memory migration.
+The independent Judge adapted this characterization for stacked draft
+publication and deferred ADR-019 and Phase 2 authorization.
