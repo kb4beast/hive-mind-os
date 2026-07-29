@@ -23,12 +23,12 @@
   },
   "implementation": {
     "src/hive_mind_os/foundation/authority.py": "sha256:bc57189477b5b793d7ee4b9e3b8d40bea50c0d3042a0e658aa670c081e35d478",
-    "src/hive_mind_os/foundation/brain.py": "sha256:1174559e3f444e624735a58c825b311e2fee6e615324e4e4fd6f69bd0c52aa9b",
+    "src/hive_mind_os/foundation/brain.py": "sha256:edaf4cd893fd82ffc4177381bf9f3ccf3cfe2d8ced68fce4a3647f6768a76a1c",
     "src/hive_mind_os/foundation/brain_contracts.py": "sha256:a8f52d8219913546737e77a07f09ca4b78dafde367dc249937b1f0effe0fd55e",
     "src/hive_mind_os/foundation/contracts.py": "sha256:a9f2916e8fa46139248f1a12ccf184977f35325f487b12892fa8bd2dbc14decf",
     "src/hive_mind_os/foundation/store.py": "sha256:e3dc857467e9b173918abbca21d1fc1013c22694d4c97334735eb858f3eba65b"
   },
-  "inventory_digest": "sha256:ea4e1323dba0ea76111f5008805d69bf08d22d5e1ae45f664a1dbc45ac4fe563",
+  "inventory_digest": "sha256:115c4705659fb4bb413ccf58677eba7e76ee58c1004885ff44f1d216acefa28e",
   "obsidian_runtime_required": false,
   "phase": 3,
   "phase2_input": {

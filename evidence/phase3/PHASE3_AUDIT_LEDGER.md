@@ -87,3 +87,22 @@ The complete current tree was reconstructed locally on both installed interprete
 
 Python 3.11, CodeQL, secret scan, dependency/license review, SBOM, and provenance
 remain pending exact-push/PR CI. No green label is substituted for those receipts.
+
+## `P3-AUDIT-006` — first exact-push static remand
+
+Candidate `2f8992195e5b781fd3262c772d621e47466d675c` was pushed and opened as
+stacked draft PR #32. Both the push run `30459931442` and PR run `30459963393`
+failed `static-and-type-checks`.
+
+Linux Pyright 1.1.411 rejected direct access to the Windows-only
+`stat_result.st_file_attributes` at `foundation/brain.py:153`:
+
+```text
+Cannot access attribute "st_file_attributes" for class "stat_result"
+```
+
+Windows local Pyright had passed because its platform model includes that field.
+This is a real cross-platform typing defect, not a waived runner difference. The
+candidate is remanded. Remediation uses portable `getattr` access for both the
+Windows stat attribute and reparse flag while retaining runtime reparse detection.
+Fresh exact-head CI and independent reconstruction remain required.

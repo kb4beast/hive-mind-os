@@ -150,10 +150,15 @@ def _is_linklike(path: Path) -> bool:
     if callable(is_junction) and is_junction():
         return True
     try:
-        attributes = path.stat(follow_symlinks=False).st_file_attributes
-    except (AttributeError, FileNotFoundError, OSError):
+        attributes = getattr(
+            path.stat(follow_symlinks=False),
+            "st_file_attributes",
+            0,
+        )
+    except (FileNotFoundError, OSError):
         return False
-    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    return bool(attributes & reparse_flag)
 
 
 def _json_bytes(value: Any) -> bytes:
