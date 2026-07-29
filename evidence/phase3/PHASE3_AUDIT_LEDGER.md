@@ -197,3 +197,25 @@ raises `NotADirectoryError` for a POSIX directory symlink. This is a portable-te
 defect and remains an exact-candidate remand. Cleanup now uses `unlink()` for
 symlinks and `rmdir()` for Windows junctions. Fresh exact-head matrix evidence is
 required.
+
+## `P3-AUDIT-012` — scoped integrity orphan remand
+
+Independent Curator review of `404b0f82c91e4fe3e2609e1a7d049f7a5f567ecd`
+found that the new inner join correctly isolated valid outbox rows but silently
+omitted an outbox row whose source record was missing. The prior global check had
+reported that corruption, so this was an evidence-control weakening and the candidate
+was remanded irrespective of CI.
+
+The repair retains scoped valid-row checks and adds a separate global orphan
+existence check whose issue text contains no record or message identifier. A
+regression inserts an offline foreign-key-disabled orphan and proves integrity fails
+closed without exposing either identifier. Fresh inventory, exact-head CI, and
+independent review remain required.
+
+The Curator also showed that filtering attempts and acknowledgements by their own
+declared scope could hide a row moved away from its immutable source scope. Delivery
+rows are now selected through message-to-source joins and their declared scope is
+still compared with that source. Separate generic checks retain fail-closed handling
+for orphaned delivery rows without identifier disclosure. Focused Phase 2 plus Phase
+3 verification after both repairs: `52 passed, 23 subtests passed`; Ruff and Pyright
+pass.

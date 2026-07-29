@@ -726,6 +726,33 @@ class FoundationStoreTests(unittest.TestCase):
         self.assertIn(local["record_id"], {item["source_record_id"] for item in local_pending})
         self.assertNotIn(other["record_id"], {item["source_record_id"] for item in local_pending})
         self.assertIn(other["record_id"], {item["source_record_id"] for item in other_pending})
+        with self.store._connection:
+            self.store._connection.execute(
+                "INSERT INTO outbox_attempts("
+                "message_id,destination,outcome,error_class,tenant_id,"
+                "repository_id,actor_id,authority_decision_id,lease_id,"
+                "attempted_at"
+                ") VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (
+                    local_pending[0]["message_id"],
+                    "local",
+                    "failed",
+                    "OfflineScopeCorruption",
+                    "tenant:test",
+                    "repository:other",
+                    "builder",
+                    "decision:offline-corruption",
+                    "lease:offline-corruption",
+                    "2026-07-29T00:00:02+00:00",
+                ),
+            )
+        local_issues = self.store.verify_integrity(
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+        )
+        self.assertTrue(
+            any("outbox_attempts" in issue and "scope mismatch" in issue for issue in local_issues)
+        )
         with self.assertRaises(PermissionError):
             self.store.record_delivery_attempt(
                 other_pending[0]["message_id"],
@@ -790,6 +817,38 @@ class FoundationStoreTests(unittest.TestCase):
             )
         )
         self.assertNotEqual(local["record_id"], other["record_id"])
+
+    def test_integrity_fails_closed_on_orphaned_outbox_without_identifier_leak(self) -> None:
+        self.store.close()
+        offline = sqlite3.connect(self.path)
+        try:
+            with offline:
+                offline.execute(
+                    "INSERT INTO outbox_messages("
+                    "message_id,source_record_id,projection_kind,"
+                    "projection_version,destination,payload_json,"
+                    "payload_digest,created_at"
+                    ") VALUES(?,?,?,?,?,?,?,?)",
+                    (
+                        "outbox:orphan-identifier-must-not-leak",
+                        "record:missing-identifier-must-not-leak",
+                        "record-projection",
+                        "v1",
+                        "local",
+                        "{}",
+                        digest({}),
+                        "2026-07-29T00:00:04+00:00",
+                    ),
+                )
+        finally:
+            offline.close()
+            self.store = FoundationStore(self.path)
+        issues = self.store.verify_integrity(
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+        )
+        self.assertIn("outbox contains an orphaned source record", issues)
+        self.assertNotIn("identifier-must-not-leak", " ".join(issues))
 
     def test_delivery_replay_uses_append_only_attempt_and_ack_receipts(self) -> None:
         self._append()

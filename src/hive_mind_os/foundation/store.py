@@ -1384,6 +1384,14 @@ class FoundationStore:
                 issues.append(
                     f"opportunity key {row['exact_digest']}: target mismatch"
                 )
+        orphaned_outbox = self._connection.execute(
+            "SELECT 1 FROM outbox_messages AS message "
+            "LEFT JOIN records AS source "
+            "ON source.record_id=message.source_record_id "
+            "WHERE source.record_id IS NULL LIMIT 1"
+        ).fetchone()
+        if orphaned_outbox is not None:
+            issues.append("outbox contains an orphaned source record")
         for row in self._connection.execute(
             "SELECT message.* FROM outbox_messages AS message "
             "JOIN records AS source ON source.record_id=message.source_record_id "
@@ -1427,8 +1435,21 @@ class FoundationStore:
                         f"outbox {row['message_id']}: source projection mismatch"
                     )
         for table in ("outbox_attempts", "outbox_acknowledgements"):
+            orphaned_delivery = self._connection.execute(
+                f"SELECT 1 FROM {table} AS delivery "
+                "LEFT JOIN outbox_messages AS message "
+                "ON message.message_id=delivery.message_id "
+                "WHERE message.message_id IS NULL LIMIT 1"
+            ).fetchone()
+            if orphaned_delivery is not None:
+                issues.append(f"{table} contains an orphaned outbox reference")
             for row in self._connection.execute(
-                f"SELECT * FROM {table} WHERE tenant_id=? AND repository_id=?",
+                f"SELECT delivery.* FROM {table} AS delivery "
+                "JOIN outbox_messages AS message "
+                "ON message.message_id=delivery.message_id "
+                "JOIN records AS source "
+                "ON source.record_id=message.source_record_id "
+                "WHERE source.tenant_id=? AND source.repository_id=?",
                 (tenant_id, repository_id),
             ):
                 destination = self._connection.execute(
