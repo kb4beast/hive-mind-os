@@ -9,9 +9,16 @@ from typing import Any, Callable, Iterator, Mapping
 
 from hive_mind_os.models import utc_now
 
+from .authority import AuthorityDecision
 from .canonical import canonical_bytes, digest, reject_private_content, stable_id
 
 FOUNDATION_SCHEMA_VERSION = 1
+RECORD_ACTIONS = {
+    "idea-encounter": "foundation.opportunity.write",
+    "opportunity-record": "foundation.opportunity.write",
+    "usage-event": "foundation.telemetry.write",
+    "usage-reconciliation": "foundation.telemetry.write",
+}
 
 
 class IdempotencyConflict(RuntimeError):
@@ -41,7 +48,11 @@ class FoundationStore:
             timeout=5.0,
         )
         self._connection.row_factory = sqlite3.Row
-        self._initialize()
+        try:
+            self._initialize()
+        except BaseException:
+            self._connection.close()
+            raise
 
     def _initialize(self) -> None:
         version = int(self._connection.execute("PRAGMA user_version").fetchone()[0])
@@ -50,6 +61,29 @@ class FoundationStore:
                 f"foundation schema {version} is newer than supported "
                 f"{FOUNDATION_SCHEMA_VERSION}"
             )
+        existing_tables = {
+            str(row[0])
+            for row in self._connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        if version == 0 and existing_tables:
+            raise RuntimeError(
+                "refusing to initialize foundation tables in a non-empty "
+                "unversioned database"
+            )
+        if version == FOUNDATION_SCHEMA_VERSION:
+            self._connection.executescript(
+                """
+                PRAGMA journal_mode=WAL;
+                PRAGMA foreign_keys=ON;
+                PRAGMA synchronous=FULL;
+                PRAGMA busy_timeout=5000;
+                """
+            )
+            self._validate_shape()
+            return
         with self._lock:
             self._connection.executescript(
                 """
@@ -57,6 +91,12 @@ class FoundationStore:
                 PRAGMA foreign_keys=ON;
                 PRAGMA synchronous=FULL;
                 PRAGMA busy_timeout=5000;
+                CREATE TABLE IF NOT EXISTS foundation_metadata (
+                    store_kind TEXT PRIMARY KEY CHECK(store_kind='hive-foundation'),
+                    schema_version INTEGER NOT NULL,
+                    schema_digest TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                ) WITHOUT ROWID;
                 CREATE TABLE IF NOT EXISTS repositories (
                     tenant_id TEXT NOT NULL,
                     repository_id TEXT NOT NULL,
@@ -76,6 +116,7 @@ class FoundationStore:
                     stream_version INTEGER NOT NULL,
                     previous_digest TEXT,
                     semantic_digest TEXT NOT NULL,
+                    command_digest TEXT NOT NULL,
                     payload_json TEXT NOT NULL,
                     actor_id TEXT NOT NULL,
                     observed_at TEXT NOT NULL,
@@ -99,6 +140,7 @@ class FoundationStore:
                     target_record_id TEXT NOT NULL,
                     relation TEXT NOT NULL,
                     evidence_digest TEXT NOT NULL,
+                    evidence_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY(source_record_id) REFERENCES records(record_id),
                     FOREIGN KEY(target_record_id) REFERENCES records(record_id)
@@ -167,6 +209,7 @@ class FoundationStore:
             )
             for table in (
                 "repositories",
+                "foundation_metadata",
                 "records",
                 "record_relations",
                 "opportunity_keys",
@@ -184,7 +227,136 @@ class FoundationStore:
                     BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;
                     """
                 )
+            if version == 0:
+                schema_digest = self._schema_digest()
+                self._connection.execute(
+                    "INSERT INTO foundation_metadata VALUES(?,?,?,?)",
+                    (
+                        "hive-foundation",
+                        FOUNDATION_SCHEMA_VERSION,
+                        schema_digest,
+                        self._clock(),
+                    ),
+                )
             self._connection.execute(f"PRAGMA user_version={FOUNDATION_SCHEMA_VERSION}")
+        self._validate_shape()
+
+    def _validate_shape(self) -> None:
+        required_columns = {
+            "foundation_metadata": {
+                "store_kind",
+                "schema_version",
+                "schema_digest",
+                "created_at",
+            },
+            "repositories": {
+                "tenant_id",
+                "repository_id",
+                "identity_digest",
+                "identity_json",
+                "registered_at",
+            },
+            "records": {
+                "sequence",
+                "record_id",
+                "record_type",
+                "schema_name",
+                "tenant_id",
+                "repository_id",
+                "stream_id",
+                "stream_version",
+                "previous_digest",
+                "semantic_digest",
+                "command_digest",
+                "payload_json",
+                "actor_id",
+                "observed_at",
+                "recorded_at",
+                "correlation_id",
+                "causation_id",
+                "sensitivity",
+                "retention",
+                "status",
+                "idempotency_key",
+            },
+            "record_relations": {
+                "sequence",
+                "tenant_id",
+                "repository_id",
+                "source_record_id",
+                "target_record_id",
+                "relation",
+                "evidence_digest",
+                "evidence_json",
+                "created_at",
+            },
+            "opportunity_keys": {
+                "tenant_id",
+                "repository_id",
+                "normalization_version",
+                "exact_digest",
+                "structured_digest",
+                "opportunity_record_id",
+                "created_at",
+            },
+            "outbox_messages": {
+                "sequence",
+                "message_id",
+                "source_record_id",
+                "projection_kind",
+                "projection_version",
+                "destination",
+                "payload_json",
+                "payload_digest",
+                "created_at",
+            },
+            "outbox_attempts": {
+                "sequence",
+                "message_id",
+                "destination",
+                "outcome",
+                "error_class",
+                "attempted_at",
+            },
+            "outbox_acknowledgements": {
+                "sequence",
+                "message_id",
+                "destination",
+                "sink_receipt_id",
+                "acknowledged_at",
+            },
+        }
+        for table, expected in required_columns.items():
+            observed = {
+                str(row[1])
+                for row in self._connection.execute(f"PRAGMA table_info({table})")
+            }
+            if observed != expected:
+                raise RuntimeError(
+                    f"foundation table {table} has incompatible columns: "
+                    f"{sorted(observed)}"
+                )
+        marker = self._connection.execute(
+            "SELECT store_kind,schema_version,schema_digest FROM foundation_metadata"
+        ).fetchall()
+        if len(marker) != 1 or tuple(marker[0][:2]) != (
+            "hive-foundation",
+            FOUNDATION_SCHEMA_VERSION,
+        ):
+            raise RuntimeError("foundation metadata marker is missing or incompatible")
+        if marker[0]["schema_digest"] != self._schema_digest():
+            raise RuntimeError("foundation schema digest is missing or incompatible")
+
+    def _schema_digest(self) -> str:
+        objects = [
+            tuple(row)
+            for row in self._connection.execute(
+                "SELECT type,name,sql FROM sqlite_master "
+                "WHERE type IN ('table','index','trigger') "
+                "AND name != 'sqlite_sequence' ORDER BY type,name"
+            )
+        ]
+        return digest(objects)
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
@@ -202,7 +374,28 @@ class FoundationStore:
         if not tenant_id.strip() or not repository_id.strip():
             raise ScopeError("tenant_id and repository_id are required")
 
-    def register_repository(self, identity: Mapping[str, Any]) -> str:
+    @staticmethod
+    def _require_authority(
+        authority: AuthorityDecision,
+        foundation_action: str,
+    ) -> None:
+        if (
+            not authority.allowed
+            or authority.foundation_action != foundation_action
+            or authority.mapped_action is None
+        ):
+            raise PermissionError(
+                f"foundation authority denied for {foundation_action}: "
+                f"{authority.reason}"
+            )
+
+    def register_repository(
+        self,
+        identity: Mapping[str, Any],
+        *,
+        authority: AuthorityDecision,
+    ) -> str:
+        self._require_authority(authority, "foundation.repository.register")
         from .contracts import validate_foundation
 
         validation = validate_foundation("repository-identity-v1", identity)
@@ -235,6 +428,8 @@ class FoundationStore:
     def append_record(
         self,
         *,
+        authority: AuthorityDecision,
+        foundation_action: str,
         tenant_id: str,
         repository_id: str,
         record_type: str,
@@ -251,6 +446,9 @@ class FoundationStore:
         status: str = "recorded",
         destination: str = "local",
     ) -> dict[str, Any]:
+        from .contracts import PHASE2_SCHEMA_NAMES, validate_foundation
+
+        self._require_authority(authority, foundation_action)
         self._require_scope(tenant_id, repository_id)
         if not all(
             item.strip()
@@ -266,7 +464,35 @@ class FoundationStore:
             raise ValueError("record identity fields cannot be empty")
         if sensitivity not in {"private", "internal", "safe-public"}:
             raise ValueError("unsupported sensitivity")
+        if sensitivity == "safe-public" and not authority.public_release_allowed:
+            raise PermissionError(
+                "safe-public requires an independent public-release decision"
+            )
+        required_action = RECORD_ACTIONS.get(
+            record_type, "foundation.memory.write"
+        )
+        if foundation_action != required_action:
+            raise PermissionError(
+                f"{record_type} requires {required_action}, not {foundation_action}"
+            )
         reject_private_content(payload)
+        if schema_name not in PHASE2_SCHEMA_NAMES:
+            raise ValueError("foundation records require a registered Phase 2 schema")
+        validation = validate_foundation(schema_name, payload)
+        if not validation.valid:
+            raise ValueError(
+                f"invalid {schema_name} contract: {'; '.join(validation.issues)}"
+            )
+        if payload.get("record_type") != record_type:
+            raise ValueError("record_type must match the validated contract")
+        for field, expected in (
+            ("tenant_id", tenant_id),
+            ("repository_id", repository_id),
+            ("sensitivity", sensitivity),
+            ("retention", retention),
+        ):
+            if field in payload and payload[field] != expected:
+                raise ScopeError(f"payload {field} differs from storage command")
         with self._lock, self._transaction():
             return self._append_record_in_transaction(
                 tenant_id=tenant_id,
@@ -284,6 +510,22 @@ class FoundationStore:
                 retention=retention,
                 status=status,
                 destination=destination,
+                command_digest=self._command_digest(
+                    tenant_id=tenant_id,
+                    repository_id=repository_id,
+                    record_type=record_type,
+                    schema_name=schema_name,
+                    stream_id=stream_id,
+                    payload=payload,
+                    actor_id=actor_id,
+                    idempotency_key=idempotency_key,
+                    correlation_id=correlation_id,
+                    causation_id=causation_id,
+                    sensitivity=sensitivity,
+                    retention=retention,
+                    status=status,
+                    destination=destination,
+                ),
             )
 
     def append_contract_record(
@@ -291,6 +533,8 @@ class FoundationStore:
         schema_name: str,
         document: Mapping[str, Any],
         *,
+        authority: AuthorityDecision,
+        foundation_action: str,
         tenant_id: str,
         repository_id: str,
         stream_id: str,
@@ -316,6 +560,8 @@ class FoundationStore:
         if not record_type:
             raise ValueError("contract record_type is required")
         return self.append_record(
+            authority=authority,
+            foundation_action=foundation_action,
             tenant_id=tenant_id,
             repository_id=repository_id,
             record_type=record_type,
@@ -346,6 +592,7 @@ class FoundationStore:
         retention: str,
         status: str,
         destination: str,
+        command_digest: str,
     ) -> dict[str, Any]:
         semantic_digest = digest(payload)
         existing = self._connection.execute(
@@ -354,7 +601,10 @@ class FoundationStore:
             (tenant_id, repository_id, idempotency_key),
         ).fetchone()
         if existing is not None:
-            if existing["semantic_digest"] != semantic_digest:
+            if (
+                existing["semantic_digest"] != semantic_digest
+                or existing["command_digest"] != command_digest
+            ):
                 raise IdempotencyConflict("idempotency key reused for different content")
             return self._decode_record(existing)
         repository = self._connection.execute(
@@ -386,10 +636,11 @@ class FoundationStore:
             """
             INSERT INTO records(
                 record_id,record_type,schema_name,tenant_id,repository_id,
-                stream_id,stream_version,previous_digest,semantic_digest,payload_json,
+                stream_id,stream_version,previous_digest,semantic_digest,command_digest,
+                payload_json,
                 actor_id,observed_at,recorded_at,correlation_id,causation_id,
                 sensitivity,retention,status,idempotency_key
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 record_id,
@@ -401,6 +652,7 @@ class FoundationStore:
                 stream_version,
                 previous_digest,
                 semantic_digest,
+                command_digest,
                 payload_json,
                 actor_id,
                 observed_at,
@@ -456,6 +708,43 @@ class FoundationStore:
         return self._decode_record(row)
 
     @staticmethod
+    def _command_digest(
+        *,
+        tenant_id: str,
+        repository_id: str,
+        record_type: str,
+        schema_name: str,
+        stream_id: str,
+        payload: Mapping[str, Any],
+        actor_id: str,
+        idempotency_key: str,
+        correlation_id: str | None,
+        causation_id: str | None,
+        sensitivity: str,
+        retention: str,
+        status: str,
+        destination: str,
+    ) -> str:
+        return digest(
+            {
+                "tenant_id": tenant_id,
+                "repository_id": repository_id,
+                "record_type": record_type,
+                "schema_name": schema_name,
+                "stream_id": stream_id,
+                "payload": payload,
+                "actor_id": actor_id,
+                "idempotency_key": idempotency_key,
+                "correlation_id": correlation_id,
+                "causation_id": causation_id,
+                "sensitivity": sensitivity,
+                "retention": retention,
+                "status": status,
+                "destination": destination,
+            }
+        )
+
+    @staticmethod
     def _decode_record(row: sqlite3.Row) -> dict[str, Any]:
         return {**dict(row), "payload": json.loads(row["payload_json"])}
 
@@ -481,6 +770,8 @@ class FoundationStore:
     def add_relation(
         self,
         *,
+        authority: AuthorityDecision,
+        foundation_action: str,
         tenant_id: str,
         repository_id: str,
         source_record_id: str,
@@ -488,20 +779,23 @@ class FoundationStore:
         relation: str,
         evidence: Mapping[str, Any],
     ) -> int:
+        self._require_authority(authority, foundation_action)
         self._require_scope(tenant_id, repository_id)
         reject_private_content(evidence)
         with self._lock, self._transaction():
+            expected_count = len({source_record_id, target_record_id})
             scoped = self._connection.execute(
                 "SELECT COUNT(*) FROM records WHERE tenant_id=? AND repository_id=? "
                 "AND record_id IN (?,?)",
                 (tenant_id, repository_id, source_record_id, target_record_id),
             ).fetchone()[0]
-            if scoped != 2 and source_record_id != target_record_id:
+            if scoped != expected_count:
                 raise ScopeError("relation endpoints must exist in the same scope")
             cursor = self._connection.execute(
                 "INSERT INTO record_relations("
                 "tenant_id,repository_id,source_record_id,target_record_id,"
-                "relation,evidence_digest,created_at) VALUES(?,?,?,?,?,?,?)",
+                "relation,evidence_digest,evidence_json,created_at) "
+                "VALUES(?,?,?,?,?,?,?,?)",
                 (
                     tenant_id,
                     repository_id,
@@ -509,6 +803,7 @@ class FoundationStore:
                     target_record_id,
                     relation,
                     digest(evidence),
+                    canonical_bytes(evidence).decode("utf-8").rstrip("\n"),
                     self._clock(),
                 ),
             )
@@ -539,13 +834,23 @@ class FoundationStore:
         destination: str,
         outcome: str,
         *,
+        authority: AuthorityDecision,
         error_class: str | None = None,
     ) -> int:
+        self._require_authority(authority, "foundation.outbox.deliver")
+        if outcome not in {"failed", "succeeded"}:
+            raise ValueError("outbox attempt outcome must be failed or succeeded")
         if error_class is not None and (
             len(error_class) > 80 or not error_class.replace("_", "").isalnum()
         ):
             raise ValueError("error_class must be a bounded symbolic value")
         with self._lock, self._transaction():
+            message = self._connection.execute(
+                "SELECT destination FROM outbox_messages WHERE message_id=?",
+                (message_id,),
+            ).fetchone()
+            if message is None or message["destination"] != destination:
+                raise ScopeError("outbox destination does not match immutable message")
             cursor = self._connection.execute(
                 "INSERT INTO outbox_attempts("
                 "message_id,destination,outcome,error_class,attempted_at) "
@@ -555,8 +860,33 @@ class FoundationStore:
             assert cursor.lastrowid is not None
             return int(cursor.lastrowid)
 
-    def acknowledge(self, message_id: str, destination: str, sink_receipt_id: str) -> None:
+    def acknowledge(
+        self,
+        message_id: str,
+        destination: str,
+        sink_receipt_id: str,
+        *,
+        authority: AuthorityDecision,
+    ) -> None:
+        self._require_authority(authority, "foundation.outbox.deliver")
+        if not sink_receipt_id.strip():
+            raise ValueError("sink_receipt_id is required")
         with self._lock, self._transaction():
+            message = self._connection.execute(
+                "SELECT destination FROM outbox_messages WHERE message_id=?",
+                (message_id,),
+            ).fetchone()
+            if message is None or message["destination"] != destination:
+                raise ScopeError("outbox destination does not match immutable message")
+            succeeded = self._connection.execute(
+                "SELECT 1 FROM outbox_attempts WHERE message_id=? AND destination=? "
+                "AND outcome='succeeded' LIMIT 1",
+                (message_id, destination),
+            ).fetchone()
+            if succeeded is None:
+                raise RuntimeError(
+                    "outbox acknowledgement requires a successful delivery attempt"
+                )
             existing = self._connection.execute(
                 "SELECT sink_receipt_id FROM outbox_acknowledgements "
                 "WHERE message_id=? AND destination=?",
@@ -581,6 +911,10 @@ class FoundationStore:
         repository_id: str,
     ) -> tuple[str, ...]:
         issues: list[str] = []
+        try:
+            self._validate_shape()
+        except RuntimeError as error:
+            issues.append(f"store schema integrity failed: {error}")
         prior_by_stream: dict[str, str] = {}
         rows = self._connection.execute(
             "SELECT * FROM records WHERE tenant_id=? AND repository_id=? "
@@ -595,14 +929,158 @@ class FoundationStore:
             except (json.JSONDecodeError, TypeError, ValueError):
                 issues.append(f"{record_id}: payload is not canonical JSON")
                 continue
+            canonical_payload = canonical_bytes(payload).decode("utf-8").rstrip("\n")
+            if canonical_payload != row["payload_json"]:
+                issues.append(f"{record_id}: payload JSON is not canonical")
             if observed_digest != row["semantic_digest"]:
                 issues.append(f"{record_id}: semantic digest mismatch")
+            command_digest = self._command_digest(
+                tenant_id=str(row["tenant_id"]),
+                repository_id=str(row["repository_id"]),
+                record_type=str(row["record_type"]),
+                schema_name=str(row["schema_name"]),
+                stream_id=str(row["stream_id"]),
+                payload=payload,
+                actor_id=str(row["actor_id"]),
+                idempotency_key=str(row["idempotency_key"]),
+                correlation_id=row["correlation_id"],
+                causation_id=row["causation_id"],
+                sensitivity=str(row["sensitivity"]),
+                retention=str(row["retention"]),
+                status=str(row["status"]),
+                destination=self._record_destination(record_id),
+            )
+            if command_digest != row["command_digest"]:
+                issues.append(f"{record_id}: command digest mismatch")
             stream_id = str(row["stream_id"])
             expected_previous = prior_by_stream.get(stream_id)
             if row["previous_digest"] != expected_previous:
                 issues.append(f"{record_id}: previous digest mismatch")
             prior_by_stream[stream_id] = str(row["semantic_digest"])
+            from .contracts import PHASE2_SCHEMA_NAMES, validate_foundation
+
+            if row["schema_name"] in PHASE2_SCHEMA_NAMES:
+                validation = validate_foundation(str(row["schema_name"]), payload)
+                if not validation.valid:
+                    issues.append(f"{record_id}: schema validation failed")
+                if payload.get("record_type") != row["record_type"]:
+                    issues.append(f"{record_id}: record type differs from payload")
+            else:
+                issues.append(f"{record_id}: schema is not registered")
+        for row in self._connection.execute(
+            "SELECT * FROM repositories WHERE tenant_id=? AND repository_id=?",
+            (tenant_id, repository_id),
+        ):
+            try:
+                identity = json.loads(row["identity_json"])
+            except json.JSONDecodeError:
+                issues.append("repository identity is not JSON")
+            else:
+                canonical_identity = canonical_bytes(identity).decode("utf-8").rstrip(
+                    "\n"
+                )
+                if canonical_identity != row["identity_json"]:
+                    issues.append("repository identity JSON is not canonical")
+                if digest(identity) != row["identity_digest"]:
+                    issues.append("repository identity digest mismatch")
+        for row in self._connection.execute(
+            "SELECT * FROM record_relations WHERE tenant_id=? AND repository_id=?",
+            (tenant_id, repository_id),
+        ):
+            try:
+                evidence = json.loads(row["evidence_json"])
+            except json.JSONDecodeError:
+                issues.append(f"relation {row['sequence']}: evidence is not JSON")
+            else:
+                canonical_evidence = canonical_bytes(evidence).decode(
+                    "utf-8"
+                ).rstrip("\n")
+                if canonical_evidence != row["evidence_json"]:
+                    issues.append(
+                        f"relation {row['sequence']}: evidence JSON is not canonical"
+                    )
+                if digest(evidence) != row["evidence_digest"]:
+                    issues.append(f"relation {row['sequence']}: evidence digest mismatch")
+            endpoint_count = self._connection.execute(
+                "SELECT COUNT(*) FROM records WHERE tenant_id=? AND repository_id=? "
+                "AND record_id IN (?,?)",
+                (
+                    tenant_id,
+                    repository_id,
+                    row["source_record_id"],
+                    row["target_record_id"],
+                ),
+            ).fetchone()[0]
+            if endpoint_count != len(
+                {row["source_record_id"], row["target_record_id"]}
+            ):
+                issues.append(f"relation {row['sequence']}: cross-scope endpoint")
+        for row in self._connection.execute(
+            "SELECT * FROM outbox_messages ORDER BY sequence"
+        ):
+            try:
+                payload = json.loads(row["payload_json"])
+            except json.JSONDecodeError:
+                issues.append(f"outbox {row['message_id']}: payload is not JSON")
+            else:
+                canonical_payload = canonical_bytes(payload).decode(
+                    "utf-8"
+                ).rstrip("\n")
+                if canonical_payload != row["payload_json"]:
+                    issues.append(
+                        f"outbox {row['message_id']}: payload JSON is not canonical"
+                    )
+                if digest(payload) != row["payload_digest"]:
+                    issues.append(f"outbox {row['message_id']}: payload digest mismatch")
+                source = self._connection.execute(
+                    "SELECT record_type,schema_name,tenant_id,repository_id,"
+                    "semantic_digest FROM records WHERE record_id=?",
+                    (row["source_record_id"],),
+                ).fetchone()
+                expected = (
+                    None
+                    if source is None
+                    else {
+                        "record_id": row["source_record_id"],
+                        "record_type": source["record_type"],
+                        "schema_name": source["schema_name"],
+                        "tenant_id": source["tenant_id"],
+                        "repository_id": source["repository_id"],
+                        "semantic_digest": source["semantic_digest"],
+                    }
+                )
+                if payload != expected:
+                    issues.append(
+                        f"outbox {row['message_id']}: source projection mismatch"
+                    )
+        for table in ("outbox_attempts", "outbox_acknowledgements"):
+            for row in self._connection.execute(f"SELECT * FROM {table}"):
+                destination = self._connection.execute(
+                    "SELECT destination FROM outbox_messages WHERE message_id=?",
+                    (row["message_id"],),
+                ).fetchone()
+                if destination is None or destination["destination"] != row["destination"]:
+                    issues.append(
+                        f"{table} {row['sequence']}: destination mismatch"
+                    )
+                if table == "outbox_acknowledgements":
+                    succeeded = self._connection.execute(
+                        "SELECT 1 FROM outbox_attempts WHERE message_id=? "
+                        "AND destination=? AND outcome='succeeded' LIMIT 1",
+                        (row["message_id"], row["destination"]),
+                    ).fetchone()
+                    if succeeded is None:
+                        issues.append(
+                            f"{table} {row['sequence']}: no successful attempt"
+                        )
         return tuple(issues)
+
+    def _record_destination(self, record_id: str) -> str:
+        row = self._connection.execute(
+            "SELECT destination FROM outbox_messages WHERE source_record_id=?",
+            (record_id,),
+        ).fetchone()
+        return "" if row is None else str(row["destination"])
 
     def journal_mode(self) -> str:
         return str(self._connection.execute("PRAGMA journal_mode").fetchone()[0])

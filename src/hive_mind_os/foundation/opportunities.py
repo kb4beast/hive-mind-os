@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-from .canonical import digest, normalize_fingerprint_text
+from .authority import AuthorityDecision
+from .canonical import (
+    canonical_bytes,
+    digest,
+    normalize_fingerprint_text,
+    reject_private_content,
+)
 from .contracts import validate_foundation
 from .store import FoundationStore, IdempotencyConflict, ScopeError
 
@@ -34,8 +40,15 @@ class OpportunityResult:
 class OpportunityLedger:
     """Transactional encounter-first opportunity classification."""
 
-    def __init__(self, store: FoundationStore) -> None:
+    def __init__(
+        self,
+        store: FoundationStore,
+        *,
+        authority: AuthorityDecision,
+    ) -> None:
+        store._require_authority(authority, "foundation.opportunity.write")
         self.store = store
+        self.authority = authority
 
     def register(
         self,
@@ -49,6 +62,7 @@ class OpportunityLedger:
         actor_id: str,
         evidence_digests: Sequence[str],
         semantic_candidate_ids: Sequence[str] = (),
+        semantic_evidence: Mapping[str, Any] | None = None,
         disposition: str | None = None,
     ) -> OpportunityResult:
         if not encounter_id.strip():
@@ -89,6 +103,9 @@ class OpportunityLedger:
                 "invalid idea encounter: " + "; ".join(encounter_validation.issues)
             )
         with self.store._lock, self.store._transaction():
+            self.store._require_authority(
+                self.authority, "foundation.opportunity.write"
+            )
             encounter = self.store._append_record_in_transaction(
                 tenant_id=tenant_id,
                 repository_id=repository_id,
@@ -105,6 +122,22 @@ class OpportunityLedger:
                 retention="governed",
                 status="recorded",
                 destination="local",
+                command_digest=self.store._command_digest(
+                    tenant_id=tenant_id,
+                    repository_id=repository_id,
+                    record_type="idea-encounter",
+                    schema_name="idea-encounter-v1",
+                    stream_id=f"encounter:{encounter_id}",
+                    payload=encounter_payload,
+                    actor_id=actor_id,
+                    idempotency_key=f"encounter:{encounter_id}",
+                    correlation_id=encounter_id,
+                    causation_id=None,
+                    sensitivity="private",
+                    retention="governed",
+                    status="recorded",
+                    destination="local",
+                ),
             )
             matches = self.store._connection.execute(
                 """
@@ -144,6 +177,23 @@ class OpportunityLedger:
 
             candidates = tuple(dict.fromkeys(semantic_candidate_ids))
             if candidates:
+                if semantic_evidence is None:
+                    raise ValueError(
+                        "semantic candidates require algorithm/index/threshold evidence"
+                    )
+                required_evidence = {
+                    "algorithm_id",
+                    "algorithm_version",
+                    "index_digest",
+                    "threshold_ppm",
+                    "neighbor_scores_ppm",
+                }
+                if set(semantic_evidence) != required_evidence:
+                    raise ValueError(
+                        "semantic evidence must bind algorithm, index, threshold, "
+                        "and neighbor scores"
+                    )
+                reject_private_content(semantic_evidence)
                 scoped_count = self.store._connection.execute(
                     "SELECT COUNT(*) FROM records WHERE tenant_id=? AND repository_id=? "
                     f"AND record_id IN ({','.join('?' for _ in candidates)})",
@@ -158,7 +208,7 @@ class OpportunityLedger:
                         encounter["record_id"],
                         candidate_id,
                         "semantic-candidate",
-                        {"algorithm": "caller-supplied-offline-v1"},
+                        semantic_evidence,
                     )
                 return OpportunityResult(
                     encounter["record_id"],
@@ -194,7 +244,7 @@ class OpportunityLedger:
             opportunity = self.store._append_record_in_transaction(
                 tenant_id=tenant_id,
                 repository_id=repository_id,
-                record_type="opportunity",
+                record_type="opportunity-record",
                 schema_name="opportunity-record-v1",
                 stream_id=f"opportunity:{exact_digest}",
                 payload=opportunity_payload,
@@ -207,6 +257,22 @@ class OpportunityLedger:
                 retention="governed",
                 status="candidate",
                 destination="local",
+                command_digest=self.store._command_digest(
+                    tenant_id=tenant_id,
+                    repository_id=repository_id,
+                    record_type="opportunity-record",
+                    schema_name="opportunity-record-v1",
+                    stream_id=f"opportunity:{exact_digest}",
+                    payload=opportunity_payload,
+                    actor_id=actor_id,
+                    idempotency_key=f"opportunity:{exact_digest}",
+                    correlation_id=encounter_id,
+                    causation_id=encounter["record_id"],
+                    sensitivity="private",
+                    retention="governed",
+                    status="candidate",
+                    destination="local",
+                ),
             )
             self.store._connection.execute(
                 "INSERT INTO opportunity_keys VALUES(?,?,?,?,?,?,?)",
@@ -245,6 +311,8 @@ class OpportunityLedger:
         if relationship not in RELATIONSHIPS - {"semantic-candidate"}:
             raise ValueError("unsupported semantic classification")
         return self.store.add_relation(
+            authority=self.authority,
+            foundation_action="foundation.opportunity.write",
             tenant_id=tenant_id,
             repository_id=repository_id,
             source_record_id=encounter_record_id,
@@ -262,10 +330,11 @@ class OpportunityLedger:
         relation: str,
         evidence: Mapping[str, Any],
     ) -> None:
+        reject_private_content(evidence)
         self.store._connection.execute(
             "INSERT INTO record_relations("
             "tenant_id,repository_id,source_record_id,target_record_id,"
-            "relation,evidence_digest,created_at) VALUES(?,?,?,?,?,?,?)",
+            "relation,evidence_digest,evidence_json,created_at) VALUES(?,?,?,?,?,?,?,?)",
             (
                 tenant_id,
                 repository_id,
@@ -273,6 +342,7 @@ class OpportunityLedger:
                 target_record_id,
                 relation,
                 digest(evidence),
+                canonical_bytes(evidence).decode("utf-8").rstrip("\n"),
                 self.store._clock(),
             ),
         )

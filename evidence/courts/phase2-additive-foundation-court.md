@@ -7,7 +7,8 @@
 - Explorer/Expert: `Wegener`
 - Architect/Cross-Examiner: `Gibbs`
 - Builder: `Codex-root`
-- Curator: pending exact-candidate appointment
+- Curator: `Kuhn`
+- Steward: `Planck`
 - Judge: pending exact-candidate appointment
 
 ## Admitted sources and dispositions
@@ -71,6 +72,15 @@ activation/support claims but do not block an inert, local Phase 2 foundation.
 
 Architecture: `adopt`.
 
-Implementation promotion remains pending independent Curator reconstruction and a
-different Judge on the exact committed candidate. Until that disposition, Generation
-Zero remains the only selected runtime.
+Initial implementation candidate
+`1754f568900a0e19517c0586c0406fe4164d8597`: `remand`.
+
+The Curator and Steward independently reproduced authority, admission, relation,
+attempt identity/retry, privacy/cardinality, schema/type, command idempotency,
+canonical-source, delivery, integrity, and characterization failures. The Builder
+accepted every finding. The append-only remediation record is
+`P2-AUDIT-009`; 22 adversarial tests now exercise the failures directly.
+
+Implementation promotion remains pending fresh Curator/Steward reconstruction and a
+different Judge on the remediated exact committed candidate. Until that disposition,
+Generation Zero remains the only selected runtime.

@@ -29,7 +29,9 @@ Delivery state is represented by append-only receipts rather than mutation.
 Phase 2 schemas and generated candidates live under
 `hive_mind_os.foundation`, outside the frozen legacy schema catalog and top-level
 facades. The wheel verifies the original 20 schemas plus the separately counted
-foundation resources. Generated agent definitions are inert and authority-free.
+foundation resources. Eight versioned canonical agent sources compile to eight inert
+generated definitions plus a manifest. The compiler binds their prompt-layer digests
+to the frozen Generation Zero prompts; generated definitions remain authority-free.
 
 Every material foundation write is bounded by:
 
@@ -37,7 +39,9 @@ Every material foundation write is bounded by:
 
 Missing input denies. A generated file, memory, usage event, outcome, or apparent
 success cannot grant authority. Usage collection requires the fixed trusted-recorder
-identity.
+identity. Store entry points enforce the decision and action/type boundary. A
+safe-public record additionally requires an explicit independent public-release
+decision.
 
 Idea handling is encounter-first. Exact and structured matches are transactional.
 Semantic matches are candidates only and cannot merge. Relationships and appeals are
@@ -52,6 +56,10 @@ attribution, corrections, and invoices are late-bound append-only records.
 Observability is local-only. Metrics use a fixed low-cardinality label vocabulary.
 Correlated trace and OpenTelemetry-shaped envelopes may carry governed identifiers,
 but bodies and free-text errors are prohibited. Export is disabled by default.
+
+The database is self-identifying. Initialization refuses every non-empty unversioned
+database, including Generation Zero stores, and validates an immutable schema-object
+digest before reopening a same-version database.
 
 ## Consequences
 
@@ -78,6 +86,9 @@ but bodies and free-text errors are prohibited. Export is disabled by default.
   never auto-merges.
 - Generated churn can hide edits: deterministic byte generation binds source and
   output digests, and `--check` rejects hand edits.
+- Advisory authority can be bypassed by direct store calls: every material write
+  requires a matching allowed decision; type/action and safe-public release are
+  enforced at the storage boundary.
 
 ## Rollback
 

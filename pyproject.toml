@@ -24,6 +24,7 @@ hive_mind_os = [
     "foundation/schemas/*.json",
     "foundation/generated/*.json",
     "foundation/generated/agents/*.json",
+    "foundation/canonical/agents/*.json",
     "builtin_packages/*/*.json",
     "builtin_packages/*/*/*.json",
     "builtin_packages/*/*/*/*.json",

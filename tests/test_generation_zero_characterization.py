@@ -442,11 +442,7 @@ class GenerationZeroCharacterizationTests(unittest.TestCase):
             SURFACE_INVENTORY_PATH.read_text(encoding="utf-8")
         )
         observed = build_inventory(REPOSITORY_ROOT)
-        self.assertEqual(
-            expected["inventory_digest"],
-            "sha256:57ad3e54934f2f1315f71e1d994253ce"
-            "5d9100e2f161d430354039592e6ec037",
-        )
+        self.assertEqual(observed, expected)
         self.assertEqual(
             observed["public_api"]["facades"],
             {
@@ -459,9 +455,9 @@ class GenerationZeroCharacterizationTests(unittest.TestCase):
                 },
             },
         )
-        self.assertGreaterEqual(
+        self.assertEqual(
             observed["observable_module_surface"]["definition_count"],
-            expected["observable_module_surface"]["definition_count"],
+            304,
         )
         effects = observed["runtime_effects"]
         self.assertEqual(effects["event_sink_count"], 48)

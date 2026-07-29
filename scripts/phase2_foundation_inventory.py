@@ -39,12 +39,19 @@ def _digest_json(value: Any) -> str:
 
 
 def build_phase2_inventory(repository: Path) -> dict[str, Any]:
-    current = build_inventory(repository)
+    current = build_inventory(repository, include_additive=True)
     baseline = json.loads((repository / ARTIFACT_PATH).read_text(encoding="utf-8"))
     schema_root = repository / "src" / "hive_mind_os" / "foundation" / "schemas"
     schema_resources = {
         path.name: _digest_bytes(path.read_bytes())
         for path in sorted(schema_root.glob("*.json"))
+    }
+    canonical_root = (
+        repository / "src" / "hive_mind_os" / "foundation" / "canonical" / "agents"
+    )
+    canonical_resources = {
+        path.name: _digest_bytes(path.read_bytes())
+        for path in sorted(canonical_root.glob("*.json"))
     }
     generated = compile_generation_zero_candidates()
     with tempfile.TemporaryDirectory() as temporary:
@@ -118,6 +125,11 @@ def build_phase2_inventory(repository: Path) -> dict[str, Any]:
                 path: _digest_bytes(content)
                 for path, content in sorted(generated.items())
             },
+        },
+        "canonical_agent_sources": {
+            "count": len(canonical_resources),
+            "resource_digests": canonical_resources,
+            "resource_set_digest": _digest_json(canonical_resources),
         },
         "foundation_store": {
             "schema_version": FOUNDATION_SCHEMA_VERSION,

@@ -33,11 +33,18 @@ requires tenant and repository.
 Each record has a stable content-bound ID, schema/type, scoped stream and monotonic
 version, prior digest, semantic digest, actor, observed/recorded times, correlation,
 causation, sensitivity, retention, status, and idempotency key. Replaying the same key
-and bytes returns the original; different bytes fail closed.
+and full semantic command returns the original; changing payload, actor, destination,
+scope, schema/type, stream, status, sensitivity, retention, correlation, or causation
+fails closed.
 
 Each record and outbox message share a single transaction. Domain and outbox tables
 reject update and delete. Delivery attempts and acknowledgements append. WAL reopen
-preserves pending work.
+preserves pending work. Delivery receipts are bound to the immutable destination, and
+an acknowledgement requires a prior successful attempt and a nonempty sink receipt.
+
+The store will create tables only in an empty, unversioned database. A versioned
+foundation database must carry the expected ownership marker, exact columns, and
+schema-object digest. It never adopts or migrates a Generation Zero database.
 
 ## Opportunity invariants
 
@@ -66,7 +73,9 @@ Sensitivity defaults to private. Safe-public requires an independent policy deci
 Metrics accept only schema version, record type, provider kind, outcome,
 reconciliation status, and sensitivity labels. IDs stay in governed records or trace
 attributes. OpenTelemetry-shaped local envelopes are dependency-free and outbound
-export remains disabled.
+export remains disabled. Metric names and values are bounded. Trace attributes reject
+body, request, response, credential, authorization, password, and reserved
+provider/outcome keys.
 
 ## Phase boundary
 

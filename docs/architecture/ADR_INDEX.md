@@ -21,4 +21,4 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-021` | [Additive memory and telemetry foundation](ADR-021-PHASE2-ADDITIVE-MEMORY-TELEMETRY-FOUNDATION.md) | Phase 2 | adopted implementation architecture; activation remains prohibited |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-021; it must be unique at creation time.
+is ADR-022; it must be unique at creation time.

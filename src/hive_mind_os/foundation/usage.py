@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
+from uuid import uuid4
 
 from hive_mind_os.model_provider import (
     ModelProvider,
     ModelRequest,
     ModelResponse,
     ModelResponseError,
+    ModelTransportError,
 )
 
+from .authority import AuthorityDecision
 from .canonical import stable_id
 from .contracts import validate_foundation
 from .store import FoundationStore, IdempotencyConflict
@@ -37,32 +40,20 @@ class ProviderUsageAdapter:
 
     @staticmethod
     def parse(provider_kind: str, raw_body: bytes) -> dict[str, Any]:
+        if len(raw_body) > 1_000_000:
+            return ProviderUsageAdapter._unknown_observation("response-size-limit")
         try:
             body = json.loads(raw_body)
         except (UnicodeDecodeError, json.JSONDecodeError):
-            return {
-                "adapter_version": NORMALIZATION_VERSION,
-                "accounting_status": "unknown",
-                "native": {},
-                "normalized_axes": ProviderUsageAdapter._unknown_axes(),
-                "provider_request_id": None,
-                "served_model_id": None,
-                "unmapped_paths": [],
-            }
+            return ProviderUsageAdapter._unknown_observation("invalid-json")
         if not isinstance(body, dict):
-            return {
-                "adapter_version": NORMALIZATION_VERSION,
-                "accounting_status": "unknown",
-                "native": {},
-                "normalized_axes": ProviderUsageAdapter._unknown_axes(),
-                "provider_request_id": None,
-                "served_model_id": None,
-                "unmapped_paths": [],
-            }
+            return ProviderUsageAdapter._unknown_observation("non-object")
         usage = body.get("usage")
         if not isinstance(usage, dict):
             usage = {}
-        native, unmapped = ProviderUsageAdapter._numeric_usage(usage)
+        native, unmapped_count = ProviderUsageAdapter._numeric_usage(
+            provider_kind, usage
+        )
         if provider_kind == "openai_compatible":
             input_tokens = _nonnegative_int(usage.get("prompt_tokens"))
             output_tokens = _nonnegative_int(usage.get("completion_tokens"))
@@ -113,33 +104,80 @@ class ProviderUsageAdapter:
             "served_model_id": (
                 body.get("model") if isinstance(body.get("model"), str) else None
             ),
-            "unmapped_paths": unmapped,
+            "unmapped_path_count": unmapped_count,
+            "observation_failure": None,
         }
 
     @staticmethod
-    def _numeric_usage(value: Mapping[str, Any]) -> tuple[dict[str, int | None], list[str]]:
+    def _numeric_usage(
+        provider_kind: str,
+        value: Mapping[str, Any],
+    ) -> tuple[dict[str, int | None], int]:
         native: dict[str, int | None] = {}
-        unmapped: list[str] = []
+        allowed = {
+            "openai_compatible": {
+                "completion_tokens",
+                "completion_tokens_details.reasoning_tokens",
+                "prompt_tokens",
+                "prompt_tokens_details.cached_tokens",
+                "total_tokens",
+            },
+            "anthropic": {
+                "cache_creation_input_tokens",
+                "cache_read_input_tokens",
+                "input_tokens",
+                "output_tokens",
+            },
+        }.get(provider_kind, set())
 
-        def visit(item: Any, path: str, depth: int) -> None:
-            if depth > 3:
-                unmapped.append(path)
+        def lookup(path: str) -> tuple[bool, Any]:
+            item: Any = value
+            for part in path.split("."):
+                if not isinstance(item, Mapping) or part not in item:
+                    return False, None
+                item = item[part]
+            return True, item
+
+        leaf_count = 0
+
+        def count_leaves(item: Any, depth: int = 0) -> None:
+            nonlocal leaf_count
+            if leaf_count > 128:
                 return
-            if isinstance(item, Mapping):
-                for key in sorted(item):
-                    if not isinstance(key, str) or len(key) > 80:
-                        unmapped.append(path)
-                        continue
-                    visit(item[key], f"{path}.{key}" if path else key, depth + 1)
-            elif item is None:
-                native[path] = None
-            elif type(item) is int and item >= 0:
-                native[path] = item
+            if isinstance(item, Mapping) and depth <= 3:
+                for child in item.values():
+                    count_leaves(child, depth + 1)
             else:
-                unmapped.append(path)
+                leaf_count += 1
 
-        visit(value, "", 0)
-        return native, sorted(set(filter(None, unmapped)))
+        count_leaves(value)
+        if leaf_count > 128:
+            return {}, leaf_count
+        mapped_count = 0
+        for path in sorted(allowed):
+            present, item = lookup(path)
+            if not present:
+                continue
+            if item is None:
+                native[path] = None
+                mapped_count += 1
+            elif type(item) is int and 0 <= item <= 10**15:
+                native[path] = item
+                mapped_count += 1
+        return native, max(0, leaf_count - mapped_count)
+
+    @staticmethod
+    def _unknown_observation(reason: str) -> dict[str, Any]:
+        return {
+            "adapter_version": NORMALIZATION_VERSION,
+            "accounting_status": "unknown",
+            "native": {},
+            "normalized_axes": ProviderUsageAdapter._unknown_axes(),
+            "provider_request_id": None,
+            "served_model_id": None,
+            "unmapped_path_count": 0,
+            "observation_failure": reason,
+        }
 
     @staticmethod
     def _axes(
@@ -221,14 +259,19 @@ class UsageRecorder:
         *,
         tenant_id: str,
         repository_id: str,
+        authority: AuthorityDecision,
         recorder_id: str = "foundation-usage-recorder-v1",
+        id_factory: Callable[[], str] | None = None,
     ) -> None:
         self.store = store
         self.tenant_id = tenant_id
         self.repository_id = repository_id
         if recorder_id != "foundation-usage-recorder-v1":
             raise ValueError("usage recorder identity is fixed and cannot self-declare")
+        store._require_authority(authority, "foundation.telemetry.write")
         self.recorder_id = recorder_id
+        self.authority = authority
+        self._id_factory = id_factory or (lambda: str(uuid4()))
 
     def start_attempt(
         self,
@@ -243,15 +286,7 @@ class UsageRecorder:
         budget_lease_id: str | None,
         trace_id: str,
     ) -> str:
-        attempt_id = stable_id(
-            "attempt",
-            {
-                "repository_id": self.repository_id,
-                "logical_request_id": logical_request_id,
-                "retry_index": retry_index,
-                "request_digest": request_digest,
-            },
-        )
+        attempt_id = f"attempt:{self._id_factory()}"
         payload = {
             "record_type": "usage-event",
             "schema_version": 1,
@@ -268,13 +303,34 @@ class UsageRecorder:
             "trace_id": trace_id,
             "accounting_status": "pending",
         }
+        payload.update(
+            self._canonical_families(
+                attempt_id=attempt_id,
+                logical_request_id=logical_request_id,
+                retry_index=retry_index,
+                provider_kind=provider_kind,
+                requested_model_id=requested_model_id,
+                served_model_id=None,
+                provider_request_id=None,
+                purpose=purpose,
+                actor_id=actor_id,
+                request_digest=request_digest,
+                budget_lease_id=budget_lease_id,
+                trace_id=trace_id,
+                duration_ms=None,
+                outcome=None,
+                error_class=None,
+            )
+        )
         validation = validate_foundation("usage-event-v1", payload)
         if not validation.valid:
             raise ValueError("invalid usage start: " + "; ".join(validation.issues))
         self.store.append_record(
+            authority=self.authority,
+            foundation_action="foundation.telemetry.write",
             tenant_id=self.tenant_id,
             repository_id=self.repository_id,
-            record_type="usage-attempt",
+            record_type="usage-event",
             schema_name="usage-event-v1",
             stream_id=f"usage:{attempt_id}",
             payload=payload,
@@ -308,7 +364,7 @@ class UsageRecorder:
             for record in self.store.records(
                 tenant_id=self.tenant_id,
                 repository_id=self.repository_id,
-                record_type="usage-attempt",
+                record_type="usage-event",
             )
             if record["payload"].get("event_kind") == "attempt-started"
             and record["payload"].get("attempt_id") == attempt_id
@@ -331,7 +387,8 @@ class UsageRecorder:
                 "normalized_axes": ProviderUsageAdapter._unknown_axes(),
                 "provider_request_id": None,
                 "served_model_id": None,
-                "unmapped_paths": [],
+                "unmapped_path_count": 0,
+                "observation_failure": "no-response",
             }
         )
         response_digest = (
@@ -352,13 +409,34 @@ class UsageRecorder:
             "error_class": error_class,
             **observation,
         }
+        payload.update(
+            self._canonical_families(
+                attempt_id=attempt_id,
+                logical_request_id=logical_request_id,
+                retry_index=int(started["retry_index"]),
+                provider_kind=provider_kind,
+                requested_model_id=str(started["requested_model_id"]),
+                served_model_id=observation["served_model_id"],
+                provider_request_id=observation["provider_request_id"],
+                purpose=str(started["purpose"]),
+                actor_id=str(started["actor_id"]),
+                request_digest=str(started["request_digest"]),
+                budget_lease_id=started["budget_lease_id"],
+                trace_id=str(started["trace_id"]),
+                duration_ms=duration_ms,
+                outcome=outcome,
+                error_class=error_class,
+            )
+        )
         validation = validate_foundation("usage-event-v1", payload)
         if not validation.valid:
             raise ValueError("invalid usage terminal: " + "; ".join(validation.issues))
         return self.store.append_record(
+            authority=self.authority,
+            foundation_action="foundation.telemetry.write",
             tenant_id=self.tenant_id,
             repository_id=self.repository_id,
-            record_type="usage-attempt",
+            record_type="usage-event",
             schema_name="usage-event-v1",
             stream_id=f"usage:{attempt_id}",
             payload=payload,
@@ -374,7 +452,7 @@ class UsageRecorder:
         records = self.store.records(
             tenant_id=self.tenant_id,
             repository_id=self.repository_id,
-            record_type="usage-attempt",
+            record_type="usage-event",
         )
         started: dict[str, dict[str, Any]] = {}
         terminal: set[str] = set()
@@ -405,6 +483,101 @@ class UsageRecorder:
             recovered.append(attempt_id)
         return tuple(recovered)
 
+    def _canonical_families(
+        self,
+        *,
+        attempt_id: str,
+        logical_request_id: str,
+        retry_index: int,
+        provider_kind: str,
+        requested_model_id: str,
+        served_model_id: Any,
+        provider_request_id: Any,
+        purpose: str,
+        actor_id: str,
+        request_digest: str,
+        budget_lease_id: Any,
+        trace_id: str,
+        duration_ms: int | float | None,
+        outcome: str | None,
+        error_class: str | None,
+    ) -> dict[str, Any]:
+        return {
+            "correlation": {
+                "repository_id": self.repository_id,
+                "tenant_id": self.tenant_id,
+                "mission_id": None,
+                "run_id": None,
+                "step_id": None,
+                "role": None,
+                "work_item_id": None,
+                "idea_id": None,
+                "case_id": None,
+                "experiment_id": None,
+                "trace_id": trace_id,
+                "span_id": None,
+                "logical_request_id": logical_request_id,
+                "attempt_id": attempt_id,
+                "provider_request_id": provider_request_id,
+            },
+            "identity": {
+                "acting_identity": actor_id,
+                "court_purpose": purpose,
+                "court_stance": "none",
+                "evaluation_arm": "none",
+                "provider_kind": provider_kind,
+                "requested_model_id": requested_model_id,
+                "served_model_id": served_model_id,
+                "model_revision": None,
+                "host_id": None,
+                "adapter_version": NORMALIZATION_VERSION,
+            },
+            "inputs": {
+                "request_digest": request_digest,
+                "prompt_layer_digest": None,
+                "context_digest": None,
+                "memory_selection_digest": None,
+                "selected_count": None,
+                "omitted_count": None,
+                "bodies_persisted": False,
+            },
+            "resources": {
+                "elapsed_ms": duration_ms,
+                "budget_lease_id": budget_lease_id,
+                "reservation": None,
+                "consumption": None,
+                "retry_index": retry_index,
+                "loop_signal_id": None,
+                "tool_id": None,
+            },
+            "cost": {
+                "amount": None,
+                "currency": None,
+                "price_card_version": None,
+                "provenance": "unknown",
+                "uncertainty": "unknown",
+            },
+            "result": {
+                "outcome": outcome,
+                "terminal_relationship": (
+                    "terminal" if outcome is not None else "pending"
+                ),
+                "error_class": error_class,
+                "redaction": "bodies-excluded",
+                "progress_fingerprint": None,
+                "value_link": None,
+            },
+            "governance": {
+                "sensitivity": "private",
+                "retention": "governed",
+                "consent_policy": "foundation-local-v1",
+                "quarantine_state": "none",
+                "exporter": "disabled",
+                "deletion_status": "retained",
+                "reconciliation_status": "pending",
+            },
+        }
+
 
 class ReceiptedModelProvider:
     """Opt-in provider adapter that durably receipts each physical attempt.
@@ -430,12 +603,19 @@ class ReceiptedModelProvider:
         self.budget_lease_id = budget_lease_id
         self.config = provider.config
         self.kind = provider.kind
-        self._attempt_index = 0
 
     def build_request_body(self, request: ModelRequest) -> bytes:
         return self.provider.build_request_body(request)
 
     def complete_once(self, request: ModelRequest) -> ModelResponse:
+        return self._complete_once(request, retry_index=0)
+
+    def _complete_once(
+        self,
+        request: ModelRequest,
+        *,
+        retry_index: int,
+    ) -> ModelResponse:
         body = self.provider.build_request_body(request)
         request_digest = f"sha256:{sha256(body).hexdigest()}"
         logical_request_id = stable_id(
@@ -446,8 +626,6 @@ class ReceiptedModelProvider:
                 "purpose": self.purpose,
             },
         )
-        retry_index = self._attempt_index
-        self._attempt_index += 1
         attempt_id = self.recorder.start_attempt(
             logical_request_id=logical_request_id,
             retry_index=retry_index,
@@ -489,7 +667,19 @@ class ReceiptedModelProvider:
         return response
 
     def complete(self, request: ModelRequest) -> ModelResponse:
-        return self.complete_once(request)
+        last_error: ModelTransportError | None = None
+        for retry_index in range(self.config.max_retries + 1):
+            try:
+                return replace(
+                    self._complete_once(request, retry_index=retry_index),
+                    transport_retry_index=retry_index,
+                )
+            except ModelTransportError as error:
+                last_error = error
+        raise ModelTransportError(
+            f"model transport failed after {self.config.max_retries + 1} "
+            f"attempts: {last_error}"
+        ) from None
 
 
 @dataclass(frozen=True, slots=True)

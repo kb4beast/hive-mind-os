@@ -461,12 +461,16 @@ def _source_arguments_contract(
     return parameters
 
 
-def observable_module_inventory(repository: Path) -> dict[str, object]:
+def observable_module_inventory(
+    repository: Path,
+    *,
+    include_additive: bool = False,
+) -> dict[str, object]:
     source_root = repository / "src" / "hive_mind_os"
     definitions: list[dict[str, object]] = []
     constants: list[dict[str, object]] = []
     module_count = 0
-    for path in _source_files(source_root):
+    for path in _source_files(source_root, include_additive=include_additive):
         relative = path.relative_to(repository).as_posix()
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=relative)
@@ -936,20 +940,34 @@ class _EffectVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-def _source_files(source_root: Path) -> Iterable[Path]:
+def _source_files(
+    source_root: Path,
+    *,
+    include_additive: bool = False,
+) -> Iterable[Path]:
     return sorted(
-        path for path in source_root.rglob("*.py") if path.is_file()
+        path
+        for path in source_root.rglob("*.py")
+        if path.is_file()
+        and (
+            include_additive
+            or "foundation" not in path.relative_to(source_root).parts
+        )
     )
 
 
-def effect_inventory(repository: Path) -> dict[str, object]:
+def effect_inventory(
+    repository: Path,
+    *,
+    include_additive: bool = False,
+) -> dict[str, object]:
     source_root = repository / "src" / "hive_mind_os"
     events: list[dict[str, object]] = []
     producers: list[dict[str, object]] = []
     writers: list[dict[str, object]] = []
     unclassified: list[dict[str, object]] = []
     files_scanned = 0
-    for path in _source_files(source_root):
+    for path in _source_files(source_root, include_additive=include_additive):
         relative = path.relative_to(repository).as_posix()
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
         visitor = _EffectVisitor(relative)
@@ -1022,13 +1040,20 @@ def effect_inventory(repository: Path) -> dict[str, object]:
     }
 
 
-def build_inventory(repository: Path) -> dict[str, Any]:
-    effects = effect_inventory(repository)
+def build_inventory(
+    repository: Path,
+    *,
+    include_additive: bool = False,
+) -> dict[str, Any]:
+    effects = effect_inventory(repository, include_additive=include_additive)
     public_api = public_api_inventory()
     body = {
         "schema_version": SCHEMA_VERSION,
         "cli": cli_inventory(),
-        "observable_module_surface": observable_module_inventory(repository),
+        "observable_module_surface": observable_module_inventory(
+            repository,
+            include_additive=include_additive,
+        ),
         "scope": {
             "package": "hive_mind_os",
             "public_api_facades": [

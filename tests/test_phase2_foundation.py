@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 import hive_mind_os
-from hive_mind_os.foundation.authority import decide_foundation_write
+from hive_mind_os.foundation.authority import AuthorityDecision, decide_foundation_write
 from hive_mind_os.foundation.canonical import digest
 from hive_mind_os.foundation.contracts import (
     PHASE2_SCHEMA_NAMES,
@@ -36,9 +36,11 @@ from hive_mind_os.foundation.usage import (
     UsageRecorder,
     reconcile_invoice,
 )
+from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.model_provider import (
     ModelRequest,
     ModelResponse,
+    ModelTransportError,
     ProviderConfig,
     ProviderKind,
 )
@@ -63,6 +65,32 @@ REPOSITORY_IDENTITY = {
 }
 
 
+def allowed_authority(
+    action: str,
+    *,
+    role: Role = Role.BUILDER,
+    public_release_allowed: bool = False,
+) -> AuthorityDecision:
+    decision = decide_foundation_write(
+        role=role,
+        action=action,
+        policy_decision=PolicyDecision(True, "fixture"),
+        lease_actions={action},
+        adapter_actions={action},
+        mission_risk_allowed=True,
+        budget_available=True,
+        recorder_identity=(
+            "foundation-usage-recorder-v1"
+            if action == "foundation.telemetry.write"
+            else None
+        ),
+        public_release_allowed=public_release_allowed,
+    )
+    if not decision.allowed:
+        raise AssertionError(decision)
+    return decision
+
+
 class FoundationContractAndGenerationTests(unittest.TestCase):
     def test_catalog_is_separate_strict_and_complete(self) -> None:
         self.assertEqual(len(PHASE2_SCHEMA_NAMES), 17)
@@ -75,6 +103,19 @@ class FoundationContractAndGenerationTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(len(first), 9)
         self.assertEqual(verify_generated_candidates(first), ())
+        canonical_root = (
+            Path(__file__).parents[1]
+            / "src"
+            / "hive_mind_os"
+            / "foundation"
+            / "canonical"
+            / "agents"
+        )
+        self.assertEqual(len(tuple(canonical_root.glob("*.json"))), 8)
+        self.assertEqual(
+            first["agents/architect.json"],
+            (canonical_root / "architect.json").read_bytes(),
+        )
         architect = json.loads(first["agents/architect.json"])
         self.assertTrue(validate_foundation("agent-definition-v2", architect).valid)
         manifest = json.loads(first["manifest.json"])
@@ -133,6 +174,7 @@ class FoundationContractAndGenerationTests(unittest.TestCase):
         self.assertTrue(inventory["foundation_contracts"]["catalog_valid"])
         self.assertEqual(inventory["foundation_contracts"]["count"], 17)
         self.assertEqual(inventory["generated_candidates"]["count"], 9)
+        self.assertEqual(inventory["canonical_agent_sources"]["count"], 8)
 
     def test_authority_is_an_intersection_and_telemetry_is_recorder_only(self) -> None:
         allowed = decide_foundation_write(
@@ -174,22 +216,81 @@ class FoundationStoreTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.path = Path(self.temporary.name) / "foundation.sqlite3"
         self.store = FoundationStore(self.path)
-        self.store.register_repository(REPOSITORY_IDENTITY)
+        self.store.register_repository(
+            REPOSITORY_IDENTITY,
+            authority=allowed_authority("foundation.repository.register"),
+        )
 
     def tearDown(self) -> None:
         self.store.close()
         self.temporary.cleanup()
 
-    def _append(self, key: str = "memory:one", payload: dict | None = None) -> dict:
+    def _append(
+        self,
+        key: str = "memory:one",
+        payload: dict | None = None,
+        *,
+        authority: AuthorityDecision | None = None,
+        sensitivity: str = "private",
+        destination: str = "local",
+        actor_id: str = "builder",
+        repository_id: str = "repository:test",
+    ) -> dict:
+        content_digest = digest("safe-reference")
+        document = {
+            "record_type": "memory-record",
+            "schema_version": 1,
+            "memory_id": key,
+            "memory_kind": "learning",
+            "repository_id": repository_id,
+            "tenant_id": "tenant:test",
+            "mission_id": None,
+            "run_id": None,
+            "step_id": None,
+            "actor_id": "builder",
+            "payload_digest": content_digest,
+            "previous_record_id": None,
+            "supersedes_record_id": None,
+            "observed_at": "2026-07-28T00:00:00+00:00",
+            "recorded_at": "2026-07-28T00:00:00+00:00",
+            "causation_id": None,
+            "correlation_id": None,
+            "source_refs": [],
+            "claim_refs": [],
+            "evidence_refs": ["fixture:evidence"],
+            "court_refs": [],
+            "code_receipt_refs": [],
+            "generation_refs": [],
+            "status": "active",
+            "confidence_ppm": None,
+            "freshness_expires_at": None,
+            "contradiction_refs": [],
+            "relation_refs": [],
+            "owner_id": "builder",
+            "sensitivity": "private",
+            "access_purpose": "test",
+            "retention": "governed",
+            "deletion_policy": "tombstone",
+            "quarantine_state": "none",
+            "appeal_state": "available",
+            "content_digest": content_digest,
+            "protected_content_ref": None,
+        }
+        if payload:
+            document.update(payload)
         return self.store.append_record(
+            authority=authority or allowed_authority("foundation.memory.write"),
+            foundation_action="foundation.memory.write",
             tenant_id="tenant:test",
-            repository_id="repository:test",
-            record_type="memory",
+            repository_id=repository_id,
+            record_type="memory-record",
             schema_name="memory-record-v1",
             stream_id="memory:stream",
-            payload=payload or {"content_digest": digest("safe-reference")},
-            actor_id="builder",
+            payload=document,
+            actor_id=actor_id,
             idempotency_key=key,
+            sensitivity=sensitivity,
+            destination=destination,
         )
 
     def test_wal_record_and_outbox_are_atomic_append_only_and_recoverable(self) -> None:
@@ -215,25 +316,228 @@ class FoundationStoreTests(unittest.TestCase):
         replay = self._append()
         self.assertEqual(replay["record_id"], original["record_id"])
         with self.assertRaises(IdempotencyConflict):
-            self._append(payload={"content_digest": digest("different")})
+            self._append(
+                payload={
+                    "content_digest": digest("different"),
+                    "payload_digest": digest("different"),
+                }
+            )
         with self.assertRaises(ScopeError):
             self.store.records(tenant_id="", repository_id="repository:test")
         with self.assertRaises(ValueError):
             self._append("memory:secret", {"prompt": "do not persist"})
 
+    def test_writes_enforce_action_scope_public_release_and_full_command(self) -> None:
+        denied = decide_foundation_write(
+            role=Role.BUILDER,
+            action="foundation.memory.write",
+            policy_decision=PolicyDecision(False, "denied"),
+            lease_actions={"foundation.memory.write"},
+            adapter_actions={"foundation.memory.write"},
+            mission_risk_allowed=True,
+            budget_available=True,
+        )
+        with self.assertRaises(PermissionError):
+            self._append("memory:denied", authority=denied)
+        with self.assertRaises(PermissionError):
+            self._append(
+                "memory:public-denied",
+                {"sensitivity": "safe-public"},
+                sensitivity="safe-public",
+            )
+        public = self._append(
+            "memory:public",
+            {"sensitivity": "safe-public"},
+            authority=allowed_authority(
+                "foundation.memory.write", public_release_allowed=True
+            ),
+            sensitivity="safe-public",
+        )
+        self.assertEqual(public["sensitivity"], "safe-public")
+        original = self._append("memory:full-command")
+        self.assertEqual(
+            self._append("memory:full-command")["record_id"],
+            original["record_id"],
+        )
+        for command in (
+            {"destination": "different"},
+            {"actor_id": "different"},
+        ):
+            with self.assertRaises(IdempotencyConflict):
+                self._append("memory:full-command", **command)
+        with self.assertRaises(ScopeError):
+            self._append(
+                "memory:wrong-scope",
+                {"repository_id": "repository:other"},
+            )
+        with self.assertRaises(PermissionError):
+            self.store.append_record(
+                authority=allowed_authority("foundation.memory.write"),
+                foundation_action="foundation.memory.write",
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                record_type="usage-event",
+                schema_name="usage-event-v1",
+                stream_id="usage:forbidden",
+                payload={},
+                actor_id="builder",
+                idempotency_key="usage:forbidden",
+            )
+
+    def test_schema_validation_and_store_admission_fail_closed(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.append_record(
+                authority=allowed_authority("foundation.memory.write"),
+                foundation_action="foundation.memory.write",
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                record_type="memory-record",
+                schema_name="memory-record-v1",
+                stream_id="memory:invalid",
+                payload={"record_type": "memory-record", "schema_version": 1},
+                actor_id="builder",
+                idempotency_key="memory:invalid",
+            )
+        with self.assertRaises(ValueError):
+            self._append(
+                "memory:type-mismatch",
+                {"record_type": "opportunity-record"},
+            )
+        with tempfile.TemporaryDirectory() as temporary:
+            legacy_path = Path(temporary) / "evidence-ledger.sqlite3"
+            legacy = EvidenceLedger(legacy_path)
+            legacy.close()
+            before = sqlite3.connect(legacy_path)
+            try:
+                before_objects = before.execute(
+                    "SELECT type,name,sql FROM sqlite_master ORDER BY type,name"
+                ).fetchall()
+                before_version = before.execute("PRAGMA user_version").fetchone()[0]
+            finally:
+                before.close()
+            with self.assertRaisesRegex(RuntimeError, "non-empty unversioned"):
+                FoundationStore(legacy_path)
+            after = sqlite3.connect(legacy_path)
+            try:
+                self.assertEqual(
+                    after.execute(
+                        "SELECT type,name,sql FROM sqlite_master ORDER BY type,name"
+                    ).fetchall(),
+                    before_objects,
+                )
+                self.assertEqual(
+                    after.execute("PRAGMA user_version").fetchone()[0],
+                    before_version,
+                )
+            finally:
+                after.close()
+
+    def test_same_version_shape_and_cross_scope_self_relation_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            malformed_path = Path(temporary) / "malformed.sqlite3"
+            connection = sqlite3.connect(malformed_path)
+            connection.executescript(
+                "CREATE TABLE unrelated(value TEXT); PRAGMA user_version=1;"
+            )
+            before = connection.execute(
+                "SELECT type,name,sql FROM sqlite_master ORDER BY type,name"
+            ).fetchall()
+            connection.close()
+            with self.assertRaises(RuntimeError):
+                FoundationStore(malformed_path)
+            verifier = sqlite3.connect(malformed_path)
+            try:
+                self.assertEqual(
+                    verifier.execute(
+                        "SELECT type,name,sql FROM sqlite_master ORDER BY type,name"
+                    ).fetchall(),
+                    before,
+                )
+            finally:
+                verifier.close()
+
+        other_identity = {
+            **REPOSITORY_IDENTITY,
+            "repository_id": "repository:other",
+            "instance_id": "instance:other",
+        }
+        self.store.register_repository(
+            other_identity,
+            authority=allowed_authority("foundation.repository.register"),
+        )
+        other = self._append(
+            "memory:other",
+            repository_id="repository:other",
+        )
+        with self.assertRaises(ScopeError):
+            self.store.add_relation(
+                authority=allowed_authority("foundation.memory.write"),
+                foundation_action="foundation.memory.write",
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                source_record_id=other["record_id"],
+                target_record_id=other["record_id"],
+                relation="self",
+                evidence={"receipt": digest("cross-scope")},
+            )
+
     def test_delivery_replay_uses_append_only_attempt_and_ack_receipts(self) -> None:
         self._append()
         message = self.store.pending_outbox()[0]
         self.store.record_delivery_attempt(
-            message["message_id"], "local", "failed", error_class="SinkUnavailable"
+            message["message_id"],
+            "local",
+            "failed",
+            authority=allowed_authority("foundation.outbox.deliver"),
+            error_class="SinkUnavailable",
         )
         self.assertEqual(len(self.store.pending_outbox()), 1)
-        self.store.acknowledge(message["message_id"], "local", "sink:receipt")
-        self.store.acknowledge(message["message_id"], "local", "sink:receipt")
+        with self.assertRaises(ScopeError):
+            self.store.record_delivery_attempt(
+                message["message_id"],
+                "wrong-destination",
+                "succeeded",
+                authority=allowed_authority("foundation.outbox.deliver"),
+            )
+        with self.assertRaises(ValueError):
+            self.store.acknowledge(
+                message["message_id"],
+                "local",
+                "",
+                authority=allowed_authority("foundation.outbox.deliver"),
+            )
+        with self.assertRaises(RuntimeError):
+            self.store.acknowledge(
+                message["message_id"],
+                "local",
+                "sink:receipt",
+                authority=allowed_authority("foundation.outbox.deliver"),
+            )
+        self.store.record_delivery_attempt(
+            message["message_id"],
+            "local",
+            "succeeded",
+            authority=allowed_authority("foundation.outbox.deliver"),
+        )
+        self.store.acknowledge(
+            message["message_id"],
+            "local",
+            "sink:receipt",
+            authority=allowed_authority("foundation.outbox.deliver"),
+        )
+        self.store.acknowledge(
+            message["message_id"],
+            "local",
+            "sink:receipt",
+            authority=allowed_authority("foundation.outbox.deliver"),
+        )
         self.assertEqual(self.store.pending_outbox(), [])
         with self.assertRaises(IdempotencyConflict):
             self.store.acknowledge(
-                message["message_id"], "local", "sink:conflicting-receipt"
+                message["message_id"],
+                "local",
+                "sink:conflicting-receipt",
+                authority=allowed_authority("foundation.outbox.deliver"),
             )
         self.assertEqual(
             self.store.verify_integrity(
@@ -242,13 +546,30 @@ class FoundationStoreTests(unittest.TestCase):
             (),
         )
 
+    def test_integrity_detects_schema_and_content_tampering(self) -> None:
+        record = self._append("memory:integrity")
+        self.store._connection.execute("DROP TRIGGER records_no_update")
+        with self.store._connection:
+            self.store._connection.execute(
+                "UPDATE records SET actor_id='tampered' WHERE record_id=?",
+                (record["record_id"],),
+            )
+        issues = self.store.verify_integrity(
+            tenant_id="tenant:test", repository_id="repository:test"
+        )
+        self.assertTrue(any("store schema integrity failed" in issue for issue in issues))
+        self.assertTrue(any("command digest mismatch" in issue for issue in issues))
+
 
 class OpportunityLedgerTests(unittest.TestCase):
     def test_exact_concurrent_duplicates_preserve_encounters_and_converge(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "foundation.sqlite3"
             initializer = FoundationStore(path)
-            initializer.register_repository(REPOSITORY_IDENTITY)
+            initializer.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
             initializer.close()
             barrier = threading.Barrier(2)
             results = []
@@ -258,7 +579,12 @@ class OpportunityLedgerTests(unittest.TestCase):
                 store = FoundationStore(path)
                 try:
                     barrier.wait()
-                    result = OpportunityLedger(store).register(
+                    result = OpportunityLedger(
+                        store,
+                        authority=allowed_authority(
+                            "foundation.opportunity.write", role=Role.EXPLORER
+                        ),
+                    ).register(
                         tenant_id="tenant:test",
                         repository_id="repository:test",
                         encounter_id=encounter_id,
@@ -307,7 +633,7 @@ class OpportunityLedgerTests(unittest.TestCase):
                         verifier.records(
                             tenant_id="tenant:test",
                             repository_id="repository:test",
-                            record_type="opportunity",
+                            record_type="opportunity-record",
                         )
                     ),
                     1,
@@ -318,8 +644,16 @@ class OpportunityLedgerTests(unittest.TestCase):
     def test_semantic_candidate_never_auto_merges(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             store = FoundationStore(Path(temporary) / "foundation.sqlite3")
-            store.register_repository(REPOSITORY_IDENTITY)
-            ledger = OpportunityLedger(store)
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
+            ledger = OpportunityLedger(
+                store,
+                authority=allowed_authority(
+                    "foundation.opportunity.write", role=Role.EXPLORER
+                ),
+            )
             first = ledger.register(
                 tenant_id="tenant:test",
                 repository_id="repository:test",
@@ -340,6 +674,15 @@ class OpportunityLedgerTests(unittest.TestCase):
                 actor_id="explorer",
                 evidence_digests=[digest("two")],
                 semantic_candidate_ids=[str(first.opportunity_record_id)],
+                semantic_evidence={
+                    "algorithm_id": "fixture-neighbor-search",
+                    "algorithm_version": "1",
+                    "index_digest": digest("fixture-index"),
+                    "threshold_ppm": 800_000,
+                    "neighbor_scores_ppm": {
+                        str(first.opportunity_record_id): 900_000
+                    },
+                },
             )
             self.assertEqual(candidate.classification, "semantic-candidate")
             self.assertIsNone(candidate.opportunity_record_id)
@@ -381,7 +724,7 @@ class UsageAndObservabilityTests(unittest.TestCase):
             "openai_compatible", self._fixture("malformed_usage.json")
         )
         self.assertEqual(malformed["native"], {})
-        self.assertIn("private_note", malformed["unmapped_paths"])
+        self.assertEqual(malformed["unmapped_path_count"], 3)
         conflicting = ProviderUsageAdapter.parse(
             "openai_compatible",
             b'{"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":99}}',
@@ -394,9 +737,15 @@ class UsageAndObservabilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "foundation.sqlite3"
             store = FoundationStore(path)
-            store.register_repository(REPOSITORY_IDENTITY)
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
             recorder = UsageRecorder(
-                store, tenant_id="tenant:test", repository_id="repository:test"
+                store,
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                authority=allowed_authority("foundation.telemetry.write"),
             )
             completed = recorder.start_attempt(
                 logical_request_id="request:one",
@@ -436,13 +785,16 @@ class UsageAndObservabilityTests(unittest.TestCase):
             store.close()
             reopened = FoundationStore(path)
             recovered = UsageRecorder(
-                reopened, tenant_id="tenant:test", repository_id="repository:test"
+                reopened,
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                authority=allowed_authority("foundation.telemetry.write"),
             ).recover_interrupted()
             self.assertEqual(recovered, (interrupted,))
             records = reopened.records(
                 tenant_id="tenant:test",
                 repository_id="repository:test",
-                record_type="usage-attempt",
+                record_type="usage-event",
             )
             terminals = [
                 record["payload"]
@@ -459,9 +811,15 @@ class UsageAndObservabilityTests(unittest.TestCase):
     def test_terminal_without_durable_start_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             store = FoundationStore(Path(temporary) / "foundation.sqlite3")
-            store.register_repository(REPOSITORY_IDENTITY)
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
             recorder = UsageRecorder(
-                store, tenant_id="tenant:test", repository_id="repository:test"
+                store,
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                authority=allowed_authority("foundation.telemetry.write"),
             )
             with self.assertRaisesRegex(ValueError, "durable start"):
                 recorder.finish_attempt(
@@ -503,9 +861,15 @@ class UsageAndObservabilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             store = FoundationStore(Path(temporary) / "foundation.sqlite3")
-            store.register_repository(REPOSITORY_IDENTITY)
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
             recorder = UsageRecorder(
-                store, tenant_id="tenant:test", repository_id="repository:test"
+                store,
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                authority=allowed_authority("foundation.telemetry.write"),
             )
             provider = ReceiptedModelProvider(
                 FixtureProvider(),
@@ -519,7 +883,7 @@ class UsageAndObservabilityTests(unittest.TestCase):
             records = store.records(
                 tenant_id="tenant:test",
                 repository_id="repository:test",
-                record_type="usage-attempt",
+                record_type="usage-event",
             )
             self.assertEqual(
                 [record["payload"]["event_kind"] for record in records],
@@ -527,6 +891,125 @@ class UsageAndObservabilityTests(unittest.TestCase):
             )
             self.assertEqual(records[-1]["payload"]["accounting_status"], "reported")
             store.close()
+
+    def test_physical_attempt_ids_are_unique_and_retry_semantics_are_preserved(
+        self,
+    ) -> None:
+        class RetryProvider:
+            kind = ProviderKind.OPENAI_COMPATIBLE
+            config = ProviderConfig(
+                ProviderKind.OPENAI_COMPATIBLE,
+                "https://example.invalid/v1",
+                "fixture-model",
+                "UNUSED_KEY",
+                max_retries=1,
+            )
+
+            def __init__(self, *, fail_once: bool) -> None:
+                self.fail_once = fail_once
+                self.calls = 0
+
+            def build_request_body(self, request: ModelRequest) -> bytes:
+                return json.dumps(
+                    {"system": request.system, "user": request.user},
+                    sort_keys=True,
+                ).encode()
+
+            def complete_once(self, request: ModelRequest) -> ModelResponse:
+                self.calls += 1
+                if self.fail_once and self.calls == 1:
+                    raise ModelTransportError("fixture transport failure")
+                return ModelResponse(
+                    "{}",
+                    (FIXTURES / "openai_usage.json").read_bytes(),
+                    100,
+                    40,
+                )
+
+            def complete(self, request: ModelRequest) -> ModelResponse:
+                return self.complete_once(request)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            store = FoundationStore(Path(temporary) / "foundation.sqlite3")
+            store.register_repository(
+                REPOSITORY_IDENTITY,
+                authority=allowed_authority("foundation.repository.register"),
+            )
+            recorder = UsageRecorder(
+                store,
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                authority=allowed_authority("foundation.telemetry.write"),
+            )
+            request = ModelRequest("system", "user")
+            for _ in range(2):
+                ReceiptedModelProvider(
+                    RetryProvider(fail_once=False),
+                    recorder,
+                    purpose="unique-attempt",
+                    actor_id="builder",
+                    trace_id="trace:unique",
+                ).complete_once(request)
+            records = store.records(
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+                record_type="usage-event",
+            )
+            start_ids = [
+                record["payload"]["attempt_id"]
+                for record in records
+                if record["payload"]["event_kind"] == "attempt-started"
+            ]
+            self.assertEqual(len(start_ids), 2)
+            self.assertEqual(len(set(start_ids)), 2)
+
+            retry_provider = RetryProvider(fail_once=True)
+            response = ReceiptedModelProvider(
+                retry_provider,
+                recorder,
+                purpose="retry-attempt",
+                actor_id="builder",
+                trace_id="trace:retry",
+            ).complete(request)
+            self.assertEqual(response.transport_retry_index, 1)
+            self.assertEqual(retry_provider.calls, 2)
+            retry_records = [
+                record["payload"]
+                for record in store.records(
+                    tenant_id="tenant:test",
+                    repository_id="repository:test",
+                    record_type="usage-event",
+                )
+                if record["payload"]["identity"]["court_purpose"] == "retry-attempt"
+            ]
+            self.assertEqual(
+                [
+                    item["resources"]["retry_index"]
+                    for item in retry_records
+                    if item["event_kind"] == "attempt-started"
+                ],
+                [0, 1],
+            )
+            self.assertEqual(
+                [
+                    item["outcome"]
+                    for item in retry_records
+                    if item["event_kind"] == "attempt-terminal"
+                ],
+                ["provider-failure", "succeeded"],
+            )
+            store.close()
+
+    def test_provider_native_observation_is_bounded_and_path_allowlisted(self) -> None:
+        usage = {f"secret_{index}": index for index in range(5_000)}
+        usage["api_key"] = 123
+        observation = ProviderUsageAdapter.parse(
+            "openai_compatible",
+            json.dumps({"usage": usage}).encode(),
+        )
+        self.assertEqual(observation["native"], {})
+        self.assertGreater(observation["unmapped_path_count"], 128)
+        self.assertNotIn("api_key", json.dumps(observation))
 
     def test_invoice_reconciliation_never_manufactures_equality(self) -> None:
         usage = [
@@ -552,13 +1035,17 @@ class UsageAndObservabilityTests(unittest.TestCase):
         point = project_metric(
             "hive.foundation.records",
             1,
-            {"record_type": "usage-attempt", "outcome": "succeeded"},
+            {"record_type": "usage-event", "outcome": "succeeded"},
         )
         self.assertEqual(point.value, 1)
         with self.assertRaises(ValueError):
             project_metric(
                 "hive.foundation.records", 1, {"repository_id": "repository:test"}
             )
+        with self.assertRaises(ValueError):
+            project_metric("hive.foundation.arbitrary", 1, {})
+        with self.assertRaises(ValueError):
+            project_metric("hive.foundation.records", 10**15 + 1, {})
         trace = project_trace(
             "model.attempt",
             trace_id="trace:one",
@@ -578,6 +1065,21 @@ class UsageAndObservabilityTests(unittest.TestCase):
                 span_id="span:one",
                 attributes={"prompt": "private"},
             )
+        for field in (
+            "request_body",
+            "api_key",
+            "authorization",
+            "password",
+            "gen_ai.provider.name",
+            "hive.outcome",
+        ):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                project_trace(
+                    "model.attempt",
+                    trace_id="trace:one",
+                    span_id="span:one",
+                    attributes={field: "untrusted"},
+                )
 
 
 if __name__ == "__main__":

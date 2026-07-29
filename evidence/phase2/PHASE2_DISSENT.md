@@ -20,3 +20,10 @@
    accounting truth and outbound export is disabled.
 9. No superiority, production readiness, live-provider support, Obsidian behavior,
    or autonomous learning/control claim is made.
+10. UUID physical-attempt identity makes accidental collision negligible but is not a
+    distributed identity authority. Cross-host coordination remains outside Phase 2.
+11. Safe-public enforcement proves that an explicit independent release bit was
+    carried into the write decision; it does not implement a publication workflow.
+12. The schema-object digest detects malformed or drifted local databases. It is an
+    integrity/admission receipt, not cryptographic protection against an attacker who
+    can rewrite both schema and metadata.

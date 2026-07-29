@@ -18,6 +18,7 @@ def _resource_paths(root: Path) -> tuple[Path, ...]:
     schema_root = root / "schemas"
     foundation_schema_root = root / "foundation" / "schemas"
     foundation_generated_root = root / "foundation" / "generated"
+    foundation_canonical_root = root / "foundation" / "canonical"
     package_root = root / "builtin_packages" / "hive-core"
     return tuple(
         sorted(
@@ -31,6 +32,11 @@ def _resource_paths(root: Path) -> tuple[Path, ...]:
                 *(
                     path
                     for path in foundation_generated_root.rglob("*.json")
+                    if path.is_file()
+                ),
+                *(
+                    path
+                    for path in foundation_canonical_root.rglob("*.json")
                     if path.is_file()
                 ),
                 *(path for path in package_root.rglob("*") if path.is_file()),
@@ -90,12 +96,16 @@ def main() -> int:
     foundation_generated_count = sum(
         name.startswith("foundation/generated/") for name in source_digests
     )
+    foundation_canonical_count = sum(
+        name.startswith("foundation/canonical/") for name in source_digests
+    )
     catalog = hive_core_catalog()
     package = catalog.package("hive-core")
     observed = {
         "schema_count": schema_count,
         "foundation_schema_count": foundation_schema_count,
         "foundation_generated_count": foundation_generated_count,
+        "foundation_canonical_count": foundation_canonical_count,
         "package_file_count": package_file_count,
         "legacy_resource_count": schema_count + package_file_count,
         "resource_count": len(source_digests),
@@ -106,9 +116,10 @@ def main() -> int:
         "schema_count": 20,
         "foundation_schema_count": 17,
         "foundation_generated_count": 9,
+        "foundation_canonical_count": 8,
         "package_file_count": 48,
         "legacy_resource_count": 68,
-        "resource_count": 94,
+        "resource_count": 102,
         "component_count": 22,
         "trust_state": "quarantined",
     }

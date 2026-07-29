@@ -2,14 +2,16 @@
 
 - Branch: `codex/phase2-additive-memory-telemetry-foundation`
 - Stack base: PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`
-- Current state: implementation candidate; not activated
+- Current state: remediated implementation candidate; not activated; independent
+  re-review pending
 - Governing ADR: ADR-021
 - Court: `evidence/courts/phase2-additive-foundation-court.md`
 - Inventory: `evidence/phase2/phase2_foundation_inventory.json`
 
 Implemented:
 
-- 17 strict additive contracts and 9 deterministic inert agent/manifest artifacts;
+- 17 strict additive contracts, 8 canonical agent sources, and 9 deterministic inert
+  agent/manifest artifacts;
 - private scoped SQLite/WAL foundation store with record chains and transactional
   outbox;
 - encounter-first concurrent exact/structured opportunity deduplication;
@@ -19,7 +21,10 @@ Implemented:
   provider wrapper;
 - append-only delivery attempts/acks, bounded metrics, correlated local traces,
   disabled-export OpenTelemetry envelope, and invoice gap reconciliation;
-- explicit authority intersection and privacy/body rejection.
+- enforced authority/action/public-release boundaries and privacy/body rejection;
+- self-identifying store admission, full-command idempotency, canonical integrity,
+  destination-bound delivery, bounded provider observations, and retry-preserving
+  physical-attempt receipts.
 
 Unchanged:
 
@@ -28,7 +33,8 @@ Unchanged:
 - legacy schemas/resources and Phase 1 historical inventory;
 - Obsidian/Phase 3 and later behavior.
 
-Resume by running deterministic generation check, the Phase 2 tests, full regression,
-Ruff, configured Pyright, wheel/resource verification, and the remaining declared
-matrix. Then appoint independent Curator/Steward and Judge identities on the exact
-committed candidate. Do not activate, merge, or start Phase 3.
+Resume by committing the remediation, rerunning independent Curator/Steward
+reconstruction, and appointing a distinct Judge on the accepted exact candidate.
+Then run/record the complete exact-head multi-Python, security, supply-chain,
+wheel/resource, provenance, and PR check matrix. Do not activate, merge, or start
+Phase 3.
