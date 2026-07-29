@@ -2,9 +2,9 @@
 
 - Branch: `codex/phase2-additive-memory-telemetry-foundation`
 - Stack base: PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`
-- Current implementation candidate:
-  `ca40eb59b2d5569e5f3dbcd05a6874cd53b3867a`; third-remand remediation sealed;
-  fresh independent review pending; not activated
+- Latest reviewed head:
+  `91fd5cff7e7b1e2d2b3203baaf67a2127e629f95`; independently remanded;
+  fourth-remand attribution-boundary remediation not yet sealed; not activated
 - Governing ADR: ADR-021
 - Court: `evidence/courts/phase2-additive-foundation-court.md`
 - Inventory: `evidence/phase2/phase2_foundation_inventory.json`

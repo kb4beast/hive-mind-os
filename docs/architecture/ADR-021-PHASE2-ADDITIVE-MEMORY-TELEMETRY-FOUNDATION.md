@@ -53,9 +53,9 @@ separate. Provider-shaped fixture fields are preserved as bounded numeric native
 paths. Normalization is versioned and keeps direction, cache, modality, output kind,
 and billing axes separate. Caller-supplied mission, run, step, role, work item,
 court/experiment, prompt-layer, context, and memory-selection attribution is bounded
-and survives start, terminal, and restart-recovery receipts. Missing is unknown,
-never zero. Decisions, outcomes, attribution, corrections, and invoices are
-late-bound append-only records.
+by both runtime admission and the strict schema, and survives start, terminal, and
+restart-recovery receipts. Missing is unknown, never zero. Decisions, outcomes,
+attribution, corrections, and invoices are late-bound append-only records.
 
 Observability is local-only. Metrics use a fixed low-cardinality label vocabulary.
 Correlated trace and OpenTelemetry-shaped envelopes may carry governed identifiers,

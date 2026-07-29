@@ -235,3 +235,43 @@ evidence.
 - Obtain fresh independent Curator and Steward reconstruction.
 - Appoint a different Judge only after both accept.
 - Repeat and record the complete exact-head matrix and final PR/checkpoint receipts.
+
+## `P2-AUDIT-014` — fourth independent remand
+
+- Exact reviewed candidate:
+  `91fd5cff7e7b1e2d2b3203baaf67a2127e629f95`; source, tests, scripts, and project
+  configuration were byte-identical to implementation commit
+  `ca40eb59b2d5569e5f3dbcd05a6874cd53b3867a`.
+- Curator `Kuhn` returned `remand` after forging a valid frozen
+  `UsageAttribution` post-construction: a 100,000-character mission ID, invalid
+  prompt digest, and `10**30` selected count were accepted because recorder admission
+  did not revalidate and the schema lacked equivalent limits.
+- Push run `30427534292` passed. PR run `30427537379` passed every job except Python
+  3.12, where unchanged seeded worker recovery test
+  `test_seeded_process_kill_sweep_reclaims_without_duplicate_effects` left a
+  non-done job. The same exact-SHA Python 3.12 suite passed on the push run, so this
+  is preserved as an adverse nondeterministic receipt, not silently relabeled.
+- Every requested third-remand path otherwise passed: 33 focused tests, normal and
+  recovered attribution, all billable statuses/conflict, adapter/schema numeric
+  maxima, all earlier remands, deterministic generation, Ruff, Pyright, exact
+  131/33/13/304 compatibility, inventories, ancestry, and stacking.
+
+## `P2-AUDIT-015` — fourth-remand remediation
+
+- `UsageAttribution` validation is a reusable boundary check invoked both after
+  construction and again by `UsageRecorder.start_attempt`, so post-construction
+  mutation cannot bypass it.
+- The local strict validator now enforces JSON Schema `maxLength` as well as
+  `maximum`; `usage-event-v1` binds attribution identifiers to 256 characters,
+  prompt/context/memory-selection fields to SHA-256 syntax, and selection counts to
+  at most `10**9`.
+- Direct tests forge the same mutated object and mutate the canonical contract;
+  recorder admission and schema validation both fail closed.
+
+## Open entries after fourth remand
+
+- Seal and push a fresh exact candidate.
+- Obtain fresh Curator and Steward acceptance.
+- Obtain a different Judge disposition only after both accept.
+- Require a clean exact-head full matrix; preserve but do not waive the Python 3.12
+  adverse receipt from run `30427537379`.

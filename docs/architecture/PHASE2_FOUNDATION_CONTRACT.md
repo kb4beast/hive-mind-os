@@ -80,7 +80,9 @@ The optional recorder accepts bounded caller attribution for mission, run, step,
 role, work item, idea, court case, experiment, span, prompt layers, context, memory
 selection, model revision, host, and access audit. The same attribution is copied
 from the durable start into normal terminal and restart-recovery receipts; omitted
-attribution remains explicit null rather than being inferred.
+attribution remains explicit null rather than being inferred. Recorder admission
+revalidates the object even if a caller bypassed its constructor, and the strict
+schema independently enforces identifier lengths, digest syntax, and count maxima.
 
 ## Privacy and observability
 

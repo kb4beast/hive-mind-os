@@ -324,48 +324,52 @@ class UsageAttribution:
     access_audit_ref: str | None = None
 
     def __post_init__(self) -> None:
-        identifiers = (
-            self.mission_id,
-            self.run_id,
-            self.step_id,
-            self.role,
-            self.work_item_id,
-            self.idea_id,
-            self.case_id,
-            self.experiment_id,
-            self.span_id,
-            self.model_revision,
-            self.host_id,
-            self.access_audit_ref,
+        _validate_usage_attribution(self)
+
+
+def _validate_usage_attribution(attribution: UsageAttribution) -> None:
+    identifiers = (
+        attribution.mission_id,
+        attribution.run_id,
+        attribution.step_id,
+        attribution.role,
+        attribution.work_item_id,
+        attribution.idea_id,
+        attribution.case_id,
+        attribution.experiment_id,
+        attribution.span_id,
+        attribution.model_revision,
+        attribution.host_id,
+        attribution.access_audit_ref,
+    )
+    if any(
+        value is not None
+        and (
+            not isinstance(value, str)
+            or not value
+            or len(value) > 256
         )
-        if any(
-            value is not None
-            and (
-                not isinstance(value, str)
-                or not value
-                or len(value) > 256
-            )
-            for value in identifiers
+        for value in identifiers
+    ):
+        raise ValueError("usage attribution identifiers must be bounded")
+    for value in (
+        attribution.prompt_layer_digest,
+        attribution.context_digest,
+        attribution.memory_selection_digest,
+    ):
+        if value is not None and (
+            not isinstance(value, str)
+            or len(value) != 71
+            or not value.startswith("sha256:")
+            or any(character not in "0123456789abcdef" for character in value[7:])
         ):
-            raise ValueError("usage attribution identifiers must be bounded")
-        for value in (
-            self.prompt_layer_digest,
-            self.context_digest,
-            self.memory_selection_digest,
-        ):
-            if value is not None and (
-                not isinstance(value, str)
-                or len(value) != 71
-                or not value.startswith("sha256:")
-                or any(character not in "0123456789abcdef" for character in value[7:])
-            ):
-                raise ValueError("usage attribution digests must be sha256 digests")
-        if any(
-            value is not None
-            and (type(value) is not int or not 0 <= value <= 10**9)
-            for value in (self.selected_count, self.omitted_count)
-        ):
-            raise ValueError("usage attribution counts must be bounded integers")
+            raise ValueError("usage attribution digests must be sha256 digests")
+    if any(
+        value is not None
+        and (type(value) is not int or not 0 <= value <= 10**9)
+        for value in (attribution.selected_count, attribution.omitted_count)
+    ):
+        raise ValueError("usage attribution counts must be bounded integers")
 
 
 class UsageRecorder:
@@ -412,6 +416,7 @@ class UsageRecorder:
         attribution: UsageAttribution | None = None,
     ) -> str:
         attempt_attribution = attribution or UsageAttribution()
+        _validate_usage_attribution(attempt_attribution)
         attempt_id = f"attempt:{self._id_factory()}"
         payload = {
             "record_type": "usage-event",

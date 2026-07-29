@@ -1336,6 +1336,13 @@ class UsageAndObservabilityTests(unittest.TestCase):
             self.assertFalse(
                 validate_foundation("usage-event-v1", unbounded_contract).valid
             )
+            forged_contract = json.loads(json.dumps(records[-1]["payload"]))
+            forged_contract["correlation"]["mission_id"] = "x" * 100_000
+            forged_contract["inputs"]["prompt_layer_digest"] = "not-a-digest"
+            forged_contract["inputs"]["selected_count"] = 10**30
+            self.assertFalse(
+                validate_foundation("usage-event-v1", forged_contract).valid
+            )
             for record in records:
                 self.assertEqual(
                     record["payload"]["correlation"]["mission_id"], "mission:one"
@@ -1351,6 +1358,35 @@ class UsageAndObservabilityTests(unittest.TestCase):
                 self.assertEqual(
                     record["payload"]["governance"]["access_audit_ref"],
                     "access:one",
+                )
+            forged_attribution = UsageAttribution(mission_id="mission:valid")
+            object.__setattr__(
+                forged_attribution,
+                "mission_id",
+                "x" * 100_000,
+            )
+            object.__setattr__(
+                forged_attribution,
+                "prompt_layer_digest",
+                "not-a-digest",
+            )
+            object.__setattr__(
+                forged_attribution,
+                "selected_count",
+                10**30,
+            )
+            with self.assertRaises(ValueError):
+                recorder.start_attempt(
+                    logical_request_id="request:forged-attribution",
+                    retry_index=0,
+                    provider_kind="openai_compatible",
+                    requested_model_id="requested",
+                    purpose="fixture",
+                    actor_id="builder",
+                    request_digest=digest("forged-attribution"),
+                    budget_lease_id=None,
+                    trace_id="trace:forged-attribution",
+                    attribution=forged_attribution,
                 )
             store.close()
 

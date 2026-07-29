@@ -73,6 +73,8 @@ def _validate(value: Any, schema: Mapping[str, Any], path: str, issues: list[str
     if isinstance(value, str):
         if isinstance(schema.get("minLength"), int) and len(value) < schema["minLength"]:
             issues.append(f"{path}: string is too short")
+        if isinstance(schema.get("maxLength"), int) and len(value) > schema["maxLength"]:
+            issues.append(f"{path}: string is too long")
         if isinstance(schema.get("pattern"), str) and re.search(schema["pattern"], value) is None:
             issues.append(f"{path}: string does not match pattern")
     if isinstance(value, (int, float)) and not isinstance(value, bool):

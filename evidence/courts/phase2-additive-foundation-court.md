@@ -119,3 +119,14 @@ Third-remand remediation implementation
 evidence-only descendant may be reviewed as the exact PR head provided the
 implementation tree is identical. No acceptance or promotion verdict is asserted
 before fresh Curator and Steward reconstruction.
+
+Fourth implementation candidate
+`91fd5cff7e7b1e2d2b3203baaf67a2127e629f95`: `remand`.
+
+Curator `Kuhn` independently forged a previously valid attribution object after
+construction and proved recorder admission plus the usage schema accepted unbounded
+and invalid attribution. The exact-head push matrix passed; the PR matrix also
+preserved one adverse Python 3.12 seeded worker-recovery failure despite the same
+suite passing on the push event. The Builder accepted the boundary finding and did
+not waive or conceal the adverse CI receipt. Remediation is recorded in
+`P2-AUDIT-015`; fresh exact-head review remains required.

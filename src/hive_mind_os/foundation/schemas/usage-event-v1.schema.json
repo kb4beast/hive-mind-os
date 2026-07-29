@@ -98,10 +98,10 @@
       "required": ["repository_id", "tenant_id", "mission_id", "run_id", "step_id", "role", "work_item_id", "idea_id", "case_id", "experiment_id", "trace_id", "span_id", "logical_request_id", "attempt_id", "provider_request_id"],
       "properties": {
         "repository_id": {"type": "string", "minLength": 1}, "tenant_id": {"type": "string", "minLength": 1},
-        "mission_id": {"type": ["string", "null"]}, "run_id": {"type": ["string", "null"]}, "step_id": {"type": ["string", "null"]},
-        "role": {"type": ["string", "null"]}, "work_item_id": {"type": ["string", "null"]}, "idea_id": {"type": ["string", "null"]},
-        "case_id": {"type": ["string", "null"]}, "experiment_id": {"type": ["string", "null"]}, "trace_id": {"type": "string", "minLength": 1},
-        "span_id": {"type": ["string", "null"]}, "logical_request_id": {"type": "string", "minLength": 1},
+        "mission_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "run_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "step_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256},
+        "role": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "work_item_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "idea_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256},
+        "case_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "experiment_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "trace_id": {"type": "string", "minLength": 1},
+        "span_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "logical_request_id": {"type": "string", "minLength": 1},
         "attempt_id": {"type": "string", "minLength": 1}, "provider_request_id": {"type": ["string", "null"]}
       }, "additionalProperties": false
     },
@@ -113,17 +113,17 @@
         "court_stance": {"type": "string", "enum": ["advocate", "cross-examiner", "judge", "witness", "none"]},
         "evaluation_arm": {"type": "string", "enum": ["champion", "challenger", "none", "unknown"]},
         "provider_kind": {"type": "string", "minLength": 1}, "requested_model_id": {"type": "string", "minLength": 1},
-        "served_model_id": {"type": ["string", "null"]}, "model_revision": {"type": ["string", "null"]},
-        "host_id": {"type": ["string", "null"]}, "adapter_version": {"type": "string", "minLength": 1}
+        "served_model_id": {"type": ["string", "null"]}, "model_revision": {"type": ["string", "null"], "minLength": 1, "maxLength": 256},
+        "host_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}, "adapter_version": {"type": "string", "minLength": 1}
       }, "additionalProperties": false
     },
     "inputs": {
       "type": "object",
       "required": ["request_digest", "prompt_layer_digest", "context_digest", "memory_selection_digest", "selected_count", "omitted_count", "bodies_persisted"],
       "properties": {
-        "request_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}, "prompt_layer_digest": {"type": ["string", "null"]},
-        "context_digest": {"type": ["string", "null"]}, "memory_selection_digest": {"type": ["string", "null"]},
-        "selected_count": {"type": ["integer", "null"], "minimum": 0}, "omitted_count": {"type": ["integer", "null"], "minimum": 0},
+        "request_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}, "prompt_layer_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "context_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"}, "memory_selection_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "selected_count": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000}, "omitted_count": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000000},
         "bodies_persisted": {"const": false}
       }, "additionalProperties": false
     },
@@ -165,7 +165,7 @@
         "consent_policy": {"type": "string", "minLength": 1}, "quarantine_state": {"type": "string", "minLength": 1},
         "exporter": {"const": "disabled"}, "deletion_status": {"type": "string", "minLength": 1},
         "reconciliation_status": {"type": "string", "minLength": 1},
-        "access_purpose": {"type": "string", "minLength": 1}, "access_audit_ref": {"type": ["string", "null"]}
+        "access_purpose": {"type": "string", "minLength": 1}, "access_audit_ref": {"type": ["string", "null"], "minLength": 1, "maxLength": 256}
       }, "additionalProperties": false
     }
   },
