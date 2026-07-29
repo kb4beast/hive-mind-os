@@ -21,6 +21,7 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-021` | [Additive memory and telemetry foundation](ADR-021-PHASE2-ADDITIVE-MEMORY-TELEMETRY-FOUNDATION.md) | Phase 2 | adopted implementation architecture; activation remains prohibited |
 | `ADR-022` | [Portable safe-public memory pack projection](ADR-022-PORTABLE-MEMORY-PACK-PROJECTION.md) | Phase 3 item 1 | adopted at independently judged implementation candidate `24e48933`; activation remains prohibited |
 | `ADR-023` | [Public/private memory release-store separation](ADR-023-PUBLIC-PRIVATE-MEMORY-SEPARATION.md) | Phase 3 item 2 | adopted architecture candidate; implementation judgment and activation pending |
+| `ADR-024` | [Stable-ID cognitive note projection](ADR-024-STABLE-ID-COGNITIVE-NOTES.md) | Phase 3 item 3 | adapted architecture candidate; implementation judgment and activation pending |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-024; it must be unique at creation time.
+is ADR-025; it must be unique at creation time.

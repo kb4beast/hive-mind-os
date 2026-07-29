@@ -461,3 +461,133 @@ focused item-2 run passed 15 functional tests with only the intentionally stale
 inventory characterization, and the regenerated inventory characterization then
 passed. Full end-to-end, multi-version, supply-chain, and final independent verdicts
 are explicitly deferred to the later final-system check at user direction.
+
+## `P3-ITEM3-AUDIT-001` — supplied base and bounded objective
+
+Phase 3 item 3 began on `codex/phase3-stable-id-cognitive-notes` from supplied PR
+#33 branch tip `40a508b6b1bfb4a8624cf1ef8169384d32a39d44`. The user-owned edit to
+`docs/NEXT_SESSION_HANDOFF_PUBLIC_PRIVATE_MEMORY.md` was preserved and was not
+treated as Builder work. `main` was not checked out or modified.
+
+The eligible objective was limited to HOME, idea, evidence, court, run, agent, and
+telemetry notes with stable IDs and properties. Bases/Canvas, Obsidian refresh or
+support, federation, self-host recursion, Inbox/import, plugins, watchers, Sync,
+retrieval, protected-content bodies, encryption/KMS, cleanup/deletion, activation,
+usefulness, production readiness, and superiority remained deferred.
+
+## `P3-ITEM3-AUDIT-002` — independent discovery, architecture, and testimony
+
+Court `P3-COGNITIVE-NOTES-003` opened before code implementation.
+
+- Explorer `/root/explorer` proved that the item-2 public envelope supports
+  metadata navigation but no truthful rich prose, court verdict, agent scorecard, or
+  raw usage accounting. The Explorer required path-independent identity, additive
+  schemas, public-store-only operation, bounded total files, and installed-resource
+  evidence.
+- Architect `/root/architect` selected an independent
+  `hive-mind/generated-cognitive` namespace, an exhaustive one-record/one-note
+  mapping, eight separate contracts, external protected state, manifest-last
+  recovery, and opt-in module commands.
+- Integrator/Optimizer witness `/root/integrator_optimizer` confirmed the frozen
+  `131/33/13/304` and 17/7/3 boundaries, required telemetry to distinguish
+  unavailable from zero, and rejected usefulness or superiority claims without
+  outcome evidence.
+
+No new external source, dependency, template, or copied code was admitted. ADR-024,
+the item-3 contract, migration/rollback record, preliminary court, and appended
+dissent preserve the adopted and rejected alternatives before implementation.
+
+## `P3-ITEM3-AUDIT-003` — bounded implementation candidate
+
+The Builder candidate adds an opt-in public-store-only cognitive projector, eight
+strict packaged schemas, deterministic HOME and one-record/one-note mapping across
+six domain folders, domain-separated stable IDs, a separate
+`hive-mind/generated-cognitive` namespace, exact manifests and ownership receipts,
+typed conflicts/failures/results, external protected journals/staging, and
+manifest-last restart recovery. It does not change the frozen root/package APIs,
+root CLI parsers, Phase 2/item-1/item-2 schemas, item-1 output, or dependencies.
+
+The inventory reconstructs the fixture with the private Foundation store unavailable,
+records all eight installed schema digests, preserves `131/33/13/304` and 17/7/3,
+reports six admitted records and seven stable notes including HOME, and explicitly
+records usage accounting as unavailable.
+
+## `P3-ITEM3-AUDIT-004` — independent cross-examination and repair
+
+Cross-Examiner `/root/cross_examiner` issued a remand for junction write-through,
+missing typed conflict evidence, absence of a total public-store bound, ambiguous
+changed-snapshot recovery, lax result counts, an unvalidated HOME document, and
+insufficient adversarial tests.
+
+The remediation validates a dedicated HOME contract, makes result counts exhaustive,
+rejects public stores above 512 MiB before decode, validates every managed ancestor
+before writes, preserves typed conflict documents externally, and specifies that a
+sealed prior transaction completes and is receipted before the current snapshot.
+Regressions cover control/bidirectional text, junction confinement, changed
+snapshots, staged-manifest tampering, abandoned staging, completed stale state,
+scope/overlap, read-only behavior, stable IDs, all memory kinds, and strict catalogs.
+
+Steward `/root/steward` then exercised narrower publication and receipt-history
+windows. The repairs:
+
+- install desired bytes with an atomic no-overwrite hardlink after preserving the
+  exact prior generated file in a transaction-qualified sibling;
+- catch both recovery-time and fresh-publication late writes as typed conflicts;
+- validate staged manifests and exact expected-prior plans before replay;
+- validate the complete current manifest plan and historical receipt chain;
+- reject extra, missing, cyclic, over-bound, corrupt, or no-op receipt operations;
+- traverse up to the explicit receipt-history bound iteratively rather than through
+  the Python call stack; and
+- recover the manifest-last hardlink window before ordinary manifest admission.
+
+The same-directory `.cognitive-prior-*` and `.cognitive-next-*` files are explicitly
+recorded in ADR-024, the contract, migration/rollback record, and dissent as reserved
+short-lived atomic-install artifacts. Durable journals, desired bytes, receipts, and
+conflicts remain in the disjoint external protected-state root.
+
+Renewed Cross-Examination then found three final-window defects: a Windows
+junction/source move between validation and hardlink, an unrelated reserved sibling
+detected only after partial replay, and admission of a schema-invalid existing
+conflict receipt. The final repair holds Windows no-delete handles on the managed
+root, destination parent, and prepared file during the final operation; revalidates
+ancestry and parent identity; preflights all reserved siblings before replay; and
+schema-validates existing conflict evidence before comparison. Independent reruns
+confirmed typed conflict evidence, no external generated file or completion receipt,
+no pre-conflict manifest mutation, preserved human bytes, and fail-closed malformed
+conflict evidence. The cross-platform malicious uncooperative-writer limitation is
+explicit in ADR-024, contract, migration, and dissent.
+
+## `P3-ITEM3-AUDIT-005` — exact focused verification
+
+On the final pre-judgment candidate:
+
+- Phase 2 plus Phase 3 items 1–3: `101 passed, 23 subtests passed`;
+- Pyright: `0 errors, 0 warnings, 0 informations`;
+- Ruff: passed;
+- exact inventory characterization: passed; and
+- diff whitespace check: passed.
+
+The adversarial item-3 suite includes a 1,051-receipt history above Python's ordinary
+recursion limit, exact historical-plan corruption, a both-null no-op operation,
+forged expected-prior journal, corrupt staged manifest, post-manifest interruption,
+manifest hardlink crash window, late human write, junction recovery, public-store
+byte bound, hostile rendered text, final-window junction/source movement, unrelated
+transaction siblings, and malformed existing conflict evidence.
+
+Full multi-version repository CI, CodeQL, secret/dependency/license review,
+wheel/resource installation, SBOM/provenance, activation, and final-system
+superiority evidence remain deferred exactly as directed by the supplied handoff.
+
+## `P3-ITEM3-AUDIT-006` — independent final judgment
+
+Distinct Judge `/root/judge` issued `adapt` for a stacked draft PR on the exact
+implementation digest
+`sha256:63e1aed35c9c403fafb488c29e098cb9178f09d9110c6098853431c19fab0b41`
+and inventory digest
+`sha256:2340004a3ed91df96e87826ca220c81ad6ca16aaae93f181119a225c4cdc4057`.
+
+The Judge reproduced `101 passed, 23 subtests passed`, considered the final
+current-byte Curator PASS, renewed Cross-Examiner PASS, Steward PASS, and preserved
+dissent. Acceptance is limited to draft delivery of the opt-in public-store-only
+metadata projection. Activation, rich content, usefulness, production readiness,
+superiority, and final-system security/supply-chain evidence remain unjudged.

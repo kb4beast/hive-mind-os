@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/cognitive-home/v1",
+  "type": "object",
+  "required": ["schema_version", "note_id", "note_kind", "tenant_id", "repository_id", "repository_identity_digest", "projection_cursor", "idea_count", "evidence_count", "court_count", "run_count", "agent_count", "telemetry_count", "total_count", "sensitivity", "generator_version", "mapping_version", "is_generated", "is_authoritative"],
+  "properties": {
+    "schema_version": {"const": "hive-cognitive-home/v1"},
+    "note_id": {"type": "string", "pattern": "^cognitive-home:[0-9a-f]{64}$"},
+    "note_kind": {"const": "home"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "projection_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "idea_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "evidence_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "court_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "run_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "agent_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "telemetry_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "total_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "sensitivity": {"const": "safe-public"},
+    "generator_version": {"const": "hive-cognitive-projector/v1"},
+    "mapping_version": {"const": "hive-cognitive-mapping/v1"},
+    "is_generated": {"const": true},
+    "is_authoritative": {"const": false}
+  },
+  "additionalProperties": false
+}

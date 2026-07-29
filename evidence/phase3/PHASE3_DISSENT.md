@@ -70,3 +70,36 @@ or superiority claim.
 - No HOME/domain notes, richer cognitive content, Bases/Canvas, Obsidian refresh or
   support, Inbox, watcher, plugin, Sync, usefulness, production-readiness, or
   superiority claim is made.
+
+## Phase 3 item 3 preserved dissent
+
+- Cognitive notes organize already released metadata; they do not add a public prose
+  body or prove that the pack is complete, useful, understandable, or sufficient for
+  retrieval.
+- Idea, evidence, court, run, and agent labels are deterministic views of
+  `memory_kind`; they do not prove a canonical opportunity, evidence body, verdict,
+  complete run timeline, activated agent, agent health, or scorecard.
+- Telemetry notes contain released `resource` or `evaluation` memory metadata only.
+  They are not canonical usage accounting and contain no token, cost, provider,
+  invoice, trace, or effectiveness measurements. Unavailable is not zero.
+- One-note-per-record avoids cross-release aggregation but may produce multiple notes
+  about the same human concept. Entity aggregation and duplicate resolution remain
+  deferred.
+- Full SHA-256 filenames prevent path injection; hashing released low-entropy IDs is
+  not anonymization and does not remove correlation or membership-inference risk.
+- The cognitive namespace has its own file-at-a-time publication and externally
+  placed recovery evidence. These controls do not provide a malicious-writer
+  filesystem transaction, encryption, ACLs, safe backups, or secure deletion.
+- Atomic no-overwrite installation requires short-lived, transaction-qualified
+  sibling files in the generated namespace. A process or machine failure can expose
+  those reserved dotfiles until exact-journal recovery; they are not manifest-owned
+  output and should not be treated as human content.
+- Windows no-delete handles close the tested prepared-file/junction race. Platforms
+  without that lease retain atomic destination no-overwrite but do not claim safety
+  against an uncooperative writer deliberately moving reserved transaction
+  artifacts outside the namespace.
+- No generated note is authoritative or a write-back/intake channel. Human edits are
+  preserved as conflicts rather than silently adopted.
+- No Bases/Canvas, Obsidian refresh or support, federation, self-host recursion,
+  Inbox, watcher, plugin, Sync, retrieval, encryption/KMS, cleanup, deletion,
+  activation, usefulness, production readiness, or superiority claim is made.

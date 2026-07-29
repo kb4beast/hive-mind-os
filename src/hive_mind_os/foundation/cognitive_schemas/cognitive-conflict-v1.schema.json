@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/cognitive-conflict/v1",
+  "type": "object",
+  "required": ["schema_version", "status", "prior_manifest_digest", "desired_manifest_digest", "authority_decision_id", "authority_actor_id", "authority_lease_id", "attempted_at", "conflicts"],
+  "properties": {
+    "schema_version": {"const": "hive-cognitive-conflict/v1"},
+    "status": {"const": "conflict"},
+    "prior_manifest_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "desired_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "authority_decision_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "authority_actor_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "authority_lease_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "attempted_at": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "conflicts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100001,
+      "items": {
+        "type": "object",
+        "required": ["path", "expected_prior_digest", "observed_digest", "desired_digest"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 240},
+          "expected_prior_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+          "observed_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+          "desired_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

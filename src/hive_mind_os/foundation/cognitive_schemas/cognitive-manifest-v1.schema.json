@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/cognitive-manifest/v1",
+  "type": "object",
+  "required": ["schema_version", "projection_contract", "projector_version", "mapping_version", "tenant_id", "repository_id", "repository_identity_digest", "source_cursor", "source_digest", "generated_namespace", "note_counts", "files"],
+  "properties": {
+    "schema_version": {"const": "hive-cognitive-manifest/v1"},
+    "projection_contract": {"const": "hive-cognitive-projection/v1"},
+    "projector_version": {"const": "hive-cognitive-projector/v1"},
+    "mapping_version": {"const": "hive-cognitive-mapping/v1"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+    "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "generated_namespace": {"const": "hive-mind/generated-cognitive"},
+    "note_counts": {
+      "type": "object",
+      "required": ["ideas", "evidence", "courts", "runs", "agents", "telemetry", "total"],
+      "properties": {
+        "ideas": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "evidence": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "courts": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "runs": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "agents": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "telemetry": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "total": {"type": "integer", "minimum": 0, "maximum": 100000}
+      },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100001,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["path", "note_id", "source_record_id", "source_digest", "content_digest"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 240},
+          "note_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "source_record_id": {"type": ["string", "null"], "maxLength": 4096},
+          "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

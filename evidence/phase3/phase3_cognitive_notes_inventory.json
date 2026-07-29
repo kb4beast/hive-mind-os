@@ -1,0 +1,133 @@
+{
+  "activation": "opt-in-public-store-module-command",
+  "base_head": "40a508b6b1bfb4a8624cf1ef8169384d32a39d44",
+  "bases_canvas_started": false,
+  "cognitive_contracts": {
+    "catalog_valid": true,
+    "count": 8,
+    "names": [
+      "cognitive-conflict-v1",
+      "cognitive-failure-v1",
+      "cognitive-home-v1",
+      "cognitive-manifest-v1",
+      "cognitive-note-v1",
+      "cognitive-receipt-v1",
+      "cognitive-result-v1",
+      "cognitive-transaction-v1"
+    ],
+    "resource_digests": {
+      "cognitive-conflict-v1.schema.json": "sha256:eab59ead3a976fd33b343f04ad7c98f889b6bd3638fa8f9c15b8616ee072adea",
+      "cognitive-failure-v1.schema.json": "sha256:beaf6c746ccbac2c41c5871aa315514f12b75ac04a195e2ec7377f934eb7aa97",
+      "cognitive-home-v1.schema.json": "sha256:d6139368348875e2f0541fe8a2e83439f1bc5ffed0d2fc66f8c0214ea5af7492",
+      "cognitive-manifest-v1.schema.json": "sha256:b59145c8e9845def9a5a6a12fbbd47fb57a6b3ac767b50914c4a8535c6c8f8d0",
+      "cognitive-note-v1.schema.json": "sha256:6a4f67410c0107fe90e30bf6abcd99c33c83fc098b5c3a724660f1bebd0e8e84",
+      "cognitive-receipt-v1.schema.json": "sha256:4d8a0a39756c5c7b447e3998601417f1ed95b1aa179f37b7dfae1b8b773457f4",
+      "cognitive-result-v1.schema.json": "sha256:295f8ed27cb67f70797139709b359445e36b8f310b8ef7878dbbf2435a7289be",
+      "cognitive-transaction-v1.schema.json": "sha256:255a9ec6f4843a365894a987c44f31a2e82c86027c028b42dcffc226c22fdec3"
+    },
+    "resource_set_digest": "sha256:f0617eac5737b7135811e68a783559c24effc38fcd37d3995183f6f647e40ac1"
+  },
+  "deterministic_fixture": {
+    "generated_paths": [
+      "HOME.md",
+      "agents/835eb295f216cfcaa5f31197f6a91b8d4961a28f1bf494dfea5078aabe220a03.md",
+      "courts/8b054eeb4e2ed2ece37c89a22babf945d3f0b0112a7e073db5826dbc64d01bda.md",
+      "evidence/928724182ff4f4d008437b60ebc484adf8d9250bee7ddc52044dd7c9d24895ea.md",
+      "ideas/cbc9272241fa093bfb6514a7a86bdc3d263d0410f21383591bde0dd184efcc3c.md",
+      "manifest.json",
+      "runs/aef40b987051afb111e50178ddb66217d9f1a7d694ab3090fd848dcb00d86cf9.md",
+      "telemetry/c4bc832e1e91977aafefe359c865213c5a36f758781f772fa2d6852972965d8f.md"
+    ],
+    "manifest_digest": "sha256:fa8d077834d0fadecbcda3e2f616bea41cce4c5a04ef89da8076eb2386e9f146",
+    "note_counts": {
+      "agents": 1,
+      "courts": 1,
+      "evidence": 1,
+      "ideas": 1,
+      "runs": 1,
+      "telemetry": 1,
+      "total": 6
+    },
+    "note_ids": [
+      "cognitive-home:e8b9fe5add70d8b36a768263645906e60e4e961c676cd41db6272ce4036000e8",
+      "cognitive-note:835eb295f216cfcaa5f31197f6a91b8d4961a28f1bf494dfea5078aabe220a03",
+      "cognitive-note:8b054eeb4e2ed2ece37c89a22babf945d3f0b0112a7e073db5826dbc64d01bda",
+      "cognitive-note:928724182ff4f4d008437b60ebc484adf8d9250bee7ddc52044dd7c9d24895ea",
+      "cognitive-note:aef40b987051afb111e50178ddb66217d9f1a7d694ab3090fd848dcb00d86cf9",
+      "cognitive-note:c4bc832e1e91977aafefe359c865213c5a36f758781f772fa2d6852972965d8f",
+      "cognitive-note:cbc9272241fa093bfb6514a7a86bdc3d263d0410f21383591bde0dd184efcc3c"
+    ],
+    "private_foundation_available_during_projection": false,
+    "private_projection_state_in_repository": false,
+    "public_store_logical_digest": "sha256:968b3d8715287bc97baa31b50908f8efe12a1d749cec2059ec86ec0ae3f4b9d6",
+    "source_cursor": "memory-set:a0ab6fc989702bf0ea9951b66e012a7f499b809e21bd2e94b0810d03a9ac7153",
+    "status": "projected",
+    "tree_digest": "sha256:66d646d09db31c24683ee279ab93fb18f80107f8c99749b47127efe16b3e3a04"
+  },
+  "external_dependencies_added": 0,
+  "federation_started": false,
+  "generation_zero": {
+    "baseline_definition_count": 304,
+    "cli_parser_count": 13,
+    "definition_count": 304,
+    "package_api_count": 33,
+    "root_api_count": 131
+  },
+  "generation_zero_activated": false,
+  "implementation": {
+    "pyproject.toml": "sha256:1757eeb16442cb24d713e277f6279056dccf873e7c498e5470b25b63e555ea09",
+    "src/hive_mind_os/foundation/cognitive.py": "sha256:63e1aed35c9c403fafb488c29e098cb9178f09d9110c6098853431c19fab0b41",
+    "src/hive_mind_os/foundation/cognitive_contracts.py": "sha256:5b91b771c0d2af200d5a181afa5b35bbf6ea9e545dfaef500cbeda375a6aa40b"
+  },
+  "inventory_digest": "sha256:2340004a3ed91df96e87826ca220c81ad6ca16aaae93f181119a225c4cdc4057",
+  "obsidian_runtime_required": false,
+  "phase": 3,
+  "phase3_item2_input": {
+    "historical_inventory_digest": "sha256:216806a5d8f95280aedad057efab883fcbc9b245a31ae94d3995c78c2338bdb5"
+  },
+  "phase_item": 3,
+  "prior_contracts": {
+    "item1_count": 7,
+    "item2_count": 3,
+    "phase2_count": 17,
+    "resource_digests": {
+      "item1": {
+        "brain-conflict-v1.schema.json": "sha256:fa574d47e9342cc2b466078b6cf5a7dde2caa64c206001770a61a62b37a1de56",
+        "brain-failure-v1.schema.json": "sha256:4756d42112fec64f8cdc3b785fe2cf62cbffb78dac6693347627043dc45318e9",
+        "brain-manifest-v1.schema.json": "sha256:ace183022081542f5bbb83be2f847d9edea7e743d4f67a3557b70d3ddce78785",
+        "brain-note-v1.schema.json": "sha256:a94af6cb40b73db26c8cf4096380d270e6013fa5838980642e5b0b3b0371e873",
+        "brain-receipt-v1.schema.json": "sha256:0d447982cc0e273cf5585ec94c161edb6eeedffda1dff570e8a85e8f78f5f30c",
+        "brain-result-v1.schema.json": "sha256:c60cfe6c02f4904de0c80ca5e532da98f3a405619bd98cbc91f37fcdfa446d37",
+        "brain-transaction-v1.schema.json": "sha256:7fcf5645d1c3aaa13d9243a6d8f85cd373c7b54b37658142a782b1ab6100ecb0"
+      },
+      "item2": {
+        "public-memory-envelope-v1.schema.json": "sha256:7948144a7d50386c6d574ba0a1edae212cf1f9340ac614cc046c2799f5e2f9c2",
+        "public-memory-materialization-result-v1.schema.json": "sha256:c0b83e106a0e32a80177dc7c901f4c069e8655821d2d0a57505b18dbeabc59df",
+        "public-memory-release-receipt-v1.schema.json": "sha256:3ee12c49b85b1a3a529f3a64c7bc90918eb507c12fe6d8036fb91ad1931b8412"
+      },
+      "phase2": {
+        "agent-definition-v2.schema.json": "sha256:10dbe87a449e6bf906778094b852bd124215ef2936691ebcc26e6c1a97df9012",
+        "budget-lease-record-v1.schema.json": "sha256:dc9c06c068399060d0a865a2ca168e64c705dd9a989fb1b2b29006e1ef3f8e39",
+        "decision-record-v1.schema.json": "sha256:93a00ef826355561c888705c76d172187a5164c814c6511d53349080708ca523",
+        "idea-encounter-v1.schema.json": "sha256:8e61eaba73859c789791cafbe4f5204f9b0ad1e4ecfe9f8a2be715a25ba3ff6a",
+        "loop-signal-v1.schema.json": "sha256:7772bf04a9a71d82f0172074fe316eb71b6d1e3becbaf5aaa20612e3bd2de3e6",
+        "memory-record-v1.schema.json": "sha256:a94398adc9568de6c422cb5ac97aa97ad8a267290ee5c3b5ff3d14b45ca08c1c",
+        "opportunity-record-v1.schema.json": "sha256:99282bb1b386ad5ef75f2670487da7617d11952795575642ec9cefb0fdfd71b4",
+        "outbox-record-v1.schema.json": "sha256:ba1e3741fcbad1c92b5d66c1c26939898e27bba45fa38d9b5ed9e392ed4ca256",
+        "outcome-attribution-record-v1.schema.json": "sha256:3fee3a050183db619fc803af03a148262eb8503d5890c30b9e281a0194aacf3d",
+        "prompt-composition-v2.schema.json": "sha256:44d6a1ed0a0d241975a5d56731151b0b22f0ef35aaa2d0ff99daac940695abfe",
+        "quarantine-record-v1.schema.json": "sha256:1e77985a35832351a9366beb408859035c5a698a342fc6d5e251e314511b9617",
+        "repository-identity-v1.schema.json": "sha256:92445e1af29e9d280ab3945a7f49f13f111d6a8f601a1f6564aaf3c56b21732c",
+        "role-constitution-v2.schema.json": "sha256:5127f5344f01202e41d2174d0ad4c534bb003e47dd62bf0a4a1ccbb697d1f840",
+        "skill-definition-v2.schema.json": "sha256:cbc9611e9e0bf6fd6f41795c0edf9daad5ca67c61e88ed292c77fc2650e3f5a2",
+        "typed-output-v1.schema.json": "sha256:a9248cc4aad95e9c20d89a88d4733cbcf2e6a92559deadc7ae6e84e51ffc813e",
+        "usage-event-v1.schema.json": "sha256:e213fb9d5c434e3dd144301d2f01a6201e95cd1ab3cddc6226169804f8c267b2",
+        "usage-reconciliation-v1.schema.json": "sha256:00595bdfe0088cc36aeff192a87f08870d8fbac72a752800d817c2c1d59e9acd"
+      }
+    }
+  },
+  "schema_version": 1,
+  "telemetry_coverage": "released-metadata-only",
+  "usage_accounting_status": "unavailable",
+  "watchers_sync_started": false
+}
