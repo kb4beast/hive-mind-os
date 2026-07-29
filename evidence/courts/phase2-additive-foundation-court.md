@@ -152,3 +152,22 @@ Fifth-remand remediation implementation
 evidence-only descendant may be reviewed as the exact PR head only if its source,
 tests, scripts, and project configuration remain byte-identical. Fresh Curator and
 Steward acceptance remains required.
+
+Sixth implementation candidate
+`d045204c5b7d620078eb0ae3de67397d5ff02a74`: `remand`.
+
+Curator `Kuhn` and Steward `Planck` independently accepted the implementation and
+exact compatibility record. Judge `Ohm` found that both green SBOM jobs ignored
+unsupported action inputs, discovered zero packages, retained only the wheel, and
+attested only the wheel. Courtroom fail-closed rules prohibit substituting a green
+job label for the missing SBOM/provenance exhibits. The exact push and PR job IDs,
+including the preserved same-SHA Python 3.11 adverse attempt, are recorded in
+`P2-AUDIT-018`.
+
+Sixth-remand remediation is recorded in `P2-AUDIT-019`. It changes only the
+supply-chain workflow and recovery contract: the Syft release URI, version, archive
+digest, and Apache-2.0 license are explicit; the archive is verified before Syft
+scans the installed wheel; an independent verifier requires the exact package in a
+nonempty SPDX 2.3 document; and upload/provenance explicitly bind both wheel and
+SBOM. No acceptance is asserted before fresh exact-head receipts and independent
+reconstruction.

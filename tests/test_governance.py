@@ -29,7 +29,9 @@ class RepositoryGovernanceTests(unittest.TestCase):
             "dependency-and-license-review",
             "sbom-and-build-provenance",
             "actions/attest@",
-            "anchore/sbom-action@",
+            "syft/releases/download/v1.50.0/",
+            "bf7b29ff57f06da30918266a0e1c2885a8f99784798d1bdb1628886aa015d788",
+            "sha256sum --check --strict",
         ):
             self.assertIn(required, workflow)
         self.assertIn("persist-credentials: false", workflow)
@@ -141,6 +143,12 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertIn("python scripts/verify_installed_wheel.py", workflow)
         self.assertIn("--source-root src/hive_mind_os", workflow)
         self.assertIn("--installed-root .wheel-install", workflow)
+        self.assertIn("scan dir:.wheel-install", workflow)
+        self.assertIn("SBOM contains no packages", workflow)
+        self.assertIn("SBOM does not identify installed distribution", workflow)
+        self.assertEqual(workflow.count("dist/hive-mind-os.spdx.json"), 4)
+        self.assertIn("dist/*.whl", workflow)
+        self.assertIn("Attest wheel and SBOM provenance", workflow)
 
     def test_secret_scan_allowlist_is_narrow_and_extends_defaults(self) -> None:
         config = tomllib.loads((ROOT / ".gitleaks.toml").read_text())

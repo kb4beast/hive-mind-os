@@ -323,3 +323,46 @@ evidence.
 - Require a completely green exact-head matrix. If the unchanged seeded worker test
   fails, rerun only from the same immutable SHA and retain every adverse receipt; do
   not modify frozen Generation Zero behavior or weaken the test.
+
+## `P2-AUDIT-018` — sixth independent remand
+
+- Exact reviewed candidate:
+  `d045204c5b7d620078eb0ae3de67397d5ff02a74`; source, tests, scripts, and project
+  configuration were byte-identical to implementation commit
+  `ace73253cdd61ef870ed4e2caacb2f4d91b1ef57`.
+- Curator `Kuhn` and Steward `Planck` independently accepted the runtime,
+  contracts, inventories, rollback, and exact Generation Zero compatibility.
+  Judge `Ohm` nevertheless remanded the supply-chain receipt.
+- Push job `90500747312` and PR job `90502048055` warned that `output-file`,
+  `upload-artifact`, and `upload-release-assets` were unsupported inputs to pinned
+  `anchore/sbom-action` v0.9.0. Syft discovered zero packages; the retained artifact
+  and attestation covered only the wheel. Green job status therefore did not prove
+  the declared SBOM and provenance obligation.
+- PR run `30428704002` attempt 1 also preserves unchanged Python 3.11 seeded-worker
+  failure `90500755817`; same-SHA attempt 2 passed all declared jobs. Neither adverse
+  receipt is waived or relabeled.
+
+## `P2-AUDIT-019` — sixth-remand remediation
+
+- The workflow downloads Syft `v1.50.0` from its immutable GitHub release URI and
+  verifies the Linux amd64 archive SHA-256
+  `bf7b29ff57f06da30918266a0e1c2885a8f99784798d1bdb1628886aa015d788`
+  before execution. Release
+  `https://github.com/anchore/syft/releases/tag/v1.50.0` and tag-bound license
+  `https://github.com/anchore/syft/blob/v1.50.0/LICENSE` were retrieved
+  2026-07-28; license disposition: `adopt` for verification tooling under
+  Apache-2.0.
+- Syft scans the installed wheel tree. A fail-closed verifier requires a nonempty
+  SPDX 2.3 JSON document and the exact installed `hive-mind-os` name/version.
+- Immutable artifact upload names both wheel and SBOM explicitly, and push-event
+  provenance names both as subjects. Absence of either file fails the job.
+- No production source, frozen test, public API, CLI contract, or Generation Zero
+  runtime selection changed in this remediation.
+
+## Open entries after sixth remand
+
+- Commit and push the workflow repair, then require a fresh exact-head full matrix.
+- Inspect logs and downloaded evidence, not job color alone: prove a nonempty
+  project-bearing SBOM, two retained files, and provenance subjects for both.
+- Obtain fresh Curator and Steward reconstruction and a distinct Judge disposition
+  on the corrected exact head before closing the court.

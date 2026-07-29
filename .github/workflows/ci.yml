@@ -130,19 +130,60 @@ jobs:
           PYTHONPATH=.wheel-install python scripts/verify_installed_wheel.py \
             --source-root src/hive_mind_os \
             --installed-root .wheel-install
-      - name: Generate SPDX JSON SBOM
-        uses: anchore/sbom-action@f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a # v0.9.0
-        with:
-          path: dist
-          format: spdx-json
-          output-file: dist/hive-mind-os.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
+      - name: Install checksum-pinned Syft
+        run: |
+          curl --fail --show-error --silent --location \
+            --output /tmp/syft.tar.gz \
+            https://github.com/anchore/syft/releases/download/v1.50.0/syft_1.50.0_linux_amd64.tar.gz
+          echo "bf7b29ff57f06da30918266a0e1c2885a8f99784798d1bdb1628886aa015d788  /tmp/syft.tar.gz" \
+            | sha256sum --check --strict
+          tar --extract --gzip --file /tmp/syft.tar.gz --directory /tmp syft
+          /tmp/syft version
+      - name: Generate and verify SPDX JSON SBOM
+        run: |
+          /tmp/syft scan dir:.wheel-install \
+            --source-name hive-mind-os-wheel-install \
+            --source-version 0.6.0 \
+            --output spdx-json=dist/hive-mind-os.spdx.json
+          PYTHONPATH=.wheel-install python - <<'PY'
+          import importlib.metadata
+          import json
+          import re
+          from pathlib import Path
+
+          sbom_path = Path("dist/hive-mind-os.spdx.json")
+          if not sbom_path.is_file() or sbom_path.stat().st_size == 0:
+              raise SystemExit("SBOM is missing or empty")
+          sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
+          if sbom.get("spdxVersion") != "SPDX-2.3":
+              raise SystemExit("SBOM is not SPDX 2.3 JSON")
+          distribution = importlib.metadata.distribution("hive-mind-os")
+          normalize = lambda value: re.sub(r"[-_.]+", "-", value).lower()
+          expected = (normalize(distribution.metadata["Name"]), distribution.version)
+          packages = sbom.get("packages")
+          if not isinstance(packages, list) or not packages:
+              raise SystemExit("SBOM contains no packages")
+          discovered = {
+              (normalize(package.get("name", "")), package.get("versionInfo"))
+              for package in packages
+              if isinstance(package, dict)
+          }
+          if expected not in discovered:
+              raise SystemExit(
+                  f"SBOM does not identify installed distribution {expected!r}"
+              )
+          print(
+              f"verified {len(packages)} SBOM package(s), including "
+              f"{distribution.metadata['Name']}=={distribution.version}"
+          )
+          PY
       - name: Upload immutable build evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hive-mind-os-build-evidence
-          path: dist/
+          path: |
+            dist/*.whl
+            dist/hive-mind-os.spdx.json
           if-no-files-found: error
           retention-days: 30
       - name: Attest wheel and SBOM provenance

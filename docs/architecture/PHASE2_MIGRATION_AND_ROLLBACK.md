@@ -57,3 +57,9 @@ an external destination acknowledged a message.
   are never added to direction totals.
 - Run deterministic generation check and the complete Generation Zero regression
   suite.
+- Build and install the wheel, generate a nonempty SPDX 2.3 JSON SBOM from that
+  installed distribution with a pinned scanner, and fail unless the SBOM identifies
+  the installed package and version.
+- Retain both wheel and SBOM as immutable workflow evidence and bind both files as
+  subjects of the push-event provenance attestation. A green job without both
+  retained subjects is not a passing supply-chain receipt.

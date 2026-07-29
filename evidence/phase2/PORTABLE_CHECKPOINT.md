@@ -4,7 +4,8 @@
 - Stack base: PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`
 - Current implementation candidate:
   `ace73253cdd61ef870ed4e2caacb2f4d91b1ef57`; fifth-remand authority-seal
-  remediation sealed; fresh independent review pending; not activated
+  remediation sealed; sixth-remand supply-chain workflow repair pending exact-head
+  verification; not activated
 - Governing ADR: ADR-021
 - Court: `evidence/courts/phase2-additive-foundation-court.md`
 - Inventory: `evidence/phase2/phase2_foundation_inventory.json`
@@ -37,6 +38,8 @@ Implemented:
   integrity.
 - process-local issuer-sealed authority decisions verified at every store boundary;
   direct fabrication and post-issuance mutation fail closed.
+- fail-closed installed-wheel SPDX generation and package identity verification;
+  immutable upload and provenance name both wheel and SBOM.
 
 Unchanged:
 
@@ -45,8 +48,8 @@ Unchanged:
 - legacy schemas/resources and Phase 1 historical inventory;
 - Obsidian/Phase 3 and later behavior.
 
-Resume by committing the remediation, rerunning independent Curator/Steward
-reconstruction, and appointing a distinct Judge on the accepted exact candidate.
-Then run/record the complete exact-head multi-Python, security, supply-chain,
-wheel/resource, provenance, and PR check matrix. Do not activate, merge, or start
-Phase 3.
+Resume by committing the sixth-remand workflow repair and running the complete
+exact-head multi-Python, security, supply-chain, wheel/resource, provenance, and PR
+check matrix. Inspect the SBOM contents, retained artifact, and attestation subjects
+directly. Then rerun independent Curator/Steward reconstruction and appoint a
+distinct Judge. Do not activate, merge, or start Phase 3.
