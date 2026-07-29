@@ -11,6 +11,8 @@
 - Migration/rollback:
   `docs/architecture/PHASE3_ITEM2_MIGRATION_AND_ROLLBACK.md`
 - Inventory: `evidence/phase3/phase3_memory_separation_inventory.json`
+- Draft delivery: PR #33, implementation head
+  `6e77e8fa392e982f0c92991cd67e1de17915c467`
 
 ## Candidate capability
 
