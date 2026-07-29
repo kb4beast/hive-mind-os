@@ -191,7 +191,10 @@ class ObsidianVaultRefreshEvidenceTests(unittest.TestCase):
             except OSError:
                 pass
             else:
-                with self.assertRaisesRegex(ValueError, "linked evidence"):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "linked evidence|escapes run directory",
+                ):
                     _bounded_file(root, symlink, 7)
 
 

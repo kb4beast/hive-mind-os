@@ -18,10 +18,10 @@
     "scripts/phase3_obsidian_refresh_fixture.py": "sha256:8d9a545df51fcf546dc0841819cd285e5263c5b39aea0df01b709029b6ab7b26",
     "scripts/phase3_obsidian_vault_refresh_inventory.py": "sha256:0dc00fdd39cab5234de61ed33b0557f1558baecbd8c17518f96ef715db52d2a5",
     "src/hive_mind_os/foundation/cognitive_views.py": "sha256:76e8a011ed71f98a6fe00f23768a8fb889331ad62ec28f8c0293438d8e4224d0",
-    "tests/test_phase3_cognitive_views.py": "sha256:56b927d278f21f7da035a51e18c4c307609f3025948f3a721b9ffca2ee217ce6",
-    "tests/test_phase3_obsidian_vault_refresh.py": "sha256:34bfc113383962fb09e1ddf2b5c35861f27b17aceb2f2ae6953b93ef0fc182f1"
+    "tests/test_phase3_cognitive_views.py": "sha256:a61ec2393dac5d6e6b4f8d99065a7415b864692259a2257ddad79d02c3b3f524",
+    "tests/test_phase3_obsidian_vault_refresh.py": "sha256:b5d79baaafd686a6ce77d2ffe8e1a49f777b321941f3a45e4897af88e14673b6"
   },
-  "inventory_digest": "sha256:e7925594ad3078d930601022ec6cb889b00753508d34b8159e49fe4af719e6e6",
+  "inventory_digest": "sha256:a19b0f105a6109afb8ecedf43ed7de879238962d5a071475d40b488b0d60592f",
   "obsidian_configuration": {
     "gitignore_rule": ".obsidian/",
     "global_profile_registration_side_effect_recorded": true,
