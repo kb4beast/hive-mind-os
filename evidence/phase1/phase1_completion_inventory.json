@@ -48,6 +48,13 @@
       "implementation_phase": 2
     }
   ],
+  "delivery_verification": {
+    "final_evidence_only_descendant_must_be_exact_head_green": true,
+    "path": "evidence/phase1/phase1_delivery_verification.json",
+    "pull_request_run": 30420957451,
+    "push_run": 30420955217,
+    "verified_parent_head": "58253bcc1f75c07abf0f66bda4b18ad2dd0402b2"
+  },
   "generation_zero": {
     "cli_parser_count": 13,
     "fixture_path": "tests/fixtures/phase1/generation_zero.json",
@@ -109,5 +116,5 @@
     "path": "evidence/courts/P1-SOURCE-ADMISSION.md",
     "sha256": "c9b62d2be91fa0669f54e70317b5033ad6e29a7140e4ae7c6eb0f10665214f7a"
   },
-  "status": "judge-adopted-pending-exact-head-delivery"
+  "status": "phase1-complete-when-final-evidence-only-descendant-is-exact-head-green"
 }

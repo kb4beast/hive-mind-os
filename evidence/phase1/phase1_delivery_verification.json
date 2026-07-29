@@ -1,0 +1,77 @@
+{
+  "base": {
+    "branch": "codex/repair-ci-test-contract",
+    "merge_base": "0948f7ec385238f5825ce7c39dd25de2e9a1035d"
+  },
+  "delivery_rule": {
+    "final_evidence_only_descendant_must_repeat_exact_head_gates": true,
+    "governed_material_changed_after_judge": false,
+    "judge_inheritance_authorized": true
+  },
+  "generation_zero": {
+    "cli_contract_count": 13,
+    "inventory_digest": "sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037",
+    "package_api_count": 33,
+    "root_api_count": 131
+  },
+  "independent_codeql": {
+    "conclusion": "success",
+    "job_id": 90477583312
+  },
+  "pr": {
+    "draft": true,
+    "merge_state": "CLEAN",
+    "number": 29,
+    "state": "OPEN",
+    "url": "https://github.com/kb4beast/hive-mind-os/pull/29"
+  },
+  "pull_request_run": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "58253bcc1f75c07abf0f66bda4b18ad2dd0402b2",
+    "jobs": {
+      "codeql-security": 90477469699,
+      "dependency-and-license-review": 90477469687,
+      "sbom-and-build-provenance": 90477469713,
+      "secret-scan": 90477469754,
+      "static-and-type-checks": 90477469711,
+      "unit-tests-python-3.11": 90477469724,
+      "unit-tests-python-3.12": 90477469741,
+      "unit-tests-python-3.14": 90477469732
+    },
+    "run_id": 30420957451,
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/30420957451"
+  },
+  "push_run": {
+    "conclusion": "success",
+    "event": "push",
+    "head_sha": "58253bcc1f75c07abf0f66bda4b18ad2dd0402b2",
+    "jobs": {
+      "codeql-security": 90477462996,
+      "sbom-and-build-provenance": 90477463003,
+      "secret-scan": 90477463008,
+      "static-and-type-checks": 90477462957,
+      "unit-tests-python-3.11": 90477463032,
+      "unit-tests-python-3.12": 90477462988,
+      "unit-tests-python-3.14": 90477462977
+    },
+    "run_id": 30420955217,
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/30420955217"
+  },
+  "schema_version": 1,
+  "verified_parent_head": "58253bcc1f75c07abf0f66bda4b18ad2dd0402b2",
+  "wheel_and_provenance": {
+    "attestation_id": 37658251,
+    "attestation_url": "https://github.com/kb4beast/hive-mind-os/attestations/37658251",
+    "component_count": 22,
+    "package_file_count": 48,
+    "rekor_log_index": 2279214882,
+    "resource_count": 68,
+    "resource_set_digest": "a439cdc93272ff1b3078492a2023447902976e4350335ce6057bb9482267249f",
+    "schema_count": 20,
+    "spdx_json_sbom": "success",
+    "trust_state": "quarantined",
+    "wheel": "hive_mind_os-0.6.0-py3-none-any.whl",
+    "wheel_sha256": "8ed98ce197ca8081787155fb451c629c456a765417ed69d8cff34783dad3a60b"
+  }
+}

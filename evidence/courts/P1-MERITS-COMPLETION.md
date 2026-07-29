@@ -149,6 +149,22 @@ SBOM, clean-wheel, provenance, and resource gates. The ruling defers Phase 2
 implementation in PR #29, rejects unsupported host/production/superiority
 claims, and preserves Armory and AgentTelemetry quarantine.
 
+## Exact-head delivery continuation
+
+Published head `58253bcc1f75c07abf0f66bda4b18ad2dd0402b2`
+passed the complete Python 3.11, 3.12, and 3.14 suites, Ruff, Pyright, CodeQL,
+secret scan, dependency/license review, clean-wheel installation, installed
+resource verification, SPDX JSON SBOM generation, and push provenance
+attestation. Exact run, job, wheel, resource, Rekor, and attestation receipts
+are pinned in `evidence/phase1/phase1_delivery_verification.json`.
+
+The commit containing that receipt is an evidence-only descendant under the
+Judge's condition 7. It inherits the merits disposition only after it becomes
+PR #29's exact published head and repeats the same full gate set. No governed
+architecture, contract, source disposition, fixture, generated inventory,
+scanner, test contract, production source, or runtime behavior changed after
+the Judge's candidate.
+
 ## Rollback and appeal
 
 Rollback is the exact procedure in

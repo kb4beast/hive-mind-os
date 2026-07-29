@@ -1,7 +1,7 @@
 # Phase 1 Completion Portable Checkpoint
 
-- Checkpoint status: independently accepted by Curator and adopted by Judge;
-  exact-published-head delivery gates pending
+- Checkpoint status: independently accepted by Curator, adopted by Judge, and
+  exact-published-head delivery gates reproduced
 - Date: 2026-07-28
 - Draft PR: `kb4beast/hive-mind-os#29`
 - Branch: `codex/phase1-redesign-characterization`
@@ -10,7 +10,10 @@
 - Starting head: `ee00967610df9e7d0ec4a5150bac751cc6880105`
 - Phase 1 completion commit:
   `0d44b1665d9775b5b889e99c2d56e63db9a010b9`
-- Exact published verification head: pending
+- Exact published verification parent:
+  `58253bcc1f75c07abf0f66bda4b18ad2dd0402b2`
+- Final evidence-only delivery head: the commit containing this checkpoint;
+  resolve it from PR #29 and require the same exact-head gates before use
 
 ## Objective and completed candidate state
 
@@ -47,9 +50,10 @@ changed by the completion candidate.
    disposition at `evidence/courts/P1-COMPLETION-JUDGE.md`. A Builder
    statement cannot satisfy either.
 5. Repair any remand without weakening the frozen surfaces or evidence gates.
-6. Push only to PR #29's branch and require its exact-head Python matrix,
-   Ruff, Pyright, CodeQL, secret scan, dependency review, SBOM, wheel,
-   provenance, and resource checks to pass.
+6. Verify `evidence/phase1/phase1_delivery_verification.json`, then require the
+   final evidence-only descendant's exact-head Python matrix, Ruff, Pyright,
+   CodeQL, secret scan, dependency review, SBOM, wheel, provenance, and
+   resource checks to pass.
 7. Keep the PR draft, stacked on PR #28, and do not merge either PR or modify
    `main`.
 
@@ -72,8 +76,11 @@ Independent Curator, Judge, and exact-published-head security/provenance gates
 were required at the initial checkpoint. The Curator subsequently accepted
 exact candidate `0d44b1665d9775b5b889e99c2d56e63db9a010b9`, and the
 separate Judge adopted the Phase 1 architecture/evidence candidate
-`a7c67c34f2986ea64732f2a75073d258a90c8ad6`. Exact-published-head
-security/provenance gates remain pending.
+`a7c67c34f2986ea64732f2a75073d258a90c8ad6`. Published descendant
+`58253bcc1f75c07abf0f66bda4b18ad2dd0402b2` then passed the full
+matrix, quality, security, dependency, SBOM, wheel, provenance, and resource
+gates. The commit containing this evidence-only checkpoint must repeat those
+same gates as PR #29's exact head before delivery is reported.
 
 ## Deferred work and next eligible objective
 
