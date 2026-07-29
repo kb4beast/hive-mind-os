@@ -36,6 +36,10 @@ observable source expressions from source segments. This keeps the evidence
 contract stable across the supported Python matrix without hiding semantic
 parameter, default, annotation, return, option, or binding changes.
 
+Enum metaclass construction signatures are also excluded because Python 3.11
+and 3.12+ expose different interpreter internals. The supported contract is
+recorded as value lookup plus the exact member names and values.
+
 ## Event path result
 
 The AST receipt contains:

@@ -1099,7 +1099,7 @@
       }
     }
   },
-  "inventory_digest": "sha256:f551d93964f13a01327efb6cb1481c88f90883454b77df2c7ee9b67ed36e1401",
+  "inventory_digest": "sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037",
   "observable_module_surface": {
     "classification": "de-facto-observable-not-promised-supported",
     "constant_count": 40,
@@ -4489,6 +4489,7 @@
         "qualname": "ActionKind",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -4497,13 +4498,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.classic_gpt.ActionKind"
         }
       },
       "hive_mind_os.classic_gpt:ClassicGptSimulationGate:class": {
@@ -4968,6 +4967,7 @@
         "qualname": "SimulationPhase",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -4976,13 +4976,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.classic_gpt.SimulationPhase"
         }
       },
       "hive_mind_os.contracts:ContractValidation:class": {
@@ -5127,6 +5125,7 @@
         "qualname": "BurdenOfProof",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -5135,13 +5134,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.courtroom.BurdenOfProof"
         }
       },
       "hive_mind_os.courtroom:CourtCase:class": {
@@ -5350,6 +5347,7 @@
         "qualname": "Disposition",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -5358,13 +5356,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.courtroom.Disposition"
         }
       },
       "hive_mind_os.courtroom:SourceDocketAuditor:class": {
@@ -9125,6 +9121,7 @@
         "qualname": "AutonomyLevel",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -9133,13 +9130,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.models.AutonomyLevel"
         }
       },
       "hive_mind_os.models:Objective:class": {
@@ -9237,6 +9232,7 @@
         "qualname": "RiskTier",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -9245,13 +9241,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.models.RiskTier"
         }
       },
       "hive_mind_os.models:Role:class": {
@@ -9299,6 +9293,7 @@
         "qualname": "Role",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -9307,13 +9302,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.models.Role"
         }
       },
       "hive_mind_os.package_system.catalog:PackageCatalog:class": {
@@ -9520,6 +9513,7 @@
         "qualname": "ConformanceStatus",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -9528,13 +9522,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.host_profiles.ConformanceStatus"
         }
       },
       "hive_mind_os.package_system.host_profiles:EvidenceLevel:class": {
@@ -9561,6 +9553,7 @@
         "qualname": "EvidenceLevel",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -9569,13 +9562,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.host_profiles.EvidenceLevel"
         }
       },
       "hive_mind_os.package_system.host_profiles:HostCapability:class": {
@@ -9646,6 +9637,7 @@
         "qualname": "HostCapability",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -9654,13 +9646,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.host_profiles.HostCapability"
         }
       },
       "hive_mind_os.package_system.host_profiles:HostCapabilityProfile:class": {
@@ -10097,6 +10087,7 @@
         "qualname": "ComponentKind",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -10105,13 +10096,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.models.ComponentKind"
         }
       },
       "hive_mind_os.package_system.models:ComponentRef:class": {
@@ -10258,6 +10247,7 @@
         "qualname": "LicenseStatus",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -10266,13 +10256,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.models.LicenseStatus"
         }
       },
       "hive_mind_os.package_system.models:LoadedPackage:class": {
@@ -10730,6 +10718,7 @@
         "qualname": "TrustState",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -10738,13 +10727,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.models.TrustState"
         }
       },
       "hive_mind_os.package_system.models:WorkflowManifest:class": {
@@ -10986,6 +10973,7 @@
         "qualname": "OODAPhase",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -10994,13 +10982,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.ooda.OODAPhase"
         }
       },
       "hive_mind_os.package_system.ooda:OODAState:class": {
@@ -11279,6 +11265,7 @@
         "qualname": "OODAStatus",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -11287,13 +11274,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.package_system.ooda.OODAStatus"
         }
       },
       "hive_mind_os.package_system.ooda:OODATerminalRecord:class": {
@@ -12326,6 +12311,7 @@
         "qualname": "ReceiptResult",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -12334,13 +12320,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.receipts.ReceiptResult"
         }
       },
       "hive_mind_os.receipts:ReceiptValidation:class": {
@@ -12744,6 +12728,7 @@
         "qualname": "ExperimentVerdict",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -12752,13 +12737,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.recursive_improvement.ExperimentVerdict"
         }
       },
       "hive_mind_os.recursive_improvement:MetricDirection:class": {
@@ -12781,6 +12764,7 @@
         "qualname": "MetricDirection",
         "signature": {
           "available": true,
+          "contract": "enum-value-lookup",
           "parameters": [
             {
               "annotation": {
@@ -12789,13 +12773,11 @@
               "default": {
                 "state": "absent"
               },
-              "kind": "var_positional",
-              "name": "values"
+              "kind": "positional_or_keyword",
+              "name": "value"
             }
           ],
-          "return": {
-            "state": "absent"
-          }
+          "return": "hive_mind_os.recursive_improvement.MetricDirection"
         }
       },
       "hive_mind_os.recursive_improvement:MetricObservation:class": {
@@ -14508,7 +14490,7 @@
         "value": 2
       }
     },
-    "digest": "sha256:d230e9d458297e67e85a1560273ef71bd7b91c0ebb10d20f658cfbfe2901d0e4",
+    "digest": "sha256:a69ce07fec663077c82da5828788866ad0912f1e9a8e49dad0f0ee94c270635f",
     "entry_count": 164,
     "facades": {
       "hive_mind_os": {

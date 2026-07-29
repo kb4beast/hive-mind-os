@@ -151,6 +151,29 @@ The independent Judge issued:
 The full disposition, conditions, dissent, rollback, and appeal boundary are
 preserved in `evidence/courts/P1-SURFACE-AND-EFFECT-JUDGE.md`.
 
+## GitHub publication remand 2 — Python 3.11 enum metaclass signature
+
+Exact evidence head `784264b49e1bf14ad6c9e76cb0d736db209200ca`
+failed both Python 3.11 GitHub unit-test jobs while Python 3.12, Python 3.14,
+security, static, dependency, secret, and provenance jobs passed. All 423
+pre-existing Python 3.11 tests passed; only the new live-inventory comparison
+failed.
+
+Container reproduction showed that Python 3.11 exposes seven `EnumMeta`
+construction parameters through `inspect.signature`, while Python 3.12 and
+3.14 expose `(*values)`. Those interpreter implementation signatures are not
+the supported enum lookup contract.
+
+The repair records one portable `enum-value-lookup(value)` contract and
+retains the exact member names and values already present in the artifact.
+Python 3.11, 3.12, and 3.14 must now produce structurally identical artifacts
+and inventory digest
+`sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037`.
+
+This failure and repair do not weaken the matrix or create a version-specific
+fixture. The repaired head requires fresh Curator and Judge review and a new
+exact-head GitHub run.
+
 ## Acceptance evidence
 
 The candidate must provide:

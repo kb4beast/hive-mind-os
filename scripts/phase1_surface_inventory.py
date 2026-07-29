@@ -275,12 +275,24 @@ def _facade_entries(
         }
         if inspect.isclass(value):
             entry["kind"] = "class"
-            entry["signature"] = _signature(value)
             entry["bases"] = [
                 _qualified_name(base) for base in value.__bases__
             ]
             entry["members"] = _public_members(value)
             if issubclass(value, Enum):
+                entry["signature"] = {
+                    "available": True,
+                    "contract": "enum-value-lookup",
+                    "parameters": [
+                        {
+                            "annotation": {"state": "absent"},
+                            "default": {"state": "absent"},
+                            "kind": "positional_or_keyword",
+                            "name": "value",
+                        }
+                    ],
+                    "return": _qualified_name(value),
+                }
                 entry["enum_members"] = [
                     {
                         "name": member.name,
@@ -288,6 +300,8 @@ def _facade_entries(
                     }
                     for member in value
                 ]
+            else:
+                entry["signature"] = _signature(value)
         elif inspect.isfunction(value):
             entry["kind"] = "function"
             entry["signature"] = _signature(value)

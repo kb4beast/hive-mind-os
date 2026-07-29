@@ -400,7 +400,7 @@
     "event_producer_count": 53,
     "event_sink_count": 48,
     "event_type_count": 47,
-    "inventory_digest": "sha256:f551d93964f13a01327efb6cb1481c88f90883454b77df2c7ee9b67ed36e1401",
+    "inventory_digest": "sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037",
     "module_definition_count": 304,
     "persistence_writer_count": 224,
     "public_api_entry_count": 164,
