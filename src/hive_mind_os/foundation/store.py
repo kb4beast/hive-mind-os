@@ -1385,7 +1385,11 @@ class FoundationStore:
                     f"opportunity key {row['exact_digest']}: target mismatch"
                 )
         for row in self._connection.execute(
-            "SELECT * FROM outbox_messages ORDER BY sequence"
+            "SELECT message.* FROM outbox_messages AS message "
+            "JOIN records AS source ON source.record_id=message.source_record_id "
+            "WHERE source.tenant_id=? AND source.repository_id=? "
+            "ORDER BY message.sequence",
+            (tenant_id, repository_id),
         ):
             try:
                 payload = json.loads(row["payload_json"])
@@ -1423,7 +1427,10 @@ class FoundationStore:
                         f"outbox {row['message_id']}: source projection mismatch"
                     )
         for table in ("outbox_attempts", "outbox_acknowledgements"):
-            for row in self._connection.execute(f"SELECT * FROM {table}"):
+            for row in self._connection.execute(
+                f"SELECT * FROM {table} WHERE tenant_id=? AND repository_id=?",
+                (tenant_id, repository_id),
+            ):
                 destination = self._connection.execute(
                     "SELECT destination FROM outbox_messages WHERE message_id=?",
                     (row["message_id"],),

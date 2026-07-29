@@ -163,3 +163,23 @@ The remediation:
 The architecture, migration, operator documentation, dissent, and court wording were
 corrected to match the narrower implementation. Fresh exact-head inventory, complete
 verification, independent reconstruction, and Judge disposition remain required.
+
+## `P3-AUDIT-010` — scoped snapshot integrity boundary
+
+Final Builder review found that `verify_integrity(tenant_id, repository_id)` scoped
+records, relations, repository identity, and opportunity keys but inspected outbox
+rows from every repository. That could make one repository's projection fail with
+identifiers from another repository. The outbox-message query is now joined to the
+requested source-record scope, and attempt/acknowledgement checks filter their
+immutable tenant/repository columns. A regression inserts a malformed message only
+for a second repository and proves the first scope stays clean while the second
+reports the issue.
+
+Post-change focused receipts on Python 3.14:
+
+- Phase 2 plus Phase 3: `51 passed, 23 subtests passed`;
+- full Ruff: pass;
+- full Pyright: 0 errors and 0 warnings.
+
+The generated inventory was refreshed. Fresh exact-head CI and independent review
+supersede all prior candidate-level promotion receipts.

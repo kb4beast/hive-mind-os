@@ -737,6 +737,60 @@ class FoundationStoreTests(unittest.TestCase):
                 actor_id="builder",
             )
 
+    def test_integrity_outbox_checks_are_repository_scoped(self) -> None:
+        other_identity = {
+            **REPOSITORY_IDENTITY,
+            "repository_id": "repository:other-integrity",
+            "instance_id": "instance:other-integrity",
+        }
+        self.store.register_repository(
+            other_identity,
+            authority=allowed_authority(
+                "foundation.repository.register",
+                repository_id="repository:other-integrity",
+            ),
+        )
+        local = self._append("memory:local-integrity")
+        other = self._append(
+            "memory:other-integrity",
+            repository_id="repository:other-integrity",
+        )
+        with self.store._connection:
+            self.store._connection.execute(
+                "INSERT INTO outbox_messages("
+                "message_id,source_record_id,projection_kind,projection_version,"
+                "destination,payload_json,payload_digest,created_at"
+                ") VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    "outbox:malformed-other-scope",
+                    other["record_id"],
+                    "record-projection",
+                    "v1",
+                    "other-test",
+                    "{}",
+                    digest({}),
+                    "2026-07-29T00:00:03+00:00",
+                ),
+            )
+        self.assertEqual(
+            self.store.verify_integrity(
+                tenant_id="tenant:test",
+                repository_id="repository:test",
+            ),
+            (),
+        )
+        other_issues = self.store.verify_integrity(
+            tenant_id="tenant:test",
+            repository_id="repository:other-integrity",
+        )
+        self.assertTrue(
+            any(
+                "outbox:malformed-other-scope" in issue
+                for issue in other_issues
+            )
+        )
+        self.assertNotEqual(local["record_id"], other["record_id"])
+
     def test_delivery_replay_uses_append_only_attempt_and_ack_receipts(self) -> None:
         self._append()
         message = self.store.pending_outbox(

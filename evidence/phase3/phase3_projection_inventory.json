@@ -26,9 +26,9 @@
     "src/hive_mind_os/foundation/brain.py": "sha256:139f01b5ca379d21fe3567aa88ea74bea50712ea3387498c430302e7ea3d62b8",
     "src/hive_mind_os/foundation/brain_contracts.py": "sha256:c01d5a15909ae45d8e2afca079224c3e4221c17f022667dbf8904d52ea112d6f",
     "src/hive_mind_os/foundation/contracts.py": "sha256:a9f2916e8fa46139248f1a12ccf184977f35325f487b12892fa8bd2dbc14decf",
-    "src/hive_mind_os/foundation/store.py": "sha256:fb274535a4875b866b80def0fd5321fe2bf775174b5fa82a8b2d0dd8541be3c6"
+    "src/hive_mind_os/foundation/store.py": "sha256:48f54d05747396404437dc9b094bf302cff79750b775ece0e0e218d86f5f6760"
   },
-  "inventory_digest": "sha256:b6b86de960f988899f5adb2e1b7c4610ebb66c345684c1b835e6b07f0fa1a2d4",
+  "inventory_digest": "sha256:b58c9f6b2fb1d9bd1a124329842b2c19fcbcb213b4c9b36c7b8693da5f4238f9",
   "obsidian_runtime_required": false,
   "phase": 3,
   "phase2_input": {
