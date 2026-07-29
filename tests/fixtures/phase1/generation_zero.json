@@ -11,7 +11,7 @@
     "steward",
     "optimizer"
   ],
-  "fixture_version": 1,
+  "fixture_version": 2,
   "hive_core": {
     "catalog_fingerprint": "sha256:697fe36427f2d2e8c903dea305e7c4f77e1eeb7c7acc88d985c9448ff547ccaf",
     "component_contracts_digest": "sha256:3fe80ace79861f55644fd404aa1eb0f9687ddf9b4657b29ed8168f3ca93c1124",
@@ -393,5 +393,17 @@
       "tables": ["jobs"],
       "triggers": {}
     }
+  },
+  "surface_inventory": {
+    "artifact": "evidence/phase1/generation_zero_surface_inventory.json",
+    "cli_parser_count": 13,
+    "event_producer_count": 53,
+    "event_sink_count": 48,
+    "event_type_count": 47,
+    "inventory_digest": "sha256:ca386d16c8f29b848116fac495a5c319ec009d226d9f9f62cd839067ef9e7bee",
+    "module_definition_count": 304,
+    "persistence_writer_count": 224,
+    "public_api_entry_count": 164,
+    "unclassified_candidate_count": 0
   }
 }

@@ -49,6 +49,12 @@ and its source path before deriving normalized dimensions.
 
 ## Event coverage gaps
 
+The prose paths below are now complemented by the exact generated registry in
+`evidence/phase1/generation_zero_surface_inventory.json`: 48 direct ledger
+sinks, 53 producing sites, and 47 literal production event types. The
+registry is bounded by its declared static sink rules and does not convert
+these gaps into implemented capabilities.
+
 The ledger receives important mission, work, result, model, prompt, experiment,
 policy, sandbox, and verification events. Coverage is nevertheless incomplete:
 
@@ -65,6 +71,11 @@ policy, sandbox, and verification events. Coverage is nevertheless incomplete:
   are not first-class events; and
 - timestamps are writer-generated and there is no ingestion/observation time
   distinction.
+
+The registry also demonstrates that `HiveKernel.run_objective` can use a
+different stream identity from `ModelBackend._record_call`, that
+`war_room.event` and `experiment.decision` lack production emitters, and that
+projection reads can create stores on a previously absent root.
 
 ## Privacy and threat obligations
 

@@ -27,10 +27,16 @@ from hive_mind_os.prompt_registry import generation_zero_prompt, prompt_digest
 from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 from hive_mind_os.scheduler import Scheduler
 from hive_mind_os.source_docket import load_default_source_docket
+from scripts.phase1_surface_inventory import (
+    ARTIFACT_PATH,
+    build_inventory,
+)
 
 FIXTURE_PATH = (
     Path(__file__).parent / "fixtures" / "phase1" / "generation_zero.json"
 )
+REPOSITORY_ROOT = Path(__file__).parents[1]
+SURFACE_INVENTORY_PATH = REPOSITORY_ROOT / ARTIFACT_PATH
 
 
 def _digest_json(value: object) -> str:
@@ -256,6 +262,30 @@ def _model_call_shape() -> dict[str, object]:
         ledger.close()
 
 
+def _surface_inventory_receipt() -> dict[str, object]:
+    inventory = json.loads(
+        SURFACE_INVENTORY_PATH.read_text(encoding="utf-8")
+    )
+    public_api = inventory["public_api"]
+    effects = inventory["runtime_effects"]
+    observable = inventory["observable_module_surface"]
+    cli = inventory["cli"]
+    return {
+        "artifact": ARTIFACT_PATH.as_posix(),
+        "cli_parser_count": cli["parser_count"],
+        "event_producer_count": effects["event_producer_count"],
+        "event_sink_count": effects["event_sink_count"],
+        "event_type_count": effects["event_type_count"],
+        "inventory_digest": inventory["inventory_digest"],
+        "module_definition_count": observable["definition_count"],
+        "persistence_writer_count": effects["persistence_writer_count"],
+        "public_api_entry_count": public_api["entry_count"],
+        "unclassified_candidate_count": effects[
+            "unclassified_candidate_count"
+        ],
+    }
+
+
 def _current_characterization() -> dict[str, object]:
     catalog = hive_core_catalog()
     package = catalog.package("hive-core")
@@ -289,7 +319,7 @@ def _current_characterization() -> dict[str, object]:
             "0948f7ec385238f5825ce7c39dd25de2e9a1035d"
         ),
         "default_lifecycle": [role.value for role in DEFAULT_LIFECYCLE],
-        "fixture_version": 1,
+        "fixture_version": 2,
         "hive_core": {
             "catalog_fingerprint": snapshot.fingerprint,
             "component_contracts_digest": _digest_json(
@@ -336,6 +366,7 @@ def _current_characterization() -> dict[str, object]:
             "sources": len(docket.sources),
         },
         "stored_state": _stored_state_shape(),
+        "surface_inventory": _surface_inventory_receipt(),
     }
 
 
@@ -403,6 +434,36 @@ class GenerationZeroCharacterizationTests(unittest.TestCase):
                             ledger._connection.execute(statement)
         finally:
             ledger.close()
+
+    def test_surface_inventory_matches_live_source_and_has_no_unknown_sink(
+        self,
+    ) -> None:
+        expected = json.loads(
+            SURFACE_INVENTORY_PATH.read_text(encoding="utf-8")
+        )
+        observed = build_inventory(REPOSITORY_ROOT)
+        self.assertEqual(observed, expected)
+        self.assertEqual(
+            observed["public_api"]["facades"],
+            {
+                "hive_mind_os": {
+                    "export_count": 131,
+                    "version": "0.6.0",
+                },
+                "hive_mind_os.package_system": {
+                    "export_count": 33,
+                },
+            },
+        )
+        self.assertEqual(
+            observed["observable_module_surface"]["definition_count"],
+            304,
+        )
+        effects = observed["runtime_effects"]
+        self.assertEqual(effects["event_sink_count"], 48)
+        self.assertEqual(effects["event_producer_count"], 53)
+        self.assertEqual(effects["event_type_count"], 47)
+        self.assertEqual(effects["unclassified_candidate_count"], 0)
 
 
 if __name__ == "__main__":
