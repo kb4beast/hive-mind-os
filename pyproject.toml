@@ -21,6 +21,9 @@ where = ["src"]
 [tool.setuptools.package-data]
 hive_mind_os = [
     "schemas/*.json",
+    "foundation/schemas/*.json",
+    "foundation/generated/*.json",
+    "foundation/generated/agents/*.json",
     "builtin_packages/*/*.json",
     "builtin_packages/*/*/*.json",
     "builtin_packages/*/*/*/*.json",

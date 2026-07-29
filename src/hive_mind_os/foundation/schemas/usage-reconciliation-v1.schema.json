@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/usage-reconciliation/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "reconciliation_id", "period", "status", "matched_attempt_ids", "missing_attempt_ids", "duplicate_attempt_ids", "residuals", "invoice_source"],
+  "properties": {
+    "record_type": {"const": "usage-reconciliation"},
+    "schema_version": {"const": 1},
+    "reconciliation_id": {"type": "string", "minLength": 1},
+    "period": {"type": "string", "minLength": 1},
+    "status": {"type": "string", "enum": ["complete", "partial", "unavailable", "missing", "conflicting", "not-applicable"]},
+    "matched_attempt_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "missing_attempt_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "duplicate_attempt_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "residuals": {"type": "array", "items": {"type": "object"}},
+    "invoice_source": {"type": ["string", "null"]}
+  },
+  "additionalProperties": false
+}

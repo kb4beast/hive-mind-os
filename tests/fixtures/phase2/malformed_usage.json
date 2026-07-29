@@ -1,0 +1,8 @@
+{
+  "id": "req-malformed-fixture",
+  "usage": {
+    "prompt_tokens": "100",
+    "completion_tokens": -1,
+    "private_note": "must-not-be-retained"
+  }
+}

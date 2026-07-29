@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/repository-identity/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "tenant_id", "repository_id", "project_lineage_id", "instance_id", "remote_evidence_digest", "controller_build_digest", "self_host_depth"],
+  "properties": {
+    "record_type": {"const": "repository-identity"},
+    "schema_version": {"const": 1},
+    "tenant_id": {"type": "string", "minLength": 1},
+    "repository_id": {"type": "string", "minLength": 1},
+    "project_lineage_id": {"type": "string", "minLength": 1},
+    "instance_id": {"type": "string", "minLength": 1},
+    "remote_evidence_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "controller_build_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "self_host_depth": {"type": "integer", "minimum": 0},
+    "parent_run_id": {"type": ["string", "null"]},
+    "subject_commit": {"type": ["string", "null"]},
+    "target_cutoff": {"type": ["string", "null"]}
+  },
+  "additionalProperties": false
+}

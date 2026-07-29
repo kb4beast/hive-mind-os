@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/usage-event/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "event_kind", "attempt_id", "logical_request_id", "provider_kind", "accounting_status"],
+  "properties": {
+    "record_type": {"const": "usage-event"},
+    "schema_version": {"const": 1},
+    "event_kind": {"type": "string", "enum": ["attempt-started", "attempt-terminal", "correction", "invoice-observation"]},
+    "attempt_id": {"type": "string", "minLength": 1},
+    "logical_request_id": {"type": "string", "minLength": 1},
+    "provider_kind": {"type": "string", "minLength": 1},
+    "accounting_status": {"type": "string", "enum": ["pending", "reported", "unknown", "partial", "conflicting"]},
+    "retry_index": {"type": "integer"},
+    "purpose": {"type": "string", "minLength": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "request_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "requested_model_id": {"type": ["string", "null"]},
+    "served_model_id": {"type": ["string", "null"]},
+    "provider_request_id": {"type": ["string", "null"]},
+    "outcome": {"type": ["string", "null"]},
+    "duration_ms": {"type": "number"},
+    "error_class": {"type": ["string", "null"]},
+    "native": {"type": "object"},
+    "normalized_axes": {"type": "object"},
+    "unmapped_paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "adapter_version": {"type": ["string", "null"]},
+    "trace_id": {"type": ["string", "null"]},
+    "budget_lease_id": {"type": ["string", "null"]},
+    "response_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,116 @@
+{
+  "activation": "inert-opt-in",
+  "additive_surface": {
+    "current_event_sink_count": 48,
+    "current_module_definition_count": 334,
+    "unclassified_candidate_count": 0
+  },
+  "base_head": "3298078c41ce69103eb2bdce61960a69dc6aab93",
+  "foundation_contracts": {
+    "catalog_valid": true,
+    "count": 17,
+    "names": [
+      "agent-definition-v2",
+      "budget-lease-record-v1",
+      "decision-record-v1",
+      "idea-encounter-v1",
+      "loop-signal-v1",
+      "memory-record-v1",
+      "opportunity-record-v1",
+      "outcome-attribution-record-v1",
+      "outbox-record-v1",
+      "prompt-composition-v2",
+      "quarantine-record-v1",
+      "repository-identity-v1",
+      "role-constitution-v2",
+      "skill-definition-v2",
+      "typed-output-v1",
+      "usage-event-v1",
+      "usage-reconciliation-v1"
+    ],
+    "resource_digests": {
+      "agent-definition-v2.schema.json": "sha256:7684a5c9511eb9d6509394c112907fa2fef358a442b689ec91a8700979d29a22",
+      "budget-lease-record-v1.schema.json": "sha256:dc9c06c068399060d0a865a2ca168e64c705dd9a989fb1b2b29006e1ef3f8e39",
+      "decision-record-v1.schema.json": "sha256:93a00ef826355561c888705c76d172187a5164c814c6511d53349080708ca523",
+      "idea-encounter-v1.schema.json": "sha256:8e61eaba73859c789791cafbe4f5204f9b0ad1e4ecfe9f8a2be715a25ba3ff6a",
+      "loop-signal-v1.schema.json": "sha256:7772bf04a9a71d82f0172074fe316eb71b6d1e3becbaf5aaa20612e3bd2de3e6",
+      "memory-record-v1.schema.json": "sha256:df5c084067798f3fd107f8102021076431745c0f3931bf4af9e247e293cbd5e9",
+      "opportunity-record-v1.schema.json": "sha256:99282bb1b386ad5ef75f2670487da7617d11952795575642ec9cefb0fdfd71b4",
+      "outbox-record-v1.schema.json": "sha256:ba1e3741fcbad1c92b5d66c1c26939898e27bba45fa38d9b5ed9e392ed4ca256",
+      "outcome-attribution-record-v1.schema.json": "sha256:3fee3a050183db619fc803af03a148262eb8503d5890c30b9e281a0194aacf3d",
+      "prompt-composition-v2.schema.json": "sha256:44d6a1ed0a0d241975a5d56731151b0b22f0ef35aaa2d0ff99daac940695abfe",
+      "quarantine-record-v1.schema.json": "sha256:1e77985a35832351a9366beb408859035c5a698a342fc6d5e251e314511b9617",
+      "repository-identity-v1.schema.json": "sha256:92445e1af29e9d280ab3945a7f49f13f111d6a8f601a1f6564aaf3c56b21732c",
+      "role-constitution-v2.schema.json": "sha256:5127f5344f01202e41d2174d0ad4c534bb003e47dd62bf0a4a1ccbb697d1f840",
+      "skill-definition-v2.schema.json": "sha256:cbc9611e9e0bf6fd6f41795c0edf9daad5ca67c61e88ed292c77fc2650e3f5a2",
+      "typed-output-v1.schema.json": "sha256:a9248cc4aad95e9c20d89a88d4733cbcf2e6a92559deadc7ae6e84e51ffc813e",
+      "usage-event-v1.schema.json": "sha256:ee5998dbb7273eb8458437e64d961e962b0901d9ed9d044ef5f75feb3572837d",
+      "usage-reconciliation-v1.schema.json": "sha256:00595bdfe0088cc36aeff192a87f08870d8fbac72a752800d817c2c1d59e9acd"
+    },
+    "resource_set_digest": "sha256:281d6fd10071296c6e78f78bb1398c1b438a29076d107a84a463d67f4e4d533d"
+  },
+  "foundation_store": {
+    "journal_mode": "wal",
+    "schema_digest": "sha256:9d6c188dcdcdb15d2cfd4a988390c6a9cc8905f44291e6e8966fd34d58dbb373",
+    "schema_version": 1,
+    "tables": [
+      "opportunity_keys",
+      "outbox_acknowledgements",
+      "outbox_attempts",
+      "outbox_messages",
+      "record_relations",
+      "records",
+      "repositories"
+    ],
+    "triggers": [
+      "opportunity_keys_no_delete",
+      "opportunity_keys_no_update",
+      "outbox_acknowledgements_no_delete",
+      "outbox_acknowledgements_no_update",
+      "outbox_attempts_no_delete",
+      "outbox_attempts_no_update",
+      "outbox_messages_no_delete",
+      "outbox_messages_no_update",
+      "record_relations_no_delete",
+      "record_relations_no_update",
+      "records_no_delete",
+      "records_no_update",
+      "repositories_no_delete",
+      "repositories_no_update"
+    ]
+  },
+  "generated_candidates": {
+    "count": 9,
+    "resource_digests": {
+      "agents/architect.json": "sha256:a07c20a0dab7c609793fa7a60940f01498b9201f05a4740b36830dd7394f8baf",
+      "agents/builder.json": "sha256:58d272346f9f203ddae0149950c48e4b5452f28fe331c65531a584a0550af0ab",
+      "agents/curator.json": "sha256:c672bb1cab6b10659a48e895a265dca5cf81419e8beb9d906562191ef0e0df01",
+      "agents/explorer.json": "sha256:211520ce21b46b92b41a0203715cfb24b92822cadd3c60d372fac153f48028bb",
+      "agents/integrator.json": "sha256:ed60d10d4b7c7ec79ec3e451f66ef6f1506a5e9edaab79d493b877a3d95d7c69",
+      "agents/optimizer.json": "sha256:2e483e235b4ee8ed8200719357756593b39b6298624f889cbf0df414ec623c0a",
+      "agents/orchestrator.json": "sha256:18f4a0a89f2dfd8c618ec9c84b664566c08255a9f583fb0f715e8e2ed6f73cfd",
+      "agents/steward.json": "sha256:157dd467de2bfc2bb3b989f7cfc57025c28eb0e043d3e61966f992ba6e20f0f6",
+      "manifest.json": "sha256:723a723c64dc959eeb21ee7061ee16b9a8f629b946cdb500b32def1564f12c12"
+    }
+  },
+  "generation_zero": {
+    "baseline_event_sink_count": 48,
+    "baseline_inventory_digest": "sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037",
+    "baseline_module_definition_count": 304,
+    "cli_parser_count": 13,
+    "legacy_package_resource_count": 48,
+    "legacy_schema_count": 20,
+    "legacy_total_resource_count": 68,
+    "package_api_count": 33,
+    "root_api_count": 131
+  },
+  "inventory_digest": "sha256:95522d8b873fd938f072868190d554d32362e79f03c462893a6d0a2b0ba6ff0a",
+  "phase": 2,
+  "provider_fixtures": {
+    "anthropic_usage.json": "sha256:38f55f99a43f36a75a08444c4b8057bab12812466161e43838e7ca10791d6f55",
+    "malformed_usage.json": "sha256:4c2cd582f7ab4524dc2fe3d6e4ad0c9b88391594adb35c80e41df5c42432e024",
+    "missing_usage.json": "sha256:c7f1952b5c17e5d4e164150153bfd57d4c7f2237a67384b4bc407360545eee96",
+    "openai_usage.json": "sha256:2e5b274070937953fec2d1c71d57703b5be4294327391abb55de8bd91a3555a8"
+  },
+  "schema_version": 1
+}

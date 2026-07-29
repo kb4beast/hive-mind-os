@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/opportunity-record/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "opportunity_id", "normalization_version", "problem_digest", "proposal_digest", "exact_digest", "structured_digest", "origin_encounter_id", "status"],
+  "properties": {
+    "record_type": {"const": "opportunity-record"},
+    "schema_version": {"const": 1},
+    "opportunity_id": {"type": "string", "minLength": 1},
+    "normalization_version": {"type": "string", "minLength": 1},
+    "problem_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "proposal_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "exact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "structured_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "origin_encounter_id": {"type": "string", "minLength": 1},
+    "status": {"type": "string", "enum": ["candidate", "adopted", "adapted", "deferred", "rejected", "quarantined", "superseded"]}
+  },
+  "additionalProperties": false
+}

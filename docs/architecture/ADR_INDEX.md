@@ -18,6 +18,7 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-018` | [Canonical agent definitions and nonauthoritative projections](ADR-018-CANONICAL-AGENT-DEFINITIONS-AND-PROJECTIONS.md) | Phase 1 | adopted architecture; additive implementation begins in Phase 2 |
 | `ADR-019` | [Open memory authority and Obsidian brain projection](ADR-019-OPEN-MEMORY-AND-OBSIDIAN-BRAIN.md) | Phase 1 | adopted architecture; memory foundation begins in Phase 2 and projection in Phase 3 |
 | `ADR-020` | [Provider-native usage, privacy, and fair learning](ADR-020-USAGE-TELEMETRY-PRIVACY-AND-FAIR-LEARNING.md) | Phase 1 | adopted architecture; additive implementation begins in Phase 2 |
+| `ADR-021` | [Additive memory and telemetry foundation](ADR-021-PHASE2-ADDITIVE-MEMORY-TELEMETRY-FOUNDATION.md) | Phase 2 | adopted implementation architecture; activation remains prohibited |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
 is ADR-021; it must be unique at creation time.

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/outbox-record/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "message_id", "source_record_id", "projection_kind", "projection_version", "destination", "payload_digest", "delivery_state"],
+  "properties": {
+    "record_type": {"const": "outbox-record"},
+    "schema_version": {"const": 1},
+    "message_id": {"type": "string", "minLength": 1},
+    "source_record_id": {"type": "string", "minLength": 1},
+    "projection_kind": {"type": "string", "minLength": 1},
+    "projection_version": {"type": "string", "minLength": 1},
+    "destination": {"type": "string", "minLength": 1},
+    "payload_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "delivery_state": {"type": "string", "enum": ["pending", "attempted", "acknowledged"]}
+  },
+  "additionalProperties": false
+}

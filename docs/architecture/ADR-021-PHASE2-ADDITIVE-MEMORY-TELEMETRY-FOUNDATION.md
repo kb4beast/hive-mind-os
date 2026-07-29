@@ -1,0 +1,86 @@
+# ADR-021: Additive memory and telemetry foundation
+
+- Status: adopted for Phase 2 implementation; activation remains prohibited
+- Date: 2026-07-28
+- Governing records: ADR-018, ADR-019, ADR-020, and the Phase 2 delivery court
+
+## Context
+
+Phase 1 adopted canonical agent, memory, Obsidian-projection, and usage contracts while
+freezing Generation Zero. Phase 2 must implement the underlying memory and telemetry
+foundation without changing the selected runtime, its two legacy SQLite stores, its
+prompts, package selection, CLI, or supported public facades.
+
+The principal conflict is atomicity. Adding memory, opportunity, accounting, and
+outbox data to separate databases would make a single governed write impossible.
+Adding tables to `EvidenceLedger` would mutate the captured Generation Zero store.
+
+## Decision
+
+Adopt one private, opt-in `FoundationStore` with SQLite WAL, `synchronous=FULL`,
+foreign keys, bounded busy timeout, and immediate write transactions. It is a new
+authority for Phase 2 records only. Generation Zero remains selected and unchanged.
+
+The store contains immutable repository identities, append-only record streams,
+relations, exact/structured opportunity keys, outbox messages, delivery attempts, and
+acknowledgements. A record and its local outbox message commit in one transaction.
+Delivery state is represented by append-only receipts rather than mutation.
+
+Phase 2 schemas and generated candidates live under
+`hive_mind_os.foundation`, outside the frozen legacy schema catalog and top-level
+facades. The wheel verifies the original 20 schemas plus the separately counted
+foundation resources. Generated agent definitions are inert and authority-free.
+
+Every material foundation write is bounded by:
+
+`role ceiling ∩ policy decision ∩ lease ∩ adapter enforcement ∩ mission risk ∩ budget`.
+
+Missing input denies. A generated file, memory, usage event, outcome, or apparent
+success cannot grant authority. Usage collection requires the fixed trusted-recorder
+identity.
+
+Idea handling is encounter-first. Exact and structured matches are transactional.
+Semantic matches are candidates only and cannot merge. Relationships and appeals are
+append-only.
+
+Usage keeps logical-request, physical-attempt, provider-request, and receipt identity
+separate. Provider-shaped fixture fields are preserved as bounded numeric native
+paths. Normalization is versioned and keeps direction, cache, modality, output kind,
+and billing axes separate. Missing is unknown, never zero. Decisions, outcomes,
+attribution, corrections, and invoices are late-bound append-only records.
+
+Observability is local-only. Metrics use a fixed low-cardinality label vocabulary.
+Correlated trace and OpenTelemetry-shaped envelopes may carry governed identifiers,
+but bodies and free-text errors are prohibited. Export is disabled by default.
+
+## Consequences
+
+- The foundation can be enabled in a shadow caller by wrapping a model provider with
+  `ReceiptedModelProvider`; no default constructor, selector, or CLI changes.
+- A started attempt is durable before I/O and a terminal usage record is durable
+  before the wrapper returns or re-raises. Restart converts a nonterminal attempt to
+  interrupted/unknown without inventing usage.
+- Atomicity is claimed only inside the foundation database. No exactly-once external
+  side effect or cross-database transaction is claimed.
+- Provider fixtures prove parser behavior, not live provider billing conformance.
+- Obsidian, role activation, active leases/loop control/quarantine, host adapters, and
+  champion promotion remain in later phases.
+
+## Threats and mitigations
+
+- A unified local store is a compromise target: it stores no prompt/response/tool
+  body by default, requires tenant/repository scope, and uses append-only triggers.
+- Digests can expose low-entropy content: foundation APIs reject raw body fields and
+  treat all new records as private unless policy explicitly says otherwise.
+- Dual records can disagree: the outbox and invoice reconciliation retain gaps and
+  residuals rather than manufacturing equality.
+- Concurrent dedup can erase dissent: every encounter survives and semantic matching
+  never auto-merges.
+- Generated churn can hide edits: deterministic byte generation binds source and
+  output digests, and `--check` rejects hand edits.
+
+## Rollback
+
+Stop constructing foundation stores and provider wrappers. Generation Zero continues
+unchanged. Retain the foundation database, pending outbox, dissent, gaps, and receipts
+for appeal; never delete or rewrite them as rollback.

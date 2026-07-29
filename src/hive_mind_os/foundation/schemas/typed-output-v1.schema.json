@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/typed-output/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "output_id", "producer_role", "contract_id", "payload_digest", "evidence_refs", "status"],
+  "properties": {
+    "record_type": {"const": "typed-output"},
+    "schema_version": {"const": 1},
+    "output_id": {"type": "string", "minLength": 1},
+    "producer_role": {"type": "string", "minLength": 1},
+    "contract_id": {"type": "string", "minLength": 1},
+    "payload_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "evidence_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "status": {"type": "string", "enum": ["candidate", "validated", "rejected", "quarantined"]}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/outcome-attribution-record/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "record_id", "subject_record_id", "outcome", "purpose_allocations_ppm", "resource_allocations_ppm", "reviewed_by"],
+  "properties": {
+    "record_type": {"type": "string", "enum": ["outcome-record", "attribution-record"]},
+    "schema_version": {"const": 1},
+    "record_id": {"type": "string", "minLength": 1},
+    "subject_record_id": {"type": "string", "minLength": 1},
+    "outcome": {"type": "string", "minLength": 1},
+    "purpose_allocations_ppm": {"type": "object"},
+    "resource_allocations_ppm": {"type": "object"},
+    "reviewed_by": {"type": ["string", "null"]}
+  },
+  "additionalProperties": false
+}

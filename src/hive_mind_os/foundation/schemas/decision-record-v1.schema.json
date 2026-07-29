@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/decision-record/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "decision_id", "subject_record_id", "decision", "decided_by", "evidence_refs", "evaluation_arm", "courtroom_stance"],
+  "properties": {
+    "record_type": {"const": "decision-record"},
+    "schema_version": {"const": 1},
+    "decision_id": {"type": "string", "minLength": 1},
+    "subject_record_id": {"type": "string", "minLength": 1},
+    "decision": {"type": "string", "enum": ["adopt", "adapt", "defer", "reject", "quarantine"]},
+    "decided_by": {"type": "string", "minLength": 1},
+    "evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "evaluation_arm": {"type": "string", "enum": ["champion", "challenger", "none", "unknown"]},
+    "courtroom_stance": {"type": "string", "enum": ["advocate", "cross-examiner", "judge", "witness", "none"]}
+  },
+  "additionalProperties": false
+}

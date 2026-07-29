@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/budget-lease-record/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "lease_id", "subject_id", "issuer_id", "token_limit", "cost_limit", "currency", "tool_call_limit", "expires_at", "status"],
+  "properties": {
+    "record_type": {"const": "budget-lease-record"},
+    "schema_version": {"const": 1},
+    "lease_id": {"type": "string", "minLength": 1},
+    "subject_id": {"type": "string", "minLength": 1},
+    "issuer_id": {"type": "string", "minLength": 1},
+    "token_limit": {"type": ["integer", "null"], "minimum": 0},
+    "cost_limit": {"type": ["string", "null"]},
+    "currency": {"type": ["string", "null"]},
+    "tool_call_limit": {"type": ["integer", "null"], "minimum": 0},
+    "expires_at": {"type": ["string", "null"]},
+    "status": {"type": "string", "enum": ["proposed", "active", "exhausted", "expired", "revoked"]}
+  },
+  "additionalProperties": false
+}

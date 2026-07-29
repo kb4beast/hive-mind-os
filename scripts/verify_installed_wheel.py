@@ -16,11 +16,23 @@ def _digest(path: Path) -> str:
 
 def _resource_paths(root: Path) -> tuple[Path, ...]:
     schema_root = root / "schemas"
+    foundation_schema_root = root / "foundation" / "schemas"
+    foundation_generated_root = root / "foundation" / "generated"
     package_root = root / "builtin_packages" / "hive-core"
     return tuple(
         sorted(
             (
                 *(path for path in schema_root.glob("*.json") if path.is_file()),
+                *(
+                    path
+                    for path in foundation_schema_root.glob("*.json")
+                    if path.is_file()
+                ),
+                *(
+                    path
+                    for path in foundation_generated_root.rglob("*.json")
+                    if path.is_file()
+                ),
                 *(path for path in package_root.rglob("*") if path.is_file()),
             ),
             key=lambda path: path.relative_to(root).as_posix(),
@@ -72,19 +84,31 @@ def main() -> int:
     package_file_count = sum(
         name.startswith("builtin_packages/hive-core/") for name in source_digests
     )
+    foundation_schema_count = sum(
+        name.startswith("foundation/schemas/") for name in source_digests
+    )
+    foundation_generated_count = sum(
+        name.startswith("foundation/generated/") for name in source_digests
+    )
     catalog = hive_core_catalog()
     package = catalog.package("hive-core")
     observed = {
         "schema_count": schema_count,
+        "foundation_schema_count": foundation_schema_count,
+        "foundation_generated_count": foundation_generated_count,
         "package_file_count": package_file_count,
+        "legacy_resource_count": schema_count + package_file_count,
         "resource_count": len(source_digests),
         "component_count": len(package.components),
         "trust_state": package.manifest.trust_state.value,
     }
     expected = {
         "schema_count": 20,
+        "foundation_schema_count": 17,
+        "foundation_generated_count": 9,
         "package_file_count": 48,
-        "resource_count": 68,
+        "legacy_resource_count": 68,
+        "resource_count": 94,
         "component_count": 22,
         "trust_state": "quarantined",
     }

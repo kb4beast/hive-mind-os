@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/idea-encounter/v1",
+  "type": "object",
+  "required": ["record_type", "schema_version", "encounter_id", "normalization_version", "problem_digest", "proposal_digest", "structured_digest", "evidence_digests", "disposition"],
+  "properties": {
+    "record_type": {"const": "idea-encounter"},
+    "schema_version": {"const": 1},
+    "encounter_id": {"type": "string", "minLength": 1},
+    "normalization_version": {"type": "string", "minLength": 1},
+    "problem_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "proposal_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "structured_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "evidence_digests": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}},
+    "disposition": {"type": ["string", "null"], "enum": [null, "abandoned", "filtered", "invalid", "non-material", "policy-blocked"]}
+  },
+  "additionalProperties": false
+}

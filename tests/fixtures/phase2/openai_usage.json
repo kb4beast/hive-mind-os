@@ -1,0 +1,15 @@
+{
+  "id": "req-openai-fixture",
+  "model": "fixture-model-revision",
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 40,
+    "total_tokens": 140,
+    "prompt_tokens_details": {
+      "cached_tokens": 25
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 10
+    }
+  }
+}
