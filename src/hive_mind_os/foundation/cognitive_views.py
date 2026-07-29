@@ -436,6 +436,12 @@ def _yaml_scalar(value: str) -> str:
     ambiguous = {
         "",
         "~",
+        "y",
+        "yes",
+        "n",
+        "no",
+        "on",
+        "off",
         "null",
         "true",
         "false",
@@ -443,17 +449,26 @@ def _yaml_scalar(value: str) -> str:
         ".inf",
         "-.inf",
     }
+    looks_typed = bool(
+        value
+        and (
+            value[0].isdigit()
+            or (
+                value[0] in "+-."
+                and len(value) > 1
+                and value[1].isdigit()
+            )
+        )
+    )
     if (
         value != value.strip()
         or value.casefold() in ambiguous
+        or looks_typed
         or value[0] in "-?:,[]{}#&*!|>'\"%@`"
         or "\n" in value
         or "\r" in value
         or ": " in value
         or " #" in value
-        or re.fullmatch(
-            r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?", value, re.I
-        )
     ):
         return json.dumps(value, ensure_ascii=False)
     return value
@@ -564,6 +579,26 @@ def _canvas(identity: str) -> dict[str, Any]:
     return document
 
 
+def _render_canvas(document: Mapping[str, Any]) -> bytes:
+    nodes = [
+        json.dumps(
+            node,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        for node in document["nodes"]
+    ]
+    lines = ["{", '\t"edges":[],', '\t"nodes":[']
+    lines.extend(
+        f"\t\t{node}{',' if index < len(nodes) - 1 else ''}"
+        for index, node in enumerate(nodes)
+    )
+    lines.extend(["\t]", "}"])
+    return "\n".join(lines).encode("utf-8")
+
+
 def compile_cognitive_views(source: VerifiedCognitiveProjection) -> CognitiveViewBundle:
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", source.repository_identity_digest):
         raise CognitiveViewError("source repository identity digest is invalid")
@@ -583,7 +618,7 @@ def compile_cognitive_views(source: VerifiedCognitiveProjection) -> CognitiveVie
             }
         )
     canvas_path = "canvases/war-room.canvas"
-    canvas_bytes = _json_bytes(_canvas(source.repository_identity_digest))
+    canvas_bytes = _render_canvas(_canvas(source.repository_identity_digest))
     if len(canvas_bytes) > MAX_CANVAS_BYTES:
         raise CognitiveViewError("generated Canvas exceeds size bound")
     files[canvas_path] = canvas_bytes

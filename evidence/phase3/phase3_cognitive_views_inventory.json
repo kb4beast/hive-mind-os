@@ -53,7 +53,7 @@
       "canvases/war-room.canvas",
       "manifest.json"
     ],
-    "manifest_digest": "sha256:4ebc1ab4328cb895a61ec8fa3735e59fd722c222b95ac31130aaf81c60233d08",
+    "manifest_digest": "sha256:651a301842b83986d4d38dbace39b6e4438b493971cd0e849ac318fbf737049a",
     "private_foundation_available_during_view_projection": false,
     "public_store_read_by_view_projection": false,
     "source_cursor": "memory-set:fc877ad10b0e147dc0ce3ab3afc2cce052e2a5f7859f2571cfe4793bba204a44",
@@ -64,7 +64,7 @@
       "bases/ideas.base": "sha256:38aa6d3ccd174e72b98df65231afb279cd70fd3e5bf2973bd28cbbd7c8fea331",
       "bases/released-war-room.base": "sha256:01c65b0554ddb0d0f905e57baf5c1b6274d630c06a94156af306580e7075b4c1",
       "bases/telemetry-metadata.base": "sha256:5b489861c89d08158515ad836fd50adb70bbeed3dd2864cea8b3289ae3de0686",
-      "canvases/war-room.canvas": "sha256:8a6a262bf5cc1ddb4f8aa22cebb0c35b32629eef16dd771f637e18e6dc950aa0"
+      "canvases/war-room.canvas": "sha256:27fb8b96c2c804d07f9a56adb47d580667e903e05f16a0657a59804600f93f0b"
     },
     "status": "projected",
     "supported_capabilities": [
@@ -73,7 +73,7 @@
       "released-static-war-room-metadata",
       "released-telemetry-metadata"
     ],
-    "tree_digest": "sha256:60b050e85f2be358b4a00d1fa1f28c78af39c8f12b656828e89f98970ce84779",
+    "tree_digest": "sha256:df7eae5bdac0ae5cb31a09bbd8144ffc1e8dc7b5b9534dcc5654fe8d0727aa0b",
     "unavailable_capabilities": [
       "agent-score-and-health",
       "loop-state",
@@ -94,9 +94,9 @@
   "implementation": {
     "pyproject.toml": "sha256:1757eeb16442cb24d713e277f6279056dccf873e7c498e5470b25b63e555ea09",
     "src/hive_mind_os/foundation/cognitive_view_contracts.py": "sha256:718dcf06b186851054bafd94dbda827c04f4c97f4231f04577ce30e66f392b0b",
-    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:1c7d822ffafb76fb6acd5402d1b3e14b89b969c2b93db14a81a4c03e5a946400"
+    "src/hive_mind_os/foundation/cognitive_views.py": "sha256:6e5b24895067988c91c8ab79e38ae0f06e8de7a8ab56a408ee81dc5fcaa1c04d"
   },
-  "inventory_digest": "sha256:baa13520fe8cd0ff1539c4f1144e6e8e94eec2bf7e69def7c035ef154ee490a4",
+  "inventory_digest": "sha256:d6bae79890ce8b22109cab55cf3512891911ec68cc0f2814a614d30b056529e5",
   "obsidian_runtime_required": false,
   "official_source_pins": {
     "bases_license": "NOASSERTION",

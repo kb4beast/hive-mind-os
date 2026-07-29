@@ -159,6 +159,35 @@ class CognitiveViewProjectionTests(unittest.TestCase):
         )
         self.assertEqual(cognitive_views._yaml_scalar("true"), '"true"')
         self.assertEqual(cognitive_views._yaml_scalar("unsafe: value"), '"unsafe: value"')
+        for value in (
+            "2026-07-29",
+            "yes",
+            "on",
+            "12:34:56",
+            "0x10",
+            "1_000",
+            "-12",
+            ".5",
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    cognitive_views._yaml_scalar(value),
+                    json.dumps(value),
+                )
+
+    def test_canvas_bytes_match_obsidian_stable_serialization(self) -> None:
+        self._project()
+        root = self.repository / cognitive_views.MANAGED_NAMESPACE
+        content = (root / "canvases" / "war-room.canvas").read_bytes()
+        text = content.decode("utf-8")
+        self.assertTrue(text.startswith('{\n\t"edges":[],\n\t"nodes":[\n\t\t{'))
+        self.assertTrue(text.endswith("\n\t]\n}"))
+        self.assertNotIn("\n    ", text)
+        self.assertTrue(
+            validate_cognitive_view(
+                "cognitive-view-canvas-v1", json.loads(text)
+            ).valid
+        )
 
     def test_repeat_and_check_are_unchanged(self) -> None:
         first = self._project()

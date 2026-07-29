@@ -37,7 +37,7 @@ def _sha256(path: Path) -> str:
 def _result_document(value: Any) -> dict[str, Any]:
     if hasattr(value, "to_document"):
         return value.to_document()
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
     raise TypeError(f"unsupported projector result: {type(value).__name__}")
 
