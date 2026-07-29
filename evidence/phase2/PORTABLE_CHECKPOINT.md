@@ -2,13 +2,14 @@
 
 - Branch: `codex/phase2-additive-memory-telemetry-foundation`
 - Stack base: PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`
-- Current implementation candidate:
-  `ace73253cdd61ef870ed4e2caacb2f4d91b1ef57`; fifth-remand authority-seal
-  remediation sealed; sixth-remand supply-chain workflow repair pending exact-head
-  verification; not activated
+- Accepted Phase 2 candidate:
+  `69ae532566ba0f780b7fb24832dee70484aa738d`; independently accepted by Curator
+  `Kuhn`, Steward `Planck`, and Judge `Ohm`; not activated or merged
 - Governing ADR: ADR-021
 - Court: `evidence/courts/phase2-additive-foundation-court.md`
 - Inventory: `evidence/phase2/phase2_foundation_inventory.json`
+- Exact verification: push run `30430857403`, PR run `30430863499`, artifact
+  `8715442587`, provenance attestation `37680789`
 
 Implemented:
 
@@ -48,8 +49,9 @@ Unchanged:
 - legacy schemas/resources and Phase 1 historical inventory;
 - Obsidian/Phase 3 and later behavior.
 
-Resume by committing the sixth-remand workflow repair and running the complete
-exact-head multi-Python, security, supply-chain, wheel/resource, provenance, and PR
-check matrix. Inspect the SBOM contents, retained artifact, and attestation subjects
-directly. Then rerun independent Curator/Steward reconstruction and appoint a
-distinct Judge. Do not activate, merge, or start Phase 3.
+Phase 2 is fully complete as an inert additive foundation. After sealing this
+evidence-only descendant and rechecking its exact head, the next eligible objective
+is Phase 3 item 1: implement a portable per-repository memory pack and deterministic
+projection with a CLI/editor-only path. Start it on a new stacked branch from the
+final PR #31 head. Do not activate Phase 2, merge either PR, or add Obsidian-dependent
+behavior to this checkpoint.

@@ -9,12 +9,14 @@
 - Builder: `Codex-root`
 - Curator: `Kuhn`
 - Steward: `Planck`
-- Judge: pending exact-candidate appointment
+- Judge: `Ohm`
 
 ## Admitted sources and dispositions
 
-No new external source or provider claim was introduced. The Phase 1 source register
-and court remain the provenance authority.
+No new semantic or provider claim was introduced; the Phase 1 source register and
+court remain their provenance authority. Sixth-remand verification admitted Syft
+only as checksum-pinned SBOM tooling, with its release custody and license recorded
+in `P2-AUDIT-019`.
 
 | Source class | Phase 2 disposition | Limit |
 | --- | --- | --- |
@@ -23,6 +25,7 @@ and court remain the provenance authority.
 | ADR-020 provider-native usage/privacy | adapt | repository-owned fixtures only; no live-provider claim |
 | SQLite behavior exercised by the repository | adopt | local WAL transaction and append-only triggers |
 | OpenTelemetry GenAI vocabulary | adapt | dependency-free local envelope; evolving vocabulary is not accounting truth |
+| Syft v1.50.0 release, Apache-2.0 | adopt | checksum-pinned CI verification tool only; no runtime or vulnerability-absence claim |
 | Provider documentation previously quarantined | quarantine | no inferred billing, cache, or reasoning semantics |
 | Prometheus, MLflow, JSON-LD, Armory, AgentTelemetry | defer/quarantine per Phase 1 | no implementation dependency or conformance claim |
 
@@ -171,3 +174,22 @@ scans the installed wheel; an independent verifier requires the exact package in
 nonempty SPDX 2.3 document; and upload/provenance explicitly bind both wheel and
 SBOM. No acceptance is asserted before fresh exact-head receipts and independent
 reconstruction.
+
+Sixth-remand candidate
+`69ae532566ba0f780b7fb24832dee70484aa738d`: `adopt`.
+
+Curator `Kuhn` and Steward `Planck` independently returned `accept` from clean
+reconstructions. Distinct Judge `Ohm` downloaded the retained two-file artifact,
+parsed the project-bearing SPDX 2.3 SBOM, and cryptographically verified the wheel
+and SBOM against one exact-head SLSA provenance statement. Both exact-head push and
+PR matrices passed. Exact receipts, digests, job IDs, identities, adverse history,
+and inventory counts are preserved in `P2-AUDIT-020`.
+
+## Final Phase 2 disposition
+
+`adopt` the inert additive memory and telemetry foundation governed by ADR-021.
+Generation Zero remains the selected runtime. No Obsidian projection, provider
+support, external delivery, publication workflow, or Phase 3 behavior is activated.
+Rollback remains removal of the explicit opt-in while retaining append-only records
+and dissent. Phase 2 is complete at the accepted candidate; merging remains outside
+this court and was not performed.

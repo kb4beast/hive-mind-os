@@ -366,3 +366,44 @@ evidence.
   project-bearing SBOM, two retained files, and provenance subjects for both.
 - Obtain fresh Curator and Steward reconstruction and a distinct Judge disposition
   on the corrected exact head before closing the court.
+
+## `P2-AUDIT-020` — exact-head verification and final disposition
+
+- Exact independently reviewed candidate:
+  `69ae532566ba0f780b7fb24832dee70484aa738d`, draft PR #31, correctly stacked on
+  PR #29 exact head `3298078c41ce69103eb2bdce61960a69dc6aab93`.
+- Push run `30430857403` passed Python 3.11 job `90507542912`, Python 3.12 job
+  `90507542925`, Python 3.14 job `90507542901`, CodeQL `90507542823`, secret scan
+  `90507542881`, static/type `90507542959`, and SBOM/build/provenance
+  `90507542956`. Each Python job ran 460 tests successfully.
+- PR run `30430863499` passed Python 3.11 job `90507561927`, Python 3.12 job
+  `90507561913`, Python 3.14 job `90507561961`, CodeQL `90507561905`, secret scan
+  `90507561836`, static/type `90507561878`, dependency/license review
+  `90507562076`, and SBOM/build job `90507561867`.
+- Push artifact `8715442587` contains exactly the 337,642-byte wheel
+  (`sha256:6769b55db821fe75b459b84828b67e5384867f2df6342aa0cdf53533f5d86c88`)
+  and 160,062-byte SPDX 2.3 JSON SBOM
+  (`sha256:3c303635a785943d480c75d575fc0a4c729ff582e2549f6269bb5d45324ee7c2`).
+  The SBOM has two packages and identifies `hive-mind-os==0.6.0`.
+- Build provenance attestation `37680789` was independently verified for both local
+  files against the repository signer workflow and exact source SHA. Its single
+  SLSA provenance statement names both file digests; Rekor log index is
+  `2279733186`.
+- Curator `Kuhn` independently returned `accept`: 34 Phase 2/Generation Zero tests,
+  8 governance tests, 9 deterministic artifacts, Ruff, Pyright, live inventories,
+  exact artifacts, and provenance all reproduced.
+- Steward `Planck` independently returned `accept`: stack, recovery, rollback,
+  resource packaging, scanner custody, two-file retention, provenance, dissent, and
+  no-activation/no-Phase-3 boundaries reproduced from a clean detached worktree.
+- Distinct Judge `Ohm` returned `adopt/accept` after independently downloading the
+  artifact and cryptographically verifying both attested subjects. The sixth remand
+  is closed.
+- Frozen compatibility remains exactly 131 root APIs, 33 package APIs, 13 CLI
+  contracts, and 304 Generation Zero definitions, inventory digest
+  `sha256:57ad3e54934f2f1315f71e1d994253ce5d9100e2f161d430354039592e6ec037`.
+  Phase 2 inventory remains 17 contracts, 8 canonical agent sources, 9 generated
+  artifacts, zero unclassified candidates, digest
+  `sha256:b580758174cb05979d4a2dcf814bbde6d09ebd08b8d443326bb42fb3e238c75b`.
+- Every earlier worker-recovery failure and the false-green SBOM evidence remains
+  append-only in this ledger. Phase 2 is complete as an inert additive foundation;
+  it is not activated or merged, and Phase 3 has not started.

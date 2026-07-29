@@ -31,3 +31,8 @@
 13. The authority decision seal is process-local tamper evidence, not durable
     cryptographic identity, cross-process delegation, or an external authorization
     service. Only decision and lease references are persisted.
+14. The SBOM receipt depends on a checksum-pinned external Syft release and the
+    GitHub Actions runner, artifact store, OIDC signer, and transparency log. The
+    archive digest, package-bearing document, retained files, and attestation are
+    verified, but this does not make those services permanently available or turn an
+    SBOM into vulnerability absence, release readiness, or runtime provenance.
