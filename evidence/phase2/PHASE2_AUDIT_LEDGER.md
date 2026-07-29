@@ -223,6 +223,11 @@ evidence.
 - Direct regressions cover 4,000- and 5,000-digit integers, direct and forged traces,
   cross-repository opportunity retargeting with restored schema shape, normal and
   recovered attribution, every billable status, and billable conflict.
+- Remediated implementation commit:
+  `ca40eb59b2d5569e5f3dbcd05a6874cd53b3867a`.
+- Focused Phase 2 plus exact Generation Zero: 33 tests passed. Deterministic
+  generation verified 9 artifacts. Ruff passed. Pyright 1.1.411: 0 errors, 0
+  warnings, 0 information. Inventory regeneration and patch-integrity checks passed.
 
 ## Open entries after third remand
 

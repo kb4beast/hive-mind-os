@@ -113,3 +113,9 @@ append-only in `P2-AUDIT-013`.
 
 Implementation promotion remains pending fresh exact-candidate Curator/Steward
 reconstruction and a different Judge.
+
+Third-remand remediation implementation
+`ca40eb59b2d5569e5f3dbcd05a6874cd53b3867a` is the next review candidate. Its
+evidence-only descendant may be reviewed as the exact PR head provided the
+implementation tree is identical. No acceptance or promotion verdict is asserted
+before fresh Curator and Steward reconstruction.
