@@ -137,13 +137,13 @@ def main() -> int:
     expected = {
         "schema_count": 20,
         "foundation_schema_count": 17,
-        "foundation_generated_count": 9,
+        "foundation_generated_count": 17,
         "foundation_canonical_count": 8,
         "projection_schema_count": 7,
         "public_memory_schema_count": 3,
         "package_file_count": 48,
         "legacy_resource_count": 68,
-        "resource_count": 112,
+        "resource_count": 120,
         "component_count": 22,
         "trust_state": "quarantined",
     }

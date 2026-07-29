@@ -610,16 +610,16 @@ class CognitiveViewProjectionTests(unittest.TestCase):
         self.assertEqual(injected.read_bytes(), b"preserve")
         self.assertTrue(any((self.view_state / "preparations").iterdir()))
 
+        within_windows_budget = Path("C:\\" + ("a" * 107))
+        outside_windows_budget = Path("C:\\" + ("a" * 108))
         with patch.object(cognitive_views.os, "name", "nt"):
-            cognitive_views._validate_windows_protected_root(
-                Path("C:\\" + ("a" * 107))
-            )
+            cognitive_views._validate_windows_protected_root(within_windows_budget)
             with self.assertRaisesRegex(
                 cognitive_views.CognitiveViewError,
                 "Windows path budget",
             ):
                 cognitive_views._validate_windows_protected_root(
-                    Path("C:\\" + ("a" * 108))
+                    outside_windows_budget
                 )
 
     def test_invalid_preparation_shape_fails_before_abandonment(self) -> None:
