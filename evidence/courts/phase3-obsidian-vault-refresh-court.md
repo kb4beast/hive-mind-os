@@ -3,6 +3,7 @@
 - Case: `P3-OBSIDIAN-REFRESH-001`
 - Disposition: pending
 - Subject implementation: `ee09e4cb9a4bc5fd0711e738249039507a194e43`
+- Review candidate: `8b0b0a029b8ef52b1ef75a64961234466f860dc2`
 - Runtime: Obsidian Desktop `1.12.7`, Windows `10.0.26200`
 
 ## Claims
@@ -39,9 +40,21 @@ Remaining weaknesses:
 
 ## Independent roles and judgment
 
-Cross-Examiner, Curator, Steward, Expert Witness, and distinct Judge identities will
-be recorded only after the fourth run and final candidate bytes exist. Until then,
-judgment is pending and no passing conformance claim is admitted.
+| Lifecycle duty | Identity | Receipt |
+|---|---|---|
+| Orchestrator | `P3I5-Orchestrator` | Scoped the exact-host claim, budgets, stop conditions, reversible stack, and court schedule. |
+| Explorer / Advocate | `P3I5-Explorer` | Pinned official help, release, installed-runtime, signature, license, and counterclaim evidence. |
+| Architect | `P3I5-Architect` | Designed the exact-commit disposable-clone protocol, deadlines, stability gate, and rollback. |
+| Builder | `P3I5-Builder` | Implemented the minimal serializers, fixture, validator, tests, and evidence package. |
+| Cross-Examiner / Integrator | `Einstein` (`/root/item5_cross_examiner`) | Passed exact candidate `8b0b0a0`; reproduced 115 integration tests with 34 subtests, Ruff, Pyright, inventory, surviving-vault, compatibility, and provenance checks. |
+| Curator / Expert Witness | `Locke` (`/root/item5_curator`) | Passed exact candidate `8b0b0a0`; reproduced all 147 tests with 57 subtests, focused tests, hashes, runtime-subject ancestry, and claim boundaries. |
+| Steward | `/root/item4_explorer/steward` | Passed exact candidate `8b0b0a0`; reproduced focused and item 2–5 matrices, recovery-boundary tests, deterministic inventory, rollback, and operational limits. |
+| Optimizer | `/root/item5_optimizer` | Passed exact candidate `8b0b0a0`; independently reconciled all three latencies, the `321.151072s` interval, comparator classification, and absence of a superiority claim. |
+
+Discover, design, build, validate, integrate, maintain, grow/outcome measurement,
+and orchestration are covered. All technical and evidentiary reviewers returned
+`PASS`; judgment alone remains pending, so no final passing disposition is yet
+admitted.
 
 The original item-5 byte-freeze instruction conflicts with runtime-discovered Base
 and Canvas canonicalization. Any final `adapt` disposition must explicitly authorize

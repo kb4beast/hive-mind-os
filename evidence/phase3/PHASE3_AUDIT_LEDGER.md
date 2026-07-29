@@ -945,3 +945,26 @@ cross-field final-projector identity. Root verification passed `147` tests with 
 subtests; Ruff and Pyright passed. The original item-5 byte-freeze conflicts with
 the runtime-required Base/Canvas serialization repair; only a distinct Judge may
 authorize that minimal `adapt`.
+
+## `P3-ITEM5-AUDIT-006` — exact-candidate independent review
+
+Independent review targeted exact candidate
+`8b0b0a029b8ef52b1ef75a64961234466f860dc2`; sealed runtime subject
+`ee09e4cb9a4bc5fd0711e738249039507a194e43` remains its ancestor with
+byte-identical production renderer and fixture files.
+
+- Cross-Examiner/Integrator `Einstein` returned `PASS`, reproduced 115 integration
+  tests with 34 subtests, and verified the surviving vault, all target hashes,
+  provenance, compatibility, and prior remands.
+- Curator/Expert Witness `Locke` returned `PASS`, reproduced all 147 tests with 57
+  subtests plus focused checks, and independently validated subject ancestry,
+  receipts, evidence privacy, and claim boundaries.
+- Steward `/root/item4_explorer/steward` returned `PASS` after focused and item 2–5
+  matrices, bounded-reader/fixture negatives, deterministic inventory, rollback,
+  and operational-limit review.
+- Optimizer `/root/item5_optimizer` returned `PASS` after independently reconciling
+  latencies `4.315128s`, `4.185468s`, and `8.940211s`, the `321.151072s` stability
+  interval, all comparator dispositions, and the absence of a superiority claim.
+
+No reviewer remand remains. A separate Judge must still decide the narrow
+byte-freeze conflict; reviewer approval cannot substitute for that disposition.
