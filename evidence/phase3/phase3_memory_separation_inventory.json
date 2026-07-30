@@ -23,12 +23,12 @@
   },
   "generation_zero_activated": false,
   "implementation": {
-    "src/hive_mind_os/foundation/authority.py": "sha256:2040da0cadbfdeb7b48a020fb5a8ae0db0ff0a38b186743f4d4d1ad892f49994",
+    "src/hive_mind_os/foundation/authority.py": "sha256:234db57ce89dbf500240092cef2689b2c96f7545c372fa5464db79246eeece68",
     "src/hive_mind_os/foundation/brain.py": "sha256:7919db183c2b376c5d9dc92a1a692dca1d6ab094df76587da37f47f8f5b50bb3",
     "src/hive_mind_os/foundation/public_memory.py": "sha256:3c4614c749bdd784d6a317d62964ec8384718cb3c46fb113a8bb35e28febd9d2",
     "src/hive_mind_os/foundation/public_memory_contracts.py": "sha256:d37ab4f9a2b5e62c003e1e94c4db4d78fa3c464fbb3ef0821b0fad11afb82e72"
   },
-  "inventory_digest": "sha256:36ba3ba7d08ea7a9438b6ec794d2f03796bad894bce71c7ddefd095d2f8a3b59",
+  "inventory_digest": "sha256:7d6763929e4320832ee1799a7f6ad37f9cecc63fc1800dcee08b869c0485b7a1",
   "later_phase3_scope_started": false,
   "phase": 3,
   "phase2_input": {
@@ -37,7 +37,7 @@
   },
   "phase3_item1_input": {
     "exact_head": "7f7013c99d86bbd34f966b902bb873cf5c10d740",
-    "historical_inventory_digest": "sha256:1561213ed7c56352e6271cc25294f78b35f016e812f3f937a3b6b4ad2a6c4833",
+    "historical_inventory_digest": "sha256:a0eab6aeb68801fac084961a421d54b6c3cc6a88147eacc438cfbe7420479467",
     "projection_schema_count": 7
   },
   "phase_item": 2,

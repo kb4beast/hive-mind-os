@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/federation-manifest/v1",
+  "type": "object",
+  "required": ["schema_version", "federation_contract", "projector_version", "portfolio_tenant_digest", "portfolio_repository_id", "generated_namespace", "source_count", "note_count", "sources", "files"],
+  "properties": {
+    "schema_version": {"const": "hive-federation-manifest/v1"},
+    "federation_contract": {"const": "hive-safe-public-federation/v1"},
+    "projector_version": {"const": "hive-federation-projector/v1"},
+    "portfolio_tenant_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "portfolio_repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "generated_namespace": {"const": "hive-mind/federated-cognitive"},
+    "source_count": {"type": "integer", "minimum": 2, "maximum": 64},
+    "note_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "sources": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["source_alias", "repository_identity_digest", "repository_id_digest", "source_manifest_digest", "source_cursor", "note_count"],
+        "properties": {
+          "source_alias": {"type": "string", "pattern": "^repo-[0-9a-f]{64}$"},
+          "repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "repository_id_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "source_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "source_cursor": {"type": "string", "pattern": "^memory-set:[0-9a-f]{64}$"},
+          "note_count": {"type": "integer", "minimum": 0, "maximum": 100000}
+        },
+        "additionalProperties": false
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100001,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["path", "federated_note_id", "source_alias", "content_digest"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 240},
+          "federated_note_id": {"type": ["string", "null"], "pattern": "^federated-note:[0-9a-f]{64}$"},
+          "source_alias": {"type": ["string", "null"], "pattern": "^repo-[0-9a-f]{64}$"},
+          "content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

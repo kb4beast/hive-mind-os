@@ -183,3 +183,22 @@ or superiority claim.
   protocols, capabilities, authority, or future evidence burdens.
 - Any relevant byte or evidence change invalidates the current review boundary and
   requires renewed independent verification and judgment.
+
+## Phase 3 item 6 — federation and self-host guards
+
+- The portfolio proves only local, same-tenant projection from released item-3
+  namespaces. Tenant string equality is not authentication or general access control.
+- Raw tenant/repository names are omitted, but source note/record IDs remain
+  provenance. Their upstream safe-public classification is a trust dependency.
+- Repository-instance digests prevent silent source collapse; they do not reconcile
+  clones, forks, mirrors, or project lineages.
+- First publication is atomic and idempotent, but this version refuses updates and
+  conflicts. It does not implement concurrent writers, deletion, or distributed
+  recovery.
+- The self-host function creates deterministic decisions. Scheduler, ingestion,
+  telemetry, idea, and delegation adapters must enforce them before a full-system
+  no-loop claim.
+- Zero observed crossover in bounded fixtures does not prove general security,
+  privacy, scale, usefulness, learning quality, or superiority.
+- Private/cross-tenant federation, Inbox/import, network transport, plugins,
+  watchers, Sync, retrieval, activation, and merge remain deferred.

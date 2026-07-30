@@ -1024,3 +1024,26 @@ test-hash bookkeeping. The prior narrow runtime judgment, fail-closed symlink
 handling, platform limitations, dissent, and protected bytes remain unchanged.
 Both draft PRs may remain published, open, unmerged, and inactive; protected-surface
 or claim changes require renewed review and judgment.
+
+## `P3-ITEM6-AUDIT-001` — bounded candidate opened
+
+Phase 3 item 6 began from exact item-5 head
+`376a4a6082f6bdf154ba6252ccb70062a17a549b` on
+`codex/phase3-federation-recursion-guards`.
+
+Eligible scope is same-tenant safe-public portfolio federation and deterministic
+self-host admission decisions. The candidate adds five strict schemas, an exact-scope
+federation authority action, portfolio-local projection, and explicit
+feedback/depth/hop/epoch guards.
+
+Builder receipts are `15` item-6 tests and `162` Phase 2 plus Phase 3 items 1–6
+tests with `57` subtests; Ruff and Pyright pass. Inventory
+`sha256:50c0f08eb12c5b8c3055d0a6ae0e53ccef6f5585492271eea33b3031d7daa9e9`,
+architecture, contract, migration/rollback, source register, court, and dissent are
+present. The item-1 through item-5 inventories were deterministically rebound for
+the additive package-data and authority hashes; item-5 runtime/production evidence
+bytes are unchanged. Isolated-wheel verification passes with `133` governed
+resources and explicit counts for eight cognitive plus five federation schemas.
+Independent exact-candidate review and judgment remain pending. No
+activation, merge, private/cross-tenant federation, lineage reconciliation, Inbox,
+Sync, plugin, retrieval, usefulness, or superiority claim is admitted.

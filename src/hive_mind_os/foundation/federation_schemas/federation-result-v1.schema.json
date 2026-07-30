@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/federation-result/v1",
+  "type": "object",
+  "required": ["schema_version", "status", "portfolio_tenant_digest", "portfolio_repository_id", "namespace_path", "manifest_digest", "source_count", "note_count", "tree_digest"],
+  "properties": {
+    "schema_version": {"const": "hive-federation-result/v1"},
+    "status": {"type": "string", "enum": ["checked", "projected", "unchanged"]},
+    "portfolio_tenant_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "portfolio_repository_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "namespace_path": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_count": {"type": "integer", "minimum": 2, "maximum": 64},
+    "note_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "tree_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

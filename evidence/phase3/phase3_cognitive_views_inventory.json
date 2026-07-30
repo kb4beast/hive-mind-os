@@ -92,11 +92,11 @@
   },
   "generation_zero_activated": false,
   "implementation": {
-    "pyproject.toml": "sha256:1757eeb16442cb24d713e277f6279056dccf873e7c498e5470b25b63e555ea09",
+    "pyproject.toml": "sha256:41f6c95bd1f3db93810163a8c869cc6e2107aec54f2876e92054eb6a2e6f81c1",
     "src/hive_mind_os/foundation/cognitive_view_contracts.py": "sha256:718dcf06b186851054bafd94dbda827c04f4c97f4231f04577ce30e66f392b0b",
     "src/hive_mind_os/foundation/cognitive_views.py": "sha256:76e8a011ed71f98a6fe00f23768a8fb889331ad62ec28f8c0293438d8e4224d0"
   },
-  "inventory_digest": "sha256:e2dcc83b4f1b11c55d8bc57c918161734f1f96d0d2a90e07197b8cc6844d2b13",
+  "inventory_digest": "sha256:b29bcbe96b9314cb2a70db76af7ef0d9fb8325f3dcfaa16a34c8aa605c1684a8",
   "obsidian_runtime_required": false,
   "official_source_pins": {
     "bases_license": "NOASSERTION",
@@ -107,7 +107,7 @@
   },
   "phase": 3,
   "phase3_item3_input": {
-    "historical_inventory_digest": "sha256:a50c164d0c5c324a653cac31f315409b9c42e4a921a5687693b1772f5f517321"
+    "historical_inventory_digest": "sha256:c6ec7cbd41fc1cf16236d7260935d2605968cd08998ed6183195c58b31b542b5"
   },
   "phase_item": 4,
   "prior_contracts": {

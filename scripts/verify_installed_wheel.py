@@ -19,6 +19,8 @@ def _resource_paths(root: Path) -> tuple[Path, ...]:
     foundation_schema_root = root / "foundation" / "schemas"
     projection_schema_root = root / "foundation" / "projection_schemas"
     public_memory_schema_root = root / "foundation" / "public_memory_schemas"
+    cognitive_schema_root = root / "foundation" / "cognitive_schemas"
+    federation_schema_root = root / "foundation" / "federation_schemas"
     foundation_generated_root = root / "foundation" / "generated"
     foundation_canonical_root = root / "foundation" / "canonical"
     package_root = root / "builtin_packages" / "hive-core"
@@ -39,6 +41,16 @@ def _resource_paths(root: Path) -> tuple[Path, ...]:
                 *(
                     path
                     for path in public_memory_schema_root.glob("*.json")
+                    if path.is_file()
+                ),
+                *(
+                    path
+                    for path in cognitive_schema_root.glob("*.json")
+                    if path.is_file()
+                ),
+                *(
+                    path
+                    for path in federation_schema_root.glob("*.json")
                     if path.is_file()
                 ),
                 *(
@@ -119,6 +131,12 @@ def main() -> int:
         name.startswith("foundation/public_memory_schemas/")
         for name in source_digests
     )
+    cognitive_schema_count = sum(
+        name.startswith("foundation/cognitive_schemas/") for name in source_digests
+    )
+    federation_schema_count = sum(
+        name.startswith("foundation/federation_schemas/") for name in source_digests
+    )
     catalog = hive_core_catalog()
     package = catalog.package("hive-core")
     observed = {
@@ -128,6 +146,8 @@ def main() -> int:
         "foundation_canonical_count": foundation_canonical_count,
         "projection_schema_count": projection_schema_count,
         "public_memory_schema_count": public_memory_schema_count,
+        "cognitive_schema_count": cognitive_schema_count,
+        "federation_schema_count": federation_schema_count,
         "package_file_count": package_file_count,
         "legacy_resource_count": schema_count + package_file_count,
         "resource_count": len(source_digests),
@@ -141,9 +161,11 @@ def main() -> int:
         "foundation_canonical_count": 8,
         "projection_schema_count": 7,
         "public_memory_schema_count": 3,
+        "cognitive_schema_count": 8,
+        "federation_schema_count": 5,
         "package_file_count": 48,
         "legacy_resource_count": 68,
-        "resource_count": 120,
+        "resource_count": 133,
         "component_count": 22,
         "trust_state": "quarantined",
     }

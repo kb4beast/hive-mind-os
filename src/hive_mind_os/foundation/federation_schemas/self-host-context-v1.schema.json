@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/self-host-context/v1",
+  "type": "object",
+  "required": ["schema_version", "controller_os_build_id", "controller_instance_id", "tenant_id", "project_lineage_id", "repo_instance_id", "subject_commit", "parent_run_id", "observation_epoch", "self_host_depth", "origin_record_id", "origin_digest", "idempotency_key", "origin_kind", "event_kind", "delegation_hops", "target_boundary"],
+  "properties": {
+    "schema_version": {"const": "hive-self-host-context/v1"},
+    "controller_os_build_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "controller_instance_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "project_lineage_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "repo_instance_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "subject_commit": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "parent_run_id": {"type": ["string", "null"], "maxLength": 4096},
+    "observation_epoch": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+    "self_host_depth": {"type": "integer", "minimum": 0, "maximum": 64},
+    "origin_record_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "origin_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "origin_kind": {"type": "string", "enum": ["external-evidence", "generated-memory", "projection-event", "telemetry-event", "idea-event", "delegation-event"]},
+    "event_kind": {"type": "string", "enum": ["evidence-ingestion", "projection", "telemetry", "idea", "delegation", "self-analysis"]},
+    "delegation_hops": {"type": "integer", "minimum": 0, "maximum": 1024},
+    "target_boundary": {"type": ["string", "null"], "maxLength": 4096}
+  },
+  "additionalProperties": false
+}

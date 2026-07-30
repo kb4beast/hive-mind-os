@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/self-host-decision/v1",
+  "type": "object",
+  "required": ["schema_version", "decision_id", "status", "reason", "context_digest", "idempotency_key", "observation_epoch", "self_host_depth", "delegation_hops"],
+  "properties": {
+    "schema_version": {"const": "hive-self-host-decision/v1"},
+    "decision_id": {"type": "string", "pattern": "^self-host-decision:[0-9a-f]{64}$"},
+    "status": {"type": "string", "enum": ["accepted", "collapsed", "rejected"]},
+    "reason": {"type": "string", "enum": ["admitted", "duplicate-origin", "generated-memory-reingestion", "projection-feedback", "telemetry-feedback", "idea-feedback", "delegation-feedback", "delegation-hop-limit", "self-host-depth-limit", "missing-target-boundary", "stale-observation-epoch"]},
+    "context_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "observation_epoch": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+    "self_host_depth": {"type": "integer", "minimum": 0, "maximum": 64},
+    "delegation_hops": {"type": "integer", "minimum": 0, "maximum": 1024}
+  },
+  "additionalProperties": false
+}

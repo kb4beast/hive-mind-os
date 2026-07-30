@@ -18,6 +18,7 @@ FOUNDATION_ACTION_MAP: dict[str, Action] = {
     "foundation.outbox.deliver": Action.WRITE_WORKSPACE,
     "foundation.projection.write": Action.WRITE_WORKSPACE,
     "foundation.public-memory.release": Action.WRITE_WORKSPACE,
+    "foundation.federation.write": Action.WRITE_WORKSPACE,
 }
 ROLE_CEILINGS: dict[Role, frozenset[str]] = {
     role: frozenset(FOUNDATION_ACTION_MAP)

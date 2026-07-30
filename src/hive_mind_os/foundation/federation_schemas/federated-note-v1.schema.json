@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/contracts/federated-note/v1",
+  "type": "object",
+  "required": ["schema_version", "federated_note_id", "source_alias", "source_repository_identity_digest", "source_manifest_digest", "source_note_id", "source_record_id", "source_content_digest", "note_kind", "sensitivity", "source_identity_role", "is_generated", "is_authoritative"],
+  "properties": {
+    "schema_version": {"const": "hive-federated-note/v1"},
+    "federated_note_id": {"type": "string", "pattern": "^federated-note:[0-9a-f]{64}$"},
+    "source_alias": {"type": "string", "pattern": "^repo-[0-9a-f]{64}$"},
+    "source_repository_identity_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_note_id": {"type": "string", "pattern": "^cognitive-note:[0-9a-f]{64}$"},
+    "source_record_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "source_content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "note_kind": {"type": "string", "enum": ["idea", "evidence", "court", "run", "agent", "telemetry"]},
+    "sensitivity": {"const": "safe-public"},
+    "source_identity_role": {"const": "provenance-only"},
+    "is_generated": {"const": true},
+    "is_authoritative": {"const": false}
+  },
+  "additionalProperties": false
+}
