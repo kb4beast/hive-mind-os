@@ -19,3 +19,15 @@ The candidate must satisfy
 `docs/architecture/PHASE4_EXPLORER_SHADOW_CONTRACT.md`, preserve all prior contracts,
 and make no activation or behavioral-superiority claim. Independent
 Cross-Examination, Curator, Steward, and Judge dispositions remain pending.
+
+## Builder candidate
+
+The first runnable candidate adds no public API, CLI, runtime selector, provider, or
+tool adapter. `foundation.explorer_shadow` compiles three inert skills, selects only
+whole same-scope pre-cutoff records with mandatory critical coverage, receipts every
+selection and omission, excludes quarantined and same-run inputs, invokes one injected
+engine, validates a closed finding shape and selected evidence membership, derives
+the collision key, and uses the existing authorized `OpportunityLedger`.
+
+Focused unittest, Ruff, Pyright, and diff checks pass. This is Builder evidence;
+independent exact-byte review remains required.
