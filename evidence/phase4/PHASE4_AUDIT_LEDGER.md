@@ -119,3 +119,11 @@ and Pyright pass. Inventory document digest:
 `sha256:bd83372d50468a5aaf8b8272497f8d3b6ea328ed273a5e83b09c3c59973f8e66`;
 inventory file digest:
 `sha256:3b003c8fa48d4ff8ea667431a983998d2a1d482a33807a611280fa24630eb5d3`.
+
+## `P4A-AUDIT-012` — final Steward pass
+
+Steward `/root/item4_explorer/steward` passed exact implementation `40bc5d6`.
+All three hostile nested lists stopped at 65 values, produced controlled failed
+terminal receipts, and wrote zero encounters or opportunities. No new critical
+reliability defect was found. Final exact-commit Cross-Examiner and Curator
+confirmation remain open.

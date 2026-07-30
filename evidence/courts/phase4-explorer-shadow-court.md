@@ -197,3 +197,16 @@ inventory document digest is
 and its file digest is
 `sha256:3b003c8fa48d4ff8ea667431a983998d2a1d482a33807a611280fa24630eb5d3`.
 Only renewed Steward review is required for this remand.
+
+## Final Steward verdict
+
+Independent Steward `/root/item4_explorer/steward` returned `PASS` on exact
+implementation commit `40bc5d6a08cbf9eb32ea4cce766da4a547e40249`.
+For each nested field, the reviewer observed exactly 65 consumed values, a controlled
+`ExplorerShadowError`, one failed terminal receipt, and zero encounter or opportunity
+writes. Focused, combined, Ruff, and Pyright receipts reproduced with no new critical
+boundedness or reliability defect.
+
+Because the final repair changes finding validation after the earlier Cross-Examiner
+and Curator exact-commit verdicts, both identities must confirm the final
+implementation before judgment.
