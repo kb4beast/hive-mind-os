@@ -113,3 +113,18 @@ document digest is
 and its file digest is
 `sha256:652006c2a626b90f0bf4e218f63087ed8c88a27456d471127e3e249ac19efc09`.
 Renewed exact-commit Cross-Examination remains required.
+
+## Renewed cross-examination verdict
+
+Independent Cross-Examiner `/root/phase4_architect` returned `PASS` on exact
+implementation commit `fd27593d76acf83f56b4ed68c75226bbcb4e44cd`.
+The reviewer reproduced all 14 focused tests, Ruff, Pyright, both the Phase 4
+inventory and historical Phase 3 inventory, and confirmed there is no implementation
+difference in the later evidence-only commit.
+
+The verdict specifically confirms zero-call replay conflicts for changed context or
+engine identity, failed terminal receipts with zero admission writes for duplicate
+finding IDs, durable preselection failure receipts, atomic admission, authority
+preflight, bounded hostile iteration, and recursion exclusions. No new critical
+fail-open defect was found. Curator, Steward, and distinct Judge review remain
+pending; publication remains prohibited.
