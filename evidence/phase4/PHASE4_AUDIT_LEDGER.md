@@ -136,3 +136,19 @@ independently passed exact implementation
 delta and confirmed no weakened authority, privacy, atomicity, compatibility, public
 surface, or nonactivation boundary. Distinct Judge disposition is the only remaining
 court burden.
+
+## `P4A-AUDIT-014` — first Judge defers lifecycle closure
+
+Distinct Judge `/root/item5_judge` issued `defer` on exact implementation
+`40bc5d6a08cbf9eb32ea4cce766da4a547e40249`. Technical evidence passed, but the
+Architect and Cross-Examiner identity overlapped and explicit Integrator, Optimizer,
+and Orchestrator receipts were missing. Publication is prohibited pending lifecycle
+closure and renewed judgment.
+
+## `P4A-AUDIT-015` — Orchestrator receipt
+
+Orchestrator `/root` seals the inert Phase 4A scope, numeric context/finding/call
+budgets, judged Phase 3 and Foundation dependencies, pending-run recovery and
+rollback, fail-closed stopping conditions, and remaining court schedule. A distinct
+Cross-Examiner, Integrator, and Optimizer must review exact implementation `40bc5d6`;
+only a renewed favorable Judge verdict can authorize an inactive stacked draft PR.

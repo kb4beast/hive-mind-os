@@ -229,3 +229,44 @@ The final technical receipts are `19 passed, 9 subtests` focused; `194 passed,
 pass; the 133-resource installed-wheel contract remains unchanged. Explorer,
 Architect, Builder, Cross-Examiner, Curator, and Steward burdens are satisfied for
 this bounded candidate. Distinct Judge disposition remains required.
+
+## First Judge disposition
+
+Distinct Judge `/root/item5_judge` issued `defer` on implementation
+`40bc5d6a08cbf9eb32ea4cce766da4a547e40249` and evidence head `d754da1`.
+Technical evidence passed, but lifecycle evidence did not:
+
+- the Architect also served as implementation Cross-Examiner;
+- no separately identified Integrator or Optimizer verdict existed; and
+- the Orchestrator scope, budget, dependencies, stopping conditions, and court
+  schedule were not explicitly receipted.
+
+A stacked draft PR is prohibited until those identities report and a distinct Judge
+renews judgment. No activation, public release, live-provider readiness, usefulness,
+customer value, semantic quality, performance, or superiority claim is admitted.
+
+## Orchestrator receipt
+
+Orchestrator `/root` records the following bounded Phase 4A decision:
+
+- **Outcome:** prove only an inert, package-private Explorer shadow substrate over
+  existing authorized storage; no behavioral-value or activation claim.
+- **Scope and authority:** additive skills, deterministic context selection,
+  one injected engine call, typed findings, and existing opportunity admission.
+  No live provider, tool, Git, web, public projection, champion, or runtime selector.
+- **Budgets:** at most 256 context records, 1,000,000 canonical context bytes,
+  64 findings, 64 values per nested finding list, and one engine call. Review work
+  is limited to exact-delta attacks after each remand.
+- **Dependencies:** judged Phase 3 head `2cbfe1d`, existing FoundationStore,
+  OpportunityLedger, canonical/schema validators, and the unchanged 133-resource
+  installed-wheel contract.
+- **Recovery and rollback:** pending sealed runs fail closed for explicit recovery;
+  same-store calls serialize; separate-store calls observe pending or replay;
+  callers can remove the opt-in substrate without changing active Generation Zero.
+- **Stopping conditions:** stop and remand on any unbounded input, ambiguous run
+  identity, missing receipt, second engine call, partial admission, authority leak,
+  public/activation drift, compatibility failure, or missing independent role.
+- **Court schedule:** preserve each remand; obtain distinct Cross-Examiner,
+  Integrator, and Optimizer receipts on the exact implementation; then renew Judge
+  review. Only an `adapt`/`adopt` verdict may permit a stacked draft PR, which must
+  remain open, draft, unmerged, and inactive.
