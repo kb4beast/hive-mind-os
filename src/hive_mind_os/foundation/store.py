@@ -946,6 +946,26 @@ class FoundationStore:
             for row in self._connection.execute(query, parameters).fetchall()
         ]
 
+    def record_by_idempotency_key(
+        self,
+        *,
+        tenant_id: str,
+        repository_id: str,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        """Return one uniquely keyed record without materializing store history."""
+
+        self._require_scope(tenant_id, repository_id)
+        if not idempotency_key.strip():
+            raise ValueError("idempotency_key is required")
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM records WHERE tenant_id=? AND repository_id=? "
+                "AND idempotency_key=? LIMIT 1",
+                (tenant_id, repository_id, idempotency_key),
+            ).fetchone()
+        return None if row is None else self._decode_record(row)
+
     @classmethod
     def read_public_memory_snapshot(
         cls,

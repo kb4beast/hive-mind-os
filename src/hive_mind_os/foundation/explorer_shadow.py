@@ -206,9 +206,24 @@ def select_context(
     _validate_request(request)
     if not isinstance(records, Sequence) or isinstance(records, (str, bytes)):
         raise ExplorerShadowError("context inventory must be a bounded sequence")
-    if not len(CRITICAL_CLASSES) <= len(records) <= MAX_CONTEXT_RECORDS:
+    checked_items: list[ContextRecord] = []
+    iterator = iter(records)
+    for _ in range(MAX_CONTEXT_RECORDS + 1):
+        try:
+            checked_items.append(_validate_record(next(iterator)))
+        except StopIteration:
+            break
+        except ExplorerShadowError:
+            raise
+        except Exception as error:
+            raise ExplorerShadowError(
+                f"context inventory iteration failed: {type(error).__name__}"
+            ) from error
+    else:
+        raise ExplorerShadowError("context inventory exceeds record bound")
+    if len(checked_items) < len(CRITICAL_CLASSES):
         raise ExplorerShadowError("context inventory size is invalid")
-    checked = tuple(_validate_record(record) for record in records)
+    checked = tuple(checked_items)
     identifiers = [record.memory_id for record in checked]
     if len(identifiers) != len(set(identifiers)):
         raise ExplorerShadowError("context record IDs must be unique")
@@ -317,17 +332,15 @@ class ExplorerShadowRunner:
 
     def _run_receipt_exists(self, request: ContextRequest) -> bool:
         store = self.ledger.store
-        for record_type in ("explorer-shadow-run", "explorer-context-selection"):
-            if any(
-                record["payload"]["run_id"] == request.run_id
-                for record in store.records(
-                    tenant_id=request.tenant_id,
-                    repository_id=request.repository_id,
-                    record_type=record_type,
-                )
-            ):
-                return True
-        return False
+        return any(
+            store.record_by_idempotency_key(
+                tenant_id=request.tenant_id,
+                repository_id=request.repository_id,
+                idempotency_key=f"{prefix}:{request.run_id}",
+            )
+            is not None
+            for prefix in ("explorer-run", "explorer-selection")
+        )
 
     def _existing(
         self,
@@ -338,35 +351,34 @@ class ExplorerShadowRunner:
     ) -> ShadowResult | None:
         store = self.ledger.store
         request_digest = digest(asdict(request))
-        terminal = [
-            record
-            for record in store.records(
-                tenant_id=request.tenant_id,
-                repository_id=request.repository_id,
-                record_type="explorer-shadow-run",
-            )
-            if record["payload"]["run_id"] == request.run_id
-        ]
-        if terminal:
-            if len(terminal) != 1 or terminal[0]["payload"]["request_digest"] != request_digest:
+        terminal = store.record_by_idempotency_key(
+            tenant_id=request.tenant_id,
+            repository_id=request.repository_id,
+            idempotency_key=f"explorer-run:{request.run_id}",
+        )
+        if terminal is not None:
+            if (
+                terminal["record_type"] != "explorer-shadow-run"
+                or terminal["payload"]["request_digest"] != request_digest
+            ):
                 raise ExplorerShadowError("run identity conflicts with prior receipt")
-            payload = terminal[0]["payload"]
+            payload = terminal["payload"]
             if payload["status"] != "succeeded":
                 raise ExplorerShadowError(
                     f"prior shadow run failed: {payload['error_code']}"
                 )
-            selection_records = [
-                record
-                for record in store.records(
-                    tenant_id=request.tenant_id,
-                    repository_id=request.repository_id,
-                    record_type="explorer-context-selection",
-                )
-                if record["record_id"] == payload["selection_record_id"]
-            ]
-            if len(selection_records) != 1:
+            selection_record = store.record_by_idempotency_key(
+                tenant_id=request.tenant_id,
+                repository_id=request.repository_id,
+                idempotency_key=f"explorer-selection:{request.run_id}",
+            )
+            if (
+                selection_record is None
+                or selection_record["record_type"] != "explorer-context-selection"
+                or selection_record["record_id"] != payload["selection_record_id"]
+            ):
                 raise ExplorerShadowError("terminal receipt lost its selection")
-            stored_selection = _selection_from_payload(selection_records[0]["payload"])
+            stored_selection = _selection_from_payload(selection_record["payload"])
             if (
                 payload["skill_bundle_digest"] != bundle_digest
                 or payload["engine_id"] != engine_id
@@ -378,20 +390,18 @@ class ExplorerShadowRunner:
                 )
             return ShadowResult(
                 stored_selection,
-                selection_records[0]["record_id"],
+                selection_record["record_id"],
                 tuple(payload["outcomes"]),
                 payload["skill_bundle_digest"],
             )
-        pending = [
-            record
-            for record in store.records(
-                tenant_id=request.tenant_id,
-                repository_id=request.repository_id,
-                record_type="explorer-context-selection",
-            )
-            if record["payload"]["run_id"] == request.run_id
-        ]
-        if pending:
+        pending = store.record_by_idempotency_key(
+            tenant_id=request.tenant_id,
+            repository_id=request.repository_id,
+            idempotency_key=f"explorer-selection:{request.run_id}",
+        )
+        if pending is not None:
+            if pending["record_type"] != "explorer-context-selection":
+                raise ExplorerShadowError("run identity conflicts with prior receipt")
             raise ExplorerShadowError("shadow run has a sealed pending selection")
         return None
 
@@ -407,6 +417,18 @@ class ExplorerShadowRunner:
             repository_id=request.repository_id,
             actor_id=ACTOR_ID,
         )
+        # A FoundationStore owns one SQLite connection. Serializing the complete
+        # shadow call on that connection makes a concurrent identical invocation
+        # wait for and replay the first terminal result instead of calling two
+        # engines. A durable selection claim below closes the same race across
+        # separate store connections.
+        with store._lock:
+            return self._run_locked(request, records)
+
+    def _run_locked(
+        self, request: ContextRequest, records: Sequence[ContextRecord]
+    ) -> ShadowResult:
+        store = self.ledger.store
         prior_exists = self._run_receipt_exists(request)
         unavailable_bundle = digest({"status": "skill-bundle-unavailable"})
         try:
@@ -469,9 +491,6 @@ class ExplorerShadowRunner:
                 type(error).__name__,
             )
             raise
-        existing = self._existing(request, selection, bundle_digest, engine_id)
-        if existing is not None:
-            return existing
         selection_payload = _selection_payload(
             request, selection, request_digest, bundle_digest
         )
@@ -479,19 +498,25 @@ class ExplorerShadowRunner:
             "explorer-context-selection-v1", selection_payload
         ).valid:
             raise ExplorerShadowError("selection payload failed its contract")
-        selection_record = store.append_record(
-            authority=self.ledger.authority,
-            foundation_action="foundation.opportunity.write",
-            tenant_id=request.tenant_id,
-            repository_id=request.repository_id,
-            record_type="explorer-context-selection",
-            schema_name="explorer-context-selection-v1",
-            stream_id=f"explorer-selection:{request.run_id}",
-            payload=selection_payload,
-            actor_id=ACTOR_ID,
-            idempotency_key=f"explorer-selection:{request.run_id}",
-            correlation_id=request.run_id,
-        )
+        with store._transaction():
+            existing = self._existing(
+                request, selection, bundle_digest, engine_id
+            )
+            if existing is not None:
+                return existing
+            selection_record = store.append_record(
+                authority=self.ledger.authority,
+                foundation_action="foundation.opportunity.write",
+                tenant_id=request.tenant_id,
+                repository_id=request.repository_id,
+                record_type="explorer-context-selection",
+                schema_name="explorer-context-selection-v1",
+                stream_id=f"explorer-selection:{request.run_id}",
+                payload=selection_payload,
+                actor_id=ACTOR_ID,
+                idempotency_key=f"explorer-selection:{request.run_id}",
+                correlation_id=request.run_id,
+            )
         try:
             raw = self.engine.discover(request, selected, _freeze(bundle))
             findings = _consume_bounded(raw, request.max_findings)
@@ -582,9 +607,31 @@ class ExplorerShadowRunner:
     def _validate_finding(
         self, finding: Any, selected: Sequence[ContextRecord]
     ) -> dict[str, Any]:
-        if not isinstance(finding, Mapping) or set(finding) != self._FINDING_FIELDS:
+        if not isinstance(finding, Mapping):
             raise ExplorerShadowError("finding shape is not exact")
-        copied = dict(finding)
+        keys: list[Any] = []
+        iterator = iter(finding)
+        for _ in range(len(self._FINDING_FIELDS) + 1):
+            try:
+                keys.append(next(iterator))
+            except StopIteration:
+                break
+            except Exception as error:
+                raise ExplorerShadowError(
+                    f"finding key iteration failed: {type(error).__name__}"
+                ) from error
+        else:
+            raise ExplorerShadowError("finding shape exceeds field bound")
+        try:
+            if set(keys) != self._FINDING_FIELDS:
+                raise ExplorerShadowError("finding shape is not exact")
+            copied = {key: finding[key] for key in sorted(self._FINDING_FIELDS)}
+        except ExplorerShadowError:
+            raise
+        except Exception as error:
+            raise ExplorerShadowError(
+                f"finding field access failed: {type(error).__name__}"
+            ) from error
         for field in (
             "finding_id",
             "problem",
@@ -711,6 +758,7 @@ def _selection_payload(
         "tenant_id": request.tenant_id,
         "repository_id": request.repository_id,
         "request_digest": request_digest,
+        "policy_version": selection.policy_version,
         "cutoff_sequence": request.cutoff_sequence,
         "inventory_digest": selection.inventory_digest,
         "selection_digest": selection.selection_digest,
@@ -730,7 +778,7 @@ def _selection_payload(
 
 def _selection_from_payload(payload: Mapping[str, Any]) -> ContextSelection:
     return ContextSelection(
-        POLICY_VERSION,
+        str(payload["policy_version"]),
         str(payload["inventory_digest"]),
         tuple(payload["selected_ids"]),
         tuple(

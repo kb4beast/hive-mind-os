@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 from pathlib import Path
+from threading import Event
 from typing import Any, Mapping, Sequence
 from unittest.mock import patch
 
+import hive_mind_os.foundation.explorer_shadow as explorer_shadow_module
 from hive_mind_os.foundation.authority import decide_foundation_write
 from hive_mind_os.foundation.canonical import canonical_bytes, digest
 from hive_mind_os.foundation.contracts import validate_foundation
@@ -139,6 +143,59 @@ class _InvalidIdentityEngine(_Engine):
     engine_id = ""
 
 
+class _LyingContextSequence(Sequence[ContextRecord]):
+    def __init__(self, records: Sequence[ContextRecord]) -> None:
+        self.records = records
+        self.yielded = 0
+
+    def __len__(self) -> int:
+        return len(CRITICAL_CLASSES)
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return self.records[index]
+        return self.records[index % len(self.records)]
+
+    def __iter__(self) -> Iterator[ContextRecord]:
+        for index in range(1_000):
+            self.yielded += 1
+            yield self.records[index % len(self.records)]
+        raise RuntimeError("unbounded context iterator")
+
+
+class _HostileFinding(Mapping[str, Any]):
+    def __init__(self) -> None:
+        self.value = _finding()
+        self.yielded = 0
+
+    def __len__(self) -> int:
+        return len(self.value)
+
+    def __getitem__(self, key: str) -> Any:
+        return self.value[key]
+
+    def __iter__(self) -> Iterator[str]:
+        keys = tuple(self.value)
+        for index in range(1_000):
+            self.yielded += 1
+            yield keys[index % len(keys)]
+        raise RuntimeError("unbounded finding iterator")
+
+
+class _BlockingEngine(_Engine):
+    def __init__(self, entered: Event, release: Event) -> None:
+        super().__init__([_finding()])
+        self.entered = entered
+        self.release = release
+
+    def discover(self, request, context, skill_bundle):
+        self.calls += 1
+        self.entered.set()
+        if not self.release.wait(timeout=5):
+            raise RuntimeError("concurrency fixture timed out")
+        return self.findings
+
+
 def _finding(**updates: Any) -> dict[str, Any]:
     value = {
         "finding_id": "finding:one",
@@ -247,6 +304,12 @@ class ExplorerShadowTests(unittest.TestCase):
         with self.assertRaisesRegex(ExplorerShadowError, "sequence cutoff"):
             select_context(_request(), records)
 
+    def test_context_inventory_does_not_trust_sequence_length(self) -> None:
+        records = _LyingContextSequence(_records())
+        with self.assertRaisesRegex(ExplorerShadowError, "record bound"):
+            select_context(_request(), records)
+        self.assertEqual(records.yielded, 257)
+
     def test_selection_rejects_malformed_scope_quarantine_and_all_recursion(self) -> None:
         cases = (
             ({"tenant_id": "tenant:other"}, "scope"),
@@ -292,6 +355,13 @@ class ExplorerShadowTests(unittest.TestCase):
         replay = runner.run(_request(), list(reversed(_records())))
         self.assertEqual(first, replay)
         self.assertEqual(engine.calls, 1)
+        with patch.object(
+            self.store,
+            "records",
+            side_effect=AssertionError("replay must not scan persistent history"),
+        ):
+            self.assertEqual(first, runner.run(_request(), _records()))
+        self.assertEqual(engine.calls, 1)
         self.assertTrue(shadow_result_bytes(first))
         self.assertEqual(len(self.store.records(
             tenant_id="tenant:test", repository_id="repository:test",
@@ -308,6 +378,47 @@ class ExplorerShadowTests(unittest.TestCase):
             ),
             (),
         )
+
+    def test_selection_receipt_preserves_policy_version_across_runtime_drift(self) -> None:
+        result = self._runner(_Engine([_finding()])).run(_request(), _records())
+        record = self.store.record_by_idempotency_key(
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            idempotency_key="explorer-selection:run:shadow",
+        )
+        assert record is not None
+        self.assertEqual(record["payload"]["policy_version"], result.selection.policy_version)
+        with patch.object(
+            explorer_shadow_module,
+            "POLICY_VERSION",
+            "explorer-context-selection-v999",
+        ):
+            reconstructed = explorer_shadow_module._selection_from_payload(
+                record["payload"]
+            )
+        self.assertEqual(reconstructed.policy_version, result.selection.policy_version)
+
+    def test_concurrent_identical_run_invokes_only_one_engine_and_replays_result(self) -> None:
+        entered = Event()
+        release = Event()
+        first_engine = _BlockingEngine(entered, release)
+        second_engine = _Engine([_finding()])
+        first_runner = self._runner(first_engine)
+        second_runner = self._runner(second_engine)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first_future = executor.submit(
+                first_runner.run, _request(), _records()
+            )
+            self.assertTrue(entered.wait(timeout=2))
+            second_future = executor.submit(
+                second_runner.run, _request(), _records()
+            )
+            release.set()
+            first = first_future.result(timeout=5)
+            second = second_future.result(timeout=5)
+        self.assertEqual(first, second)
+        self.assertEqual(first_engine.calls, 1)
+        self.assertEqual(second_engine.calls, 0)
 
     def test_replay_conflicts_on_changed_engine_or_context_without_engine_call(self) -> None:
         engine = _Engine([_finding()])
@@ -405,6 +516,15 @@ class ExplorerShadowTests(unittest.TestCase):
         with self.assertRaisesRegex(ExplorerShadowError, "finding bound"):
             self._runner(engine).run(_request(max_findings=2), _records())
         self.assertEqual(engine.yielded, 3)
+        self.assertEqual(len(self.store.records(
+            tenant_id="tenant:test", repository_id="repository:test",
+            record_type="opportunity-record")), 0)
+
+    def test_hostile_finding_mapping_is_consumed_only_to_field_bound_plus_one(self) -> None:
+        finding = _HostileFinding()
+        with self.assertRaisesRegex(ExplorerShadowError, "field bound"):
+            self._runner(_Engine([finding])).run(_request(), _records())
+        self.assertEqual(finding.yielded, 14)
         self.assertEqual(len(self.store.records(
             tenant_id="tenant:test", repository_id="repository:test",
             record_type="opportunity-record")), 0)

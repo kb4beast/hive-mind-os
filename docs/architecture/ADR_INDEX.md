@@ -28,4 +28,4 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-028` | [Explorer shadow substrate](ADR-028-EXPLORER-SHADOW-SUBSTRATE.md) | Phase 4A | proposed for independent implementation court |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-028; it must be unique at creation time.
+is ADR-029; it must be unique at creation time.
