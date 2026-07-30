@@ -55,8 +55,22 @@ def _digest_json(value: Any) -> str:
     )
 
 
+def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    document: dict[str, Any] = {}
+    for name, value in pairs:
+        if name in document:
+            raise ValueError(f"duplicate JSON object name: {name}")
+        document[name] = value
+    return document
+
+
 def _canonical_json_file_digest(path: Path) -> str:
-    return _digest_json(json.loads(path.read_text(encoding="utf-8")))
+    return _digest_json(
+        json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_pairs,
+        )
+    )
 
 
 def _write_empty_source(root: Path, repository_id: str, seed: str) -> Path:

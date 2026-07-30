@@ -67,15 +67,15 @@
   "generation_zero_activated": false,
   "implementation": {
     "pyproject.toml": "sha256:41f6c95bd1f3db93810163a8c869cc6e2107aec54f2876e92054eb6a2e6f81c1",
-    "scripts/phase3_federation_inventory.py": "sha256:f18e40cb9064aec51d91433640b758d14ec0fcb58ed29ecc61c9ad3a9d027567",
+    "scripts/phase3_federation_inventory.py": "sha256:2e99a25c5e563fc9b0b232abf61fb12023395ef5d6b044d3af6c59d7023cb4fb",
     "scripts/verify_installed_wheel.py": "sha256:174d4c0fe832e26e29d750d82005c20f03327cc7b3dd70ffda44d3a1744b424f",
     "src/hive_mind_os/foundation/authority.py": "sha256:234db57ce89dbf500240092cef2689b2c96f7545c372fa5464db79246eeece68",
     "src/hive_mind_os/foundation/federation.py": "sha256:fe38dd090bfea19b6cc013e3477599fdc39cd5311ef908f7dc8abc15021f7b37",
     "src/hive_mind_os/foundation/federation_contracts.py": "sha256:9928038e1bc986fe724d448bd95b0a6f635330f6ed8d6d507db43d39dcdfa970",
-    "tests/test_phase3_federation.py": "sha256:9bb05770e547579c1e617d42a08d08eab776b3cbd110581e4a7a57aa840c7383"
+    "tests/test_phase3_federation.py": "sha256:8a2cb31cfa244d65805649b76919094a99f153f66b6b9023ca3ab1006580a99a"
   },
   "inbox_or_import_started": false,
-  "inventory_digest": "sha256:7656c7f2fec506eecaa23b5b4a378187d246e26de92c870e5aece185c3caa9ec",
+  "inventory_digest": "sha256:0d798c8caa36edf3323389be8cab4af9a59b7aba5821532f84a2eb934be3367f",
   "obsidian_required": false,
   "phase": 3,
   "phase3_item5_input": {

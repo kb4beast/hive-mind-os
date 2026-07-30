@@ -1265,3 +1265,25 @@ inventory equality, and diff checks pass. Cross-platform inventory is
 No runtime, schema, authority, workflow, contract, source-admission, identity,
 protocol, capability, or claim surface changed. Renewed independent review and
 judgment remain required before pushing.
+
+## `P3-ITEM6-AUDIT-012` — duplicate-key fail-closed remand
+
+Curator/Expert Witness `Locke` returned `PASS` on exact cross-platform repair
+`7f0a28a`. Cross-Examiner `item6_cross_examiner` returned `REMAND` because the
+default JSON decoder's last-value-wins handling allowed duplicate object names to
+collapse distinct evidence bytes to the same canonical document.
+
+The repaired canonical loader rejects duplicate names with an
+`object_pairs_hook`. The 29th item-6 test now proves all three boundaries:
+semantically identical LF/CRLF JSON hashes equally, duplicate-name JSON fails
+closed, and malformed/non-finite JSON remains rejected.
+
+Windows unittest and pytest, plus Linux Python 3.12 unittest, each execute all 29
+item-6 cases with `28 passed, 1 platform skip`. Combined Phase 2/3 pytest reports
+`175 passed, 1 skipped, 57 subtests`; all eight governance tests, Ruff, Pyright,
+inventory equality, and diff checks pass. The repaired inventory is
+`sha256:0d798c8caa36edf3323389be8cab4af9a59b7aba5821532f84a2eb934be3367f`.
+
+No runtime, schema, authority, workflow, contract, source-admission, identity,
+protocol, capability, or claim surface changed. Renewed independent review and
+judgment remain required before pushing.

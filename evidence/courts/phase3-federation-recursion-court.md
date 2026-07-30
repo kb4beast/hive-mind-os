@@ -284,3 +284,32 @@ Builder receipts are:
 
 This is Builder evidence. Renewed independent review and judgment are required
 before another push.
+
+## Duplicate-key fail-closed remand
+
+Curator/Expert Witness `Locke` independently returned `PASS` on exact
+cross-platform repair `7f0a28a`. Cross-Examiner `item6_cross_examiner` returned
+`REMAND`: Python's default JSON decoder accepts duplicate object names with
+last-value-wins semantics, so distinct evidence bytes such as
+`{"a":1,"a":2}` and `{"a":2}` could collapse to one canonical digest.
+
+The repair installs a duplicate-detecting `object_pairs_hook` for the inherited
+inventory document. Duplicate names now fail closed before canonicalization.
+The newline regression additionally proves that LF and CRLF encodings remain
+equivalent while duplicate-name JSON is rejected. Malformed and non-finite JSON
+remain rejected. Runtime, schemas, authority, workflow, contracts, source
+admission, identity, protocol, capability, and claim scope are unchanged.
+
+Builder receipts are:
+
+- Windows item 6 via unittest: `28 passed, 1 privilege-dependent skip`;
+- Windows item 6 via pytest: `28 passed, 1 privilege-dependent skip`;
+- Linux Python 3.12 item 6: `28 passed, 1 Windows-only skip`;
+- combined Phase 2/3 pytest: `175 passed, 1 skipped, 57 subtests passed`;
+- all eight governance tests, Ruff, Pyright, inventory equality, and diff checks:
+  pass; and
+- cross-platform, duplicate-safe inventory:
+  `sha256:0d798c8caa36edf3323389be8cab4af9a59b7aba5821532f84a2eb934be3367f`.
+
+This is renewed Builder evidence. Independent review and judgment remain required
+before pushing.

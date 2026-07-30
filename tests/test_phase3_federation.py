@@ -993,11 +993,15 @@ def _case_item6_inventory_is_exact() -> None:
 def _case_prior_inventory_digest_is_newline_independent(tmp_path: Path) -> None:
     lf = tmp_path / "lf.json"
     crlf = tmp_path / "crlf.json"
+    duplicate = tmp_path / "duplicate.json"
     lf.write_bytes(b'{\n  "schema_version": 1,\n  "value": "same"\n}\n')
     crlf.write_bytes(
         b'{\r\n  "schema_version": 1,\r\n  "value": "same"\r\n}\r\n'
     )
     assert _canonical_json_file_digest(lf) == _canonical_json_file_digest(crlf)
+    duplicate.write_bytes(b'{"schema_version": 1, "schema_version": 2}\n')
+    with _raises(ValueError, match="duplicate JSON object name"):
+        _canonical_json_file_digest(duplicate)
 
 
 class FederationTests(unittest.TestCase):
