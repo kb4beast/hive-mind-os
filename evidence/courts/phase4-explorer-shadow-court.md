@@ -270,3 +270,40 @@ Orchestrator `/root` records the following bounded Phase 4A decision:
   Integrator, and Optimizer receipts on the exact implementation; then renew Judge
   review. Only an `adapt`/`adopt` verdict may permit a stacked draft PR, which must
   remain open, draft, unmerged, and inactive.
+
+## Distinct Cross-Examiner remand
+
+New identity `/root/phase4_distinct_cross`, with no prior Explorer, Advocate,
+Architect, Builder, Curator, Steward, or Judge role in this case, returned `REMAND`
+on implementation `40bc5d6a08cbf9eb32ea4cce766da4a547e40249`.
+
+The injected engine received the same frozen dataclass instances later used for
+terminal and evidence receipts. Reflective `object.__setattr__` mutation could
+therefore make a successful terminal request digest disagree with its sealed
+selection and derive encounter evidence from post-selection content while store
+integrity still passed. Separately, exported skill mapping proxies retained a private
+mutable dictionary alias, allowing schema-valid packaged skill drift.
+
+## Sealed-input and immutable-skill repair candidate
+
+Exact implementation commit `f91d227bbe8ddcdb5d8833aafcf695f6ccd302f8`
+copies the request at the trust boundary, snapshots each validated context record,
+and passes further independent request/context copies to injected engine code.
+Admission and terminal receipts therefore reuse internal pre-engine snapshots even
+when the engine reflectively mutates its copies.
+
+Packaged skills now have no retained mutable backing alias, use immutable nested
+values, and must compile to the pinned bundle digest
+`sha256:f0c149f6ae3a738cc0324ecb3311e0a3ff93cdfd4923be3709e3c9e5e5b05985`.
+Schema-valid drift fails compilation. Direct attacks cover reflective request/context
+mutation, matching sealed request digests, pre-engine evidence digests, absent mutable
+backing, mapping immutability, and pinned-digest failure.
+
+Builder receipts are `20 passed, 9 subtests` focused; `195 passed, 1 skipped,
+66 subtests` combined; all fourteen governance tests; Ruff and Pyright pass. The
+inventory document digest is
+`sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36`
+and its file digest is
+`sha256:ba453267f1dee2097430d0054156d7c93306e6d910b500d377de62aacc10945e`.
+Distinct Cross-Examiner renewal remains required; Integrator and Optimizer roles are
+still open.

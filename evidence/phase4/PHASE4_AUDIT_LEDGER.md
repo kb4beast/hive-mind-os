@@ -152,3 +152,24 @@ budgets, judged Phase 3 and Foundation dependencies, pending-run recovery and
 rollback, fail-closed stopping conditions, and remaining court schedule. A distinct
 Cross-Examiner, Integrator, and Optimizer must review exact implementation `40bc5d6`;
 only a renewed favorable Judge verdict can authorize an inactive stacked draft PR.
+
+## `P4A-AUDIT-016` — distinct Cross-Examiner remand
+
+New independent identity `/root/phase4_distinct_cross` remanded exact implementation
+`40bc5d6`. Reflective engine mutation could change the internal request/context
+objects used after selection, breaking request- and evidence-digest binding while
+store integrity passed. Packaged skill mapping proxies also retained a mutable
+private backing alias. Integrator and Optimizer scheduling remained blocked; no
+verdict was fabricated.
+
+## `P4A-AUDIT-017` — sealed-input and immutable-skill repair
+
+Exact implementation commit `f91d227bbe8ddcdb5d8833aafcf695f6ccd302f8`
+uses independent pre-engine and engine-facing request/context snapshots, removes the
+mutable packaged-skill backing alias, and pins the compiled skill-bundle digest.
+Receipts: `20 passed, 9 subtests` focused; `195 passed, 1 skipped, 66 subtests`
+combined; all fourteen governance tests; Ruff and Pyright pass. Inventory document
+digest:
+`sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36`;
+inventory file digest:
+`sha256:ba453267f1dee2097430d0054156d7c93306e6d910b500d377de62aacc10945e`.
