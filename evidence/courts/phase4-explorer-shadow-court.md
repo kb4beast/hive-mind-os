@@ -335,3 +335,18 @@ The Orchestrator, Explorer, Architect, Builder, distinct Cross-Examiner, Curator
 Integrator, Steward, and Optimizer duties are now explicitly receipted. Because the
 final sealed-input repair postdates the Curator's exact-commit verdict, final Curator
 confirmation and renewed distinct judgment remain required.
+
+## Final Curator confirmation
+
+Curator `/root/item5_curator` returned `PASS` on exact implementation
+`f91d227bbe8ddcdb5d8833aafcf695f6ccd302f8`. Reflective mutation of engine
+snapshots and externally retained originals could not alter sealed request,
+selection, evidence, terminal, privacy, or integrity receipts. Skill drift failed
+against the pinned digest before an engine call, emitted one failed terminal, and
+wrote zero admissions. All 20 focused tests, the 195-test combined matrix,
+governance, Ruff, Pyright, both inventories, and the exact installed wheel passed.
+
+The independently rebuilt exact wheel preserved all 133 resources, imported the
+Phase 4 modules, and compiled the inert authority-none bundle to its pinned digest.
+All mandatory lifecycle roles and final implementation receipts are now present.
+Renewed distinct Judge disposition is required before any draft publication.

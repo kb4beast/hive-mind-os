@@ -196,3 +196,12 @@ substrate at exact implementation `f91d227`. Numeric structural budgets are enfo
 but outcome, token/cost/time, semantic quality, causal learning, challenger/champion,
 and superiority evidence is absent. No activation, promotion, customer-value,
 learning, or superiority claim is authorized.
+
+## `P4A-AUDIT-021` — final Curator and installed-wheel passes
+
+Curator `/root/item5_curator` passed exact implementation `f91d227`, including
+sealed engine-input provenance, pinned skill drift failure before engine invocation,
+privacy, authority, atomicity, compatibility, inventories, and all local gates. A
+fresh exact wheel preserved 133 resources and the inert authority-none pinned skill
+bundle. All mandatory lifecycle roles are now receipted; renewed distinct judgment
+is the only open burden.
