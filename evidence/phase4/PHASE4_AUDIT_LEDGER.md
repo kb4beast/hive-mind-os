@@ -76,3 +76,27 @@ All three second-remand attacks were reproduced as closed, the 14 focused tests 
 static gates passed independently, both Phase 3 and Phase 4 inventories regenerated
 exactly, and no new critical fail-open defect was found. Curator, Steward, and Judge
 burdens remain open.
+
+## `P4A-AUDIT-008` — Curator and Steward remands
+
+Independent Curator `/root/item5_curator` remanded the missing durable selection
+`policy_version` and stale ADR next-identifier statement. Independent Steward
+`/root/item4_explorer/steward` remanded unbounded hostile sequence/mapping
+iteration, whole-history replay queries, and a same-store concurrent invocation race
+that could call two engines. Both verdicts apply to implementation `fd27593d` and
+block judgment despite the prior Cross-Examiner pass.
+
+## `P4A-AUDIT-009` — bounded concurrency and policy repair
+
+Exact implementation commit `52f4ce8484dedd6f2b6457af331251a2e5e0f3e1`
+persists historical policy identity, consumes hostile containers only to bounded
+maximum-plus-one limits, performs replay lookup by unique indexed keys, serializes
+same-store calls, and atomically seals the selection claim across store connections.
+ADR-029 is now correctly identified as next.
+
+Receipts: `18 passed, 6 subtests` focused; `193 passed, 1 skipped, 63 subtests`
+combined; all fourteen governance tests; Ruff and Pyright pass; isolated wheel
+preserves 133 resources and installed imports. Inventory document digest:
+`sha256:973fbd14dd87472a760f197377cae4ac204f871ce0c15eb369deb0916248bf48`;
+inventory file digest:
+`sha256:b16d565f1517cc9765a198a7023f90c598d02327551be355fbc7b59e5749d4de`.

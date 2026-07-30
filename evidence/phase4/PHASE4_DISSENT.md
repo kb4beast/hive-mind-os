@@ -22,3 +22,10 @@
 - Preselection failure receipts use explicit unavailable sentinel digests/identities
   because no valid skill bundle or engine identity exists to preserve. They prove the
   failure boundary, not the missing artifact's content.
+- Same-store shadow calls are deliberately serialized across the injected engine
+  call. This favors one-call replay integrity over throughput; later live execution
+  needs separately adjudicated durable leases rather than weakening the lock.
+- A second store connection encountering a sealed selection before its terminal
+  receipt fails closed as pending. It does not wait indefinitely or invoke another
+  engine; retry after explicit recovery or terminal completion remains the caller's
+  responsibility.

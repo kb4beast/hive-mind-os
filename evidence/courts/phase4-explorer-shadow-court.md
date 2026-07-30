@@ -128,3 +128,44 @@ finding IDs, durable preselection failure receipts, atomic admission, authority
 preflight, bounded hostile iteration, and recursion exclusions. No new critical
 fail-open defect was found. Curator, Steward, and distinct Judge review remain
 pending; publication remains prohibited.
+
+## Curator and Steward remands
+
+Independent Curator `/root/item5_curator` returned `REMAND` on implementation
+`fd27593d76acf83f56b4ed68c75226bbcb4e44cd`. The durable context-selection
+payload omitted `policy_version`, so replay reconstructed historical receipts using
+the current runtime policy constant. The Curator also found the ADR index still
+named ADR-028 as the next available identifier.
+
+Independent Steward `/root/item4_explorer/steward` separately returned `REMAND`.
+Hostile `Sequence` and `Mapping` implementations could make selection and finding
+validation iterate beyond declared limits; replay queries materialized complete
+record histories; and two concurrent identical run invocations on one store could
+both call their engines before colliding at receipt admission.
+
+Both reviewers reproduced the prior green receipts. These remands supersede the
+earlier Cross-Examiner pass for promotion purposes and remain part of the permanent
+record.
+
+## Curator and Steward repair candidate
+
+Exact implementation commit `52f4ce8484dedd6f2b6457af331251a2e5e0f3e1`
+persists and reconstructs `policy_version`, tests policy drift, and corrects the ADR
+index. Context sequences and finding mappings are now consumed only to explicit
+maximum-plus-one limits without trusting reported length. Replay uses unique
+idempotency-key lookups with `LIMIT 1`, not whole-history scans.
+
+One store serializes the complete shadow invocation, so a concurrent identical call
+waits and replays the first result without invoking its engine. The selection check
+and durable claim also execute in one immediate transaction, so a separate store
+connection observes either a terminal replay or a sealed pending run rather than
+calling a second engine.
+
+Builder receipts are `18 passed, 6 subtests` focused; `193 passed, 1 skipped,
+63 subtests` combined; all fourteen governance tests; Ruff and Pyright pass; and an
+isolated wheel preserves all 133 resources and installed Phase 4 imports. The
+inventory document digest is
+`sha256:973fbd14dd87472a760f197377cae4ac204f871ce0c15eb369deb0916248bf48`
+and its file digest is
+`sha256:b16d565f1517cc9765a198a7023f90c598d02327551be355fbc7b59e5749d4de`.
+Renewed Curator and Steward review of the exact repair is required.
