@@ -19,7 +19,7 @@ from scripts.phase1_surface_inventory import build_inventory, cli_inventory
 OUTPUT_PATH = Path("evidence/phase4d/phase4d_explorer_idea_lifecycle_inventory.json")
 BASE_HEAD = "59df5f5f2d0af45f403f74dac9781d2664f227cd"
 PHASE4C_INVENTORY_DIGEST = (
-    "sha256:86e1ec6bf309ce98fb12aa38c3a78f878e14b1cf786810166538a4e3bed22d1e"
+    "sha256:4aad6678c3a2e1d401c29484e1efaf30e846c265912fd6bb05acd6b2bc71e161"
 )
 
 

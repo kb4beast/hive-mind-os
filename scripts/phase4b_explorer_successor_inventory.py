@@ -23,7 +23,7 @@ from scripts.phase1_surface_inventory import build_inventory, cli_inventory
 OUTPUT_PATH = Path("evidence/phase4b/phase4b_explorer_successor_inventory.json")
 BASE_HEAD = "316ee55da4ea7449bcdb934ab442ef0d95f54ba5"
 PHASE4A_INVENTORY_DIGEST = (
-    "sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36"
+    "sha256:aca98143ccecc633e7e7631fac297e8fdcad0b384bbb980c2b286fe1083f9984"
 )
 
 

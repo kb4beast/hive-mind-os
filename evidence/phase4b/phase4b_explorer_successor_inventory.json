@@ -18,22 +18,22 @@
   },
   "implementation": {
     "docs/architecture/ADR-029-EXPLORER-V2-SUCCESSOR-COMPOSITION.md": "sha256:6db059547b98ab9322f048fb39c42c5c1176ddcd3dfae59b329a937ef47ce029",
-    "docs/architecture/ADR_INDEX.md": "sha256:05e148a78d8b12e56eec0ca7c5dacbb0319a80735f30dfb2e96e007a0f408c40",
+    "docs/architecture/ADR_INDEX.md": "sha256:67bd401e702f2843e03f566165de7e769e6ae9e9ecc49f64e66548fde1dac0ab",
     "docs/architecture/PHASE4B_EXPLORER_SUCCESSOR_CONTRACT.md": "sha256:bcbd107174ff3174fd1b51810431986c47cad0e9157809a387d7fd6d23f862cb",
     "evidence/courts/phase4b-explorer-successor-court.md": "sha256:f3e7601edd463ab016fb9931dfc7eb1bcd2b20a87e33ec74078a4a1f994cd2d9",
     "evidence/phase4b/PHASE4B_AUDIT_LEDGER.md": "sha256:e7b56d57bd8087d5225d6d85c201c34ebc1674d74ea34d7b8c720e0954f3e8dd",
     "evidence/phase4b/PHASE4B_DISSENT.md": "sha256:3dcb0c034825deda916860822620ec924a5af92e3fb477a6a35cc590bdbddb01",
     "evidence/phase4b/PHASE4B_INSTALLED_WHEEL_RECEIPT.md": "sha256:e3b4e7f3fb085271a3fb031dc7b4122a3d94967f2ecdd2fc1bdc8d36dee739c8",
     "evidence/sources/PHASE4B_EXPLORER_SUCCESSOR_SOURCE_REGISTER.md": "sha256:0bd42dc49bb31f652735395fb5fd54af7ce19d9f8959a91e3054217f185e1f92",
-    "scripts/phase4b_explorer_successor_inventory.py": "sha256:899f8d2ddb909f2d35906a1eedf31bbf84353ee3d9e9079f33bc65cb98169068",
+    "scripts/phase4b_explorer_successor_inventory.py": "sha256:8857d417f0b7b45c29556ae5b516dd628cd71729512e5d63201c5608e576b72e",
     "src/hive_mind_os/foundation/explorer_successor.py": "sha256:24d491900d80c371cbeb048e3d2e8984eed168b87f8d5d921c9bf40082c3b316",
     "src/hive_mind_os/foundation/explorer_successor_contracts.py": "sha256:9dfd4cba2b9b390fd4fcb32a2f1dbda0467f66c0f6da0ea109c08aead308d22d",
     "tests/test_phase4b_explorer_successor.py": "sha256:eba8321f77aebe8a2f8eca2eae29edce8b7d982684a1bea144818cda853b4ab4"
   },
-  "inventory_digest": "sha256:2949f6899424049961c8e5d8d7d41872324c364a54cafbace9fab934dcd0b8ad",
+  "inventory_digest": "sha256:8a8208c3e57f4e0f52b14954a3df36c7c9c02c4b9d39e677593dee94e73bde3c",
   "phase": 4,
   "phase4a_input": {
-    "inventory_digest": "sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36"
+    "inventory_digest": "sha256:aca98143ccecc633e7e7631fac297e8fdcad0b384bbb980c2b286fe1083f9984"
   },
   "phase_item": "B",
   "production_activation": false,

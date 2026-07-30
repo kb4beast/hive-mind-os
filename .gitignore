@@ -442,3 +442,11 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Versioned Hive Mind release/integration evidence is source, not build output.
+!docs/releases/
+!docs/releases/version_1.1-integration.md
+!docs/releases/version_1.1-manifest.json
+!evidence/releases/
+!evidence/releases/version_1.1/
+!evidence/releases/version_1.1/procedural-role-review.json

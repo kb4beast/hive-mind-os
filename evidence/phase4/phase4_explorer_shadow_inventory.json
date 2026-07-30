@@ -32,10 +32,10 @@
     "src/hive_mind_os/foundation/store.py": "sha256:18aa4b1096a0325660d7a002a8bfbd77af3fa3ac47ef415a228dddd65c76bbbb",
     "tests/test_phase4_explorer_shadow.py": "sha256:8e659bb24a067d37f762e2c46ac6c60e34bd03da08e891cf0ea59a79a1f7849a"
   },
-  "inventory_digest": "sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36",
+  "inventory_digest": "sha256:aca98143ccecc633e7e7631fac297e8fdcad0b384bbb980c2b286fe1083f9984",
   "phase": 4,
   "phase3_input": {
-    "inventory_digest": "sha256:f39f79ec2dc8634cae1aa3b406cbc22a890752e0e2214f0f3cbb444acf4689cd"
+    "inventory_digest": "sha256:79dc8c6054db2113c2a782bf65312d50811a728f4c0c0fe7ce822a6c3f055a80"
   },
   "phase_item": "A",
   "prior_contracts": {

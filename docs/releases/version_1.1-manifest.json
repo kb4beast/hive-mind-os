@@ -1,0 +1,176 @@
+{
+  "accepted_stacked_prs": [
+    {
+      "head": "0948f7ec385238f5825ce7c39dd25de2e9a1035d",
+      "number": 28,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "3298078c41ce69103eb2bdce61960a69dc6aab93",
+      "number": 29,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "94e67cde15fa8a75d92561384241f0419c9f589b",
+      "number": 31,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "7f7013c99d86bbd34f966b902bb873cf5c10d740",
+      "number": 32,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "40a508b6b1bfb4a8624cf1ef8169384d32a39d44",
+      "number": 33,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "7e26a56eab5fe79f075cccc57a6ff0a01fb9ef9a",
+      "number": 34,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "ff2bbb14729cf8b3d1475a1d3ef0281f6e713e50",
+      "number": 35,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "376a4a6082f6bdf154ba6252ccb70062a17a549b",
+      "number": 36,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "2cbfe1d0e4dccd6f1758e5ddba10f799834bf857",
+      "number": 37,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "316ee55da4ea7449bcdb934ab442ef0d95f54ba5",
+      "number": 38,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "55ec59828dcd999723627219210e5b224c65a36f",
+      "number": 39,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "59df5f5f2d0af45f403f74dac9781d2664f227cd",
+      "number": 40,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "11e4a7b16b00e11caf59c231b5b718f14ed65195",
+      "number": 41,
+      "posture": "accepted-stack-input"
+    },
+    {
+      "head": "0cbf581b77b77c1cdc15879a05164674fd5ae3ec",
+      "number": 42,
+      "posture": "accepted-stack-input"
+    }
+  ],
+  "claims": {
+    "automatic_merge_authorized": false,
+    "explorer_comparison_complete": false,
+    "learning_authorized": false,
+    "main_modified": false,
+    "production_ready": false,
+    "promotion_authorized": false,
+    "release_ready": false,
+    "runtime_activation_authorized": false,
+    "source_branches_deleted_or_rewritten": false,
+    "source_prs_closed_or_merged": false,
+    "superiority_claimed": false,
+    "value_claimed": false
+  },
+  "dependency_prs": [
+    {
+      "head": "59d81845eb366583dee1efa1396058137acbc57f",
+      "number": 5,
+      "posture": "exact-ancestry-preserved"
+    },
+    {
+      "head": "1848ac70905f006a042a83b8dc0be02134068207",
+      "number": 6,
+      "posture": "exact-ancestry-preserved"
+    },
+    {
+      "head": "ec9bfc65575573ead36c2c72c748725dc8018c93",
+      "number": 7,
+      "posture": "exact-ancestry-preserved"
+    }
+  ],
+  "distribution": {
+    "build_backend": "setuptools.build_meta",
+    "build_requirements": [
+      "setuptools==83.0.0"
+    ],
+    "name": "hive-mind-os",
+    "version": "0.6.0",
+    "version_explanation": "Integration train 1.1 names the preserved multi-PR repository integration; the Python distribution remains hive-mind-os 0.6.0 until a separately authorized package release changes it."
+  },
+  "evidence": {
+    "integration_court": "evidence/courts/version-1.1-integration-court.md",
+    "inventory_reconciliation": "evidence/releases/version_1.1/inventory-reconciliation.json",
+    "procedural_role_review": "evidence/releases/version_1.1/procedural-role-review.json",
+    "release_audit_artifact": "dist/release-version-1.1-audit.json"
+  },
+  "forbidden_active_paths": [
+    "src/hive_mind_os_v2",
+    "tests/test_v2_memory_usage_foundation.py",
+    "docs/architecture/PHASE2_MEMORY_USAGE_FOUNDATION.md"
+  ],
+  "handoffs": {
+    "current": "docs/NEXT_SESSION_HANDOFF_PHASE5A_ORCHESTRATOR_OBJECTIVE.md",
+    "superseded": "docs/NEXT_SESSION_HANDOFF_PUBLIC_PRIVATE_MEMORY.md"
+  },
+  "integration_train": "1.1",
+  "integration_train_is_distribution_version": false,
+  "manifest_kind": "hive-mind-os-integration-train",
+  "open_blockers": [
+    "B-OPS-09",
+    "P20-release-readiness-court"
+  ],
+  "required_ancestor_commits": [
+    "07b19ba809b1be24d50f64de5a8704a760414db0",
+    "0948f7ec385238f5825ce7c39dd25de2e9a1035d",
+    "3298078c41ce69103eb2bdce61960a69dc6aab93",
+    "94e67cde15fa8a75d92561384241f0419c9f589b",
+    "7f7013c99d86bbd34f966b902bb873cf5c10d740",
+    "40a508b6b1bfb4a8624cf1ef8169384d32a39d44",
+    "7e26a56eab5fe79f075cccc57a6ff0a01fb9ef9a",
+    "ff2bbb14729cf8b3d1475a1d3ef0281f6e713e50",
+    "376a4a6082f6bdf154ba6252ccb70062a17a549b",
+    "2cbfe1d0e4dccd6f1758e5ddba10f799834bf857",
+    "316ee55da4ea7449bcdb934ab442ef0d95f54ba5",
+    "55ec59828dcd999723627219210e5b224c65a36f",
+    "59df5f5f2d0af45f403f74dac9781d2664f227cd",
+    "11e4a7b16b00e11caf59c231b5b718f14ed65195",
+    "0cbf581b77b77c1cdc15879a05164674fd5ae3ec",
+    "39e07c9e3c3ce439911481be2d38d901d05d4824",
+    "59d81845eb366583dee1efa1396058137acbc57f",
+    "1848ac70905f006a042a83b8dc0be02134068207",
+    "ec9bfc65575573ead36c2c72c748725dc8018c93"
+  ],
+  "schema_version": 1,
+  "source": {
+    "archive_ref": "archive/release-version_1.1-pre-hardening-2026-07-30",
+    "draft_pull_request": 47,
+    "hardening_branch": "agent/version-1.1-release-hardening",
+    "main_start": "b032a9f32f48889e0889fae8d6dd04eb03f46b63",
+    "release_branch": "release/version_1.1",
+    "release_head_before_hardening": "07b19ba809b1be24d50f64de5a8704a760414db0"
+  },
+  "superseded_historical_prs": [
+    {
+      "disposition_record": "docs/architecture/PR30_SUPERSESSION_AND_DISPOSITION.md",
+      "head": "39e07c9e3c3ce439911481be2d38d901d05d4824",
+      "number": 30,
+      "posture": "superseded-but-preserved",
+      "qualified_adr": "ADR-021-PR30",
+      "tree_neutral_merge_commit": null
+    }
+  ]
+}

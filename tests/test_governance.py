@@ -80,8 +80,12 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertIn("one-maintainer", rules["verification_residual"])
 
     def test_build_backend_is_exactly_pinned(self) -> None:
-        project = (ROOT / "pyproject.toml").read_text()
-        self.assertIn('requires = ["setuptools==80.9.0"]', project)
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text())
+        self.assertEqual(project["build-system"]["requires"], ["setuptools==83.0.0"])
+        self.assertEqual(
+            project["build-system"]["build-backend"],
+            "setuptools.build_meta",
+        )
 
     def test_unittest_contract_has_no_pytest_only_modules_or_silent_cases(
         self,
@@ -148,7 +152,7 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertIn("SBOM does not identify installed distribution", workflow)
         self.assertEqual(workflow.count("dist/hive-mind-os.spdx.json"), 4)
         self.assertIn("dist/*.whl", workflow)
-        self.assertIn("Attest wheel and SBOM provenance", workflow)
+        self.assertIn("Attest wheel, SBOM, and release audit provenance", workflow)
 
     def test_secret_scan_allowlist_is_narrow_and_extends_defaults(self) -> None:
         config = tomllib.loads((ROOT / ".gitleaks.toml").read_text())
