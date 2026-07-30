@@ -91,6 +91,14 @@
   `sha256:d60bd5` is a receipt only, not a reproducibility claim. Functional
   recommendation is `adapt`; final inventory resealing is the only remaining
   mechanical remand.
+- `P4C-AUDIT-017`: Fresh Judge `/root/phase4c_judge` issued `adapt` for exact
+  implementation `175e2d2` against sealed pre-verdict evidence head `356b62c`.
+  The Judge independently reproduced pre-verdict inventory digest
+  `sha256:2fdd6624cc97c48adaca1d714b6d8240c9108c591ff822cc249567a723557ee0`,
+  found all mandatory remands closed, and admitted only inert, package-private,
+  deterministic contract/receipt measurement for externally supplied Generation
+  Zero development observations. Candidate execution and comparison did not occur.
+  Only evidence, ADR, and inventory closeout may follow without renewed review.
 
 ## Preserved dissent
 

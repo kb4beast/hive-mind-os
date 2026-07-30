@@ -88,3 +88,27 @@ rejection specifically because the metric result did not match the observation.
 Relevant Phase 4A-C, static/type, no-I/O, and clean-wheel checks passed; the wheel
 retained 133 JSON resources and both private modules. Its functional recommendation
 is `adapt`; final inventory resealing is the only remaining mechanical obligation.
+
+## Judgment
+
+Fresh Judge `/root/phase4c_judge`, distinct from every lifecycle and prior court
+identity, issued `adapt` for exact implementation
+`175e2d2d47177f887039728697aa7c20f7ae9b58` against sealed pre-verdict evidence
+head `356b62c79bdacfec03d9f6de40ab2a12e38c0a80`. The Judge independently
+reproduced inventory digest
+`sha256:2fdd6624cc97c48adaca1d714b6d8240c9108c591ff822cc249567a723557ee0`,
+found every mandatory remand closed, and admitted only this claim:
+
+> Phase 4C adds an inert, package-private, deterministic development evaluation
+> substrate for externally supplied Generation Zero observations across eleven
+> fixed families. Receipt integrity, scoring derivation, provenance pins, safety
+> floors, and incomplete/not-run behavior are validated. Explorer v2 remains
+> forced-not-run; no candidate comparison occurred.
+
+Actual Explorer behavior, fixture/oracle semantics, holdout integrity, learning,
+customer value, generalization, candidate quality, comparison, champion status,
+promotion, activation, and superiority remain prohibited claims. Rollback is
+deletion-only to exact Phase 4B base `55ec598`. Publication is permitted only as
+an inactive draft stacked on `codex/phase4-explorer-v2-candidate`, after verdict
+inventory resealing and local/hosted gates; merge, activation, and promotion are
+not authorized.

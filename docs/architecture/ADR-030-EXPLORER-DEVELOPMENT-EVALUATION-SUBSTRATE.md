@@ -1,6 +1,6 @@
 # ADR-030: Explorer development evaluation substrate
 
-- Status: proposed for P4C-001 implementation court
+- Status: accepted with adapted scope by P4C-001
 - Date: 2026-07-30
 - Base: `55ec59828dcd999723627219210e5b224c65a36f`
 - Extends: ADR-028 and ADR-029
@@ -28,6 +28,11 @@ Do not modify the generic benchmark harness, prompt experiment runner, recursive
 improvement gate, stores, dependencies, runtime selectors, CLI, public APIs, or
 installed JSON resources. The scorer performs no filesystem, clock, randomness,
 store, model, provider, tool, authority, or write operation.
+
+The accepted claim is limited to deterministic contract and receipt integrity for
+externally supplied Generation Zero development observations. It is not evidence
+that Explorer behavior, fixture semantics, learning, value, comparison, promotion,
+activation, or superiority occurred.
 
 ## Rollback
 
