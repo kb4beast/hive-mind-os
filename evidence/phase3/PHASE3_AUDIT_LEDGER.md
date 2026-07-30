@@ -1083,3 +1083,31 @@ orphan and refuses the rerun.
 Renewed Steward review of `616f59d` separately found eager directory materialization
 before the entry bound. Both managed-tree and staging-parent scans now iterate and
 stop at the first over-bound entry. An instrumented regression proves early stop.
+
+## `P3-ITEM6-AUDIT-004` — architecture and provenance remand
+
+Architect `Heisenberg` and Explorer/Advocate `Helmholtz` independently remanded exact
+candidate `0b45fc4f01400e1c9d3ec310e5a4fe593194ac32`.
+
+The architecture remand reproduced a portfolio beside `hive-mind` but still inside
+the source vault passing check mode because the projector knew only the namespace
+root. The implementation now requires the canonical
+`<vault>/hive-mind/generated-cognitive` suffix, derives the enclosing source-vault
+root after fail-closed component checks, and rejects mutual ancestry for every
+source/target and source/source pair. Parameterized check/project regressions and a
+nested-source regression prove zero target creation and unchanged source bytes.
+
+The provenance remand found an unsupported founding-docket attribution, omitted
+`P1SRC-OBSIDIAN-HELP/SRC-OB-05` provenance and unresolved license, ambiguous prior
+artifact references, collapsed obligations, and incomplete alternatives. The source
+register now pins exact base blobs and the external commit/page digest, preserves
+the unresolved documentation license, explicitly disposes lineage/link/novelty-scan/
+challenger/adapter claims, assigns later owners and rollback, and compares
+no-change, index-only, nonauthoritative deep-link, materialized, and shared-store
+alternatives.
+
+Builder repair receipts are `27 passed, 1 skipped` for item 6 and `174 passed,
+1 skipped, 57 subtests passed` for the combined Phase 2/3 matrix. Ruff, Pyright,
+inventory equality, and diff checks pass. Inventory is
+`sha256:89b7625dbc4070ddf364e900de7a465005ce852d14a58d4133eb15341a072371`.
+Renewed exact-candidate review and independent judgment remain pending.

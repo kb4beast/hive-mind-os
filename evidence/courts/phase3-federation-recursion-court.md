@@ -13,8 +13,9 @@ without changing canonical state, activating federation, or weakening items 1–
 
 ## Clerk record
 
-The source register preserves seven claims and counterclaims. The candidate adds
-five schemas, one exact-scope write action, deterministic portfolio-local
+The source register preserves twelve atomic claims, their counterclaims and
+dispositions, exact inherited source pins, and five alternatives. The candidate
+adds five schemas, one exact-scope write action, deterministic portfolio-local
 projection, and explicit feedback/depth/hop/epoch decisions.
 
 ## Advocate
@@ -92,10 +93,37 @@ The isolated wheel contains all `133` governed resources, including the previous
 unwalked eight cognitive schemas and all five federation schemas. The verifier now
 counts both directories explicitly instead of allowing a packaging blind spot.
 
-This is Builder testimony, not final verification.
+## Second exact-candidate remand
+
+Architect `Heisenberg` and Explorer/Advocate `Helmholtz` independently remanded exact
+candidate `0b45fc4f01400e1c9d3ec310e5a4fe593194ac32`.
+
+The Architect reproduced a prohibited layout that returned `checked`: source
+namespace `vault-a/hive-mind/generated-cognitive` with portfolio
+`vault-a/portfolio-vault`. The implementation compared the target only with the
+namespace, not its enclosing vault. The repair requires the canonical source suffix,
+derives each enclosing vault root without linked/reparse components, rejects mutual
+ancestry for each source/target pair and source/source pair, and tests both check and
+project paths for zero source/output mutation.
+
+The Explorer found that the source register misattributed federation/self-host
+requirements to `founding_docket.py`, flattened an unresolved documentation license
+into repository MIT, ambiguously cited items 2–5, collapsed atomic obligations, and
+omitted material alternatives. The repaired register removes the unsupported
+attribution, pins every internal blob and the complete
+`P1SRC-OBSIDIAN-HELP/SRC-OB-05` chain, preserves the unresolved documentation
+license, adds explicit `adapt`/`defer` claims with owners and rollback, and compares
+no-change, index-only, deep-link, materialized-copy, and shared-store choices.
+
+The repaired item-6 suite passes `27` tests with one environment-dependent ordinary
+symlink skip. The combined matrix passes `174` tests, one skip, and `57` subtests.
+Ruff, Pyright, inventory equality, and diff checks pass. Repaired inventory is
+`sha256:89b7625dbc4070ddf364e900de7a465005ce852d14a58d4133eb15341a072371`.
+This is Builder testimony; renewed exact-candidate review remains required.
 
 ## Pending judgment
 
-A distinct Cross-Examiner, Curator, Steward, Optimizer, and Judge must inspect the
-exact candidate. Until then, promotion remains `defer`. The branch may be developed
-and tested but must not be activated or merged.
+A distinct Explorer/Advocate, Architect, Cross-Examiner, Curator, Steward,
+Optimizer, and Judge must inspect the exact repaired candidate or review record
+applicable to their role. Until then, promotion remains `defer`. The branch may be
+developed and tested but must not be activated, published, or merged.

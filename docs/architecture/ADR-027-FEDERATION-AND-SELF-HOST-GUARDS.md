@@ -23,8 +23,9 @@ unsupported inference.
 
 Add one opt-in local module with two independent duties:
 
-1. Accept two to 64 already released, strict item-3 cognitive namespaces from
-   exactly one tenant and materialize a portfolio-local namespace.
+1. Accept two to 64 already released, strict item-3 cognitive namespaces at the
+   canonical `<source-vault>/hive-mind/generated-cognitive` path from exactly one
+   tenant and materialize a portfolio-local namespace.
 2. Evaluate an explicit self-host context before generated or self-observed material
    can become another ingestion, projection, telemetry, idea, delegation, or
    self-analysis event.
@@ -38,8 +39,10 @@ Federation is a projection, not a shared truth store:
   replaced with deterministic digests or aliases;
 - portfolio notes receive new local IDs while source IDs remain
   `provenance-only`;
+- source vault roots are safely derived from the required canonical namespace;
 - source namespaces are never modified;
-- nested vaults, symlinks, Windows reparse points/junctions, hardlinks, source drift,
+- portfolio/source and pairwise source-vault nesting, symlinks, Windows reparse
+  points/junctions, hardlinks, source drift,
   partial or unmanaged trees, duplicate identity, and cross-tenant sources fail
   closed;
 - writes require additive `foundation.federation.write` authority; and
@@ -60,6 +63,12 @@ than matching prior history.
 
 ## Alternatives
 
+- No change was rejected for this bounded candidate because it leaves the admitted
+  item-6 claims without executable evidence; it remains the rollback.
+- A manifest/index-only portfolio was deferred because it does not provide the
+  selected inspectable local-note surface; its cost advantage is unmeasured.
+- Clearly nonauthoritative deep links were deferred because availability and mutable
+  paths remain coupled to each source vault.
 - Cross-vault Wikilinks were rejected because mutable vault paths are not canonical
   identity or tenant controls.
 - Nested vaults were rejected because they create ambiguous ownership and refresh.
@@ -82,5 +91,10 @@ repository ID, and the command result discloses the local namespace path. Other
 safe-public provenance values may textually equal a repository name; the projector
 does not claim whole-output identifier anonymization.
 
-Changes to source admission, identity, tenant policy, guard precedence, write
-protocol, authority, or claimed scope require renewed independent review.
+Explorer novelty-scan exclusion, persistent adapter enforcement, and the normal
+challenger/evaluation/promotion path remain explicit later obligations; item 6 does
+not implement or claim them.
+
+Changes to source admission, source-vault derivation, identity, tenant policy, guard
+precedence, write protocol, authority, or claimed scope require renewed independent
+review.

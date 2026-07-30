@@ -63,6 +63,7 @@ def _write_source(
     record_id: str,
     payload_updates: Mapping[str, object] | None = None,
 ) -> Path:
+    root = root / "hive-mind" / "generated-cognitive"
     root.mkdir(parents=True)
     identity_digest = _digest_document({"identity": identity_seed})
     source_digest = _digest_document({"record": record_id})
@@ -452,6 +453,85 @@ def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
         )
 
 
+@pytest.mark.parametrize("check", [True, False])
+def test_rejects_portfolio_sibling_inside_enclosing_source_vault_without_mutation(
+    tmp_path: Path,
+    check: bool,
+) -> None:
+    first = _write_source(
+        tmp_path / "first-vault",
+        tenant="tenant-a",
+        repository="repo-one",
+        identity_seed="one",
+        record_id="record:one",
+    )
+    second = _write_source(
+        tmp_path / "second-vault",
+        tenant="tenant-a",
+        repository="repo-two",
+        identity_seed="two",
+        record_id="record:two",
+    )
+    first_vault = first.parents[1]
+    target = first_vault / "portfolio-vault"
+    before = {
+        path.relative_to(first_vault).as_posix(): path.read_bytes()
+        for path in first_vault.rglob("*")
+        if path.is_file()
+    }
+    with pytest.raises(FederationError, match="inside a source vault"):
+        if check:
+            project_federation(
+                [first, second],
+                target,
+                tenant_id="tenant-a",
+                portfolio_repository_id="portfolio",
+                check=True,
+            )
+        else:
+            project_federation(
+                [first, second],
+                target,
+                tenant_id="tenant-a",
+                portfolio_repository_id="portfolio",
+                authority=_authority(),
+            )
+    after = {
+        path.relative_to(first_vault).as_posix(): path.read_bytes()
+        for path in first_vault.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+    assert not target.exists()
+
+
+def test_rejects_nested_source_vaults_without_output(tmp_path: Path) -> None:
+    outer = _write_source(
+        tmp_path / "outer-vault",
+        tenant="tenant-a",
+        repository="repo-outer",
+        identity_seed="outer",
+        record_id="record:outer",
+    )
+    inner = _write_source(
+        tmp_path / "outer-vault" / "nested-vault",
+        tenant="tenant-a",
+        repository="repo-inner",
+        identity_seed="inner",
+        record_id="record:inner",
+    )
+    target = tmp_path / "portfolio"
+    with pytest.raises(FederationError, match="source vaults cannot overlap or nest"):
+        project_federation(
+            [outer, inner],
+            target,
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            check=True,
+        )
+    assert not target.exists()
+
+
 def test_rejects_private_unknown_and_inconsistent_payloads(tmp_path: Path) -> None:
     second = _write_source(
         tmp_path / "second",
@@ -713,11 +793,14 @@ def test_rejects_linked_source_and_target_roots(tmp_path: Path) -> None:
         )
         for name in ("one", "two")
     ]
-    source_link = tmp_path / "source-link"
+    source_link = (
+        tmp_path / "source-link-vault" / "hive-mind" / "generated-cognitive"
+    )
     target_link = tmp_path / "target-link"
     target_destination = tmp_path / "target-destination"
     target_destination.mkdir()
     try:
+        source_link.parent.mkdir(parents=True)
         source_link.symlink_to(sources[0], target_is_directory=True)
         target_link.symlink_to(target_destination, target_is_directory=True)
     except OSError:

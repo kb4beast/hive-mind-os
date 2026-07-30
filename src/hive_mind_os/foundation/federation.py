@@ -32,6 +32,7 @@ from .federation_contracts import validate_federation
 FEDERATION_ACTION = "foundation.federation.write"
 FEDERATION_ACTOR = "foundation-federation-projector-v1"
 FEDERATION_NAMESPACE = "hive-mind/federated-cognitive"
+COGNITIVE_NAMESPACE_PARTS = ("hive-mind", "generated-cognitive")
 MAX_SOURCES = 64
 MAX_NOTES = 100_000
 MAX_MANIFEST_BYTES = 32 * 1024 * 1024
@@ -109,6 +110,25 @@ def _reject_linked_components(path: Path, label: str) -> None:
             raise FederationError(f"{label} component is unavailable") from error
         if _is_link_like(component, info):
             raise FederationError(f"{label} contains a linked or reparse component")
+
+
+def _source_vault_root(source_namespace: Path) -> Path:
+    if (
+        len(source_namespace.parts) < len(COGNITIVE_NAMESPACE_PARTS) + 1
+        or source_namespace.parts[-len(COGNITIVE_NAMESPACE_PARTS) :]
+        != COGNITIVE_NAMESPACE_PARTS
+    ):
+        raise FederationError(
+            "source must be the canonical <vault>/hive-mind/generated-cognitive namespace"
+        )
+    _reject_linked_components(source_namespace, "source cognitive namespace")
+    try:
+        resolved = source_namespace.resolve(strict=True)
+    except OSError as error:
+        raise FederationError("source cognitive namespace is unavailable") from error
+    if resolved.parts[-len(COGNITIVE_NAMESPACE_PARTS) :] != COGNITIVE_NAMESPACE_PARTS:
+        raise FederationError("source cognitive namespace resolves outside its vault")
+    return resolved.parents[len(COGNITIVE_NAMESPACE_PARTS) - 1]
 
 
 def _enumerate_tree(root: Path) -> tuple[set[str], set[str]]:
@@ -853,12 +873,20 @@ def project_federation(
             raise FederationError("portfolio vault must be a real directory")
     target_resolved = target_root.resolve(strict=False)
     namespace = target_resolved.joinpath(*PurePosixPath(FEDERATION_NAMESPACE).parts)
-    for source in source_roots:
-        source_resolved = source.resolve(strict=True)
-        if source_resolved == target_resolved or source_resolved in target_resolved.parents:
+    source_vaults = [_source_vault_root(source) for source in source_roots]
+    for source_vault in source_vaults:
+        if source_vault == target_resolved or source_vault in target_resolved.parents:
             raise FederationError("portfolio vault cannot be inside a source vault")
-        if target_resolved in source_resolved.parents:
+        if target_resolved in source_vault.parents:
             raise FederationError("source vault cannot be inside the portfolio vault")
+    for index, source_vault in enumerate(source_vaults):
+        for other_source_vault in source_vaults[index + 1 :]:
+            if (
+                source_vault == other_source_vault
+                or source_vault in other_source_vault.parents
+                or other_source_vault in source_vault.parents
+            ):
+                raise FederationError("source vaults cannot overlap or nest")
     desired, manifest, source_receipts = _desired_portfolio(
         source_roots,
         tenant_id=tenant_id,

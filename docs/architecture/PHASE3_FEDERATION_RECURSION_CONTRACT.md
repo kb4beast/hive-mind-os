@@ -12,7 +12,10 @@ watchers, activation, and merge are excluded.
 
 ## Federation invariants
 
-1. A source is a real directory with a strict `hive-cognitive-manifest/v1`.
+1. A source is a real directory at the exact
+   `<source-vault>/hive-mind/generated-cognitive` suffix with a strict
+   `hive-cognitive-manifest/v1`; the enclosing source-vault root is derived before
+   admission.
 2. Every listed file is bounded, stable, single-link, regular, and confined.
 3. Every note is strict, `safe-public`, generated, non-authoritative,
    manifest-bound, and scope-consistent.
@@ -23,7 +26,8 @@ watchers, activation, and merge are excluded.
    safe-public provenance are not anonymized.
 7. Portfolio notes receive new IDs; source IDs remain provenance only.
 8. Payloads are re-parsed, private-field checked, scope-stripped, and rerendered.
-9. Sources are read-only and source/target vaults cannot overlap or nest.
+9. Sources are read-only. Every source-vault/target pair and every source-vault pair
+   must be distinct and mutually non-ancestral.
 10. Check mode writes nothing. Projection needs authentic exact-scope authority.
 11. First write stages, revalidates exact source trees, and atomically installs with
     no replacement. Exact reruns are `unchanged`; source/target drift, interrupted
@@ -56,7 +60,10 @@ build/instance, tenant, lineage, and repository-instance scope.
 - source ordering does not change manifest/tree digests;
 - same-tenant sources create only portfolio-local authority;
 - explicit source tenant/repository scope fields are absent from output;
-- cross-tenant, duplicate, linked, nested, drift, and forged-authority cases reject;
+- noncanonical source paths; cross-tenant, duplicate, linked, nested, drift, and
+  forged-authority cases reject;
+- a portfolio beside `hive-mind` but inside a source vault rejects in check and
+  project modes with zero source/output mutation; nested source vaults reject;
 - Windows junction/reparse redirection, unmanaged directories, interrupted staging,
   source mutation after admission, and destination-creation races reject;
 - exact rerun is idempotent;

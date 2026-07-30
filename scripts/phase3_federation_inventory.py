@@ -56,7 +56,8 @@ def _digest_json(value: Any) -> str:
 
 
 def _write_empty_source(root: Path, repository_id: str, seed: str) -> Path:
-    root.mkdir()
+    root = root / "hive-mind" / "generated-cognitive"
+    root.mkdir(parents=True)
     home = b"# Empty safe-public cognitive source\n"
     (root / "HOME.md").write_bytes(home)
     manifest = {

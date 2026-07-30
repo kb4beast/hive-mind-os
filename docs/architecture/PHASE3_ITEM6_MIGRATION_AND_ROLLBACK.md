@@ -3,9 +3,12 @@
 ## Preconditions
 
 - Keep the stacked PR draft, open, unmerged, and inactive.
-- Supply two or more independently generated item-3 cognitive namespaces.
+- Supply two or more independently generated item-3 cognitive namespaces at the
+  exact `<source-vault>\hive-mind\generated-cognitive` suffix. Other source path
+  shapes fail closed because the enclosing vault boundary would be ambiguous.
 - Confirm every source belongs to the intended tenant.
-- Use a separate portfolio vault; never nest source and portfolio vaults.
+- Use a separate portfolio vault; never nest a portfolio in a source vault, a source
+  in the portfolio, or one source vault in another.
 - Run `check` before granting the bounded local write.
 
 ## Check

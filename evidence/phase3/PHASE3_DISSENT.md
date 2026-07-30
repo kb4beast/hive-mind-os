@@ -193,12 +193,19 @@ or superiority claim.
   This is not whole-output anonymization.
 - Repository-instance digests prevent silent source collapse; they do not reconcile
   clones, forks, mirrors, or project lineages.
+- Source inputs must use the exact
+  `<vault>/hive-mind/generated-cognitive` suffix so the projector can derive and
+  enforce the real vault boundary. Arbitrary equivalent layouts are intentionally
+  rejected.
 - First publication is no-replace and idempotent, but not a durability/fsync
   guarantee. Interrupted staging requires operator recovery; updates, deletion, and
   distributed recovery are absent.
 - The self-host function creates deterministic decisions. Scheduler, ingestion,
   telemetry, idea, and delegation adapters must enforce them before a full-system
   no-loop claim.
+- Explorer generated-directory exclusion and the normal versioned
+  challenger/independent-evaluation/promotion path are retained obligations, not
+  item-6 implementations.
 - Zero observed crossover in bounded fixtures does not prove general security,
   privacy, scale, usefulness, learning quality, or superiority.
 - Private/cross-tenant federation, Inbox/import, network transport, plugins,
