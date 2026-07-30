@@ -1,6 +1,6 @@
 # ADR-031: Explorer idea lifecycle reference events
 
-- Status: proposed for P4D-001 implementation court
+- Status: accepted with adapted inert scope by P4D-001
 - Date: 2026-07-30
 - Base: `59df5f5f2d0af45f403f74dac9781d2664f227cd`
 - Extends: ADR-021, ADR-024, ADR-025, ADR-028, ADR-029, and ADR-030
@@ -61,3 +61,10 @@ runtime integration, comparison, customer outcomes, learning, promotion, activat
 and superiority require later courts. Runtime integration also requires a governed
 ancestry-work/depth budget or independently judged authenticated checkpoint/index
 design.
+
+## Judgment
+
+Independent Judge `/root/phase4d_judge` issued `adapt` for exact implementation
+`93c43f51488ba13177759a83191ede9f5d50210d`. The admitted scope is only the
+inert, package-private reference-event bridge described above. Runtime binding,
+backfill, champion use, promotion, activation, and superiority remain denied.

@@ -90,7 +90,33 @@ authentication, deduplication and denominator rules, lifecycle-completeness
 semantics, customer-value metrics, equal budgets, held-out comparators, and
 independent promotion judgment.
 
-A separate Judge remains pending.
+All required lifecycle and courtroom testimony is complete.
+
+## Verdict
+
+Fresh Judge `/root/phase4d_judge` issued `adapt` for exact implementation
+`93c43f51488ba13177759a83191ede9f5d50210d`, using sealed pre-judge evidence
+head `058775ddd48b0de94f0157d4954088db31194974` and inventory digest
+`sha256:dd41cd1a30f8418b86ca609027e469bc9630e77ce750977ecf748bfb2c09e02a`.
+
+Admitted only:
+
+- deterministic compilation of lifecycle references into existing
+  `memory-record-v1`;
+- private default and unchanged independent safe-public release;
+- content-addressed semantic relationship identity;
+- complete iterative ancestry, transition, terminal, stored-identity, and cycle
+  validation;
+- existing-store idempotent replay and restart recovery; and
+- no public API, CLI, runtime binding, schema/migration, projector, view, dependency,
+  automatic release, or backfill.
+
+Activation is denied. Runtime binding and backfill require separate courts. Before
+runtime activation, the system must separately adopt a leased, observable,
+fail-closed ancestry-work budget or an authenticated checkpoint/index preserving
+complete provenance. Artifact authentication, lifecycle completeness, customer
+outcomes, equal-budget held-out comparisons, learning, promotion, activation, and
+superiority remain unproved and unauthorized.
 
 ## Preserved limits
 

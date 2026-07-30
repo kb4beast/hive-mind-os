@@ -64,6 +64,14 @@
   receipts remained reference-only, `pinned-unverified`, `not-run`, and denied
   completeness, value, promotion, and activation. Raw event counts remain
   inadmissible as success or customer-value metrics.
+- `P4D-AUDIT-014`: Fresh Judge `/root/phase4d_judge` issued `adapt` for exact
+  implementation `93c43f5` against sealed pre-judge evidence head `058775d` and
+  inventory digest
+  `sha256:dd41cd1a30f8418b86ca609027e469bc9630e77ce750977ecf748bfb2c09e02a`.
+  The Judge admitted only the inert, package-private reference bridge and denied
+  runtime binding, backfill, champion use, promotion, activation, and superiority.
+  The pre-judge inventory remains historical; a post-verdict inventory must replace
+  it as the final delivery receipt.
 
 ## Preserved dissent
 

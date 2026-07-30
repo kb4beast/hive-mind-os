@@ -9,16 +9,16 @@
   "comparison_complete": false,
   "external_dependencies_added": 0,
   "implementation": {
-    "docs/architecture/ADR-031-EXPLORER-IDEA-LIFECYCLE-REFERENCE-EVENTS.md": "sha256:0a33881814d1b19d6cd1f84d561370dee3ff8f8d65b88d86da9806063e6e14f0",
-    "docs/architecture/ADR_INDEX.md": "sha256:dceb61249657ac4ff0ce199898d7fc465aeeb91700348c4986bea0d303c9d4b9",
-    "evidence/courts/phase4d-explorer-idea-lifecycle-court.md": "sha256:6b9e517252718ec77a46857c5473eaafca04725ac226ce12aa963180e6f239fc",
-    "evidence/phase4d/PHASE4D_AUDIT_AND_DISSENT.md": "sha256:fe8ac4186e8feca87123ee618a94e9ca7364a80da7eb0bcf25fef26ebdd4e0ea",
+    "docs/architecture/ADR-031-EXPLORER-IDEA-LIFECYCLE-REFERENCE-EVENTS.md": "sha256:b1d2d6fc5415bf7d34fb5c05a223895f9e855da9db2e2f4e1483bad4c70a3e38",
+    "docs/architecture/ADR_INDEX.md": "sha256:f017f658d460e555034b86c72a7ecf1cd8ba04bb22f35806aa646f6cc1df0ee3",
+    "evidence/courts/phase4d-explorer-idea-lifecycle-court.md": "sha256:a3c37db40b02fb22e5aef1892bcc0a51ec9ddf98403a6bd9267dc3c596daf519",
+    "evidence/phase4d/PHASE4D_AUDIT_AND_DISSENT.md": "sha256:19d47d0997778d226c29e8cf07319f3b7dbf2122fd544a62357813fe70dc8ee3",
     "evidence/sources/PHASE4D_EXPLORER_IDEA_LIFECYCLE_SOURCE_REGISTER.md": "sha256:2841c02bf4432dda31123dc221ffa68ce74c2469088e14ce2f2d598f7594f7a3",
     "scripts/phase4d_explorer_idea_lifecycle_inventory.py": "sha256:2eb039b09db865969bd46481ae12d3733748810dedb82e90541c80332bc279f3",
     "src/hive_mind_os/foundation/explorer_idea_lifecycle.py": "sha256:ab7fdd15e00b7e54249cac2664e09c1f8e24db2dc5b7028136d70083aacfd098",
     "tests/test_phase4d_explorer_idea_lifecycle.py": "sha256:38b593af3b891a7c8ac169c0d60de107628e173fa219dfb76a7369252dcaf2c8"
   },
-  "inventory_digest": "sha256:dd41cd1a30f8418b86ca609027e469bc9630e77ce750977ecf748bfb2c09e02a",
+  "inventory_digest": "sha256:06bb664eccd1cb7a7f5ad80c799ea045b1746688d26349a2a8486e13bb62e6e4",
   "lifecycle_complete_claimed": false,
   "phase": 4,
   "phase4c_input": {
