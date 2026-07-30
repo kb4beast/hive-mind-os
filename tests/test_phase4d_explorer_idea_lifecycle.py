@@ -91,6 +91,9 @@ def _compile(
     court_disposition: str | None = None,
     terminal_disposition: str | None = None,
     sensitivity: str = "private",
+    stage_reference_override: dict | None = None,
+    observed_at: str | None = None,
+    recorded_at: str | None = None,
 ) -> dict:
     previous = (
         (None, None, None)
@@ -101,8 +104,16 @@ def _compile(
             prior[0]["receipt"]["content_digest"],
         )
     )
-    stage_reference = (
-        semantic_relationship_reference(
+    if stage == "relationship":
+        relationship_basis = {
+            "tenant_id": TENANT,
+            "repository_id": REPOSITORY,
+            "source_record_id": "record:encounter",
+            "target_record_id": "record:opportunity",
+            "relationship": classification or "new",
+            "evidence_digest": digest({"stage": stage}),
+        }
+        stage_reference = semantic_relationship_reference(
             tenant_id=TENANT,
             repository_id=REPOSITORY,
             source_record_id="record:encounter",
@@ -110,8 +121,9 @@ def _compile(
             relationship=classification or "new",
             evidence_digest=digest({"stage": stage}),
         )
-        if stage == "relationship"
-        else {
+    else:
+        relationship_basis = None
+        stage_reference = {
             "ref": (
                 "observation:artifact:test"
                 if stage == "encounter"
@@ -119,7 +131,8 @@ def _compile(
             ),
             "digest": digest({"stage": stage}),
         }
-    )
+    if stage_reference_override is not None:
+        stage_reference = stage_reference_override
     return compile_explorer_idea_lifecycle_event(
         lifecycle_id=lifecycle_id,
         event_id=event_id or (
@@ -134,8 +147,8 @@ def _compile(
         run_id="run:test",
         actor_id="explorer",
         owner_id="orchestrator",
-        observed_at=f"2026-07-30T00:00:0{len(stage) % 10}+00:00",
-        recorded_at=f"2026-07-30T00:01:0{len(stage) % 10}+00:00",
+        observed_at=observed_at or f"2026-07-30T00:00:0{len(stage) % 10}+00:00",
+        recorded_at=recorded_at or f"2026-07-30T00:01:0{len(stage) % 10}+00:00",
         subject_ref=SUBJECT,
         stage_reference=stage_reference,
         encounter_record_id="record:encounter",
@@ -145,6 +158,7 @@ def _compile(
         classification=classification,
         court_disposition=court_disposition,
         terminal_disposition=terminal_disposition,
+        relationship_basis=relationship_basis,
         previous_event_id=previous[0],
         previous_event_record_id=previous[1],
         previous_event_digest=previous[2],
@@ -300,6 +314,82 @@ class ExplorerIdeaLifecycleTests(unittest.TestCase):
             semantic_relationship_reference(**arguments),
             semantic_relationship_reference(**changed),
         )
+
+        foreign = semantic_relationship_reference(
+            **{
+                **arguments,
+                "tenant_id": "tenant:foreign",
+                "relationship": "duplicate",
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "semantic relationship reference"):
+            _compile(
+                "relationship",
+                prior=(
+                    _compile("encounter"),
+                    {"record_id": "record:prior"},
+                ),
+                classification="new",
+                stage_reference_override=foreign,
+            )
+
+    def test_counterfeit_predecessor_hostile_scalars_and_metadata_fail(self) -> None:
+        prepared = _compile("encounter", lifecycle_id="idea:counterfeit")
+        counterfeit = {
+            **prepared["memory"],
+            "memory_id": "generic:memory",
+            "payload_digest": digest("unrelated"),
+            "claim_refs": [],
+            "relation_refs": [],
+        }
+        prior = self.store.append_record(
+            authority=_authority("foundation.memory.write"),
+            foundation_action="foundation.memory.write",
+            tenant_id=TENANT,
+            repository_id=REPOSITORY,
+            record_type="memory-record",
+            schema_name="memory-record-v1",
+            stream_id=prepared["stream_id"],
+            payload=counterfeit,
+            actor_id="explorer",
+            idempotency_key=prepared["idempotency_key"],
+            observed_at=counterfeit["observed_at"],
+            correlation_id="idea:counterfeit",
+            causation_id="record:encounter",
+            sensitivity="private",
+            retention="governed",
+            status="active",
+        )
+        successor = _compile(
+            "relationship",
+            lifecycle_id="idea:counterfeit",
+            prior=(prepared, prior),
+            classification="new",
+        )
+        with self.assertRaisesRegex(ValueError, "previous lifecycle"):
+            self._append(successor)
+
+        class HostileString(str):
+            calls = 0
+
+            def __hash__(self) -> int:
+                type(self).calls += 1
+                raise AssertionError("hostile hash executed")
+
+        with self.assertRaisesRegex(ValueError, "built-in string"):
+            _compile(
+                "encounter",
+                lifecycle_id="idea:hostile",
+                sensitivity=HostileString("private"),
+            )
+        self.assertEqual(HostileString.calls, 0)
+
+        with self.assertRaises(ValueError):
+            _compile("encounter", lifecycle_id="idea:\x00control")
+        with self.assertRaises(ValueError):
+            _compile("encounter", observed_at="not-a-timestamp")
+        with self.assertRaises(ValueError):
+            _compile("encounter", recorded_at="2026-07-30T00:00:00")
 
     def test_private_default_is_absent_from_public_snapshot(self) -> None:
         self._append(_compile("encounter"))

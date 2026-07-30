@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import unicodedata
 from copy import deepcopy
+from datetime import datetime
 from typing import Any, Mapping
 
 from .authority import AuthorityDecision
@@ -39,7 +41,13 @@ _MAX_TIME = 100
 
 
 def _bounded_string(value: Any, name: str, *, limit: int = _MAX_ID) -> str:
-    if type(value) is not str or not value.strip() or len(value) > limit:
+    if (
+        type(value) is not str
+        or not value.strip()
+        or len(value) > limit
+        or not value.isprintable()
+        or unicodedata.normalize("NFC", value) != value
+    ):
         raise ValueError(f"{name} must be a bounded nonempty built-in string")
     return value
 
@@ -70,6 +78,47 @@ def _reference(value: Any, name: str) -> dict[str, str]:
     }
 
 
+def _timestamp(value: Any, name: str) -> str:
+    text = _bounded_string(value, name, limit=_MAX_TIME)
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as error:
+        raise ValueError(f"{name} must be an ISO-8601 timestamp") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{name} must include a timezone")
+    return text
+
+
+def _relationship_basis(value: Any) -> dict[str, str]:
+    fields = {
+        "tenant_id",
+        "repository_id",
+        "source_record_id",
+        "target_record_id",
+        "relationship",
+        "evidence_digest",
+    }
+    if type(value) is not dict or set(value) != fields:
+        raise ValueError("relationship_basis fields are not exact")
+    relationship = _bounded_string(value["relationship"], "relationship")
+    if relationship not in RELATIONSHIP_CLASSIFICATIONS:
+        raise ValueError("relationship classification is unsupported")
+    return {
+        "tenant_id": _bounded_string(value["tenant_id"], "tenant_id"),
+        "repository_id": _bounded_string(value["repository_id"], "repository_id"),
+        "source_record_id": _bounded_string(
+            value["source_record_id"], "source_record_id"
+        ),
+        "target_record_id": _bounded_string(
+            value["target_record_id"], "target_record_id"
+        ),
+        "relationship": relationship,
+        "evidence_digest": _digest_string(
+            value["evidence_digest"], "evidence_digest"
+        ),
+    }
+
+
 def semantic_relationship_reference(
     *,
     tenant_id: str,
@@ -79,17 +128,16 @@ def semantic_relationship_reference(
     relationship: str,
     evidence_digest: str,
 ) -> dict[str, str]:
-    relationship_value = _bounded_string(relationship, "relationship")
-    if relationship_value not in RELATIONSHIP_CLASSIFICATIONS:
-        raise ValueError("relationship classification is unsupported")
-    body = {
-        "tenant_id": _bounded_string(tenant_id, "tenant_id"),
-        "repository_id": _bounded_string(repository_id, "repository_id"),
-        "source_record_id": _bounded_string(source_record_id, "source_record_id"),
-        "target_record_id": _bounded_string(target_record_id, "target_record_id"),
-        "relationship": relationship_value,
-        "evidence_digest": _digest_string(evidence_digest, "evidence_digest"),
-    }
+    body = _relationship_basis(
+        {
+            "tenant_id": tenant_id,
+            "repository_id": repository_id,
+            "source_record_id": source_record_id,
+            "target_record_id": target_record_id,
+            "relationship": relationship,
+            "evidence_digest": evidence_digest,
+        }
+    )
     identity = digest(body)
     return {
         "ref": f"explorer-relationship:{identity.removeprefix(_DIGEST_PREFIX)}",
@@ -103,21 +151,35 @@ def _validate_stage_fields(receipt: Mapping[str, Any]) -> None:
     court_disposition = receipt["court_disposition"]
     terminal_disposition = receipt["terminal_disposition"]
     opportunity_record_id = receipt["opportunity_record_id"]
+    relationship_basis = receipt["relationship_basis"]
     if stage == "relationship":
         if classification not in RELATIONSHIP_CLASSIFICATIONS:
             raise ValueError("relationship event requires a classification")
         if opportunity_record_id is None:
             raise ValueError("relationship event requires an opportunity record")
-        expected_relation_ref = (
-            "explorer-relationship:"
-            + receipt["stage_reference"]["digest"].removeprefix(_DIGEST_PREFIX)
+        if relationship_basis is None:
+            raise ValueError("relationship event requires its semantic preimage")
+        expected_basis = {
+            "tenant_id": receipt["tenant_id"],
+            "repository_id": receipt["repository_id"],
+            "source_record_id": receipt["encounter_record_id"],
+            "target_record_id": opportunity_record_id,
+            "relationship": classification,
+            "evidence_digest": relationship_basis["evidence_digest"],
+        }
+        if relationship_basis != expected_basis:
+            raise ValueError("relationship semantic preimage does not match event")
+        expected_relation_ref = semantic_relationship_reference(
+            **relationship_basis
         )
-        if receipt["stage_reference"]["ref"] != expected_relation_ref:
+        if receipt["stage_reference"] != expected_relation_ref:
             raise ValueError(
                 "relationship event requires a semantic relationship reference"
             )
-    elif classification is not None:
-        raise ValueError("classification is valid only for relationship events")
+    elif classification is not None or relationship_basis is not None:
+        raise ValueError(
+            "classification and relationship basis are valid only for relationship events"
+        )
     if stage == "court":
         if court_disposition not in COURT_DISPOSITIONS:
             raise ValueError("court event requires a courtroom disposition")
@@ -151,11 +213,23 @@ def _memory_payload(receipt: Mapping[str, Any]) -> dict[str, Any]:
     claim_refs = [
         "explorer-lifecycle:reference-only",
         f"explorer-lifecycle-stage:{stage}",
+        "explorer-lifecycle-receipt:"
+        + receipt["content_digest"].removeprefix(_DIGEST_PREFIX),
+        "explorer-stage-reference-digest:"
+        + receipt["stage_reference"]["digest"].removeprefix(_DIGEST_PREFIX),
+        "explorer-subject-digest:"
+        + receipt["subject_ref"]["digest"].removeprefix(_DIGEST_PREFIX),
     ]
     if opportunity_record_id is not None:
         claim_refs.append(f"foundation-record:{opportunity_record_id}")
     if receipt["classification"] is not None:
         claim_refs.append(f"explorer-relationship:{receipt['classification']}")
+        claim_refs.append(
+            "explorer-relationship-evidence-digest:"
+            + receipt["relationship_basis"]["evidence_digest"].removeprefix(
+                _DIGEST_PREFIX
+            )
+        )
     if receipt["court_disposition"] is not None:
         claim_refs.append(f"court-disposition:{receipt['court_disposition']}")
     if receipt["terminal_disposition"] is not None:
@@ -166,6 +240,13 @@ def _memory_payload(receipt: Mapping[str, Any]) -> dict[str, Any]:
     relation_refs = [f"explorer-lifecycle:{receipt['lifecycle_id']}"]
     if previous_record_id is not None:
         relation_refs.append(f"previous-lifecycle-event:{previous_record_id}")
+        relation_refs.append(
+            f"previous-lifecycle-event-id:{receipt['previous_event_id']}"
+        )
+        relation_refs.append(
+            "previous-lifecycle-event-digest:"
+            + receipt["previous_event_digest"].removeprefix(_DIGEST_PREFIX)
+        )
     source_refs = [f"foundation-record:{receipt['encounter_record_id']}"]
     evidence_refs: list[str] = []
     court_refs: list[str] = []
@@ -247,6 +328,7 @@ def compile_explorer_idea_lifecycle_event(
     classification: str | None = None,
     court_disposition: str | None = None,
     terminal_disposition: str | None = None,
+    relationship_basis: Mapping[str, Any] | None = None,
     previous_event_id: str | None = None,
     previous_event_record_id: str | None = None,
     previous_event_digest: str | None = None,
@@ -255,7 +337,8 @@ def compile_explorer_idea_lifecycle_event(
     stage_value = _bounded_string(stage, "stage")
     if stage_value not in LIFECYCLE_STAGES:
         raise ValueError("lifecycle stage is unsupported")
-    if sensitivity not in {"private", "safe-public"}:
+    sensitivity_value = _bounded_string(sensitivity, "sensitivity")
+    if sensitivity_value not in {"private", "safe-public"}:
         raise ValueError("lifecycle events support private or safe-public metadata")
     previous = (
         previous_event_id,
@@ -276,8 +359,8 @@ def compile_explorer_idea_lifecycle_event(
         "run_id": _bounded_string(run_id, "run_id"),
         "actor_id": _bounded_string(actor_id, "actor_id"),
         "owner_id": _bounded_string(owner_id, "owner_id"),
-        "observed_at": _bounded_string(observed_at, "observed_at", limit=_MAX_TIME),
-        "recorded_at": _bounded_string(recorded_at, "recorded_at", limit=_MAX_TIME),
+        "observed_at": _timestamp(observed_at, "observed_at"),
+        "recorded_at": _timestamp(recorded_at, "recorded_at"),
         "subject_ref": _reference(subject_ref, "subject_ref"),
         "stage_reference": _reference(stage_reference, "stage_reference"),
         "encounter_record_id": _bounded_string(
@@ -292,6 +375,11 @@ def compile_explorer_idea_lifecycle_event(
         ),
         "terminal_disposition": _optional_string(
             terminal_disposition, "terminal_disposition"
+        ),
+        "relationship_basis": (
+            None
+            if relationship_basis is None
+            else _relationship_basis(relationship_basis)
         ),
         "previous_event_id": _optional_string(previous_event_id, "previous_event_id"),
         "previous_event_record_id": _optional_string(
@@ -308,7 +396,7 @@ def compile_explorer_idea_lifecycle_event(
             if terminal_disposition is not None
             else "unknown"
         ),
-        "sensitivity": sensitivity,
+        "sensitivity": sensitivity_value,
         "comparison_status": "not-run",
         "lifecycle_complete_claimed": False,
         "value_claimed": False,
@@ -369,6 +457,7 @@ def _validate_prepared(prepared: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         "classification",
         "court_disposition",
         "terminal_disposition",
+        "relationship_basis",
         "previous_event_id",
         "previous_event_record_id",
         "previous_event_digest",
@@ -402,6 +491,7 @@ def _validate_prepared(prepared: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         classification=receipt["classification"],
         court_disposition=receipt["court_disposition"],
         terminal_disposition=receipt["terminal_disposition"],
+        relationship_basis=receipt["relationship_basis"],
         previous_event_id=receipt["previous_event_id"],
         previous_event_record_id=receipt["previous_event_record_id"],
         previous_event_digest=receipt["previous_event_digest"],
@@ -410,6 +500,194 @@ def _validate_prepared(prepared: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     if prepared != rebuilt:
         raise ValueError("prepared lifecycle event does not reproduce")
     return deepcopy(rebuilt["receipt"]), deepcopy(rebuilt["memory"])
+
+
+def _prefixed(
+    values: list[Any],
+    prefix: str,
+    *,
+    required: bool = True,
+) -> str | None:
+    matches = [
+        value.removeprefix(prefix)
+        for value in values
+        if type(value) is str and value.startswith(prefix)
+    ]
+    if len(matches) != (1 if required else min(1, len(matches))):
+        raise ValueError(f"predecessor {prefix} identity is not exact")
+    return matches[0] if matches else None
+
+
+def _reconstruct_predecessor(
+    previous: Mapping[str, Any],
+    current: Mapping[str, Any],
+) -> dict[str, Any]:
+    payload = previous["payload"]
+    validation = validate_foundation("memory-record-v1", payload)
+    if not validation.valid:
+        raise ValueError("previous lifecycle memory contract is invalid")
+    previous_event_id = current["previous_event_id"]
+    previous_digest = current["previous_event_digest"]
+    if (
+        previous["record_type"] != "memory-record"
+        or previous["schema_name"] != "memory-record-v1"
+        or previous["tenant_id"] != current["tenant_id"]
+        or previous["repository_id"] != current["repository_id"]
+        or previous["actor_id"] != payload["actor_id"]
+        or previous["observed_at"] != payload["observed_at"]
+        or payload["memory_id"]
+        != f"explorer-lifecycle:{current['lifecycle_id']}:{previous_event_id}"
+        or payload["payload_digest"] != previous_digest
+        or payload["content_digest"] != previous_digest
+        or payload["correlation_id"] != current["lifecycle_id"]
+        or payload["access_purpose"] != "explorer-lifecycle-reference"
+        or payload["memory_kind"] != "opportunity"
+        or payload["status"] != "active"
+        or payload["sensitivity"] != current["sensitivity"]
+        or payload["owner_id"] != current["owner_id"]
+        or payload["mission_id"] != current["mission_id"]
+        or payload["run_id"] != current["run_id"]
+    ):
+        raise ValueError("previous lifecycle memory identity does not match")
+    claim_refs = payload["claim_refs"]
+    relation_refs = payload["relation_refs"]
+    stage = payload["step_id"]
+    if stage not in LIFECYCLE_STAGES:
+        raise ValueError("previous lifecycle stage is unsupported")
+    receipt_digest = _digest_string(
+        _DIGEST_PREFIX
+        + str(_prefixed(claim_refs, "explorer-lifecycle-receipt:")),
+        "previous receipt digest",
+    )
+    if receipt_digest != previous_digest:
+        raise ValueError("previous lifecycle receipt digest does not match")
+    stage_digest = _digest_string(
+        _DIGEST_PREFIX
+        + str(_prefixed(claim_refs, "explorer-stage-reference-digest:")),
+        "previous stage reference digest",
+    )
+    subject_digest = _digest_string(
+        _DIGEST_PREFIX
+        + str(_prefixed(claim_refs, "explorer-subject-digest:")),
+        "previous subject digest",
+    )
+    if "explorer-lifecycle:reference-only" not in claim_refs:
+        raise ValueError("previous lifecycle reference-only boundary is missing")
+    if f"explorer-lifecycle-stage:{stage}" not in claim_refs:
+        raise ValueError("previous lifecycle stage marker is missing")
+    encounter_prefix = "foundation-record:"
+    if not payload["source_refs"] or not payload["source_refs"][0].startswith(
+        encounter_prefix
+    ):
+        raise ValueError("previous encounter identity is missing")
+    encounter_record_id = payload["source_refs"][0].removeprefix(encounter_prefix)
+    subject_ref = {
+        "ref": payload["generation_refs"][0],
+        "digest": subject_digest,
+    }
+    if stage == "encounter":
+        if len(payload["source_refs"]) != 2:
+            raise ValueError("encounter predecessor source references are not exact")
+        stage_reference = {
+            "ref": payload["source_refs"][1],
+            "digest": stage_digest,
+        }
+    elif stage == "relationship":
+        relation_ref = _prefixed(relation_refs, "explorer-relationship:")
+        stage_reference = {
+            "ref": "explorer-relationship:" + str(relation_ref),
+            "digest": stage_digest,
+        }
+    elif stage == "court":
+        if len(payload["court_refs"]) != 1:
+            raise ValueError("court predecessor reference is not exact")
+        stage_reference = {"ref": payload["court_refs"][0], "digest": stage_digest}
+    elif stage == "experiment":
+        if len(payload["generation_refs"]) != 2:
+            raise ValueError("experiment predecessor reference is not exact")
+        stage_reference = {
+            "ref": payload["generation_refs"][1],
+            "digest": stage_digest,
+        }
+    else:
+        if len(payload["evidence_refs"]) != 1:
+            raise ValueError("outcome predecessor reference is not exact")
+        stage_reference = {
+            "ref": payload["evidence_refs"][0],
+            "digest": stage_digest,
+        }
+    opportunity = _prefixed(claim_refs, "foundation-record:", required=False)
+    classification = _prefixed(
+        claim_refs, "explorer-relationship:", required=False
+    )
+    court_disposition = _prefixed(
+        claim_refs, "court-disposition:", required=False
+    )
+    terminal_disposition = _prefixed(
+        claim_refs, "explorer-terminal:", required=False
+    )
+    relationship_basis = None
+    if stage == "relationship":
+        evidence_digest = _digest_string(
+            _DIGEST_PREFIX
+            + str(
+                _prefixed(
+                    claim_refs,
+                    "explorer-relationship-evidence-digest:",
+                )
+            ),
+            "previous relationship evidence digest",
+        )
+        relationship_basis = {
+            "tenant_id": payload["tenant_id"],
+            "repository_id": payload["repository_id"],
+            "source_record_id": encounter_record_id,
+            "target_record_id": opportunity,
+            "relationship": classification,
+            "evidence_digest": evidence_digest,
+        }
+    prior_event_id = _prefixed(
+        relation_refs, "previous-lifecycle-event-id:", required=False
+    )
+    prior_event_digest_text = _prefixed(
+        relation_refs, "previous-lifecycle-event-digest:", required=False
+    )
+    prior_event_digest = (
+        None
+        if prior_event_digest_text is None
+        else _digest_string(
+            _DIGEST_PREFIX + prior_event_digest_text,
+            "predecessor previous event digest",
+        )
+    )
+    rebuilt = compile_explorer_idea_lifecycle_event(
+        lifecycle_id=current["lifecycle_id"],
+        event_id=previous_event_id,
+        stage=stage,
+        tenant_id=payload["tenant_id"],
+        repository_id=payload["repository_id"],
+        mission_id=payload["mission_id"],
+        run_id=payload["run_id"],
+        actor_id=payload["actor_id"],
+        owner_id=payload["owner_id"],
+        observed_at=payload["observed_at"],
+        recorded_at=payload["recorded_at"],
+        subject_ref=subject_ref,
+        stage_reference=stage_reference,
+        encounter_record_id=encounter_record_id,
+        opportunity_record_id=opportunity,
+        classification=classification,
+        court_disposition=court_disposition,
+        terminal_disposition=terminal_disposition,
+        relationship_basis=relationship_basis,
+        previous_event_id=prior_event_id,
+        previous_event_record_id=payload["previous_record_id"],
+        previous_event_digest=prior_event_digest,
+        sensitivity=payload["sensitivity"],
+    )
+    if rebuilt["memory"] != payload or rebuilt["receipt"]["content_digest"] != previous_digest:
+        raise ValueError("previous lifecycle event is not reconstructable")
+    return rebuilt["receipt"]
 
 
 def append_explorer_idea_lifecycle_event(
@@ -428,17 +706,14 @@ def append_explorer_idea_lifecycle_event(
         )
         if previous is None:
             raise ValueError("previous lifecycle event is unavailable")
+        previous_receipt = _reconstruct_predecessor(previous, receipt)
         previous_payload = previous["payload"]
         if (
-            previous["record_type"] != "memory-record"
-            or previous["schema_name"] != "memory-record-v1"
-            or previous["stream_id"] != prepared["stream_id"]
+            previous["stream_id"] != prepared["stream_id"]
             or previous["record_id"] != receipt["previous_event_record_id"]
-            or previous_payload["content_digest"] != receipt["previous_event_digest"]
-            or previous_payload["correlation_id"] != receipt["lifecycle_id"]
         ):
             raise ValueError("previous lifecycle event identity does not match")
-        previous_stage = previous_payload["step_id"]
+        previous_stage = previous_receipt["stage"]
         allowed = {
             "encounter": {"relationship"},
             "relationship": {"court"},
