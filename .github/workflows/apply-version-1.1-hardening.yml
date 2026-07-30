@@ -36,13 +36,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          chunks=(.github/bootstrap/version-1.1-hardening.part-*)
-          if [[ ${#chunks[@]} -eq 0 ]]; then
+          chunks=(
+            .github/bootstrap/version-1.1-hardening.part-00-0
+            .github/bootstrap/version-1.1-hardening.part-00-1
+            .github/bootstrap/version-1.1-hardening.part-00-2
+            .github/bootstrap/version-1.1-hardening.part-01
+            .github/bootstrap/version-1.1-hardening.part-02
+            .github/bootstrap/version-1.1-hardening.part-03-0
+            .github/bootstrap/version-1.1-hardening.part-03-1
+            .github/bootstrap/version-1.1-hardening.part-03-2
+            .github/bootstrap/version-1.1-hardening.part-04
+          )
+          if [[ ! -f "${chunks[0]}" ]]; then
             echo 'verified hardening payload already applied'
             exit 0
           fi
-          test ${#chunks[@]} -eq 7
+          for chunk in "${chunks[@]}"; do
+            test -f "$chunk"
+          done
           cat "${chunks[@]}" > /tmp/version-1.1-hardening.patch.gz.b64
           echo "40e97dd716e4a375fd14d63132c45d85c0ff8adbbd97c87b5525a1ced14a21bc  /tmp/version-1.1-hardening.patch.gz.b64" \
             | sha256sum --check --strict
