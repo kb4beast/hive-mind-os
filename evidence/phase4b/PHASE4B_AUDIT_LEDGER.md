@@ -26,3 +26,22 @@ candidate is pinned as
 Focused Phase 2/4A/4B verification passed 59 tests and 37 subtests; Ruff and Pyright
 passed. This is a builder claim awaiting independent cross-examination and
 reproduction, not an activation, usefulness, value, or superiority verdict.
+
+## `P4B-AUDIT-004` — Cross-Examiner defer and remand
+
+Independent Cross-Examiner `/root/phase4b_cross` issued `defer` for implementation
+checkpoint `de85ec0`. A correctly resealed substitute could retain the fixed
+successor identity and pass the standalone validator. Installed-wheel proof,
+resource-count evidence, the ADR-index implementation receipt, and exact internal
+source provenance were also incomplete. The Cross-Examiner found no runtime,
+authority, public-surface, Phase 2, or Phase 4A mutation. All remands remain
+append-only and must be independently reproduced after repair.
+
+## `P4B-AUDIT-005` — Builder repair
+
+Builder `/root` moved the reviewed fixed-identity digest into the validation
+boundary, added correctly resealed base/playbook/governance/capability substitution
+attacks, and made the compiler compare packaged Phase 2 canonical, generated
+Explorer, and generated-manifest bytes. The inventory now includes the changed ADR
+index and the source JSON-resource count; the source register supplies exact paths,
+base commit, and file digests. Clean installed-wheel proof remains pending.

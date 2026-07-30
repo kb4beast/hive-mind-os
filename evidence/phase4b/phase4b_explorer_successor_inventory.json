@@ -13,21 +13,23 @@
     "generated_manifest_digest": "sha256:e652f81353af4d0abe41b656ff0a16d71368510b4b3efe985eed99976376659d",
     "generated_verification_issues": [],
     "package_api_count": 33,
-    "root_api_count": 131
+    "root_api_count": 131,
+    "source_json_resource_count": 133
   },
   "implementation": {
     "docs/architecture/ADR-029-EXPLORER-V2-SUCCESSOR-COMPOSITION.md": "sha256:c5e4edd4d1fbf3b56c06ea3630fa10593e9513b69a8741a20e0f886a58739ec1",
-    "docs/architecture/PHASE4B_EXPLORER_SUCCESSOR_CONTRACT.md": "sha256:72b96a8e1e34adfda8583bcbf2ea6b49bc337f45e9f17a1248f9bb2145e087d0",
+    "docs/architecture/ADR_INDEX.md": "sha256:05e148a78d8b12e56eec0ca7c5dacbb0319a80735f30dfb2e96e007a0f408c40",
+    "docs/architecture/PHASE4B_EXPLORER_SUCCESSOR_CONTRACT.md": "sha256:bcbd107174ff3174fd1b51810431986c47cad0e9157809a387d7fd6d23f862cb",
     "evidence/courts/phase4b-explorer-successor-court.md": "sha256:75e2575a28b622e2a0f25766f772a6f1a9162a02eff9d2ddaa88807f4fc08a86",
-    "evidence/phase4b/PHASE4B_AUDIT_LEDGER.md": "sha256:801b229ab4cc3199a2c1e242c611150632d0c2af9c2b4d2fe08f266c6d7f009a",
+    "evidence/phase4b/PHASE4B_AUDIT_LEDGER.md": "sha256:59526d7b56f6f036a94ae3d04f2cfb2d967bb78b065f559a3e5fdedeca089e6e",
     "evidence/phase4b/PHASE4B_DISSENT.md": "sha256:9e533adb1ee9a2056b8d8b1138bf2cf61041e4f4902974c3866db194def02b8d",
-    "evidence/sources/PHASE4B_EXPLORER_SUCCESSOR_SOURCE_REGISTER.md": "sha256:d51fa9ce68b0f9f282a81a7d2184d424a8f81db0c8ab34645e382da672b2da67",
-    "scripts/phase4b_explorer_successor_inventory.py": "sha256:57bd37dd185257cd063624a47fbdc99fc0b805965ed767411b2bb78b2213ca64",
-    "src/hive_mind_os/foundation/explorer_successor.py": "sha256:d30fba3b71bfca21c1fa6aa8379feca8985c6e6ed8dd2bd9367158c93711c241",
-    "src/hive_mind_os/foundation/explorer_successor_contracts.py": "sha256:a24a0ffbae42443ecae01e81cd8891044a5ffbc24742ff19d29158a36c629e43",
-    "tests/test_phase4b_explorer_successor.py": "sha256:3b2df7dd955ebd9b38a2b833403a9f17c7f53432a78ba64aa9578392f3157dcc"
+    "evidence/sources/PHASE4B_EXPLORER_SUCCESSOR_SOURCE_REGISTER.md": "sha256:38bc964a85a64266dae833999ef01ee456d162ba1058d5ae1207db6ac2f55d00",
+    "scripts/phase4b_explorer_successor_inventory.py": "sha256:30167beacd86a8ad96637303fe6600129ef1c522365b323e65005cc2a1c39fbf",
+    "src/hive_mind_os/foundation/explorer_successor.py": "sha256:24d491900d80c371cbeb048e3d2e8984eed168b87f8d5d921c9bf40082c3b316",
+    "src/hive_mind_os/foundation/explorer_successor_contracts.py": "sha256:9dfd4cba2b9b390fd4fcb32a2f1dbda0467f66c0f6da0ea109c08aead308d22d",
+    "tests/test_phase4b_explorer_successor.py": "sha256:eba8321f77aebe8a2f8eca2eae29edce8b7d982684a1bea144818cda853b4ab4"
   },
-  "inventory_digest": "sha256:3fce70340b9d76dcf4a1e6f7b04f538ac9a9458223ec3f7bf35ae94d8ab2fdec",
+  "inventory_digest": "sha256:0f28249ad821fa3cc0ab4e786f0eafe5ddd0b077541577d2869e89fbff2fcada",
   "phase": 4,
   "phase4a_input": {
     "inventory_digest": "sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36"

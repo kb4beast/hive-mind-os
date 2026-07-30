@@ -7,6 +7,9 @@ from .canonical import digest
 from .contracts import FoundationValidation, validate_document_against_schema
 
 EXPLORER_SUCCESSOR_SCHEMA_NAME = "explorer-agent-successor-v1"
+EXPECTED_SUCCESSOR_DIGEST = (
+    "sha256:0494c32237fbbe83b90444c9b0496646e8f0b27e7c20379320a6bd7241697463"
+)
 _DIALECT = "https://json-schema.org/draft/2020-12/schema"
 _DIGEST = {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
 _ID = {"type": "string", "minLength": 1, "maxLength": 200}
@@ -210,6 +213,8 @@ def validate_explorer_successor(document: Any) -> FoundationValidation:
     body = {key: value for key, value in document.items() if key != "content_digest"}
     if document["content_digest"] != digest(body):
         issues.append("successor content_digest does not match its body")
+    if document["content_digest"] != EXPECTED_SUCCESSOR_DIGEST:
+        issues.append("successor differs from its reviewed fixed-identity digest")
     return FoundationValidation(not issues, tuple(issues))
 
 

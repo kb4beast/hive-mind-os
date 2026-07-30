@@ -56,6 +56,7 @@ def build_phase4b_inventory(repository: Path) -> dict[str, Any]:
     surface = build_inventory(repository)
     implementation_paths = (
         "docs/architecture/ADR-029-EXPLORER-V2-SUCCESSOR-COMPOSITION.md",
+        "docs/architecture/ADR_INDEX.md",
         "docs/architecture/PHASE4B_EXPLORER_SUCCESSOR_CONTRACT.md",
         "evidence/courts/phase4b-explorer-successor-court.md",
         "evidence/phase4b/PHASE4B_AUDIT_LEDGER.md",
@@ -115,6 +116,9 @@ def build_phase4b_inventory(repository: Path) -> dict[str, Any]:
             "definition_count": surface["observable_module_surface"][
                 "definition_count"
             ],
+            "source_json_resource_count": len(
+                tuple((repository / "src/hive_mind_os").rglob("*.json"))
+            ),
         },
         "implementation": {
             path: _digest_bytes((repository / path).read_bytes())

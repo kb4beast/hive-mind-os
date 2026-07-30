@@ -144,6 +144,46 @@ class ExplorerSuccessorTests(unittest.TestCase):
             with self.subTest(mutation=mutation):
                 self.assertFalse(validate_explorer_successor(mutation).valid)
 
+    def test_contract_rejects_resealed_fixed_identity_substitutions(self) -> None:
+        candidate = compile_explorer_successor()
+        substitutions = []
+
+        base = deepcopy(candidate)
+        base["layers"][0]["layer_id"] = "substituted-base"
+        base["layers"][0]["version"] = "99"
+        base["layers"][0]["source_digests"][0] = "sha256:" + ("0" * 64)
+        base["layers"][0]["digest"] = digest(
+            {
+                key: value
+                for key, value in base["layers"][0].items()
+                if key != "digest"
+            }
+        )
+        _reseal(base)
+        substitutions.append(base)
+
+        playbook = deepcopy(candidate)
+        playbook["playbook"]["lenses"][0] = "substituted-lens"
+        _reseal(playbook)
+        substitutions.append(playbook)
+
+        governance = deepcopy(candidate)
+        governance["governance"]["source_refs"][0] = "substituted-source"
+        _reseal(governance)
+        substitutions.append(governance)
+
+        capability = deepcopy(candidate)
+        capability["requested_capabilities"] = ["delete_repository"]
+        capability["unsupported_capabilities"] = ["delete_repository"]
+        _reseal(capability)
+        substitutions.append(capability)
+
+        for substitution in substitutions:
+            with self.subTest(substitution=substitution):
+                validation = validate_explorer_successor(substitution)
+                self.assertFalse(validation.valid)
+                self.assertIn("fixed-identity", " ".join(validation.issues))
+
     def test_dependency_drift_fails_closed(self) -> None:
         generated = compile_generation_zero_candidates()
         changed_generated = dict(generated)
@@ -163,7 +203,7 @@ class ExplorerSuccessorTests(unittest.TestCase):
             "compile_shadow_skills",
             return_value=changed_skills,
         ):
-            with self.assertRaisesRegex(ValueError, "reviewed digest"):
+            with self.assertRaisesRegex(ValueError, "reviewed.*digest"):
                 compile_explorer_successor()
 
         with patch.object(
@@ -171,8 +211,18 @@ class ExplorerSuccessorTests(unittest.TestCase):
             "_LENSES",
             successor_module._LENSES + ("unreviewed-lens",),
         ):
-            with self.assertRaisesRegex(ValueError, "reviewed digest"):
+            with self.assertRaisesRegex(ValueError, "reviewed.*digest"):
                 compile_explorer_successor()
+
+    def test_packaged_phase2_byte_drift_fails_closed(self) -> None:
+        generated = compile_generation_zero_candidates()
+        with patch.object(
+            successor_module,
+            "verify_generated_candidates",
+            return_value=("generated artifact drift: agents/explorer.json",),
+        ):
+            with self.assertRaisesRegex(ValueError, "packaged.*bytes drifted"):
+                successor_module._verify_packaged_phase2_bytes(generated)
 
     def test_candidate_contains_only_bounded_definition_metadata(self) -> None:
         candidate = compile_explorer_successor()

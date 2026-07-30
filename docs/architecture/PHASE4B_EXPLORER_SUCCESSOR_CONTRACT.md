@@ -8,7 +8,8 @@
   activate the Phase 2 candidate.
 - Compile ordered content-addressed layers for base, prompt, playbook, skills,
   context, output, admission, and lifecycle.
-- Recompute every referenced digest from current packaged sources and fail closed on
+- Recompute every referenced digest from current packaged sources, compare the
+  protected canonical/generated resources byte-for-byte, and fail closed on
   omission, duplication, reorder, substitution, version drift, or pin mismatch.
 - Use a strict bounded contract with `additionalProperties: false` throughout.
 - Preserve requested capabilities only as inherited metadata. Effective
@@ -23,7 +24,9 @@
 
 ## Acceptance tests
 
-Test deterministic compilation, exact Phase 2 byte preservation, unique successor
+The compiler proves semantic composition plus packaged Phase 2 byte bindings.
+Source-tree and clean installed-wheel gates prove packaging preservation. Test
+deterministic compilation, exact Phase 2 byte preservation, unique successor
 identity, fixed layer order, base/projection/prompt/skill/schema/policy/output/
 admission/lifecycle drift, missing/duplicate/extra layers, unknown fields, mutable
 aliases, capability confusion, private-content absence, public/API/CLI/runtime
