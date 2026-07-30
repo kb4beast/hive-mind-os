@@ -13,7 +13,7 @@ without changing canonical state, activating federation, or weakening items 1–
 
 ## Clerk record
 
-The source register preserves twelve atomic claims, their counterclaims and
+The source register preserves fifteen atomic claims, their counterclaims and
 dispositions, exact inherited source pins, and five alternatives. The candidate
 adds five schemas, one exact-scope write action, deterministic portfolio-local
 projection, and explicit feedback/depth/hop/epoch decisions.
@@ -114,6 +114,14 @@ attribution, pins every internal blob and the complete
 `P1SRC-OBSIDIAN-HELP/SRC-OB-05` chain, preserves the unresolved documentation
 license, adds explicit `adapt`/`defer` claims with owners and rollback, and compares
 no-change, index-only, deep-link, materialized-copy, and shared-store choices.
+
+Renewed Explorer review of repaired implementation commit `0fe89d3` passed the
+runtime and original provenance repairs but issued one evidence-only remand:
+portfolio-local identity, ordinary-clone reconciliation, fork/mirror non-collapse,
+and full lineage/repository-instance/tenant/commit record binding remained bundled.
+The register now gives each proposition its own `adapt` or `defer`, acceptance
+mapping, owner, and rollback, preserves the no-lineage-inference boundary, and
+withdraws comparative “narrowest candidate” language.
 
 The repaired item-6 suite passes `27` tests with one environment-dependent ordinary
 symlink skip. The combined matrix passes `174` tests, one skip, and `57` subtests.

@@ -30,7 +30,10 @@ the common item-6 rollback unless a row says otherwise.
 | ID | Atomic proposition | Disposition | Evidence/acceptance mapping | Counterclaim or deferred obligation |
 | --- | --- | --- | --- | --- |
 | `FED-001` | Federation must not cross tenants. | `adapt` | exact tenant equality and cross-tenant rejection tests; Builder | Caller-supplied strings are not authentication. |
-| `FED-002` | Portfolio identity must be local; source identity is provenance only. | `adapt` | manifest/note identity tests and schemas; Builder | Ordinary-clone, fork, mirror, and lineage reconciliation are deferred. |
+| `FED-002A` | Portfolio identity must be local; source identity is provenance only. | `adapt` | manifest/note identity tests and schemas; Builder | Cross-vault identity is not canonical identity. |
+| `FED-002B` | Tenant and repository-instance/fork identities must remain separate; forks, independent mirrors, and private tenants must not be silently collapsed. | `adapt` conservatively | exact tenant equality and unique repository-instance-digest tests reject crossover/duplicate identity; Builder | Item 6 collapses no source identities and does not infer whether two instances share a lineage. Rollback: remove the generated portfolio. |
+| `FED-002C` | Ordinary clones should reconcile without collapsing forks or independent mirrors. | `defer` | no clone/lineage evidence is admitted by item 6; Integrator owns a later versioned lineage contract and clone/fork fixtures | Until proved, every repository-instance digest remains distinct. Rollback: retain distinct identities and no federation activation. |
+| `FED-002D` | Every federated record should bind project/lineage, repository instance, tenant, and commit identity. | `defer` | item 6 preserves tenant/repository provenance but source item-3 records do not provide a complete lineage-plus-commit binding; Architect and Integrator own the later schema/migration/acceptance tests | No complete cross-repository record-binding claim is admitted. Rollback: do not migrate or activate the later schema. |
 | `FED-003` | Only strict released safe-public notes may federate. | `adapt` | full payload/schema/hash/scope negative tests; Builder | Upstream public-release authenticity remains trusted. |
 | `FED-004` | Source and portfolio vaults must never overlap or nest. | `adapt` | canonical `<vault>/hive-mind/generated-cognitive` inputs derive source-vault roots; check/project sibling-in-vault and pairwise nested-source regressions prove zero output mutation; Builder | Path-alias and platform coverage remains bounded. |
 | `FED-005` | Generated output must not recursively become ingestion, projection, telemetry, idea, or delegation work. | `adapt` | five negative decision tests; Builder | This deterministic primitive is not persistent enforcement. |
@@ -53,5 +56,5 @@ the common item-6 rollback unless a row says otherwise.
 | Shared writable federated store | direct multi-repository query/update | ownership, isolation, lineage, deletion, concurrency, and recovery are unproved | `defer` |
 
 No alternative has a usefulness, scale, cost, privacy, security, or superiority
-verdict. The selected design is only the narrowest executable item-6 candidate that
-satisfies the admitted internal obligations.
+verdict. This is the selected bounded item-6 candidate; no comparative narrowness
+claim is admitted.

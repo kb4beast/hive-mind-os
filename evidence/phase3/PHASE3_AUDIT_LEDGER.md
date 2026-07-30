@@ -1111,3 +1111,11 @@ Builder repair receipts are `27 passed, 1 skipped` for item 6 and `174 passed,
 inventory equality, and diff checks pass. Inventory is
 `sha256:89b7625dbc4070ddf364e900de7a465005ce852d14a58d4133eb15341a072371`.
 Renewed exact-candidate review and independent judgment remain pending.
+
+Renewed Explorer/Advocate review passed the implementation and original provenance
+repair but remanded one remaining evidence-only collapse: local identity,
+ordinary-clone reconciliation, fork/mirror non-collapse, and complete
+lineage/repository-instance/tenant/commit record binding were not atomic. The source
+register now separates those propositions, assigns `adapt` or `defer`, owners,
+acceptance mappings, and rollback, retains distinct repository instances until
+lineage evidence exists, and removes an unproved comparative-narrowness phrase.
