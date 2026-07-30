@@ -1,0 +1,73 @@
+{
+  "activation_authorized": false,
+  "artifact_truth_claimed": false,
+  "automatic_public_release": false,
+  "backfill_claimed": false,
+  "base_head": "59df5f5f2d0af45f403f74dac9781d2664f227cd",
+  "candidate_behavior_measured": false,
+  "cli_added": 0,
+  "comparison_complete": false,
+  "external_dependencies_added": 0,
+  "implementation": {
+    "docs/architecture/ADR-031-EXPLORER-IDEA-LIFECYCLE-REFERENCE-EVENTS.md": "sha256:0a33881814d1b19d6cd1f84d561370dee3ff8f8d65b88d86da9806063e6e14f0",
+    "docs/architecture/ADR_INDEX.md": "sha256:dceb61249657ac4ff0ce199898d7fc465aeeb91700348c4986bea0d303c9d4b9",
+    "evidence/courts/phase4d-explorer-idea-lifecycle-court.md": "sha256:6b9e517252718ec77a46857c5473eaafca04725ac226ce12aa963180e6f239fc",
+    "evidence/phase4d/PHASE4D_AUDIT_AND_DISSENT.md": "sha256:fe8ac4186e8feca87123ee618a94e9ca7364a80da7eb0bcf25fef26ebdd4e0ea",
+    "evidence/sources/PHASE4D_EXPLORER_IDEA_LIFECYCLE_SOURCE_REGISTER.md": "sha256:2841c02bf4432dda31123dc221ffa68ce74c2469088e14ce2f2d598f7594f7a3",
+    "scripts/phase4d_explorer_idea_lifecycle_inventory.py": "sha256:2eb039b09db865969bd46481ae12d3733748810dedb82e90541c80332bc279f3",
+    "src/hive_mind_os/foundation/explorer_idea_lifecycle.py": "sha256:ab7fdd15e00b7e54249cac2664e09c1f8e24db2dc5b7028136d70083aacfd098",
+    "tests/test_phase4d_explorer_idea_lifecycle.py": "sha256:38b593af3b891a7c8ac169c0d60de107628e173fa219dfb76a7369252dcaf2c8"
+  },
+  "inventory_digest": "sha256:dd41cd1a30f8418b86ca609027e469bc9630e77ce750977ecf748bfb2c09e02a",
+  "lifecycle_complete_claimed": false,
+  "phase": 4,
+  "phase4c_input": {
+    "inventory_digest": "sha256:86e1ec6bf309ce98fb12aa38c3a78f878e14b1cf786810166538a4e3bed22d1e"
+  },
+  "phase_item": "D",
+  "projector_changed": false,
+  "promotion_authorized": false,
+  "protected_surfaces": {
+    "cli_parser_count": 13,
+    "cognitive_projector_digest": "sha256:63e1aed35c9c403fafb488c29e098cb9178f09d9110c6098853431c19fab0b41",
+    "cognitive_views_digest": "sha256:76e8a011ed71f98a6fe00f23768a8fb889331ad62ec28f8c0293438d8e4224d0",
+    "definition_count": 304,
+    "json_resource_count": 133,
+    "opportunity_ledger_digest": "sha256:6602b1931c01c3ba1569c40a5618714026a6bc2fd867022a19661f266bf38025",
+    "package_api_count": 33,
+    "root_api_count": 131,
+    "runtime_unclassified_count": 0,
+    "store_digest": "sha256:18aa4b1096a0325660d7a002a8bfbd77af3fa3ac47ef415a228dddd65c76bbbb"
+  },
+  "public_api_added": 0,
+  "runtime_binding_added": false,
+  "sample_event": {
+    "activation_authorized": false,
+    "comparison_status": "not-run",
+    "lifecycle_complete_claimed": false,
+    "memory_contract_valid": true,
+    "promotion_authorized": false,
+    "receipt_digest": "sha256:d8ad1e96a4b071980c4ec8d2c407e6ef1372a82a67d573176598cf56defaf0f1",
+    "reference_status": "pinned-unverified",
+    "remaining_stage_status": "unknown",
+    "sensitivity": "private",
+    "value_claimed": false
+  },
+  "sample_relationship": {
+    "digest": "sha256:f1a5046c3bb0ffcdefad37af48262d772b8c320d75843c4cc0df340524bc4ea8",
+    "ref": "explorer-relationship:f1a5046c3bb0ffcdefad37af48262d772b8c320d75843c4cc0df340524bc4ea8"
+  },
+  "schema_version": 1,
+  "scope": "append-only-reference-events",
+  "stages": [
+    "encounter",
+    "relationship",
+    "court",
+    "experiment",
+    "outcome"
+  ],
+  "store_or_migration_added": false,
+  "superiority_claimed": false,
+  "value_claimed": false,
+  "view_mapping_changed": false
+}

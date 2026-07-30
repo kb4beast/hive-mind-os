@@ -28,6 +28,7 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-028` | [Explorer shadow substrate](ADR-028-EXPLORER-SHADOW-SUBSTRATE.md) | Phase 4A | adapted as bounded inert candidate; activation and value claims deferred |
 | `ADR-029` | [Explorer v2 successor composition](ADR-029-EXPLORER-V2-SUCCESSOR-COMPOSITION.md) | Phase 4B | adapted as an inert definition-only candidate; activation and behavior claims deferred |
 | `ADR-030` | [Explorer development evaluation substrate](ADR-030-EXPLORER-DEVELOPMENT-EVALUATION-SUBSTRATE.md) | Phase 4C | adapted as an inert development-visible contract substrate; behavior and comparison claims deferred |
+| `ADR-031` | [Explorer idea lifecycle reference events](ADR-031-EXPLORER-IDEA-LIFECYCLE-REFERENCE-EVENTS.md) | Phase 4D | proposed as a private-by-default, reference-only lifecycle bridge |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-031; it must be unique at creation time.
+is ADR-032; it must be unique at creation time.
