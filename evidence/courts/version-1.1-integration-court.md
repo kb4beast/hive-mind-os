@@ -3,6 +3,9 @@
 - Case: `VERSION-1.1-INTEGRATION-HARDENING`
 - Base release head: `07b19ba809b1be24d50f64de5a8704a760414db0`
 - Historical omitted candidate: PR #30 at `39e07c9e3c3ce439911481be2d38d901d05d4824`
+- Integrated implementation candidate: `043c3539a2a79682c7ebe004806e5ae19b758ed4`
+- Selected tree: `6c5c9eac9bdb842cdaf143cc26001d5d896c9805`
+- PR #30 preservation: second parent of the candidate; zero tree delta
 - Burden: reversible draft integration evidence only
 - Independence: procedural single-model role simulation; not authenticated independent actors
 

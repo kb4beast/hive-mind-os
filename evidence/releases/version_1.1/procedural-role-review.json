@@ -111,9 +111,11 @@
   "schema_version": 1,
   "subject": {
     "base_release_head": "07b19ba809b1be24d50f64de5a8704a760414db0",
+    "final_evidence_binding": "generated CI audit artifact and GitHub provenance identify the exact workflow subject SHA",
     "final_evidence_head": null,
-    "implementation_candidate": null,
+    "implementation_candidate": "043c3539a2a79682c7ebe004806e5ae19b758ed4",
     "integration_train": "1.1",
-    "pr30_tree_neutral_merge_commit": null
+    "pr30_tree_neutral_merge_commit": "043c3539a2a79682c7ebe004806e5ae19b758ed4",
+    "selected_tree_sha": "6c5c9eac9bdb842cdaf143cc26001d5d896c9805"
   }
 }

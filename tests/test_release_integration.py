@@ -42,6 +42,14 @@ class ReleaseVersion11IntegrationTests(unittest.TestCase):
             "39e07c9e3c3ce439911481be2d38d901d05d4824",
         )
         self.assertEqual(superseded[0]["posture"], "superseded-but-preserved")
+        self.assertEqual(
+            superseded[0]["tree_neutral_merge_commit"],
+            "043c3539a2a79682c7ebe004806e5ae19b758ed4",
+        )
+        self.assertEqual(
+            self.manifest["source"]["selected_tree_sha"],
+            "6c5c9eac9bdb842cdaf143cc26001d5d896c9805",
+        )
 
     def test_losing_pr30_package_is_not_a_second_active_authority(self) -> None:
         for relative in self.manifest["forbidden_active_paths"]:
@@ -115,6 +123,14 @@ class ReleaseVersion11IntegrationTests(unittest.TestCase):
         identities = tuple(item["identity"] for item in review["roles"])
         self.assertEqual(len(identities), len(set(identities)))
         self.assertTrue(all(item["disposition"] == "adapt" for item in review["roles"]))
+        self.assertEqual(
+            review["subject"]["implementation_candidate"],
+            "043c3539a2a79682c7ebe004806e5ae19b758ed4",
+        )
+        self.assertEqual(
+            review["subject"]["pr30_tree_neutral_merge_commit"],
+            "043c3539a2a79682c7ebe004806e5ae19b758ed4",
+        )
 
     def test_manifest_denies_unsupported_claims(self) -> None:
         claims = self.manifest["claims"]
@@ -130,12 +146,10 @@ class ReleaseVersion11IntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
                 load_json_strict(duplicate)
 
-    def test_repository_contract_passes_without_pending_git_seal(self) -> None:
+    def test_repository_contract_passes_without_git_ancestry_probe(self) -> None:
         result = audit_repository(
             ROOT,
             require_git_ancestry=False,
-            allow_pending_pr30_merge=True,
-            allow_bootstrap_workflow=True,
         )
         self.assertTrue(result.valid, result.issues)
 
@@ -143,13 +157,13 @@ class ReleaseVersion11IntegrationTests(unittest.TestCase):
         merge_commit = self.manifest["superseded_historical_prs"][0][
             "tree_neutral_merge_commit"
         ]
-        if merge_commit is None:
-            self.skipTest("tree-neutral PR #30 merge is sealed after implementation push")
+        self.assertEqual(
+            merge_commit,
+            "043c3539a2a79682c7ebe004806e5ae19b758ed4",
+        )
         result = audit_repository(
             ROOT,
             require_git_ancestry=True,
-            allow_pending_pr30_merge=False,
-            allow_bootstrap_workflow=False,
         )
         self.assertTrue(result.valid, result.issues)
 

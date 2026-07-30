@@ -54,7 +54,7 @@ selected tree does not copy the obsolete sibling package. See:
 - `PR30_SUPERSESSION_AND_DISPOSITION.md`; and
 - `version_1.1-manifest.json`.
 
-The exact preservation merge SHA is sealed in the manifest after the merge is created.
+The exact preservation merge is `043c3539a2a79682c7ebe004806e5ae19b758ed4`. Its first parent is `a1aed43d62066ebb7831349f7a748caf9564fef9`, its second parent is the exact PR #30 head `39e07c9e3c3ce439911481be2d38d901d05d4824`, and its tree `6c5c9eac9bdb842cdaf143cc26001d5d896c9805` is byte-identical to the first-parent tree. The merge therefore changes ancestry only.
 
 ## Independent dependency PRs
 

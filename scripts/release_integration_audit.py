@@ -184,8 +184,6 @@ def audit_repository(
     repository: Path,
     *,
     require_git_ancestry: bool,
-    allow_pending_pr30_merge: bool = False,
-    allow_bootstrap_workflow: bool = False,
 ) -> AuditResult:
     repository = repository.resolve()
     issues: list[str] = []
@@ -246,6 +244,26 @@ def audit_repository(
         issues,
     )
 
+    source = _mapping(manifest.get("source"), "source", issues)
+    _expect(
+        source.get("release_head_before_hardening")
+        == "07b19ba809b1be24d50f64de5a8704a760414db0",
+        "pre-hardening release head is not pinned",
+        issues,
+    )
+    _expect(
+        source.get("implementation_candidate")
+        == "043c3539a2a79682c7ebe004806e5ae19b758ed4",
+        "integrated implementation candidate is not pinned",
+        issues,
+    )
+    _expect(
+        source.get("selected_tree_sha")
+        == "6c5c9eac9bdb842cdaf143cc26001d5d896c9805",
+        "selected implementation tree is not pinned",
+        issues,
+    )
+
     accepted = _list(manifest.get("accepted_stacked_prs"), "accepted_stacked_prs", issues)
     accepted_numbers = tuple(
         item.get("number") for item in accepted if isinstance(item, Mapping)
@@ -283,11 +301,9 @@ def audit_repository(
             issues,
         )
         merge_commit = pr30.get("tree_neutral_merge_commit")
-        if merge_commit is None and not allow_pending_pr30_merge:
+        if merge_commit is None:
             issues.append("PR #30 tree-neutral merge commit is not sealed")
-        elif merge_commit is not None and not (
-            isinstance(merge_commit, str) and len(merge_commit) == 40
-        ):
+        elif not (isinstance(merge_commit, str) and len(merge_commit) == 40):
             issues.append("PR #30 tree-neutral merge commit must be a full SHA")
 
     claims = _mapping(manifest.get("claims"), "claims", issues)
@@ -465,13 +481,36 @@ def audit_repository(
         issues,
     )
 
+    role_subject = _mapping(role_review.get("subject"), "role subject", issues)
+    _expect(
+        role_subject.get("implementation_candidate") == source.get("implementation_candidate"),
+        "procedural role subject does not bind the implementation candidate",
+        issues,
+    )
+    _expect(
+        role_subject.get("pr30_tree_neutral_merge_commit")
+        == pr30.get("tree_neutral_merge_commit") if isinstance(pr30, Mapping) else False,
+        "procedural role subject does not bind the PR #30 preservation merge",
+        issues,
+    )
+    _expect(
+        role_subject.get("selected_tree_sha") == source.get("selected_tree_sha"),
+        "procedural role subject does not bind the selected implementation tree",
+        issues,
+    )
+    _expect(
+        role_subject.get("final_evidence_binding")
+        == "generated CI audit artifact and GitHub provenance identify the exact workflow subject SHA",
+        "procedural review does not state how final exact-head evidence is bound",
+        issues,
+    )
+
     workflow_text = _read_text(repository, ".github/workflows/ci.yml", issues)
-    if not allow_bootstrap_workflow:
-        _expect(
-            not (repository / TEMPORARY_EXPORT_WORKFLOW).exists(),
-            "temporary source-export workflow remains in selected tree",
-            issues,
-        )
+    _expect(
+        not (repository / TEMPORARY_EXPORT_WORKFLOW).exists(),
+        "temporary source-export workflow remains in selected tree",
+        issues,
+    )
     for required in (
         "scripts/release_integration_audit.py",
         "dist/release-version-1.1-audit.json",
@@ -482,6 +521,12 @@ def audit_repository(
     _expect(
         "--source-version 0.6.0" not in workflow_text,
         "SBOM source version remains a duplicated hard-coded literal",
+        issues,
+    )
+    _expect(
+        "--allow-pending-pr30-merge" not in workflow_text
+        and "--allow-bootstrap-workflow" not in workflow_text,
+        "CI still contains a release-audit bootstrap bypass",
         issues,
     )
 
@@ -544,6 +589,11 @@ def audit_repository(
                         issues,
                     )
                     _expect(
+                        merge_tree == source.get("selected_tree_sha"),
+                        "manifest selected tree does not match PR #30 preservation merge",
+                        issues,
+                    )
+                    _expect(
                         _is_ancestor(repository, merge_commit),
                         "PR #30 preservation merge is not an ancestor of HEAD",
                         issues,
@@ -587,8 +637,6 @@ def _parse_args(arguments: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output", type=Path)
     parser.add_argument("--no-git-ancestry", action="store_true")
-    parser.add_argument("--allow-pending-pr30-merge", action="store_true")
-    parser.add_argument("--allow-bootstrap-workflow", action="store_true")
     return parser.parse_args(arguments)
 
 
@@ -597,8 +645,6 @@ def main(arguments: Iterable[str] | None = None) -> int:
     result = audit_repository(
         options.repository,
         require_git_ancestry=not options.no_git_ancestry,
-        allow_pending_pr30_merge=options.allow_pending_pr30_merge,
-        allow_bootstrap_workflow=options.allow_bootstrap_workflow,
     )
     rendered = json.dumps(result.report, indent=2, sort_keys=True, allow_nan=False) + "\n"
     if options.output is not None:

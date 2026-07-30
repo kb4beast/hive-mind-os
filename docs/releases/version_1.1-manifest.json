@@ -159,9 +159,11 @@
     "archive_ref": "archive/release-version_1.1-pre-hardening-2026-07-30",
     "draft_pull_request": 47,
     "hardening_branch": "agent/version-1.1-release-hardening",
+    "implementation_candidate": "043c3539a2a79682c7ebe004806e5ae19b758ed4",
     "main_start": "b032a9f32f48889e0889fae8d6dd04eb03f46b63",
     "release_branch": "release/version_1.1",
-    "release_head_before_hardening": "07b19ba809b1be24d50f64de5a8704a760414db0"
+    "release_head_before_hardening": "07b19ba809b1be24d50f64de5a8704a760414db0",
+    "selected_tree_sha": "6c5c9eac9bdb842cdaf143cc26001d5d896c9805"
   },
   "superseded_historical_prs": [
     {
@@ -170,7 +172,7 @@
       "number": 30,
       "posture": "superseded-but-preserved",
       "qualified_adr": "ADR-021-PR30",
-      "tree_neutral_merge_commit": null
+      "tree_neutral_merge_commit": "043c3539a2a79682c7ebe004806e5ae19b758ed4"
     }
   ]
 }
