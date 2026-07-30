@@ -1335,3 +1335,20 @@ truthful append-only preservation of each remand.
 Runtime, schemas, authority, contracts, workflow, dependencies, governance,
 sources, claims, and protected prior bytes remain unchanged. A distinct Judge
 verdict is the remaining publication gate.
+
+## `P3-ITEM6-AUDIT-016` — final repair judged `adapt`
+
+Distinct Judge `/root/item5_judge` reviewed exact repair
+`47338b6ffbf408e6309dae9818d98cf4077b7d63` and review record
+`befde498ef7104512126261f242533ebd343cfa4` and issued `adapt` with no remand.
+
+The Judge independently reproduced all 29 item-6 unittest cases, pytest and
+governance coverage, exact inventory generation, Ruff, and Pyright. Inventory
+`sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68`
+is admitted as portable and duplicate-safe. Runtime, schemas, authority, contracts,
+workflow, dependencies, sources, capabilities, protected evidence, and claim scope
+remain unchanged.
+
+The repair may be pushed to existing draft PR `#37`, which must remain open,
+unmerged, and inactive. Activation and merge remain prohibited. Hosted checks must
+pass before the PR may be described as passing.

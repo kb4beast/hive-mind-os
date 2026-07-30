@@ -1,6 +1,7 @@
 # ADR-027: Safe-public portfolio federation and self-host recursion guards
 
-- Status: proposed cross-platform inventory repair; renewed judgment pending
+- Status: adapted for bounded stacked draft delivery; activation and final-system
+  promotion remain pending
 - Date: 2026-07-29
 - Base: `376a4a6082f6bdf154ba6252ccb70062a17a549b`
 - Governing claims: `MEM-024`, `MEM-025`
@@ -99,3 +100,15 @@ not implement or claim them.
 Changes to source admission, source-vault derivation, identity, tenant policy, guard
 precedence, write protocol, authority, or claimed scope require renewed independent
 review.
+
+## Final cross-platform repair judgment
+
+Distinct Judge `/root/item5_judge` issued `adapt` with no remand for exact repair
+`47338b6ffbf408e6309dae9818d98cf4077b7d63` and review record
+`befde498ef7104512126261f242533ebd343cfa4`. The portable, duplicate-safe inventory
+digest admitted by that judgment is
+`sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68`.
+
+The repair may be pushed only to existing draft PR `#37`. The PR must remain open,
+unmerged, and inactive. Activation and merge are prohibited, and the PR may not be
+described as passing until hosted checks reach a passing terminal state.
