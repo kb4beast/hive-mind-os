@@ -31,3 +31,22 @@ the collision key, and uses the existing authorized `OpportunityLedger`.
 
 Focused unittest, Ruff, Pyright, and diff checks pass. This is Builder evidence;
 independent exact-byte review remains required.
+
+## First-candidate cross-examination
+
+Architect acting as independent implementation Cross-Examiner returned `REMAND` on
+exact commit `9b34f6a8b80ab2ffac43956ff8aea55daae380f2`. Focused tests, Ruff, and Pyright pass,
+but the candidate does not yet satisfy the court:
+
+- skills are mutable runtime constants rather than strict packaged resources;
+- string cutoffs, shallow typing, content-only byte counting, and unbounded input/
+  output materialization are unsafe;
+- later-run generated material is not excluded and selection is not durably appended;
+- authority scope is checked after the engine call;
+- findings are written before the full batch validates; and
+- replay calls the engine again and changes `new` into `duplicate`.
+
+Repair must deep-freeze validated packaged skills, use sealed sequence cutoffs and
+canonical whole-record bounds, extend self-host exclusions, append run/selection/
+failure receipts, preflight authority, validate a bounded batch before one atomic
+write, and make run replay deterministic. No publication or judgment is permitted.

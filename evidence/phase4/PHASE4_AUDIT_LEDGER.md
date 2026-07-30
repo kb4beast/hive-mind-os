@@ -17,3 +17,11 @@ fail-closed behavior, one injected discovery call, exact typed findings, selecte
 evidence enforcement, runner-derived collision keys, and registration through the
 existing opportunity ledger. Focused unittest, Ruff, Pyright, and diff checks pass.
 No Generation Zero or Phase 2/3 public facade is changed.
+
+## `P4A-AUDIT-003` — first candidate remanded
+
+Independent Cross-Examination remanded exact commit `9b34f6a`. Passing focused tests
+did not cover mutable skills, malformed/string-ordered cutoffs, full-record bounds,
+later-run recursion, durable receipts, pre-call authority, batch atomicity, hostile
+iterables, or replay idempotency. The candidate remains inert and unpublished.
+Repair must address those exact obligations without weakening the Phase 4A contract.
