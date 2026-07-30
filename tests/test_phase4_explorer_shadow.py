@@ -11,6 +11,8 @@ from hive_mind_os.foundation.authority import decide_foundation_write
 from hive_mind_os.foundation.canonical import canonical_bytes, digest
 from hive_mind_os.foundation.contracts import validate_foundation
 from hive_mind_os.foundation.explorer_contracts import (
+    load_explorer_schema,
+    validate_explorer,
     validate_explorer_catalog,
 )
 from hive_mind_os.foundation.explorer_shadow import (
@@ -133,6 +135,10 @@ class _HostileIterableEngine(_Engine):
             yield _finding(finding_id=f"finding:{self.yielded}")
 
 
+class _InvalidIdentityEngine(_Engine):
+    engine_id = ""
+
+
 def _finding(**updates: Any) -> dict[str, Any]:
     value = {
         "finding_id": "finding:one",
@@ -198,6 +204,35 @@ class ExplorerShadowTests(unittest.TestCase):
         forged = dict(first)
         forged["bundle_digest"] = digest("forged")
         self.assertNotEqual(forged, compile_shadow_skills())
+        schema = load_explorer_schema("explorer-shadow-run-v1")
+        schema["properties"]["status"] = {"const": "forged"}
+        self.assertNotEqual(schema, load_explorer_schema("explorer-shadow-run-v1"))
+        failed_with_outcome = {
+            "record_type": "explorer-shadow-run",
+            "schema_version": 1,
+            "run_id": "run:test",
+            "tenant_id": "tenant:test",
+            "repository_id": "repository:test",
+            "request_digest": digest("request"),
+            "selection_record_id": None,
+            "selection_digest": None,
+            "skill_bundle_digest": digest("skills"),
+            "engine_id": "engine:test",
+            "status": "failed",
+            "outcomes": [{
+                "finding_id": "finding:test",
+                "encounter_record_id": "encounter:test",
+                "opportunity_record_id": None,
+                "classification": "duplicate",
+            }],
+            "error_code": None,
+        }
+        validation = validate_explorer(
+            "explorer-shadow-run-v1", failed_with_outcome
+        )
+        self.assertFalse(validation.valid)
+        self.assertIn("failed runs cannot contain outcomes", validation.issues)
+        self.assertIn("failed runs require an error_code", validation.issues)
 
     def test_selection_is_order_independent_whole_record_and_sequence_sealed(self) -> None:
         records = _records()
@@ -273,6 +308,71 @@ class ExplorerShadowTests(unittest.TestCase):
             ),
             (),
         )
+
+    def test_replay_conflicts_on_changed_engine_or_context_without_engine_call(self) -> None:
+        engine = _Engine([_finding()])
+        self._runner(engine).run(_request(), _records())
+        changed_engine = _Engine([_finding()])
+        changed_engine.engine_id = "fixture-engine:v2"
+        with self.assertRaisesRegex(ExplorerShadowError, "run identity conflicts"):
+            self._runner(changed_engine).run(_request(), _records())
+        self.assertEqual(changed_engine.calls, 0)
+        changed_context_engine = _Engine([_finding()])
+        changed_records = _records()
+        changed_records[-1] = replace(
+            changed_records[-1], content="different blocker evidence"
+        )
+        with self.assertRaisesRegex(ExplorerShadowError, "run identity conflicts"):
+            self._runner(changed_context_engine).run(_request(), changed_records)
+        self.assertEqual(changed_context_engine.calls, 0)
+        self.assertEqual(len(self.store.records(
+            tenant_id="tenant:test", repository_id="repository:test",
+            record_type="explorer-shadow-run")), 1)
+
+    def test_duplicate_finding_ids_fail_before_any_opportunity_write(self) -> None:
+        findings = [
+            _finding(),
+            _finding(
+                problem="A distinct second defect",
+                proposal="Add a distinct second guard",
+            ),
+        ]
+        with self.assertRaisesRegex(ExplorerShadowError, "must be unique"):
+            self._runner(_Engine(findings)).run(_request(), _records())
+        self.assertEqual(len(self.store.records(
+            tenant_id="tenant:test", repository_id="repository:test",
+            record_type="idea-encounter")), 0)
+        self.assertEqual(len(self.store.records(
+            tenant_id="tenant:test", repository_id="repository:test",
+            record_type="opportunity-record")), 0)
+        terminal = self.store.records(
+            tenant_id="tenant:test", repository_id="repository:test",
+            record_type="explorer-shadow-run")
+        self.assertEqual(terminal[0]["payload"]["status"], "failed")
+
+    def test_preselection_failures_are_terminally_receipted(self) -> None:
+        invalid_engine = _InvalidIdentityEngine([_finding()])
+        with self.assertRaisesRegex(ExplorerShadowError, "engine_id"):
+            self._runner(invalid_engine).run(
+                _request(run_id="run:invalid-engine"), _records()
+            )
+        self.assertEqual(invalid_engine.calls, 0)
+        with patch(
+            "hive_mind_os.foundation.explorer_shadow.compile_shadow_skills",
+            side_effect=ValueError("injected skill failure"),
+        ):
+            with self.assertRaisesRegex(ExplorerShadowError, "skill compilation"):
+                self._runner(_Engine([_finding()])).run(
+                    _request(run_id="run:invalid-skills"), _records()
+                )
+        terminal = self.store.records(
+            tenant_id="tenant:test", repository_id="repository:test",
+            record_type="explorer-shadow-run")
+        self.assertEqual(len(terminal), 2)
+        for record in terminal:
+            self.assertEqual(record["payload"]["status"], "failed")
+            self.assertIsNone(record["payload"]["selection_record_id"])
+            self.assertIsNone(record["payload"]["selection_digest"])
 
     def test_invalid_second_finding_writes_no_opportunity_and_terminal_failure(self) -> None:
         engine = _Engine([_finding(), _finding(

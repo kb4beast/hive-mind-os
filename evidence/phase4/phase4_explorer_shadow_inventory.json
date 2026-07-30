@@ -26,13 +26,13 @@
   "implementation": {
     "scripts/phase3_projection_inventory.py": "sha256:f1055a86c11b91e15203b4f742e2db6ba34682da279cfdc92d4391c4e2d26663",
     "scripts/phase4_explorer_shadow_inventory.py": "sha256:08b648e49e4baef25eee041317f045fb6b4baad7bca69c6a60b35ac396c9285a",
-    "src/hive_mind_os/foundation/explorer_contracts.py": "sha256:c88fa05f1e24146a3fa83117e9dec6067fb758663f3fd1cb94e11d6d08995d01",
-    "src/hive_mind_os/foundation/explorer_shadow.py": "sha256:d225227d1bcf84020f28523bdb2af3acebffa2a562955581d0c5439675efd53b",
+    "src/hive_mind_os/foundation/explorer_contracts.py": "sha256:1dfdb794ddbac16547ed9fc9bee0a7d41035c150e291f9de9f9178a5ed1e57ac",
+    "src/hive_mind_os/foundation/explorer_shadow.py": "sha256:ff00f1d272807b3b3faa8a55d5e86853c5451b326f85ac4018da8eda2b39f21f",
     "src/hive_mind_os/foundation/explorer_skill_resources.py": "sha256:a1f907b13ccc28383f085e93e4e55ae5cd7a1cc616bf09bfedcfa740ace50310",
     "src/hive_mind_os/foundation/store.py": "sha256:910421450d7f34c63a894fb40e0be6f5fdf352032afd13ba88a86e948c286586",
-    "tests/test_phase4_explorer_shadow.py": "sha256:401c1727c3961530436335f1b0705a697ab86bec1425746440b6b04c143ba0b0"
+    "tests/test_phase4_explorer_shadow.py": "sha256:362cca4a27ffa37e6f7e55e5382fd06f5e2a16ba4d2485841912ea1726680728"
   },
-  "inventory_digest": "sha256:f9c6cc97137dc5b4188c77c65766af6bee1ffde409e231bbb2b2b351e94423b5",
+  "inventory_digest": "sha256:b4791e6f4ebe0cca2b3833efd7350c8df227c0a4d768d1a4aeab235f51269d7c",
   "phase": 4,
   "phase3_input": {
     "inventory_digest": "sha256:f39f79ec2dc8634cae1aa3b406cbc22a890752e0e2214f0f3cbb444acf4689cd"

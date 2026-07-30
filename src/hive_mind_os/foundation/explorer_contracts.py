@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from .contracts import FoundationValidation, validate_document_against_schema
@@ -144,7 +145,7 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
 def load_explorer_schema(name: str) -> dict[str, Any]:
     if name not in EXPLORER_SCHEMA_NAMES:
         raise KeyError(f"unknown Explorer schema: {name}")
-    return _SCHEMAS[name]
+    return deepcopy(_SCHEMAS[name])
 
 
 def validate_explorer(name: str, document: Any) -> FoundationValidation:
@@ -152,7 +153,27 @@ def validate_explorer(name: str, document: Any) -> FoundationValidation:
         schema = load_explorer_schema(name)
     except KeyError as error:
         return FoundationValidation(False, (f"schema unavailable: KeyError: {error}",))
-    return validate_document_against_schema(document, schema)
+    structural = validate_document_against_schema(document, schema)
+    if not structural.valid or name != "explorer-shadow-run-v1":
+        return structural
+    issues: list[str] = []
+    selection_fields = (
+        document["selection_record_id"],
+        document["selection_digest"],
+    )
+    if (selection_fields[0] is None) != (selection_fields[1] is None):
+        issues.append("selection_record_id and selection_digest must be jointly present")
+    if document["status"] == "succeeded":
+        if None in selection_fields:
+            issues.append("succeeded runs require a sealed selection")
+        if document["error_code"] is not None:
+            issues.append("succeeded runs cannot contain an error_code")
+    else:
+        if document["outcomes"]:
+            issues.append("failed runs cannot contain outcomes")
+        if document["error_code"] is None:
+            issues.append("failed runs require an error_code")
+    return FoundationValidation(not issues, tuple(issues))
 
 
 def validate_explorer_catalog() -> FoundationValidation:

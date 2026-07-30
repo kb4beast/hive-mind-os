@@ -315,7 +315,27 @@ class ExplorerShadowRunner:
         self.engine = engine
         self.ledger = ledger
 
-    def _existing(self, request: ContextRequest) -> ShadowResult | None:
+    def _run_receipt_exists(self, request: ContextRequest) -> bool:
+        store = self.ledger.store
+        for record_type in ("explorer-shadow-run", "explorer-context-selection"):
+            if any(
+                record["payload"]["run_id"] == request.run_id
+                for record in store.records(
+                    tenant_id=request.tenant_id,
+                    repository_id=request.repository_id,
+                    record_type=record_type,
+                )
+            ):
+                return True
+        return False
+
+    def _existing(
+        self,
+        request: ContextRequest,
+        selection: ContextSelection,
+        bundle_digest: str,
+        engine_id: str,
+    ) -> ShadowResult | None:
         store = self.ledger.store
         request_digest = digest(asdict(request))
         terminal = [
@@ -346,9 +366,18 @@ class ExplorerShadowRunner:
             ]
             if len(selection_records) != 1:
                 raise ExplorerShadowError("terminal receipt lost its selection")
-            selection = _selection_from_payload(selection_records[0]["payload"])
+            stored_selection = _selection_from_payload(selection_records[0]["payload"])
+            if (
+                payload["skill_bundle_digest"] != bundle_digest
+                or payload["engine_id"] != engine_id
+                or stored_selection.inventory_digest != selection.inventory_digest
+                or stored_selection.selection_digest != selection.selection_digest
+            ):
+                raise ExplorerShadowError(
+                    "run identity conflicts with current engine, skills, or context"
+                )
             return ShadowResult(
-                selection,
+                stored_selection,
                 selection_records[0]["record_id"],
                 tuple(payload["outcomes"]),
                 payload["skill_bundle_digest"],
@@ -378,18 +407,57 @@ class ExplorerShadowRunner:
             repository_id=request.repository_id,
             actor_id=ACTOR_ID,
         )
-        existing = self._existing(request)
-        if existing is not None:
-            return existing
-        bundle = compile_shadow_skills()
-        bundle_digest = str(bundle["bundle_digest"])
-        engine_id = _bounded_text(
-            getattr(self.engine, "engine_id", None), "engine_id", maximum=200
-        )
+        prior_exists = self._run_receipt_exists(request)
+        unavailable_bundle = digest({"status": "skill-bundle-unavailable"})
+        try:
+            bundle = compile_shadow_skills()
+            bundle_digest = str(bundle["bundle_digest"])
+        except Exception as error:
+            if prior_exists:
+                raise ExplorerShadowError(
+                    "run identity conflicts with unavailable current skills"
+                ) from error
+            self._append_terminal(
+                request,
+                None,
+                None,
+                unavailable_bundle,
+                "unavailable:preselection",
+                (),
+                "failed",
+                type(error).__name__[:200],
+            )
+            raise ExplorerShadowError(
+                f"shadow skill compilation failed: {type(error).__name__}"
+            ) from error
+        try:
+            engine_id = _bounded_text(
+                getattr(self.engine, "engine_id", None), "engine_id", maximum=200
+            )
+        except ExplorerShadowError as error:
+            if prior_exists:
+                raise ExplorerShadowError(
+                    "run identity conflicts with invalid current engine"
+                ) from error
+            self._append_terminal(
+                request,
+                None,
+                None,
+                bundle_digest,
+                "unavailable:invalid-engine-id",
+                (),
+                "failed",
+                type(error).__name__,
+            )
+            raise
         request_digest = digest(asdict(request))
         try:
             selection, selected = select_context(request, records)
         except ExplorerShadowError as error:
+            if prior_exists:
+                raise ExplorerShadowError(
+                    "run identity conflicts with invalid current context"
+                ) from error
             self._append_terminal(
                 request,
                 None,
@@ -401,6 +469,9 @@ class ExplorerShadowRunner:
                 type(error).__name__,
             )
             raise
+        existing = self._existing(request, selection, bundle_digest, engine_id)
+        if existing is not None:
+            return existing
         selection_payload = _selection_payload(
             request, selection, request_digest, bundle_digest
         )
@@ -427,6 +498,9 @@ class ExplorerShadowRunner:
             prepared = tuple(
                 self._validate_finding(finding, selected) for finding in findings
             )
+            finding_ids = [finding["finding_id"] for finding in prepared]
+            if len(finding_ids) != len(set(finding_ids)):
+                raise ExplorerShadowError("finding IDs must be unique within one batch")
         except Exception as error:
             self._append_terminal(
                 request,
