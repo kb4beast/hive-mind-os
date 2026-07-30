@@ -148,6 +148,23 @@ def _bounded_text(value: Any, name: str, *, maximum: int = MAX_TEXT) -> str:
     return value
 
 
+def _bounded_list(value: Any, name: str, *, maximum: int) -> list[Any]:
+    if not isinstance(value, list):
+        raise ExplorerShadowError(f"{name} must be a bounded list")
+    items: list[Any] = []
+    iterator = iter(value)
+    for _ in range(maximum + 1):
+        try:
+            items.append(next(iterator))
+        except StopIteration:
+            return items
+        except Exception as error:
+            raise ExplorerShadowError(
+                f"{name} iteration failed: {type(error).__name__}"
+            ) from error
+    raise ExplorerShadowError(f"{name} exceeds item bound")
+
+
 def _validate_request(request: ContextRequest) -> None:
     for field in ("tenant_id", "repository_id", "run_id"):
         _bounded_text(getattr(request, field), field, maximum=200)
@@ -653,11 +670,11 @@ class ExplorerShadowRunner:
         ) or copied["disposition"] not in DISPOSITIONS:
             raise ExplorerShadowError("finding disposition is unsupported")
         selected_by_id = {record.memory_id: record for record in selected}
-        evidence_ids = copied["evidence_memory_ids"]
+        evidence_ids = _bounded_list(
+            copied["evidence_memory_ids"], "evidence_memory_ids", maximum=64
+        )
         if (
-            not isinstance(evidence_ids, list)
-            or not evidence_ids
-            or len(evidence_ids) > 64
+            not evidence_ids
             or len(evidence_ids) != len(set(evidence_ids))
             or not all(
                 isinstance(item, str) and item in selected_by_id for item in evidence_ids
@@ -665,11 +682,9 @@ class ExplorerShadowRunner:
         ):
             raise ExplorerShadowError("finding cites unavailable evidence")
         for field in ("acceptance_criteria", "metrics"):
-            values = copied[field]
+            values = _bounded_list(copied[field], field, maximum=64)
             if (
-                not isinstance(values, list)
-                or not values
-                or len(values) > 64
+                not values
                 or not all(
                     isinstance(item, str) and item.strip() and len(item) <= MAX_TEXT
                     for item in values
@@ -677,6 +692,8 @@ class ExplorerShadowRunner:
                 or len(values) != len(set(values))
             ):
                 raise ExplorerShadowError(f"{field} must be a bounded string list")
+            copied[field] = values
+        copied["evidence_memory_ids"] = evidence_ids
         copied["evidence_digests"] = [
             digest(asdict(selected_by_id[item])) for item in evidence_ids
         ]

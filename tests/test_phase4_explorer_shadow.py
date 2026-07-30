@@ -182,6 +182,21 @@ class _HostileFinding(Mapping[str, Any]):
         raise RuntimeError("unbounded finding iterator")
 
 
+class _HostileList(list[Any]):
+    def __init__(self, value: Any) -> None:
+        super().__init__([value])
+        self.yielded = 0
+
+    def __len__(self) -> int:
+        return 1
+
+    def __iter__(self) -> Iterator[Any]:
+        for _ in range(1_000):
+            self.yielded += 1
+            yield self[0]
+        raise RuntimeError("unbounded nested list iterator")
+
+
 class _BlockingEngine(_Engine):
     def __init__(self, entered: Event, release: Event) -> None:
         super().__init__([_finding()])
@@ -528,6 +543,22 @@ class ExplorerShadowTests(unittest.TestCase):
         self.assertEqual(len(self.store.records(
             tenant_id="tenant:test", repository_id="repository:test",
             record_type="opportunity-record")), 0)
+
+    def test_nested_finding_lists_are_consumed_only_to_item_bound_plus_one(self) -> None:
+        for field in ("evidence_memory_ids", "acceptance_criteria", "metrics"):
+            with self.subTest(field=field):
+                value = (
+                    "memory:blocker"
+                    if field == "evidence_memory_ids"
+                    else "bounded fixture value"
+                )
+                hostile = _HostileList(value)
+                request = _request(run_id=f"run:nested:{field}")
+                with self.assertRaisesRegex(ExplorerShadowError, "item bound"):
+                    self._runner(
+                        _Engine([_finding(**{field: hostile})])
+                    ).run(request, _records())
+                self.assertEqual(hostile.yielded, 65)
 
     def test_operational_second_write_failure_rolls_back_batch_and_is_receipted(self) -> None:
         engine = _Engine([
