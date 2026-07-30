@@ -11,5 +11,10 @@
   change outcomes.
 - Exact and structured opportunity convergence exists, but semantic escape and
   false-merge rates remain unmeasured.
+- The output binding currently references private `_FINDING_FIELDS`; package
+  privacy is a convention, and a later runtime/cross-language phase should expose a
+  stable typed manifest instead.
+- Wheel contents and installed behavior reproduced, but independently built archive
+  digests differed; bit-reproducible wheels are not claimed.
 - No champion pointer, activation, promotion, learning, or superiority claim is
   admitted.

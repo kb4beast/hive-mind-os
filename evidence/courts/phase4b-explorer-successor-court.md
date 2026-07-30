@@ -19,3 +19,37 @@ The candidate must satisfy
 contract and byte pin, and make no runtime, activation, public, usefulness, learning,
 or superiority claim. Independent Cross-Examiner, Curator, Integrator, Steward,
 Optimizer, and Judge dispositions remain pending.
+
+## Cross-examination
+
+Independent Cross-Examiner `/root/phase4b_cross` initially issued `defer` at
+implementation checkpoint `de85ec0`: the standalone validator accepted correctly
+resealed semantic substitutions under the fixed identity, and wheel, resource,
+inventory, and source-provenance receipts were incomplete. The append-only remand is
+preserved in `evidence/phase4b/PHASE4B_AUDIT_LEDGER.md`.
+
+After repair at implementation `e00b017` and evidence head `1d0293c`, the same
+Cross-Examiner independently closed every remand and changed its recommendation to
+`adapt`. This admits deterministic composition, package integrity, inertness, and
+provenance only. Python package privacy is a convention, not a security boundary,
+and behavior, learning, value, activation, promotion, and superiority remain
+unproven.
+
+## Independent lifecycle testimony
+
+- Curator/Expert Witness `/root/phase4b_curator`: `adapt`; independently reproduced
+  the candidate, protected surfaces, 214-test lifecycle gate, clean wheel, and 133
+  installed JSON resources. A license-label remand was repaired and closed.
+- Integrator `/root/item5_judge`: pass; reproduced frozen versioned contracts,
+  supported surfaces, no runtime/store/provider/tool migration, and additive
+  rollback.
+- Steward `/root/phase4b_steward`: `adapt` conditioned on final inventory reseal.
+  It preserved maintenance debt around a private-field binding and Python-held
+  canonical playbook data.
+
+- Optimizer `/root/phase4b_optimizer`: `adapt` only for deterministic definition
+  composition. Champion/challenger leakage is avoided, but controlled-experiment,
+  learning, behavior, value, and superiority evidence does not yet exist.
+
+All eight specialist roles and required temporary court identities now have
+receipts. Final inventory reseal and Judge disposition remain pending.

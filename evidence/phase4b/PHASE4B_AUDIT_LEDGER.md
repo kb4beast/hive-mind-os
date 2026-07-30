@@ -55,3 +55,78 @@ and clean-installed without dependencies. The installed package retained exactly
 with inert activation, no authority, and no public status. The wheel receipt is
 `evidence/phase4b/PHASE4B_INSTALLED_WHEEL_RECEIPT.md`. Independent Curator
 reproduction remains pending.
+
+## `P4B-AUDIT-007` — Cross-Examiner remand closure
+
+The same independent Cross-Examiner `/root/phase4b_cross` reproduced the repaired
+boundary and changed recommendation from `defer` to `adapt`. Correctly resealed
+base, playbook (including its layer binding), governance, and capability
+substitutions failed. Independent canonical/generated/manifest substitutions
+failed. A separately rebuilt clean installation retained 133 JSON resources and
+the exact inert successor digest. Inventory coverage and all seven pinned base-file
+digests reproduced. The independent focused result was 9 tests and 9 subtests; the
+combined Generation Zero/Phase 2/4A/4B result was 65 tests and 45 subtests; Ruff and
+Pyright passed. No behavior, value, learning, activation, or superiority claim was
+admitted.
+
+## `P4B-AUDIT-008` — Orchestrator compatibility gate
+
+Orchestrator `/root` reproduced the complete Phase 1–4 compatibility set against
+implementation `e00b017`: 214 passed, 1 skipped, and 79 subtests. Ruff and Pyright
+passed across the repository. The skip is the pre-existing environment-conditional
+Obsidian integration. Independent Curator and remaining lifecycle testimony remain
+pending.
+
+## `P4B-AUDIT-009` — Curator and Expert Witness
+
+Independent Curator/Expert Witness `/root/phase4b_curator` recommended `adapt`.
+The candidate, all seven source pins, protected bytes and surfaces, fixed-identity
+substitution rejection, Phase 4A input, clean installed wheel, and 133 JSON
+resources reproduced. The full lifecycle set passed 214 tests with 1 pre-existing
+environment skip and 79 subtests; Ruff and Pyright passed. The Curator remanded the
+source-register License column because it named artifact classes rather than a
+license. All five internal rows now identify `MIT (repository LICENSE)`, and the
+same Curator independently closed the remand. Independently built wheel archives
+had different archive digests, so bit-reproducible wheels are not claimed.
+
+## `P4B-AUDIT-010` — Integrator
+
+Independent Integrator `/root/item5_judge` recommended pass for the bounded inert
+integration. Its 71-test/45-subtest gate, Ruff, and Pyright passed. It reproduced
+131 root APIs, 33 package APIs, 13 CLI parsers, 304 observable definitions, 133 JSON
+resources, and no generated-candidate issues. No dependency, store, provider, tool,
+runtime selector, public projection, or migration changed. Rollback remains
+additive removal, and any stacked draft must use exact base `316ee55` and remain
+open, draft, unmerged, and inactive pending judgment.
+
+## `P4B-AUDIT-011` — Steward
+
+Independent Steward `/root/phase4b_steward` recommended `adapt`, conditioned on a
+final inventory reseal after testimony. Focused reproduction passed 9 tests and 9
+subtests. Reliability and rollback burdens pass because drift fails closed and no
+consumer selects the candidate. Non-blocking maintenance debt remains: the output
+binding references private `_FINDING_FIELDS`, and canonical playbook material is
+Python-held. The inventory mismatch observed while this ledger, court record, and
+license receipt were changing is preserved as a procedural remand; it must close by
+one final regeneration after adjudication.
+
+## `P4B-AUDIT-012` — Optimizer
+
+Independent Optimizer `/root/phase4b_optimizer` recommended `adapt` only for inert
+definition composition. Focused reproduction passed 9 tests and 9 subtests. The
+inventory correctly denies completed evaluation, value, superiority, activation,
+runtime binding, and provider/tool use. There is no held-out corpus, preregistered
+metric matrix, comparator pin, trial allocation, contamination guard, evaluator,
+safety floor, regression budget, root-cause record, or teaching packet. These are
+required before any later behavioral, value, learning, promotion, or superiority
+court. The eight stopping categories are design vocabulary, not evidence of
+executable enforcement.
+
+## `P4B-AUDIT-013` — pre-judgment reseal
+
+All Explorer, Advocate, Architect, Builder, Cross-Examiner, Curator/Expert,
+Integrator, Steward, and Optimizer testimony is now appended. Orchestrator `/root`
+regenerates and independently recomputes the inventory at this boundary before
+requesting judgment, closing the Steward/Optimizer procedural remand. The Judge
+may authorize one final evidence-only reseal after its verdict without reopening
+implementation `e00b017`.
