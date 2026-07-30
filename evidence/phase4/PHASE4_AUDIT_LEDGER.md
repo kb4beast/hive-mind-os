@@ -205,3 +205,12 @@ privacy, authority, atomicity, compatibility, inventories, and all local gates. 
 fresh exact wheel preserved 133 resources and the inert authority-none pinned skill
 bundle. All mandatory lifecycle roles are now receipted; renewed distinct judgment
 is the only open burden.
+
+## `P4A-AUDIT-022` — final Judge adapts bounded candidate
+
+Distinct Judge `/root/item5_judge` issued `adapt` on exact implementation
+`f91d227bbe8ddcdb5d8833aafcf695f6ccd302f8` with evidence head `aebb84c`.
+All lifecycle and court burdens are explicit. Only an open, draft, unmerged,
+inactive PR stacked on `codex/phase3-federation-recursion-guards` is permitted.
+Activation, public release, live readiness, semantic quality, value, learning,
+promotion, and superiority remain prohibited and deferred.

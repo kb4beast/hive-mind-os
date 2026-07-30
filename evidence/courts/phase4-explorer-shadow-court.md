@@ -350,3 +350,19 @@ The independently rebuilt exact wheel preserved all 133 resources, imported the
 Phase 4 modules, and compiled the inert authority-none bundle to its pinned digest.
 All mandatory lifecycle roles and final implementation receipts are now present.
 Renewed distinct Judge disposition is required before any draft publication.
+
+## Final Judge disposition
+
+Distinct Judge `/root/item5_judge` issued `adapt` on exact implementation
+`f91d227bbe8ddcdb5d8833aafcf695f6ccd302f8` with evidence head
+`aebb84c87723cb4c684dfab086f0ed79382eafd1`. The prior `defer`, every remand,
+dissent, repair, and losing assumption remains preserved. All required specialist
+and court identities now have explicit receipts.
+
+The verdict admits only the bounded, inert, package-private Explorer shadow
+substrate. It permits a stacked PR based on
+`codex/phase3-federation-recursion-guards` only while open, draft, unmerged, and
+inactive. It does not admit activation, public release, live provider/tool readiness,
+semantic quality, usefulness, customer value, learning, promotion, or superiority.
+Caller classification, byte-versus-token budgeting, pending-run recovery, semantic
+evaluation, live integration, and champion/challenger evidence remain deferred.

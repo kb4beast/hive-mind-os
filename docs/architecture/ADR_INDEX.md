@@ -25,7 +25,7 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-025` | [Bounded Obsidian Bases and JSON Canvas views](ADR-025-OBSIDIAN-BASES-CANVAS-VIEWS.md) | Phase 3 item 4 | adapted for bounded stacked draft delivery; activation and final-system promotion pending |
 | `ADR-026` | [Pinned Obsidian vault refresh conformance](ADR-026-OBSIDIAN-VAULT-REFRESH-CONFORMANCE.md) | Phase 3 item 5 | proposed; final exact-build evidence and independent judgment pending |
 | `ADR-027` | [Safe-public portfolio federation and self-host recursion guards](ADR-027-FEDERATION-AND-SELF-HOST-GUARDS.md) | Phase 3 item 6 | adapted for bounded stacked draft delivery; activation pending |
-| `ADR-028` | [Explorer shadow substrate](ADR-028-EXPLORER-SHADOW-SUBSTRATE.md) | Phase 4A | proposed for independent implementation court |
+| `ADR-028` | [Explorer shadow substrate](ADR-028-EXPLORER-SHADOW-SUBSTRATE.md) | Phase 4A | adapted as bounded inert candidate; activation and value claims deferred |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
 is ADR-029; it must be unique at creation time.

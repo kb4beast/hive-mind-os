@@ -1,6 +1,6 @@
 # ADR-028: Explorer shadow substrate
 
-- Status: proposed for independent implementation court
+- Status: adapted as bounded inert candidate; activation and value claims deferred
 - Date: 2026-07-29
 - Base: `2cbfe1d0e4dccd6f1758e5ddba10f799834bf857`
 - Governing claims: `AG-010`, `AG-014`, `AG-018`–`AG-020`,
