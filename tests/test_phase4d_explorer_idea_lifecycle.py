@@ -430,6 +430,54 @@ class ExplorerIdeaLifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ancestry is unavailable"):
             self._append(court)
 
+    def test_long_repeated_court_ancestry_is_validated_iteratively(self) -> None:
+        encounter_prepared = _compile("encounter", lifecycle_id="idea:long")
+        encounter = self._append(encounter_prepared)
+        previous_prepared = _compile(
+            "relationship",
+            lifecycle_id="idea:long",
+            prior=(encounter_prepared, encounter),
+            classification="new",
+        )
+        previous = self._append(previous_prepared)
+        for index in range(1, 1_026):
+            prepared = _compile(
+                "court",
+                lifecycle_id="idea:long",
+                event_id=f"idea:long:court:{index}",
+                prior=(previous_prepared, previous),
+                court_disposition="adapt",
+            )
+            memory = prepared["memory"]
+            previous = self.store.append_record(
+                authority=_authority("foundation.memory.write"),
+                foundation_action="foundation.memory.write",
+                tenant_id=TENANT,
+                repository_id=REPOSITORY,
+                record_type="memory-record",
+                schema_name="memory-record-v1",
+                stream_id=prepared["stream_id"],
+                payload=memory,
+                actor_id="explorer",
+                idempotency_key=prepared["idempotency_key"],
+                observed_at=memory["observed_at"],
+                correlation_id="idea:long",
+                causation_id="record:encounter",
+                sensitivity="private",
+                retention="governed",
+                status="active",
+            )
+            previous_prepared = prepared
+        final = _compile(
+            "court",
+            lifecycle_id="idea:long",
+            event_id="idea:long:court:final",
+            prior=(previous_prepared, previous),
+            court_disposition="adapt",
+        )
+        appended = self._append(final)
+        self.assertEqual(appended["payload"]["step_id"], "court")
+
     def test_private_default_is_absent_from_public_snapshot(self) -> None:
         self._append(_compile("encounter"))
         snapshot = FoundationStore.read_public_memory_snapshot(

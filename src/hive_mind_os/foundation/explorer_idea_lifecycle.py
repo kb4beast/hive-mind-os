@@ -696,18 +696,9 @@ def _validate_predecessor_chain(
     current: Mapping[str, Any],
     *,
     stream_id: str,
-    visited_record_ids: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
-    previous_record_id = _bounded_string(previous["record_id"], "previous record_id")
-    if previous_record_id in visited_record_ids:
-        raise ValueError("lifecycle predecessor chain contains a cycle")
-    if (
-        previous["stream_id"] != stream_id
-        or previous_record_id != current["previous_event_record_id"]
-    ):
-        raise ValueError("previous lifecycle event identity does not match")
-    previous_receipt = _reconstruct_predecessor(previous, current)
-    previous_payload = previous["payload"]
+    immediate_receipt: dict[str, Any] | None = None
+    visited_record_ids: set[str] = set()
     allowed = {
         "encounter": {"relationship"},
         "relationship": {"court"},
@@ -715,15 +706,32 @@ def _validate_predecessor_chain(
         "experiment": {"experiment", "outcome"},
         "outcome": {"outcome"},
     }
-    if current["stage"] not in allowed[previous_receipt["stage"]]:
-        raise ValueError("lifecycle stage transition is invalid")
-    if any(
-        type(value) is str and value.startswith("explorer-terminal:")
-        for value in previous_payload["claim_refs"]
-    ):
-        raise ValueError("terminal lifecycle event cannot have a successor")
-    ancestor_event_id = previous_receipt["previous_event_id"]
-    if ancestor_event_id is not None:
+    while True:
+        previous_record_id = _bounded_string(
+            previous["record_id"], "previous record_id"
+        )
+        if previous_record_id in visited_record_ids:
+            raise ValueError("lifecycle predecessor chain contains a cycle")
+        visited_record_ids.add(previous_record_id)
+        if (
+            previous["stream_id"] != stream_id
+            or previous_record_id != current["previous_event_record_id"]
+        ):
+            raise ValueError("previous lifecycle event identity does not match")
+        previous_receipt = _reconstruct_predecessor(previous, current)
+        if immediate_receipt is None:
+            immediate_receipt = previous_receipt
+        previous_payload = previous["payload"]
+        if current["stage"] not in allowed[previous_receipt["stage"]]:
+            raise ValueError("lifecycle stage transition is invalid")
+        if any(
+            type(value) is str and value.startswith("explorer-terminal:")
+            for value in previous_payload["claim_refs"]
+        ):
+            raise ValueError("terminal lifecycle event cannot have a successor")
+        ancestor_event_id = previous_receipt["previous_event_id"]
+        if ancestor_event_id is None:
+            return immediate_receipt
         ancestor = store.record_by_idempotency_key(
             tenant_id=previous_receipt["tenant_id"],
             repository_id=previous_receipt["repository_id"],
@@ -731,14 +739,8 @@ def _validate_predecessor_chain(
         )
         if ancestor is None:
             raise ValueError("lifecycle predecessor ancestry is unavailable")
-        _validate_predecessor_chain(
-            store,
-            ancestor,
-            previous_receipt,
-            stream_id=stream_id,
-            visited_record_ids=visited_record_ids | {previous_record_id},
-        )
-    return previous_receipt
+        current = previous_receipt
+        previous = ancestor
 
 
 def append_explorer_idea_lifecycle_event(
