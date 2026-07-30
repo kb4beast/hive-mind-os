@@ -1,0 +1,80 @@
+{
+  "entries": [
+    {
+      "historical_digest": "sha256:b29487e00e70e142a499f84671f75011202fba24539b794b304f006ce316140d",
+      "integrated_tree_digest": "sha256:7829a08a49dd0782900014b3a7ecd1e4e6f4c0783a1eae3b048ff7105a2ee0f9",
+      "path": "evidence/phase3/phase3_cognitive_notes_inventory.json",
+      "phase": "phase3-item3"
+    },
+    {
+      "historical_digest": "sha256:b29bcbe96b9314cb2a70db76af7ef0d9fb8325f3dcfaa16a34c8aa605c1684a8",
+      "integrated_tree_digest": "sha256:b6ba9f0777b28bf7e6eae5ace02b550f3dec94e8401ca29c270218258d926974",
+      "path": "evidence/phase3/phase3_cognitive_views_inventory.json",
+      "phase": "phase3-item4"
+    },
+    {
+      "historical_digest": "sha256:64a46ce051879e6e41785578264a174bd894e2ea0d28fd04fb3439ada1e33c61",
+      "integrated_tree_digest": "sha256:b92c9f65c5f5516f9f611b999f16d7743d703c32dc9bbb19e508ad719942d6da",
+      "path": "evidence/phase3/phase3_obsidian_vault_refresh_inventory.json",
+      "phase": "phase3-item5"
+    },
+    {
+      "historical_digest": "sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68",
+      "integrated_tree_digest": "sha256:6037df04216e257e7936d7852265200b876f5ebd4d79aa31f7fd698a91f827a2",
+      "path": "evidence/phase3/phase3_federation_inventory.json",
+      "phase": "phase3-item6"
+    },
+    {
+      "historical_digest": "sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36",
+      "integrated_tree_digest": "sha256:aca98143ccecc633e7e7631fac297e8fdcad0b384bbb980c2b286fe1083f9984",
+      "path": "evidence/phase4/phase4_explorer_shadow_inventory.json",
+      "phase": "phase4A"
+    },
+    {
+      "historical_digest": "sha256:2949f6899424049961c8e5d8d7d41872324c364a54cafbace9fab934dcd0b8ad",
+      "integrated_tree_digest": "sha256:8a8208c3e57f4e0f52b14954a3df36c7c9c02c4b9d39e677593dee94e73bde3c",
+      "path": "evidence/phase4b/phase4b_explorer_successor_inventory.json",
+      "phase": "phase4B"
+    },
+    {
+      "historical_digest": "sha256:86e1ec6bf309ce98fb12aa38c3a78f878e14b1cf786810166538a4e3bed22d1e",
+      "integrated_tree_digest": "sha256:4aad6678c3a2e1d401c29484e1efaf30e846c265912fd6bb05acd6b2bc71e161",
+      "path": "evidence/phase4c/phase4c_explorer_behavior_inventory.json",
+      "phase": "phase4C"
+    },
+    {
+      "historical_digest": "sha256:06bb664eccd1cb7a7f5ad80c799ea045b1746688d26349a2a8486e13bb62e6e4",
+      "integrated_tree_digest": "sha256:d54189883c3d13db297e63192623604d1c377e35f936175bd07b5359e6f7446e",
+      "path": "evidence/phase4d/phase4d_explorer_idea_lifecycle_inventory.json",
+      "phase": "phase4D"
+    }
+  ],
+  "generator_chain": [
+    "scripts/phase3_cognitive_notes_inventory.py",
+    "scripts/phase3_cognitive_views_inventory.py",
+    "scripts/phase3_obsidian_vault_refresh_inventory.py",
+    "scripts/phase3_federation_inventory.py",
+    "scripts/phase4_explorer_shadow_inventory.py",
+    "scripts/phase4b_explorer_successor_inventory.py",
+    "scripts/phase4c_explorer_behavior_inventory.py",
+    "scripts/phase4d_explorer_idea_lifecycle_inventory.py"
+  ],
+  "historical_evidence_rewritten": false,
+  "integration_train": "1.1",
+  "product_runtime_source_changed_by_reconciliation": false,
+  "reason": [
+    "Dependency PR #7 selected setuptools==83.0.0 after the stacked phase inventories had been sealed against setuptools==80.9.0.",
+    "The Version 1.1 hardening qualified the historical ADR-021 collision and corrected the ADR-026 index posture.",
+    "Current-tree inventories are regenerated in dependency order; historical inventory bytes and verdicts remain available at their exact prior commits."
+  ],
+  "record_type": "integration-inventory-reconciliation",
+  "runtime_activation_changed": false,
+  "schema_version": 1,
+  "verification": {
+    "affected_regression_tests": 152,
+    "historical_digest_semantics": "point-in-time evidence at the original exact heads",
+    "integrated_digest_semantics": "current selected file tree after dependency and registry reconciliation",
+    "platform_skips": 2,
+    "result": "pass"
+  }
+}

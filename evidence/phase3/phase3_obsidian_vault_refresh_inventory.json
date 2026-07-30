@@ -21,7 +21,7 @@
     "tests/test_phase3_cognitive_views.py": "sha256:a61ec2393dac5d6e6b4f8d99065a7415b864692259a2257ddad79d02c3b3f524",
     "tests/test_phase3_obsidian_vault_refresh.py": "sha256:b5d79baaafd686a6ce77d2ffe8e1a49f777b321941f3a45e4897af88e14673b6"
   },
-  "inventory_digest": "sha256:64a46ce051879e6e41785578264a174bd894e2ea0d28fd04fb3439ada1e33c61",
+  "inventory_digest": "sha256:b92c9f65c5f5516f9f611b999f16d7743d703c32dc9bbb19e508ad719942d6da",
   "obsidian_configuration": {
     "gitignore_rule": ".obsidian/",
     "global_profile_registration_side_effect_recorded": true,
@@ -29,7 +29,7 @@
   },
   "phase": 3,
   "phase_item": 5,
-  "prior_item4_inventory_digest": "sha256:2fb0442be736eea717dd5120fd3c1f175fb8da806379a2aaa738dea46139bbec",
+  "prior_item4_inventory_digest": "sha256:8e98ab19fd2e94cf37942b2e1a6a7707565e5014ca2e97e7c7f30993dbc257e3",
   "runs": {
     "20260729T201251Z-windows-obsidian-1.12.7": {
       "failed_cases": [

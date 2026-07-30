@@ -1,8 +1,8 @@
 # Architecture Decision Record Index
 
-This registry disambiguates two historical numeric collisions without renaming or deleting
+This registry disambiguates three historical numeric collisions without renaming or deleting
 records referenced by committed audits. Use the qualified key or the full filename in new
-evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
+evidence. Numeric-only references to ADR-008, ADR-012, or ADR-021 are ambiguous.
 
 | Qualified key | Record | Phase | Current posture |
 |---|---|---|---|
@@ -18,12 +18,13 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-018` | [Canonical agent definitions and nonauthoritative projections](ADR-018-CANONICAL-AGENT-DEFINITIONS-AND-PROJECTIONS.md) | Phase 1 | adopted architecture; additive implementation begins in Phase 2 |
 | `ADR-019` | [Open memory authority and Obsidian brain projection](ADR-019-OPEN-MEMORY-AND-OBSIDIAN-BRAIN.md) | Phase 1 | adopted architecture; memory foundation begins in Phase 2 and projection in Phase 3 |
 | `ADR-020` | [Provider-native usage, privacy, and fair learning](ADR-020-USAGE-TELEMETRY-PRIVACY-AND-FAIR-LEARNING.md) | Phase 1 | adopted architecture; additive implementation begins in Phase 2 |
-| `ADR-021` | [Additive memory and telemetry foundation](ADR-021-PHASE2-ADDITIVE-MEMORY-TELEMETRY-FOUNDATION.md) | Phase 2 | adopted implementation architecture; activation remains prohibited |
+| `ADR-021-PR30` | [Historical quarantined v2 foundation namespace](ADR-021-PR30-QUARANTINED-V2-FOUNDATION-NAMESPACE.md) | Phase 2 candidate | superseded but preserved at exact PR #30 history; runtime activation prohibited |
+| `ADR-021-PR31` | [Additive memory and telemetry foundation](ADR-021-PHASE2-ADDITIVE-MEMORY-TELEMETRY-FOUNDATION.md) | Phase 2 selected candidate | adopted implementation architecture; activation remains prohibited |
 | `ADR-022` | [Portable safe-public memory pack projection](ADR-022-PORTABLE-MEMORY-PACK-PROJECTION.md) | Phase 3 item 1 | adopted at independently judged implementation candidate `24e48933`; activation remains prohibited |
 | `ADR-023` | [Public/private memory release-store separation](ADR-023-PUBLIC-PRIVATE-MEMORY-SEPARATION.md) | Phase 3 item 2 | adopted architecture candidate; implementation judgment and activation pending |
 | `ADR-024` | [Stable-ID cognitive note projection](ADR-024-STABLE-ID-COGNITIVE-NOTES.md) | Phase 3 item 3 | adapted for bounded draft delivery; activation and final-system promotion pending |
 | `ADR-025` | [Bounded Obsidian Bases and JSON Canvas views](ADR-025-OBSIDIAN-BASES-CANVAS-VIEWS.md) | Phase 3 item 4 | adapted for bounded stacked draft delivery; activation and final-system promotion pending |
-| `ADR-026` | [Pinned Obsidian vault refresh conformance](ADR-026-OBSIDIAN-VAULT-REFRESH-CONFORMANCE.md) | Phase 3 item 5 | proposed; final exact-build evidence and independent judgment pending |
+| `ADR-026` | [Pinned Obsidian vault refresh conformance](ADR-026-OBSIDIAN-VAULT-REFRESH-CONFORMANCE.md) | Phase 3 item 5 | adapted for bounded stacked draft delivery; activation and broader host claims remain deferred |
 | `ADR-027` | [Safe-public portfolio federation and self-host recursion guards](ADR-027-FEDERATION-AND-SELF-HOST-GUARDS.md) | Phase 3 item 6 | adapted for bounded stacked draft delivery; activation pending |
 | `ADR-028` | [Explorer shadow substrate](ADR-028-EXPLORER-SHADOW-SUBSTRATE.md) | Phase 4A | adapted as bounded inert candidate; activation and value claims deferred |
 | `ADR-029` | [Explorer v2 successor composition](ADR-029-EXPLORER-V2-SUCCESSOR-COMPOSITION.md) | Phase 4B | adapted as an inert definition-only candidate; activation and behavior claims deferred |

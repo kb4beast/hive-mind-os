@@ -1,13 +1,28 @@
-# Release version 1.1 integration ledger
+# Release Version 1.1 integration ledger
 
-- Release branch: `release/version_1.1`
+- Integration train: `1.1`
+- Python distribution: `hive-mind-os==0.6.0`
+- Release archive branch: `release/version_1.1`
+- Pre-hardening release head: `07b19ba809b1be24d50f64de5a8704a760414db0`
+- Immutable preservation ref: `archive/release-version_1.1-pre-hardening-2026-07-30`
 - Main starting point: `b032a9f32f48889e0889fae8d6dd04eb03f46b63`
 - Integration date: 2026-07-30
-- Preservation rule: original pull requests and source branches are not modified, closed, merged, or deleted by this integration.
+- Preservation rule: original pull requests and source branches are not modified,
+  closed, merged, force-updated, or deleted by this integration.
 
-## Stacked product and governance work
+## Version terminology
 
-The exact PR stack from #28 through #42 is included through final stack head `0cbf581b77b77c1cdc15879a05164674fd5ae3ec`. Each PR base SHA equals the preceding PR head SHA, so the final head contains the complete ordered history.
+The branch name and manifest identify **integration train 1.1**. They do not rename the
+Python package. The distribution remains `0.6.0`, and CI derives the SBOM version from
+the installed package metadata. A package-version change requires a separate release
+decision and regenerated wheel/SBOM/provenance evidence.
+
+## Accepted stacked product and governance work
+
+The accepted stack #28, #29, and #31 through #42 is present in order through final
+stack head `0cbf581b77b77c1cdc15879a05164674fd5ae3ec`. PR #30 is intentionally not
+classified as accepted stack work; its losing candidate is dispositioned and preserved
+separately below.
 
 | PR | Head SHA |
 |---:|---|
@@ -26,24 +41,52 @@ The exact PR stack from #28 through #42 is included through final stack head `0c
 | #41 | `11e4a7b16b00e11caf59c231b5b718f14ed65195` |
 | #42 | `0cbf581b77b77c1cdc15879a05164674fd5ae3ec` |
 
+## Historical PR #30
+
+PR #30 at `39e07c9e3c3ce439911481be2d38d901d05d4824` implemented a quarantined
+`hive_mind_os_v2` alternative. The selected PR #31 foundation adapted most of its
+contracts into `hive_mind_os.foundation` and rejected a second active namespace.
+
+The exact PR #30 commit is preserved through a tree-neutral ancestry merge. The
+selected tree does not copy the obsolete sibling package. See:
+
+- `ADR-021-PR30-QUARANTINED-V2-FOUNDATION-NAMESPACE.md`;
+- `PR30_SUPERSESSION_AND_DISPOSITION.md`; and
+- `version_1.1-manifest.json`.
+
+The exact preservation merge is `043c3539a2a79682c7ebe004806e5ae19b758ed4`. Its first parent is `a1aed43d62066ebb7831349f7a748caf9564fef9`, its second parent is the exact PR #30 head `39e07c9e3c3ce439911481be2d38d901d05d4824`, and its tree `6c5c9eac9bdb842cdaf143cc26001d5d896c9805` is byte-identical to the first-parent tree. The merge therefore changes ancestry only.
+
 ## Independent dependency PRs
 
-| PR | Source head | Release resolution |
+| PR | Source head | Selected resolution |
 |---:|---|---|
-| #5 | `59d81845eb366583dee1efa1396058137acbc57f` | Applied the `actions/attest` pin `f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6` in release commit `94cda1ce2b37869678a5bb5b35b1f9da30612673`. |
-| #6 | `1848ac70905f006a042a83b8dc0be02134068207` | The original `anchore/sbom-action` step was superseded within the stack by a checksum-pinned direct Syft `v1.50.0` installation. The release retains that newer hardened implementation rather than restoring the older action path. The original PR and branch remain preserved. |
-| #7 | `ec9bfc65575573ead36c2c72c748725dc8018c93` | Applied `setuptools==83.0.0` in release commit `533b24a9e1f2b5836685be73d6f44fa7816f77b9`. |
+| #5 | `59d81845eb366583dee1efa1396058137acbc57f` | Retain the updated `actions/attest` commit pin. |
+| #6 | `1848ac70905f006a042a83b8dc0be02134068207` | Preserve exact history, but retain the stronger checksum-pinned direct Syft `v1.50.0` implementation selected later. |
+| #7 | `ec9bfc65575573ead36c2c72c748725dc8018c93` | Select `setuptools==83.0.0` and bind governance tests to that exact pin. |
 
-## Exact ancestry preservation
+## Existing dependency-history preservation
 
-The exact source commits for PRs #5, #6, and #7 are also ancestors of the release branch; their preservation does not rely only on equivalent patches or this ledger.
+- Internal PR #43 merged exact PR #5 history into a branch rooted at exact PR #6
+  head; merge commit `7f5e471391a597ca96c55e476418b9fcba4df8cf`.
+- Internal PR #45 combined that history with a branch rooted at exact PR #7 head;
+  merge commit `f5940ae9a2038625959a9e45c47124d45f72017f`.
+- Internal PR #46 merged the combined dependency history into the release archive;
+  merge commit `a2900fa2f394887084af5fa235357013adb7cbdc`.
+- Comparing `d36a7ed648a195fdd353c2e20833f9f1f43ee75a` to `a2900fa...`
+  produced ten additional commits and zero file changes.
+- Internal PR #44 was an integration-only failed direction and was closed unmerged;
+  no original PR or source branch was changed.
 
-- Internal PR #43 merged exact PR #5 history into a branch rooted at exact PR #6 head; merge commit `7f5e471391a597ca96c55e476418b9fcba4df8cf`.
-- Internal PR #45 combined that PR #5/#6 history with a branch rooted at exact PR #7 head; merge commit `f5940ae9a2038625959a9e45c47124d45f72017f`.
-- Internal PR #46 merged the combined dependency history into `release/version_1.1`; merge commit `a2900fa2f394887084af5fa235357013adb7cbdc`.
-- Comparing the pre-ancestry release head `d36a7ed648a195fdd353c2e20833f9f1f43ee75a` with `a2900fa2f394887084af5fa235357013adb7cbdc` yields ten additional commits and zero file changes. The merge changed ancestry only.
-- Internal PR #44 was closed unmerged after GitHub detected conflicts in the first attempted merge direction. It did not modify an original PR or source branch.
+## Handoff correction
 
-## Scope boundary
+The old public/private-memory handoff is retained with a `SUPERSEDED — DO NOT
+EXECUTE` banner. The current next-session objective is the conservative Phase 5A
+Orchestrator handoff. It does not invent the unavailable off-repository wording and
+cannot rely on the deferred Explorer comparison or resolve `B-OPS-09`.
 
-This branch consolidates the existing work without changing `main`, retargeting the original source PRs, or deleting any original source ref. PR #6 is preserved as a superseded implementation proposal; its older workflow mechanism is not reintroduced over the stronger implementation already present in the stack.
+## Authority and scope boundary
+
+No merge is authorized by this ledger. The hardening work may produce an open draft
+PR and exact-head CI evidence only. It does not modify `main`, activate a runtime,
+resolve P20, close `B-OPS-09`, or claim production readiness, release readiness,
+customer value, learning, promotion, or superiority.

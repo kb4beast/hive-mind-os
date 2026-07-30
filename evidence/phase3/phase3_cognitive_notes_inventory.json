@@ -75,11 +75,11 @@
   },
   "generation_zero_activated": false,
   "implementation": {
-    "pyproject.toml": "sha256:41f6c95bd1f3db93810163a8c869cc6e2107aec54f2876e92054eb6a2e6f81c1",
+    "pyproject.toml": "sha256:9b3af8db1c3502649d28d9f90fe567e9abb2fa7419d94704b79a80d345a5c611",
     "src/hive_mind_os/foundation/cognitive.py": "sha256:63e1aed35c9c403fafb488c29e098cb9178f09d9110c6098853431c19fab0b41",
     "src/hive_mind_os/foundation/cognitive_contracts.py": "sha256:5b91b771c0d2af200d5a181afa5b35bbf6ea9e545dfaef500cbeda375a6aa40b"
   },
-  "inventory_digest": "sha256:b29487e00e70e142a499f84671f75011202fba24539b794b304f006ce316140d",
+  "inventory_digest": "sha256:7829a08a49dd0782900014b3a7ecd1e4e6f4c0783a1eae3b048ff7105a2ee0f9",
   "obsidian_runtime_required": false,
   "phase": 3,
   "phase3_item2_input": {

@@ -1,3 +1,6 @@
+> **SUPERSEDED — DO NOT EXECUTE.** This Phase 3 item-3 handoff is retained as historical evidence only.
+> Continue from `docs/NEXT_SESSION_HANDOFF_PHASE5A_ORCHESTRATOR_OBJECTIVE.md`.
+
 # Next-session handoff — Phase 3 item 3
 
 Continue Hive Mind OS from this supplied state. Trust this handoff and the already

@@ -10,19 +10,19 @@
   "external_dependencies_added": 0,
   "implementation": {
     "docs/architecture/ADR-031-EXPLORER-IDEA-LIFECYCLE-REFERENCE-EVENTS.md": "sha256:b1d2d6fc5415bf7d34fb5c05a223895f9e855da9db2e2f4e1483bad4c70a3e38",
-    "docs/architecture/ADR_INDEX.md": "sha256:f017f658d460e555034b86c72a7ecf1cd8ba04bb22f35806aa646f6cc1df0ee3",
+    "docs/architecture/ADR_INDEX.md": "sha256:67bd401e702f2843e03f566165de7e769e6ae9e9ecc49f64e66548fde1dac0ab",
     "evidence/courts/phase4d-explorer-idea-lifecycle-court.md": "sha256:a3c37db40b02fb22e5aef1892bcc0a51ec9ddf98403a6bd9267dc3c596daf519",
     "evidence/phase4d/PHASE4D_AUDIT_AND_DISSENT.md": "sha256:19d47d0997778d226c29e8cf07319f3b7dbf2122fd544a62357813fe70dc8ee3",
     "evidence/sources/PHASE4D_EXPLORER_IDEA_LIFECYCLE_SOURCE_REGISTER.md": "sha256:2841c02bf4432dda31123dc221ffa68ce74c2469088e14ce2f2d598f7594f7a3",
-    "scripts/phase4d_explorer_idea_lifecycle_inventory.py": "sha256:2eb039b09db865969bd46481ae12d3733748810dedb82e90541c80332bc279f3",
+    "scripts/phase4d_explorer_idea_lifecycle_inventory.py": "sha256:b4dc6b30595a3e53f8430a4c5fbc724c54b468211fb3b6a874cf47b42bddca24",
     "src/hive_mind_os/foundation/explorer_idea_lifecycle.py": "sha256:ab7fdd15e00b7e54249cac2664e09c1f8e24db2dc5b7028136d70083aacfd098",
     "tests/test_phase4d_explorer_idea_lifecycle.py": "sha256:38b593af3b891a7c8ac169c0d60de107628e173fa219dfb76a7369252dcaf2c8"
   },
-  "inventory_digest": "sha256:06bb664eccd1cb7a7f5ad80c799ea045b1746688d26349a2a8486e13bb62e6e4",
+  "inventory_digest": "sha256:d54189883c3d13db297e63192623604d1c377e35f936175bd07b5359e6f7446e",
   "lifecycle_complete_claimed": false,
   "phase": 4,
   "phase4c_input": {
-    "inventory_digest": "sha256:86e1ec6bf309ce98fb12aa38c3a78f878e14b1cf786810166538a4e3bed22d1e"
+    "inventory_digest": "sha256:4aad6678c3a2e1d401c29484e1efaf30e846c265912fd6bb05acd6b2bc71e161"
   },
   "phase_item": "D",
   "projector_changed": false,

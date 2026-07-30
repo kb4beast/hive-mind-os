@@ -28,19 +28,19 @@
   "held_out_claimed": false,
   "implementation": {
     "docs/architecture/ADR-030-EXPLORER-DEVELOPMENT-EVALUATION-SUBSTRATE.md": "sha256:d0c7acc50a61fee196eb9d1a156b212152eeda01ab74de35542ac9fa9a23afec",
-    "docs/architecture/ADR_INDEX.md": "sha256:ecab386fd166c55c8074defca17fc37cb48d88124f6ca96841701cae2653a8fb",
+    "docs/architecture/ADR_INDEX.md": "sha256:67bd401e702f2843e03f566165de7e769e6ae9e9ecc49f64e66548fde1dac0ab",
     "evidence/courts/phase4c-explorer-behavior-court.md": "sha256:15d7b31c98a2ef0b6268cf1f65a9bd6c8bece779c64f096db424392564609b44",
     "evidence/phase4c/PHASE4C_AUDIT_AND_DISSENT.md": "sha256:b8911e11bcefd5d38627787c2a6f221c8d3a014a1a9f4a1444a36207c1324d29",
     "evidence/sources/PHASE4C_EXPLORER_BEHAVIOR_SOURCE_REGISTER.md": "sha256:4a46c1a251f3f56ba2b0c8eedcba652db760ddd42a76de665080f2e0fe069c67",
-    "scripts/phase4c_explorer_behavior_inventory.py": "sha256:5deebc9bcf518f76feeeb7f227de6c6e1161c50e9436b8cf8195acd06eaf9122",
+    "scripts/phase4c_explorer_behavior_inventory.py": "sha256:75a9762a6d1311ccd18f3321107d61939bb641522febdfe3c057343d9035c048",
     "src/hive_mind_os/foundation/explorer_behavior.py": "sha256:342af7ef556d75d673d12af6595f26c76e83de5aaf724a17f79033d04a15ce1d",
     "src/hive_mind_os/foundation/explorer_behavior_contracts.py": "sha256:6e882cea2f6aab27303abe6adecf0d472d0ea53ba212821089f4ff4efd99734a",
     "tests/test_phase4c_explorer_behavior.py": "sha256:d20f91f1d79e880ad09dbddbe1ef0426cdb7aff278ce405200049a172adb6501"
   },
-  "inventory_digest": "sha256:86e1ec6bf309ce98fb12aa38c3a78f878e14b1cf786810166538a4e3bed22d1e",
+  "inventory_digest": "sha256:4aad6678c3a2e1d401c29484e1efaf30e846c265912fd6bb05acd6b2bc71e161",
   "phase": 4,
   "phase4b_input": {
-    "inventory_digest": "sha256:2949f6899424049961c8e5d8d7d41872324c364a54cafbace9fab934dcd0b8ad"
+    "inventory_digest": "sha256:8a8208c3e57f4e0f52b14954a3df36c7c9c02c4b9d39e677593dee94e73bde3c"
   },
   "phase_item": "C",
   "promotion_authorized": false,
