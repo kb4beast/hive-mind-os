@@ -313,3 +313,22 @@ Builder receipts are:
 
 This is renewed Builder evidence. Independent review and judgment remain required
 before pushing.
+
+### Curator evidence-coverage remand
+
+Curator/Expert Witness `Locke` independently reproduced the behavior and receipts
+at exact commit `d5f3633`, including top-level and nested duplicate rejection,
+newline and key-order stability, malformed and non-finite rejection, the exact
+inventory, and unchanged protected surfaces. The Curator nevertheless returned
+`REMAND`: the committed 29th test demonstrated newline stability and only a
+top-level duplicate, while the audit said it also proved nested duplicate,
+malformed, and non-finite rejection.
+
+The same test case now includes top-level and nested duplicates, malformed JSON,
+and `NaN`, positive infinity, and negative infinity fixtures. The case count and
+runtime remain unchanged. Windows unittest and pytest report
+`28 passed, 1 skipped`; the combined Phase 2/3 matrix reports
+`175 passed, 1 skipped, 57 subtests passed`; Ruff, Pyright, inventory equality,
+and diff checks pass. Regenerated inventory is
+`sha256:788340384cc3b0489e2e909b93f8d92bf911792a3f08f64eb5231ea701e4378a`.
+Renewed exact-commit review is required.

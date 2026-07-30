@@ -1266,6 +1266,23 @@ No runtime, schema, authority, workflow, contract, source-admission, identity,
 protocol, capability, or claim surface changed. Renewed independent review and
 judgment remain required before pushing.
 
+## `P3-ITEM6-AUDIT-013` — evidence-coverage remand
+
+Curator/Expert Witness `Locke` reproduced the claimed loader behavior and all
+receipts at exact commit `d5f3633`, but returned `REMAND` because the 29th test
+proved only newline stability and top-level duplicate rejection. The preceding
+audit entry overstated durable test coverage for nested duplicates, malformed JSON,
+and non-finite values.
+
+The same test case now explicitly rejects top-level and nested duplicate names,
+malformed JSON, `NaN`, positive infinity, and negative infinity. This changes no
+runtime and does not increase the 29-case count. Windows unittest and pytest report
+`28 passed, 1 skipped`; the combined Phase 2/3 matrix reports
+`175 passed, 1 skipped, 57 subtests passed`; Ruff, Pyright, inventory equality,
+and diff checks pass. Regenerated inventory is
+`sha256:788340384cc3b0489e2e909b93f8d92bf911792a3f08f64eb5231ea701e4378a`.
+Renewed independent review is required.
+
 ## `P3-ITEM6-AUDIT-012` — duplicate-key fail-closed remand
 
 Curator/Expert Witness `Locke` returned `PASS` on exact cross-platform repair

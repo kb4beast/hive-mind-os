@@ -993,15 +993,24 @@ def _case_item6_inventory_is_exact() -> None:
 def _case_prior_inventory_digest_is_newline_independent(tmp_path: Path) -> None:
     lf = tmp_path / "lf.json"
     crlf = tmp_path / "crlf.json"
-    duplicate = tmp_path / "duplicate.json"
     lf.write_bytes(b'{\n  "schema_version": 1,\n  "value": "same"\n}\n')
     crlf.write_bytes(
         b'{\r\n  "schema_version": 1,\r\n  "value": "same"\r\n}\r\n'
     )
     assert _canonical_json_file_digest(lf) == _canonical_json_file_digest(crlf)
-    duplicate.write_bytes(b'{"schema_version": 1, "schema_version": 2}\n')
-    with _raises(ValueError, match="duplicate JSON object name"):
-        _canonical_json_file_digest(duplicate)
+    rejected = {
+        "top-level-duplicate.json": b'{"schema_version":1,"schema_version":2}\n',
+        "nested-duplicate.json": b'{"nested":{"value":1,"value":2}}\n',
+        "malformed.json": b'{"schema_version":\n',
+        "nan.json": b'{"value":NaN}\n',
+        "infinity.json": b'{"value":Infinity}\n',
+        "negative-infinity.json": b'{"value":-Infinity}\n',
+    }
+    for name, content in rejected.items():
+        candidate = tmp_path / name
+        candidate.write_bytes(content)
+        with _raises(ValueError):
+            _canonical_json_file_digest(candidate)
 
 
 class FederationTests(unittest.TestCase):
