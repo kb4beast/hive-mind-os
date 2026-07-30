@@ -1,0 +1,113 @@
+{
+  "activation_authorized": false,
+  "base_head": "55ec59828dcd999723627219210e5b224c65a36f",
+  "candidate_behavior_measured": false,
+  "cli_added": 0,
+  "comparison_complete": false,
+  "contracts": {
+    "catalog_valid": true,
+    "names": [
+      "explorer-behavior-suite-v1",
+      "explorer-evaluation-subject-v1",
+      "explorer-behavior-observation-v1",
+      "explorer-behavior-metric-v1",
+      "explorer-behavior-measurement-v1"
+    ]
+  },
+  "empty_observation_receipt": {
+    "activation_authorized": false,
+    "comparison_status": "not-run",
+    "content_digest": "sha256:6ad1fcf2dee224ee635b8443cd1afa53a4b81f0ad193a144578b2c205994ad7d",
+    "metric_statuses": [
+      "not-run"
+    ],
+    "promotion_authorized": false,
+    "status": "incomplete"
+  },
+  "external_dependencies_added": 0,
+  "held_out_claimed": false,
+  "implementation": {
+    "docs/architecture/ADR-030-EXPLORER-DEVELOPMENT-EVALUATION-SUBSTRATE.md": "sha256:38aa11ffffb92bab8d9a547e2ffad7dac7370e0055394dc268b108aa4432bb8f",
+    "docs/architecture/ADR_INDEX.md": "sha256:8127bee3b554a3f614001286a2ca30af0cd6bf1f1ee8a5ae7a4cd79b2463ef91",
+    "evidence/courts/phase4c-explorer-behavior-court.md": "sha256:d5364d0f1da2b0fc9e696930b36b8ab1f2723d95e433dc0b50df3bd5c4236a3b",
+    "evidence/phase4c/PHASE4C_AUDIT_AND_DISSENT.md": "sha256:0cee301c1d15928ca0e6e21afbed21553847869e59ed8babbb7ead2e1ff57014",
+    "evidence/sources/PHASE4C_EXPLORER_BEHAVIOR_SOURCE_REGISTER.md": "sha256:4a46c1a251f3f56ba2b0c8eedcba652db760ddd42a76de665080f2e0fe069c67",
+    "scripts/phase4c_explorer_behavior_inventory.py": "sha256:5deebc9bcf518f76feeeb7f227de6c6e1161c50e9436b8cf8195acd06eaf9122",
+    "src/hive_mind_os/foundation/explorer_behavior.py": "sha256:640b668799eb5f50d762bb76b389cef55fcd13f770a943e035cb39c65e8a15af",
+    "src/hive_mind_os/foundation/explorer_behavior_contracts.py": "sha256:3d2da12a7cb61e31e5a1e812c9ae5cc3c6ff3db11c4b3b9c8b93dc9eb1c97330",
+    "tests/test_phase4c_explorer_behavior.py": "sha256:9ba3c3bc1c250fa6f65d03d4cffba9ef68e6af27cabf726328e83b1c60f2cf24"
+  },
+  "inventory_digest": "sha256:7ac23486aeb443ad42942002de1af615be939e6027ae6b831e2596406ab05450",
+  "phase": 4,
+  "phase4b_input": {
+    "inventory_digest": "sha256:2949f6899424049961c8e5d8d7d41872324c364a54cafbace9fab934dcd0b8ad"
+  },
+  "phase_item": "C",
+  "promotion_authorized": false,
+  "protected_surfaces": {
+    "benchmark_harness_digest": "sha256:383902076158ce43ccb4dfc27664a50f3a7bc00f4030d9e7c7244a1ceb3efd69",
+    "cli_parser_count": 13,
+    "definition_count": 304,
+    "experiment_runner_digest": "sha256:e570d87db997362e5c88d2d18ed0836c81ccd9eb600700fe3953e8bde749bf62",
+    "json_resource_count": 133,
+    "package_api_count": 33,
+    "root_api_count": 131,
+    "runtime_unclassified_count": 0
+  },
+  "provider_or_tool_calls": false,
+  "public_api_added": 0,
+  "runtime_binding_added": false,
+  "schema_version": 1,
+  "scope": "development-visible-evaluation-substrate",
+  "store_or_migration_added": false,
+  "subjects": {
+    "baseline": {
+      "authority": "none",
+      "content_digest": "sha256:1380946b5a1d15cbbd9026544a99a1acb0b0b0c90cea831bc3da45549d97944b",
+      "executable": true,
+      "execution_state": "development-executable",
+      "subject_id": "hive-eval-subject:explorer:generation-zero:v1"
+    },
+    "candidate": {
+      "authority": "none",
+      "content_digest": "sha256:8ba529cbd979b80b2d32a7b50d8446e0c0d8d4bbd4ea9a16fb9b2a844fcfbbac",
+      "executable": false,
+      "execution_state": "forced-not-run",
+      "subject_id": "hive-eval-subject:explorer:v2-shadow-1:v1"
+    }
+  },
+  "suite": {
+    "case_count": 11,
+    "comparison": false,
+    "content_digest": "sha256:6cc7f90a4e5f09c643c5e23367173f49ac0d9c25e46772bd8b8facd957590af2",
+    "families": [
+      "duplicate",
+      "bug",
+      "serendipity",
+      "cross-domain",
+      "provenance",
+      "injection",
+      "authority",
+      "stopping",
+      "loop",
+      "token-attribution",
+      "memory-contamination"
+    ],
+    "holdout": false,
+    "metric_weight_total_ppm": 1000000,
+    "promotion": false,
+    "safety_families": [
+      "authority",
+      "injection",
+      "loop",
+      "memory-contamination",
+      "provenance",
+      "stopping",
+      "token-attribution"
+    ],
+    "suite_id": "hive-eval-suite:explorer:development-visible:v1",
+    "visibility": "development-visible"
+  },
+  "superiority_claimed": false,
+  "value_claimed": false
+}
