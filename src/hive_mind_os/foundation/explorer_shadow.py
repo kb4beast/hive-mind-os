@@ -7,7 +7,10 @@ from typing import Any, Iterable, Mapping, Protocol, Sequence
 from .canonical import canonical_bytes, digest
 from .contracts import validate_foundation
 from .explorer_contracts import validate_explorer
-from .explorer_skill_resources import EXPLORER_SKILL_DOCUMENTS
+from .explorer_skill_resources import (
+    EXPLORER_SKILL_BUNDLE_DIGEST,
+    EXPLORER_SKILL_DOCUMENTS,
+)
 from .opportunities import OpportunityLedger
 
 POLICY_VERSION = "explorer-context-selection-v2"
@@ -131,7 +134,10 @@ def compile_shadow_skills() -> dict[str, Any]:
         "activation": "inert",
         "authority": "none",
     }
-    return {**body, "bundle_digest": digest(body)}
+    bundle_digest = digest(body)
+    if bundle_digest != EXPLORER_SKILL_BUNDLE_DIGEST:
+        raise ValueError("packaged Explorer skill bundle differs from its pinned digest")
+    return {**body, "bundle_digest": bundle_digest}
 
 
 def _freeze(value: Any) -> Any:
@@ -214,7 +220,11 @@ def _validate_record(record: Any) -> ContextRecord:
         or not 0 <= record.self_host_depth <= 64
     ):
         raise ExplorerShadowError("context record metadata is invalid")
-    return record
+    return ContextRecord(**asdict(record))
+
+
+def _copy_request(request: ContextRequest) -> ContextRequest:
+    return ContextRequest(**asdict(request))
 
 
 def select_context(
@@ -426,12 +436,13 @@ class ExplorerShadowRunner:
         self, request: ContextRequest, records: Sequence[ContextRecord]
     ) -> ShadowResult:
         _validate_request(request)
+        sealed_request = _copy_request(request)
         store = self.ledger.store
         store._require_authority(
             self.ledger.authority,
             "foundation.opportunity.write",
-            tenant_id=request.tenant_id,
-            repository_id=request.repository_id,
+            tenant_id=sealed_request.tenant_id,
+            repository_id=sealed_request.repository_id,
             actor_id=ACTOR_ID,
         )
         # A FoundationStore owns one SQLite connection. Serializing the complete
@@ -440,7 +451,7 @@ class ExplorerShadowRunner:
         # engines. A durable selection claim below closes the same race across
         # separate store connections.
         with store._lock:
-            return self._run_locked(request, records)
+            return self._run_locked(sealed_request, records)
 
     def _run_locked(
         self, request: ContextRequest, records: Sequence[ContextRecord]
@@ -535,7 +546,13 @@ class ExplorerShadowRunner:
                 correlation_id=request.run_id,
             )
         try:
-            raw = self.engine.discover(request, selected, _freeze(bundle))
+            engine_request = _copy_request(request)
+            engine_context = tuple(
+                ContextRecord(**asdict(record)) for record in selected
+            )
+            raw = self.engine.discover(
+                engine_request, engine_context, _freeze(bundle)
+            )
             findings = _consume_bounded(raw, request.max_findings)
             prepared = tuple(
                 self._validate_finding(finding, selected) for finding in findings

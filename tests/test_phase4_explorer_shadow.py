@@ -7,10 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 from pathlib import Path
 from threading import Event
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 from unittest.mock import patch
 
 import hive_mind_os.foundation.explorer_shadow as explorer_shadow_module
+import hive_mind_os.foundation.explorer_skill_resources as skill_resources_module
 from hive_mind_os.foundation.authority import decide_foundation_write
 from hive_mind_os.foundation.canonical import canonical_bytes, digest
 from hive_mind_os.foundation.contracts import validate_foundation
@@ -211,6 +212,14 @@ class _BlockingEngine(_Engine):
         return self.findings
 
 
+class _ReflectiveMutationEngine(_Engine):
+    def discover(self, request, context, skill_bundle):
+        self.calls += 1
+        object.__setattr__(request, "purpose", "mutated by injected engine")
+        object.__setattr__(context[0], "content", "mutated by injected engine")
+        return self.findings
+
+
 def _finding(**updates: Any) -> dict[str, Any]:
     value = {
         "finding_id": "finding:one",
@@ -276,6 +285,21 @@ class ExplorerShadowTests(unittest.TestCase):
         forged = dict(first)
         forged["bundle_digest"] = digest("forged")
         self.assertNotEqual(forged, compile_shadow_skills())
+        self.assertFalse(hasattr(skill_resources_module, "_DOCUMENTS"))
+        with self.assertRaises(TypeError):
+            cast(
+                Any, skill_resources_module.EXPLORER_SKILL_DOCUMENTS[0]
+            )["purpose"] = "forged"
+        with patch.object(
+            explorer_shadow_module,
+            "EXPLORER_SKILL_DOCUMENTS",
+            ({
+                **dict(skill_resources_module.EXPLORER_SKILL_DOCUMENTS[0]),
+                "purpose": "schema-valid but unpinned mutation",
+            }, *skill_resources_module.EXPLORER_SKILL_DOCUMENTS[1:]),
+        ):
+            with self.assertRaisesRegex(ValueError, "pinned digest"):
+                compile_shadow_skills()
         schema = load_explorer_schema("explorer-shadow-run-v1")
         schema["properties"]["status"] = {"const": "forged"}
         self.assertNotEqual(schema, load_explorer_schema("explorer-shadow-run-v1"))
@@ -412,6 +436,45 @@ class ExplorerShadowTests(unittest.TestCase):
                 record["payload"]
             )
         self.assertEqual(reconstructed.policy_version, result.selection.policy_version)
+
+    def test_engine_receives_independent_request_and_context_snapshots(self) -> None:
+        records = _records()
+        expected_evidence_digest = digest(asdict(records[0]))
+        request = _request()
+        expected_request_digest = digest(asdict(request))
+        result = self._runner(
+            _ReflectiveMutationEngine([_finding()])
+        ).run(request, records)
+        self.assertEqual(request.purpose, "fixture discovery")
+        self.assertEqual(records[0].content, "blocker evidence")
+        selection = self.store.record_by_idempotency_key(
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            idempotency_key="explorer-selection:run:shadow",
+        )
+        terminal = self.store.record_by_idempotency_key(
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            idempotency_key="explorer-run:run:shadow",
+        )
+        assert selection is not None and terminal is not None
+        self.assertEqual(selection["payload"]["request_digest"], expected_request_digest)
+        self.assertEqual(terminal["payload"]["request_digest"], expected_request_digest)
+        encounter = self.store.records(
+            tenant_id="tenant:test",
+            repository_id="repository:test",
+            record_type="idea-encounter",
+        )[0]
+        self.assertEqual(
+            encounter["payload"]["evidence_digests"],
+            [expected_evidence_digest],
+        )
+        self.assertEqual(result.selection, explorer_shadow_module._selection_from_payload(
+            selection["payload"]
+        ))
+        self.assertEqual(self.store.verify_integrity(
+            tenant_id="tenant:test", repository_id="repository:test"
+        ), ())
 
     def test_concurrent_identical_run_invokes_only_one_engine_and_replays_result(self) -> None:
         entered = Event()
