@@ -10,9 +10,10 @@
 
 Items 1–5 create one safe-public, deterministic cognitive vault per repository.
 They intentionally do not combine repositories or decide when Hive Mind OS may
-treat its own generated output as new work. The founding docket requires an
-optional portfolio view without tenant crossover, nested vault authority, or
-projection, ingestion, telemetry, idea, and delegation feedback loops.
+treat its own generated output as new work. The pinned internal redesign record and
+adopted design claims `MEM-024`/`MEM-025` require an optional portfolio view without
+tenant crossover, nested vault authority, or projection, ingestion, telemetry,
+idea, and delegation feedback loops.
 
 The source cognitive manifests identify tenant, repository, and repository-instance
 digest, but do not expose enough lineage evidence to reconcile forks, mirrors, or

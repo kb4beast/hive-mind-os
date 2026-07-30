@@ -1146,3 +1146,17 @@ Their independent receipts preserve:
 
 Optimizer recommends only narrow `adapt`. A distinct Judge verdict remains required
 before draft publication; activation and merge remain prohibited.
+
+## `P3-ITEM6-AUDIT-006` — Judge provenance remand
+
+Distinct Judge `/root/item5_judge` reviewed exact implementation `0fe89d3`, identity
+record `494a717`, and specialist record `ab21442` and issued `defer`. All technical
+receipts passed, but ADR-027 retained an obsolete claim that “the founding docket
+requires” item-6 behavior. The source register correctly establishes that
+`founding_docket.py` contains no such atomic proposition and pins the actual internal
+redesign record plus `MEM-024`/`MEM-025`.
+
+ADR-027 now attributes the requirement only to those pinned sources. Technical bytes
+are unchanged, so the Judge requires renewed exact-record judgment but no production
+rerun. Draft publication, activation, and merge remain prohibited pending that
+renewed verdict.

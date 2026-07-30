@@ -164,7 +164,14 @@ schemas, `3` public-memory schemas, `48` package files, and `22` components.
 
 ## Pending judgment
 
-All required renewed specialist reviews pass. A distinct Judge must inspect exact
-implementation `0fe89d3` and exact review record `494a717` and issue
-`adopt`, `adapt`, `defer`, `reject`, or `quarantine`. Until that verdict, promotion
-remains `defer`; the branch must not be activated, published, or merged.
+Distinct Judge `/root/item5_judge` reviewed implementation `0fe89d3`, identity record
+`494a717`, and specialist record `ab21442` and issued `defer`. The technical evidence
+passed, but ADR-027 still said “the founding docket requires” item-6 behavior while
+the corrected source register truthfully says that docket contains no such atomic
+proposition. The actual pinned requirements are the internal redesign record and
+`MEM-024`/`MEM-025`.
+
+The evidence-only repair attributes the requirement solely to those pinned sources.
+The Judge required no production rerun because technical bytes are unchanged, but
+must renew judgment on the exact repair record. Until then, the branch must not be
+activated, published, or merged.
