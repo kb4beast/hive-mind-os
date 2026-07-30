@@ -307,3 +307,31 @@ and its file digest is
 `sha256:ba453267f1dee2097430d0054156d7c93306e6d910b500d377de62aacc10945e`.
 Distinct Cross-Examiner renewal remains required; Integrator and Optimizer roles are
 still open.
+
+## Lifecycle closure verdicts
+
+Distinct Cross-Examiner `/root/phase4_distinct_cross` returned `PASS` on exact
+implementation `f91d227bbe8ddcdb5d8833aafcf695f6ccd302f8`. Reflective engine
+mutation left caller and sealed snapshots unchanged, selection and terminal request
+digests matched, admitted evidence retained its pre-engine digest, integrity passed,
+the mutable skill alias was absent, direct mutation failed, and schema-valid drift
+was rejected by the pinned bundle digest.
+
+Independent Integrator `/root/phase4_explorer/integrator` returned `PASS` for the
+bounded integration. Phase 2–4 contracts, FoundationStore, OpportunityLedger,
+inventories, governance, package-private boundaries, root/foundation exports, CLI,
+runtime, projections, packaging, and rollback remained compatible and inactive.
+No public projection or private-data boundary changed.
+
+Independent Optimizer `/root/phase4_explorer/optimizer` returned `PASS` only for the
+inert substrate. The numeric byte/count/call envelopes and honest deferred claims are
+adequate for this slice. Finding metrics and stopping strings remain hypotheses;
+caller classification can bias selection; no token/cost/time budget, semantic quality,
+baseline, holdout, causal attribution, learning, challenger/champion, regression,
+safety-budget, or multi-comparator superiority evidence exists. Therefore no value,
+learning, activation, promotion, or superiority claim is admitted.
+
+The Orchestrator, Explorer, Architect, Builder, distinct Cross-Examiner, Curator,
+Integrator, Steward, and Optimizer duties are now explicitly receipted. Because the
+final sealed-input repair postdates the Curator's exact-commit verdict, final Curator
+confirmation and renewed distinct judgment remain required.

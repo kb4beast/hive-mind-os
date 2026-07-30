@@ -173,3 +173,26 @@ digest:
 `sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36`;
 inventory file digest:
 `sha256:ba453267f1dee2097430d0054156d7c93306e6d910b500d377de62aacc10945e`.
+
+## `P4A-AUDIT-018` — distinct Cross-Examiner pass
+
+Distinct Cross-Examiner `/root/phase4_distinct_cross` passed exact implementation
+`f91d227bbe8ddcdb5d8833aafcf695f6ccd302f8`. Both reflective sealed-input and
+mutable packaged-skill attacks are closed, focused tests passed, inventory reproduced,
+and no new critical fail-open defect was found.
+
+## `P4A-AUDIT-019` — Integrator pass
+
+Independent Integrator `/root/phase4_explorer/integrator` passed exact
+implementation `f91d227`. Phase 2–4 contracts, store/ledger interfaces, root and
+foundation exports, CLI, runtime, projections, package boundaries, privacy,
+compatibility, and additive rollback remain unchanged and inactive. Live and public
+integration remains deferred.
+
+## `P4A-AUDIT-020` — Optimizer pass with value claims deferred
+
+Independent Optimizer `/root/phase4_explorer/optimizer` passed only the inert bounded
+substrate at exact implementation `f91d227`. Numeric structural budgets are enforced,
+but outcome, token/cost/time, semantic quality, causal learning, challenger/champion,
+and superiority evidence is absent. No activation, promotion, customer-value,
+learning, or superiority claim is authorized.
