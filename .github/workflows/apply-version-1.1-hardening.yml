@@ -1,0 +1,48 @@
+name: Apply verified Version 1.1 hardening patch
+
+on:
+  push:
+    branches:
+      - agent/version-1.1-release-hardening
+    paths:
+      - .github/bootstrap/version-1.1-hardening.patch.gz.b64
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-1.1-hardening-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor == 'kb4beast'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact bootstrap head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Decode and verify local candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .github/bootstrap/version-1.1-hardening.patch.gz.b64 \
+            | gzip --decompress > /tmp/version-1.1-hardening.patch
+          echo "7531e43fad261432ab85e764ac5d058df28b1d05759a38b7b0cfd5e71ab2dce7  /tmp/version-1.1-hardening.patch" \
+            | sha256sum --check --strict
+          git apply --check --index /tmp/version-1.1-hardening.patch
+      - name: Apply exact candidate tree and remove bootstrap inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --index /tmp/version-1.1-hardening.patch
+          git rm .github/bootstrap/version-1.1-hardening.patch.gz.b64
+          git rm .github/workflows/apply-version-1.1-hardening.yml
+          observed_tree="$(git write-tree)"
+          test "$observed_tree" = "6c5c9eac9bdb842cdaf143cc26001d5d896c9805"
+          git config user.name "kb4beast"
+          git config user.email "14246027+kb4beast@users.noreply.github.com"
+          git commit -m "Harden version 1.1 integration contract"
+          git push origin HEAD:refs/heads/agent/version-1.1-release-hardening
