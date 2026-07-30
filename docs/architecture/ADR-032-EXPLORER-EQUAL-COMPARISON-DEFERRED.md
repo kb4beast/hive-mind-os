@@ -1,6 +1,6 @@
 # ADR-032: Explorer equal-evidence comparison is deferred
 
-- Status: proposed `defer` for P4E-001
+- Status: accepted `defer` by P4E-001; roadmap item 6 remains incomplete
 - Date: 2026-07-30
 - Base: `11e4a7b16b00e11caf59c231b5b718f14ed65195`
 - Extends: ADR-028, ADR-029, ADR-030, and ADR-031
@@ -73,3 +73,11 @@ Even a later valid result is scoped only to its pinned subjects, sampled
 task/repository population, evidence, provider/model/configuration, resource policy,
 environment, and time. A head-to-head test estimates the total composition effect;
 component causality requires separately preregistered ablations.
+
+## Judgment
+
+Fresh Judge `/root/phase4e_judge` issued `defer` at exact evidence head
+`c4cad6fa8de52475c01fd8a86fc5ca680ebe05e5`. The bounded readiness
+adjudication is complete; the comparison is not. `B-OPS-09` remains open. Phase 5
+may proceed only without relying on any comparison, behavior, value, learning,
+promotion, or activation claim.

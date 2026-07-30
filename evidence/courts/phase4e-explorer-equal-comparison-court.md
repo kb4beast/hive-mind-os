@@ -73,7 +73,23 @@ contracts. No unavailable source content is inferred.
   budget failures. It remanded draft rollback language that allowed evidence removal;
   ADR-032 now requires append-only supersession.
 
-Judge testimony remains pending.
+## Verdict
+
+Fresh Judge `/root/phase4e_judge` issued `defer` at exact evidence head
+`c4cad6fa8de52475c01fd8a86fc5ca680ebe05e5`. Independent reproduction passed
+41 tests and 23 subtests across the decisive Phase 4B, Phase 4C, P10, and P13
+surfaces.
+
+The Judge admitted only that the existing repository correctly fails closed, the
+four-file governance/evidence delta is nonduplicative, all eight specialist
+functions are sufficiently represented for a defer-level decision, and
+`B-OPS-09` must remain open. Local role labels are procedural evidence, not
+externally authenticated identities.
+
+The bounded Phase 4E readiness adjudication is complete with `defer`; roadmap item
+6 is not complete. Phase 5 may proceed only when no work relies on a comparison,
+behavior, value, learning, promotion, or activation claim. All ADR-032 reopening
+gates remain binding and require a fresh court.
 
 ## Proposed disposition
 
