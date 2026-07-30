@@ -169,3 +169,31 @@ inventory document digest is
 and its file digest is
 `sha256:b16d565f1517cc9765a198a7023f90c598d02327551be355fbc7b59e5749d4de`.
 Renewed Curator and Steward review of the exact repair is required.
+
+## Renewed Curator and Steward review
+
+Curator `/root/item5_curator` returned `PASS` on exact repair
+`52f4ce8484dedd6f2b6457af331251a2e5e0f3e1`. Historical policy identity,
+ADR indexing, a separate-store pending-run probe, privacy, authority, compatibility,
+packaging, and nonactivation boundaries all passed.
+
+Steward `/root/item4_explorer/steward` retained one `REMAND`. Top-level hostile
+context and mapping bounds, indexed replay, same-store convergence, cross-store
+pending/replay, and interruption recovery passed, but the list-valued finding fields
+still trusted hostile `list` subclass iteration for evidence IDs, acceptance criteria,
+and metrics.
+
+## Nested finding-bound repair candidate
+
+Exact implementation commit `40bc5d6a08cbf9eb32ea4cce766da4a547e40249`
+consumes all three nested list fields only through a shared explicit
+maximum-plus-one limiter before membership, uniqueness, or content checks. Hostile
+list subclasses are rejected after 65 values and cannot reach ledger writes.
+
+Builder receipts are `19 passed, 9 subtests` focused; `194 passed, 1 skipped,
+66 subtests` combined; all fourteen governance tests; Ruff and Pyright pass. The
+inventory document digest is
+`sha256:bd83372d50468a5aaf8b8272497f8d3b6ea328ed273a5e83b09c3c59973f8e66`
+and its file digest is
+`sha256:3b003c8fa48d4ff8ea667431a983998d2a1d482a33807a611280fa24630eb5d3`.
+Only renewed Steward review is required for this remand.

@@ -100,3 +100,22 @@ preserves 133 resources and installed imports. Inventory document digest:
 `sha256:973fbd14dd87472a760f197377cae4ac204f871ce0c15eb369deb0916248bf48`;
 inventory file digest:
 `sha256:b16d565f1517cc9765a198a7023f90c598d02327551be355fbc7b59e5749d4de`.
+
+## `P4A-AUDIT-010` — Curator pass and residual Steward remand
+
+Curator `/root/item5_curator` passed exact repair `52f4ce8`, including historical
+policy reconstruction and separate-store concurrency. Steward
+`/root/item4_explorer/steward` passed every top-level boundedness, indexed replay,
+concurrency, and interruption repair but remanded hostile `list` subclasses inside
+the three list-valued finding fields.
+
+## `P4A-AUDIT-011` — nested finding lists bounded
+
+Exact implementation commit `40bc5d6a08cbf9eb32ea4cce766da4a547e40249`
+applies explicit maximum-plus-one consumption to evidence IDs, acceptance criteria,
+and metrics before any later iteration. Receipts: `19 passed, 9 subtests` focused;
+`194 passed, 1 skipped, 66 subtests` combined; all fourteen governance tests; Ruff
+and Pyright pass. Inventory document digest:
+`sha256:bd83372d50468a5aaf8b8272497f8d3b6ea328ed273a5e83b09c3c59973f8e66`;
+inventory file digest:
+`sha256:3b003c8fa48d4ff8ea667431a983998d2a1d482a33807a611280fa24630eb5d3`.
