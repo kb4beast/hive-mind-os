@@ -61,6 +61,7 @@ def build_phase4b_inventory(repository: Path) -> dict[str, Any]:
         "evidence/courts/phase4b-explorer-successor-court.md",
         "evidence/phase4b/PHASE4B_AUDIT_LEDGER.md",
         "evidence/phase4b/PHASE4B_DISSENT.md",
+        "evidence/phase4b/PHASE4B_INSTALLED_WHEEL_RECEIPT.md",
         "evidence/sources/PHASE4B_EXPLORER_SUCCESSOR_SOURCE_REGISTER.md",
         "scripts/phase4b_explorer_successor_inventory.py",
         "src/hive_mind_os/foundation/explorer_successor.py",
