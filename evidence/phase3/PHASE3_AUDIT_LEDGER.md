@@ -1160,3 +1160,22 @@ ADR-027 now attributes the requirement only to those pinned sources. Technical b
 are unchanged, so the Judge requires renewed exact-record judgment but no production
 rerun. Draft publication, activation, and merge remain prohibited pending that
 renewed verdict.
+
+## `P3-ITEM6-AUDIT-007` — final narrow `adapt`
+
+Distinct Judge `/root/item5_judge` renewed judgment on exact evidence repair
+`7e66574945b1a45a59958406494dd27ff37dafcf` and issued `adapt` with no
+remand. The final judgment also binds implementation `0fe89d3`, identity evidence
+`494a717`, and specialist record `ab21442`.
+
+Only stacked draft publication may proceed, open, unmerged, and inactive. Activation
+and merge are prohibited. The judgment admits only opt-in first publication of a
+local same-tenant safe-public portfolio, deterministic self-host decisions as an
+inactive primitive, and the tested bounded/read-only/non-nested/no-replace/rollback
+behavior.
+
+Adapter enforcement, a full-system no-loop guarantee, clone/fork/lineage
+reconciliation, complete lineage/commit binding, persistent history, updates,
+deletion, fsync durability, concurrent/distributed writers, private/cross-tenant
+federation, authentication, and every usefulness, value, performance, scale,
+privacy, security, learning, generalization, or superiority claim remain deferred.

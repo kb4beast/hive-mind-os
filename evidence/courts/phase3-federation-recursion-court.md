@@ -162,7 +162,7 @@ The Builder also reproduced an isolated install with all `133` governed resource
 foundation-generated records, `8` foundation-canonical records, `7` projection
 schemas, `3` public-memory schemas, `48` package files, and `22` components.
 
-## Pending judgment
+## Judgment
 
 Distinct Judge `/root/item5_judge` reviewed implementation `0fe89d3`, identity record
 `494a717`, and specialist record `ab21442` and issued `defer`. The technical evidence
@@ -172,6 +172,24 @@ proposition. The actual pinned requirements are the internal redesign record and
 `MEM-024`/`MEM-025`.
 
 The evidence-only repair attributes the requirement solely to those pinned sources.
-The Judge required no production rerun because technical bytes are unchanged, but
-must renew judgment on the exact repair record. Until then, the branch must not be
-activated, published, or merged.
+The Judge required no production rerun because technical bytes are unchanged.
+
+On exact repair `7e66574945b1a45a59958406494dd27ff37dafcf`, the same distinct
+Judge issued final `adapt` with no remand. Admitted scope is only:
+
+- opt-in first publication of a local, same-tenant portfolio from strict safe-public
+  item-3 projections;
+- deterministic self-host admission decisions as an inactive primitive; and
+- tested source-read-only, bounded, non-nested, fail-closed, no-replace, reversible
+  behavior.
+
+Adapter enforcement, full-system no-loop claims, clone/fork/lineage reconciliation,
+complete lineage/commit binding, persistent history, updates, deletion, fsync
+durability, concurrent/distributed writers, private/cross-tenant federation,
+authentication, activation, and every usefulness, value, performance, scale,
+privacy, security, learning, generalization, or superiority claim remain unadmitted.
+
+Only stacked draft publication may proceed. It must remain open, unmerged, and
+inactive. Any relevant implementation, schema, source-admission, identity,
+authority, protocol, capability, or claim change requires renewed independent
+review and judgment.
