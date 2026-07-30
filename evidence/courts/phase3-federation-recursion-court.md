@@ -129,9 +129,42 @@ Ruff, Pyright, inventory equality, and diff checks pass. Repaired inventory is
 `sha256:89b7625dbc4070ddf364e900de7a465005ce852d14a58d4133eb15341a072371`.
 This is Builder testimony; renewed exact-candidate review remains required.
 
+## Renewed independent review
+
+The final technical candidate is
+`0fe89d3382c624cbf4e3fb4da8a9a681306fc2a9`; the evidence-only identity repair is
+`494a7175d62e988ba9a071b726e023487333e042`.
+
+- Explorer/Advocate `Helmholtz`: `PASS` on exact record `494a717`. Every inherited
+  blob/license chain resolves, `FED-002A/B/C/D` is atomic, comparative narrowness is
+  withdrawn, and no value/superiority claim remains.
+- Architect `Heisenberg`: `PASS` on exact implementation `0fe89d3`. Independently
+  reproduced canonical root derivation, both ancestry directions, nested sources,
+  junction rejection, and zero mutation.
+- Cross-Examiner/Integrator `item6_cross_examiner`: `PASS` on exact implementation
+  `0fe89d3`. Reproduced noncanonical, ancestry, nested-source, source/target junction,
+  and pre-consumption authority failures with no mutation.
+- Curator/Expert Witness `Locke`: `PASS` on exact record `494a717` after reproducing
+  `27 passed, 1 skipped`; `174 passed, 1 skipped, 57 subtests passed`; exact
+  inventory; Ruff/Pyright; `133` wheel resources; prior remand closure; and unchanged
+  item-1 through item-5 protected/runtime evidence.
+- Steward `/root/item4_explorer/steward`: `PASS` on implementation `0fe89d3` plus
+  record `494a717`. Bounded traversal, interrupted-stage refusal, source
+  revalidation, no-replace publication, idempotency, manual recovery, and rollback
+  remain closed; no fsync or concurrent/distributed-writer claim is admitted.
+- Optimizer `Tesla`: `PASS` on exact implementation `0fe89d3`, recommending only
+  narrow `adapt`. Runtimes are observations, the zero-note inventory is not a
+  representative workload, and no performance, scale, cost, customer-value,
+  learning, privacy/security, or superiority result exists.
+
+The Builder also reproduced an isolated install with all `133` governed resources:
+`8` cognitive schemas, `5` federation schemas, `17` foundation schemas, `17`
+foundation-generated records, `8` foundation-canonical records, `7` projection
+schemas, `3` public-memory schemas, `48` package files, and `22` components.
+
 ## Pending judgment
 
-A distinct Explorer/Advocate, Architect, Cross-Examiner, Curator, Steward,
-Optimizer, and Judge must inspect the exact repaired candidate or review record
-applicable to their role. Until then, promotion remains `defer`. The branch may be
-developed and tested but must not be activated, published, or merged.
+All required renewed specialist reviews pass. A distinct Judge must inspect exact
+implementation `0fe89d3` and exact review record `494a717` and issue
+`adopt`, `adapt`, `defer`, `reject`, or `quarantine`. Until that verdict, promotion
+remains `defer`; the branch must not be activated, published, or merged.

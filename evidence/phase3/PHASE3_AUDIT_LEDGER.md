@@ -1119,3 +1119,30 @@ lineage/repository-instance/tenant/commit record binding were not atomic. The so
 register now separates those propositions, assigns `adapt` or `defer`, owners,
 acceptance mappings, and rollback, retains distinct repository instances until
 lineage evidence exists, and removes an unproved comparative-narrowness phrase.
+
+## `P3-ITEM6-AUDIT-005` — renewed specialist review passes
+
+Exact implementation `0fe89d3382c624cbf4e3fb4da8a9a681306fc2a9` and exact
+evidence record `494a7175d62e988ba9a071b726e023487333e042` now have renewed
+independent `PASS` verdicts from Explorer/Advocate `Helmholtz`, Architect
+`Heisenberg`, Cross-Examiner/Integrator `item6_cross_examiner`, Curator/Expert
+Witness `Locke`, Steward `/root/item4_explorer/steward`, and Optimizer `Tesla`.
+
+Their independent receipts preserve:
+
+- `27 passed, 1 skipped` for item 6;
+- `174 passed, 1 skipped, 57 subtests passed` for the combined matrix;
+- Ruff and Pyright success;
+- inventory
+  `sha256:89b7625dbc4070ddf364e900de7a465005ce852d14a58d4133eb15341a072371`;
+- isolated-wheel equality across all `133` governed resources, including eight
+  cognitive and five federation schemas;
+- zero mutation for noncanonical, nested, linked/reparse, authority, drift, race,
+  and interrupted-stage failures;
+- unchanged item-1 through item-5 protected/runtime evidence; and
+- explicit deferral of fsync/concurrency, adapter enforcement, ordinary-clone
+  reconciliation, complete lineage/commit binding, activation, performance, scale,
+  value, learning, privacy/security, and superiority claims.
+
+Optimizer recommends only narrow `adapt`. A distinct Judge verdict remains required
+before draft publication; activation and merge remain prohibited.
