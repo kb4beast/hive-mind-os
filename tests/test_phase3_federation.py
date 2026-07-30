@@ -28,7 +28,10 @@ from hive_mind_os.foundation.federation_contracts import (
 )
 from hive_mind_os.models import Role
 from hive_mind_os.policy import PolicyDecision
-from scripts.phase3_federation_inventory import build_phase3_item6_inventory
+from scripts.phase3_federation_inventory import (
+    _canonical_json_file_digest,
+    build_phase3_item6_inventory,
+)
 
 
 class _Raises:
@@ -987,6 +990,16 @@ def _case_item6_inventory_is_exact() -> None:
     assert build_phase3_item6_inventory(repository) == committed
 
 
+def _case_prior_inventory_digest_is_newline_independent(tmp_path: Path) -> None:
+    lf = tmp_path / "lf.json"
+    crlf = tmp_path / "crlf.json"
+    lf.write_bytes(b'{\n  "schema_version": 1,\n  "value": "same"\n}\n')
+    crlf.write_bytes(
+        b'{\r\n  "schema_version": 1,\r\n  "value": "same"\r\n}\r\n'
+    )
+    assert _canonical_json_file_digest(lf) == _canonical_json_file_digest(crlf)
+
+
 class FederationTests(unittest.TestCase):
     def _temporary_case(self, case: Any, *arguments: object) -> None:
         with TemporaryDirectory() as temporary:
@@ -1124,3 +1137,6 @@ class FederationTests(unittest.TestCase):
 
     def test_item6_inventory_is_exact(self) -> None:
         _case_item6_inventory_is_exact()
+
+    def test_prior_inventory_digest_is_newline_independent(self) -> None:
+        self._temporary_case(_case_prior_inventory_digest_is_newline_independent)

@@ -1243,3 +1243,25 @@ truthfully rebinds only the converted test bytes.
 The repair may be pushed to existing draft PR `#37`; it must remain open, unmerged,
 and inactive. Activation and merge are prohibited. Hosted checks must rerun before
 the PR is described as passing.
+
+## `P3-ITEM6-AUDIT-011` — cross-platform inventory remand
+
+Fresh push run `30508445464` and PR run `30508447831` at exact judged repair head
+`8f97ebc` passed all non-test checks and ran the full hosted suite. Every completed
+Python job failed only item-6 inventory equality; behavior and discovery tests
+passed.
+
+Root cause: the item-6 chain hashed raw working-tree bytes of the inherited item-5
+JSON inventory. Windows CRLF and GitHub LF checkouts therefore produced different
+digests for semantically identical committed JSON.
+
+The repair hashes the parsed inherited document using canonical JSON and adds a
+direct LF/CRLF equality regression. Windows and Linux Python 3.12 each run all 29
+item-6 tests with `28 passed, 1 platform skip`. Combined Phase 2/3 pytest reports
+`175 passed, 1 skipped, 57 subtests`; all eight governance tests, Ruff, Pyright,
+inventory equality, and diff checks pass. Cross-platform inventory is
+`sha256:7656c7f2fec506eecaa23b5b4a378187d246e26de92c870e5aece185c3caa9ec`.
+
+No runtime, schema, authority, workflow, contract, source-admission, identity,
+protocol, capability, or claim surface changed. Renewed independent review and
+judgment remain required before pushing.

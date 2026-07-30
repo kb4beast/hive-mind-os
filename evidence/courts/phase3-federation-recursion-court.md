@@ -253,3 +253,34 @@ evidence, or claim change.
 The repair may be pushed to existing draft PR `#37`, which must remain open,
 unmerged, and inactive. Activation and merge remain prohibited. Hosted checks must
 rerun and reach a passing terminal result before the PR may be described as passing.
+
+## Hosted cross-platform inventory remand
+
+Fresh push run `30508445464` and PR run `30508447831` at exact head `8f97ebc`
+passed every non-test check and ran all `605` hosted tests, but each completed Python
+job failed only `test_item6_inventory_is_exact`. The federation behavior and
+unittest discovery repairs passed.
+
+The failure exposed a second deterministic-evidence defect:
+`phase3_item5_input.historical_inventory_digest` hashed raw bytes from the inherited
+item-5 JSON inventory. The Windows checkout contained CRLF working-tree bytes while
+the GitHub checkout contained LF bytes, even though Git normalized both to the same
+committed JSON. The chained item-6 digest was therefore checkout-dependent.
+
+The repair parses the inherited JSON and hashes its canonical JSON representation.
+An explicit LF/CRLF fixture proves equivalent JSON has one digest. It adds no
+dependency and changes no runtime, schema, authority, workflow, contract,
+source-admission, identity, protocol, capability, or claim surface.
+
+Builder receipts are:
+
+- Windows item 6: `28 passed, 1 privilege-dependent skip`;
+- Linux Python 3.12 item 6: `28 passed, 1 Windows-only skip`;
+- combined Phase 2/3 pytest: `175 passed, 1 skipped, 57 subtests passed`;
+- all eight governance tests, Ruff, Pyright, inventory equality, and diff checks:
+  pass; and
+- cross-platform inventory:
+  `sha256:7656c7f2fec506eecaa23b5b4a378187d246e26de92c870e5aece185c3caa9ec`.
+
+This is Builder evidence. Renewed independent review and judgment are required
+before another push.

@@ -55,6 +55,10 @@ def _digest_json(value: Any) -> str:
     )
 
 
+def _canonical_json_file_digest(path: Path) -> str:
+    return _digest_json(json.loads(path.read_text(encoding="utf-8")))
+
+
 def _write_empty_source(root: Path, repository_id: str, seed: str) -> Path:
     root = root / "hive-mind" / "generated-cognitive"
     root.mkdir(parents=True)
@@ -232,7 +236,9 @@ def build_phase3_item6_inventory(repository: Path) -> dict[str, Any]:
             ],
         },
         "phase3_item5_input": {
-            "historical_inventory_digest": _digest_bytes(prior_inventory.read_bytes()),
+            "historical_inventory_digest": _canonical_json_file_digest(
+                prior_inventory
+            ),
         },
         "prior_contracts": {
             "phase2_count": len(PHASE2_SCHEMA_NAMES),

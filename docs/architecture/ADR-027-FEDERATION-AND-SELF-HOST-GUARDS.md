@@ -1,6 +1,6 @@
 # ADR-027: Safe-public portfolio federation and self-host recursion guards
 
-- Status: adapted for stacked draft delivery; open, unmerged, inactive
+- Status: proposed cross-platform inventory repair; renewed judgment pending
 - Date: 2026-07-29
 - Base: `376a4a6082f6bdf154ba6252ccb70062a17a549b`
 - Governing claims: `MEM-024`, `MEM-025`
