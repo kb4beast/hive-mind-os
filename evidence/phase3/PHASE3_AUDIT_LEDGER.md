@@ -1226,3 +1226,20 @@ Runtime, schemas, authority, contracts, source register, dissent, workflow,
 governance criteria, dependencies, prior tests/inventories, and protected runtime
 evidence remain unchanged. A renewed Judge verdict is the only remaining gate before
 pushing the repair.
+
+## `P3-ITEM6-AUDIT-010` — CI repair judged `adapt`
+
+Distinct Judge `/root/item5_judge` reviewed exact repair `d2aee8a` and renewed
+review record `1bce33b` and issued `adapt` with no remand. The Judge independently
+reproduced all 28 item-6 unittest cases, pytest compatibility, all eight governance
+tests, deterministic inventory, Ruff, and Pyright.
+
+The prior narrow item-6 judgment remains controlling because production, schemas,
+authority, workflow, contracts, source admission, identity, protocol, capability,
+protected evidence, and claims are unchanged. Inventory
+`sha256:0cb30744190e9eb521ed99da01ddf25bdb89dc755812786b2be1dff9abd1fe87`
+truthfully rebinds only the converted test bytes.
+
+The repair may be pushed to existing draft PR `#37`; it must remain open, unmerged,
+and inactive. Activation and merge are prohibited. Hosted checks must rerun before
+the PR is described as passing.

@@ -243,5 +243,13 @@ focused and combined suites passed; implementation, schemas, authority, CI
 criteria, prior tests/inventories, and protected runtime evidence are unchanged.
 The Curator accepts the root full-discovery receipt of `605 tests, 4 platform skips`.
 
-A renewed distinct Judge verdict on exact repair `d2aee8a` is still required before
-the repair may be pushed.
+Distinct Judge `/root/item5_judge` reviewed exact repair `d2aee8a` and review record
+`1bce33b` and issued `adapt` with no remand. The Judge independently reproduced all
+28 item-6 unittest cases, pytest compatibility, all eight governance tests,
+inventory, Ruff, and Pyright, and confirmed no implementation, schema, authority,
+workflow, contract, source-admission, identity, protocol, capability, protected
+evidence, or claim change.
+
+The repair may be pushed to existing draft PR `#37`, which must remain open,
+unmerged, and inactive. Activation and merge remain prohibited. Hosted checks must
+rerun and reach a passing terminal result before the PR may be described as passing.
