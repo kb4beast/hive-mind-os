@@ -223,3 +223,25 @@ equality, and diff checks pass. New inventory is
 This is Builder testimony. The earlier `adapt` does not cover changed test/evidence
 bytes; renewed independent review and judgment are required before pushing the
 repair or treating PR `#37` as a passing draft.
+
+## Renewed CI-repair review
+
+Cross-Examiner `item6_cross_examiner` and Curator/Expert Witness `Locke`
+independently returned `PASS` on exact repair
+`d2aee8af1665504943133e14c369ba612c7a78c2`.
+
+The Cross-Examiner confirmed all 20 prior test bodies remain equivalent after only
+the pytest-to-standard-library substitutions, parameter expansion still yields 28
+distinct cases, exception mismatch/absence/propagation and patch cleanup work, both
+vault-sibling modes and all eight self-host cases remain distinct, and the Windows
+junction case ran. Focused unittest, focused pytest, all eight governance tests, and
+the combined Phase 2/3 matrix passed.
+
+The Curator independently counted 28 unique unittest methods, 35 assertions, and 23
+negative exception checks with no weakening. Inventory, Ruff, Pyright, governance,
+focused and combined suites passed; implementation, schemas, authority, CI
+criteria, prior tests/inventories, and protected runtime evidence are unchanged.
+The Curator accepts the root full-discovery receipt of `605 tests, 4 platform skips`.
+
+A renewed distinct Judge verdict on exact repair `d2aee8a` is still required before
+the repair may be pushed.

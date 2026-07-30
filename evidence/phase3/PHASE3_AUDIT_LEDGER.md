@@ -1209,3 +1209,20 @@ Builder repair receipts:
 
 The prior judgment does not authorize the changed test/evidence bytes. Renewed
 independent review and judgment are required before the repair is pushed.
+
+## `P3-ITEM6-AUDIT-009` — CI repair independently verified
+
+Cross-Examiner `item6_cross_examiner` and Curator/Expert Witness `Locke` returned
+independent `PASS` verdicts on exact repair `d2aee8a`.
+
+They verified 28 unique unittest-discoverable cases retain all 20 prior test bodies,
+both vault-sibling modes, all eight self-host parameter cases, 35 assertions, and 23
+negative exception checks. Exception mismatch/absence/propagation, patch cleanup,
+the Windows junction case, focused unittest/pytest, all governance tests, combined
+Phase 2/3 pytest, inventory equality, Ruff, and Pyright pass. Root full discovery
+ran `605 tests` with four platform skips.
+
+Runtime, schemas, authority, contracts, source register, dissent, workflow,
+governance criteria, dependencies, prior tests/inventories, and protected runtime
+evidence remain unchanged. A renewed Judge verdict is the only remaining gate before
+pushing the repair.
