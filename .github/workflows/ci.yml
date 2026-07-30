@@ -139,8 +139,6 @@ jobs:
       - name: Audit Version 1.1 integration contract
         run: |
           python scripts/release_integration_audit.py \
-            --allow-pending-pr30-merge \
-            --allow-bootstrap-workflow \
             --output dist/release-version-1.1-audit.json
       - name: Build wheel without project dependencies
         run: python -m pip wheel --disable-pip-version-check --no-deps --wheel-dir dist .
