@@ -63,6 +63,9 @@ jobs:
             | sha256sum --check --strict
           git apply --check --index /tmp/version-1.1-hardening.patch
           git apply --index /tmp/version-1.1-hardening.patch
+          # GitHub Actions tokens cannot update workflow files. The authenticated
+          # connector publishes the separately verified CI file after this commit.
+          git restore --source=HEAD --staged --worktree .github/workflows/ci.yml
           git rm "${chunks[@]}"
           if [[ -f .github/bootstrap/version-1.1-hardening.patch.gz.b64 ]]; then
             git rm .github/bootstrap/version-1.1-hardening.patch.gz.b64
