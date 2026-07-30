@@ -22,6 +22,14 @@
   scoring performs no resource read; all scalar entry points require exact built-in
   strings. Focused verification now passes 10 tests and 14 subtests, Ruff, and
   Pyright. Independent remand closure remains pending.
+- `P4C-AUDIT-006`: Cross-Examiner recheck closed measurement semantics, no-I/O,
+  and hostile-scalar remands but kept provenance open: detached metrics could
+  reseal copied provenance without retaining the source observations.
+- `P4C-AUDIT-007`: Builder embeds the bounded validated observation manifest in
+  every measurement. Standalone validation now requires unique observation
+  identities/digests/cases, exact per-case suite/subject/case/dataset/oracle/input/
+  evaluator/budget pins, one-to-one metric provenance, and observation coverage
+  matching missing cases. Independent closure remains pending.
 
 ## Preserved dissent
 

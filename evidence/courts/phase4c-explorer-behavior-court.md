@@ -39,3 +39,9 @@ binds each measured metric to the exact observation and execution pins, removes
 successor compilation/resource reads from scoring, and rejects non-built-in scalar
 inputs. The original defer remains preserved; the same Cross-Examiner must
 independently reproduce closure.
+
+The first recheck closed three remands but kept exact provenance open because
+detached metrics could reseal copied fields. The second repair embeds each validated
+source observation in the measurement and rederives all one-to-one links and fixed
+case pins. This additional remand and repair remain append-only pending final Cross-
+Examiner closure.

@@ -278,6 +278,28 @@ class ExplorerBehaviorTests(unittest.TestCase):
             ).valid
         )
 
+        provenance = score_explorer_behavior(
+            _observations(),
+            evaluator_id="evaluator:independent",
+            budget_manifest_digest=BUDGET_DIGEST,
+        )
+        for metric in provenance["metrics"]:
+            metric["observation_id"] = "forged:duplicate"
+            metric["observation_digest"] = "sha256:" + ("9" * 64)
+            metric["seed"] = 999
+            metric["repetition"] = 999
+            metric["dataset_digest"] = "sha256:" + ("a" * 64)
+            metric["oracle_digest"] = "sha256:" + ("b" * 64)
+            metric["input_manifest_digest"] = "sha256:" + ("c" * 64)
+            metric["budget_manifest_digest"] = "sha256:" + ("d" * 64)
+            _reseal(metric)
+        _reseal(provenance)
+        forged = validate_explorer_behavior(
+            EXPLORER_BEHAVIOR_SCHEMA_NAMES[4], provenance
+        )
+        self.assertFalse(forged.valid)
+        self.assertIn("does not match observation", " ".join(forged.issues))
+
     def test_invalid_numbers_and_hostile_containers_fail_closed(self) -> None:
         invalid = _observations()
         invalid[0]["seed"] = True
