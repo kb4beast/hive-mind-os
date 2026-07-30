@@ -391,6 +391,45 @@ class ExplorerIdeaLifecycleTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _compile("encounter", recorded_at="2026-07-30T00:00:00")
 
+    def test_exact_predecessor_with_missing_ancestry_fails_closed(self) -> None:
+        encounter_prepared = _compile(
+            "encounter",
+            lifecycle_id="idea:orphan-ancestry",
+        )
+        relationship_prepared = _compile(
+            "relationship",
+            lifecycle_id="idea:orphan-ancestry",
+            prior=(encounter_prepared, {"record_id": "record:missing"}),
+            classification="new",
+        )
+        relationship_memory = relationship_prepared["memory"]
+        relationship = self.store.append_record(
+            authority=_authority("foundation.memory.write"),
+            foundation_action="foundation.memory.write",
+            tenant_id=TENANT,
+            repository_id=REPOSITORY,
+            record_type="memory-record",
+            schema_name="memory-record-v1",
+            stream_id=relationship_prepared["stream_id"],
+            payload=relationship_memory,
+            actor_id="explorer",
+            idempotency_key=relationship_prepared["idempotency_key"],
+            observed_at=relationship_memory["observed_at"],
+            correlation_id="idea:orphan-ancestry",
+            causation_id="record:encounter",
+            sensitivity="private",
+            retention="governed",
+            status="active",
+        )
+        court = _compile(
+            "court",
+            lifecycle_id="idea:orphan-ancestry",
+            prior=(relationship_prepared, relationship),
+            court_disposition="adapt",
+        )
+        with self.assertRaisesRegex(ValueError, "ancestry is unavailable"):
+            self._append(court)
+
     def test_private_default_is_absent_from_public_snapshot(self) -> None:
         self._append(_compile("encounter"))
         snapshot = FoundationStore.read_public_memory_snapshot(
