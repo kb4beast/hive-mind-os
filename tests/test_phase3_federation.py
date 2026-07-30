@@ -6,7 +6,7 @@ import subprocess
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 import pytest
 
@@ -551,6 +551,75 @@ def test_rejects_interrupted_staging_and_excess_sources(tmp_path: Path) -> None:
             portfolio_repository_id="portfolio",
             check=True,
         )
+
+
+def test_interrupted_staging_blocks_unchanged_rerun(tmp_path: Path) -> None:
+    sources = [
+        _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+        )
+        for name in ("one", "two")
+    ]
+    portfolio = tmp_path / "portfolio"
+    project_federation(
+        sources,
+        portfolio,
+        tenant_id="tenant-a",
+        portfolio_repository_id="portfolio",
+        authority=_authority(),
+    )
+    staging = portfolio / "hive-mind" / ".federation-interrupted"
+    staging.mkdir()
+    (staging / "partial").write_text("preserve", encoding="utf-8")
+    with pytest.raises(FederationError, match="operator recovery"):
+        project_federation(
+            sources,
+            portfolio,
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            authority=_authority(),
+        )
+    assert (staging / "partial").read_text(encoding="utf-8") == "preserve"
+
+
+def test_tree_enumeration_stops_at_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "many"
+    root.mkdir()
+    for index in range(10):
+        (root / f"{index}.txt").write_text("x", encoding="utf-8")
+    real_scandir = os.scandir
+    consumed = [0]
+
+    class CountingScandir:
+        def __init__(self, path: str | os.PathLike[str]) -> None:
+            self._inner = real_scandir(path)
+
+        def __enter__(self) -> "CountingScandir":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            self._inner.close()
+
+        def __iter__(self) -> "CountingScandir":
+            return self
+
+        def __next__(self) -> Any:
+            item = next(self._inner)
+            consumed[0] += 1
+            return item
+
+    monkeypatch.setattr(federation_module, "MAX_TREE_ENTRIES", 2)
+    monkeypatch.setattr(federation_module.os, "scandir", CountingScandir)
+    with pytest.raises(FederationError, match="entry bound"):
+        federation_module._enumerate_tree(root)
+    assert consumed[0] == 3
 
 
 def test_revalidates_sources_after_staging(

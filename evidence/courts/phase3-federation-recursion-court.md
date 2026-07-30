@@ -65,12 +65,23 @@ Those repairs require renewed exact-candidate review.
 
 ## Builder evidence
 
-The repaired item-6 suite passes `22` tests with one environment-dependent directory
-symlink skip; the combined matrix passes `169` tests, one skip, and `57` subtests.
+The repaired item-6 suite passes `24` tests with one environment-dependent directory
+symlink skip; the combined matrix passes `171` tests, one skip, and `57` subtests.
 Ruff and Pyright pass. Repaired inventory
-`sha256:5955865d37533c828772bb9a1b8396eabcd799464dbc5251d7e819e3af7060ae`
+`sha256:5dd1e6b1b68e5020c7b0bf936f93530ca71976a346d708d1dec4f0c68e693956`
 is exact. The Windows junction regression itself ran and passed; the skip covers
 ordinary directory-symlink creation unavailable to the current Windows user.
+
+Renewed Cross-Examiner review of `616f59d` found that interrupted staging blocked a
+new publication but not an otherwise unchanged rerun. The final repair moves that
+check ahead of both paths and preserves the orphan for operator recovery. The
+combined matrix after this repair is `170` tests, one skip, and `57` subtests.
+
+Renewed Steward review of `616f59d` found that source/target traversal checked its
+limit only after materializing a directory. Traversal and staging scans now consume
+entries incrementally and stop at `MAX_TREE_ENTRIES + 1`; an instrumented regression
+proves only three entries are consumed when the test bound is two. The final combined
+matrix after both residual repairs is `171` tests, one skip, and `57` subtests.
 
 Adding one package-data directory and authority action legitimately rebinds the
 current inventories for items 1–5. The item-5 inventory changes only its chained

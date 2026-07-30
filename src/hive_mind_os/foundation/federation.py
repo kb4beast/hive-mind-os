@@ -122,28 +122,34 @@ def _enumerate_tree(root: Path) -> tuple[set[str], set[str]]:
         if len(relative_current.parts) > MAX_TREE_DEPTH:
             raise FederationError("managed tree exceeds its depth bound")
         try:
-            children = list(os.scandir(current))
+            with os.scandir(current) as children:
+                for child in children:
+                    entries += 1
+                    if entries > MAX_TREE_ENTRIES:
+                        raise FederationError("managed tree exceeds its entry bound")
+                    candidate = Path(child.path)
+                    try:
+                        info = candidate.lstat()
+                    except OSError as error:
+                        raise FederationError(
+                            "managed tree entry is unavailable"
+                        ) from error
+                    if _is_link_like(candidate, info):
+                        raise FederationError(
+                            "managed tree contains linked or reparse evidence"
+                        )
+                    relative = candidate.relative_to(root).as_posix()
+                    if stat.S_ISDIR(info.st_mode):
+                        directories.add(relative)
+                        pending.append(candidate)
+                    elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
+                        files.add(relative)
+                    else:
+                        raise FederationError(
+                            "managed tree entry is not a safe regular object"
+                        )
         except OSError as error:
             raise FederationError("managed tree could not be enumerated") from error
-        for child in children:
-            entries += 1
-            if entries > MAX_TREE_ENTRIES:
-                raise FederationError("managed tree exceeds its entry bound")
-            candidate = Path(child.path)
-            try:
-                info = candidate.lstat()
-            except OSError as error:
-                raise FederationError("managed tree entry is unavailable") from error
-            if _is_link_like(candidate, info):
-                raise FederationError("managed tree contains linked or reparse evidence")
-            relative = candidate.relative_to(root).as_posix()
-            if stat.S_ISDIR(info.st_mode):
-                directories.add(relative)
-                pending.append(candidate)
-            elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
-                files.add(relative)
-            else:
-                raise FederationError("managed tree entry is not a safe regular object")
     return files, directories
 
 
@@ -755,6 +761,27 @@ def _rename_no_replace(source: Path, destination: Path) -> None:
         raise OSError(error_number, os.strerror(error_number), destination)
 
 
+def _reject_interrupted_staging(parent: Path) -> None:
+    if not os.path.lexists(parent):
+        return
+    _reject_linked_components(parent, "federation target")
+    count = 0
+    try:
+        with os.scandir(parent) as existing_entries:
+            for entry in existing_entries:
+                count += 1
+                if count > MAX_TREE_ENTRIES:
+                    raise FederationError(
+                        "federation target parent exceeds its entry bound"
+                    )
+                if entry.name.startswith(".federation-"):
+                    raise FederationError(
+                        "interrupted federation staging requires operator recovery"
+                    )
+    except OSError as error:
+        raise FederationError("federation target parent cannot be enumerated") from error
+
+
 def _write_new_namespace(
     namespace: Path,
     desired: Mapping[str, bytes],
@@ -769,14 +796,7 @@ def _write_new_namespace(
         raise FederationError("federation target parent is unavailable") from error
     if not stat.S_ISDIR(parent_info.st_mode):
         raise FederationError("federation target parent is not a real directory")
-    try:
-        existing_entries = list(parent.iterdir())
-    except OSError as error:
-        raise FederationError("federation target parent cannot be enumerated") from error
-    if len(existing_entries) > MAX_TREE_ENTRIES:
-        raise FederationError("federation target parent exceeds its entry bound")
-    if any(path.name.startswith(".federation-") for path in existing_entries):
-        raise FederationError("interrupted federation staging requires operator recovery")
+    _reject_interrupted_staging(parent)
     staging = Path(tempfile.mkdtemp(prefix=".federation-", dir=parent))
     try:
         for relative, content in sorted(desired.items()):
@@ -846,6 +866,7 @@ def project_federation(
     )
     manifest_digest = _file_digest(desired["manifest.json"])
     tree_digest = _tree_digest(desired)
+    _reject_interrupted_staging(namespace.parent)
 
     def validate_sources() -> None:
         for source_root, receipt, expected_digests in source_receipts:

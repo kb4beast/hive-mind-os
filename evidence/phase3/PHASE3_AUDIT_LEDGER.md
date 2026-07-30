@@ -1066,11 +1066,20 @@ independent review are pending.
 
 ## `P3-ITEM6-AUDIT-003` — Builder remand repair
 
-The repaired item-6 suite passes `22` tests with one ordinary-symlink environment
+The repaired item-6 suite passes `24` tests with one ordinary-symlink environment
 skip; its Windows junction regression ran and passed. The combined Phase 2 plus
-Phase 3 items 1–6 matrix passes `169` tests, one skip, and `57` subtests. Ruff and
+Phase 3 items 1–6 matrix passes `171` tests, one skip, and `57` subtests. Ruff and
 Pyright pass. Repaired inventory is
-`sha256:5955865d37533c828772bb9a1b8396eabcd799464dbc5251d7e819e3af7060ae`.
+`sha256:5dd1e6b1b68e5020c7b0bf936f93530ca71976a346d708d1dec4f0c68e693956`.
 
 An exact repair commit and renewed independent review remain required. These Builder
 receipts do not close the prior remands or authorize publication.
+
+Renewed Cross-Examiner review of intermediate repair `616f59d` found one residual:
+an orphan staging directory was not consulted on an `unchanged` rerun. The staging
+check now precedes both unchanged and publication paths; a regression preserves the
+orphan and refuses the rerun.
+
+Renewed Steward review of `616f59d` separately found eager directory materialization
+before the entry bound. Both managed-tree and staging-parent scans now iterate and
+stop at the first over-bound entry. An instrumented regression proves early stop.
