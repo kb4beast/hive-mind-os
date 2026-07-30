@@ -15,6 +15,8 @@ from .canonical import canonical_bytes, digest, reject_private_content, stable_i
 
 FOUNDATION_SCHEMA_VERSION = 1
 RECORD_ACTIONS = {
+    "explorer-context-selection": "foundation.opportunity.write",
+    "explorer-shadow-run": "foundation.opportunity.write",
     "idea-encounter": "foundation.opportunity.write",
     "opportunity-record": "foundation.opportunity.write",
     "usage-event": "foundation.telemetry.write",
@@ -57,6 +59,7 @@ class FoundationStore:
         self.path = str(path)
         self._clock = clock
         self._lock = RLock()
+        self._savepoint_counter = 0
         self._connection = sqlite3.connect(
             self.path,
             check_same_thread=False,
@@ -428,6 +431,19 @@ class FoundationStore:
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
+        if self._connection.in_transaction:
+            self._savepoint_counter += 1
+            name = f"hive_nested_{self._savepoint_counter}"
+            self._connection.execute(f"SAVEPOINT {name}")
+            try:
+                yield
+            except BaseException:
+                self._connection.execute(f"ROLLBACK TO {name}")
+                self._connection.execute(f"RELEASE {name}")
+                raise
+            else:
+                self._connection.execute(f"RELEASE {name}")
+            return
         self._connection.execute("BEGIN IMMEDIATE")
         try:
             yield
@@ -583,9 +599,19 @@ class FoundationStore:
                 f"{record_type} requires {required_action}, not {foundation_action}"
             )
         reject_private_content(payload)
-        if schema_name not in PHASE2_SCHEMA_NAMES:
-            raise ValueError("foundation records require a registered Phase 2 schema")
-        validation = validate_foundation(schema_name, payload)
+        if schema_name in PHASE2_SCHEMA_NAMES:
+            validation = validate_foundation(schema_name, payload)
+        else:
+            from .explorer_contracts import (
+                EXPLORER_SCHEMA_NAMES,
+                validate_explorer,
+            )
+
+            if schema_name not in EXPLORER_SCHEMA_NAMES:
+                raise ValueError(
+                    "foundation records require a registered schema"
+                )
+            validation = validate_explorer(schema_name, payload)
         if not validation.valid:
             raise ValueError(
                 f"invalid {schema_name} contract: {'; '.join(validation.issues)}"
@@ -1308,7 +1334,19 @@ class FoundationStore:
                 if payload.get("record_type") != row["record_type"]:
                     issues.append(f"{record_id}: record type differs from payload")
             else:
-                issues.append(f"{record_id}: schema is not registered")
+                from .explorer_contracts import (
+                    EXPLORER_SCHEMA_NAMES,
+                    validate_explorer,
+                )
+
+                if row["schema_name"] not in EXPLORER_SCHEMA_NAMES:
+                    issues.append(f"{record_id}: schema is not registered")
+                else:
+                    validation = validate_explorer(str(row["schema_name"]), payload)
+                    if not validation.valid:
+                        issues.append(f"{record_id}: schema validation failed")
+                    if payload.get("record_type") != row["record_type"]:
+                        issues.append(f"{record_id}: record type differs from payload")
         for row in self._connection.execute(
             "SELECT * FROM repositories WHERE tenant_id=? AND repository_id=?",
             (tenant_id, repository_id),

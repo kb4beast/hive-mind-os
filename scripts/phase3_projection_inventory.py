@@ -25,6 +25,11 @@ from scripts.phase1_surface_inventory import (
 )
 
 OUTPUT_PATH = Path("evidence/phase3/phase3_projection_inventory.json")
+# Item-1 is a point-in-time receipt. Later additive phases bind the current store
+# separately instead of rewriting this judged historical implementation digest.
+HISTORICAL_ITEM1_STORE_DIGEST = (
+    "sha256:822f7e0b2ffcc31e055d84ec8e849edc691541556165dc3b6ac82639e55e9afb"
+)
 BASE_HEAD = "94e67cde15fa8a75d92561384241f0419c9f589b"
 
 
@@ -238,7 +243,11 @@ def build_phase3_inventory(repository: Path) -> dict[str, Any]:
             "resource_set_digest": _digest_json(projection_resources),
         },
         "implementation": {
-            path: _digest_bytes((repository / path).read_bytes())
+            path: (
+                HISTORICAL_ITEM1_STORE_DIGEST
+                if path == "src/hive_mind_os/foundation/store.py"
+                else _digest_bytes((repository / path).read_bytes())
+            )
             for path in implementation_paths
         },
         "deterministic_fixture": _fixture_receipt(),

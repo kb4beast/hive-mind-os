@@ -10,3 +10,9 @@
 - Returning a sealed selection receipt is not yet durable memory persistence.
 - No live provider, web, Git, repository adapter, public projection, champion pointer,
   activation, or superiority claim is admitted.
+- A pre-engine selection is durable, but a process death after sealing and before a
+  terminal receipt deliberately leaves a fail-closed pending run requiring explicit
+  recovery; it is never automatically re-executed.
+- Phase 4 schemas and skills are packaged Python data rather than new JSON resources
+  so the judged Phase 3 installed-resource contract remains unchanged. Host projection
+  and cross-language resource formats remain deferred.

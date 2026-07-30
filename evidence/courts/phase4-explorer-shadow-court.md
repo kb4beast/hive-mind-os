@@ -50,3 +50,30 @@ Repair must deep-freeze validated packaged skills, use sealed sequence cutoffs a
 canonical whole-record bounds, extend self-host exclusions, append run/selection/
 failure receipts, preflight authority, validate a bounded batch before one atomic
 write, and make run replay deterministic. No publication or judgment is permitted.
+
+## Remand repair candidate
+
+The repair replaces mutable skill dictionaries with an immutable packaged Python
+resource validated against `skill-definition-v2`; adds two strict Phase 4 schemas;
+uses integer sequence cutoffs and canonical whole-record byte accounting; bounds and
+validates every request, record, finding, list, and hostile iterable; excludes
+same-run, generated, projection, Explorer-shadow, and nonzero self-host inputs; and
+preflights authentic actor/scope authority before selecting or invoking the engine.
+
+Selection and all terminal success/failure states are append-only Foundation records.
+The full finding batch validates before writes. Savepoint-safe nested transactions
+make all encounters, opportunities, relations, and the terminal success receipt one
+atomic unit. Operational rollback receives a terminal failure receipt. Exact run
+replay returns the stored result without invoking the engine again.
+
+Phase 3 item 1 is now explicitly treated as a historical point-in-time receipt: its
+judged store digest remains pinned while the new Phase 4 inventory binds the current
+store and the compatibility bridge. No Phase 3 evidence file or installed-resource
+count changes.
+
+Builder receipts are `11 passed` focused, `186 passed, 1 skipped, 63 subtests passed`
+for the combined Phase 2–4 matrix, all eight governance tests, Ruff, Pyright, exact
+inventory, diff checks, and an isolated installed wheel with the unchanged
+133-resource contract. Phase 4 inventory is
+`sha256:f9c6cc97137dc5b4188c77c65766af6bee1ffde409e231bbb2b2b351e94423b5`.
+Renewed exact-byte Cross-Examination is required.

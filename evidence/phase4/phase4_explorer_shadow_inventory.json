@@ -1,0 +1,59 @@
+{
+  "activation": "inert-opt-in-shadow-only",
+  "base_head": "2cbfe1d0e4dccd6f1758e5ddba10f799834bf857",
+  "cli_added": 0,
+  "deterministic_fixture": {
+    "selection_digest": "sha256:cc0061d5c36c54ad551d02d09b691f25c18e5575c31642a21f6cec927d5702f5",
+    "skill_bundle_digest": "sha256:f0c149f6ae3a738cc0324ecb3311e0a3ff93cdfd4923be3709e3c9e5e5b05985"
+  },
+  "explorer_contracts": {
+    "catalog_valid": true,
+    "count": 2,
+    "names": [
+      "explorer-context-selection-v1",
+      "explorer-shadow-run-v1"
+    ]
+  },
+  "external_dependencies_added": 0,
+  "generation_zero": {
+    "baseline_definition_count": 304,
+    "cli_parser_count": 13,
+    "definition_count": 304,
+    "package_api_count": 33,
+    "root_api_count": 131
+  },
+  "generation_zero_activated": false,
+  "implementation": {
+    "scripts/phase3_projection_inventory.py": "sha256:f1055a86c11b91e15203b4f742e2db6ba34682da279cfdc92d4391c4e2d26663",
+    "scripts/phase4_explorer_shadow_inventory.py": "sha256:08b648e49e4baef25eee041317f045fb6b4baad7bca69c6a60b35ac396c9285a",
+    "src/hive_mind_os/foundation/explorer_contracts.py": "sha256:c88fa05f1e24146a3fa83117e9dec6067fb758663f3fd1cb94e11d6d08995d01",
+    "src/hive_mind_os/foundation/explorer_shadow.py": "sha256:d225227d1bcf84020f28523bdb2af3acebffa2a562955581d0c5439675efd53b",
+    "src/hive_mind_os/foundation/explorer_skill_resources.py": "sha256:a1f907b13ccc28383f085e93e4e55ae5cd7a1cc616bf09bfedcfa740ace50310",
+    "src/hive_mind_os/foundation/store.py": "sha256:910421450d7f34c63a894fb40e0be6f5fdf352032afd13ba88a86e948c286586",
+    "tests/test_phase4_explorer_shadow.py": "sha256:401c1727c3961530436335f1b0705a697ab86bec1425746440b6b04c143ba0b0"
+  },
+  "inventory_digest": "sha256:f9c6cc97137dc5b4188c77c65766af6bee1ffde409e231bbb2b2b351e94423b5",
+  "phase": 4,
+  "phase3_input": {
+    "inventory_digest": "sha256:f39f79ec2dc8634cae1aa3b406cbc22a890752e0e2214f0f3cbb444acf4689cd"
+  },
+  "phase_item": "A",
+  "prior_contracts": {
+    "phase2_count": 17,
+    "phase3_item1_count": 7,
+    "phase3_item2_count": 3,
+    "phase3_item3_count": 8,
+    "phase3_item4_count": 8,
+    "phase3_item6_count": 5
+  },
+  "production_activation": false,
+  "provider_or_tool_calls": false,
+  "public_api_added": 0,
+  "schema_version": 1,
+  "skill_bundle": {
+    "activation": "inert",
+    "authority": "none",
+    "count": 3,
+    "digest": "sha256:f0c149f6ae3a738cc0324ecb3311e0a3ff93cdfd4923be3709e3c9e5e5b05985"
+  }
+}

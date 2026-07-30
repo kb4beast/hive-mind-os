@@ -25,3 +25,21 @@ did not cover mutable skills, malformed/string-ordered cutoffs, full-record boun
 later-run recursion, durable receipts, pre-call authority, batch atomicity, hostile
 iterables, or replay idempotency. The candidate remains inert and unpublished.
 Repair must address those exact obligations without weakening the Phase 4A contract.
+
+## `P4A-AUDIT-004` — remand repair candidate
+
+The repaired candidate adds immutable schema-validated packaged skills, two strict
+Phase 4 schemas, sealed integer cutoffs, canonical whole-record bounds, complete
+runtime type/size validation, generated/self-host exclusion, pre-engine authority
+preflight, durable selection and terminal receipts, bounded output consumption,
+whole-batch validation, atomic admission with nested savepoints, operational failure
+receipts, and replay from stored results without a second engine call.
+
+The Phase 3 item-1 inventory bridge pins its judged historical store digest while the
+new Phase 4 inventory binds current shared-store bytes; Phase 3 evidence and the
+133-resource installed-wheel contract remain unchanged.
+
+Receipts: `11` focused tests; `186 passed, 1 skipped, 63 subtests` combined; all eight
+governance tests; Ruff and Pyright pass; isolated wheel and diff checks pass.
+Inventory:
+`sha256:f9c6cc97137dc5b4188c77c65766af6bee1ffde409e231bbb2b2b351e94423b5`.

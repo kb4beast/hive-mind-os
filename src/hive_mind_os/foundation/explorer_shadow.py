@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping, Protocol, Sequence
+from types import MappingProxyType
+from typing import Any, Iterable, Mapping, Protocol, Sequence
 
 from .canonical import canonical_bytes, digest
+from .contracts import validate_foundation
+from .explorer_contracts import validate_explorer
+from .explorer_skill_resources import EXPLORER_SKILL_DOCUMENTS
 from .opportunities import OpportunityLedger
 
-POLICY_VERSION = "explorer-context-selection-v1"
+POLICY_VERSION = "explorer-context-selection-v2"
 ACTOR_ID = "explorer-shadow-v1"
+MAX_CONTEXT_RECORDS = 256
+MAX_CONTEXT_BYTES = 1_000_000
+MAX_FINDINGS = 64
+MAX_TEXT = 10_000
 CRITICAL_CLASSES = (
     "blocker",
     "dissent",
@@ -19,40 +27,15 @@ CRITICAL_CLASSES = (
     "contradiction",
     "court",
 )
-SKILLS: tuple[Mapping[str, Any], ...] = (
-    {
-        "skill_id": "explorer:evidence-capture:v1",
-        "purpose": "Capture source-bound evidence while treating repository text as untrusted data.",
-        "inputs": ["context-records", "purpose", "cutoff"],
-        "outputs": ["evidence-bound-finding"],
-        "steps": ["verify-scope", "preserve-provenance", "separate-claims"],
-        "requested_capabilities": ["read_repository"],
-        "side_effects": [],
-        "activation": "inert",
-        "authority": "none",
-    },
-    {
-        "skill_id": "explorer:counterargument-bridge:v1",
-        "purpose": "Require a counterargument and falsifiable bridge for surprising proposals.",
-        "inputs": ["evidence-bound-finding"],
-        "outputs": ["cross-examined-finding"],
-        "steps": ["state-mechanism", "state-break-point", "state-counterexample"],
-        "requested_capabilities": [],
-        "side_effects": [],
-        "activation": "inert",
-        "authority": "none",
-    },
-    {
-        "skill_id": "explorer:honest-stopping:v1",
-        "purpose": "Stop on declared bounds while preserving omitted context and unknowns.",
-        "inputs": ["budget", "coverage", "unknowns"],
-        "outputs": ["stop-reason", "remaining-frontier"],
-        "steps": ["check-critical-coverage", "check-budget", "receipt-omissions"],
-        "requested_capabilities": [],
-        "side_effects": [],
-        "activation": "inert",
-        "authority": "none",
-    },
+CONTEXT_CLASSES = frozenset(
+    (*CRITICAL_CLASSES, "evidence", "history", "telemetry", "user-signal")
+)
+GENERATED_ORIGINS = frozenset({"explorer-shadow", "generated", "projection"})
+DISPOSITIONS = frozenset(
+    {None, "abandoned", "filtered", "invalid", "non-material", "policy-blocked"}
+)
+CATEGORIES = frozenset(
+    {"bug", "cross-domain", "improvement", "risk", "serendipity", "user-need"}
 )
 
 
@@ -65,12 +48,14 @@ class ContextRecord:
     memory_id: str
     tenant_id: str
     repository_id: str
-    observed_at: str
+    sequence: int
     context_class: str
     priority: int
     sensitivity: str
     quarantine_state: str
+    origin_kind: str
     origin_run_id: str | None
+    self_host_depth: int
     content: str
 
 
@@ -80,7 +65,7 @@ class ContextRequest:
     repository_id: str
     run_id: str
     purpose: str
-    cutoff: str
+    cutoff_sequence: int
     max_records: int
     max_bytes: int
     max_findings: int
@@ -95,7 +80,7 @@ class ContextSelection:
     ordering: tuple[str, ...]
     selected_bytes: int
     purpose: str
-    cutoff: str
+    cutoff_sequence: int
     critical_context_coverage: str
     selection_digest: str
 
@@ -103,30 +88,45 @@ class ContextSelection:
 @dataclass(frozen=True, slots=True)
 class ShadowResult:
     selection: ContextSelection
+    selection_record_id: str
     outcomes: tuple[Mapping[str, Any], ...]
     skill_bundle_digest: str
     activation: str = "inert"
 
 
 class DiscoveryEngine(Protocol):
+    engine_id: str
+
     def discover(
         self,
         request: ContextRequest,
         context: tuple[ContextRecord, ...],
         skill_bundle: Mapping[str, Any],
-    ) -> Sequence[Mapping[str, Any]]: ...
+    ) -> Iterable[Mapping[str, Any]]: ...
 
 
 def compile_shadow_skills() -> dict[str, Any]:
-    records = [dict(skill) for skill in SKILLS]
+    skills: list[dict[str, Any]] = []
+    for resource in EXPLORER_SKILL_DOCUMENTS:
+        document = {
+            key: list(value) if isinstance(value, tuple) else value
+            for key, value in resource.items()
+        }
+        validation = validate_foundation("skill-definition-v2", document)
+        if not validation.valid:
+            raise ValueError(
+                "invalid packaged Explorer skill: " + "; ".join(validation.issues)
+            )
+        skills.append(document)
+    if len(skills) != 3 or len({item["skill_id"] for item in skills}) != 3:
+        raise ValueError("Explorer shadow requires exactly three unique packaged skills")
     outputs = [
-        {"skill_id": record["skill_id"], "digest": digest(record)}
-        for record in records
+        {"skill_id": item["skill_id"], "digest": digest(item)} for item in skills
     ]
     body = {
         "record_type": "explorer-shadow-skill-bundle",
         "schema_version": 1,
-        "skills": records,
+        "skills": skills,
         "outputs": outputs,
         "activation": "inert",
         "authority": "none",
@@ -134,57 +134,101 @@ def compile_shadow_skills() -> dict[str, Any]:
     return {**body, "bundle_digest": digest(body)}
 
 
+def _freeze(value: Any) -> Any:
+    if isinstance(value, dict):
+        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def _bounded_text(value: Any, name: str, *, maximum: int = MAX_TEXT) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+        raise ExplorerShadowError(f"{name} must be a bounded nonempty string")
+    return value
+
+
+def _validate_request(request: ContextRequest) -> None:
+    for field in ("tenant_id", "repository_id", "run_id"):
+        _bounded_text(getattr(request, field), field, maximum=200)
+    _bounded_text(request.purpose, "purpose", maximum=500)
+    if type(request.cutoff_sequence) is not int or request.cutoff_sequence < 0:
+        raise ExplorerShadowError("cutoff_sequence must be a nonnegative integer")
+    if (
+        type(request.max_records) is not int
+        or not len(CRITICAL_CLASSES) <= request.max_records <= MAX_CONTEXT_RECORDS
+        or type(request.max_bytes) is not int
+        or not 1 <= request.max_bytes <= MAX_CONTEXT_BYTES
+        or type(request.max_findings) is not int
+        or not 0 <= request.max_findings <= MAX_FINDINGS
+    ):
+        raise ExplorerShadowError("request bounds are invalid")
+
+
+def _validate_record(record: Any) -> ContextRecord:
+    if not isinstance(record, ContextRecord):
+        raise ExplorerShadowError("context entries must be ContextRecord values")
+    for field in ("memory_id", "tenant_id", "repository_id"):
+        _bounded_text(getattr(record, field), field, maximum=200)
+    _bounded_text(record.content, "content", maximum=100_000)
+    if (
+        type(record.sequence) is not int
+        or record.sequence < 0
+        or not isinstance(record.context_class, str)
+        or record.context_class not in CONTEXT_CLASSES
+        or type(record.priority) is not int
+        or not 0 <= record.priority <= 1_000_000
+        or not isinstance(record.sensitivity, str)
+        or record.sensitivity not in {"private", "internal", "safe-public"}
+        or not isinstance(record.quarantine_state, str)
+        or record.quarantine_state not in {"clear", "quarantined"}
+        or not isinstance(record.origin_kind, str)
+        or record.origin_kind
+        not in {"external", "generated", "human", "explorer-shadow", "projection", "source"}
+        or (
+            record.origin_run_id is not None
+            and (
+                not isinstance(record.origin_run_id, str)
+                or not record.origin_run_id.strip()
+                or len(record.origin_run_id) > 200
+            )
+        )
+        or type(record.self_host_depth) is not int
+        or not 0 <= record.self_host_depth <= 64
+    ):
+        raise ExplorerShadowError("context record metadata is invalid")
+    return record
+
+
 def select_context(
     request: ContextRequest, records: Sequence[ContextRecord]
 ) -> tuple[ContextSelection, tuple[ContextRecord, ...]]:
-    if not all(
-        isinstance(value, str) and value.strip()
-        for value in (
-            request.tenant_id,
-            request.repository_id,
-            request.run_id,
-            request.purpose,
-            request.cutoff,
-        )
-    ):
-        raise ExplorerShadowError("context request identity and purpose are required")
-    if (
-        request.max_records < len(CRITICAL_CLASSES)
-        or request.max_records > 256
-        or request.max_bytes < 1
-        or request.max_bytes > 1_000_000
-        or request.max_findings < 0
-        or request.max_findings > 64
-    ):
-        raise ExplorerShadowError("budget cannot cover mandatory critical context")
-    identifiers = [record.memory_id for record in records]
+    _validate_request(request)
+    if not isinstance(records, Sequence) or isinstance(records, (str, bytes)):
+        raise ExplorerShadowError("context inventory must be a bounded sequence")
+    if not len(CRITICAL_CLASSES) <= len(records) <= MAX_CONTEXT_RECORDS:
+        raise ExplorerShadowError("context inventory size is invalid")
+    checked = tuple(_validate_record(record) for record in records)
+    identifiers = [record.memory_id for record in checked]
     if len(identifiers) != len(set(identifiers)):
         raise ExplorerShadowError("context record IDs must be unique")
     eligible: list[ContextRecord] = []
     omitted: list[tuple[str, str]] = []
-    for record in records:
-        if (
-            not record.memory_id.strip()
-            or not record.observed_at.strip()
-            or not record.context_class.strip()
-            or record.sensitivity not in {"private", "internal", "safe-public"}
-            or record.quarantine_state not in {"clear", "quarantined"}
-            or type(record.priority) is not int
-            or not 0 <= record.priority <= 1_000_000
-        ):
-            raise ExplorerShadowError("context record metadata is invalid")
+    for record in checked:
         if (
             record.tenant_id != request.tenant_id
             or record.repository_id != request.repository_id
         ):
             raise ExplorerShadowError("context scope mismatch")
-        if record.observed_at > request.cutoff:
-            raise ExplorerShadowError("context exceeds sealed cutoff")
+        if record.sequence > request.cutoff_sequence:
+            raise ExplorerShadowError("context exceeds sealed sequence cutoff")
         reason = None
         if record.quarantine_state != "clear":
             reason = "quarantined"
         elif record.origin_run_id == request.run_id:
             reason = "same-run-recursion"
+        elif record.origin_kind in GENERATED_ORIGINS or record.self_host_depth > 0:
+            reason = "generated-recursion"
         if reason is not None:
             if record.context_class in CRITICAL_CLASSES:
                 raise ExplorerShadowError(f"critical context is {reason}")
@@ -205,14 +249,14 @@ def select_context(
             0 if item.context_class in order else 1,
             order.get(item.context_class, 0),
             -item.priority,
-            item.observed_at,
+            item.sequence,
             item.memory_id,
         ),
     )
     selected: list[ContextRecord] = []
     used = 0
     for record in ordered:
-        size = len(record.content.encode("utf-8"))
+        size = len(canonical_bytes(asdict(record)))
         if len(selected) >= request.max_records or used + size > request.max_bytes:
             if record.context_class in CRITICAL_CLASSES:
                 raise ExplorerShadowError("critical context exceeds whole-record budget")
@@ -220,27 +264,30 @@ def select_context(
             continue
         selected.append(record)
         used += size
-    inventory = digest([asdict(record) for record in sorted(records, key=lambda x: x.memory_id)])
+    inventory_document = [asdict(record) for record in sorted(checked, key=lambda x: x.memory_id)]
+    inventory_bytes = canonical_bytes(inventory_document)
+    if len(inventory_bytes) > MAX_CONTEXT_BYTES:
+        raise ExplorerShadowError("canonical context inventory exceeds size bound")
     receipt_body = {
         "policy_version": POLICY_VERSION,
-        "inventory_digest": inventory,
+        "inventory_digest": digest(inventory_document),
         "selected_ids": [record.memory_id for record in selected],
         "omitted": sorted(omitted),
         "ordering": [record.memory_id for record in ordered],
         "selected_bytes": used,
         "purpose": request.purpose,
-        "cutoff": request.cutoff,
+        "cutoff_sequence": request.cutoff_sequence,
         "critical_context_coverage": "complete",
     }
     receipt = ContextSelection(
         POLICY_VERSION,
-        inventory,
+        receipt_body["inventory_digest"],
         tuple(receipt_body["selected_ids"]),
         tuple(tuple(item) for item in receipt_body["omitted"]),
         tuple(receipt_body["ordering"]),
         used,
         request.purpose,
-        request.cutoff,
+        request.cutoff_sequence,
         "complete",
         digest(receipt_body),
     )
@@ -268,74 +315,360 @@ class ExplorerShadowRunner:
         self.engine = engine
         self.ledger = ledger
 
+    def _existing(self, request: ContextRequest) -> ShadowResult | None:
+        store = self.ledger.store
+        request_digest = digest(asdict(request))
+        terminal = [
+            record
+            for record in store.records(
+                tenant_id=request.tenant_id,
+                repository_id=request.repository_id,
+                record_type="explorer-shadow-run",
+            )
+            if record["payload"]["run_id"] == request.run_id
+        ]
+        if terminal:
+            if len(terminal) != 1 or terminal[0]["payload"]["request_digest"] != request_digest:
+                raise ExplorerShadowError("run identity conflicts with prior receipt")
+            payload = terminal[0]["payload"]
+            if payload["status"] != "succeeded":
+                raise ExplorerShadowError(
+                    f"prior shadow run failed: {payload['error_code']}"
+                )
+            selection_records = [
+                record
+                for record in store.records(
+                    tenant_id=request.tenant_id,
+                    repository_id=request.repository_id,
+                    record_type="explorer-context-selection",
+                )
+                if record["record_id"] == payload["selection_record_id"]
+            ]
+            if len(selection_records) != 1:
+                raise ExplorerShadowError("terminal receipt lost its selection")
+            selection = _selection_from_payload(selection_records[0]["payload"])
+            return ShadowResult(
+                selection,
+                selection_records[0]["record_id"],
+                tuple(payload["outcomes"]),
+                payload["skill_bundle_digest"],
+            )
+        pending = [
+            record
+            for record in store.records(
+                tenant_id=request.tenant_id,
+                repository_id=request.repository_id,
+                record_type="explorer-context-selection",
+            )
+            if record["payload"]["run_id"] == request.run_id
+        ]
+        if pending:
+            raise ExplorerShadowError("shadow run has a sealed pending selection")
+        return None
+
     def run(
         self, request: ContextRequest, records: Sequence[ContextRecord]
     ) -> ShadowResult:
-        selection, selected = select_context(request, records)
+        _validate_request(request)
+        store = self.ledger.store
+        store._require_authority(
+            self.ledger.authority,
+            "foundation.opportunity.write",
+            tenant_id=request.tenant_id,
+            repository_id=request.repository_id,
+            actor_id=ACTOR_ID,
+        )
+        existing = self._existing(request)
+        if existing is not None:
+            return existing
         bundle = compile_shadow_skills()
-        raw_findings = tuple(self.engine.discover(request, selected, bundle))
-        if len(raw_findings) > request.max_findings:
-            raise ExplorerShadowError("engine exceeded finding bound")
-        selected_by_id = {record.memory_id: record for record in selected}
+        bundle_digest = str(bundle["bundle_digest"])
+        engine_id = _bounded_text(
+            getattr(self.engine, "engine_id", None), "engine_id", maximum=200
+        )
+        request_digest = digest(asdict(request))
+        try:
+            selection, selected = select_context(request, records)
+        except ExplorerShadowError as error:
+            self._append_terminal(
+                request,
+                None,
+                None,
+                bundle_digest,
+                engine_id,
+                (),
+                "failed",
+                type(error).__name__,
+            )
+            raise
+        selection_payload = _selection_payload(
+            request, selection, request_digest, bundle_digest
+        )
+        if not validate_explorer(
+            "explorer-context-selection-v1", selection_payload
+        ).valid:
+            raise ExplorerShadowError("selection payload failed its contract")
+        selection_record = store.append_record(
+            authority=self.ledger.authority,
+            foundation_action="foundation.opportunity.write",
+            tenant_id=request.tenant_id,
+            repository_id=request.repository_id,
+            record_type="explorer-context-selection",
+            schema_name="explorer-context-selection-v1",
+            stream_id=f"explorer-selection:{request.run_id}",
+            payload=selection_payload,
+            actor_id=ACTOR_ID,
+            idempotency_key=f"explorer-selection:{request.run_id}",
+            correlation_id=request.run_id,
+        )
+        try:
+            raw = self.engine.discover(request, selected, _freeze(bundle))
+            findings = _consume_bounded(raw, request.max_findings)
+            prepared = tuple(
+                self._validate_finding(finding, selected) for finding in findings
+            )
+        except Exception as error:
+            self._append_terminal(
+                request,
+                selection_record["record_id"],
+                selection.selection_digest,
+                bundle_digest,
+                engine_id,
+                (),
+                "failed",
+                type(error).__name__[:200],
+            )
+            if isinstance(error, ExplorerShadowError):
+                raise
+            raise ExplorerShadowError(
+                f"shadow discovery failed: {type(error).__name__}"
+            ) from error
         outcomes: list[Mapping[str, Any]] = []
-        for finding in raw_findings:
-            if set(finding) != self._FINDING_FIELDS:
-                raise ExplorerShadowError("finding shape is not exact")
-            evidence_ids = finding["evidence_memory_ids"]
+        try:
+            with store._lock, store._transaction():
+                for finding in prepared:
+                    result = self.ledger.register(
+                        tenant_id=request.tenant_id,
+                        repository_id=request.repository_id,
+                        encounter_id=f"{request.run_id}:{finding['finding_id']}",
+                        problem=finding["problem"],
+                        proposal=finding["proposal"],
+                        structured_key={
+                            "affected_user": finding["affected_user"],
+                            "scope": finding["scope"],
+                            "problem": finding["problem"],
+                            "proposal": finding["proposal"],
+                            "expected_outcome": finding["expected_outcome"],
+                        },
+                        actor_id=ACTOR_ID,
+                        evidence_digests=finding["evidence_digests"],
+                        disposition=finding["disposition"],
+                    )
+                    outcomes.append(
+                        {
+                            "finding_id": finding["finding_id"],
+                            "encounter_record_id": result.encounter_record_id,
+                            "opportunity_record_id": result.opportunity_record_id,
+                            "classification": result.classification,
+                        }
+                    )
+                self._append_terminal(
+                    request,
+                    selection_record["record_id"],
+                    selection.selection_digest,
+                    bundle_digest,
+                    engine_id,
+                    outcomes,
+                    "succeeded",
+                    None,
+                )
+        except Exception as error:
+            self._append_terminal(
+                request,
+                selection_record["record_id"],
+                selection.selection_digest,
+                bundle_digest,
+                engine_id,
+                (),
+                "failed",
+                type(error).__name__[:200],
+            )
+            if isinstance(error, ExplorerShadowError):
+                raise
+            raise ExplorerShadowError(
+                f"shadow admission failed: {type(error).__name__}"
+            ) from error
+        return ShadowResult(
+            selection,
+            selection_record["record_id"],
+            tuple(outcomes),
+            bundle_digest,
+        )
+
+    def _validate_finding(
+        self, finding: Any, selected: Sequence[ContextRecord]
+    ) -> dict[str, Any]:
+        if not isinstance(finding, Mapping) or set(finding) != self._FINDING_FIELDS:
+            raise ExplorerShadowError("finding shape is not exact")
+        copied = dict(finding)
+        for field in (
+            "finding_id",
+            "problem",
+            "affected_user",
+            "scope",
+            "proposal",
+            "expected_outcome",
+            "counterargument",
+            "stop_reason",
+        ):
+            copied[field] = _bounded_text(
+                copied[field], field, maximum=200 if field == "finding_id" else MAX_TEXT
+            )
+        if not isinstance(copied["category"], str) or copied["category"] not in CATEGORIES:
+            raise ExplorerShadowError("finding category is unsupported")
+        if (
+            copied["disposition"] is not None
+            and not isinstance(copied["disposition"], str)
+        ) or copied["disposition"] not in DISPOSITIONS:
+            raise ExplorerShadowError("finding disposition is unsupported")
+        selected_by_id = {record.memory_id: record for record in selected}
+        evidence_ids = copied["evidence_memory_ids"]
+        if (
+            not isinstance(evidence_ids, list)
+            or not evidence_ids
+            or len(evidence_ids) > 64
+            or len(evidence_ids) != len(set(evidence_ids))
+            or not all(
+                isinstance(item, str) and item in selected_by_id for item in evidence_ids
+            )
+        ):
+            raise ExplorerShadowError("finding cites unavailable evidence")
+        for field in ("acceptance_criteria", "metrics"):
+            values = copied[field]
             if (
-                not isinstance(evidence_ids, list)
-                or not evidence_ids
-                or len(evidence_ids) != len(set(evidence_ids))
-                or any(item not in selected_by_id for item in evidence_ids)
+                not isinstance(values, list)
+                or not values
+                or len(values) > 64
+                or not all(
+                    isinstance(item, str) and item.strip() and len(item) <= MAX_TEXT
+                    for item in values
+                )
+                or len(values) != len(set(values))
             ):
-                raise ExplorerShadowError("finding cites unavailable evidence")
-            text_fields = self._FINDING_FIELDS - {
-                "evidence_memory_ids",
-                "acceptance_criteria",
-                "metrics",
-                "disposition",
-            }
-            if any(
-                not isinstance(finding[field], str) or not finding[field].strip()
-                for field in text_fields
-            ):
-                raise ExplorerShadowError("finding text fields are required")
-            for field in ("acceptance_criteria", "metrics"):
-                if (
-                    not isinstance(finding[field], list)
-                    or not finding[field]
-                    or not all(isinstance(item, str) and item.strip() for item in finding[field])
-                    or len(finding[field]) != len(set(finding[field]))
-                ):
-                    raise ExplorerShadowError(f"{field} must be a nonempty string list")
-            result = self.ledger.register(
-                tenant_id=request.tenant_id,
-                repository_id=request.repository_id,
-                encounter_id=f"{request.run_id}:{finding['finding_id']}",
-                problem=finding["problem"],
-                proposal=finding["proposal"],
-                structured_key={
-                    "affected_user": finding["affected_user"],
-                    "scope": finding["scope"],
-                    "problem": finding["problem"],
-                    "proposal": finding["proposal"],
-                    "expected_outcome": finding["expected_outcome"],
-                },
-                actor_id=ACTOR_ID,
-                evidence_digests=[
-                    digest(asdict(selected_by_id[item])) for item in evidence_ids
-                ],
-                disposition=finding["disposition"],
+                raise ExplorerShadowError(f"{field} must be a bounded string list")
+        copied["evidence_digests"] = [
+            digest(asdict(selected_by_id[item])) for item in evidence_ids
+        ]
+        return copied
+
+    def _append_terminal(
+        self,
+        request: ContextRequest,
+        selection_record_id: str | None,
+        selection_digest: str | None,
+        bundle_digest: str,
+        engine_id: str,
+        outcomes: Sequence[Mapping[str, Any]],
+        status: str,
+        error_code: str | None,
+    ) -> dict[str, Any]:
+        payload = {
+            "record_type": "explorer-shadow-run",
+            "schema_version": 1,
+            "run_id": request.run_id,
+            "tenant_id": request.tenant_id,
+            "repository_id": request.repository_id,
+            "request_digest": digest(asdict(request)),
+            "selection_record_id": selection_record_id,
+            "selection_digest": selection_digest,
+            "skill_bundle_digest": bundle_digest,
+            "engine_id": engine_id,
+            "status": status,
+            "outcomes": list(outcomes),
+            "error_code": error_code,
+        }
+        validation = validate_explorer("explorer-shadow-run-v1", payload)
+        if not validation.valid:
+            raise ExplorerShadowError(
+                "terminal payload failed its contract: " + "; ".join(validation.issues)
             )
-            outcomes.append(
-                {
-                    "finding_id": finding["finding_id"],
-                    "encounter_record_id": result.encounter_record_id,
-                    "opportunity_record_id": result.opportunity_record_id,
-                    "classification": result.classification,
-                }
-            )
-        return ShadowResult(selection, tuple(outcomes), bundle["bundle_digest"])
+        return self.ledger.store.append_record(
+            authority=self.ledger.authority,
+            foundation_action="foundation.opportunity.write",
+            tenant_id=request.tenant_id,
+            repository_id=request.repository_id,
+            record_type="explorer-shadow-run",
+            schema_name="explorer-shadow-run-v1",
+            stream_id=f"explorer-run:{request.run_id}",
+            payload=payload,
+            actor_id=ACTOR_ID,
+            idempotency_key=f"explorer-run:{request.run_id}",
+            correlation_id=request.run_id,
+        )
+
+
+def _consume_bounded(raw: Any, maximum: int) -> tuple[Mapping[str, Any], ...]:
+    if isinstance(raw, (str, bytes, Mapping)):
+        raise ExplorerShadowError("engine output must be an iterable of findings")
+    try:
+        iterator = iter(raw)
+    except TypeError as error:
+        raise ExplorerShadowError("engine output is not iterable") from error
+    findings: list[Mapping[str, Any]] = []
+    for _ in range(maximum + 1):
+        try:
+            item = next(iterator)
+        except StopIteration:
+            return tuple(findings)
+        findings.append(item)
+    raise ExplorerShadowError("engine exceeded finding bound")
+
+
+def _selection_payload(
+    request: ContextRequest,
+    selection: ContextSelection,
+    request_digest: str,
+    bundle_digest: str,
+) -> dict[str, Any]:
+    return {
+        "record_type": "explorer-context-selection",
+        "schema_version": 1,
+        "run_id": request.run_id,
+        "tenant_id": request.tenant_id,
+        "repository_id": request.repository_id,
+        "request_digest": request_digest,
+        "cutoff_sequence": request.cutoff_sequence,
+        "inventory_digest": selection.inventory_digest,
+        "selection_digest": selection.selection_digest,
+        "skill_bundle_digest": bundle_digest,
+        "selected_ids": list(selection.selected_ids),
+        "omitted": [
+            {"memory_id": memory_id, "reason": reason}
+            for memory_id, reason in selection.omitted
+        ],
+        "ordering": list(selection.ordering),
+        "selected_bytes": selection.selected_bytes,
+        "purpose": selection.purpose,
+        "critical_context_coverage": selection.critical_context_coverage,
+        "status": "sealed",
+    }
+
+
+def _selection_from_payload(payload: Mapping[str, Any]) -> ContextSelection:
+    return ContextSelection(
+        POLICY_VERSION,
+        str(payload["inventory_digest"]),
+        tuple(payload["selected_ids"]),
+        tuple(
+            (str(item["memory_id"]), str(item["reason"])) for item in payload["omitted"]
+        ),
+        tuple(payload["ordering"]),
+        int(payload["selected_bytes"]),
+        str(payload["purpose"]),
+        int(payload["cutoff_sequence"]),
+        str(payload["critical_context_coverage"]),
+        str(payload["selection_digest"]),
+    )
 
 
 def shadow_result_bytes(result: ShadowResult) -> bytes:
