@@ -34,6 +34,16 @@ The exact PR stack from #28 through #42 is included through final stack head `0c
 | #6 | `1848ac70905f006a042a83b8dc0be02134068207` | The original `anchore/sbom-action` step was superseded within the stack by a checksum-pinned direct Syft `v1.50.0` installation. The release retains that newer hardened implementation rather than restoring the older action path. The original PR and branch remain preserved. |
 | #7 | `ec9bfc65575573ead36c2c72c748725dc8018c93` | Applied `setuptools==83.0.0` in release commit `533b24a9e1f2b5836685be73d6f44fa7816f77b9`. |
 
+## Exact ancestry preservation
+
+The exact source commits for PRs #5, #6, and #7 are also ancestors of the release branch; their preservation does not rely only on equivalent patches or this ledger.
+
+- Internal PR #43 merged exact PR #5 history into a branch rooted at exact PR #6 head; merge commit `7f5e471391a597ca96c55e476418b9fcba4df8cf`.
+- Internal PR #45 combined that PR #5/#6 history with a branch rooted at exact PR #7 head; merge commit `f5940ae9a2038625959a9e45c47124d45f72017f`.
+- Internal PR #46 merged the combined dependency history into `release/version_1.1`; merge commit `a2900fa2f394887084af5fa235357013adb7cbdc`.
+- Comparing the pre-ancestry release head `d36a7ed648a195fdd353c2e20833f9f1f43ee75a` with `a2900fa2f394887084af5fa235357013adb7cbdc` yields ten additional commits and zero file changes. The merge changed ancestry only.
+- Internal PR #44 was closed unmerged after GitHub detected conflicts in the first attempted merge direction. It did not modify an original PR or source branch.
+
 ## Scope boundary
 
-This branch consolidates the existing work without changing `main`, retargeting the source PRs, or deleting any source ref. PR #6 is preserved as a superseded implementation proposal; its older workflow mechanism is not reintroduced over the stronger implementation already present in the stack.
+This branch consolidates the existing work without changing `main`, retargeting the original source PRs, or deleting any original source ref. PR #6 is preserved as a superseded implementation proposal; its older workflow mechanism is not reintroduced over the stronger implementation already present in the stack.
