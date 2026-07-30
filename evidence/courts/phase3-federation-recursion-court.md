@@ -332,3 +332,18 @@ runtime remain unchanged. Windows unittest and pytest report
 and diff checks pass. Regenerated inventory is
 `sha256:788340384cc3b0489e2e909b93f8d92bf911792a3f08f64eb5231ea701e4378a`.
 Renewed exact-commit review is required.
+
+### Cross-Examiner assertion-specificity remand
+
+Cross-Examiner `item6_cross_examiner` reproduced the behavior and receipts at exact
+commit `857e921` but returned `REMAND`: grouping every rejected fixture under a
+generic `ValueError` assertion weakened the prior duplicate-message check and could
+allow an unrelated error path to satisfy a duplicate-key fixture.
+
+The test now separately requires the duplicate-key message for both duplicate
+fixtures, `JSONDecodeError` for malformed JSON, and the non-finite serialization
+message for `NaN` and both infinities. Runtime and case count remain unchanged.
+Windows item-6 unittest reports `28 passed, 1 skipped`; Ruff, Pyright, inventory
+equality, and diff checks pass. Regenerated inventory is
+`sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68`.
+Renewed exact-commit review is required.

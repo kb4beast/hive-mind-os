@@ -998,18 +998,28 @@ def _case_prior_inventory_digest_is_newline_independent(tmp_path: Path) -> None:
         b'{\r\n  "schema_version": 1,\r\n  "value": "same"\r\n}\r\n'
     )
     assert _canonical_json_file_digest(lf) == _canonical_json_file_digest(crlf)
-    rejected = {
+    duplicates = {
         "top-level-duplicate.json": b'{"schema_version":1,"schema_version":2}\n',
         "nested-duplicate.json": b'{"nested":{"value":1,"value":2}}\n',
-        "malformed.json": b'{"schema_version":\n',
+    }
+    for name, content in duplicates.items():
+        candidate = tmp_path / name
+        candidate.write_bytes(content)
+        with _raises(ValueError, match="duplicate JSON object name"):
+            _canonical_json_file_digest(candidate)
+    malformed = tmp_path / "malformed.json"
+    malformed.write_bytes(b'{"schema_version":\n')
+    with _raises(json.JSONDecodeError):
+        _canonical_json_file_digest(malformed)
+    non_finite = {
         "nan.json": b'{"value":NaN}\n',
         "infinity.json": b'{"value":Infinity}\n',
         "negative-infinity.json": b'{"value":-Infinity}\n',
     }
-    for name, content in rejected.items():
+    for name, content in non_finite.items():
         candidate = tmp_path / name
         candidate.write_bytes(content)
-        with _raises(ValueError):
+        with _raises(ValueError, match="Out of range float values"):
             _canonical_json_file_digest(candidate)
 
 

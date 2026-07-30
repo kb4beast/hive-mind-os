@@ -72,10 +72,10 @@
     "src/hive_mind_os/foundation/authority.py": "sha256:234db57ce89dbf500240092cef2689b2c96f7545c372fa5464db79246eeece68",
     "src/hive_mind_os/foundation/federation.py": "sha256:fe38dd090bfea19b6cc013e3477599fdc39cd5311ef908f7dc8abc15021f7b37",
     "src/hive_mind_os/foundation/federation_contracts.py": "sha256:9928038e1bc986fe724d448bd95b0a6f635330f6ed8d6d507db43d39dcdfa970",
-    "tests/test_phase3_federation.py": "sha256:74d858d9e2caa9b3e8b75acab92556d4d09787eb25724aa045e6b969f1b25403"
+    "tests/test_phase3_federation.py": "sha256:d8efc91867e9c6aa70b98a388180e1d64ec99412751f4c043b532ef38232e7a5"
   },
   "inbox_or_import_started": false,
-  "inventory_digest": "sha256:788340384cc3b0489e2e909b93f8d92bf911792a3f08f64eb5231ea701e4378a",
+  "inventory_digest": "sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68",
   "obsidian_required": false,
   "phase": 3,
   "phase3_item5_input": {
