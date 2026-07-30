@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/phase5a-orchestrator-shadow
+  pull_request:
+    branches:
+      - release/version_1.1
 
 permissions:
   contents: read
