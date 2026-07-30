@@ -5,13 +5,13 @@ on:
     branches:
       - agent/version-1.1-release-hardening
     paths:
-      - .github/bootstrap/version-1.1-hardening.patch.gz.b64
+      - .github/bootstrap/version-1.1-hardening.part-*
       - .github/workflows/apply-version-1.1-hardening.yml
   pull_request:
     branches:
       - main
     paths:
-      - .github/bootstrap/version-1.1-hardening.patch.gz.b64
+      - .github/bootstrap/version-1.1-hardening.part-*
       - .github/workflows/apply-version-1.1-hardening.yml
 
 permissions:
@@ -32,21 +32,30 @@ jobs:
           ref: agent/version-1.1-release-hardening
           fetch-depth: 0
           persist-credentials: true
-      - name: Apply verified candidate once
+      - name: Reconstruct and apply verified candidate once
         shell: bash
         run: |
           set -euo pipefail
-          payload=.github/bootstrap/version-1.1-hardening.patch.gz.b64
-          if [[ ! -f "$payload" ]]; then
+          shopt -s nullglob
+          chunks=(.github/bootstrap/version-1.1-hardening.part-*)
+          if [[ ${#chunks[@]} -eq 0 ]]; then
             echo 'verified hardening payload already applied'
             exit 0
           fi
-          base64 --decode "$payload" | gzip --decompress > /tmp/version-1.1-hardening.patch
+          test ${#chunks[@]} -eq 7
+          cat "${chunks[@]}" > /tmp/version-1.1-hardening.patch.gz.b64
+          echo "40e97dd716e4a375fd14d63132c45d85c0ff8adbbd97c87b5525a1ced14a21bc  /tmp/version-1.1-hardening.patch.gz.b64" \
+            | sha256sum --check --strict
+          base64 --decode /tmp/version-1.1-hardening.patch.gz.b64 \
+            | gzip --decompress > /tmp/version-1.1-hardening.patch
           echo "7531e43fad261432ab85e764ac5d058df28b1d05759a38b7b0cfd5e71ab2dce7  /tmp/version-1.1-hardening.patch" \
             | sha256sum --check --strict
           git apply --check --index /tmp/version-1.1-hardening.patch
           git apply --index /tmp/version-1.1-hardening.patch
-          git rm "$payload"
+          git rm "${chunks[@]}"
+          if [[ -f .github/bootstrap/version-1.1-hardening.patch.gz.b64 ]]; then
+            git rm .github/bootstrap/version-1.1-hardening.patch.gz.b64
+          fi
           git config user.name "kb4beast"
           git config user.email "14246027+kb4beast@users.noreply.github.com"
           git commit -m "Harden version 1.1 integration contract"
