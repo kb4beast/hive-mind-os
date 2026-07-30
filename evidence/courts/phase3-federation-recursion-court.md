@@ -347,3 +347,26 @@ Windows item-6 unittest reports `28 passed, 1 skipped`; Ruff, Pyright, inventory
 equality, and diff checks pass. Regenerated inventory is
 `sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68`.
 Renewed exact-commit review is required.
+
+## Final cross-platform inventory review
+
+Cross-Examiner `item6_cross_examiner` and Curator/Expert Witness `Locke`
+independently returned `PASS` with no remand on exact commit
+`47338b6ffbf408e6309dae9818d98cf4077b7d63`.
+
+Both verified that the unchanged 29th case requires the duplicate-key message for
+top-level and nested duplicates, `JSONDecodeError` for malformed JSON, and the
+non-finite serialization message for `NaN` and both infinities. Windows and Linux
+Python 3.12 each ran all 29 item-6 cases with `28 passed, 1 platform skip`.
+Inventory regenerates exactly as
+`sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68`;
+all seven recorded implementation hashes match; Ruff and Pyright pass.
+
+The Curator additionally verified chronological ledger order
+`011 → 012 → 013 → 014` and truthful preservation of every remand and correction.
+The Cross-Examiner verified the four-file delta from the prior reviewed repair is
+limited to the test, inventory, court, and audit. Loader/runtime, schemas, authority,
+contracts, workflow, dependencies, governance, sources, claims, and protected prior
+bytes remain unchanged.
+
+A distinct Judge verdict is the remaining gate before pushing the repaired draft.

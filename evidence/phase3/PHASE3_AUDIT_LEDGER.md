@@ -1319,3 +1319,19 @@ Windows item-6 unittest reports `28 passed, 1 skipped`; Ruff, Pyright, inventory
 equality, and diff checks pass. Regenerated inventory is
 `sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68`.
 Renewed independent review is required.
+
+## `P3-ITEM6-AUDIT-015` — cross-platform repair independently verified
+
+Cross-Examiner `item6_cross_examiner` and Curator/Expert Witness `Locke`
+independently returned `PASS` with no remand on exact commit
+`47338b6ffbf408e6309dae9818d98cf4077b7d63`.
+
+They verified exact error-path assertions, Windows and Linux execution of all 29
+cases with `28 passed, 1 platform skip`, exact inventory
+`sha256:cff51961260981afc68e2bbf96d5043d155c8f54155461def69cae5b37156f68`,
+all seven implementation hashes, Ruff, Pyright, chronological ledger order, and
+truthful append-only preservation of each remand.
+
+Runtime, schemas, authority, contracts, workflow, dependencies, governance,
+sources, claims, and protected prior bytes remain unchanged. A distinct Judge
+verdict is the remaining publication gate.
