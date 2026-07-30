@@ -16,3 +16,9 @@
 - Phase 4 schemas and skills are packaged Python data rather than new JSON resources
   so the judged Phase 3 installed-resource contract remains unchanged. Host projection
   and cross-language resource formats remain deferred.
+- Replay now deliberately conflicts when current context, skills, or engine identity
+  differs from the sealed run. This protects provenance but means an operator must use
+  a new run ID for intentional re-evaluation under changed inputs.
+- Preselection failure receipts use explicit unavailable sentinel digests/identities
+  because no valid skill bundle or engine identity exists to preserve. They prove the
+  failure boundary, not the missing artifact's content.

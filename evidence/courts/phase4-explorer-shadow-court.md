@@ -77,3 +77,39 @@ inventory, diff checks, and an isolated installed wheel with the unchanged
 133-resource contract. Phase 4 inventory is
 `sha256:f9c6cc97137dc5b4188c77c65766af6bee1ffde409e231bbb2b2b351e94423b5`.
 Renewed exact-byte Cross-Examination is required.
+
+## Second cross-examination
+
+The same independent Cross-Examiner returned `REMAND` on exact commit
+`6afd1d6102ed529d3011dada65401a9d387d4247`. The first remand was repaired, but
+three adversarial cases remained:
+
+- replay identity did not bind the newly supplied context inventory, current skill
+  bundle digest, and engine identity;
+- duplicate finding IDs inside one batch could create contradictory encounter
+  relations; and
+- invalid engine identity or skill compilation failures before selection had no
+  durable terminal receipt.
+
+The Cross-Examiner required conflict without an engine call for changed replay
+inputs, global finding-ID uniqueness before admission, and a failed terminal receipt
+for every authorized preselection failure.
+
+## Second remand repair candidate
+
+Exact implementation commit `fd27593d76acf83f56b4ed68c75226bbcb4e44cd`
+recomputes and compares current context, skill, and engine identity before accepting
+a stored success; rejects changed replay inputs without invoking the engine; checks
+finding-ID uniqueness before the admission transaction; and durably receipts invalid
+engine identity and skill compilation failures with explicit unavailable sentinels.
+
+The repair also returns defensive schema copies and enforces semantic consistency
+between terminal status, selection fields, outcomes, and error code. Builder receipts
+are `14 passed, 6 subtests` focused; `189 passed, 1 skipped, 63 subtests` combined;
+all fourteen governance tests; Ruff and Pyright pass; isolated-wheel verification
+preserves all 133 resources and validates installed Phase 4 imports. The inventory
+document digest is
+`sha256:b4791e6f4ebe0cca2b3833efd7350c8df227c0a4d768d1a4aeab235f51269d7c`
+and its file digest is
+`sha256:652006c2a626b90f0bf4e218f63087ed8c88a27456d471127e3e249ac19efc09`.
+Renewed exact-commit Cross-Examination remains required.
