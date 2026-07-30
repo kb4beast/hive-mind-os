@@ -210,3 +210,22 @@ boundedness or reliability defect.
 Because the final repair changes finding validation after the earlier Cross-Examiner
 and Curator exact-commit verdicts, both identities must confirm the final
 implementation before judgment.
+
+## Final Cross-Examiner and Curator verdicts
+
+Cross-Examiner `/root/phase4_architect` and Curator `/root/item5_curator`
+independently returned `PASS` on exact implementation
+`40bc5d6a08cbf9eb32ea4cce766da4a547e40249`.
+
+Cross-Examination reproduced policy drift, indexed replay, all hostile-container
+bounds, same-store one-engine convergence, separate-store pending then replay,
+changed-input conflicts, duplicate finding rejection, and preselection failure
+receipts. Curator independently confirmed the nested-list bounds, failed terminal
+receipts, zero admissions, privacy, unchanged schema/authority/public surfaces, exact
+inventories, and inert nonactivation boundaries.
+
+The final technical receipts are `19 passed, 9 subtests` focused; `194 passed,
+1 skipped, 66 subtests` combined; all fourteen governance tests; Ruff and Pyright
+pass; the 133-resource installed-wheel contract remains unchanged. Explorer,
+Architect, Builder, Cross-Examiner, Curator, and Steward burdens are satisfied for
+this bounded candidate. Distinct Judge disposition remains required.

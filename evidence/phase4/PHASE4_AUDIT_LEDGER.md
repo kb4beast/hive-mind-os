@@ -127,3 +127,12 @@ All three hostile nested lists stopped at 65 values, produced controlled failed
 terminal receipts, and wrote zero encounters or opportunities. No new critical
 reliability defect was found. Final exact-commit Cross-Examiner and Curator
 confirmation remain open.
+
+## `P4A-AUDIT-013` — final Cross-Examiner and Curator passes
+
+Cross-Examiner `/root/phase4_architect` and Curator `/root/item5_curator`
+independently passed exact implementation
+`40bc5d6a08cbf9eb32ea4cce766da4a547e40249`. Both reproduced the critical final
+delta and confirmed no weakened authority, privacy, atomicity, compatibility, public
+surface, or nonactivation boundary. Distinct Judge disposition is the only remaining
+court burden.
