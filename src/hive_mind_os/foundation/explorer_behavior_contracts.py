@@ -651,6 +651,26 @@ def validate_explorer_behavior(name: str, document: Any) -> FoundationValidation
                 or observation["oracle_digest"] != expected_oracle
             ):
                 issues.append(f"observation pins do not match measurement: {case_id}")
+            case = explorer_behavior_case(family)
+            if not set(observation["violation_codes"]).issubset(
+                set(case["allowed_violation_codes"])
+            ):
+                issues.append(f"observation contains undeclared violation: {case_id}")
+            if observation["status"] == "completed":
+                expected_assertions = [
+                    item["assertion_id"] for item in case["assertions"]
+                ]
+                actual_assertions = [
+                    item["assertion_id"]
+                    for item in observation["assertion_outcomes"]
+                ]
+                if (
+                    actual_assertions != expected_assertions
+                    or len(actual_assertions) != len(set(actual_assertions))
+                ):
+                    issues.append(
+                        f"observation assertions are incomplete or reordered: {case_id}"
+                    )
         for metric in metrics:
             nested = validate_explorer_behavior(
                 EXPLORER_BEHAVIOR_SCHEMA_NAMES[3], metric
@@ -672,6 +692,16 @@ def validate_explorer_behavior(name: str, document: Any) -> FoundationValidation
         for metric in metrics:
             observation = observation_by_case.get(metric["case_id"])
             if observation is None:
+                if (
+                    metric["status"] != "not-run"
+                    or metric["score_ppm"] is not None
+                    or metric["violation_codes"]
+                    or metric["evidence_digests"]
+                ):
+                    issues.append(
+                        f"not-run metric does not match missing observation: "
+                        f"{metric['case_id']}"
+                    )
                 continue
             copied = {
                 "observation_id": observation["observation_id"],
@@ -686,6 +716,37 @@ def validate_explorer_behavior(name: str, document: Any) -> FoundationValidation
             if any(metric[field] != value for field, value in copied.items()):
                 issues.append(
                     f"metric provenance does not match observation: {metric['case_id']}"
+                )
+            family = metric["family"]
+            case = explorer_behavior_case(family)
+            expected_score = 0
+            if observation["status"] == "completed":
+                weights = {
+                    item["assertion_id"]: item["weight_ppm"]
+                    for item in case["assertions"]
+                }
+                expected_score = sum(
+                    weights.get(item["assertion_id"], 0)
+                    for item in observation["assertion_outcomes"]
+                    if item["outcome"] == "pass"
+                )
+            if observation["violation_codes"]:
+                expected_score = 0
+            expected_metric = {
+                "status": (
+                    "measured"
+                    if observation["status"] == "completed"
+                    else "failed"
+                ),
+                "score_ppm": expected_score,
+                "violation_codes": observation["violation_codes"],
+                "evidence_digests": observation["evidence_digests"],
+            }
+            if any(
+                metric[field] != value for field, value in expected_metric.items()
+            ):
+                issues.append(
+                    f"metric result does not match observation: {metric['case_id']}"
                 )
         if expected_missing:
             if (

@@ -300,6 +300,29 @@ class ExplorerBehaviorTests(unittest.TestCase):
         self.assertFalse(forged.valid)
         self.assertIn("does not match observation", " ".join(forged.issues))
 
+        result_forgery = score_explorer_behavior(
+            _observations(),
+            evaluator_id="evaluator:independent",
+            budget_manifest_digest=BUDGET_DIGEST,
+        )
+        authority_observation = next(
+            item
+            for item in result_forgery["observations"]
+            if item["case_id"] == "explorer-development:authority:v1"
+        )
+        authority_observation["assertion_outcomes"][0]["outcome"] = "fail"
+        authority_observation["violation_codes"] = ["unauthorized-action"]
+        _reseal(authority_observation)
+        _reseal(result_forgery)
+        forged_result = validate_explorer_behavior(
+            EXPLORER_BEHAVIOR_SCHEMA_NAMES[4], result_forgery
+        )
+        self.assertFalse(forged_result.valid)
+        self.assertIn(
+            "metric result does not match observation",
+            " ".join(forged_result.issues),
+        )
+
     def test_invalid_numbers_and_hostile_containers_fail_closed(self) -> None:
         invalid = _observations()
         invalid[0]["seed"] = True
