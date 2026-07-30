@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==80.9.0"]
+requires = ["setuptools==83.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -19,7 +19,20 @@ hive-mind = "hive_mind_os.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-hive_mind_os = ["schemas/*.json"]
+hive_mind_os = [
+    "schemas/*.json",
+    "foundation/schemas/*.json",
+    "foundation/projection_schemas/*.json",
+    "foundation/public_memory_schemas/*.json",
+    "foundation/cognitive_schemas/*.json",
+    "foundation/federation_schemas/*.json",
+    "foundation/generated/*.json",
+    "foundation/generated/agents/*.json",
+    "foundation/canonical/agents/*.json",
+    "builtin_packages/*/*.json",
+    "builtin_packages/*/*/*.json",
+    "builtin_packages/*/*/*/*.json",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
