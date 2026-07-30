@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
+from typing import Mapping
 
 import pytest
 
+import hive_mind_os.foundation.federation as federation_module
 from hive_mind_os.foundation.authority import decide_foundation_write
 from hive_mind_os.foundation.canonical import canonical_bytes
 from hive_mind_os.foundation.federation import (
@@ -58,6 +61,7 @@ def _write_source(
     repository: str,
     identity_seed: str,
     record_id: str,
+    payload_updates: Mapping[str, object] | None = None,
 ) -> Path:
     root.mkdir(parents=True)
     identity_digest = _digest_document({"identity": identity_seed})
@@ -96,7 +100,7 @@ def _write_source(
         "court_refs": [],
         "code_receipt_refs": [],
         "generation_refs": [],
-        "status": "accepted",
+        "status": "active",
         "confidence_ppm": 900000,
         "freshness_expires_at": None,
         "contradiction_refs": [],
@@ -112,6 +116,8 @@ def _write_source(
         "protected_content_ref": None,
         "retrieval_receipt": None,
     }
+    if payload_updates:
+        payload.update(payload_updates)
     properties = {
         "schema_version": "hive-cognitive-note/v1",
         "note_id": note_id,
@@ -446,6 +452,264 @@ def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
         )
 
 
+def test_rejects_private_unknown_and_inconsistent_payloads(tmp_path: Path) -> None:
+    second = _write_source(
+        tmp_path / "second",
+        tenant="tenant-a",
+        repository="repo-two",
+        identity_seed="two",
+        record_id="record:two",
+    )
+    for name, updates in (
+        ("private", {"sensitivity": "private"}),
+        ("unknown", {"password": "must-not-publish"}),
+    ):
+        first = _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+            payload_updates=updates,
+        )
+        with pytest.raises(FederationError, match="payload"):
+            project_federation(
+                [first, second],
+                tmp_path / f"portfolio-{name}",
+                tenant_id="tenant-a",
+                portfolio_repository_id="portfolio",
+                check=True,
+            )
+
+
+def test_rejects_unmanaged_source_and_target_state(tmp_path: Path) -> None:
+    sources = [
+        _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+        )
+        for name in ("one", "two")
+    ]
+    (sources[0] / "unmanaged.txt").write_text("unmanaged", encoding="utf-8")
+    with pytest.raises(FederationError, match="unmanaged"):
+        project_federation(
+            sources,
+            tmp_path / "portfolio",
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            check=True,
+        )
+    (sources[0] / "unmanaged.txt").unlink()
+    project_federation(
+        sources,
+        tmp_path / "portfolio",
+        tenant_id="tenant-a",
+        portfolio_repository_id="portfolio",
+        authority=_authority(),
+    )
+    namespace = tmp_path / "portfolio" / "hive-mind" / "federated-cognitive"
+    (namespace / "unmanaged-empty-directory").mkdir()
+    with pytest.raises(FederationError, match="unmanaged directories"):
+        project_federation(
+            sources,
+            tmp_path / "portfolio",
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            authority=_authority(),
+        )
+
+
+def test_rejects_interrupted_staging_and_excess_sources(tmp_path: Path) -> None:
+    sources = [
+        _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+        )
+        for name in ("one", "two")
+    ]
+    staging = tmp_path / "portfolio" / "hive-mind" / ".federation-interrupted"
+    staging.mkdir(parents=True)
+    with pytest.raises(FederationError, match="operator recovery"):
+        project_federation(
+            sources,
+            tmp_path / "portfolio",
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            authority=_authority(),
+        )
+    with pytest.raises(FederationError, match="source bound"):
+        project_federation(
+            (sources[index % 2] for index in range(65)),
+            tmp_path / "other-portfolio",
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            check=True,
+        )
+
+
+def test_revalidates_sources_after_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sources = [
+        _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+        )
+        for name in ("one", "two")
+    ]
+    original = federation_module._source_tree_receipt
+    calls = 0
+
+    def mutate_before_final(
+        source_root: Path,
+        expected_digests: Mapping[str, str],
+    ) -> str:
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            (sources[0] / "HOME.md").write_text("changed\n", encoding="utf-8")
+        return original(source_root, expected_digests)
+
+    monkeypatch.setattr(
+        federation_module,
+        "_source_tree_receipt",
+        mutate_before_final,
+    )
+    with pytest.raises(FederationError, match="changed"):
+        project_federation(
+            sources,
+            tmp_path / "portfolio",
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            authority=_authority(),
+        )
+    parent = tmp_path / "portfolio" / "hive-mind"
+    assert not (parent / "federated-cognitive").exists()
+    assert not list(parent.glob(".federation-*"))
+
+
+def test_no_replace_publication_preserves_racing_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sources = [
+        _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+        )
+        for name in ("one", "two")
+    ]
+    original = federation_module._rename_no_replace
+
+    def race(source: Path, destination: Path) -> None:
+        destination.mkdir()
+        (destination / "racing-owner.txt").write_text("preserve", encoding="utf-8")
+        original(source, destination)
+
+    monkeypatch.setattr(federation_module, "_rename_no_replace", race)
+    with pytest.raises((FileExistsError, OSError)):
+        project_federation(
+            sources,
+            tmp_path / "portfolio",
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            authority=_authority(),
+        )
+    namespace = tmp_path / "portfolio" / "hive-mind" / "federated-cognitive"
+    assert (namespace / "racing-owner.txt").read_text(encoding="utf-8") == "preserve"
+    assert not list(namespace.parent.glob(".federation-*"))
+
+
+def test_rejects_linked_source_and_target_roots(tmp_path: Path) -> None:
+    sources = [
+        _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+        )
+        for name in ("one", "two")
+    ]
+    source_link = tmp_path / "source-link"
+    target_link = tmp_path / "target-link"
+    target_destination = tmp_path / "target-destination"
+    target_destination.mkdir()
+    try:
+        source_link.symlink_to(sources[0], target_is_directory=True)
+        target_link.symlink_to(target_destination, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlink creation is unavailable")
+    with pytest.raises(FederationError, match="linked or reparse"):
+        project_federation(
+            [source_link, sources[1]],
+            tmp_path / "portfolio",
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            check=True,
+        )
+    with pytest.raises(FederationError, match="linked or reparse"):
+        project_federation(
+            sources,
+            target_link,
+            tenant_id="tenant-a",
+            portfolio_repository_id="portfolio",
+            authority=_authority(),
+        )
+    assert not (target_destination / "hive-mind").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows junction regression")
+def test_rejects_windows_junction_redirection_into_source(tmp_path: Path) -> None:
+    sources = [
+        _write_source(
+            tmp_path / name,
+            tenant="tenant-a",
+            repository=f"repo-{name}",
+            identity_seed=name,
+            record_id=f"record:{name}",
+        )
+        for name in ("one", "two")
+    ]
+    portfolio = tmp_path / "portfolio"
+    portfolio.mkdir()
+    junction = portfolio / "hive-mind"
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(junction), str(sources[0])],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if created.returncode != 0:
+        pytest.skip("junction creation is unavailable")
+    try:
+        with pytest.raises(FederationError, match="linked or reparse"):
+            project_federation(
+                sources,
+                portfolio,
+                tenant_id="tenant-a",
+                portfolio_repository_id="portfolio",
+                authority=_authority(),
+            )
+        assert not (sources[0] / "federated-cognitive").exists()
+    finally:
+        if os.path.lexists(junction):
+            os.rmdir(junction)
+
+
 @pytest.mark.parametrize(
     ("updates", "reason"),
     [
@@ -500,6 +764,34 @@ def test_self_host_duplicate_and_epoch_rules() -> None:
     )
     assert admitted["status"] == "accepted"
     assert admitted["reason"] == "admitted"
+
+
+def test_self_host_prior_scope_epoch_and_history_bounds() -> None:
+    prior = _context(observation_epoch=2)
+    with pytest.raises(FederationError, match="scope mismatch"):
+        evaluate_self_host_context(
+            _context(
+                origin_record_id="record:new",
+                origin_digest="sha256:" + "2" * 64,
+                idempotency_key="idempotency:new",
+            ),
+            [{**prior, "tenant_id": "tenant-b"}],
+        )
+    regressed = _context(
+        subject_commit="commit:b",
+        observation_epoch=1,
+        origin_record_id="record:changed",
+        origin_digest="sha256:" + "3" * 64,
+        idempotency_key="idempotency:changed",
+    )
+    decision = evaluate_self_host_context(regressed, [prior])
+    assert decision["status"] == "rejected"
+    assert decision["reason"] == "stale-observation-epoch"
+    with pytest.raises(FederationError, match="history exceeds"):
+        evaluate_self_host_context(
+            _context(),
+            (_context(idempotency_key=f"idempotency:{index}") for index in range(10_001)),
+        )
 
 
 def test_item6_inventory_is_exact() -> None:

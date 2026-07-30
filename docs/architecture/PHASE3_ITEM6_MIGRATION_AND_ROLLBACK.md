@@ -31,6 +31,10 @@ sources, `.obsidian`, canonical stores, public stores, or protected state.
 An exact rerun reports `unchanged`. Differing or unmanaged existing bytes fail
 closed; this version does not update or delete a portfolio namespace.
 
+Any `.federation-*` staging directory indicates interrupted work. Preserve and
+inspect it; the projector refuses another write until the operator moves it out of
+the target parent under normal recoverable-file policy.
+
 ## Rollback
 
 1. Stop invoking the federation module.
@@ -41,5 +45,6 @@ closed; this version does not update or delete a portfolio namespace.
 4. Leave source vaults and canonical/public/protected stores untouched.
 
 No schema migration or database downgrade is required. Atomic first publication
-assumes staging and final paths share a filesystem. Manual drift, concurrent writers,
-deletion, private data, and remote synchronization require a later court.
+assumes staging and final paths share a filesystem and the platform supports
+no-replace rename. It is not a durability/fsync guarantee. Manual drift, concurrent
+writers, deletion, private data, and remote synchronization require a later court.

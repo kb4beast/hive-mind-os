@@ -18,13 +18,16 @@ watchers, activation, and merge are excluded.
    manifest-bound, and scope-consistent.
 4. Every source tenant equals the requested portfolio tenant.
 5. Repository-instance digests are unique; clones/forks/mirrors are not collapsed.
-6. Portfolio bytes omit raw tenant/repository names and use digests or opaque aliases.
+6. Portfolio bytes omit explicit source `tenant_id`/`repository_id` scope fields and
+   use digests or opaque aliases. The portfolio ID, result path, and other upstream
+   safe-public provenance are not anonymized.
 7. Portfolio notes receive new IDs; source IDs remain provenance only.
 8. Payloads are re-parsed, private-field checked, scope-stripped, and rerendered.
 9. Sources are read-only and source/target vaults cannot overlap or nest.
 10. Check mode writes nothing. Projection needs authentic exact-scope authority.
-11. First write stages and atomically renames. Exact reruns are `unchanged`; drift or
-    unmanaged content fails closed without overwrite.
+11. First write stages, revalidates exact source trees, and atomically installs with
+    no replacement. Exact reruns are `unchanged`; source/target drift, interrupted
+    staging, or unmanaged content fails closed without overwrite.
 12. Sources, notes, files, paths, bytes, depth, and hops are bounded.
 
 ## Self-host decision matrix
@@ -40,19 +43,22 @@ watchers, activation, and merge are excluded.
 | delegation | excessive hops | reject |
 | any | excessive self-host depth | reject |
 | self-analysis | missing explicit target | reject |
-| changed subject | same controller/repository and epoch | reject |
+| changed subject | epoch not strictly newer than matching history | reject |
 | otherwise | valid bounded context | accept |
 
 Decision order is normative: repeats collapse first, then kind feedback, hop/depth
 limits, target presence, and epoch freshness. Decisions have stable IDs over the
-exact context and result.
+exact context and result. Prior history is bounded and must match controller
+build/instance, tenant, lineage, and repository-instance scope.
 
 ## Acceptance
 
 - source ordering does not change manifest/tree digests;
 - same-tenant sources create only portfolio-local authority;
-- raw tenant/repository names are absent from output;
+- explicit source tenant/repository scope fields are absent from output;
 - cross-tenant, duplicate, linked, nested, drift, and forged-authority cases reject;
+- Windows junction/reparse redirection, unmanaged directories, interrupted staging,
+  source mutation after admission, and destination-creation races reject;
 - exact rerun is idempotent;
 - every recursion class has a negative test;
 - repeats collapse and changed commits require a new epoch;

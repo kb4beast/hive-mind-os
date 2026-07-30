@@ -1047,3 +1047,30 @@ resources and explicit counts for eight cognitive plus five federation schemas.
 Independent exact-candidate review and judgment remain pending. No
 activation, merge, private/cross-tenant federation, lineage reconciliation, Inbox,
 Sync, plugin, retrieval, usefulness, or superiority claim is admitted.
+
+## `P3-ITEM6-AUDIT-002` — first-candidate independent remand
+
+Cross-Examiner, Curator, and Steward independently remanded exact candidate
+`34938782c750ea9d2080dcf2d25207dc13264be8`. Their adversarial fixtures proved
+Windows junction source mutation, broken-link redirection, incomplete payload
+validation, cross-tenant prior suppression, stale-epoch regression, late global
+bounds, unmanaged target-directory admission, missing final source revalidation,
+unclassified interrupted staging, and a POSIX destination replacement race.
+
+The repair changes only item-6 code, tests, inventory, and its governing records.
+It adds strict reparse/component checks, exact bounded trees, full memory/telemetry
+payload validation, bounded scope-matched history, monotonic changed-subject epochs,
+final source revalidation, interrupted-staging refusal, and native no-replace
+publication. The failed candidate remains preserved; repaired receipts and renewed
+independent review are pending.
+
+## `P3-ITEM6-AUDIT-003` — Builder remand repair
+
+The repaired item-6 suite passes `22` tests with one ordinary-symlink environment
+skip; its Windows junction regression ran and passed. The combined Phase 2 plus
+Phase 3 items 1–6 matrix passes `169` tests, one skip, and `57` subtests. Ruff and
+Pyright pass. Repaired inventory is
+`sha256:5955865d37533c828772bb9a1b8396eabcd799464dbc5251d7e819e3af7060ae`.
+
+An exact repair commit and renewed independent review remain required. These Builder
+receipts do not close the prior remands or authorize publication.

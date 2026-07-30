@@ -34,16 +34,18 @@ Federation is a projection, not a shared truth store:
 - every source file is manifest-bound, confined, bounded, stable, and hash-checked;
 - every admitted note remains `safe-public`, generated, non-authoritative,
   scope-consistent, and private-field-free;
-- tenant and repository names are omitted from portfolio bytes and replaced with
-  deterministic digests or aliases;
+- explicit source `tenant_id` and `repository_id` scope fields are omitted and
+  replaced with deterministic digests or aliases;
 - portfolio notes receive new local IDs while source IDs remain
   `provenance-only`;
 - source namespaces are never modified;
-- nested vaults, links, hardlinks, drift, partial trees, duplicate source identity,
-  cross-tenant sources, and unmanaged target content fail closed;
+- nested vaults, symlinks, Windows reparse points/junctions, hardlinks, source drift,
+  partial or unmanaged trees, duplicate identity, and cross-tenant sources fail
+  closed;
 - writes require additive `foundation.federation.write` authority; and
-- first publication uses same-volume staging and atomic directory rename. Exact
-  bytes are idempotent; differing bytes are preserved as conflict.
+- first publication uses same-volume staging, final source revalidation, and atomic
+  no-replace directory rename. Interrupted staging requires explicit operator
+  recovery; exact bytes are idempotent and differing bytes are preserved.
 
 The self-host guard records controller, subject, tenant, lineage, repository
 instance, parent run, epoch, depth, origin, idempotency key, event kind, and hops.
@@ -51,6 +53,10 @@ It collapses exact repeated origins and rejects generated-memory re-ingestion,
 projection-on-projection, telemetry-on-telemetry, idea feedback,
 delegation-on-delegation, excessive hops/depth, missing self-analysis targets, and
 changed subject commits reused inside one observation epoch.
+
+Prior contexts are bounded and must match controller build/instance, tenant,
+lineage, and repository instance. A changed subject requires an epoch strictly newer
+than matching prior history.
 
 ## Alternatives
 
@@ -70,6 +76,11 @@ projections. It does not implement private or cross-tenant federation, lineage
 reconciliation, retrieval, network synchronization, Inbox/import, plugins, watchers,
 deletion, activation, or usefulness. The guard is a deterministic admission
 primitive, not a persistent scheduler or complete loop detector.
+
+The portfolio manifest intentionally discloses the caller-supplied portfolio
+repository ID, and the command result discloses the local namespace path. Other
+safe-public provenance values may textually equal a repository name; the projector
+does not claim whole-output identifier anonymization.
 
 Changes to source admission, identity, tenant policy, guard precedence, write
 protocol, authority, or claimed scope require renewed independent review.

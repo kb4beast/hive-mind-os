@@ -188,13 +188,14 @@ or superiority claim.
 
 - The portfolio proves only local, same-tenant projection from released item-3
   namespaces. Tenant string equality is not authentication or general access control.
-- Raw tenant/repository names are omitted, but source note/record IDs remain
-  provenance. Their upstream safe-public classification is a trust dependency.
+- Explicit source tenant/repository scope fields are omitted, but portfolio ID,
+  result path, source note/record IDs, and other safe-public values remain visible.
+  This is not whole-output anonymization.
 - Repository-instance digests prevent silent source collapse; they do not reconcile
   clones, forks, mirrors, or project lineages.
-- First publication is atomic and idempotent, but this version refuses updates and
-  conflicts. It does not implement concurrent writers, deletion, or distributed
-  recovery.
+- First publication is no-replace and idempotent, but not a durability/fsync
+  guarantee. Interrupted staging requires operator recovery; updates, deletion, and
+  distributed recovery are absent.
 - The self-host function creates deterministic decisions. Scheduler, ingestion,
   telemetry, idea, and delegation adapters must enforce them before a full-system
   no-loop claim.

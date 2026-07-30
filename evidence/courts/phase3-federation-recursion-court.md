@@ -37,24 +37,47 @@ The candidate is not:
 - automatic learning, retrieval, Inbox, Sync, or Obsidian behavior; or
 - evidence of usefulness, scale, generalization, or superiority.
 
-Upstream public-release correctness remains a dependency. Path aliases, Windows
-reparse behavior, hardlinks, target drift, schema packaging, and unchanged prior
-contracts require independent reproduction.
+Upstream public-release authenticity remains a dependency. Portfolio repository ID
+and local result path are explicitly disclosed; other safe-public provenance is not
+anonymized.
+
+## First-candidate remand
+
+Independent Cross-Examiner `item6_cross_examiner`, Curator `Locke`, and Steward
+`/root/item4_explorer/steward` remanded exact candidate
+`34938782c750ea9d2080dcf2d25207dc13264be8`. Reproduced failures included:
+
+- Windows junction/reparse redirection that wrote into a source vault;
+- private/unknown payload fields accepted without full memory-schema validation;
+- cross-tenant prior contexts suppressing current work;
+- regressed observation epochs admitted;
+- unbounded sources, source bytes, prior history, and target traversal;
+- unmanaged empty target directories treated as unchanged;
+- post-read source mutation not revalidated;
+- interrupted staging ignored; and
+- POSIX replacement of a racing destination.
+
+The failed candidate remains historical evidence. The repair adds component-level
+reparse rejection, exact bounded source/target trees, complete payload validation,
+bounded scope-matched priors, monotonic changed-subject epochs, final source
+revalidation, explicit interrupted-staging refusal, and native no-replace rename.
+Those repairs require renewed exact-candidate review.
 
 ## Builder evidence
 
-The item-6 suite passes `15` tests; the Phase 2 plus Phase 3 items 1–6 matrix passes
-`162` tests with `57` subtests. Ruff and Pyright pass. Deterministic inventory
-`sha256:50c0f08eb12c5b8c3055d0a6ae0e53ccef6f5585492271eea33b3031d7daa9e9`
-binds the item-5 ancestor, five schema resources, implementation files,
-order-invariant fixture, sanitization checks, and self-host decisions.
+The repaired item-6 suite passes `22` tests with one environment-dependent directory
+symlink skip; the combined matrix passes `169` tests, one skip, and `57` subtests.
+Ruff and Pyright pass. Repaired inventory
+`sha256:5955865d37533c828772bb9a1b8396eabcd799464dbc5251d7e819e3af7060ae`
+is exact. The Windows junction regression itself ran and passed; the skip covers
+ordinary directory-symlink creation unavailable to the current Windows user.
 
 Adding one package-data directory and authority action legitimately rebinds the
 current inventories for items 1–5. The item-5 inventory changes only its chained
 item-4 digest and its own inventory digest; sealed runtime subjects, screenshots,
 receipts, source fixtures, and production projector bytes are unchanged.
 
-An isolated wheel contains all `133` governed resources, including the previously
+The isolated wheel contains all `133` governed resources, including the previously
 unwalked eight cognitive schemas and all five federation schemas. The verifier now
 counts both directories explicitly instead of allowing a packaging blind spot.
 

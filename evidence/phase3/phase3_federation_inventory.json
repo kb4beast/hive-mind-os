@@ -5,9 +5,12 @@
   "cross_tenant_federation_allowed": false,
   "deterministic_fixture": {
     "check_status": "checked",
+    "explicit_source_repository_ids_absent_in_fixture": true,
+    "explicit_source_tenant_absent_in_fixture": true,
     "note_count": 0,
     "order_independent_manifest": true,
     "order_independent_tree": true,
+    "portfolio_repository_id_disclosed": true,
     "projection_feedback": {
       "context_digest": "sha256:5f7e91e6fb73413d6344792c028ef83129cb7afd5970c5cd2b65a4e456cbe15b",
       "decision_id": "self-host-decision:31b07861801498abda9e2c9c9f36d57ad0ac6653a9e773d2bd1aac33da56d7ad",
@@ -20,8 +23,7 @@
       "status": "rejected"
     },
     "projection_status": "projected",
-    "raw_repository_ids_absent": true,
-    "raw_tenant_absent": true,
+    "result_namespace_path_disclosed": true,
     "self_analysis_admission": {
       "context_digest": "sha256:f2837cb221f0857de0ec93fd3874fcaab434bb2bda767c8ac4a9f15664eeeea4",
       "decision_id": "self-host-decision:7773934fbd6f9fd9fb1e16d12fc91379854fc90f3e01633fed70d7a1df60c6f0",
@@ -65,15 +67,15 @@
   "generation_zero_activated": false,
   "implementation": {
     "pyproject.toml": "sha256:41f6c95bd1f3db93810163a8c869cc6e2107aec54f2876e92054eb6a2e6f81c1",
-    "scripts/phase3_federation_inventory.py": "sha256:c923b428c6ec73451a25c6aca99cbaa9059615fac7ac7004769a067558562180",
+    "scripts/phase3_federation_inventory.py": "sha256:f447ebb2a3538f5c44b518fc57f0b79439c62f22e2555cbaa2b86b7951b197ae",
     "scripts/verify_installed_wheel.py": "sha256:174d4c0fe832e26e29d750d82005c20f03327cc7b3dd70ffda44d3a1744b424f",
     "src/hive_mind_os/foundation/authority.py": "sha256:234db57ce89dbf500240092cef2689b2c96f7545c372fa5464db79246eeece68",
-    "src/hive_mind_os/foundation/federation.py": "sha256:6edf58008083092226cae1dbf218a042be32a7ec9fa2334c70aaec52f60b395e",
+    "src/hive_mind_os/foundation/federation.py": "sha256:5e56cbb70ed9898ae117cf96a2d9a2515ae4763edd8dbed8140cc608c6bd2642",
     "src/hive_mind_os/foundation/federation_contracts.py": "sha256:9928038e1bc986fe724d448bd95b0a6f635330f6ed8d6d507db43d39dcdfa970",
-    "tests/test_phase3_federation.py": "sha256:e4024d557546e24e39498e18898c3326213437c519404aa8c44462e7defc8ea0"
+    "tests/test_phase3_federation.py": "sha256:d18ec14234880a89d7aabd6b295272744e4137c35469ab9f1684bd3e216d8564"
   },
   "inbox_or_import_started": false,
-  "inventory_digest": "sha256:50c0f08eb12c5b8c3055d0a6ae0e53ccef6f5585492271eea33b3031d7daa9e9",
+  "inventory_digest": "sha256:5955865d37533c828772bb9a1b8396eabcd799464dbc5251d7e819e3af7060ae",
   "obsidian_required": false,
   "phase": 3,
   "phase3_item5_input": {

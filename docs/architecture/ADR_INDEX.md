@@ -27,4 +27,4 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-027` | [Safe-public portfolio federation and self-host recursion guards](ADR-027-FEDERATION-AND-SELF-HOST-GUARDS.md) | Phase 3 item 6 | proposed bounded candidate; independent implementation judgment pending |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-027; it must be unique at creation time.
+is ADR-028; it must be unique at creation time.

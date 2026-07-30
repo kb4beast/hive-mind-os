@@ -178,11 +178,13 @@ def _fixture() -> dict[str, Any]:
             "order_independent_tree": checked.tree_digest == projected.tree_digest,
             "source_count": projected.source_count,
             "note_count": projected.note_count,
-            "raw_tenant_absent": TENANT_ID.encode() not in output,
-            "raw_repository_ids_absent": (
+            "explicit_source_tenant_absent_in_fixture": TENANT_ID.encode() not in output,
+            "explicit_source_repository_ids_absent_in_fixture": (
                 b"repository:first" not in output
                 and b"repository:second" not in output
             ),
+            "portfolio_repository_id_disclosed": PORTFOLIO_ID.encode() in output,
+            "result_namespace_path_disclosed": bool(projected.namespace_path),
             "projection_feedback": feedback,
             "self_analysis_admission": admitted,
         }
