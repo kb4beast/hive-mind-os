@@ -12,17 +12,21 @@ from .explorer_behavior_contracts import (
     EXPECTED_CANDIDATE_SUBJECT_DIGEST,
     EXPECTED_SUITE_DIGEST,
     EXPLORER_BEHAVIOR_SCHEMA_NAMES,
+    METRIC_WEIGHTS,
     SAFETY_FAMILIES,
     SUITE_ID,
     validate_explorer_behavior,
 )
-from .explorer_successor import (
-    BASE_DEFINITION_ID,
-    BASE_PROMPT_DIGEST,
-    compile_explorer_successor,
-)
 
-_METRIC_WEIGHTS = (90_909,) * 10 + (90_910,)
+_BASE_DEFINITION_ID = "hive-agent-definition:explorer:v2-candidate"
+_BASE_PROMPT_DIGEST = (
+    "sha256:74415c43cb1e5950e98ef6f046f9db44900abdeeedfe9bd5647da48b070f6aca"
+)
+_CANDIDATE_AGENT_ID = "hive-agent:explorer:v2-shadow-1"
+_CANDIDATE_DEFINITION_ID = "hive-agent-definition:explorer:v2-shadow-1"
+_CANDIDATE_COMPOSITION_DIGEST = (
+    "sha256:0494c32237fbbe83b90444c9b0496646e8f0b27e7c20379320a6bd7241697463"
+)
 _VIOLATIONS = {
     "duplicate": (),
     "bug": (),
@@ -78,7 +82,7 @@ def _case(family: str, metric_weight: int) -> dict[str, Any]:
 def _compile_suite_unpinned() -> dict[str, Any]:
     cases = [
         _case(family, weight)
-        for family, weight in zip(BEHAVIOR_FAMILIES, _METRIC_WEIGHTS, strict=True)
+        for family, weight in zip(BEHAVIOR_FAMILIES, METRIC_WEIGHTS, strict=True)
     ]
     body = {
         "record_type": "explorer-behavior-suite",
@@ -115,8 +119,8 @@ def _compile_subjects_unpinned(suite_digest: str) -> tuple[dict[str, Any], dict[
             "subject_id": BASELINE_SUBJECT_ID,
             "subject_kind": "generation-zero-baseline",
             "agent_id": "generation-zero:explorer",
-            "definition_id": BASE_DEFINITION_ID,
-            "composition_digest": BASE_PROMPT_DIGEST,
+            "definition_id": _BASE_DEFINITION_ID,
+            "composition_digest": _BASE_PROMPT_DIGEST,
             "suite_digest": suite_digest,
             "execution_state": "development-executable",
             "not_run_reason": None,
@@ -125,16 +129,15 @@ def _compile_subjects_unpinned(suite_digest: str) -> tuple[dict[str, Any], dict[
             "authority": "none",
         }
     )
-    successor = compile_explorer_successor()
     candidate = _sealed(
         {
             "record_type": "explorer-evaluation-subject",
             "schema_version": 1,
             "subject_id": CANDIDATE_SUBJECT_ID,
             "subject_kind": "explorer-v2-candidate",
-            "agent_id": successor["agent_id"],
-            "definition_id": successor["definition_id"],
-            "composition_digest": successor["content_digest"],
+            "agent_id": _CANDIDATE_AGENT_ID,
+            "definition_id": _CANDIDATE_DEFINITION_ID,
+            "composition_digest": _CANDIDATE_COMPOSITION_DIGEST,
             "suite_digest": suite_digest,
             "execution_state": "forced-not-run",
             "not_run_reason": "runtime-binding-absent",
@@ -201,6 +204,7 @@ def _metric(
     score: int | None,
     violations: list[str],
     evidence: list[str],
+    observation: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     return _sealed(
         {
@@ -213,6 +217,26 @@ def _metric(
             "safety_floor_ppm": case["safety_floor_ppm"],
             "violation_codes": violations,
             "evidence_digests": evidence,
+            "observation_id": (
+                None if observation is None else observation["observation_id"]
+            ),
+            "observation_digest": (
+                None if observation is None else observation["content_digest"]
+            ),
+            "repetition": None if observation is None else observation["repetition"],
+            "seed": None if observation is None else observation["seed"],
+            "dataset_digest": (
+                None if observation is None else observation["dataset_digest"]
+            ),
+            "oracle_digest": (
+                None if observation is None else observation["oracle_digest"]
+            ),
+            "input_manifest_digest": (
+                None if observation is None else observation["input_manifest_digest"]
+            ),
+            "budget_manifest_digest": (
+                None if observation is None else observation["budget_manifest_digest"]
+            ),
         }
     )
 
@@ -229,14 +253,21 @@ def score_explorer_behavior(
     if len(observations) > len(BEHAVIOR_FAMILIES):
         raise ValueError("observation count exceeds suite")
     copied = _copy_json(list(observations))
-    if not isinstance(evaluator_id, str) or not evaluator_id.strip():
+    if type(evaluator_id) is not str or not evaluator_id.strip() or len(evaluator_id) > 200:
         raise ValueError("evaluator_id must be nonempty")
     if (
-        not isinstance(budget_manifest_digest, str)
+        type(budget_manifest_digest) is not str
         or len(budget_manifest_digest) != 71
         or not budget_manifest_digest.startswith("sha256:")
+        or any(character not in "0123456789abcdef" for character in budget_manifest_digest[7:])
     ):
         raise ValueError("budget_manifest_digest must be a SHA-256 digest")
+    if (
+        type(measurement_id) is not str
+        or not measurement_id.strip()
+        or len(measurement_id) > 200
+    ):
+        raise ValueError("measurement_id must be a bounded nonempty string")
 
     suite = compile_explorer_behavior_suite()
     subjects = compile_explorer_evaluation_subjects()
@@ -264,6 +295,8 @@ def score_explorer_behavior(
             or raw["subject_digest"] != baseline["content_digest"]
             or raw["dataset_digest"] != case["fixture_digest"]
             or raw["input_manifest_digest"] != case["fixture_digest"]
+            or raw["oracle_digest"] != case["oracle_digest"]
+            or raw["budget_manifest_digest"] != budget_manifest_digest
         ):
             raise ValueError("observation pin mismatch")
         if raw["evaluator_id"] != evaluator_id:
@@ -289,7 +322,14 @@ def score_explorer_behavior(
         if observation is None:
             missing.append(case["case_id"])
             metrics.append(
-                _metric(case, status="not-run", score=None, violations=[], evidence=[])
+                _metric(
+                    case,
+                    status="not-run",
+                    score=None,
+                    violations=[],
+                    evidence=[],
+                    observation=None,
+                )
             )
             continue
         score = 0
@@ -316,6 +356,7 @@ def score_explorer_behavior(
                 score=score,
                 violations=violations,
                 evidence=list(observation["evidence_digests"]),
+                observation=observation,
             )
         )
     if missing:

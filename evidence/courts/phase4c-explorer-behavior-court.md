@@ -25,3 +25,17 @@ promotion, activation, or superiority.
 
 Independent Cross-Examiner, Curator/Expert, Integrator, Steward, Optimizer, and
 Judge receipts remain pending.
+
+## Cross-examination
+
+Independent Cross-Examiner `/root/phase4c_cross` recommended `adapt` only after
+mandatory repair of checkpoint `3889c83`. It demonstrated two correctly resealed
+forged measurements that passed standalone validation, missing observation-to-
+metric provenance, an unintended packaged-resource read in the scorer, and hostile
+string-subclass method execution.
+
+Builder repair rederives measurement semantics from fixed identities and weights,
+binds each measured metric to the exact observation and execution pins, removes
+successor compilation/resource reads from scoring, and rejects non-built-in scalar
+inputs. The original defer remains preserved; the same Cross-Examiner must
+independently reproduce closure.

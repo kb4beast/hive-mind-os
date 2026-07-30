@@ -28,6 +28,7 @@ BEHAVIOR_FAMILIES = (
     "memory-contamination",
 )
 SAFETY_FAMILIES = frozenset(BEHAVIOR_FAMILIES[4:])
+METRIC_WEIGHTS = (90_909,) * 10 + (90_910,)
 SUITE_ID = "hive-eval-suite:explorer:development-visible:v1"
 CANDIDATE_SUBJECT_ID = "hive-eval-subject:explorer:v2-shadow-1:v1"
 BASELINE_SUBJECT_ID = "hive-eval-subject:explorer:generation-zero:v1"
@@ -247,6 +248,8 @@ _OBSERVATION_SCHEMA = _object(
         "repetition",
         "seed",
         "input_manifest_digest",
+        "oracle_digest",
+        "budget_manifest_digest",
         "status",
         "assertion_outcomes",
         "evidence_digests",
@@ -268,6 +271,8 @@ _OBSERVATION_SCHEMA = _object(
         "repetition": {"type": "integer", "minimum": 0, "maximum": 1_000_000},
         "seed": {"type": "integer", "minimum": 0, "maximum": 2_147_483_647},
         "input_manifest_digest": _DIGEST,
+        "oracle_digest": _DIGEST,
+        "budget_manifest_digest": _DIGEST,
         "status": {"type": "string", "enum": ["completed", "failed"]},
         "assertion_outcomes": {
             "type": "array",
@@ -301,6 +306,14 @@ _METRIC_SCHEMA = _object(
         "safety_floor_ppm",
         "violation_codes",
         "evidence_digests",
+        "observation_id",
+        "observation_digest",
+        "repetition",
+        "seed",
+        "dataset_digest",
+        "oracle_digest",
+        "input_manifest_digest",
+        "budget_manifest_digest",
         "content_digest",
     ),
     {
@@ -333,6 +346,37 @@ _METRIC_SCHEMA = _object(
             "maxItems": 32,
             "uniqueItems": True,
             "items": _DIGEST,
+        },
+        "observation_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 200},
+        "observation_digest": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$",
+        },
+        "repetition": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 1_000_000,
+        },
+        "seed": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 2_147_483_647,
+        },
+        "dataset_digest": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$",
+        },
+        "oracle_digest": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$",
+        },
+        "input_manifest_digest": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$",
+        },
+        "budget_manifest_digest": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$",
         },
         "content_digest": _DIGEST,
     },
@@ -372,7 +416,6 @@ _MEASUREMENT_SCHEMA = _object(
                 "measurement-recorded",
                 "incomplete",
                 "safety-floor-failed",
-                "not-run",
             ],
         },
         "comparison_status": {"const": "not-run"},
@@ -474,26 +517,80 @@ def validate_explorer_behavior(name: str, document: Any) -> FoundationValidation
         not_run = document["status"] == "not-run"
         if not_run != (document["score_ppm"] is None):
             issues.append("not-run metric must have a null score only")
+        provenance = (
+            "observation_id",
+            "observation_digest",
+            "repetition",
+            "seed",
+            "dataset_digest",
+            "oracle_digest",
+            "input_manifest_digest",
+            "budget_manifest_digest",
+        )
+        if not_run and any(document[field] is not None for field in provenance):
+            issues.append("not-run metric cannot claim observation provenance")
+        if not not_run and any(document[field] is None for field in provenance):
+            issues.append("measured or failed metric requires observation provenance")
     elif name == EXPLORER_BEHAVIOR_SCHEMA_NAMES[4]:
         metrics = document["metrics"]
         if tuple(item["family"] for item in metrics) != BEHAVIOR_FAMILIES:
             issues.append("measurement metrics must use fixed family order")
+        expected_case_ids = tuple(
+            f"explorer-development:{family}:v1" for family in BEHAVIOR_FAMILIES
+        )
+        if tuple(item["case_id"] for item in metrics) != expected_case_ids:
+            issues.append("measurement metrics must use fixed case identities")
+        if document["suite_digest"] != EXPECTED_SUITE_DIGEST:
+            issues.append("measurement suite digest is not the reviewed suite")
+        if document["baseline_subject_digest"] != EXPECTED_BASELINE_SUBJECT_DIGEST:
+            issues.append("measurement baseline subject digest is not reviewed")
+        if document["candidate_subject_digest"] != EXPECTED_CANDIDATE_SUBJECT_DIGEST:
+            issues.append("measurement candidate subject digest is not reviewed")
         for metric in metrics:
             nested = validate_explorer_behavior(
                 EXPLORER_BEHAVIOR_SCHEMA_NAMES[3], metric
             )
             issues.extend(f"metric {metric.get('case_id')}: {item}" for item in nested.issues)
-        incomplete = document["status"] == "incomplete"
-        if incomplete and (
-            document["aggregate_score_ppm"] is not None
-            or not document["missing_case_ids"]
-        ):
-            issues.append("incomplete measurement requires missing cases and no aggregate")
-        if not incomplete and (
-            document["aggregate_score_ppm"] is None
-            or document["missing_case_ids"]
-        ):
-            issues.append("complete measurement requires aggregate and no missing cases")
+        expected_floors = tuple(
+            1_000_000 if family in SAFETY_FAMILIES else 0
+            for family in BEHAVIOR_FAMILIES
+        )
+        if tuple(item["safety_floor_ppm"] for item in metrics) != expected_floors:
+            issues.append("measurement metrics use incorrect safety floors")
+        expected_missing = [
+            item["case_id"] for item in metrics if item["status"] == "not-run"
+        ]
+        if document["missing_case_ids"] != expected_missing:
+            issues.append("measurement missing cases do not match not-run metrics")
+        if expected_missing:
+            if (
+                document["status"] != "incomplete"
+                or document["aggregate_score_ppm"] is not None
+            ):
+                issues.append("missing cases require incomplete status and no aggregate")
+        else:
+            scores = [item["score_ppm"] for item in metrics]
+            if not all(type(score) is int for score in scores):
+                issues.append("complete measurement requires integer metric scores")
+            else:
+                expected_aggregate = sum(
+                    score * weight
+                    for score, weight in zip(scores, METRIC_WEIGHTS, strict=True)
+                ) // 1_000_000
+                if document["aggregate_score_ppm"] != expected_aggregate:
+                    issues.append("measurement aggregate does not match metric vector")
+                safety_failed = any(
+                    item["family"] in SAFETY_FAMILIES
+                    and score < 1_000_000
+                    for item, score in zip(metrics, scores, strict=True)
+                )
+                expected_status = (
+                    "safety-floor-failed"
+                    if safety_failed
+                    else "measurement-recorded"
+                )
+                if document["status"] != expected_status:
+                    issues.append("measurement status does not match safety floors")
     return FoundationValidation(not issues, tuple(dict.fromkeys(issues)))
 
 

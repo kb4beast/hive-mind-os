@@ -4,6 +4,7 @@ import math
 import unittest
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from unittest.mock import patch
 
 import hive_mind_os
 import hive_mind_os.package_system as package_system
@@ -74,6 +75,8 @@ def _observations(
             "repetition": 0,
             "seed": index,
             "input_manifest_digest": case["fixture_digest"],
+            "oracle_digest": case["oracle_digest"],
+            "budget_manifest_digest": BUDGET_DIGEST,
             "status": "completed",
             "assertion_outcomes": outcomes,
             "evidence_digests": [digest({"case": case["case_id"], "result": "fixture"})],
@@ -227,6 +230,54 @@ class ExplorerBehaviorTests(unittest.TestCase):
                         budget_manifest_digest=BUDGET_DIGEST,
                     )
 
+    def test_forged_resealed_measurements_fail_semantic_validation(self) -> None:
+        valid = score_explorer_behavior(
+            _observations(),
+            evaluator_id="evaluator:independent",
+            budget_manifest_digest=BUDGET_DIGEST,
+        )
+        for metric in valid["metrics"]:
+            metric["case_id"] = "forged:same-case"
+            metric["safety_floor_ppm"] = 0
+            _reseal(metric)
+        valid["suite_digest"] = "sha256:" + ("2" * 64)
+        valid["baseline_subject_digest"] = "sha256:" + ("3" * 64)
+        valid["candidate_subject_digest"] = "sha256:" + ("4" * 64)
+        valid["aggregate_score_ppm"] = 999_999
+        _reseal(valid)
+        validation = validate_explorer_behavior(
+            EXPLORER_BEHAVIOR_SCHEMA_NAMES[4], valid
+        )
+        self.assertFalse(validation.valid)
+        self.assertIn("fixed case", " ".join(validation.issues))
+
+        incomplete = score_explorer_behavior(
+            [],
+            evaluator_id="evaluator:independent",
+            budget_manifest_digest=BUDGET_DIGEST,
+        )
+        incomplete["status"] = "measurement-recorded"
+        incomplete["aggregate_score_ppm"] = 0
+        incomplete["missing_case_ids"] = []
+        for metric in incomplete["metrics"]:
+            metric["status"] = "measured"
+            metric["score_ppm"] = 0
+            metric["observation_id"] = "forged"
+            metric["observation_digest"] = "sha256:" + ("5" * 64)
+            metric["repetition"] = 0
+            metric["seed"] = 0
+            metric["dataset_digest"] = "sha256:" + ("6" * 64)
+            metric["oracle_digest"] = "sha256:" + ("7" * 64)
+            metric["input_manifest_digest"] = "sha256:" + ("8" * 64)
+            metric["budget_manifest_digest"] = BUDGET_DIGEST
+            _reseal(metric)
+        _reseal(incomplete)
+        self.assertFalse(
+            validate_explorer_behavior(
+                EXPLORER_BEHAVIOR_SCHEMA_NAMES[4], incomplete
+            ).valid
+        )
+
     def test_invalid_numbers_and_hostile_containers_fail_closed(self) -> None:
         invalid = _observations()
         invalid[0]["seed"] = True
@@ -244,6 +295,41 @@ class ExplorerBehaviorTests(unittest.TestCase):
                 evaluator_id="evaluator:independent",
                 budget_manifest_digest=BUDGET_DIGEST,
             )
+
+        class HostileString(str):
+            def strip(self, *args, **kwargs):
+                raise AssertionError("hostile string method executed")
+
+            def startswith(self, *args, **kwargs):
+                raise AssertionError("hostile string method executed")
+
+        for field in ("evaluator", "budget", "measurement"):
+            with self.subTest(field=field):
+                arguments = {
+                    "evaluator_id": "evaluator:independent",
+                    "budget_manifest_digest": BUDGET_DIGEST,
+                    "measurement_id": "measurement:test",
+                }
+                key = {
+                    "evaluator": "evaluator_id",
+                    "budget": "budget_manifest_digest",
+                    "measurement": "measurement_id",
+                }[field]
+                arguments[key] = HostileString(arguments[key])
+                with self.assertRaises(ValueError):
+                    score_explorer_behavior([], **arguments)
+
+    def test_scoring_performs_no_resource_filesystem_read(self) -> None:
+        with patch(
+            "hive_mind_os.foundation.explorer_successor.files",
+            side_effect=AssertionError("resource read reached"),
+        ):
+            result = score_explorer_behavior(
+                [],
+                evaluator_id="evaluator:independent",
+                budget_manifest_digest=BUDGET_DIGEST,
+            )
+        self.assertEqual(result["comparison_status"], "not-run")
 
     def test_supported_surfaces_and_generic_evaluators_remain_frozen(self) -> None:
         inventory = build_inventory(REPOSITORY)

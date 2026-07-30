@@ -10,6 +10,18 @@
   benchmark, experiment, learning, runtime, store, CLI, or public surfaces.
 - `P4C-AUDIT-003`: Builder reports 8 focused tests and 11 adversarial subtests,
   Ruff, and Pyright passing before independent review.
+- `P4C-AUDIT-004`: Cross-Examiner `/root/phase4c_cross` deferred checkpoint
+  `3889c83` pending four remands: correctly resealed forged measurements validated;
+  observation provenance was dropped from metrics; scoring reached packaged
+  filesystem resources despite its pure boundary; and hostile string subclasses
+  executed overridden methods.
+- `P4C-AUDIT-005`: Builder `/root` repaired all four boundaries. Standalone
+  validation now rederives fixed suite/subject/case/floor/status/missing/aggregate
+  semantics; metrics bind observation ID/digest, repetition, seed, dataset, oracle,
+  input, and budget pins; subject compilation uses reviewed immutable constants and
+  scoring performs no resource read; all scalar entry points require exact built-in
+  strings. Focused verification now passes 10 tests and 14 subtests, Ruff, and
+  Pyright. Independent remand closure remains pending.
 
 ## Preserved dissent
 

@@ -17,7 +17,7 @@
   "empty_observation_receipt": {
     "activation_authorized": false,
     "comparison_status": "not-run",
-    "content_digest": "sha256:6ad1fcf2dee224ee635b8443cd1afa53a4b81f0ad193a144578b2c205994ad7d",
+    "content_digest": "sha256:847bcbf0ceef7d4d7cf1b8534edbbb896016fc628a583276d5f67d50175bd3fc",
     "metric_statuses": [
       "not-run"
     ],
@@ -29,15 +29,15 @@
   "implementation": {
     "docs/architecture/ADR-030-EXPLORER-DEVELOPMENT-EVALUATION-SUBSTRATE.md": "sha256:38aa11ffffb92bab8d9a547e2ffad7dac7370e0055394dc268b108aa4432bb8f",
     "docs/architecture/ADR_INDEX.md": "sha256:8127bee3b554a3f614001286a2ca30af0cd6bf1f1ee8a5ae7a4cd79b2463ef91",
-    "evidence/courts/phase4c-explorer-behavior-court.md": "sha256:d5364d0f1da2b0fc9e696930b36b8ab1f2723d95e433dc0b50df3bd5c4236a3b",
-    "evidence/phase4c/PHASE4C_AUDIT_AND_DISSENT.md": "sha256:0cee301c1d15928ca0e6e21afbed21553847869e59ed8babbb7ead2e1ff57014",
+    "evidence/courts/phase4c-explorer-behavior-court.md": "sha256:19cc56ee004885074bacb4cf556f2118b8d51692d6130de9f4e1ed7a1df60930",
+    "evidence/phase4c/PHASE4C_AUDIT_AND_DISSENT.md": "sha256:a80953bde802e58f7122f165ac9ce34cd3da96baf47cd6bf4f030d05afe5d0df",
     "evidence/sources/PHASE4C_EXPLORER_BEHAVIOR_SOURCE_REGISTER.md": "sha256:4a46c1a251f3f56ba2b0c8eedcba652db760ddd42a76de665080f2e0fe069c67",
     "scripts/phase4c_explorer_behavior_inventory.py": "sha256:5deebc9bcf518f76feeeb7f227de6c6e1161c50e9436b8cf8195acd06eaf9122",
-    "src/hive_mind_os/foundation/explorer_behavior.py": "sha256:640b668799eb5f50d762bb76b389cef55fcd13f770a943e035cb39c65e8a15af",
-    "src/hive_mind_os/foundation/explorer_behavior_contracts.py": "sha256:3d2da12a7cb61e31e5a1e812c9ae5cc3c6ff3db11c4b3b9c8b93dc9eb1c97330",
-    "tests/test_phase4c_explorer_behavior.py": "sha256:9ba3c3bc1c250fa6f65d03d4cffba9ef68e6af27cabf726328e83b1c60f2cf24"
+    "src/hive_mind_os/foundation/explorer_behavior.py": "sha256:47b5b220fdda54c82eeef6e664dc09f85ac023047956536605b4a3cb2a14ffd8",
+    "src/hive_mind_os/foundation/explorer_behavior_contracts.py": "sha256:c1efd7e875eaa6f50a1342114c3ab0893fe985c5485c9a668ef6ec7e07fcc747",
+    "tests/test_phase4c_explorer_behavior.py": "sha256:99d0572a7e03110189856d1b49b5572372d513cfe99815b9f4d0dc5c7e5d6b6b"
   },
-  "inventory_digest": "sha256:7ac23486aeb443ad42942002de1af615be939e6027ae6b831e2596406ab05450",
+  "inventory_digest": "sha256:ec31fb95aeda4131cd4d72489818b5e7a599c4615caa6ce7fef1ccdd38fab6f5",
   "phase": 4,
   "phase4b_input": {
     "inventory_digest": "sha256:2949f6899424049961c8e5d8d7d41872324c364a54cafbace9fab934dcd0b8ad"
