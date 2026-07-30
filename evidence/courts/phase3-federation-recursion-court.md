@@ -193,3 +193,33 @@ Only stacked draft publication may proceed. It must remain open, unmerged, and
 inactive. Any relevant implementation, schema, source-admission, identity,
 authority, protocol, capability, or claim change requires renewed independent
 review and judgment.
+
+## Hosted CI contract remand
+
+Draft PR `#37` at judged head `b1d2575` passed static/type checks, CodeQL,
+dependency/license review, secret scanning, and isolated build provenance but failed
+the hosted unit-test matrix. GitHub runs `30506872482` and `30506889077` proved that
+`tests/test_phase3_federation.py` imported unavailable `pytest` and exposed top-level
+tests that `unittest` could not discover. The repository governance test correctly
+reported the zero-extra-dependency/discoverability violation. This invalidates draft
+delivery at that head even though the item-6 pytest matrix was green.
+
+The repair changes only the item-6 test harness and its deterministic inventory hash:
+
+- all 28 cases are standard-library `unittest.TestCase` methods;
+- temporary directories, exception assertions, patch cleanup, parameter cases, and
+  platform skips use only standard-library behavior;
+- no CI dependency or governance criterion is weakened; and
+- runtime, schemas, authority, architecture, source admission, identity, protocol,
+  capability, and claimed scope are byte-identical to the judged implementation.
+
+Builder repair receipts are `27 passed, 1 skipped` for both unittest and pytest
+item-6 execution, `174 passed, 1 skipped, 57 subtests passed` for the combined
+Phase 2/3 pytest matrix, and `605 tests, 4 platform skips` for exact hosted-style
+full unittest discovery. Ruff, Pyright, governance discoverability, inventory
+equality, and diff checks pass. New inventory is
+`sha256:0cb30744190e9eb521ed99da01ddf25bdb89dc755812786b2be1dff9abd1fe87`.
+
+This is Builder testimony. The earlier `adapt` does not cover changed test/evidence
+bytes; renewed independent review and judgment are required before pushing the
+repair or treating PR `#37` as a passing draft.

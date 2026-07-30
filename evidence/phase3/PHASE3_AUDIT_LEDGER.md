@@ -1179,3 +1179,33 @@ reconciliation, complete lineage/commit binding, persistent history, updates,
 deletion, fsync durability, concurrent/distributed writers, private/cross-tenant
 federation, authentication, and every usefulness, value, performance, scale,
 privacy, security, learning, generalization, or superiority claim remain deferred.
+
+## `P3-ITEM6-AUDIT-008` — hosted unittest compatibility remand
+
+Draft PR `#37` at exact head `b1d2575` failed all completed hosted unit-test jobs
+while static/type checks, CodeQL, dependency/license review, secret scan, and build
+provenance passed. Runs `30506872482` and `30506889077` reported two exact causes:
+the item-6 test module imported unavailable `pytest`, and its top-level tests were
+not discoverable by the required `python -m unittest discover -s tests -v` command.
+The constitutional governance test correctly failed rather than silently skipping
+item 6.
+
+The narrow repair converts all 28 item-6 cases to standard-library
+`unittest.TestCase` discovery without adding dependencies or weakening tests,
+policies, acceptance criteria, or governance. Runtime, schemas, authority,
+architecture, source admission, identity, protocol, capability, and claimed scope
+remain unchanged. Only the test module and its deterministic inventory hash change.
+
+Builder repair receipts:
+
+- item 6 via unittest: `27 passed, 1 privilege-dependent skip`;
+- item 6 via pytest: `27 passed, 1 privilege-dependent skip`;
+- combined Phase 2/3 pytest: `174 passed, 1 skipped, 57 subtests passed`;
+- exact hosted-style full unittest discovery: `605 tests, 4 platform skips`;
+- governance discoverability, Ruff, Pyright, inventory equality, and diff checks:
+  pass; and
+- inventory:
+  `sha256:0cb30744190e9eb521ed99da01ddf25bdb89dc755812786b2be1dff9abd1fe87`.
+
+The prior judgment does not authorize the changed test/evidence bytes. Renewed
+independent review and judgment are required before the repair is pushed.

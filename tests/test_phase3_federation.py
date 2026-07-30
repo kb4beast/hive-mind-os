@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
+import unittest
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Mapping
-
-import pytest
+from unittest.mock import patch
 
 import hive_mind_os.foundation.federation as federation_module
 from hive_mind_os.foundation.authority import decide_foundation_write
@@ -27,6 +29,57 @@ from hive_mind_os.foundation.federation_contracts import (
 from hive_mind_os.models import Role
 from hive_mind_os.policy import PolicyDecision
 from scripts.phase3_federation_inventory import build_phase3_item6_inventory
+
+
+class _Raises:
+    def __init__(
+        self,
+        expected: type[BaseException] | tuple[type[BaseException], ...],
+        match: str | None = None,
+    ) -> None:
+        self.expected = expected
+        self.match = match
+
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception: BaseException | None,
+        _traceback: object,
+    ) -> bool:
+        if exception_type is None or exception is None:
+            raise AssertionError(f"expected {self.expected!r} to be raised")
+        if not issubclass(exception_type, self.expected):
+            return False
+        if self.match is not None and re.search(self.match, str(exception)) is None:
+            raise AssertionError(
+                f"{exception!r} does not match expected pattern {self.match!r}"
+            )
+        return True
+
+
+def _raises(
+    expected: type[BaseException] | tuple[type[BaseException], ...],
+    *,
+    match: str | None = None,
+) -> _Raises:
+    return _Raises(expected, match)
+
+
+class _MonkeyPatch:
+    def __init__(self) -> None:
+        self._patches: list[Any] = []
+
+    def setattr(self, target: object, name: str, value: object) -> None:
+        active = patch.object(target, name, value)
+        active.start()
+        self._patches.append(active)
+
+    def undo(self) -> None:
+        for active in reversed(self._patches):
+            active.stop()
 
 
 def _digest_bytes(content: bytes) -> str:
@@ -255,12 +308,12 @@ def _context(**updates: object) -> dict[str, object]:
     return context
 
 
-def test_federation_catalog_is_strict() -> None:
+def _case_federation_catalog_is_strict() -> None:
     assert len(FEDERATION_SCHEMA_NAMES) == 5
     assert validate_federation_catalog().valid
 
 
-def test_projects_deterministic_sanitized_portfolio(tmp_path: Path) -> None:
+def _case_projects_deterministic_sanitized_portfolio(tmp_path: Path) -> None:
     first = _write_source(
         tmp_path / "first",
         tenant="tenant-a",
@@ -314,7 +367,9 @@ def test_projects_deterministic_sanitized_portfolio(tmp_path: Path) -> None:
     assert b"is_authoritative: false" in all_bytes
 
 
-def test_rejects_cross_tenant_and_conflicting_existing_namespace(tmp_path: Path) -> None:
+def _case_rejects_cross_tenant_and_conflicting_existing_namespace(
+    tmp_path: Path,
+) -> None:
     first = _write_source(
         tmp_path / "first",
         tenant="tenant-a",
@@ -329,7 +384,7 @@ def test_rejects_cross_tenant_and_conflicting_existing_namespace(tmp_path: Path)
         identity_seed="two",
         record_id="record:two",
     )
-    with pytest.raises(FederationError, match="cross-tenant"):
+    with _raises(FederationError, match="cross-tenant"):
         project_federation(
             [first, other_tenant],
             tmp_path / "portfolio",
@@ -359,7 +414,7 @@ def test_rejects_cross_tenant_and_conflicting_existing_namespace(tmp_path: Path)
         / "manifest.json"
     )
     manifest.write_text("{}\n", encoding="utf-8")
-    with pytest.raises(FederationError, match="conflicts"):
+    with _raises(FederationError, match="conflicts"):
         project_federation(
             [first, second],
             tmp_path / "portfolio",
@@ -369,7 +424,7 @@ def test_rejects_cross_tenant_and_conflicting_existing_namespace(tmp_path: Path)
         )
 
 
-def test_requires_authentic_exact_scope_authority(tmp_path: Path) -> None:
+def _case_requires_authentic_exact_scope_authority(tmp_path: Path) -> None:
     sources = [
         _write_source(
             tmp_path / name,
@@ -380,7 +435,7 @@ def test_requires_authentic_exact_scope_authority(tmp_path: Path) -> None:
         )
         for name in ("one", "two")
     ]
-    with pytest.raises(PermissionError):
+    with _raises(PermissionError):
         project_federation(
             sources,
             tmp_path / "portfolio",
@@ -389,7 +444,7 @@ def test_requires_authentic_exact_scope_authority(tmp_path: Path) -> None:
         )
     assert not (tmp_path / "portfolio").exists()
     wrong_scope = replace(_authority(), repository_id="other")
-    with pytest.raises(PermissionError):
+    with _raises(PermissionError):
         project_federation(
             sources,
             tmp_path / "portfolio",
@@ -400,7 +455,7 @@ def test_requires_authentic_exact_scope_authority(tmp_path: Path) -> None:
     assert not (tmp_path / "portfolio").exists()
 
 
-def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
+def _case_rejects_linked_content_duplicate_identity_and_nested_vaults(
     tmp_path: Path,
 ) -> None:
     first = _write_source(
@@ -417,7 +472,7 @@ def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
         identity_seed="same",
         record_id="record:two",
     )
-    with pytest.raises(FederationError, match="repeat a repository identity"):
+    with _raises(FederationError, match="repeat a repository identity"):
         project_federation(
             [first, duplicate_identity],
             tmp_path / "portfolio",
@@ -434,7 +489,7 @@ def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
     )
     note = next((first / "evidence").glob("*.md"))
     os.link(note, tmp_path / "linked-note.md")
-    with pytest.raises(FederationError, match="single-link"):
+    with _raises(FederationError, match="single-link"):
         project_federation(
             [first, second],
             tmp_path / "portfolio",
@@ -443,7 +498,7 @@ def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
             check=True,
         )
     (tmp_path / "linked-note.md").unlink()
-    with pytest.raises(FederationError, match="inside a source vault"):
+    with _raises(FederationError, match="inside a source vault"):
         project_federation(
             [first, second],
             first / "nested-portfolio",
@@ -453,8 +508,7 @@ def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
         )
 
 
-@pytest.mark.parametrize("check", [True, False])
-def test_rejects_portfolio_sibling_inside_enclosing_source_vault_without_mutation(
+def _case_rejects_portfolio_sibling_inside_enclosing_source_vault_without_mutation(
     tmp_path: Path,
     check: bool,
 ) -> None:
@@ -479,7 +533,7 @@ def test_rejects_portfolio_sibling_inside_enclosing_source_vault_without_mutatio
         for path in first_vault.rglob("*")
         if path.is_file()
     }
-    with pytest.raises(FederationError, match="inside a source vault"):
+    with _raises(FederationError, match="inside a source vault"):
         if check:
             project_federation(
                 [first, second],
@@ -505,7 +559,7 @@ def test_rejects_portfolio_sibling_inside_enclosing_source_vault_without_mutatio
     assert not target.exists()
 
 
-def test_rejects_nested_source_vaults_without_output(tmp_path: Path) -> None:
+def _case_rejects_nested_source_vaults_without_output(tmp_path: Path) -> None:
     outer = _write_source(
         tmp_path / "outer-vault",
         tenant="tenant-a",
@@ -521,7 +575,7 @@ def test_rejects_nested_source_vaults_without_output(tmp_path: Path) -> None:
         record_id="record:inner",
     )
     target = tmp_path / "portfolio"
-    with pytest.raises(FederationError, match="source vaults cannot overlap or nest"):
+    with _raises(FederationError, match="source vaults cannot overlap or nest"):
         project_federation(
             [outer, inner],
             target,
@@ -532,7 +586,7 @@ def test_rejects_nested_source_vaults_without_output(tmp_path: Path) -> None:
     assert not target.exists()
 
 
-def test_rejects_private_unknown_and_inconsistent_payloads(tmp_path: Path) -> None:
+def _case_rejects_private_unknown_and_inconsistent_payloads(tmp_path: Path) -> None:
     second = _write_source(
         tmp_path / "second",
         tenant="tenant-a",
@@ -552,7 +606,7 @@ def test_rejects_private_unknown_and_inconsistent_payloads(tmp_path: Path) -> No
             record_id=f"record:{name}",
             payload_updates=updates,
         )
-        with pytest.raises(FederationError, match="payload"):
+        with _raises(FederationError, match="payload"):
             project_federation(
                 [first, second],
                 tmp_path / f"portfolio-{name}",
@@ -562,7 +616,7 @@ def test_rejects_private_unknown_and_inconsistent_payloads(tmp_path: Path) -> No
             )
 
 
-def test_rejects_unmanaged_source_and_target_state(tmp_path: Path) -> None:
+def _case_rejects_unmanaged_source_and_target_state(tmp_path: Path) -> None:
     sources = [
         _write_source(
             tmp_path / name,
@@ -574,7 +628,7 @@ def test_rejects_unmanaged_source_and_target_state(tmp_path: Path) -> None:
         for name in ("one", "two")
     ]
     (sources[0] / "unmanaged.txt").write_text("unmanaged", encoding="utf-8")
-    with pytest.raises(FederationError, match="unmanaged"):
+    with _raises(FederationError, match="unmanaged"):
         project_federation(
             sources,
             tmp_path / "portfolio",
@@ -592,7 +646,7 @@ def test_rejects_unmanaged_source_and_target_state(tmp_path: Path) -> None:
     )
     namespace = tmp_path / "portfolio" / "hive-mind" / "federated-cognitive"
     (namespace / "unmanaged-empty-directory").mkdir()
-    with pytest.raises(FederationError, match="unmanaged directories"):
+    with _raises(FederationError, match="unmanaged directories"):
         project_federation(
             sources,
             tmp_path / "portfolio",
@@ -602,7 +656,7 @@ def test_rejects_unmanaged_source_and_target_state(tmp_path: Path) -> None:
         )
 
 
-def test_rejects_interrupted_staging_and_excess_sources(tmp_path: Path) -> None:
+def _case_rejects_interrupted_staging_and_excess_sources(tmp_path: Path) -> None:
     sources = [
         _write_source(
             tmp_path / name,
@@ -615,7 +669,7 @@ def test_rejects_interrupted_staging_and_excess_sources(tmp_path: Path) -> None:
     ]
     staging = tmp_path / "portfolio" / "hive-mind" / ".federation-interrupted"
     staging.mkdir(parents=True)
-    with pytest.raises(FederationError, match="operator recovery"):
+    with _raises(FederationError, match="operator recovery"):
         project_federation(
             sources,
             tmp_path / "portfolio",
@@ -623,7 +677,7 @@ def test_rejects_interrupted_staging_and_excess_sources(tmp_path: Path) -> None:
             portfolio_repository_id="portfolio",
             authority=_authority(),
         )
-    with pytest.raises(FederationError, match="source bound"):
+    with _raises(FederationError, match="source bound"):
         project_federation(
             (sources[index % 2] for index in range(65)),
             tmp_path / "other-portfolio",
@@ -633,7 +687,7 @@ def test_rejects_interrupted_staging_and_excess_sources(tmp_path: Path) -> None:
         )
 
 
-def test_interrupted_staging_blocks_unchanged_rerun(tmp_path: Path) -> None:
+def _case_interrupted_staging_blocks_unchanged_rerun(tmp_path: Path) -> None:
     sources = [
         _write_source(
             tmp_path / name,
@@ -655,7 +709,7 @@ def test_interrupted_staging_blocks_unchanged_rerun(tmp_path: Path) -> None:
     staging = portfolio / "hive-mind" / ".federation-interrupted"
     staging.mkdir()
     (staging / "partial").write_text("preserve", encoding="utf-8")
-    with pytest.raises(FederationError, match="operator recovery"):
+    with _raises(FederationError, match="operator recovery"):
         project_federation(
             sources,
             portfolio,
@@ -666,9 +720,9 @@ def test_interrupted_staging_blocks_unchanged_rerun(tmp_path: Path) -> None:
     assert (staging / "partial").read_text(encoding="utf-8") == "preserve"
 
 
-def test_tree_enumeration_stops_at_bound(
+def _case_tree_enumeration_stops_at_bound(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     root = tmp_path / "many"
     root.mkdir()
@@ -697,14 +751,14 @@ def test_tree_enumeration_stops_at_bound(
 
     monkeypatch.setattr(federation_module, "MAX_TREE_ENTRIES", 2)
     monkeypatch.setattr(federation_module.os, "scandir", CountingScandir)
-    with pytest.raises(FederationError, match="entry bound"):
+    with _raises(FederationError, match="entry bound"):
         federation_module._enumerate_tree(root)
     assert consumed[0] == 3
 
 
-def test_revalidates_sources_after_staging(
+def _case_revalidates_sources_after_staging(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     sources = [
         _write_source(
@@ -734,7 +788,7 @@ def test_revalidates_sources_after_staging(
         "_source_tree_receipt",
         mutate_before_final,
     )
-    with pytest.raises(FederationError, match="changed"):
+    with _raises(FederationError, match="changed"):
         project_federation(
             sources,
             tmp_path / "portfolio",
@@ -747,9 +801,9 @@ def test_revalidates_sources_after_staging(
     assert not list(parent.glob(".federation-*"))
 
 
-def test_no_replace_publication_preserves_racing_destination(
+def _case_no_replace_publication_preserves_racing_destination(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     sources = [
         _write_source(
@@ -769,7 +823,7 @@ def test_no_replace_publication_preserves_racing_destination(
         original(source, destination)
 
     monkeypatch.setattr(federation_module, "_rename_no_replace", race)
-    with pytest.raises((FileExistsError, OSError)):
+    with _raises((FileExistsError, OSError)):
         project_federation(
             sources,
             tmp_path / "portfolio",
@@ -782,7 +836,7 @@ def test_no_replace_publication_preserves_racing_destination(
     assert not list(namespace.parent.glob(".federation-*"))
 
 
-def test_rejects_linked_source_and_target_roots(tmp_path: Path) -> None:
+def _case_rejects_linked_source_and_target_roots(tmp_path: Path) -> None:
     sources = [
         _write_source(
             tmp_path / name,
@@ -804,8 +858,8 @@ def test_rejects_linked_source_and_target_roots(tmp_path: Path) -> None:
         source_link.symlink_to(sources[0], target_is_directory=True)
         target_link.symlink_to(target_destination, target_is_directory=True)
     except OSError:
-        pytest.skip("directory symlink creation is unavailable")
-    with pytest.raises(FederationError, match="linked or reparse"):
+        raise unittest.SkipTest("directory symlink creation is unavailable")
+    with _raises(FederationError, match="linked or reparse"):
         project_federation(
             [source_link, sources[1]],
             tmp_path / "portfolio",
@@ -813,7 +867,7 @@ def test_rejects_linked_source_and_target_roots(tmp_path: Path) -> None:
             portfolio_repository_id="portfolio",
             check=True,
         )
-    with pytest.raises(FederationError, match="linked or reparse"):
+    with _raises(FederationError, match="linked or reparse"):
         project_federation(
             sources,
             target_link,
@@ -824,8 +878,7 @@ def test_rejects_linked_source_and_target_roots(tmp_path: Path) -> None:
     assert not (target_destination / "hive-mind").exists()
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows junction regression")
-def test_rejects_windows_junction_redirection_into_source(tmp_path: Path) -> None:
+def _case_rejects_windows_junction_redirection_into_source(tmp_path: Path) -> None:
     sources = [
         _write_source(
             tmp_path / name,
@@ -846,9 +899,9 @@ def test_rejects_windows_junction_redirection_into_source(tmp_path: Path) -> Non
         text=True,
     )
     if created.returncode != 0:
-        pytest.skip("junction creation is unavailable")
+        raise unittest.SkipTest("junction creation is unavailable")
     try:
-        with pytest.raises(FederationError, match="linked or reparse"):
+        with _raises(FederationError, match="linked or reparse"):
             project_federation(
                 sources,
                 portfolio,
@@ -862,41 +915,16 @@ def test_rejects_windows_junction_redirection_into_source(tmp_path: Path) -> Non
             os.rmdir(junction)
 
 
-@pytest.mark.parametrize(
-    ("updates", "reason"),
-    [
-        (
-            {"origin_kind": "generated-memory", "event_kind": "evidence-ingestion"},
-            "generated-memory-reingestion",
-        ),
-        (
-            {"origin_kind": "projection-event", "event_kind": "projection"},
-            "projection-feedback",
-        ),
-        (
-            {"origin_kind": "telemetry-event", "event_kind": "telemetry"},
-            "telemetry-feedback",
-        ),
-        (
-            {"origin_kind": "idea-event", "event_kind": "idea"},
-            "idea-feedback",
-        ),
-        (
-            {"origin_kind": "delegation-event", "event_kind": "delegation"},
-            "delegation-feedback",
-        ),
-        ({"delegation_hops": 9}, "delegation-hop-limit"),
-        ({"self_host_depth": 2}, "self-host-depth-limit"),
-        ({"target_boundary": None}, "missing-target-boundary"),
-    ],
-)
-def test_self_host_feedback_guards(updates: dict[str, object], reason: str) -> None:
+def _case_self_host_feedback_guards(
+    updates: dict[str, object],
+    reason: str,
+) -> None:
     decision = evaluate_self_host_context(_context(**updates))
     assert decision["status"] == "rejected"
     assert decision["reason"] == reason
 
 
-def test_self_host_duplicate_and_epoch_rules() -> None:
+def _case_self_host_duplicate_and_epoch_rules() -> None:
     prior = _context()
     duplicate = evaluate_self_host_context(_context(), [prior])
     assert duplicate["status"] == "collapsed"
@@ -918,9 +946,9 @@ def test_self_host_duplicate_and_epoch_rules() -> None:
     assert admitted["reason"] == "admitted"
 
 
-def test_self_host_prior_scope_epoch_and_history_bounds() -> None:
+def _case_self_host_prior_scope_epoch_and_history_bounds() -> None:
     prior = _context(observation_epoch=2)
-    with pytest.raises(FederationError, match="scope mismatch"):
+    with _raises(FederationError, match="scope mismatch"):
         evaluate_self_host_context(
             _context(
                 origin_record_id="record:new",
@@ -939,14 +967,14 @@ def test_self_host_prior_scope_epoch_and_history_bounds() -> None:
     decision = evaluate_self_host_context(regressed, [prior])
     assert decision["status"] == "rejected"
     assert decision["reason"] == "stale-observation-epoch"
-    with pytest.raises(FederationError, match="history exceeds"):
+    with _raises(FederationError, match="history exceeds"):
         evaluate_self_host_context(
             _context(),
             (_context(idempotency_key=f"idempotency:{index}") for index in range(10_001)),
         )
 
 
-def test_item6_inventory_is_exact() -> None:
+def _case_item6_inventory_is_exact() -> None:
     repository = Path(__file__).parents[1]
     committed = json.loads(
         (
@@ -957,3 +985,142 @@ def test_item6_inventory_is_exact() -> None:
         ).read_text(encoding="utf-8")
     )
     assert build_phase3_item6_inventory(repository) == committed
+
+
+class FederationTests(unittest.TestCase):
+    def _temporary_case(self, case: Any, *arguments: object) -> None:
+        with TemporaryDirectory() as temporary:
+            case(Path(temporary), *arguments)
+
+    def _monkey_case(self, case: Any) -> None:
+        monkeypatch = _MonkeyPatch()
+        try:
+            with TemporaryDirectory() as temporary:
+                case(Path(temporary), monkeypatch)
+        finally:
+            monkeypatch.undo()
+
+    def test_federation_catalog_is_strict(self) -> None:
+        _case_federation_catalog_is_strict()
+
+    def test_projects_deterministic_sanitized_portfolio(self) -> None:
+        self._temporary_case(_case_projects_deterministic_sanitized_portfolio)
+
+    def test_rejects_cross_tenant_and_conflicting_existing_namespace(self) -> None:
+        self._temporary_case(
+            _case_rejects_cross_tenant_and_conflicting_existing_namespace
+        )
+
+    def test_requires_authentic_exact_scope_authority(self) -> None:
+        self._temporary_case(_case_requires_authentic_exact_scope_authority)
+
+    def test_rejects_linked_content_duplicate_identity_and_nested_vaults(
+        self,
+    ) -> None:
+        self._temporary_case(
+            _case_rejects_linked_content_duplicate_identity_and_nested_vaults
+        )
+
+    def test_rejects_portfolio_sibling_in_source_vault_check(self) -> None:
+        self._temporary_case(
+            _case_rejects_portfolio_sibling_inside_enclosing_source_vault_without_mutation,
+            True,
+        )
+
+    def test_rejects_portfolio_sibling_in_source_vault_project(self) -> None:
+        self._temporary_case(
+            _case_rejects_portfolio_sibling_inside_enclosing_source_vault_without_mutation,
+            False,
+        )
+
+    def test_rejects_nested_source_vaults_without_output(self) -> None:
+        self._temporary_case(_case_rejects_nested_source_vaults_without_output)
+
+    def test_rejects_private_unknown_and_inconsistent_payloads(self) -> None:
+        self._temporary_case(_case_rejects_private_unknown_and_inconsistent_payloads)
+
+    def test_rejects_unmanaged_source_and_target_state(self) -> None:
+        self._temporary_case(_case_rejects_unmanaged_source_and_target_state)
+
+    def test_rejects_interrupted_staging_and_excess_sources(self) -> None:
+        self._temporary_case(_case_rejects_interrupted_staging_and_excess_sources)
+
+    def test_interrupted_staging_blocks_unchanged_rerun(self) -> None:
+        self._temporary_case(_case_interrupted_staging_blocks_unchanged_rerun)
+
+    def test_tree_enumeration_stops_at_bound(self) -> None:
+        self._monkey_case(_case_tree_enumeration_stops_at_bound)
+
+    def test_revalidates_sources_after_staging(self) -> None:
+        self._monkey_case(_case_revalidates_sources_after_staging)
+
+    def test_no_replace_publication_preserves_racing_destination(self) -> None:
+        self._monkey_case(
+            _case_no_replace_publication_preserves_racing_destination
+        )
+
+    def test_rejects_linked_source_and_target_roots(self) -> None:
+        self._temporary_case(_case_rejects_linked_source_and_target_roots)
+
+    @unittest.skipUnless(os.name == "nt", "Windows junction regression")
+    def test_rejects_windows_junction_redirection_into_source(self) -> None:
+        self._temporary_case(
+            _case_rejects_windows_junction_redirection_into_source
+        )
+
+    def test_self_host_generated_memory_reingestion(self) -> None:
+        _case_self_host_feedback_guards(
+            {"origin_kind": "generated-memory", "event_kind": "evidence-ingestion"},
+            "generated-memory-reingestion",
+        )
+
+    def test_self_host_projection_feedback(self) -> None:
+        _case_self_host_feedback_guards(
+            {"origin_kind": "projection-event", "event_kind": "projection"},
+            "projection-feedback",
+        )
+
+    def test_self_host_telemetry_feedback(self) -> None:
+        _case_self_host_feedback_guards(
+            {"origin_kind": "telemetry-event", "event_kind": "telemetry"},
+            "telemetry-feedback",
+        )
+
+    def test_self_host_idea_feedback(self) -> None:
+        _case_self_host_feedback_guards(
+            {"origin_kind": "idea-event", "event_kind": "idea"},
+            "idea-feedback",
+        )
+
+    def test_self_host_delegation_feedback(self) -> None:
+        _case_self_host_feedback_guards(
+            {"origin_kind": "delegation-event", "event_kind": "delegation"},
+            "delegation-feedback",
+        )
+
+    def test_self_host_delegation_hop_limit(self) -> None:
+        _case_self_host_feedback_guards(
+            {"delegation_hops": 9},
+            "delegation-hop-limit",
+        )
+
+    def test_self_host_depth_limit(self) -> None:
+        _case_self_host_feedback_guards(
+            {"self_host_depth": 2},
+            "self-host-depth-limit",
+        )
+
+    def test_self_host_missing_target_boundary(self) -> None:
+        _case_self_host_feedback_guards(
+            {"target_boundary": None},
+            "missing-target-boundary",
+        )
+
+    def test_self_host_duplicate_and_epoch_rules(self) -> None:
+        _case_self_host_duplicate_and_epoch_rules()
+
+    def test_self_host_prior_scope_epoch_and_history_bounds(self) -> None:
+        _case_self_host_prior_scope_epoch_and_history_bounds()
+
+    def test_item6_inventory_is_exact(self) -> None:
+        _case_item6_inventory_is_exact()
