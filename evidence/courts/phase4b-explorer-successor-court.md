@@ -17,8 +17,8 @@ remain metadata; effective capabilities and tools remain empty.
 The candidate must satisfy
 `docs/architecture/PHASE4B_EXPLORER_SUCCESSOR_CONTRACT.md`, preserve every earlier
 contract and byte pin, and make no runtime, activation, public, usefulness, learning,
-or superiority claim. Independent Cross-Examiner, Curator, Integrator, Steward,
-Optimizer, and Judge dispositions remain pending.
+or superiority claim. Cross-Examiner, Curator, Integrator, Steward, Optimizer, and
+Judge dispositions were pending when this burden was opened; their receipts follow.
 
 ## Cross-examination
 
@@ -52,4 +52,25 @@ unproven.
   learning, behavior, value, and superiority evidence does not yet exist.
 
 All eight specialist roles and required temporary court identities now have
-receipts. Final inventory reseal and Judge disposition remain pending.
+receipts.
+
+## Judge verdict
+
+Independent Judge `/root/phase4b_judge` issued `adapt` for exact base
+`316ee55da4ea7449bcdb934ab442ef0d95f54ba5`, implementation
+`e00b017e10d202504e4a9ec601f52349002a66c1`, and sealed evidence
+`fed1f87a05f64cc690638cb6d201ee15fc687f81`.
+
+The verdict admits only deterministic eight-layer definition composition,
+fixed-identity and packaged-byte drift controls, defensive copying, inert/no-
+authority/non-public status, 133 JSON resources, and additive rollback. It excludes
+runtime binding, activation, public release, live repository/history/web/provider/
+tool use, executable stop enforcement, behavioral usefulness, customer value,
+semantic quality, learning, champion selection, promotion, superiority, and
+bit-reproducible wheel archives.
+
+Remaining debt is the private `_FINDING_FIELDS` coupling, Python-held canonical
+playbook, conventional package privacy, cross-language portability, and absence of
+held-out evaluation infrastructure. The Judge authorized this evidence-only verdict
+append and final inventory reseal without reopening implementation. P4B-001 is
+closed `adapt`; any later behavioral or activation claim requires a new court.

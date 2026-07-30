@@ -130,3 +130,14 @@ regenerates and independently recomputes the inventory at this boundary before
 requesting judgment, closing the Steward/Optimizer procedural remand. The Judge
 may authorize one final evidence-only reseal after its verdict without reopening
 implementation `e00b017`.
+
+## `P4B-AUDIT-014` — Judge verdict
+
+Independent Judge `/root/phase4b_judge` issued `adapt` for exact implementation
+`e00b017e10d202504e4a9ec601f52349002a66c1` and sealed pre-verdict evidence
+`fed1f87a05f64cc690638cb6d201ee15fc687f81`. It admitted only the inert,
+definition-only composition and authorized this final evidence-only append/reseal.
+Every runtime, activation, public, behavior, value, learning, promotion,
+superiority, executable-stopping, and bit-reproducible-wheel claim remains
+excluded. A stacked PR may be open only as draft, unmerged, and inactive against
+`codex/phase4-explorer-shadow`.

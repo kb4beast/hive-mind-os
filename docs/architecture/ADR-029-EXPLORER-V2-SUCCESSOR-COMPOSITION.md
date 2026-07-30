@@ -1,6 +1,6 @@
 # ADR-029: Explorer v2 successor composition
 
-- Status: proposed for independent implementation court
+- Status: accepted as an inert definition-only candidate by P4B-001 (`adapt`)
 - Date: 2026-07-30
 - Base: `316ee55da4ea7449bcdb934ab442ef0d95f54ba5`
 - Extends: ADR-018 and ADR-028

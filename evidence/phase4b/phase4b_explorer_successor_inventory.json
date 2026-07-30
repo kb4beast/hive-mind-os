@@ -17,11 +17,11 @@
     "source_json_resource_count": 133
   },
   "implementation": {
-    "docs/architecture/ADR-029-EXPLORER-V2-SUCCESSOR-COMPOSITION.md": "sha256:c5e4edd4d1fbf3b56c06ea3630fa10593e9513b69a8741a20e0f886a58739ec1",
+    "docs/architecture/ADR-029-EXPLORER-V2-SUCCESSOR-COMPOSITION.md": "sha256:6db059547b98ab9322f048fb39c42c5c1176ddcd3dfae59b329a937ef47ce029",
     "docs/architecture/ADR_INDEX.md": "sha256:05e148a78d8b12e56eec0ca7c5dacbb0319a80735f30dfb2e96e007a0f408c40",
     "docs/architecture/PHASE4B_EXPLORER_SUCCESSOR_CONTRACT.md": "sha256:bcbd107174ff3174fd1b51810431986c47cad0e9157809a387d7fd6d23f862cb",
-    "evidence/courts/phase4b-explorer-successor-court.md": "sha256:3a6acfdc9effa832155600d8128ae7c09b0a48301e683e311f59aeb72049cdfd",
-    "evidence/phase4b/PHASE4B_AUDIT_LEDGER.md": "sha256:fdb215b74a9db6b1c8c62ba6a15c5659cd8fc4ef0ec900ab8eb7e616fe39ea22",
+    "evidence/courts/phase4b-explorer-successor-court.md": "sha256:f3e7601edd463ab016fb9931dfc7eb1bcd2b20a87e33ec74078a4a1f994cd2d9",
+    "evidence/phase4b/PHASE4B_AUDIT_LEDGER.md": "sha256:e7b56d57bd8087d5225d6d85c201c34ebc1674d74ea34d7b8c720e0954f3e8dd",
     "evidence/phase4b/PHASE4B_DISSENT.md": "sha256:3dcb0c034825deda916860822620ec924a5af92e3fb477a6a35cc590bdbddb01",
     "evidence/phase4b/PHASE4B_INSTALLED_WHEEL_RECEIPT.md": "sha256:e3b4e7f3fb085271a3fb031dc7b4122a3d94967f2ecdd2fc1bdc8d36dee739c8",
     "evidence/sources/PHASE4B_EXPLORER_SUCCESSOR_SOURCE_REGISTER.md": "sha256:0bd42dc49bb31f652735395fb5fd54af7ce19d9f8959a91e3054217f185e1f92",
@@ -30,7 +30,7 @@
     "src/hive_mind_os/foundation/explorer_successor_contracts.py": "sha256:9dfd4cba2b9b390fd4fcb32a2f1dbda0467f66c0f6da0ea109c08aead308d22d",
     "tests/test_phase4b_explorer_successor.py": "sha256:eba8321f77aebe8a2f8eca2eae29edce8b7d982684a1bea144818cda853b4ab4"
   },
-  "inventory_digest": "sha256:002bcddd4ed7f72daac4fd19b18c459e9e33f1910a4ea17993bb0e78f7978f61",
+  "inventory_digest": "sha256:2949f6899424049961c8e5d8d7d41872324c364a54cafbace9fab934dcd0b8ad",
   "phase": 4,
   "phase4a_input": {
     "inventory_digest": "sha256:6b5656608a5a53c104d4e9139f0ac485eebec6eab6db3d3350a4581b62816b36"
