@@ -45,3 +45,13 @@ attacks, and made the compiler compare packaged Phase 2 canonical, generated
 Explorer, and generated-manifest bytes. The inventory now includes the changed ADR
 index and the source JSON-resource count; the source register supplies exact paths,
 base commit, and file digests. Clean installed-wheel proof remains pending.
+
+## `P4B-AUDIT-006` — installed-wheel receipt
+
+Exact implementation commit `e00b017` built through the isolated PEP 517 backend
+and clean-installed without dependencies. The installed package retained exactly
+133 JSON resources and compiled successor digest
+`sha256:0494c32237fbbe83b90444c9b0496646e8f0b27e7c20379320a6bd7241697463`
+with inert activation, no authority, and no public status. The wheel receipt is
+`evidence/phase4b/PHASE4B_INSTALLED_WHEEL_RECEIPT.md`. Independent Curator
+reproduction remains pending.
