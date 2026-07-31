@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: phase5d-materialize-${{ github.event.pull_request.head.ref }}
@@ -38,32 +38,20 @@ jobs:
           python -m pip install --disable-pip-version-check --no-deps -e .
           PYTHONPATH=src:. python scripts/phase5d_materialize.py
 
-      - name: Export exact validated candidate
+      - name: Commit and push validated non-workflow product
         shell: bash
         run: |
           set -euo pipefail
           rm -rf .phase5d-payload
+          git checkout HEAD -- .github/workflows/phase5d-materialize.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          test ! -e .github/workflows/phase5d-materialize.yml
+          test -e .github/workflows/phase5d-materialize.yml
           test ! -e scripts/phase5d_materialize.py
           test ! -e .phase5d-payload
-          git diff --cached --name-only --diff-filter=ACMR -z > /tmp/phase5d-files.list
-          mkdir -p phase5d-export
-          git diff --cached --name-status > phase5d-export/phase5d-name-status.txt
-          git diff --cached --binary --full-index > phase5d-export/phase5d-product.patch
-          tar --null --files-from=/tmp/phase5d-files.list \
-            --create --gzip --file phase5d-export/phase5d-product-files.tar.gz
-          sha256sum \
-            phase5d-export/phase5d-product-files.tar.gz \
-            phase5d-export/phase5d-product.patch \
-            phase5d-export/phase5d-name-status.txt \
-            > phase5d-export/phase5d-export-sha256.txt
-
-      - name: Upload exact validated candidate
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
-        with:
-          name: phase5d-materialized-product-${{ github.event.pull_request.head.sha }}
-          path: phase5d-export/*
-          if-no-files-found: error
-          retention-days: 30
+          git diff --cached --quiet -- .github/workflows/ci.yml
+          git diff --cached --quiet -- .github/workflows/phase5d-materialize.yml
+          git commit -m 'Add inert Phase 5D Curator deep playbook'
+          git push origin HEAD:agent/phase5d-curator-shadow
