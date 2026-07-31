@@ -54,6 +54,17 @@ jobs:
           for chunk in "${chunks[@]}"; do
             test -f "$chunk"
           done
+          cat > /tmp/phase5a-chunks.sha256 <<'EOF'
+          f20ac05a5902af4b40db101a2618a0c051cb2160ba4afc1cb2cb2f962cb17dd0  .github/bootstrap/phase5a-final.part-00
+          c7a4794a3151b8191584955f83b5b76814181fb96fc29caae37be6f6b7038d1d  .github/bootstrap/phase5a-final.part-01
+          945b1e448d473e5a08143bf6114c878dc9826ee0235c9e31403c48afe42466da  .github/bootstrap/phase5a-final.part-02
+          2ef3aecabd28b6706c71412cb743f65b1479a9691f6b09383291d4d9000da7fa  .github/bootstrap/phase5a-final.part-03
+          703fcb929417b59d96457be721413d6f1f304cbfe356d4cf9ec96a2c89ab20a0  .github/bootstrap/phase5a-final.part-04
+          84799a97de0cb987fba15930c12fc7e6dd194dd7edc06189f3b3cc8d1d43deb1  .github/bootstrap/phase5a-final.part-05
+          d47217d611665626234f62f5d5c975753febc6476605a6428ea27f6065a10c2b  .github/bootstrap/phase5a-final.part-06
+          1c255f381e97a133dff134e502ac08e223934c0379ae35a8728bcc7d6d667746  .github/bootstrap/phase5a-final.part-07
+          EOF
+          sha256sum --check --strict /tmp/phase5a-chunks.sha256
           cat "${chunks[@]}" > /tmp/phase5a-final.patch.gz.b64
           echo '30684561939d353639c4b3e1c0b0afe5b985428180981506a45efaec5d718409  /tmp/phase5a-final.patch.gz.b64' \
             | sha256sum --check --strict
