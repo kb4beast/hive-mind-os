@@ -26,7 +26,7 @@ from scripts.phase1_surface_inventory import build_inventory, cli_inventory
 OUTPUT_PATH = Path("evidence/phase5b/phase5b_architect_inventory.json")
 BASE_HEAD = "ed1c0a76c52335e7cf92ba92b2f4d401116f85e1"
 PHASE5A_INVENTORY_DIGEST = (
-    "sha256:ff76b245267d244354d99bf136a35088e7169b1e9da9f6afa7afa73ffdc0fa55"
+    "sha256:a972c2618e779f5031495189362e4bccf2f3c5ed96c403a2d4731be3ba65ef43"
 )
 
 
@@ -75,11 +75,12 @@ def _resource_reconciles(design: dict[str, Any]) -> bool:
 
 def build_phase5b_inventory(repository: Path) -> dict[str, Any]:
     successor = compile_architect_successor()
-    request = example_architect_request()
-    design = compile_architect_design(request)
+    design = compile_architect_design(example_architect_request())
     surface = build_inventory(repository)
     output_validity = {
-        field: validate_architect(OUTPUT_SCHEMA_BY_FIELD[field], design["outputs"][field]).valid
+        field: validate_architect(
+            OUTPUT_SCHEMA_BY_FIELD[field], design["outputs"][field]
+        ).valid
         for field in OUTPUT_FIELDS
     }
     rankings = design["outputs"]["option_analysis"]["rankings"]
@@ -150,14 +151,14 @@ def build_phase5b_inventory(repository: Path) -> dict[str, Any]:
             "blocked_option_count": sum(
                 item["viability_status"] == "blocked" for item in rankings
             ),
-            "provisional_preferred_option_id": design["outputs"][
-                "option_analysis"
-            ]["provisional_preferred_option_id"],
             "requested_option_id": design["outputs"]["option_analysis"][
                 "requested_option_id"
             ],
             "requested_option_eligible": design["outputs"]["option_analysis"][
                 "requested_option_eligible"
+            ],
+            "provisional_preferred_option_id": design["outputs"]["option_analysis"][
+                "provisional_preferred_option_id"
             ],
             "selection_status": design["outputs"]["option_analysis"][
                 "selection_status"
@@ -181,9 +182,11 @@ def build_phase5b_inventory(repository: Path) -> dict[str, Any]:
             "root_api_count": len(hive_mind_os.__all__),
             "package_api_count": len(package_system.__all__),
             "cli_parser_count": cli_inventory()["parser_count"],
-            "definition_count": surface["observable_module_surface"]["definition_count"],
+            "definition_count": surface["observable_module_surface"][
+                "definition_count"
+            ],
             "json_resource_count": len(
-                tuple((repository / "src/hive_mind_os").rglob("*.json"))
+                tuple(Path(hive_mind_os.__file__).parent.rglob("*.json"))
             ),
             "runtime_unclassified_count": surface["runtime_effects"][
                 "unclassified_candidate_count"
