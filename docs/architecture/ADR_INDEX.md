@@ -34,6 +34,7 @@ evidence. Numeric-only references to ADR-008, ADR-012, or ADR-021 are ambiguous.
 | `ADR-033` | [Inert Orchestrator deep-playbook candidate](ADR-033-ORCHESTRATOR-DEEP-PLAYBOOK.md) | Phase 5A | adapted as a package-private planning candidate; execution, authenticated independence, merge, and activation remain prohibited |
 | `ADR-034` | [Inert Architect deep-playbook candidate](ADR-034-ARCHITECT-DEEP-PLAYBOOK.md) | Phase 5B | adapted as a package-private design candidate; selection, implementation, authenticated independence, merge, and activation remain prohibited |
 | `ADR-035` | [Inert Builder deep-playbook candidate](ADR-035-BUILDER-DEEP-PLAYBOOK.md) | Phase 5C | adapted as a package-private implementation-planning candidate; execution, test-result authority, completion, authenticated independence, merge, and activation remain prohibited |
+| `ADR-036` | [Inert Curator deep-playbook candidate](ADR-036-CURATOR-DEEP-PLAYBOOK.md) | Phase 5D | adapted as a package-private hostile-verification candidate; authenticated independence, execution, release approval, merge, and activation remain prohibited |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-036; it must be unique at creation time.
+is ADR-037; it must be unique at creation time.

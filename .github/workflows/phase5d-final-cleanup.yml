@@ -1,0 +1,51 @@
+name: Phase 5D final cleanup
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase5d-final-cleanup-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.head.ref == 'agent/phase5d-curator-shadow'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Repair static findings and remove temporary workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'ruff==0.16.0' 'pyright==1.1.411'
+          ruff check --fix --unsafe-fixes src/hive_mind_os/foundation/curator_playbook.py tests/test_phase5d_curator_playbook.py
+          rm -f \
+            .github/workflows/phase5d-materialize.yml \
+            .github/workflows/phase5d-publication-remand.yml \
+            .github/workflows/phase5d-final-cleanup.yml
+          python -m pip install --disable-pip-version-check --no-deps -e .
+          python -m compileall -q src tests scripts
+          python -m unittest discover -s tests -p 'test_phase5d_curator_playbook.py' -v
+          ruff check src tests scripts
+          pyright
+
+      - name: Commit and push exact cleaned candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Finalize Phase 5D static fixes and remove scaffolding'
+          git push origin HEAD:agent/phase5d-curator-shadow

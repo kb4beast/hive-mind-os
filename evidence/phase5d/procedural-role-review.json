@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "phase": "5D",
+  "subject": "inert-curator-deep-playbook",
+  "authenticated_distinct_actors": false,
+  "same_assistant_performed_procedural_passes": true,
+  "independence_claimed": false,
+  "roles": [
+    {"role": "orchestrator", "actor_id": "procedural:orchestrator", "disposition": "proceed-bounded"},
+    {"role": "explorer-advocate", "actor_id": "procedural:explorer-advocate", "disposition": "sources-admitted-with-limits"},
+    {"role": "architect", "actor_id": "procedural:architect", "disposition": "interfaces-and-authority-preserved"},
+    {"role": "builder", "actor_id": "procedural:builder", "disposition": "implemented"},
+    {"role": "cross-examiner", "actor_id": "procedural:cross-examiner", "disposition": "hostile-cases-retained"},
+    {"role": "curator", "actor_id": "procedural:curator", "disposition": "procedural-reconstruction-only"},
+    {"role": "integrator", "actor_id": "procedural:integrator", "disposition": "compatibility-pending-hosted"},
+    {"role": "steward", "actor_id": "procedural:steward", "disposition": "rollback-and-reserves-present"},
+    {"role": "optimizer", "actor_id": "procedural:optimizer", "disposition": "no-value-or-superiority-claim"},
+    {"role": "judge", "actor_id": "procedural:judge", "disposition": "adapt-bounded-draft-only"}
+  ],
+  "authority": "none",
+  "activation": "inert",
+  "release_authorized": false,
+  "approval_authorized": false,
+  "promotion_authorized": false
+}
