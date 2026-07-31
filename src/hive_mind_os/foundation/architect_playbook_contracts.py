@@ -1049,7 +1049,7 @@ _SCHEMAS: Mapping[str, Mapping[str, Any]] = MappingProxyType(
 def load_architect_schema(name: str) -> dict[str, Any]:
     if name not in ARCHITECT_SCHEMA_NAMES:
         raise KeyError(f"unknown Architect schema: {name}")
-    return deepcopy(_SCHEMAS[name])
+    return dict(deepcopy(_SCHEMAS[name]))
 
 
 def _exact_json_issues(value: Any, path: str, issues: list[str], *, depth: int = 0) -> None:

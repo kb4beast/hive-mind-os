@@ -132,3 +132,12 @@ The complete suite remanded publication because Phase 5A's current-tree inventor
 bound the earlier CI and ADR-index bytes. The current-tree inventory was regenerated,
 while the earlier digest remains retained in the Phase 5B audit ledger as point-in-time
 evidence. No Phase 5A implementation or behavioral contract changed.
+
+## Hosted static-analysis remand
+
+The hosted Curator/static-analysis pass remanded the first published tree on one exact
+Pyright 1.1.411 error: `load_architect_schema` promised `dict[str, Any]` but returned a
+value inferred as `Mapping[str, Any]`. The Builder repaired only the return boundary by
+wrapping the deep-copied schema in `dict(...)`. The schema remains defensive and
+caller-mutable without exposing canonical backing data. This repair grants no new
+authority and requires a fresh terminal hosted matrix.

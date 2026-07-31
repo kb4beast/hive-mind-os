@@ -78,3 +78,17 @@ regenerated without changing Phase 5A code, contracts, or historical commits. It
 digest `sha256:0628a5236d5e06cceb3055fc65320a339c48cd229f56bfd39ef1ebce0c03d516`
 remains recorded here; the reconciled input digest is
 `sha256:ff76b245267d244354d99bf136a35088e7169b1e9da9f6afa7afa73ffdc0fa55`.
+
+## P5B-AUDIT-014 — hosted Pyright return-type remand
+
+The first exact hosted Phase 5B matrix passed Ruff, packaging, both installed-wheel
+verifiers, the Version 1.1 integration audit, SPDX generation, secret scanning, and
+dependency review, but Pyright 1.1.411 rejected `load_architect_schema` because the
+annotated source catalog is `Mapping[str, Mapping[str, Any]]` while the public loader
+promises `dict[str, Any]`. Runtime behavior already returned an independent deep copy,
+but the static contract was not explicit.
+
+The repair converts the deep-copied mapping to an ordinary `dict` at the return
+boundary. It does not change schema bytes, validation behavior, candidate identity,
+authority, activation, or any typed output. Hosted exact-head validation is required
+again after publication.
