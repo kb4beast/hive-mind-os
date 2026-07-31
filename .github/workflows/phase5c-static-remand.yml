@@ -1,25 +1,24 @@
 name: Phase 5C apply static-check remand
 
 on:
-  pull_request:
+  push:
     branches:
-      - agent/phase5a-orchestrator-shadow
-    types: [synchronize, reopened]
+      - agent/phase5c-builder-shadow
 
 permissions:
   contents: write
 
 jobs:
   repair:
-    if: github.actor != 'github-actions[bot]' && github.head_ref == 'agent/phase5c-builder-shadow'
+    if: github.actor != 'github-actions[bot]' && github.ref_name == 'agent/phase5c-builder-shadow'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out exact PR head
+      - name: Check out exact branch head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
 
       - name: Apply exact Ruff remands and append evidence
         shell: bash
