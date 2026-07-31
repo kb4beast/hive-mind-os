@@ -1,9 +1,10 @@
 name: Phase 5C finalize bounded remands
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/phase5c-builder-shadow
+      - agent/phase5a-orchestrator-shadow
+    types: [synchronize]
 
 permissions:
   contents: write
@@ -14,7 +15,7 @@ concurrency:
 
 jobs:
   finalize:
-    if: github.ref_name == 'agent/phase5c-builder-shadow'
+    if: github.head_ref == 'agent/phase5c-builder-shadow'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -22,7 +23,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Apply bounded code, test, and evidence remands
         shell: bash
