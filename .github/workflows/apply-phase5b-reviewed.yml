@@ -6,6 +6,11 @@ on:
       - agent/phase5b-architect-shadow
     paths:
       - .github/bootstrap/phase5b.ready
+  pull_request:
+    branches:
+      - agent/phase5a-orchestrator-shadow
+    paths:
+      - .github/bootstrap/phase5b.ready
 
 permissions:
   contents: write
@@ -16,6 +21,7 @@ concurrency:
 
 jobs:
   apply:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'agent/phase5b-architect-shadow'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact Phase 5B branch head
