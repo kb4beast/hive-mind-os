@@ -32,6 +32,7 @@ evidence. Numeric-only references to ADR-008, ADR-012, or ADR-021 are ambiguous.
 | `ADR-031` | [Explorer idea lifecycle reference events](ADR-031-EXPLORER-IDEA-LIFECYCLE-REFERENCE-EVENTS.md) | Phase 4D | adapted as an inert package-private reference bridge; runtime activation denied |
 | `ADR-032` | [Explorer equal-evidence comparison is deferred](ADR-032-EXPLORER-EQUAL-COMPARISON-DEFERRED.md) | Phase 4E | accepted defer; readiness adjudicated, roadmap item 6 incomplete, B-OPS-09 open |
 | `ADR-033` | [Inert Orchestrator deep-playbook candidate](ADR-033-ORCHESTRATOR-DEEP-PLAYBOOK.md) | Phase 5A | adapted as a package-private planning candidate; execution, authenticated independence, merge, and activation remain prohibited |
+| `ADR-034` | [Inert Architect deep-playbook candidate](ADR-034-ARCHITECT-DEEP-PLAYBOOK.md) | Phase 5B | adapted as a package-private design candidate; selection, implementation, authenticated independence, merge, and activation remain prohibited |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-034; it must be unique at creation time.
+is ADR-035; it must be unique at creation time.
