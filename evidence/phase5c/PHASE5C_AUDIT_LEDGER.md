@@ -48,3 +48,15 @@ Append-only record for the inert Builder deep-playbook candidate.
 - Exact Armory source and semantics: unresolved.
 - Customer value, behavior quality, learning, promotion, activation, production readiness,
   release readiness, and superiority: not established.
+
+## Entry 6 — local command-target and branch-hygiene remand
+
+- Recovered candidate review found one stale sample unittest class target:
+  `BuilderAdversarialTests` did not exist.
+- Repair: target `BuilderOutputAndAdversarialTests` and add a regression that resolves every
+  sample unittest target before publication.
+- Branch hygiene: remove temporary write-capable static-remand workflow scaffolding from the
+  final candidate tree; it is not product functionality or Builder authority.
+- Local result after repair: 67 focused test methods passed.
+- No execution, test-result, completion, promotion, activation, value, production, release, or
+  superiority authority was added.

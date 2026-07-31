@@ -101,3 +101,16 @@ activation, production readiness, release readiness, value, learning, or superio
 4. Hosted exact-head security, wheel, SBOM, dependency, and provenance results are external
    receipts and must be checked before calling the final head green.
 5. B-OPS-09, P14-P20, source/license appeals, and Armory semantics remain open.
+
+## Local command-target and automation-scaffolding remand
+
+A resumed review found that the sample execution-evidence plan named
+`BuilderAdversarialTests`, while the actual focused class is
+`BuilderOutputAndAdversarialTests`. The stale target could make a future executor fail before
+running the intended hostile and resealing cases even though the direct focused suite was green.
+The target was corrected and a compatibility regression now resolves every sample unittest class.
+
+Temporary write-capable repair workflow scaffolding added only to transfer the prior Ruff remand
+was not part of the Builder candidate and would contradict the no-runtime/no-authority delivery
+boundary if retained. It is removed from the final candidate tree. These repairs do not authorize
+execution, weaken tests, or establish authenticated independence.

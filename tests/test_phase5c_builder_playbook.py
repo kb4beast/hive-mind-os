@@ -876,13 +876,17 @@ class BuilderCompatibilityTests(unittest.TestCase):
             compile_architect_successor,
             example_architect_request,
         )
-        from hive_mind_os.foundation.architect_playbook_contracts import validate_architect
+        from hive_mind_os.foundation.architect_playbook_contracts import (
+            validate_architect,
+        )
         from hive_mind_os.foundation.orchestrator_playbook import (
             compile_orchestrator_plan,
             compile_orchestrator_successor,
             example_orchestrator_request,
         )
-        from hive_mind_os.foundation.orchestrator_playbook_contracts import validate_orchestrator
+        from hive_mind_os.foundation.orchestrator_playbook_contracts import (
+            validate_orchestrator,
+        )
 
         self.assertTrue(
             validate_orchestrator(
@@ -907,6 +911,23 @@ class BuilderCompatibilityTests(unittest.TestCase):
             ).valid
         )
 
+
+    def test_example_unittest_targets_resolve(self) -> None:
+        request = example_builder_request()
+        commands = [
+            item["command"]
+            for item in request["tests"]
+            if item["command"].startswith("python -m unittest ")
+        ]
+        self.assertTrue(commands)
+        for command in commands:
+            with self.subTest(command=command):
+                target = command.removeprefix("python -m unittest ")
+                module_name, class_name = target.rsplit(".", 1)
+                self.assertEqual(module_name, "tests.test_phase5c_builder_playbook")
+                test_case = globals().get(class_name)
+                self.assertIsInstance(test_case, type)
+                self.assertTrue(issubclass(test_case, unittest.TestCase))
 
     def test_committed_phase5c_inventory_matches_current_tree(self) -> None:
         observed = build_phase5c_inventory(REPOSITORY)

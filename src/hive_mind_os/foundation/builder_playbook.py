@@ -486,7 +486,7 @@ def _validate_request_semantics(request: dict[str, Any]) -> None:
     evidence_ids = set(_unique_ids(evidence_plan, "evidence_id", "evidence"))
     checkpoint_ids = set(_unique_ids(checkpoints, "checkpoint_id", "checkpoint"))
     rollback_ids = set(_unique_ids(rollback_steps, "rollback_id", "rollback"))
-    artifact_ids = set(_unique_ids(artifacts, "artifact_id", "artifact"))
+    _unique_ids(artifacts, "artifact_id", "artifact")
 
     architecture = request["architecture_decision"]
     architecture_refs = set(architecture["architecture_refs"])
@@ -1247,7 +1247,7 @@ def example_builder_request(*, known_budget: bool = True) -> dict[str, Any]:
         {
             "test_id": "test:authority-and-resealing",
             "kind": "security",
-            "command": "python -m unittest tests.test_phase5c_builder_playbook.BuilderAdversarialTests",
+            "command": "python -m unittest tests.test_phase5c_builder_playbook.BuilderOutputAndAdversarialTests",
             "expected_before": "fail",
             "expected_after": "pass",
             "requirement_refs": [
