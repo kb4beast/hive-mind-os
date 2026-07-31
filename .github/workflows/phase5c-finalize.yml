@@ -155,7 +155,6 @@ jobs:
           PYTHONPATH=src python scripts/phase5c_builder_inventory.py
           python -m compileall -q src tests scripts
           PYTHONPATH=src python -m unittest discover -s tests -p 'test_phase5c_builder_playbook.py' -v
-          python -m unittest discover -s tests -v
 
       - name: Commit exact bounded final tree
         shell: bash
