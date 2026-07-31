@@ -6,7 +6,6 @@ from typing import Any, Mapping, cast
 from .canonical import digest
 from .integrator_playbook_contracts import (
     ACCEPTED_BASE_COMMIT,
-    ACTIVATION,
     AFFECTED_BOUNDARIES,
     AGENT_ID,
     BASE_DEFINITION_ID,
