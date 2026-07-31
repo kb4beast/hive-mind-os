@@ -31,6 +31,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
+
           def replace_once(path: Path, old: str, new: str, label: str) -> None:
               text = path.read_text(encoding="utf-8")
               if old in text:
@@ -38,6 +39,7 @@ jobs:
                   return
               if new not in text:
                   raise SystemExit(f"missing expected {label} source")
+
 
           builder = Path("src/hive_mind_os/foundation/builder_playbook.py")
           replace_once(
@@ -102,41 +104,49 @@ jobs:
           court = Path("evidence/courts/phase5c-builder-playbook-court.md")
           text = court.read_text(encoding="utf-8")
           if "## Local command-target and automation-scaffolding remand" not in text:
-              text = text.rstrip() + '''
-
-## Local command-target and automation-scaffolding remand
-
-A resumed review found that the sample execution-evidence plan named
-`BuilderAdversarialTests`, while the actual focused class is
-`BuilderOutputAndAdversarialTests`. The stale target could make a future executor fail before
-running the intended hostile and resealing cases even though the direct focused suite was green.
-The target was corrected and a compatibility regression now resolves every sample unittest class.
-
-Temporary write-capable repair workflow scaffolding added only to transfer the prior Ruff remand
-was not part of the Builder candidate and would contradict the no-runtime/no-authority delivery
-boundary if retained. It is removed from the final candidate tree. These repairs do not authorize
-execution, weaken tests, or establish authenticated independence.
-'''
-              court.write_text(text, encoding="utf-8", newline="\n")
+              addition = "\n".join(
+                  [
+                      "",
+                      "",
+                      "## Local command-target and automation-scaffolding remand",
+                      "",
+                      "A resumed review found that the sample execution-evidence plan named",
+                      "`BuilderAdversarialTests`, while the actual focused class is",
+                      "`BuilderOutputAndAdversarialTests`. The stale target could make a future executor fail before",
+                      "running the intended hostile and resealing cases even though the direct focused suite was green.",
+                      "The target was corrected and a compatibility regression now resolves every sample unittest class.",
+                      "",
+                      "Temporary write-capable repair workflow scaffolding added only to transfer the prior Ruff remand",
+                      "was not part of the Builder candidate and would contradict the no-runtime/no-authority delivery",
+                      "boundary if retained. It is removed from the final candidate tree. These repairs do not authorize",
+                      "execution, weaken tests, or establish authenticated independence.",
+                      "",
+                  ]
+              )
+              court.write_text(text.rstrip() + addition, encoding="utf-8", newline="\n")
 
           ledger = Path("evidence/phase5c/PHASE5C_AUDIT_LEDGER.md")
           text = ledger.read_text(encoding="utf-8")
           if "## Entry 6 — local command-target and branch-hygiene remand" not in text:
-              text = text.rstrip() + '''
-
-## Entry 6 — local command-target and branch-hygiene remand
-
-- Recovered candidate review found one stale sample unittest class target:
-  `BuilderAdversarialTests` did not exist.
-- Repair: target `BuilderOutputAndAdversarialTests` and add a regression that resolves every
-  sample unittest target before publication.
-- Branch hygiene: remove temporary write-capable static-remand workflow scaffolding from the
-  final candidate tree; it is not product functionality or Builder authority.
-- Local result after repair: 67 focused test methods passed.
-- No execution, test-result, completion, promotion, activation, value, production, release, or
-  superiority authority was added.
-'''
-              ledger.write_text(text, encoding="utf-8", newline="\n")
+              addition = "\n".join(
+                  [
+                      "",
+                      "",
+                      "## Entry 6 — local command-target and branch-hygiene remand",
+                      "",
+                      "- Recovered candidate review found one stale sample unittest class target:",
+                      "  `BuilderAdversarialTests` did not exist.",
+                      "- Repair: target `BuilderOutputAndAdversarialTests` and add a regression that resolves every",
+                      "  sample unittest target before publication.",
+                      "- Branch hygiene: remove temporary write-capable static-remand workflow scaffolding from the",
+                      "  final candidate tree; it is not product functionality or Builder authority.",
+                      "- Local result after repair: 67 focused test methods passed.",
+                      "- No execution, test-result, completion, promotion, activation, value, production, release, or",
+                      "  superiority authority was added.",
+                      "",
+                  ]
+              )
+              ledger.write_text(text.rstrip() + addition, encoding="utf-8", newline="\n")
           PY
 
           test ! -e .github/workflows/phase5c-static-remand.yml
