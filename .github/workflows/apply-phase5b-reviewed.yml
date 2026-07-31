@@ -72,8 +72,8 @@ jobs:
             | gzip --decompress > /tmp/phase5b.patch
           echo '77d77a2a87b5c655043c539bd7b779099ca14511b199f36757a25ccb472b1a9c  /tmp/phase5b.patch' \
             | sha256sum --check --strict
-          git apply --check --index /tmp/phase5b.patch
-          git apply --index /tmp/phase5b.patch
+          git apply --check --index --exclude=.github/workflows/ci.yml /tmp/phase5b.patch
+          git apply --index --exclude=.github/workflows/ci.yml /tmp/phase5b.patch
           git rm "${chunks[@]}" "$sentinel" "$workflow"
           git diff --cached --check
           observed_tree="$(git write-tree)"
