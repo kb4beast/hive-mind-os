@@ -7,6 +7,10 @@ on:
     paths:
       - .phase5c/**
       - .github/workflows/phase5c-materialize.yml
+  pull_request:
+    branches:
+      - agent/phase5a-orchestrator-shadow
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -17,15 +21,17 @@ concurrency:
 
 jobs:
   materialize:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || github.head_ref == 'agent/phase5c-builder-shadow')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
     steps:
       - name: Check out exact bootstrap head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
 
       - name: Verify segments and reconstruct archive
         shell: bash
@@ -107,4 +113,4 @@ jobs:
           git diff --name-only 43db53de7a41d9bc02e987776edc260594def4c8 HEAD \
             | LC_ALL=C sort > /tmp/phase5c-final.txt
           diff -u /tmp/phase5c-expected.txt /tmp/phase5c-final.txt
-          git push origin HEAD:${{ github.ref_name }}
+          git push origin HEAD:"$TARGET_BRANCH"
