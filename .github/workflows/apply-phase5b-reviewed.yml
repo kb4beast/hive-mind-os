@@ -1,0 +1,62 @@
+name: Apply reviewed Phase 5B Architect candidate
+
+on:
+  push:
+    branches:
+      - agent/phase5b-architect-shadow
+    paths:
+      - .github/bootstrap/phase5b.ready
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase5b-reviewed-publication
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Phase 5B branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/phase5b-architect-shadow
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Verify and publish reviewed tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel=.github/bootstrap/phase5b.ready
+          workflow=.github/workflows/apply-phase5b-reviewed.yml
+          chunks=(
+            .github/bootstrap/phase5b.part-00
+            .github/bootstrap/phase5b.part-01
+          )
+          test -f "$sentinel"
+          for chunk in "${chunks[@]}"; do
+            test -f "$chunk"
+          done
+          cat > /tmp/phase5b-chunks.sha256 <<'EOF'
+          65f1a9e38c55e489d1788f585f5abc86c1a39390b7d645823612e406edc2d89e  .github/bootstrap/phase5b.part-00
+          f42a469646ec38f7996263077ae2c67fe13a4daafe041386f36fce5bbb2242f3  .github/bootstrap/phase5b.part-01
+          EOF
+          sha256sum --check --strict /tmp/phase5b-chunks.sha256
+          cat "${chunks[@]}" > /tmp/phase5b.patch.gz.b64
+          echo 'e4a11998fe9c5212abeaf6ab573fa9586d61b43c1260f98b7b5f58c0e3715fbf  /tmp/phase5b.patch.gz.b64' \
+            | sha256sum --check --strict
+          base64 --decode /tmp/phase5b.patch.gz.b64 \
+            | gzip --decompress > /tmp/phase5b.patch
+          echo '77d77a2a87b5c655043c539bd7b779099ca14511b199f36757a25ccb472b1a9c  /tmp/phase5b.patch' \
+            | sha256sum --check --strict
+          git apply --check --index /tmp/phase5b.patch
+          git apply --index /tmp/phase5b.patch
+          git rm "${chunks[@]}" "$sentinel" "$workflow"
+          git diff --cached --check
+          observed_tree="$(git write-tree)"
+          test "$observed_tree" = 4ebf4eb700433452c9eff8045e100fd6ec525a67
+          git config user.name 'kb4beast'
+          git config user.email '14246027+kb4beast@users.noreply.github.com'
+          git commit -m 'Add inert Phase 5B Architect deep playbook'
+          git push origin HEAD:refs/heads/agent/phase5b-architect-shadow
