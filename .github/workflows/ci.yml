@@ -153,6 +153,11 @@ jobs:
           PYTHONPATH=.wheel-install python scripts/verify_phase5a_installed_wheel.py \
             --installed-root .wheel-install \
             --output dist/phase5a-installed-wheel.json
+      - name: Verify installed Phase 5B Architect
+        run: |
+          PYTHONPATH=.wheel-install python scripts/verify_phase5b_installed_wheel.py \
+            --installed-root .wheel-install \
+            --output dist/phase5b-installed-wheel.json
       - name: Install checksum-pinned Syft
         run: |
           curl --fail --show-error --silent --location \
@@ -209,6 +214,7 @@ jobs:
             dist/hive-mind-os.spdx.json
             dist/release-version-1.1-audit.json
             dist/phase5a-installed-wheel.json
+            dist/phase5b-installed-wheel.json
           if-no-files-found: error
           retention-days: 30
       - name: Attest wheel, SBOM, and release audit provenance
@@ -220,3 +226,4 @@ jobs:
             dist/hive-mind-os.spdx.json
             dist/release-version-1.1-audit.json
             dist/phase5a-installed-wheel.json
+            dist/phase5b-installed-wheel.json
