@@ -96,3 +96,5 @@ used to claim authenticated independence, execution, release approval, or readin
           test "$(git diff --cached --name-only | wc -l)" -eq 3
           git commit -m 'Preserve Phase 5D publication remands'
           git push origin HEAD:agent/phase5d-curator-shadow
+
+# Registration trigger after workflow creation.
