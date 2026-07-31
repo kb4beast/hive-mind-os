@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   finalize:
-    if: github.actor != 'github-actions[bot]' && github.ref_name == 'agent/phase5c-builder-shadow'
+    if: github.ref_name == 'agent/phase5c-builder-shadow'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
