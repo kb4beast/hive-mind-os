@@ -1,0 +1,5 @@
+phase=5B
+repair=hosted-pyright-return-contract
+local_commit=40f2237d0f5c153241b3451104b66948f2d641c9
+reviewed_tree=13d5e797fea85d52824b6b18f5f6f8a578df39e4
+patch_sha256=8c8e8ff205c095078750c512562d08797855fc64a30353c0f743d13e731765c7
