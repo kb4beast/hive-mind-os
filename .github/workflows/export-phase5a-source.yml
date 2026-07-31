@@ -7,6 +7,12 @@ on:
     paths:
       - .github/bootstrap/phase5a-final.ready
       - .github/workflows/export-phase5a-source.yml
+  pull_request:
+    branches:
+      - release/version_1.1
+    paths:
+      - .github/bootstrap/phase5a-final.ready
+      - .github/workflows/export-phase5a-source.yml
 
 permissions:
   contents: write
@@ -17,6 +23,7 @@ concurrency:
 
 jobs:
   apply:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'agent/phase5a-orchestrator-shadow'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact Phase 5A branch head
