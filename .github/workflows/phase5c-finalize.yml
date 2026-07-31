@@ -78,24 +78,24 @@ jobs:
               marker = "    def test_committed_phase5c_inventory_matches_current_tree(self) -> None:\n"
               if marker not in text:
                   raise SystemExit("inventory compatibility test marker is missing")
-              regression = '''    def test_example_unittest_targets_resolve(self) -> None:
-              request = example_builder_request()
-              commands = [
-                  item["command"]
-                  for item in request["tests"]
-                  if item["command"].startswith("python -m unittest ")
-              ]
-              self.assertTrue(commands)
-              for command in commands:
-                  with self.subTest(command=command):
-                      target = command.removeprefix("python -m unittest ")
-                      module_name, class_name = target.rsplit(".", 1)
-                      self.assertEqual(module_name, "tests.test_phase5c_builder_playbook")
-                      test_case = globals().get(class_name)
-                      self.assertIsInstance(test_case, type)
-                      self.assertTrue(issubclass(test_case, unittest.TestCase))
-
-'''
+              regression = (
+                  "    def test_example_unittest_targets_resolve(self) -> None:\n"
+                  "        request = example_builder_request()\n"
+                  "        commands = [\n"
+                  "            item[\"command\"]\n"
+                  "            for item in request[\"tests\"]\n"
+                  "            if item[\"command\"].startswith(\"python -m unittest \")\n"
+                  "        ]\n"
+                  "        self.assertTrue(commands)\n"
+                  "        for command in commands:\n"
+                  "            with self.subTest(command=command):\n"
+                  "                target = command.removeprefix(\"python -m unittest \")\n"
+                  "                module_name, class_name = target.rsplit(\".\", 1)\n"
+                  "                self.assertEqual(module_name, \"tests.test_phase5c_builder_playbook\")\n"
+                  "                test_case = globals().get(class_name)\n"
+                  "                self.assertIsInstance(test_case, type)\n"
+                  "                self.assertTrue(issubclass(test_case, unittest.TestCase))\n\n"
+              )
               text = text.replace(marker, regression + marker, 1)
           tests.write_text(text, encoding="utf-8", newline="\n")
 
