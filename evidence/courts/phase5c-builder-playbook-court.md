@@ -114,3 +114,26 @@ Temporary write-capable repair workflow scaffolding added only to transfer the p
 was not part of the Builder candidate and would contradict the no-runtime/no-authority delivery
 boundary if retained. It is removed from the final candidate tree. These repairs do not authorize
 execution, weaken tests, or establish authenticated independence.
+
+## Hosted type and inherited-inventory remand
+
+Constitutional CI run `30654019571` on exact head
+`6d07f9acb63f86d27fe68e5e3ff66621bea09a2f` produced a bounded remand.
+Python 3.11, 3.12, and 3.14 each reached the same inherited Phase 5B
+inventory failure: Phase 5C had redirected `selection_authorized` and
+`implementation_authorized` to the Architect handoff output even though those
+facts remain owned by `option_analysis` and `architecture`. Pyright 1.1.411
+also rejected four optional-integer arithmetic sites after runtime validation.
+
+The repair restores the exact Phase 5B authority-field sources, regenerates the
+Phase 5B to Phase 5C inventory chain, and adds static casts only after existing
+fail-closed exact-integer validation. It does not change accepted values, resource
+arithmetic, schemas, authority, activation, APIs, CLI, runtime bindings, or package
+resources. Self-removing repair run `30654662336` passed the focused Phase 5B
+and 67-test Phase 5C suites, Ruff 0.16.0, and Pyright 1.1.411 before publication.
+
+The prior failing run remains adverse evidence. Its CodeQL, secret scan,
+dependency/license review, wheel build, installed Phase 5A/5B/5C verification,
+SPDX SBOM, and immutable artifact upload passed; PR-event provenance attestation
+was skipped and is not claimed. The procedural Judge remains `adapt` for a draft
+stacked delivery only, contingent on terminal Constitutional CI for the repaired head.

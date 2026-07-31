@@ -60,3 +60,22 @@ Append-only record for the inert Builder deep-playbook candidate.
 - Local result after repair: 67 focused test methods passed.
 - No execution, test-result, completion, promotion, activation, value, production, release, or
   superiority authority was added.
+
+## Entry 7 — hosted type and inherited-inventory remand
+
+- Source head: `7cc98bfaa7d0f911f956886fcfcd3dc0ca1d13ac`.
+- Adverse Constitutional CI: run `30654019571` on head
+  `6d07f9acb63f86d27fe68e5e3ff66621bea09a2f`.
+- Python 3.11/3.12/3.14: failed on one common Phase 5B inventory `KeyError`
+  caused by Phase 5C reading two Architect authority facts from the wrong output.
+- Pyright 1.1.411: failed on four optional-integer arithmetic diagnostics.
+- Ruff, CodeQL, secret scan, dependency/license review, release audit, wheel build,
+  installed resource verification, inherited Phase 5A/5B verification, Phase 5C
+  verification, SPDX SBOM, and immutable artifact upload: passed on the adverse head.
+- PR-event provenance attestation: skipped; no push-event attestation is claimed.
+- Repair: restore Phase 5B authority-field ownership, add validated static narrowing,
+  regenerate Phase 5B and Phase 5C inventories, and retain the failing run.
+- Repair workflow run: `30654662336`; focused Phase 5B and Phase 5C suites,
+  Ruff 0.16.0, and Pyright 1.1.411 passed before the self-removing commit.
+- Authority remains none; activation remains inert; no execution, test-result,
+  completion, promotion, value, production, release, or superiority claim is added.

@@ -4,7 +4,7 @@ import json
 import math
 from copy import deepcopy
 from importlib.resources import files
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from hive_mind_os.roles import DEFAULT_LIFECYCLE
 
@@ -1035,9 +1035,12 @@ def _allocate_axis(
         }
     if not all(type(value) is int for value in (checkpoint_ppm, evidence_ppm, rollback_ppm)):
         raise BuilderContractError("known budget lacks resource reserve percentages")
-    checkpoint = max(1, ceiling * checkpoint_ppm // 1_000_000)
-    evidence = max(1, ceiling * evidence_ppm // 1_000_000)
-    rollback = max(1, ceiling * rollback_ppm // 1_000_000)
+    checkpoint_rate = cast(int, checkpoint_ppm)
+    evidence_rate = cast(int, evidence_ppm)
+    rollback_rate = cast(int, rollback_ppm)
+    checkpoint = max(1, ceiling * checkpoint_rate // 1_000_000)
+    evidence = max(1, ceiling * evidence_rate // 1_000_000)
+    rollback = max(1, ceiling * rollback_rate // 1_000_000)
     remaining = ceiling - checkpoint - evidence - rollback
     if remaining < len(RESOURCE_SECTIONS):
         raise BuilderContractError("known budget cannot fund all Builder sections")

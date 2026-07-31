@@ -4,7 +4,7 @@ import json
 from copy import deepcopy
 from functools import lru_cache
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from .canonical import canonical_bytes, digest
 from .contracts import FoundationValidation, validate_document_against_schema
@@ -1327,12 +1327,16 @@ def _validate_resource_accounting(document: Mapping[str, Any], issues: list[str]
         if not all(type(value) is int and value > 0 for value in values):
             issues.append(f"resource axis {axis} does not fund reserves and every section")
             continue
-        ceiling = allocation.get("ceiling")
+        ceiling = cast(int, allocation.get("ceiling"))
+        checkpoint_reserve = cast(int, allocation.get("checkpoint_reserve"))
+        evidence_reserve = cast(int, allocation.get("evidence_reserve"))
+        rollback_reserve = cast(int, allocation.get("rollback_reserve"))
+        section_values = [cast(int, sections[section]) for section in RESOURCE_SECTIONS]
         observed = (
-            allocation.get("checkpoint_reserve")
-            + allocation.get("evidence_reserve")
-            + allocation.get("rollback_reserve")
-            + sum(sections[section] for section in RESOURCE_SECTIONS)
+            checkpoint_reserve
+            + evidence_reserve
+            + rollback_reserve
+            + sum(section_values)
         )
         if observed != ceiling:
             issues.append(f"resource axis {axis} does not reconcile to its ceiling")

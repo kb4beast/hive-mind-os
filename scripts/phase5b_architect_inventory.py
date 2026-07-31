@@ -168,11 +168,11 @@ def build_phase5b_inventory(repository: Path) -> dict[str, Any]:
             ],
             "resource_reconciles": _resource_reconciles(design),
             "handoff_role": design["outputs"]["handoff"]["next_role"],
-            "implementation_authorized": design["outputs"]["handoff"][
-                "implementation_authorized"
-            ],
-            "selection_authorized": design["outputs"]["handoff"][
+            "selection_authorized": design["outputs"]["option_analysis"][
                 "selection_authorized"
+            ],
+            "implementation_authorized": design["outputs"]["architecture"][
+                "implementation_authorized"
             ],
             "activation_authorized": design["outputs"]["handoff"][
                 "activation_authorized"
