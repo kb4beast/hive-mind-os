@@ -1,0 +1,260 @@
+name: Phase 5C type and inventory remand
+
+on:
+  pull_request:
+    branches:
+      - agent/phase5a-orchestrator-shadow
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase5c-type-inventory-remand-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.head_ref == 'agent/phase5c-builder-shadow'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Apply bounded type and inherited-inventory repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+
+          def replace_once(path: Path, old: str, new: str, label: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              if old in text:
+                  path.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
+                  return
+              if new not in text:
+                  raise SystemExit(f"missing expected {label} source")
+
+
+          builder = Path("src/hive_mind_os/foundation/builder_playbook.py")
+          replace_once(
+              builder,
+              "from typing import Any, Mapping\n",
+              "from typing import Any, Mapping, cast\n",
+              "Builder cast import",
+          )
+          replace_once(
+              builder,
+              '''    if not all(type(value) is int for value in (checkpoint_ppm, evidence_ppm, rollback_ppm)):
+                  raise BuilderContractError("known budget lacks resource reserve percentages")
+              checkpoint = max(1, ceiling * checkpoint_ppm // 1_000_000)
+              evidence = max(1, ceiling * evidence_ppm // 1_000_000)
+              rollback = max(1, ceiling * rollback_ppm // 1_000_000)
+              ''',
+              '''    if not all(type(value) is int for value in (checkpoint_ppm, evidence_ppm, rollback_ppm)):
+                  raise BuilderContractError("known budget lacks resource reserve percentages")
+              checkpoint_rate = cast(int, checkpoint_ppm)
+              evidence_rate = cast(int, evidence_ppm)
+              rollback_rate = cast(int, rollback_ppm)
+              checkpoint = max(1, ceiling * checkpoint_rate // 1_000_000)
+              evidence = max(1, ceiling * evidence_rate // 1_000_000)
+              rollback = max(1, ceiling * rollback_rate // 1_000_000)
+              ''',
+              "Builder reserve narrowing",
+          )
+
+          contracts = Path("src/hive_mind_os/foundation/builder_playbook_contracts.py")
+          replace_once(
+              contracts,
+              "from typing import Any, Mapping\n",
+              "from typing import Any, Mapping, cast\n",
+              "contract cast import",
+          )
+          replace_once(
+              contracts,
+              '''        ceiling = allocation.get("ceiling")
+                      observed = (
+                          allocation.get("checkpoint_reserve")
+                          + allocation.get("evidence_reserve")
+                          + allocation.get("rollback_reserve")
+                          + sum(sections[section] for section in RESOURCE_SECTIONS)
+                      )
+              ''',
+              '''        ceiling = cast(int, allocation.get("ceiling"))
+                      checkpoint_reserve = cast(int, allocation.get("checkpoint_reserve"))
+                      evidence_reserve = cast(int, allocation.get("evidence_reserve"))
+                      rollback_reserve = cast(int, allocation.get("rollback_reserve"))
+                      section_values = [cast(int, sections[section]) for section in RESOURCE_SECTIONS]
+                      observed = (
+                          checkpoint_reserve
+                          + evidence_reserve
+                          + rollback_reserve
+                          + sum(section_values)
+                      )
+              ''',
+              "contract resource narrowing",
+          )
+
+          phase5b = Path("scripts/phase5b_architect_inventory.py")
+          replace_once(
+              phase5b,
+              '''            "implementation_authorized": design["outputs"]["handoff"][
+                              "implementation_authorized"
+                          ],
+                          "selection_authorized": design["outputs"]["handoff"][
+                              "selection_authorized"
+                          ],
+              ''',
+              '''            "selection_authorized": design["outputs"]["option_analysis"][
+                              "selection_authorized"
+                          ],
+                          "implementation_authorized": design["outputs"]["architecture"][
+                              "implementation_authorized"
+                          ],
+              ''',
+              "Phase 5B authority-field source restoration",
+          )
+          PY
+
+          rm .github/workflows/phase5c-pyright-inventory-remand.yml
+          phase5b_output=$(PYTHONPATH=src:. python scripts/phase5b_architect_inventory.py)
+          printf '%s\n' "$phase5b_output"
+          phase5b_digest=$(printf '%s\n' "$phase5b_output" | tail -n 1)
+          case "$phase5b_digest" in
+            sha256:*) ;;
+            *) echo "invalid Phase 5B inventory digest: $phase5b_digest" >&2; exit 1 ;;
+          esac
+          python - "$phase5b_digest" <<'PY'
+          from pathlib import Path
+          import sys
+
+          path = Path("scripts/phase5c_builder_inventory.py")
+          text = path.read_text(encoding="utf-8")
+          old = next(
+              line
+              for line in text.splitlines()
+              if line.startswith("PHASE5B_INVENTORY_DIGEST = ")
+          )
+          new = f'PHASE5B_INVENTORY_DIGEST = "{sys.argv[1]}"'
+          path.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
+          PY
+          PYTHONPATH=src:. python scripts/phase5c_builder_inventory.py
+          python -m compileall -q src tests scripts
+          PYTHONPATH=src:. python -m unittest discover -s tests -p 'test_phase5b_architect_playbook.py' -v
+          PYTHONPATH=src:. python -m unittest discover -s tests -p 'test_phase5c_builder_playbook.py' -v
+
+      - name: Ruff static checks on repaired tree
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v3.5.1
+        with:
+          version: 0.16.0
+          args: check src tests scripts
+
+      - name: Pyright checks on repaired tree
+        uses: jakebailey/pyright-action@8ec14b5cfe41f26e5f41686a31eb6012758217ef # v3.0.2
+        with:
+          version: 1.1.411
+          warnings: false
+
+      - name: Seal append-only remand evidence and final inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          run_id = os.environ["GITHUB_RUN_ID"]
+          source_head = os.environ["GITHUB_SHA"]
+
+          court = Path("evidence/courts/phase5c-builder-playbook-court.md")
+          text = court.read_text(encoding="utf-8")
+          marker = "## Hosted type and inherited-inventory remand"
+          if marker not in text:
+              lines = [
+                  "",
+                  "",
+                  marker,
+                  "",
+                  "Constitutional CI run `30654019571` on exact head",
+                  "`6d07f9acb63f86d27fe68e5e3ff66621bea09a2f` produced a bounded remand.",
+                  "Python 3.11, 3.12, and 3.14 each reached the same inherited Phase 5B",
+                  "inventory failure: Phase 5C had redirected `selection_authorized` and",
+                  "`implementation_authorized` to the Architect handoff output even though those",
+                  "facts remain owned by `option_analysis` and `architecture`. Pyright 1.1.411",
+                  "also rejected four optional-integer arithmetic sites after runtime validation.",
+                  "",
+                  "The repair restores the exact Phase 5B authority-field sources, regenerates the",
+                  "Phase 5B to Phase 5C inventory chain, and adds static casts only after existing",
+                  "fail-closed exact-integer validation. It does not change accepted values, resource",
+                  "arithmetic, schemas, authority, activation, APIs, CLI, runtime bindings, or package",
+                  "resources. The self-removing repair run `" + run_id + "` passed the focused Phase 5B",
+                  "and 67-test Phase 5C suites, Ruff 0.16.0, and Pyright 1.1.411 before publication.",
+                  "",
+                  "The prior failing run remains adverse evidence. Its CodeQL, secret scan,",
+                  "dependency/license review, wheel build, installed Phase 5A/5B/5C verification,",
+                  "SPDX SBOM, and immutable artifact upload passed; PR-event provenance attestation",
+                  "was skipped and is not claimed. The procedural Judge remains `adapt` for a draft",
+                  "stacked delivery only, contingent on terminal Constitutional CI for the repaired head.",
+                  "",
+              ]
+              court.write_text(text.rstrip() + "\n".join(lines), encoding="utf-8", newline="\n")
+
+          ledger = Path("evidence/phase5c/PHASE5C_AUDIT_LEDGER.md")
+          text = ledger.read_text(encoding="utf-8")
+          marker = "## Entry 7 — hosted type and inherited-inventory remand"
+          if marker not in text:
+              lines = [
+                  "",
+                  "",
+                  marker,
+                  "",
+                  "- Source head: `" + source_head + "`.",
+                  "- Adverse Constitutional CI: run `30654019571` on head",
+                  "  `6d07f9acb63f86d27fe68e5e3ff66621bea09a2f`.",
+                  "- Python 3.11/3.12/3.14: failed on one common Phase 5B inventory `KeyError`",
+                  "  caused by Phase 5C reading two Architect authority facts from the wrong output.",
+                  "- Pyright 1.1.411: failed on four optional-integer arithmetic diagnostics.",
+                  "- Ruff, CodeQL, secret scan, dependency/license review, release audit, wheel build,",
+                  "  installed resource verification, inherited Phase 5A/5B verification, Phase 5C",
+                  "  verification, SPDX SBOM, and immutable artifact upload: passed on the adverse head.",
+                  "- PR-event provenance attestation: skipped; no push-event attestation is claimed.",
+                  "- Repair: restore Phase 5B authority-field ownership, add validated static narrowing,",
+                  "  regenerate Phase 5B and Phase 5C inventories, and retain the failing run.",
+                  "- Repair workflow run: `" + run_id + "`; focused Phase 5B and Phase 5C suites,",
+                  "  Ruff 0.16.0, and Pyright 1.1.411 passed before the self-removing commit.",
+                  "- Authority remains none; activation remains inert; no execution, test-result,",
+                  "  completion, promotion, value, production, release, or superiority claim is added.",
+                  "",
+              ]
+              ledger.write_text(text.rstrip() + "\n".join(lines), encoding="utf-8", newline="\n")
+          PY
+
+          PYTHONPATH=src:. python scripts/phase5c_builder_inventory.py
+          PYTHONPATH=src:. python -m unittest discover -s tests -p 'test_phase5c_builder_playbook.py' -q
+
+      - name: Commit exact repaired candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A \
+            .github/workflows/phase5c-pyright-inventory-remand.yml \
+            scripts/phase5b_architect_inventory.py \
+            evidence/phase5b/phase5b_architect_inventory.json \
+            scripts/phase5c_builder_inventory.py \
+            evidence/phase5c/phase5c_builder_inventory.json \
+            src/hive_mind_os/foundation/builder_playbook.py \
+            src/hive_mind_os/foundation/builder_playbook_contracts.py \
+            evidence/courts/phase5c-builder-playbook-court.md \
+            evidence/phase5c/PHASE5C_AUDIT_LEDGER.md
+          git diff --cached --check
+          test "$(git diff --cached --name-only | wc -l)" -eq 9
+          git commit -m 'Repair Phase 5C typing and inherited inventory chain'
+          git push origin HEAD:agent/phase5c-builder-shadow
