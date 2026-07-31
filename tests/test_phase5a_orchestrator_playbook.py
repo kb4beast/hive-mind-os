@@ -68,7 +68,10 @@ class OrchestratorSuccessorTests(unittest.TestCase):
         candidate = compile_orchestrator_successor()
         self.assertEqual(candidate["agent_id"], "hive-agent:orchestrator:v2-shadow-1")
         self.assertEqual(tuple(layer["kind"] for layer in candidate["layers"]), LAYER_KINDS)
-        self.assertEqual(tuple(layer["position"] for layer in candidate["layers"]), tuple(range(1, 9)))
+        self.assertEqual(
+            tuple(layer["position"] for layer in candidate["layers"]),
+            tuple(range(1, 9)),
+        )
         self.assertEqual(candidate["requested_capabilities"], candidate["unsupported_capabilities"])
         self.assertIsNot(
             candidate["requested_capabilities"],
@@ -96,22 +99,36 @@ class OrchestratorSuccessorTests(unittest.TestCase):
 
         effective = deepcopy(candidate)
         effective["effective_capabilities"] = ["create_work_items"]
-        effective["content_digest"] = digest({k: v for k, v in effective.items() if k != "content_digest"})
+        effective["content_digest"] = digest(
+            {k: v for k, v in effective.items() if k != "content_digest"}
+        )
         mutations.append(effective)
 
         reordered = deepcopy(candidate)
         reordered["layers"].reverse()
-        reordered["content_digest"] = digest({k: v for k, v in reordered.items() if k != "content_digest"})
+        reordered["content_digest"] = digest(
+            {k: v for k, v in reordered.items() if k != "content_digest"}
+        )
         mutations.append(reordered)
 
         changed_identity = deepcopy(candidate)
         changed_identity["definition_id"] = "hive-agent-definition:orchestrator:forged"
-        changed_identity["content_digest"] = digest({k: v for k, v in changed_identity.items() if k != "content_digest"})
+        changed_identity["content_digest"] = digest(
+            {
+                k: v
+                for k, v in changed_identity.items()
+                if k != "content_digest"
+            }
+        )
         mutations.append(changed_identity)
 
         for mutation in mutations:
             with self.subTest(mutation=mutation):
-                self.assertFalse(validate_orchestrator("orchestrator-agent-successor-v1", mutation).valid)
+                self.assertFalse(
+                    validate_orchestrator(
+                        "orchestrator-agent-successor-v1", mutation
+                    ).valid
+                )
 
     def test_successor_contract_rejects_resealed_layer_digest_drift(self) -> None:
         candidate = compile_orchestrator_successor()
@@ -137,11 +154,19 @@ class OrchestratorSuccessorTests(unittest.TestCase):
         generated = compile_generation_zero_candidates()
         changed = dict(generated)
         changed["agents/orchestrator.json"] += b" "
-        with patch.object(playbook_module, "compile_generation_zero_candidates", return_value=changed):
+        with patch.object(
+            playbook_module,
+            "compile_generation_zero_candidates",
+            return_value=changed,
+        ):
             with self.assertRaisesRegex(ValueError, "projection drifted"):
                 playbook_module._compile_unpinned_successor()
 
-        with patch.object(playbook_module, "_RESPONSIBILITIES", playbook_module._RESPONSIBILITIES + ("unreviewed",)):
+        with patch.object(
+            playbook_module,
+            "_RESPONSIBILITIES",
+            playbook_module._RESPONSIBILITIES + ("unreviewed",),
+        ):
             candidate = playbook_module._compile_unpinned_successor()
             self.assertNotEqual(candidate["content_digest"], EXPECTED_SUCCESSOR_DIGEST)
             with self.assertRaisesRegex(ValueError, "reviewed digest"):
@@ -315,7 +340,15 @@ class OrchestratorPlanTests(unittest.TestCase):
             compile_orchestrator_plan(duplicate_actor)
 
     def test_missing_actor_roles_stay_unknown(self) -> None:
-        request = _request(actors=[{"role": "orchestrator", "actor_id": "procedural:one", "authenticated": False}])
+        request = _request(
+            actors=[
+                {
+                    "role": "orchestrator",
+                    "actor_id": "procedural:one",
+                    "authenticated": False,
+                }
+            ]
+        )
         plan = compile_orchestrator_plan(request)
         court = plan["outputs"]["court_schedule"]
         self.assertEqual(court["independence_status"], "unknown")
@@ -323,12 +356,18 @@ class OrchestratorPlanTests(unittest.TestCase):
         self.assertEqual(court["stages"][0]["actor_status"], "procedural-unverified")
         self.assertIsNone(court["stages"][1]["actor_id"])
         self.assertEqual(court["stages"][1]["actor_status"], "unassigned")
-        self.assertIn("required-role-labels-incomplete", plan["outputs"]["stop_decision"]["reasons"])
+        self.assertIn(
+            "required-role-labels-incomplete",
+            plan["outputs"]["stop_decision"]["reasons"],
+        )
 
     def test_private_content_is_rejected_through_phase5a_error_surface(self) -> None:
         request = _request()
         request["constraints"] = [{"prompt": "secret"}]
-        with self.assertRaisesRegex(OrchestratorContractError, "private content field is prohibited"):
+        with self.assertRaisesRegex(
+            OrchestratorContractError,
+            "private content field is prohibited",
+        ):
             compile_orchestrator_plan(request)
 
     def test_recursion_depth_must_match_ancestry(self) -> None:
@@ -337,7 +376,12 @@ class OrchestratorPlanTests(unittest.TestCase):
 
     def test_recursion_limit_stops_and_routes_to_steward(self) -> None:
         ancestry = [f"run:{index}" for index in range(MAX_ANCESTRY_DEPTH)]
-        plan = compile_orchestrator_plan(_request(recursion_depth=MAX_ANCESTRY_DEPTH, ancestry=ancestry))
+        plan = compile_orchestrator_plan(
+            _request(
+                recursion_depth=MAX_ANCESTRY_DEPTH,
+                ancestry=ancestry,
+            )
+        )
         self.assertEqual(plan["outputs"]["stop_decision"]["recursion_status"], "limit-reached")
         self.assertEqual(plan["outputs"]["stop_decision"]["decision"], "stop")
         self.assertEqual(plan["outputs"]["handoff"]["next_role"], "steward")
@@ -348,7 +392,9 @@ class OrchestratorPlanTests(unittest.TestCase):
         self.assertEqual(plan["outputs"]["stop_decision"]["decision"], "stop")
 
     def test_partial_period_progress_loop_is_a_stall(self) -> None:
-        plan = compile_orchestrator_plan(_request(progress_fingerprints=["x", "a", "b", "a", "b", "a"]))
+        plan = compile_orchestrator_plan(
+            _request(progress_fingerprints=["x", "a", "b", "a", "b", "a"])
+        )
         self.assertEqual(plan["outputs"]["stop_decision"]["progress_status"], "stalled")
 
     def test_long_bounded_progress_period_is_still_detected(self) -> None:
@@ -841,7 +887,10 @@ class OrchestratorPlanTests(unittest.TestCase):
     def test_committed_phase5a_inventory_matches_current_tree(self) -> None:
         observed = build_phase5a_inventory(REPOSITORY)
         committed = json.loads(
-            (REPOSITORY / "evidence/phase5a/phase5a_orchestrator_inventory.json").read_text(encoding="utf-8")
+            (
+                REPOSITORY
+                / "evidence/phase5a/phase5a_orchestrator_inventory.json"
+            ).read_text(encoding="utf-8")
         )
         self.assertEqual(observed, committed)
         self.assertEqual(observed["contracts"]["count"], 10)
@@ -867,7 +916,10 @@ class OrchestratorPlanTests(unittest.TestCase):
 
     def test_fixed_role_and_court_orders_are_preserved(self) -> None:
         plan = compile_orchestrator_plan(_request())
-        work_roles = tuple(item["role"] for item in plan["outputs"]["objective_decomposition"]["work_items"])
+        work_roles = tuple(
+            item["role"]
+            for item in plan["outputs"]["objective_decomposition"]["work_items"]
+        )
         court_roles = tuple(stage["role"] for stage in plan["outputs"]["court_schedule"]["stages"])
         self.assertEqual(work_roles, WORK_ROLES)
         self.assertEqual(court_roles, COURT_ROLES)

@@ -1,65 +1,61 @@
 {
-  "schema_version": 1,
-  "case_id": "P5A-001",
-  "subject": "phase5a-orchestrator-deep-playbook",
-  "review_mode": "procedural-simulation",
+  "activation_authorized": false,
   "authenticated_distinct_actors": false,
   "authenticated_evidence_verifier": false,
-  "same_assistant_performed_all_passes": true,
-  "independence_claimed": false,
-  "reviewed_successor_digest": "sha256:e2e6f8ee8975db17a002fafc7d78aa5e2f696540e2ce4404d4548785643528fc",
-  "roles": [
+  "case_id": "P5A-001",
+  "final_disposition": "adapt",
+  "hosted_ci_repairs": [
     {
-      "role": "orchestrator",
-      "disposition": "pass",
-      "purpose": "freeze objective, scope, budgets, dependencies, rollback, and stopping"
-    },
-    {
-      "role": "explorer-advocate",
-      "disposition": "pass",
-      "purpose": "locate controlling sources and avoid inventing unavailable handoff content"
-    },
-    {
-      "role": "architect",
-      "disposition": "pass",
-      "purpose": "define interfaces, invariants, threats, migration, and rollback"
-    },
-    {
-      "role": "builder",
-      "disposition": "pass-after-remand",
-      "purpose": "implement and repair the bounded inert candidate with executable tests"
-    },
-    {
-      "role": "cross-examiner",
-      "disposition": "pass-after-four-remands",
-      "purpose": "attack authority, evidence truth, scope binding, dependency, budget, court, recursion, stall, replay, resealing, and mutable-input paths"
-    },
-    {
-      "role": "curator",
-      "disposition": "pass",
-      "purpose": "reproduce contracts, digests, tests, provenance, inventory, and package contents"
-    },
-    {
-      "role": "integrator",
-      "disposition": "pass",
-      "purpose": "confirm no root API, CLI, store, projector, host, or resource drift"
-    },
-    {
-      "role": "steward",
-      "disposition": "pass",
-      "purpose": "verify boundedness, recovery, interruption posture, maintainability, and evidence durability"
-    },
-    {
-      "role": "optimizer",
-      "disposition": "pass",
-      "purpose": "verify honest unknowns and stopping and absence of unsupported value or superiority claims"
-    },
-    {
-      "role": "judge",
-      "disposition": "adapt",
-      "purpose": "permit draft delivery only; deny merge, activation, and broader claims"
+      "finding": "F841-unused-builtin-prompt-binding",
+      "focused_tests_passed": 46,
+      "full_local_discovery": "not-completed-600-second-bound",
+      "full_local_discovery_pass_claimed": false,
+      "hosted_exact_head_pending": true,
+      "hosted_head": "09da4042dd4f850e19c58a080e8bc96f805dc2c1",
+      "inventory_reproduced": true,
+      "isolated_wheel_verified": true,
+      "job_id": 91045572842,
+      "local_wheel_sha256": "ce8ff674a7784422f6af576dea5d93755575b52ce609ea93d4e225a056233372",
+      "plan_digest_unchanged": true,
+      "repair": "retain digest-verification call and remove only unused local binding",
+      "selected_compatibility_skipped": 2,
+      "selected_compatibility_tests_passed": 271,
+      "source_repair_commit": "4247e50c8f6ce40dcc61876c98004b3a5fa799f6",
+      "successor_digest_unchanged": true,
+      "verification_json_sha256": "73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee",
+      "workflow_run_id": 30595066374
     }
   ],
+  "independence_claimed": false,
+  "learning_claimed": false,
+  "local_verification_subject": {
+    "ast_equivalent_files": [
+      "src/hive_mind_os/foundation/orchestrator_playbook.py",
+      "scripts/phase5a_orchestrator_inventory.py",
+      "tests/test_phase5a_orchestrator_playbook.py"
+    ],
+    "commit": "835c8854e79b12de7db998836062158c6e64caca",
+    "focused_tests_passed": 46,
+    "formatting_parent": "2b4c45997c04e09d2f5dc173e4978e84675aa489",
+    "full_suite_elapsed_seconds": 129.675,
+    "full_suite_skipped": 3,
+    "full_suite_tests_passed": 712,
+    "hosted_exact_head_pending": true,
+    "static_hygiene_fix": {
+      "digest_checked_resource_read_retained": true,
+      "exact_source_head_full_suite_pending": true,
+      "focused_tests_passed": 46,
+      "other_unused_phase5a_locals_found": 0,
+      "unused_binding_removed": "builtin_prompt",
+      "verification_json_sha256": "73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee",
+      "wheel_sha256": "1f49f782c59f836c98cbc604f45d85dc62759a27f356507a7590c3333277638d"
+    },
+    "verification_json_sha256": "73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee",
+    "wheel_sha256": "fd3b32a1d6f151fdd4c6d702daca77b6b6a7a5cdf566469793b490700ae3b5c6"
+  },
+  "merge_authorized": false,
+  "production_ready": false,
+  "release_ready": false,
   "remands": [
     "caller-authentication-not-admissible",
     "caller-evidence-labels-not-authenticated-verification",
@@ -83,14 +79,67 @@
     "canonical-request-derived-output-replay",
     "single-source-bounded-cycle-detection",
     "static-import-hygiene",
-    "portable-installed-wheel-receipt-paths"
+    "portable-installed-wheel-receipt-paths",
+    "hosted-ruff-unused-builtin-prompt-binding",
+    "unused-local-static-analysis-binding"
   ],
-  "final_disposition": "adapt",
-  "merge_authorized": false,
-  "activation_authorized": false,
-  "production_ready": false,
-  "release_ready": false,
-  "value_claimed": false,
-  "learning_claimed": false,
-  "superiority_claimed": false
+  "review_mode": "procedural-simulation",
+  "reviewed_successor_digest": "sha256:e2e6f8ee8975db17a002fafc7d78aa5e2f696540e2ce4404d4548785643528fc",
+  "roles": [
+    {
+      "disposition": "pass",
+      "purpose": "freeze objective, scope, budgets, dependencies, rollback, and stopping",
+      "role": "orchestrator"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "locate controlling sources and avoid inventing unavailable handoff content",
+      "role": "explorer-advocate"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "define interfaces, invariants, threats, migration, and rollback",
+      "role": "architect"
+    },
+    {
+      "disposition": "pass-after-remand",
+      "purpose": "implement and repair the bounded inert candidate with executable tests",
+      "role": "builder"
+    },
+    {
+      "disposition": "pass-after-five-remands",
+      "purpose": "attack authority, evidence truth, scope binding, dependency, budget, court, recursion, stall, replay, resealing, and mutable-input paths",
+      "role": "cross-examiner"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "reproduce contracts, digests, tests, provenance, inventory, and package contents",
+      "role": "curator"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "confirm no root API, CLI, store, projector, host, or resource drift",
+      "role": "integrator"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "verify boundedness, recovery, interruption posture, maintainability, and evidence durability",
+      "role": "steward"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "verify honest unknowns and stopping and absence of unsupported value or superiority claims",
+      "role": "optimizer"
+    },
+    {
+      "disposition": "adapt",
+      "purpose": "permit draft delivery only; deny merge, activation, and broader claims",
+      "role": "judge"
+    }
+  ],
+  "same_assistant_performed_all_passes": true,
+  "schema_version": 1,
+  "subject": "phase5a-orchestrator-deep-playbook",
+  "superiority_claimed": false,
+  "value_claimed": false
 }

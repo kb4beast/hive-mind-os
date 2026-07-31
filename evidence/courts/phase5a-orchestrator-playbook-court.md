@@ -98,8 +98,9 @@ import hygiene is clean.
 
 Reproduced the successor digest, plan determinism, strict schema catalog, direct and nested
 output digests, semantic reseal rejection, Phase 2 packaged byte pins, focused tests, selected
-Phase 2–5A compatibility matrix, current inventory, and isolated-wheel import. The wheel receipt uses portable relative paths and
-reproduces the exact example stop, handoff, scope, and truth posture. Hosted exact-head evidence
+Phase 2–5A compatibility matrix, current inventory, full 712-test repository discovery,
+and isolated-wheel import. The wheel receipt uses portable relative paths and reproduces
+the exact example stop, handoff, scope, and truth posture. Hosted exact-head evidence
 remains a publication gate.
 
 ## Integrator
@@ -133,3 +134,60 @@ This disposition does not authenticate the simulated roles or evidence, authoriz
 activation, resolve `B-OPS-09`, satisfy P20, or establish behavior, customer value, learning,
 promotion, production readiness, release readiness, or superiority. Exact-head hosted CI and
 provenance are conditions of technical completion, not authority to expand this judgment.
+
+## Curator — exact formatted-head confirmation
+
+Reproduced the 46-test focused suite, the complete 712-test repository suite with three
+inherited skips, the strict inventory, and the isolated installed wheel at exact local subject
+`835c8854e79b12de7db998836062158c6e64caca`. AST comparison against `2b4c45997c04e09d2f5dc173e4978e84675aa489` proves that the intervening
+source/test formatting delta changed no Python semantics. The wheel digest is
+`fd3b32a1d6f151fdd4c6d702daca77b6b6a7a5cdf566469793b490700ae3b5c6` and the verification JSON digest is `73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee`.
+
+## Judge — publication boundary unchanged
+
+The formatting and receipt confirmation do not expand the earlier `adapt` verdict. Publication
+remains limited to an open draft PR into `release/version_1.1`; exact-head hosted verification
+is still required. Merge, activation, release readiness, production readiness, value, learning,
+promotion, and superiority remain unauthorized.
+
+## Hosted static witness — Ruff remand
+
+The first exact hosted subject passed build, release-audit, installed-wheel, SBOM,
+secret, and dependency/license gates, but Ruff 0.16.0 found one unused local binding:
+`builtin_prompt` retained the return value of an already required digest-verification
+call. Pyright correctly did not run after Ruff failed. The draft remained unmerged and
+inactive; the failure was not waived or hidden.
+
+## Builder — hosted Ruff repair
+
+Repair `4247e50c8f6ce40dcc61876c98004b3a5fa799f6` removes only the unused
+name while retaining the packaged prompt read and `BUILTIN_PROMPT_DIGEST` verification.
+The successor and example-plan digests are unchanged, and a renewed isolated wheel
+reproduces the same Phase 5A verification document.
+
+## Judge — publication boundary still unchanged
+
+This narrow static repair is eligible only for renewed exact-head CI on the existing
+draft PR. It does not authorize merge, activation, release readiness, production
+readiness, value, learning, promotion, comparison, or superiority.
+
+## Cross-Examiner — hosted-static-analysis remand
+
+The functional suite did not expose one unused local assignment around the built-in prompt
+digest check. Because the repository's hosted Ruff contract includes F rules, publication with
+that binding would be a false green local claim even though runtime behavior was correct.
+
+## Builder — static-analysis repair
+
+Removed only the unused local target while retaining the exact digest-checked prompt resource
+read. A function-scope binding scan found no additional unused Phase 5A locals. Focused tests and
+the isolated-wheel contract remain green, and all deterministic candidate/output digests remain
+unchanged.
+
+## Curator — hosted Ruff repair reproduction
+
+Reproduced the exact packaged-prompt digest check, unchanged successor/request/plan
+digests, 46 focused tests, the 271-test selected Phase 2–5A matrix with two inherited
+skips, deterministic inventory regeneration, and the renewed isolated wheel. The full
+local discovery attempt exceeded its execution bound and is not counted as a pass; the
+hosted three-version matrix remains mandatory.

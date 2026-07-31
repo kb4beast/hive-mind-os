@@ -3,7 +3,7 @@
 - Verification boundary: local isolated-wheel import and deterministic contract execution
 - Distribution: `hive-mind-os==0.6.0`
 - Wheel: `hive_mind_os-0.6.0-py3-none-any.whl`
-- Wheel SHA-256: `7d8f17406c5f54dee5c02d3c1e22590ab655da89629dfe11849edc56c930ebf3`
+- Wheel SHA-256: `ce8ff674a7784422f6af576dea5d93755575b52ce609ea93d4e225a056233372`
 - Verification JSON SHA-256: `73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee`
 - Governed JSON resources retained: 133
 - Governed components retained: 22
@@ -40,3 +40,10 @@ build gate for the repository-pinned `setuptools==83.0.0`. Exact-head hosted CI 
 install, verify, generate the SPDX SBOM, and attest the final subjects before technical
 completion. This receipt does not authorize merge, runtime selection, activation, production
 readiness, release readiness, value, learning, promotion, or superiority.
+
+## Hosted Ruff repair receipt
+
+The wheel was rebuilt after source repair
+`4247e50c8f6ce40dcc61876c98004b3a5fa799f6`. The repair retained the exact
+built-in prompt digest-verification call and removed only an unused local assignment.
+The successor, request, plan, and verification JSON digests are unchanged.

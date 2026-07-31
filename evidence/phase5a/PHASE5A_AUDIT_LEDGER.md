@@ -95,8 +95,10 @@ The candidate was repaired to:
 ## P5A-AUDIT-013 — renewed local verification
 
 - Phase 5A focused suite: 46 tests passed.
-- Phase 2–5A selected compatibility matrix: 271 tests passed with two inherited platform-specific skips.
-- Full repository standard-library discovery: the local run exceeded 900 seconds after 58 completed tests with no observed failure; exact-head hosted matrices remain controlling.
+- Phase 2–5A selected compatibility matrix: 271 tests passed with two inherited
+  platform-specific skips.
+- Full repository standard-library discovery: 712 tests passed with three inherited
+  platform-specific skips in 449.331 seconds on the clean sealed tree.
 - Deterministic successor digest:
   `sha256:e2e6f8ee8975db17a002fafc7d78aa5e2f696540e2ce4404d4548785643528fc`.
 - Example request digest:
@@ -140,3 +142,85 @@ Cycle detection now has one package-private implementation shared by compilation
 Unused imports were removed, verification-claim terminology was corrected, and executable
 regressions cover objective, budget, court, recovery, handoff, and cross-request output
 substitution attacks.
+
+## P5A-AUDIT-018 — exact formatted-head verification
+
+The source-format normalization head `835c8854e79b12de7db998836062158c6e64caca` was compared with tested parent
+`2b4c45997c04e09d2f5dc173e4978e84675aa489`. Abstract syntax trees are identical for the Orchestrator implementation,
+Phase 5A inventory generator, and Phase 5A test module; the delta changes layout only.
+
+Exact-head local verification produced:
+
+- Phase 5A focused suite: 46 tests passed.
+- Complete standard-library discovery: 712 tests passed with three inherited
+  platform-specific skips in 129.675 seconds.
+- Isolated installed wheel: `hive_mind_os-0.6.0-py3-none-any.whl`.
+- Wheel SHA-256: `fd3b32a1d6f151fdd4c6d702daca77b6b6a7a5cdf566469793b490700ae3b5c6`.
+- Verification JSON SHA-256: `73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee`.
+- Governed resources/components: 133/22.
+- Effective capabilities/tools: 0/0; authority `none`; activation `inert`.
+
+The following evidence-only descendant may update receipts and inventory without changing
+source or test semantics. Hosted Python, Ruff, Pyright, CodeQL, secret, dependency/license,
+SBOM, and provenance checks remain mandatory on the final remote head.
+
+## P5A-AUDIT-019 — hosted Ruff remand
+
+Exact hosted PR head `09da4042dd4f850e19c58a080e8bc96f805dc2c1` reached the
+Constitutional CI matrix in run `30595066374`. Secret scanning, dependency/license
+review, release integration audit, wheel construction, the 133-resource verifier, the
+Phase 5A installed-wheel verifier, and SPDX generation passed. Ruff 0.16.0 remanded
+the static/type job before Pyright because `_compile_unpinned_successor()` assigned the
+digest-verified built-in prompt document to local name `builtin_prompt` without reading
+that name (`F841`). No runtime, schema, digest, authority, or typed-output failure was
+reported.
+
+## P5A-AUDIT-020 — hosted Ruff repair
+
+Source repair `4247e50c8f6ce40dcc61876c98004b3a5fa799f6` preserves the exact
+`_read_builtin_json(("prompts", "orchestrator.json"), BUILTIN_PROMPT_DIGEST)` call and
+removes only the unused local binding. The packaged prompt bytes remain digest-checked
+and the compiled successor, example request, and example plan digests remain unchanged.
+
+The renewed local isolated wheel retained `hive-mind-os==0.6.0`, 133 governed JSON
+resources, 22 governed components, zero effective capabilities/tools, authority `none`,
+and activation `inert`. Its wheel SHA-256 is
+`ce8ff674a7784422f6af576dea5d93755575b52ce609ea93d4e225a056233372`; the
+Phase 5A verification JSON remains
+`73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee`.
+A fresh hosted Ruff/Pyright and full exact-head matrix remain required.
+
+## P5A-AUDIT-019 — hosted-static-analysis remand and repair
+
+A final source inspection found that `builtin_prompt` captured the result of a digest-checked
+resource read but never used the local binding. Runtime behavior and all functional tests were
+correct, but hosted Ruff rule F841 would reject the unused assignment.
+
+The repair preserves the mandatory `_read_builtin_json(...)` call and its digest validation while
+removing only the unused local name. A function-scope AST binding scan found no other unused
+Phase 5A local assignments, and import/symbol-table checks remained clean. The focused 46-test
+suite and isolated installed-wheel verification pass after the repair.
+
+- Rebuilt wheel SHA-256: `1f49f782c59f836c98cbc604f45d85dc62759a27f356507a7590c3333277638d`.
+- Verification JSON SHA-256: `73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee`.
+- Successor, request, plan, authority, activation, resource, and handoff results are unchanged.
+
+A complete exact-source-head test run and strict release audit remain required before the final
+evidence-only publication descendant is sealed.
+
+## P5A-AUDIT-021 — renewed local static-repair verification
+
+Against source repair `4247e50c8f6ce40dcc61876c98004b3a5fa799f6`:
+
+- Phase 5A focused suite: 46 tests passed.
+- Phase 2–5A selected compatibility matrix: 271 tests passed with two inherited
+  platform-specific skips.
+- Successor, request, and example plan digests are unchanged.
+- Deterministic inventory regeneration matched the repaired current tree.
+- Isolated-wheel and Phase 5A installed-wheel verification passed with wheel digest
+  `ce8ff674a7784422f6af576dea5d93755575b52ce609ea93d4e225a056233372`.
+- A complete local discovery attempt exceeded its 600-second execution bound without an
+  observed test failure and is not represented as passed. The exact hosted Python
+  3.11/3.12/3.14 jobs remain the controlling full-suite evidence.
+
+This repair does not expand the prior `adapt` disposition.

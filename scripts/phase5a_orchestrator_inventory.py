@@ -112,7 +112,9 @@ def build_phase5a_inventory(repository: Path) -> dict[str, Any]:
             "budget_status": plan["outputs"]["budget_plan"]["accounting_status"],
             "lease_status": plan["outputs"]["budget_plan"]["lease_status"],
             "independence_status": plan["outputs"]["court_schedule"]["independence_status"],
-            "authenticated_distinct_actors": plan["outputs"]["court_schedule"]["authenticated_distinct_actors"],
+            "authenticated_distinct_actors": plan["outputs"][
+                "court_schedule"
+            ]["authenticated_distinct_actors"],
             "stop_decision": plan["outputs"]["stop_decision"]["decision"],
             "evidence_status": plan["outputs"]["stop_decision"]["evidence_status"],
             "handoff_role": plan["outputs"]["handoff"]["next_role"],
@@ -128,11 +130,27 @@ def build_phase5a_inventory(repository: Path) -> dict[str, Any]:
             "cli_parser_count": cli_inventory()["parser_count"],
             "definition_count": surface["observable_module_surface"]["definition_count"],
             "json_resource_count": len(tuple((repository / "src/hive_mind_os").rglob("*.json"))),
-            "runtime_unclassified_count": surface["runtime_effects"]["unclassified_candidate_count"],
-            "store_digest": _digest_bytes((repository / "src/hive_mind_os/foundation/store.py").read_bytes()),
-            "brain_digest": _digest_bytes((repository / "src/hive_mind_os/foundation/brain.py").read_bytes()),
-            "explorer_successor_digest": _digest_bytes((repository / "src/hive_mind_os/foundation/explorer_successor.py").read_bytes()),
-            "explorer_behavior_digest": _digest_bytes((repository / "src/hive_mind_os/foundation/explorer_behavior.py").read_bytes()),
+            "runtime_unclassified_count": surface["runtime_effects"][
+                "unclassified_candidate_count"
+            ],
+            "store_digest": _digest_bytes(
+                (repository / "src/hive_mind_os/foundation/store.py").read_bytes()
+            ),
+            "brain_digest": _digest_bytes(
+                (repository / "src/hive_mind_os/foundation/brain.py").read_bytes()
+            ),
+            "explorer_successor_digest": _digest_bytes(
+                (
+                    repository
+                    / "src/hive_mind_os/foundation/explorer_successor.py"
+                ).read_bytes()
+            ),
+            "explorer_behavior_digest": _digest_bytes(
+                (
+                    repository
+                    / "src/hive_mind_os/foundation/explorer_behavior.py"
+                ).read_bytes()
+            ),
         },
         "implementation": {
             path: _digest_bytes((repository / path).read_bytes())

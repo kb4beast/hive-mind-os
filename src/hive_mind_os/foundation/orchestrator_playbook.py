@@ -105,6 +105,8 @@ _PROHIBITED_ACTIONS = (
     "claim-completion-from-plan-generation",
     "activate-runtime-or-scheduler",
 )
+
+
 class OrchestratorContractError(ValueError):
     """A Phase 5A request or generated artifact failed closed."""
 
@@ -181,7 +183,7 @@ def _compile_unpinned_successor() -> dict[str, Any]:
         raise ValueError("Generation Zero Orchestrator prompt binding drifted")
 
     builtin_agent = _read_builtin_json(("agents", "orchestrator.json"), BUILTIN_AGENT_DIGEST)
-    builtin_prompt = _read_builtin_json(("prompts", "orchestrator.json"), BUILTIN_PROMPT_DIGEST)
+    _read_builtin_json(("prompts", "orchestrator.json"), BUILTIN_PROMPT_DIGEST)
     builtin_skill = _read_builtin_json(("skills", "orchestrator.json"), BUILTIN_SKILL_DIGEST)
     builtin_instruction = _read_builtin_json(
         ("skills", "instructions", "orchestrator.json"),
@@ -214,13 +216,59 @@ def _compile_unpinned_successor() -> dict[str, Any]:
     if lifecycle != ["orchestrator", *WORK_ROLES]:
         raise ValueError("constitutional lifecycle order drifted")
     layers = [
-        _layer(1, BASE_DEFINITION_ID, "base", "2-candidate", [BASE_CONTENT_DIGEST, BASE_PROJECTION_DIGEST]),
-        _layer(2, "generation-zero:orchestrator", "prompt", "1", [BASE_PROMPT_DIGEST, BUILTIN_PROMPT_DIGEST]),
+        _layer(
+            1,
+            BASE_DEFINITION_ID,
+            "base",
+            "2-candidate",
+            [BASE_CONTENT_DIGEST, BASE_PROJECTION_DIGEST],
+        ),
+        _layer(
+            2,
+            "generation-zero:orchestrator",
+            "prompt",
+            "1",
+            [BASE_PROMPT_DIGEST, BUILTIN_PROMPT_DIGEST],
+        ),
         _layer(3, "orchestrator:deep-playbook", "playbook", "1", [digest(playbook)]),
-        _layer(4, "skill.orchestrator", "skills", "1", [BUILTIN_SKILL_DIGEST, BUILTIN_SKILL_INSTRUCTION_DIGEST]),
-        _layer(5, "orchestrator:plan-request", "input", "1", [schema_digests["orchestrator-plan-request-v1"]]),
-        _layer(6, "orchestrator:typed-outputs", "outputs", "1", [digest({key: schema_digests[key] for key in _TYPED_OUTPUTS})]),
-        _layer(7, "orchestrator:phase5a-governance", "governance", "1", [digest({"sources": ["phase1-canonical-contracts", "phase5a-handoff"], "court": "P5A-001"})]),
+        _layer(
+            4,
+            "skill.orchestrator",
+            "skills",
+            "1",
+            [BUILTIN_SKILL_DIGEST, BUILTIN_SKILL_INSTRUCTION_DIGEST],
+        ),
+        _layer(
+            5,
+            "orchestrator:plan-request",
+            "input",
+            "1",
+            [schema_digests["orchestrator-plan-request-v1"]],
+        ),
+        _layer(
+            6,
+            "orchestrator:typed-outputs",
+            "outputs",
+            "1",
+            [digest({key: schema_digests[key] for key in _TYPED_OUTPUTS})],
+        ),
+        _layer(
+            7,
+            "orchestrator:phase5a-governance",
+            "governance",
+            "1",
+            [
+                digest(
+                    {
+                        "sources": [
+                            "phase1-canonical-contracts",
+                            "phase5a-handoff",
+                        ],
+                        "court": "P5A-001",
+                    }
+                )
+            ],
+        ),
         _layer(8, "generation-zero:lifecycle", "lifecycle", "1", [digest({"stages": lifecycle})]),
     ]
     requested = list(orchestrator["requested_capabilities"])
@@ -282,7 +330,10 @@ def _compile_unpinned_successor() -> dict[str, Any]:
         enforce_reviewed_successor=False,
     )
     if not validation.valid:
-        raise ValueError("Orchestrator successor failed its contract: " + "; ".join(validation.issues))
+        raise ValueError(
+            "Orchestrator successor failed its contract: "
+            + "; ".join(validation.issues)
+        )
     return candidate
 
 
@@ -297,7 +348,13 @@ def orchestrator_successor_bytes() -> bytes:
     return canonical_bytes(compile_orchestrator_successor())
 
 
-def _strict_json_copy(value: Any, *, path: str = "$", depth: int = 0, counter: list[int] | None = None) -> Any:
+def _strict_json_copy(
+    value: Any,
+    *,
+    path: str = "$",
+    depth: int = 0,
+    counter: list[int] | None = None,
+) -> Any:
     if counter is None:
         counter = [0]
     counter[0] += 1
@@ -325,7 +382,12 @@ def _strict_json_copy(value: Any, *, path: str = "$", depth: int = 0, counter: l
         for key, item in value.items():
             if type(key) is not str:
                 raise OrchestratorContractError(f"{path} contains a non-string key")
-            copied[key] = _strict_json_copy(item, path=f"{path}.{key}", depth=depth + 1, counter=counter)
+            copied[key] = _strict_json_copy(
+                item,
+                path=f"{path}.{key}",
+                depth=depth + 1,
+                counter=counter,
+            )
         return copied
     raise OrchestratorContractError(f"{path} contains unsupported type {type(value).__name__}")
 
@@ -340,7 +402,9 @@ def _validated_request(request: Mapping[str, Any]) -> dict[str, Any]:
         raise OrchestratorContractError(str(error)) from error
     validation = validate_orchestrator("orchestrator-plan-request-v1", copied)
     if not validation.valid:
-        raise OrchestratorContractError("invalid Orchestrator request: " + "; ".join(validation.issues))
+        raise OrchestratorContractError(
+            "invalid Orchestrator request: " + "; ".join(validation.issues)
+        )
     return copied
 
 
@@ -498,7 +562,13 @@ def _stop_decision(
     independence: str,
 ) -> dict[str, Any]:
     progress_values = list(request["progress_fingerprints"])
-    progress = "unknown" if not progress_values else "stalled" if has_bounded_progress_cycle(progress_values) else "progressing"
+    progress = (
+        "unknown"
+        if not progress_values
+        else "stalled"
+        if has_bounded_progress_cycle(progress_values)
+        else "progressing"
+    )
     recursion = "limit-reached" if request["recursion_depth"] >= MAX_ANCESTRY_DEPTH else "bounded"
     evidence_refs = set(request["evidence_refs"])
     # The request may carry caller-asserted verification labels for traceability, but
@@ -512,7 +582,11 @@ def _stop_decision(
         if claimed_refs == evidence_refs
         else "claims-incomplete"
     )
-    budget_status = {"proposed": "available", "unknown": "unknown", "exhausted": "exhausted"}[budget["accounting_status"]]
+    budget_status = {
+        "proposed": "available",
+        "unknown": "unknown",
+        "exhausted": "exhausted",
+    }[budget["accounting_status"]]
     reasons: list[str] = []
     if progress == "unknown":
         reasons.append("progress-evidence-unknown")
@@ -570,7 +644,11 @@ def _handoff(
     independence: str,
 ) -> dict[str, Any]:
     reasons = set(stop["reasons"])
-    if stop["decision"] in {"stop", "recover"} or stop["progress_status"] == "stalled" or stop["recursion_status"] == "limit-reached":
+    if (
+        stop["decision"] in {"stop", "recover"}
+        or stop["progress_status"] == "stalled"
+        or stop["recursion_status"] == "limit-reached"
+    ):
         next_role, reason = "steward", "recovery-or-stop-review"
     elif stop["evidence_status"] in {"unknown", "claims-incomplete"}:
         next_role, reason = "explorer", "evidence-gap-review"
@@ -615,9 +693,22 @@ def compile_orchestrator_plan(request: Mapping[str, Any]) -> dict[str, Any]:
             **_output_scope(copied, request_digest),
             "objective": copied["objective"],
             "constraints": list(copied["constraints"]),
-            "status": "blocked" if stop["decision"] == "stop" else "deferred" if stop["decision"] in {"defer", "recover"} else "decomposed",
+            "status": (
+                "blocked"
+                if stop["decision"] == "stop"
+                else "deferred"
+                if stop["decision"] in {"defer", "recover"}
+                else "decomposed"
+            ),
             "work_items": work_items,
-            "unknowns": [reason for reason in stop["reasons"] if "unknown" in reason or "unavailable" in reason or "not-fully" in reason or "incomplete" in reason],
+            "unknowns": [
+                reason
+                for reason in stop["reasons"]
+                if "unknown" in reason
+                or "unavailable" in reason
+                or "not-fully" in reason
+                or "incomplete" in reason
+            ],
             "completion_authorized": False,
         }
     )
@@ -659,7 +750,10 @@ def compile_orchestrator_plan(request: Mapping[str, Any]) -> dict[str, Any]:
     envelope = {**body, "plan_digest": digest(body)}
     validation = validate_orchestrator("orchestrator-plan-envelope-v1", envelope)
     if not validation.valid:
-        raise OrchestratorContractError("generated Orchestrator plan is invalid: " + "; ".join(validation.issues))
+        raise OrchestratorContractError(
+            "generated Orchestrator plan is invalid: "
+            + "; ".join(validation.issues)
+        )
     return deepcopy(envelope)
 
 
