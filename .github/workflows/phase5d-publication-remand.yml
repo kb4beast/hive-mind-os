@@ -1,0 +1,98 @@
+name: Phase 5D preserve publication remands
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase5d-publication-remand-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preserve:
+    if: github.event.pull_request.head.ref == 'agent/phase5d-curator-shadow'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Append publication remands and reseal inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          audit = Path("evidence/phase5d/PHASE5D_AUDIT_LEDGER.md")
+          text = audit.read_text(encoding="utf-8")
+          marker = "## Entry 6 — hosted publication remands"
+          if marker not in text:
+              addition = """
+
+## Entry 6 — hosted publication remands
+
+- Materialization run `30659699582`: payload digests, Phase 5A–5D focused suites, and inventory
+  regeneration passed. The generated product commit was not published because GitHub rejected a
+  workflow-token push that modified `.github/workflows/ci.yml` without workflow permission.
+- Export run `30659915044`: materialization, focused suites, inventory regeneration, and exact
+  staged-tree export passed. Artifact upload failed because the export directory was hidden and
+  the pinned upload action excludes hidden files by default.
+- Corrected export run `30660098733`: checksum validation, all focused suites, inventory
+  regeneration, exact-tree export, and immutable artifact upload passed.
+- Product publication run `30660447137`: after `ci.yml` was committed through the authorized
+  connector, the workflow revalidated and pushed only non-workflow product files plus payload
+  deletions. The temporary materializer was then deleted by cleanup commit
+  `8aeb1d1cb533786054d514f6ed5680c5b8e56ed7`.
+- The failed publication attempts changed no product tree. Their logs remain adverse evidence.
+- These remands add no capability, tool, authority, activation, execution, approval, release,
+  value, production-readiness, or superiority claim.
+"""
+              audit.write_text(text.rstrip() + addition, encoding="utf-8", newline="\n")
+
+          court = Path("evidence/courts/phase5d-curator-playbook-court.md")
+          text = court.read_text(encoding="utf-8")
+          marker = "## Hosted publication remands"
+          if marker not in text:
+              addition = """
+
+## Hosted publication remands
+
+The court preserves three publication-path outcomes rather than presenting the first successful
+push as the only history. Run `30659699582` validated the candidate but GitHub denied a workflow-
+token push that changed CI. Run `30659915044` validated and exported the exact candidate but the
+artifact step excluded the hidden export directory. Run `30660098733` corrected the export path
+and uploaded the immutable validated tree. Run `30660447137` then revalidated and published the
+non-workflow product after CI had been changed through the authorized connector.
+
+The failures were transport and permission defects, not evidence that the candidate passed
+checks it did not run. No product commit was created from either failed attempt, and neither is
+used to claim authenticated independence, execution, release approval, or readiness.
+"""
+              court.write_text(text.rstrip() + addition, encoding="utf-8", newline="\n")
+          PY
+          python -m pip install --disable-pip-version-check --no-deps -e .
+          PYTHONPATH=src:. python scripts/phase5d_curator_inventory.py
+          python -m compileall -q src tests scripts
+          PYTHONPATH=src:. python -m unittest discover -s tests -p 'test_phase5d_curator_playbook.py' -v
+
+      - name: Commit and push permanent remand record
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            evidence/courts/phase5d-curator-playbook-court.md \
+            evidence/phase5d/PHASE5D_AUDIT_LEDGER.md \
+            evidence/phase5d/phase5d_curator_inventory.json
+          git diff --cached --check
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git commit -m 'Preserve Phase 5D publication remands'
+          git push origin HEAD:agent/phase5d-curator-shadow
