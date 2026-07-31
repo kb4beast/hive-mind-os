@@ -1,0 +1,106 @@
+{
+  "activation_authorized": false,
+  "authenticated_distinct_actors": false,
+  "case_id": "P5B-001",
+  "final_disposition": "adapt",
+  "independence_claimed": false,
+  "learning_claimed": false,
+  "local_verification": {
+    "build_backend_note": "local setuptools 82.0.1; hosted setuptools 83.0.0 required",
+    "component_count": 22,
+    "focused_tests_passed": 51,
+    "governed_json_resources": 133,
+    "output_count": 10,
+    "phase5a_verification_json_sha256": "73c1f76efb9683e6673f11cca376881f283374cfec0d7be0cd34dc765bca91ee",
+    "phase5b_verification_json_sha256": "0a011b0c2e028e65d8d7fc938527d07b71ed3ec1bc9e5a77cc76a5d68f07b316",
+    "schema_count": 13,
+    "wheel_sha256": "6f3c561cf714e5cc8fcc3bdb997f02cc136f47c9fe5f1c83f4b15b43414608da"
+  },
+  "merge_authorized": false,
+  "phase5a_inventory_reconciliation": {
+    "phase5a_behavior_changed": false,
+    "prior_digest": "sha256:0628a5236d5e06cceb3055fc65320a339c48cd229f56bfd39ef1ebce0c03d516",
+    "reason": "shared CI and ADR index current-tree bytes changed",
+    "reconciled_digest": "sha256:ff76b245267d244354d99bf136a35088e7169b1e9da9f6afa7afa73ffdc0fa55"
+  },
+  "production_ready": false,
+  "release_ready": false,
+  "remands": [
+    "option-local-claim-integrity",
+    "complete-per-option-verification",
+    "trust-boundary-component-data-and-threat-containment",
+    "canonical-envelope-semantic-reseal-rejection",
+    "viability-before-caller-score",
+    "exact-positive-resource-reserves-and-section-allocation",
+    "adopted-claim-evidence-and-acceptance-regardless-of-material-flag"
+  ],
+  "review_mode": "procedural-simulation",
+  "reviewed_successor_digest": "sha256:ecc0ba88c036f1f041f390cc8c68c20d52ec0336eb182c624028290d67f39bda",
+  "roles": [
+    {
+      "disposition": "pass",
+      "purpose": "freeze scope, authority ceiling, budgets, stop conditions, and rollback",
+      "role": "orchestrator"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "locate controlling sources and preserve unavailable evidence as unavailable",
+      "role": "explorer-advocate"
+    },
+    {
+      "disposition": "pass-after-remand",
+      "purpose": "separate contracts, interfaces, invariants, threats, migration, rollback, verification, and resources",
+      "role": "architect"
+    },
+    {
+      "disposition": "pass-after-seven-remands",
+      "purpose": "implement the bounded inert candidate and executable regressions",
+      "role": "builder"
+    },
+    {
+      "disposition": "pass-after-seven-remands",
+      "purpose": "attack locality, coverage, containment, scoring, reserves, evidence bypass, mutation, and resealing",
+      "role": "cross-examiner"
+    },
+    {
+      "disposition": "pass-local-hosted-pending",
+      "purpose": "reconstruct contracts, digests, tests, inventory, package, and exact-tree claims",
+      "role": "curator"
+    },
+    {
+      "disposition": "pass-local-hosted-pending",
+      "purpose": "confirm no public API, CLI, store, projector, resource, or runtime drift",
+      "role": "integrator"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "verify boundedness, recovery posture, reserves, maintainability, and evidence durability",
+      "role": "steward"
+    },
+    {
+      "disposition": "pass",
+      "purpose": "verify honest unknowns, ranking resistance, and absence of value or superiority claims",
+      "role": "optimizer"
+    },
+    {
+      "disposition": "adapt",
+      "purpose": "permit draft delivery only and deny merge, activation, and broader claims",
+      "role": "judge"
+    }
+  ],
+  "same_assistant_performed_all_passes": true,
+  "schema_version": 1,
+  "subject": "phase5b-architect-deep-playbook",
+  "superiority_claimed": false,
+  "terminal_evidence_pending": [
+    "hosted-python-matrix",
+    "ruff",
+    "pyright",
+    "codeql",
+    "secret-scan",
+    "dependency-review",
+    "sbom",
+    "provenance"
+  ],
+  "value_claimed": false
+}
