@@ -1,0 +1,40 @@
+name: Export exact Phase 5B base
+
+on:
+  push:
+    branches:
+      - utility/phase5b-source-export
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout utility branch with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build exact terminal Phase 5A source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=ed1c0a76c52335e7cf92ba92b2f4d401116f85e1
+          git cat-file -e "$expected^{commit}"
+          git branch phase5b-base "$expected"
+          git bundle create hive-mind-os-phase5b-base.bundle phase5b-base
+          git bundle verify hive-mind-os-phase5b-base.bundle
+          printf '%s\n' "$expected" > bundle-head.txt
+          git show -s --format=fuller "$expected" > bundle-commit.txt
+      - name: Upload exact source bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hive-mind-os-phase5b-base-source
+          path: |
+            hive-mind-os-phase5b-base.bundle
+            bundle-head.txt
+            bundle-commit.txt
+          if-no-files-found: error
+          retention-days: 1
