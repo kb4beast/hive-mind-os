@@ -16,16 +16,17 @@ or a longer definition as proven behavior.
 The Generation Zero and Phase 2 Orchestrator already state the constitutional purpose:
 translate outcomes into bounded work, coordinate specialists, and preserve explicit
 acceptance criteria and dependencies. They do not provide one strict, deterministic contract
-covering decomposition, dependency closure, budget reserves, court scheduling, recovery,
-stopping, and handoff.
+covering request scope, decomposition, dependency closure, budget reserves, court scheduling,
+recovery, stopping, and handoff.
 
 ## Decision
 
 Add two package-private Python modules:
 
-- `orchestrator_playbook_contracts.py` contains ten strict, fail-closed schemas; and
-- `orchestrator_playbook.py` composes one inert successor and generates one deterministic
-  plan envelope containing seven typed outputs.
+- `orchestrator_playbook_contracts.py` contains ten strict, fail-closed schemas and semantic
+  consistency checks; and
+- `orchestrator_playbook.py` composes one inert successor and generates one deterministic plan
+  envelope containing seven typed outputs.
 
 The candidate:
 
@@ -33,19 +34,31 @@ The candidate:
    prompt, built-in `skill.orchestrator`, and constitutional lifecycle;
 2. exposes no root API, CLI command, tool, host adapter, provider call, scheduler binding,
    capability, lease, or runtime selector;
-3. retains every requested Generation Zero capability only as unsupported metadata;
-4. creates seven non-Orchestrator work items in constitutional order and binds every later
-   item to all earlier items;
-5. binds admitted evidence and rollback references into every work item;
-6. proposes either a wholly known budget with positive rollback and verification reserves,
-   or a wholly unknown budget without invented allocations;
-7. records a ten-stage procedural court schedule while fixing
+3. retains every requested Generation Zero capability only as unsupported metadata and embeds
+   one immutable ordered instruction for each non-Orchestrator work role in the reviewed
+   successor;
+4. embeds the exact validated request snapshot in the plan envelope and binds every output and
+   work item to the request ID and digest, objective, tenant, and
+   repository; work items also retain the objective text, constraints, acceptance criteria,
+   admitted evidence, and rollback set;
+5. creates seven non-Orchestrator work items in constitutional order and binds every later item
+   to all earlier items;
+6. treats `verification_claim_refs` only as caller-asserted labels. Even complete caller claims
+   remain `claimed-unverified` because Phase 5A has no authenticated evidence verifier;
+7. proposes either a wholly known budget with positive rollback and verification reserves and
+   a positive allocation for every role, or a wholly unknown budget without invented values;
+8. records a ten-stage procedural court schedule with unique role and actor identifiers,
+   explicit procedural/unassigned actor status, and
    `authenticated_distinct_actors=false`;
-8. fails closed on private-content fields, caller-supplied authentication, mixed accounting,
-   ancestry mismatch, recursion limits, repeated/partial-period progress loops, unbounded
-   containers, unknown fields, and output-digest drift; and
-9. derives stopping and handoff from evidence, budget, recovery, recursion, stall, and
-   independence state rather than caller preference.
+9. validates each output digest directly and then validates cross-output meaning: scope,
+   decomposition/graph closure, budget/stop correspondence, court predecessor closure, stop
+   reasons, unknowns, recovery references, state-derived handoff, and the exact handoff
+   evidence/rollback/reason union;
+10. rejects resealed successor drift by requiring the exact reviewed successor digest in
+    addition to layer and content-digest integrity; and
+11. fails closed on private-content fields, caller-supplied authentication, mixed accounting,
+    ancestry mismatch, recursion limits, repeated/partial-period progress loops, hostile
+    containers, unknown fields, and semantic or digest drift.
 
 The maximum output is a plan. It does not execute work, issue leases, approve completion,
 activate a candidate, or satisfy an independent court.
@@ -55,22 +68,26 @@ activate a candidate, or satisfy an independent court.
 - Candidate agent: `hive-agent:orchestrator:v2-shadow-1`
 - Candidate definition: `hive-agent-definition:orchestrator:v2-shadow-1`
 - Base/rollback: `hive-agent-definition:orchestrator:v2-candidate`
-- Successor digest: `sha256:27ee0dd40c63e1fcae04425552d8e3e3c124a807bb9f4cea4b06cca2809b9574`
+- Successor digest: `sha256:e2e6f8ee8975db17a002fafc7d78aa5e2f696540e2ce4404d4548785643528fc`
 
 ## Threats and controls
 
 | Threat | Control |
 |---|---|
 | Planning silently becomes authority | Effective capabilities and tools are empty; authority and activation are fixed to none/inert. |
-| Labels are presented as independent actors | Caller-supplied `authenticated=true` is rejected; outputs always state authenticated independence is unavailable. |
-| A later role runs without prior context | Dependency graph is the full earlier-to-later transitive closure. |
-| Evidence or rollback disappears during decomposition | Every work item binds the complete admitted evidence and rollback sets. |
-| Budget allocation consumes recovery capacity | Known budgets require positive rollback and verification reserves; allocations plus reserves equal one million ppm. |
-| Unknown accounting is rendered as zero | All budget axes must be wholly known or wholly unknown; unknown allocations remain null. |
-| Recursive self-hosting or oscillation appears as progress | Ancestry must equal recursion depth; depth is bounded; exact and partial-period loops stop. |
+| Labels are presented as independent actors | Caller-supplied `authenticated=true` is rejected; role and actor IDs must be unique; outputs always state authenticated independence is unavailable. |
+| Caller-asserted evidence is presented as authenticated | The field is explicitly named `verification_claim_refs`; complete claims produce `claimed-unverified`, never `verified`. |
+| A plan or work item is replayed under another mission, tenant, or objective | The envelope retains the exact validated request snapshot; its digest and scope are rechecked. Each work item binds request ID/digest, objective ID/text, tenant, repository, constraints, evidence, rollback, and acceptance criteria; the stable ID binds request digest and role. |
+| A later role runs without prior context | Dependencies and graph edges are the full earlier-to-later transitive closure. |
+| Evidence or rollback disappears during decomposition or handoff | Every work item carries the same admitted sets; recovery must match rollback; handoff must equal the bounded union of evidence, rollback, and stop reasons. |
+| Budget allocation consumes recovery capacity | Known budgets require positive reserves and a positive allocation for every role; allocations plus reserves equal one million ppm. |
+| Unknown accounting is rendered as zero | All budget axes must be wholly known or wholly unknown; unknown reserves and allocations remain null. |
+| Recursive self-hosting or oscillation appears as progress | Ancestry must equal recursion depth; depth is bounded; every bounded period is checked for exact or partial-period repetition. |
 | Caller steers a later role around a blocker | Requested next role is advisory; the compiler derives the eligible role from fail-closed state. |
+| A nested output is changed and the envelope is resealed | Every typed-output digest is checked directly and cross-output semantic relationships are re-derived. |
+| A successor layer is changed and locally resealed | Layer/content hashes must be valid and the whole successor must equal the reviewed digest. |
 | Mutable subclasses or post-call mutation alter sealed meaning | Exact built-in JSON containers are required and outputs are defensive copies bound by canonical digests. |
-| A generated plan is treated as completion | Every output fixes completion or activation authorization to false. |
+| A generated plan is treated as completion | Every output fixes completion or activation authorization to false; inert Phase 5A cannot return `continue`. |
 
 ## Migration
 
@@ -81,25 +98,25 @@ real lease enforcement, behavioral evaluation, and independent promotion evidenc
 
 ## Rollback
 
-Remove the Phase 5A modules, tests, inventory, and documents, then restore the ADR index and
-CI additions. No data conversion is required. Existing Generation Zero, Phase 2–4 stores,
+Remove the Phase 5A modules, tests, inventory, and documents, then restore the ADR index and CI
+additions. No data conversion is required. Existing Generation Zero, Phase 2–4 stores,
 projectors, resources, and public surfaces remain unchanged.
 
 ## Acceptance boundary
 
 Accepted only for an open draft delivery when:
 
-- all ten schema contracts fail closed;
+- all ten schema contracts fail closed structurally and semantically;
 - deterministic successor and plan digests reproduce;
-- adversarial request, authority, replay, budget, recursion, stall, recovery, and role-boundary
-  tests pass;
+- adversarial request, authority, replay, budget, recursion, stall, recovery, cross-output,
+  scope-binding, evidence-truth, and role-boundary tests pass;
 - Phase 2–5A compatibility remains green;
 - the isolated wheel imports and compiles the successor and all seven outputs;
 - the 133-resource installed-wheel contract remains unchanged;
 - Ruff, Pyright, CodeQL, secret scan, dependency/license review, SBOM, and provenance pass on
   the exact hosted head; and
-- the procedural court record discloses that one assistant simulated the role purposes and
-  did not create authenticated independent actors.
+- the procedural court record discloses that one assistant simulated the role purposes and did
+  not create authenticated independent actors.
 
 ## Explicitly not established
 

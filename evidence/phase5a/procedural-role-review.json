@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "case_id": "P5A-001",
+  "subject": "phase5a-orchestrator-deep-playbook",
+  "review_mode": "procedural-simulation",
+  "authenticated_distinct_actors": false,
+  "authenticated_evidence_verifier": false,
+  "same_assistant_performed_all_passes": true,
+  "independence_claimed": false,
+  "reviewed_successor_digest": "sha256:e2e6f8ee8975db17a002fafc7d78aa5e2f696540e2ce4404d4548785643528fc",
+  "roles": [
+    {
+      "role": "orchestrator",
+      "disposition": "pass",
+      "purpose": "freeze objective, scope, budgets, dependencies, rollback, and stopping"
+    },
+    {
+      "role": "explorer-advocate",
+      "disposition": "pass",
+      "purpose": "locate controlling sources and avoid inventing unavailable handoff content"
+    },
+    {
+      "role": "architect",
+      "disposition": "pass",
+      "purpose": "define interfaces, invariants, threats, migration, and rollback"
+    },
+    {
+      "role": "builder",
+      "disposition": "pass-after-remand",
+      "purpose": "implement and repair the bounded inert candidate with executable tests"
+    },
+    {
+      "role": "cross-examiner",
+      "disposition": "pass-after-four-remands",
+      "purpose": "attack authority, evidence truth, scope binding, dependency, budget, court, recursion, stall, replay, resealing, and mutable-input paths"
+    },
+    {
+      "role": "curator",
+      "disposition": "pass",
+      "purpose": "reproduce contracts, digests, tests, provenance, inventory, and package contents"
+    },
+    {
+      "role": "integrator",
+      "disposition": "pass",
+      "purpose": "confirm no root API, CLI, store, projector, host, or resource drift"
+    },
+    {
+      "role": "steward",
+      "disposition": "pass",
+      "purpose": "verify boundedness, recovery, interruption posture, maintainability, and evidence durability"
+    },
+    {
+      "role": "optimizer",
+      "disposition": "pass",
+      "purpose": "verify honest unknowns and stopping and absence of unsupported value or superiority claims"
+    },
+    {
+      "role": "judge",
+      "disposition": "adapt",
+      "purpose": "permit draft delivery only; deny merge, activation, and broader claims"
+    }
+  ],
+  "remands": [
+    "caller-authentication-not-admissible",
+    "caller-evidence-labels-not-authenticated-verification",
+    "procedural-role-and-actor-identity-uniqueness",
+    "ancestry-depth-binding",
+    "exact-and-partial-period-stall-detection",
+    "hostile-container-rejection",
+    "validated-request-snapshot-digest-and-scope-binding",
+    "work-item-request-objective-tenant-repository-binding",
+    "work-item-objective-constraints-evidence-rollback-binding",
+    "stable-work-item-request-role-identity",
+    "full-predecessor-dependency-closure",
+    "positive-rollback-verification-and-role-reserves",
+    "court-predecessor-and-actor-status-binding",
+    "direct-typed-output-digest-verification",
+    "cross-output-semantic-reseal-rejection",
+    "bounded-complete-handoff-reference-union",
+    "state-derived-stop-reasons-unknowns-and-handoff",
+    "immutable-ordered-role-instruction-backing",
+    "whole-successor-reviewed-digest-binding",
+    "canonical-request-derived-output-replay",
+    "single-source-bounded-cycle-detection",
+    "static-import-hygiene",
+    "portable-installed-wheel-receipt-paths"
+  ],
+  "final_disposition": "adapt",
+  "merge_authorized": false,
+  "activation_authorized": false,
+  "production_ready": false,
+  "release_ready": false,
+  "value_claimed": false,
+  "learning_claimed": false,
+  "superiority_claimed": false
+}
