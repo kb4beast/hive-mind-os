@@ -23,9 +23,9 @@
   },
   "external_dependencies_added": 0,
   "implementation": {
-    ".github/workflows/ci.yml": "sha256:c0a10cf4e275678414758e8cfafdc1333c044115e4d8d6f1cfd53148cd0faaa1",
+    ".github/workflows/ci.yml": "sha256:bd9af0f2697955bd3e407cce6e7d2657672375e8aacd42f08693e757e563e374",
     "docs/architecture/ADR-033-ORCHESTRATOR-DEEP-PLAYBOOK.md": "sha256:f2bf953d10be41cfcfd5effb4e360baa5a2c2f2cfecaebecf4b6f8c3d9d3dc29",
-    "docs/architecture/ADR_INDEX.md": "sha256:20136275aab8aa862ce4f92fdf02564b8927686e1001796ed8a415cb452b5a86",
+    "docs/architecture/ADR_INDEX.md": "sha256:365bf7ac33159537d9ff6db015151b66a06b35f8b583beddd476e6c568368ec4",
     "docs/architecture/PHASE5A_MIGRATION_AND_ROLLBACK.md": "sha256:579c9abedbe7455dd3efefda0f904243f84ff4b996b7579eb3fecec5fad6ecc4",
     "docs/architecture/PHASE5A_ORCHESTRATOR_CONTRACT.md": "sha256:625016215c46c32d977263cae4c7765dfaef417b9a9b6c05d20473bd3da10a14",
     "evidence/courts/phase5a-orchestrator-playbook-court.md": "sha256:91276be218af835a360c0abcf242036b401cba3607fe316be7c5e721c9e0a2ce",
@@ -40,7 +40,7 @@
     "src/hive_mind_os/foundation/orchestrator_playbook_contracts.py": "sha256:688f237c75c5c9acbdc6c7ba68590d424bee6cf831db6ed892f53989cb3bf29c",
     "tests/test_phase5a_orchestrator_playbook.py": "sha256:8d79bf1c282ba62b8119185781a417b5e87f7b5b98bba7192a7946f8f1925ba4"
   },
-  "inventory_digest": "sha256:a972c2618e779f5031495189362e4bccf2f3c5ed96c403a2d4731be3ba65ef43",
+  "inventory_digest": "sha256:1319b302b7e895329a3e2ad3c123fcb0ff2db6c62a16ad89e002774fa033fc95",
   "json_resources_added": 0,
   "learning_claimed": false,
   "phase": 5,
