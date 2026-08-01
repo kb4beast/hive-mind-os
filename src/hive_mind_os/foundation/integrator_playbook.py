@@ -21,7 +21,6 @@ from .integrator_playbook_contracts import (
     validate_integrator_request,
 )
 
-
 _CHECK_BOUNDARY = {
     "exact-contract-versions": "contracts",
     "undeclared-dependency-detection": "dependencies",
