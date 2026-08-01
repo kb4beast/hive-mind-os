@@ -1,9 +1,9 @@
 # Phase 5J Independent Adoption Review Packet audit ledger
 
-This ledger is append-only. It records preparation of an unsigned external-review packet. It does
-not claim authenticated participants, signatures, external retention, a completed review, ADR-015
-adoption, P14/P20 eligibility, release readiness, production readiness, deployment, promotion,
-superiority, authority, or activation.
+This ledger is append-only. It records preparation and maintainer-authorized closeout of an unsigned
+external-review packet. It does not claim authenticated participants, signatures, external retention,
+a completed review, ADR-015 adoption, P14/P20 eligibility, release readiness, production readiness,
+deployment, promotion, superiority, authority, or activation.
 
 ## Entry 1 — accepted integration base
 
@@ -52,14 +52,11 @@ superiority, authority, or activation.
 - Secrets and private signing material are prohibited from repository storage.
 - The procedural session must stop before performing or fabricating the external review.
 
-## Entry 6 — current verification posture
+## Entry 6 — initial verification posture
 
 - The initial Phase 5J files were committed and pushed incrementally through the authenticated GitHub
   connector.
-- Hosted focused/full tests, Ruff, Pyright, inventory, installed-wheel verification, and an external
-  review result are not yet terminal at this entry.
 - One assistant prepared the packet; authenticated independent adoption is not claimed.
-- Any Phase 5J defect or inherited failure must be preserved and either fixed or carried forward.
 
 ## Entry 7 — fixed non-permissions
 
@@ -75,3 +72,29 @@ Until valid external evidence is supplied and independently verified:
 - superiority established: false;
 - authority: none; and
 - activation: inert.
+
+## Entry 8 — terminal hosted evidence
+
+- Tested source head: `f4b96077df02327d966b1c389d584e97efb04ec2`.
+- Constitutional CI run: `30681791236`.
+- Python 3.11, 3.12, and 3.14 full deterministic suites passed.
+- Build and installed-wheel verification through Phase 5D passed.
+- SBOM, CodeQL, secret scan, and dependency/license review passed.
+- Ruff failed only the inherited Phase 5D Curator and test findings.
+- Global Pyright was skipped because Ruff failed first.
+- No Phase 5J file was reported by Ruff.
+- The intermittent worker sweep passed in this run but remains reopened because its repeated fail/pass
+  sequence has no deterministic root cause.
+- The terminal receipt is `docs/plan/PHASE5J_TERMINAL_RECEIPT.md`.
+
+## Entry 9 — maintainer-authorized closeout
+
+- The maintainer explicitly directed unresolved issues to be marked in the plan, carried forward, and
+  PR #60 to be normal-merged.
+- `P5J-DEBT-01` through `P5J-DEBT-05` are recorded in
+  `docs/plan/PHASE5J_CARRIED_FORWARD_DEBT.md`.
+- All thirty inherited Phase 5D–5I items remain active; Phase 5J adds five open items.
+- The next owning phase is Phase 5K External Adoption Evidence Intake.
+- The Phase 5J source branch must remain preserved.
+- No external review, selected decision, signature, adoption, P14 authorization, release, production,
+  deployment, promotion, superiority, authority, or activation is created by this closeout.
