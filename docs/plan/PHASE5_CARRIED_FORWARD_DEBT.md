@@ -6,8 +6,8 @@
 - **Posture:** accepted integration debt; not a green-build, release-readiness, production-readiness,
   independent-verification, or superiority claim.
 - **Applies from:** Phase 5D Curator integration into `agent/phase5a-orchestrator-shadow`.
-- **Current next owning phase:** Phase 5I Post-P13 Adoption Docket unless a later explicit plan
-  decision assigns an item elsewhere.
+- **Current next owning phase:** Phase 5J Independent Adoption Review Packet unless a later explicit
+  plan decision assigns an item elsewhere.
 
 ## Carry-forward rules
 
@@ -27,9 +27,9 @@
 
 | ID | Finding and evidence | Current impact | Required resolution / exit condition | Effective status |
 |---|---|---|---|---|
-| P5D-DEBT-01 | Constitutional CI run `30660783595` reported unsorted imports in `src/hive_mind_os/foundation/curator_playbook.py`, unused local `builtin_instruction`, and unsorted imports in `tests/test_phase5d_curator_playbook.py`. Cleanup run `30661841213` demonstrated deterministic Ruff repairs but stopped before commit because Pyright failed. Phase 5E, 5F, 5G, and 5H exact-head runs reproduced the same Ruff findings. | Full repository static validation is not green. | Commit the deterministic Ruff repairs; run `ruff check src tests scripts` on the exact resulting head and retain a successful hosted receipt. | open |
+| P5D-DEBT-01 | Constitutional CI run `30660783595` reported unsorted imports in `src/hive_mind_os/foundation/curator_playbook.py`, unused local `builtin_instruction`, and unsorted imports in `tests/test_phase5d_curator_playbook.py`. Cleanup run `30661841213` demonstrated deterministic Ruff repairs but stopped before commit because Pyright failed. Phase 5E through Phase 5I exact-head runs reproduced the same Ruff findings. | Full repository static validation is not green. | Commit the deterministic Ruff repairs; run `ruff check src tests scripts` on the exact resulting head and retain a successful hosted receipt. | open |
 | P5D-DEBT-02 | Cleanup run `30661841213` passed all 41 focused Phase 5D tests and Ruff after repair, then Pyright 1.1.411 reported two `Mapping`/`dict` errors in `curator_playbook.py`. Later global Pyright jobs were skipped because Ruff failed first. | Global type validation remains unresolved. | Correct the mutable-container typing without weakening exact-container validation or defensive-copy semantics; run Pyright 1.1.411 and focused/full tests successfully on the exact successor head. | open |
-| P5D-DEBT-03 | Run `30660783595` failed `test_seeded_process_kill_sweep_reclaims_without_duplicate_effects` on Python 3.11. Runs `30674773848`, `30677041971`, and `30677227480` later passed all Python matrices, but Phase 5G initial run `30679862330` failed the same worker test on Python 3.12 with the queue not fully reaching `done`. Runs `30680063488` and `30680444662` subsequently passed all matrices without explaining the recurrence. | The worker sweep is intermittently nondeterministic across exact hosted runs; passing receipts remain valid but do not prove closure. | Reproduce and correct the deterministic timing/state defect without weakening the test. Exit requires a root-cause record plus repeated exact-head Python 3.11, 3.12, and 3.14 passes. | reopened |
+| P5D-DEBT-03 | Run `30660783595` failed `test_seeded_process_kill_sweep_reclaims_without_duplicate_effects` on Python 3.11. Later runs passed all matrices, but Phase 5G run `30679862330` failed it on Python 3.12 and Phase 5I run `30681039055` failed it again on Python 3.11, each with the queue not fully reaching `done`. Passing runs `30680063488` and `30680444662` did not explain the recurrence. | The worker sweep is intermittently nondeterministic across exact hosted runs; passing receipts remain valid but do not prove closure. | Reproduce and correct the deterministic timing/state defect without weakening the test. Exit requires a root-cause record plus repeated exact-head Python 3.11, 3.12, and 3.14 passes. | reopened |
 | P5D-DEBT-04 | The integration tree retains `.github/workflows/phase5d-materialize.yml`, `.github/workflows/phase5d-publication-remand.yml`, and `.github/workflows/phase5d-final-cleanup.yml`. Their predicates are Phase-5D-specific, but they remain write-capable integration surface. | Temporary publication machinery remains in the combined tree. | Remove all three workflows in a normal successor commit after preserving their run receipts; verify no permanent behavior is lost and run governance/static tests. | open |
 | P5D-DEBT-05 | Later exact-head runs passed broad test, build, SBOM, CodeQL, secret, and dependency gates but continued to fail inherited Ruff, skip global Pyright, or expose the reopened worker failure. | The integration head has broad evidence but is not fully green. | Obtain an exact-head Constitutional CI run where every required job, including Ruff, global Pyright, and all Python matrices, completes successfully after applicable root causes are resolved. | open |
 
@@ -71,9 +71,8 @@ PR #57 delivered a bounded, inert Optimizer intake rather than an executed optim
 
 ## Phase 5H carried-forward items
 
-PR #58 delivers a bounded, deterministic, non-release consolidation court rather than an authenticated
-adoption or release court. The maintainer explicitly authorized normal merge with the following work
-carried into Phase 5I.
+PR #58 delivered a bounded, deterministic, non-release consolidation court rather than an authenticated
+adoption or release court.
 
 | ID | Finding and evidence | Current impact | Required resolution / exit condition | Status |
 |---|---|---|---|---|
@@ -83,40 +82,55 @@ carried into Phase 5I.
 | P5H-DEBT-04 | ADR-015 and `01_POST_P13_OVERVIEW.md` remain proposed. P14 cannot begin under their own executor protocol until the complete program receives an independent permitting disposition. P18, P19, operational evidence, external retention, and applicable blocker exits are also absent. | P14–P20 remain unavailable; Phase 5H can only issue `defer-non-release`. | Complete an independent adoption docket for ADR-015 and the full P14–P20 plan. A permitting disposition may unlock only P14; it does not clear any capability, production, source, or superiority blocker. | open |
 | P5H-DEBT-05 | Run `30680444662` on source head `045bc758213d9410642d6c9909b408dff0ffafc5` passed all three Python matrices, build/SBOM, CodeQL, secret, and dependency jobs. It failed only inherited Phase 5D Ruff and skipped global Pyright. Closeout documentation commits were added after the tested source head. | Phase 5H has broad source compatibility evidence but no fully green or exact-final-head receipt. | Preserve `docs/plan/PHASE5H_TERMINAL_RECEIPT.md`; later obtain exact-final-head tests, chained inventory/installed-wheel verification, Ruff, global Pyright, and fully successful Constitutional CI. | open |
 
+## Phase 5I carried-forward items
+
+PR #59 delivers a bounded local adoption-preparation docket rather than an authenticated independent
+adoption review. The maintainer explicitly authorized normal merge with the following work carried
+into Phase 5J.
+
+| ID | Finding and evidence | Current impact | Required resolution / exit condition | Status |
+|---|---|---|---|---|
+| P5I-DEBT-01 | Phase 5I emits a proposed document manifest, required-but-unauthenticated adoption roles, missing external-input register, and `awaiting-independent-adoption`. It does not produce an authenticated Curator recommendation, Judge disposition, or Orchestrator confirmation. | ADR-015 and the P14–P20 program remain proposed; P14 remains blocked. | Obtain distinct non-self-issued reviewer identities and externally verifiable signed dispositions bound to the exact packet and scope. | open |
+| P5I-DEBT-02 | No Phase 5I inventory generator, chained Phase 5E–5I inventory artifact, installed-wheel verifier, package-resource verification, or permanent CI step was added. Permanent installed-wheel verification still stops at Phase 5D. | Packaged adoption-docket availability and current-tree inventory integrity are unverified. | Add chained Phase 5E–5I inventories and installed-wheel verification, update permanent CI, and retain successful exact-head artifacts. | open |
+| P5I-DEBT-03 | Provider authority, identity/signing, external retention, deployment/rollback, source/license, and comparator-access inputs remain missing. No secret, credential, signature, external account, grant, or evidence body was accepted. | The adoption packet cannot satisfy external authority, custody, or operational prerequisites. | Supply each input through an authorized external boundary with custody, expiry, revocation, replay, and bypass evidence; do not commit secrets. | open |
+| P5I-DEBT-04 | Run `30681039055` on source head `eb1fb6a48e1ae3f080582888dcd40274fa0eb699` passed Python 3.12 and 3.14, build/SBOM, CodeQL, secret, and dependency jobs. All eleven Phase 5I tests passed, but Python 3.11 reproduced reopened `P5D-DEBT-03`; inherited Ruff failed and global Pyright was skipped. | Phase 5I has bounded contract evidence but no cross-version or fully green integrated receipt. | Preserve `docs/plan/PHASE5I_TERMINAL_RECEIPT.md`; resolve the worker and static/type root causes, then obtain exact-head all-matrix and fully successful CI. | open |
+| P5I-DEBT-05 | Phase 5I remains package-private, inert, authority-free, and its closeout documentation follows the tested source head. It cannot itself accept or manufacture an independent permitting decision. | No exact-final-head, authenticated-adoption, P14-eligibility, release, production, deployment, promotion, or superiority claim may be inferred. | Complete an external independent review of the frozen packet; record its authenticated result without broadening the permitted scope, then rerun exact-final-head verification. | open |
+
 ## Evidence that remains valid
 
-- Phase 4 Explorer and Phase 5A–5H candidates remain bounded and do not gain authority merely from
+- Phase 4 Explorer and Phase 5A–5I candidates remain bounded and do not gain authority merely from
   integration or naming.
 - Cleanup run `30661841213` executed 41 focused Phase 5D tests successfully before Pyright stopped
   publication.
 - Phase 5E focused run `30674699706` passed its focused tests, Ruff, and Pyright.
-- Later Phase 5E through Phase 5H runs passed broad Python, build, SBOM, CodeQL, secret, and dependency
+- Later Phase 5E through Phase 5I runs passed broad Python, build, SBOM, CodeQL, secret, and dependency
   gates where reported.
 - Phase 5G corrected the request-digest test contract in commit
   `99d20dac8b2b0891020a473c206676860ac61a14`.
 - Phase 5H run `30680444662` passed the full deterministic suite on Python 3.11, 3.12, and 3.14 and
   introduced no Phase 5H Ruff finding.
+- Phase 5I run `30681039055` passed all eleven Phase 5I tests, Python 3.12 and 3.14 full suites, and
+  build/security gates; its Python 3.11 failure was the reopened worker test.
 - One assistant performed separate procedural role passes; authenticated independent Curator,
   Integrator, Steward, Optimizer, court, Judge, or Orchestrator execution is not claimed.
 
-## Handoff to Phase 5I
+## Handoff to Phase 5J
 
-Phase 5I begins from the normal merge commit of PR #58. It is a **Post-P13 Adoption Docket**, not P14
-implementation and not P20 Release Readiness. ADR-015 and the P14–P20 plan remain proposed until an
-authenticated independent Curator, Judge, and Orchestrator issue a permitting disposition.
+Phase 5J begins from the normal merge commit of PR #59. It is an **Independent Adoption Review
+Packet**, not an independent review result, P14 implementation, or P20 Release Readiness.
 
-Phase 5I must:
+Phase 5J must:
 
-1. freeze the exact ADR-015 and `01_POST_P13_OVERVIEW.md` bytes, scope, claims, dependencies, branches,
-   authority requirements, and rollback boundaries;
-2. create a machine-readable adoption evidence index and unresolved-obligation register;
-3. bind every applicable Phase 5D–5H debt and repository blocker without silently clearing it;
-4. define distinct authenticated Curator, Judge, and Orchestrator evidence requirements while
-   truthfully marking actual authentication and execution as absent;
-5. issue only `awaiting-independent-adoption` until externally verifiable permitting evidence exists;
-6. keep P14, P20, release, production, deployment, promotion, superiority, and activation authority
-   false;
-7. remain inert, package-private, and outside supported API/CLI/runtime selection; and
-8. route any external credentials, identities, provider authority, signing, retention, deployment,
-   source, license, or comparator access to explicit human/external-input obligations rather than
-   inventing them.
+1. freeze the exact Phase 5I merge commit, tree, ADR-015 bytes, P14–P20 overview bytes, debt-plan bytes,
+   and all applicable evidence references;
+2. produce a reviewer-facing Curator packet, Judge decision template, and Orchestrator confirmation
+   template without pre-filling a permitting outcome;
+3. define signature, identity, expiry, revocation, replay, external-retention, conflict-of-interest,
+   and scope-binding requirements for each external participant;
+4. include every open or reopened Phase 5D–5I debt item and every missing external-input class;
+5. preserve dissent, rejection, abstention, narrowing, and `defer` as first-class outcomes;
+6. issue only `awaiting-external-review` until authenticated external evidence is supplied;
+7. keep ADR adoption, P14/P20 eligibility, release, production, deployment, promotion, superiority,
+   authority, and activation false; and
+8. end with a human/external handoff rather than fabricating the independent review inside this
+   procedural session.
