@@ -87,8 +87,7 @@ was preserved rather than erased.
   review completed successfully.
 - Ruff again failed only inherited Phase 5D findings; global Pyright was skipped.
 - Python 3.11, 3.12, and 3.14 matrices were still executing when the maintainer-authorized closeout
-  record was prepared. No nonterminal result is represented as passing.
-- The incomplete terminal receipt is carried as `P5G-DEBT-04` rather than hidden.
+  record was prepared. No nonterminal result was represented as passing.
 
 ## Entry 9 — maintainer-authorized closeout and successor
 
@@ -103,3 +102,17 @@ was preserved rather than erased.
 - The Phase 5G source branch must be preserved.
 - No release, production, deployment, promotion, superiority, or authenticated-independence claim is
   authorized by this closeout.
+
+## Entry 10 — terminal corrected-run addendum
+
+- Run `30680063488` subsequently completed.
+- Python 3.11, 3.12, and 3.14 full deterministic suites all passed.
+- The Phase 5G digest-boundary correction therefore has successful cross-version full-suite
+  evidence.
+- Build, installed-wheel checks through Phase 5D, SBOM, CodeQL, secret scan, and dependency/license
+  review passed.
+- Ruff failed only inherited Phase 5D findings; global Pyright was skipped.
+- The detailed plan addendum is `docs/plan/PHASE5G_TERMINAL_RECEIPT_ADDENDUM.md`.
+- `P5D-DEBT-03` remains reopened: the latest pass does not establish a deterministic root cause for
+  its repeated exact-run failure/pass sequence.
+- `P5G-DEBT-04` remains open because a fully green static/type integration receipt is absent.
