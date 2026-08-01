@@ -1,0 +1,41 @@
+name: Phase 5E bounded Ruff repair
+
+on:
+  push:
+    branches: [agent/phase5e-integrator-shadow]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase5e-ruff-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: agent/phase5e-integrator-shadow
+      - name: Apply pinned Ruff import repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'ruff==0.16.0'
+          ruff check --fix src/hive_mind_os/foundation/integrator_playbook.py
+          ruff check src/hive_mind_os/foundation/integrator_playbook.py
+          changed="$(git diff --name-only)"
+          if [ -z "$changed" ]; then
+            exit 0
+          fi
+          test "$changed" = 'src/hive_mind_os/foundation/integrator_playbook.py'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/hive_mind_os/foundation/integrator_playbook.py
+          git diff --cached --check
+          git commit -m 'Format Phase 5E Integrator imports'
+          git push origin HEAD:agent/phase5e-integrator-shadow
