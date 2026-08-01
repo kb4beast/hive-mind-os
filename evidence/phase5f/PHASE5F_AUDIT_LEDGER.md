@@ -70,3 +70,29 @@ No open item is closed by creating the Steward intake. New exact-head receipts a
   It does not complete Phase 5F, execute maintenance or recovery, prove installed-wheel availability
   for Phase 5F, establish a fully green static/type gate, approve release, prove production readiness,
   authenticate independent execution, or support superiority.
+
+## Entry 7 — exact-head closeout evidence
+
+- Exact tested source head: `922d7b4d9c4b8642e143335bd997709e4d5425c6`.
+- Constitutional CI run: `30677227480`.
+- Full deterministic suites passed on Python 3.11, 3.12, and 3.14.
+- Build and installed-wheel verification through Phase 5D passed.
+- SBOM and immutable build-evidence upload passed.
+- CodeQL, secret scan, and dependency/license review passed.
+- Ruff again failed only on inherited Phase 5D findings; no new Phase 5F Ruff defect was reported.
+- Global Pyright was skipped after Ruff failed, so the combined integration head remains non-green.
+- This exact-head run supports bounded compatibility of the Phase 5F intake but not complete Steward
+  verification, package availability, maintenance execution, recovery execution, health, release,
+  production readiness, authenticated independence, or superiority.
+
+## Entry 8 — maintainer-authorized closeout and handoff
+
+- The maintainer explicitly directed that unresolved issues be marked in the plan, carried forward,
+  and that PR #56 be normal-merged.
+- `docs/plan/PHASE5_CARRIED_FORWARD_DEBT.md` was updated in commit
+  `74682ec724da42c6303f70af65f7cad1c86678b5`.
+- Five Phase 5F obligations were added as `P5F-DEBT-01` through `P5F-DEBT-05`.
+- Phase 5G Optimizer is the next owner for all still-open Phase 5D, Phase 5E, and Phase 5F items.
+- `P5D-DEBT-03` remains resolved; its original adverse run remains preserved.
+- The merge exception does not convert this bounded intake into a complete, healthy, verified,
+  release-ready, production-ready, independently authenticated, or superior system.
