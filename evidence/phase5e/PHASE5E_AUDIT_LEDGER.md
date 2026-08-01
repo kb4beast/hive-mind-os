@@ -44,10 +44,31 @@ The following items remain open and are carried without erasure:
 
 No item is closed by creating the Integrator intake. Future exact-head receipts are required.
 
-## Entry 5 — current verification posture
+## Entry 5 — initial hosted full-suite remand
 
-- The files above were committed and pushed incrementally through the authenticated GitHub
-  connector.
-- Focused Phase 5E tests and hosted Constitutional CI are not yet receipted at this ledger entry.
-- Any test, lint, type, package, inventory, or integration failure discovered after opening the
-  draft PR must be appended as adverse evidence and carried forward until resolved.
+- Constitutional CI on the initial Phase 5E heads continued to fail the inherited Phase 5D Ruff
+  findings before Pyright could run globally.
+- The first Phase 5E source head also had one new import-order finding in
+  `integrator_playbook.py`; pinned Ruff 0.16.0 repaired that file in commit
+  `d7aba278c3198d59ecfb62f0a1e1df81d502826c`.
+- The bounded repair workflow was removed in commit
+  `a0c0ceb23906f6a9db281306b2f5ad6176cfab5d`.
+- Exact-head full static status remains non-green only because of the inherited Phase 5D items;
+  this statement does not resolve those items.
+
+## Entry 6 — focused Phase 5E receipt
+
+- Exact tested head: `cf51e91f874d6ca81af90e4152f649e0ccfa79e7`.
+- Hosted workflow run: `30674699706`.
+- Python 3.11 compilation passed for both Phase 5E modules and the focused test file.
+- All 9 focused Phase 5E test methods passed.
+- Ruff 0.16.0 passed on the two Phase 5E modules and focused test file.
+- Pyright 1.1.411 reported zero errors, warnings, or information messages on the same files.
+- Full output is preserved in
+  `evidence/phase5e/PHASE5E_FOCUSED_VERIFICATION_RECEIPT.md`.
+- Receipt commit: `1897ce8fb854b51002fc920461e8ed14c51a6e4f`.
+- The self-recording verification workflow removed itself in that same commit.
+
+This receipt validates only the bounded first Phase 5E increment. It does not execute compatibility
+checks, resolve inherited debt, establish full-suite green status, approve release, prove production
+readiness, authenticate independent execution, or support superiority.
