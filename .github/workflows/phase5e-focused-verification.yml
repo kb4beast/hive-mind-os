@@ -5,7 +5,7 @@ on:
     branches: [agent/phase5e-integrator-shadow]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: phase5e-focused-verification
@@ -29,18 +29,76 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check --no-deps -e .
           python -m pip install --disable-pip-version-check 'ruff==0.16.0' 'pyright==1.1.411'
-      - name: Verify Phase 5E increment only
+      - name: Verify, preserve receipt, and remove temporary workflow
+        shell: bash
         run: |
+          set +e
           python -m compileall -q \
             src/hive_mind_os/foundation/integrator_playbook.py \
             src/hive_mind_os/foundation/integrator_playbook_contracts.py \
-            tests/test_phase5e_integrator_playbook.py
-          python -m unittest discover -s tests -p 'test_phase5e_integrator_playbook.py' -v
+            tests/test_phase5e_integrator_playbook.py \
+            > /tmp/phase5e-compile.log 2>&1
+          compile_status=$?
+          python -m unittest discover -s tests -p 'test_phase5e_integrator_playbook.py' -v \
+            > /tmp/phase5e-tests.log 2>&1
+          test_status=$?
           ruff check \
             src/hive_mind_os/foundation/integrator_playbook.py \
             src/hive_mind_os/foundation/integrator_playbook_contracts.py \
-            tests/test_phase5e_integrator_playbook.py
+            tests/test_phase5e_integrator_playbook.py \
+            > /tmp/phase5e-ruff.log 2>&1
+          ruff_status=$?
           pyright \
             src/hive_mind_os/foundation/integrator_playbook.py \
             src/hive_mind_os/foundation/integrator_playbook_contracts.py \
-            tests/test_phase5e_integrator_playbook.py
+            tests/test_phase5e_integrator_playbook.py \
+            > /tmp/phase5e-pyright.log 2>&1
+          pyright_status=$?
+          set -e
+
+          mkdir -p evidence/phase5e
+          {
+            echo '# Phase 5E focused verification receipt'
+            echo
+            echo "- Exact tested head: \`${GITHUB_SHA}\`"
+            echo "- Workflow run: \`${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\`"
+            echo '- Python: 3.11'
+            echo '- Ruff: 0.16.0'
+            echo '- Pyright: 1.1.411'
+            echo "- Compile exit: \`${compile_status}\`"
+            echo "- Focused unittest exit: \`${test_status}\`"
+            echo "- Ruff exit: \`${ruff_status}\`"
+            echo "- Pyright exit: \`${pyright_status}\`"
+            echo
+            echo 'This receipt covers only the new Phase 5E Integrator modules and focused test file.'
+            echo 'It does not resolve or relabel inherited Phase 5D debt, full-suite status, release readiness,'
+            echo 'production readiness, authenticated independence, or superiority.'
+            echo
+            echo '## Focused unittest output'
+            echo '```text'
+            cat /tmp/phase5e-tests.log
+            echo '```'
+            echo
+            echo '## Ruff output'
+            echo '```text'
+            cat /tmp/phase5e-ruff.log
+            echo '```'
+            echo
+            echo '## Pyright output'
+            echo '```text'
+            cat /tmp/phase5e-pyright.log
+            echo '```'
+          } > evidence/phase5e/PHASE5E_FOCUSED_VERIFICATION_RECEIPT.md
+
+          git rm .github/workflows/phase5e-focused-verification.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/phase5e/PHASE5E_FOCUSED_VERIFICATION_RECEIPT.md
+          git diff --cached --check
+          git commit -m 'Record Phase 5E focused verification receipt'
+          git push origin HEAD:agent/phase5e-integrator-shadow
+
+          test "$compile_status" -eq 0
+          test "$test_status" -eq 0
+          test "$ruff_status" -eq 0
+          test "$pyright_status" -eq 0
