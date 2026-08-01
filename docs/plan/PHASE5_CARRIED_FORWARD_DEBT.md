@@ -6,8 +6,8 @@
 - **Posture:** accepted integration debt; not a green-build, release-readiness, production-readiness,
   independent-verification, or superiority claim.
 - **Applies from:** Phase 5D Curator integration into `agent/phase5a-orchestrator-shadow`.
-- **Current next owning phase:** Phase 5H Role-Deepening Consolidation Court unless a later explicit
-  plan decision assigns an item elsewhere.
+- **Current next owning phase:** Phase 5I Post-P13 Adoption Docket unless a later explicit plan
+  decision assigns an item elsewhere.
 
 ## Carry-forward rules
 
@@ -20,14 +20,16 @@
    exit conditions are satisfied with exact-head receipts.
 6. Later evidence may resolve or reopen an earlier item; every transition must preserve both the
    prior adverse evidence and the later receipt.
+7. Procedural role labels, local digests, merged PRs, and broad passing jobs cannot satisfy an
+   authenticated-independence or external-adoption gate.
 
 ## Phase 5D carried-forward items
 
 | ID | Finding and evidence | Current impact | Required resolution / exit condition | Effective status |
 |---|---|---|---|---|
-| P5D-DEBT-01 | Constitutional CI run `30660783595` reported unsorted imports in `src/hive_mind_os/foundation/curator_playbook.py`, unused local `builtin_instruction`, and unsorted imports in `tests/test_phase5d_curator_playbook.py`. Cleanup run `30661841213` demonstrated deterministic Ruff repairs but stopped before commit because Pyright failed. Phase 5E, 5F, and 5G exact-head runs reproduced the same Ruff findings. | Full repository static validation is not green. | Commit the deterministic Ruff repairs; run `ruff check src tests scripts` on the exact resulting head and retain a successful hosted receipt. | open |
+| P5D-DEBT-01 | Constitutional CI run `30660783595` reported unsorted imports in `src/hive_mind_os/foundation/curator_playbook.py`, unused local `builtin_instruction`, and unsorted imports in `tests/test_phase5d_curator_playbook.py`. Cleanup run `30661841213` demonstrated deterministic Ruff repairs but stopped before commit because Pyright failed. Phase 5E, 5F, 5G, and 5H exact-head runs reproduced the same Ruff findings. | Full repository static validation is not green. | Commit the deterministic Ruff repairs; run `ruff check src tests scripts` on the exact resulting head and retain a successful hosted receipt. | open |
 | P5D-DEBT-02 | Cleanup run `30661841213` passed all 41 focused Phase 5D tests and Ruff after repair, then Pyright 1.1.411 reported two `Mapping`/`dict` errors in `curator_playbook.py`. Later global Pyright jobs were skipped because Ruff failed first. | Global type validation remains unresolved. | Correct the mutable-container typing without weakening exact-container validation or defensive-copy semantics; run Pyright 1.1.411 and focused/full tests successfully on the exact successor head. | open |
-| P5D-DEBT-03 | Run `30660783595` failed `test_seeded_process_kill_sweep_reclaims_without_duplicate_effects` on Python 3.11. Runs `30674773848`, `30677041971`, and `30677227480` later passed all Python matrices, but Phase 5G initial run `30679862330` failed the same worker test on Python 3.12 with the queue not fully reaching `done`. | The worker sweep is intermittently nondeterministic across exact hosted runs; prior passing receipts remain valid but do not prove closure. | Reproduce and correct the deterministic timing/state defect without weakening the test. Exit requires a root-cause record plus repeated exact-head Python 3.11, 3.12, and 3.14 passes. | reopened |
+| P5D-DEBT-03 | Run `30660783595` failed `test_seeded_process_kill_sweep_reclaims_without_duplicate_effects` on Python 3.11. Runs `30674773848`, `30677041971`, and `30677227480` later passed all Python matrices, but Phase 5G initial run `30679862330` failed the same worker test on Python 3.12 with the queue not fully reaching `done`. Runs `30680063488` and `30680444662` subsequently passed all matrices without explaining the recurrence. | The worker sweep is intermittently nondeterministic across exact hosted runs; passing receipts remain valid but do not prove closure. | Reproduce and correct the deterministic timing/state defect without weakening the test. Exit requires a root-cause record plus repeated exact-head Python 3.11, 3.12, and 3.14 passes. | reopened |
 | P5D-DEBT-04 | The integration tree retains `.github/workflows/phase5d-materialize.yml`, `.github/workflows/phase5d-publication-remand.yml`, and `.github/workflows/phase5d-final-cleanup.yml`. Their predicates are Phase-5D-specific, but they remain write-capable integration surface. | Temporary publication machinery remains in the combined tree. | Remove all three workflows in a normal successor commit after preserving their run receipts; verify no permanent behavior is lost and run governance/static tests. | open |
 | P5D-DEBT-05 | Later exact-head runs passed broad test, build, SBOM, CodeQL, secret, and dependency gates but continued to fail inherited Ruff, skip global Pyright, or expose the reopened worker failure. | The integration head has broad evidence but is not fully green. | Obtain an exact-head Constitutional CI run where every required job, including Ruff, global Pyright, and all Python matrices, completes successfully after applicable root causes are resolved. | open |
 
@@ -57,46 +59,64 @@ PR #56 delivered a bounded, inert Steward intake rather than the complete Stewar
 
 ## Phase 5G carried-forward items
 
-PR #57 delivers a bounded, inert Optimizer intake rather than an executed optimization program.
-The maintainer explicitly authorized normal merge with the following work carried into Phase 5H.
+PR #57 delivered a bounded, inert Optimizer intake rather than an executed optimization program.
 
 | ID | Finding and evidence | Current impact | Required resolution / exit condition | Status |
 |---|---|---|---|---|
 | P5G-DEBT-01 | Phase 5G implements only a degraded baseline snapshot, proposed challenger plan, non-executed evaluation plan, and blocked promotion-court handoff. Real metrics, outcome datasets, resource budgets, comparator results, regression results, experiment receipts, improvement proposals, and rollback exercises are absent. | Optimizer cannot support improvement, learning, superiority, promotion, or release conclusions. | Implement separately versioned, digest-bound outcome, experiment, resource, regression, rollback, and proposal contracts with held-out and adversarial tests. | open |
 | P5G-DEBT-02 | No Phase 5G inventory generator, chained inventory artifact, installed-wheel verifier, package-resource verification, or permanent CI installation step was added. Existing permanent verification stops at Phase 5D. | Packaged Phase 5G availability and current-tree inventory integrity are unverified. | Add chained Phase 5E–5G inventories and installed-wheel verification, update permanent CI, and retain successful exact-head artifacts. | open |
 | P5G-DEBT-03 | No Phase 5G courtroom docket, dissent record, ADR, source register, protected-holdout custody receipt, comparator manifest, losing-result archive, independent evaluator record, or promotion-court disposition was completed. | Governance and independent promotion evidence are absent. | Add append-only evidence and court records while keeping holdout contents sealed and avoiding authenticated-independence claims without external proof. | open |
-| P5G-DEBT-04 | Initial run `30679862330` exposed a Phase 5G test-contract error and the reopened worker failure. The digest-boundary test was corrected in commit `99d20dac8b2b0891020a473c206676860ac61a14`; corrected run `30680063488` passed build, SBOM, CodeQL, secret, and dependency jobs but remained nonterminal at closeout for Python matrices and still failed inherited Ruff before global Pyright. | The fix is committed, but no terminal fully green exact-head receipt exists. | Preserve both runs; require terminal passing focused Phase 5G tests, global Pyright, all Python matrices, and a fully successful exact-head Constitutional CI run. | open |
+| P5G-DEBT-04 | Initial run `30679862330` exposed a Phase 5G test-contract error and the reopened worker failure. The digest-boundary test was corrected in commit `99d20dac8b2b0891020a473c206676860ac61a14`. Corrected run `30680063488` passed all three Python matrices plus build, SBOM, CodeQL, secret, and dependency jobs, but inherited Ruff failed and global Pyright was skipped. | The Phase 5G source correction has cross-version evidence, but no fully green exact-head receipt exists. | Preserve both runs; require successful global Pyright, all Python matrices, and a fully successful exact-head Constitutional CI run after inherited gates are repaired. | open |
 | P5G-DEBT-05 | Phase 5G remains package-private, inert, authority-free, leaves holdout `sealed-not-accessed`, evaluations `not-run`, superiority `prohibited`, and promotion court blocked. No authenticated independent Optimizer, evaluator, Judge, or court execution exists. | No learning, improvement, superiority, promotion, release, production readiness, or independent verification may be inferred. | Require authenticated independent evaluation, protected-holdout custody, preserved losing results, statistical/regression evidence, and applicable court approval before changing these claims. | open |
+
+## Phase 5H carried-forward items
+
+PR #58 delivers a bounded, deterministic, non-release consolidation court rather than an authenticated
+adoption or release court. The maintainer explicitly authorized normal merge with the following work
+carried into Phase 5I.
+
+| ID | Finding and evidence | Current impact | Required resolution / exit condition | Status |
+|---|---|---|---|---|
+| P5H-DEBT-01 | Phase 5H binds an exact eight-role request and emits role inventory, evidence coverage, conflicts, and `defer-non-release`, but it does not independently reconstruct every role candidate’s Git ancestry, tree, inventory, contract digest, and evidence chain from authoritative repository data. | The local court cannot prove a complete, current, independently reconstructed role-deepening inventory. | Produce a machine-readable ancestry and contract/evidence index keyed to exact commits, trees, file digests, PR merges, and retained receipts; verify it independently against Git and package contents. | open |
+| P5H-DEBT-02 | No Phase 5H inventory generator, chained Phase 5E–5H inventory artifact, installed-wheel verifier, package-resource verification, or permanent CI step was added. Permanent installed-wheel verification still stops at Phase 5D. | Packaged Integrator through consolidation-court availability and inventory integrity remain unverified. | Add chained Phase 5E–5H inventories and installed-wheel verifiers, update permanent CI, and retain successful exact-head artifacts. | open |
+| P5H-DEBT-03 | Phase 5H was executed procedurally by one assistant. No externally retained court record or authenticated distinct Curator, Judge, Appeals Judge, or Orchestrator decision exists. | The court cannot satisfy ADR-015 adoption, authenticated independence, P20, or release-governance burdens. | Obtain non-self-issued, revocable identities and externally retained signed court evidence from distinct authorized participants; verify forgery, replay, expiry, and bypass fail closed. | open |
+| P5H-DEBT-04 | ADR-015 and `01_POST_P13_OVERVIEW.md` remain proposed. P14 cannot begin under their own executor protocol until the complete program receives an independent permitting disposition. P18, P19, operational evidence, external retention, and applicable blocker exits are also absent. | P14–P20 remain unavailable; Phase 5H can only issue `defer-non-release`. | Complete an independent adoption docket for ADR-015 and the full P14–P20 plan. A permitting disposition may unlock only P14; it does not clear any capability, production, source, or superiority blocker. | open |
+| P5H-DEBT-05 | Run `30680444662` on source head `045bc758213d9410642d6c9909b408dff0ffafc5` passed all three Python matrices, build/SBOM, CodeQL, secret, and dependency jobs. It failed only inherited Phase 5D Ruff and skipped global Pyright. Closeout documentation commits were added after the tested source head. | Phase 5H has broad source compatibility evidence but no fully green or exact-final-head receipt. | Preserve `docs/plan/PHASE5H_TERMINAL_RECEIPT.md`; later obtain exact-final-head tests, chained inventory/installed-wheel verification, Ruff, global Pyright, and fully successful Constitutional CI. | open |
 
 ## Evidence that remains valid
 
-- Phase 4 Explorer and Phase 5A–5G candidates remain bounded and do not gain authority merely from
+- Phase 4 Explorer and Phase 5A–5H candidates remain bounded and do not gain authority merely from
   integration or naming.
 - Cleanup run `30661841213` executed 41 focused Phase 5D tests successfully before Pyright stopped
   publication.
 - Phase 5E focused run `30674699706` passed its focused tests, Ruff, and Pyright.
-- Later Phase 5E and Phase 5F runs passed broad Python, build, SBOM, CodeQL, secret, and dependency
+- Later Phase 5E through Phase 5H runs passed broad Python, build, SBOM, CodeQL, secret, and dependency
   gates where reported.
-- Phase 5G corrected the request-digest test contract in commit `99d20dac8b2b0891020a473c206676860ac61a14`.
+- Phase 5G corrected the request-digest test contract in commit
+  `99d20dac8b2b0891020a473c206676860ac61a14`.
+- Phase 5H run `30680444662` passed the full deterministic suite on Python 3.11, 3.12, and 3.14 and
+  introduced no Phase 5H Ruff finding.
 - One assistant performed separate procedural role passes; authenticated independent Curator,
-  Integrator, Steward, Optimizer, court, or Judge execution is not claimed.
+  Integrator, Steward, Optimizer, court, Judge, or Orchestrator execution is not claimed.
 
-## Handoff to Phase 5H
+## Handoff to Phase 5I
 
-Phase 5H begins from the normal merge commit of PR #57. It is a **Role-Deepening Consolidation
-Court**, not P20 Release Readiness. P20 remains unavailable because its P18/P19, external-retention,
-authenticated-judge, operational, and blocker prerequisites are not satisfied.
+Phase 5I begins from the normal merge commit of PR #58. It is a **Post-P13 Adoption Docket**, not P14
+implementation and not P20 Release Readiness. ADR-015 and the P14–P20 plan remain proposed until an
+authenticated independent Curator, Judge, and Orchestrator issue a permitting disposition.
 
-Phase 5H must:
+Phase 5I must:
 
-1. reconstruct the exact Phase 4 Explorer and Phase 5A–5G candidate inventory and ancestry;
-2. ingest every open or reopened Phase 5D–5G item with exact run and commit bindings;
-3. preserve all resolved, reopened, adverse, dissenting, losing, and inconclusive evidence;
-4. produce a role-coverage matrix, contract/evidence index, conflict register, rollback map, and
-   machine-readable non-release disposition;
-5. reject any claim that merged PRs, broad passing jobs, or procedural role labels establish release
-   readiness, production readiness, authenticated independence, or superiority;
-6. remain inert, package-private, authority-free, and outside supported API/CLI/runtime selection;
-7. route unresolved obligations to P14–P20 adoption or another explicit successor without pretending
-   those phases are complete; and
-8. avoid promotion, release, deployment, production, or comparative-claim authority.
+1. freeze the exact ADR-015 and `01_POST_P13_OVERVIEW.md` bytes, scope, claims, dependencies, branches,
+   authority requirements, and rollback boundaries;
+2. create a machine-readable adoption evidence index and unresolved-obligation register;
+3. bind every applicable Phase 5D–5H debt and repository blocker without silently clearing it;
+4. define distinct authenticated Curator, Judge, and Orchestrator evidence requirements while
+   truthfully marking actual authentication and execution as absent;
+5. issue only `awaiting-independent-adoption` until externally verifiable permitting evidence exists;
+6. keep P14, P20, release, production, deployment, promotion, superiority, and activation authority
+   false;
+7. remain inert, package-private, and outside supported API/CLI/runtime selection; and
+8. route any external credentials, identities, provider authority, signing, retention, deployment,
+   source, license, or comparator access to explicit human/external-input obligations rather than
+   inventing them.
