@@ -34,15 +34,15 @@ compatibility checks, release approval, production readiness, or superiority.
 
 ## Entry 4 — inherited adverse evidence
 
-The following items remain open and are carried without erasure:
+The following items were inherited at Phase 5E intake and preserved without erasure:
 
 1. `P5D-DEBT-01` — demonstrated but uncommitted Ruff repairs.
 2. `P5D-DEBT-02` — two Pyright Mapping/dict errors.
-3. `P5D-DEBT-03` — unresolved Python 3.11 worker-test failure.
+3. `P5D-DEBT-03` — unresolved Python 3.11 worker-test failure at intake time.
 4. `P5D-DEBT-04` — retained temporary write-capable Phase 5D workflows.
 5. `P5D-DEBT-05` — failed exact-head Constitutional CI and cleanup runs.
 
-No item is closed by creating the Integrator intake. Future exact-head receipts are required.
+Later evidence may resolve an item but does not erase its original adverse history.
 
 ## Entry 5 — initial hosted full-suite remand
 
@@ -53,8 +53,7 @@ No item is closed by creating the Integrator intake. Future exact-head receipts 
   `d7aba278c3198d59ecfb62f0a1e1df81d502826c`.
 - The bounded repair workflow was removed in commit
   `a0c0ceb23906f6a9db281306b2f5ad6176cfab5d`.
-- Exact-head full static status remains non-green only because of the inherited Phase 5D items;
-  this statement does not resolve those items.
+- Exact-head full static status remained non-green because of the inherited Phase 5D items.
 
 ## Entry 6 — focused Phase 5E receipt
 
@@ -72,3 +71,22 @@ No item is closed by creating the Integrator intake. Future exact-head receipts 
 This receipt validates only the bounded first Phase 5E increment. It does not execute compatibility
 checks, resolve inherited debt, establish full-suite green status, approve release, prove production
 readiness, authenticate independent execution, or support superiority.
+
+## Entry 7 — final exact-head evidence and maintainer exception
+
+- Exact pre-closeout source head: `6e817115bc214d61ebd251e43a014cbbe4f20d96`.
+- Constitutional CI run: `30674773848`.
+- Full deterministic suites passed on Python 3.11, 3.12, and 3.14.
+- Build, installed-wheel verification through Phase 5D, SBOM, CodeQL, secret scan, and
+  dependency/license review passed.
+- The Python 3.11 worker-test uncertainty recorded as `P5D-DEBT-03` is resolved by this exact-head
+  cross-version receipt without erasing the earlier failure.
+- Ruff failed only on the three inherited Phase 5D Curator/test findings, and global Pyright was
+  skipped because Ruff failed first.
+- The complete Integrator deep playbook, Phase 5E inventories, installed-wheel integration,
+  courtroom/dissent artifacts, migration/rollback mappings, and full compatibility evidence remain
+  incomplete.
+- The maintainer explicitly directed that all unresolved and incomplete items be recorded in
+  `docs/plan/PHASE5_CARRIED_FORWARD_DEBT.md`, carried into Phase 5F, and that PR #55 be normal-merged.
+- This exception does not establish a green static/type gate, complete integration, release
+  readiness, production readiness, authenticated independence, or superiority.
