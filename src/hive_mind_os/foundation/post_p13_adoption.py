@@ -122,8 +122,8 @@ def _adoption_disposition(request: dict[str, Any]) -> dict[str, Any]:
 def compile_post_p13_adoption_docket(
     value: Mapping[str, Any],
 ) -> dict[str, Any]:
+    validate_adoption_request(value)
     request = deepcopy(dict(value))
-    validate_adoption_request(request)
     outputs = {
         "document_manifest": _document_manifest(request),
         "adoption_requirements": _adoption_requirements(request),
