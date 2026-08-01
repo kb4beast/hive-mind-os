@@ -87,16 +87,14 @@ class OptimizerIntakeTests(unittest.TestCase):
         with self.assertRaises(OptimizerContractError):
             validate_optimizer_request(hostile)
 
-    def test_scope_identity_debt_and_holdout_substitutions_fail_closed(self) -> None:
+    def test_scope_identity_debt_and_malformed_digests_fail_closed(self) -> None:
         request = example_optimizer_request()
         for field, replacement in (
             ("tenant_id", "tenant:other"),
             ("repository_id", "github:other/repository"),
             ("subject_commit", "0" * 40),
-            ("steward_envelope_digest", "sha256:" + ("0" * 64)),
             ("champion_id", "champion:other"),
             ("challenger_id", "challenger:other"),
-            ("holdout_manifest_digest", "sha256:" + ("0" * 64)),
             ("requested_next_stage", "release"),
             ("authority", "repository"),
             ("activation", "active"),
@@ -105,10 +103,30 @@ class OptimizerIntakeTests(unittest.TestCase):
             hostile[field] = replacement
             with self.assertRaises(OptimizerContractError):
                 validate_optimizer_request(hostile)
+        for field in ("steward_envelope_digest", "holdout_manifest_digest"):
+            hostile = deepcopy(request)
+            hostile[field] = "sha256:not-a-canonical-digest"
+            with self.assertRaises(OptimizerContractError):
+                validate_optimizer_request(hostile)
         hostile = deepcopy(request)
         hostile["open_debt_ids"].pop()
         with self.assertRaises(OptimizerContractError):
             validate_optimizer_request(hostile)
+
+    def test_well_formed_request_digests_are_bound_into_outputs(self) -> None:
+        request = example_optimizer_request()
+        request["steward_envelope_digest"] = "sha256:" + ("5" * 64)
+        request["holdout_manifest_digest"] = "sha256:" + ("6" * 64)
+        envelope = compile_optimizer_intake(request)
+        validate_optimizer(envelope)
+        self.assertEqual(
+            envelope["outputs"]["baseline_snapshot"]["steward_envelope_digest"],
+            request["steward_envelope_digest"],
+        )
+        self.assertEqual(
+            envelope["outputs"]["evaluation_plan"]["holdout_manifest_digest"],
+            request["holdout_manifest_digest"],
+        )
 
     def test_semantic_reseal_cannot_claim_health_superiority_or_promotion(self) -> None:
         envelope = compile_optimizer_intake(example_optimizer_request())
