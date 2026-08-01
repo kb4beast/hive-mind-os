@@ -1,0 +1,46 @@
+name: Phase 5E focused verification
+
+on:
+  push:
+    branches: [agent/phase5e-integrator-shadow]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase5e-focused-verification
+  cancel-in-progress: true
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Configure Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
+        with:
+          python-version: '3.11'
+      - name: Install exact local package and pinned checks
+        run: |
+          python -m pip install --disable-pip-version-check --no-deps -e .
+          python -m pip install --disable-pip-version-check 'ruff==0.16.0' 'pyright==1.1.411'
+      - name: Verify Phase 5E increment only
+        run: |
+          python -m compileall -q \
+            src/hive_mind_os/foundation/integrator_playbook.py \
+            src/hive_mind_os/foundation/integrator_playbook_contracts.py \
+            tests/test_phase5e_integrator_playbook.py
+          python -m unittest discover -s tests -p 'test_phase5e_integrator_playbook.py' -v
+          ruff check \
+            src/hive_mind_os/foundation/integrator_playbook.py \
+            src/hive_mind_os/foundation/integrator_playbook_contracts.py \
+            tests/test_phase5e_integrator_playbook.py
+          pyright \
+            src/hive_mind_os/foundation/integrator_playbook.py \
+            src/hive_mind_os/foundation/integrator_playbook_contracts.py \
+            tests/test_phase5e_integrator_playbook.py
