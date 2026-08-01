@@ -51,6 +51,22 @@ No open item is closed by creating the Steward intake. New exact-head receipts a
 
 - The first Phase 5F files were committed and pushed incrementally through the authenticated GitHub
   connector.
-- Focused Phase 5F tests and hosted Constitutional CI are not yet receipted at this entry.
+- Focused Phase 5F tests and hosted Constitutional CI were not yet receipted at this entry.
 - Any test, lint, type, package, inventory, integration, recovery, or evidence-integrity failure must
   be preserved and carried forward until resolved.
+
+## Entry 6 — first hosted Phase 5F evidence
+
+- Exact tested source head: `560a508bf66718f2fa5a92259255f6cf42120467`.
+- Constitutional CI run: `30677041971`.
+- Full deterministic suites passed on Python 3.11, 3.12, and 3.14.
+- Build and installed-wheel verification through Phase 5D passed.
+- SBOM generation and immutable build-evidence upload passed.
+- CodeQL, secret scan, and dependency/license review passed.
+- Ruff failed only on the three inherited Phase 5D Curator/test findings recorded as
+  `P5D-DEBT-01`; no new Phase 5F Ruff finding was reported.
+- Global Pyright was skipped because inherited Ruff failed first, so `P5D-DEBT-02` remains open.
+- This run validates compilation and full-suite compatibility of the bounded first Steward increment.
+  It does not complete Phase 5F, execute maintenance or recovery, prove installed-wheel availability
+  for Phase 5F, establish a fully green static/type gate, approve release, prove production readiness,
+  authenticate independent execution, or support superiority.
