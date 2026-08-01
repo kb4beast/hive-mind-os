@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from .canonical import digest
 from .external_adoption_evidence_contracts import (
@@ -110,7 +110,7 @@ def compile_external_adoption_evidence_intake(
     if type(value) is not dict:
         validate_evidence_intake_request(value)
         raise AssertionError("unreachable")
-    request = deepcopy(value)
+    request = deepcopy(cast(dict[str, Any], value))
     validate_evidence_intake_request(request)
     outputs = {
         "evidence_requirements": _evidence_requirements(request),
