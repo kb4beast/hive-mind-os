@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import unittest
 from copy import deepcopy
 from pathlib import Path
-import unittest
 
 import hive_mind_os
 import hive_mind_os.foundation as foundation
