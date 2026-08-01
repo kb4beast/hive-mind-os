@@ -1,8 +1,9 @@
 # Phase 5H Role-Deepening Consolidation Court audit ledger
 
-This ledger is append-only. It records the bounded start of a non-release consolidation court. It
-does not claim authenticated independent judges, completed evidence, P20 eligibility, release
-readiness, production readiness, promotion authority, superiority, deployment, or activation.
+This ledger is append-only. It records the bounded start and maintainer-authorized closeout of a
+non-release consolidation court. It does not claim authenticated independent judges, completed
+evidence, P14 or P20 eligibility, release readiness, production readiness, promotion authority,
+superiority, deployment, or activation.
 
 ## Entry 1 — accepted integration base
 
@@ -42,12 +43,52 @@ readiness, production readiness, promotion authority, superiority, deployment, o
 - P20 eligibility, release readiness, production readiness, promotion eligibility, authenticated
   independence, and superiority are fixed false.
 
-## Entry 5 — current verification posture
+## Entry 5 — initial verification posture
 
 - The first Phase 5H files were committed and pushed incrementally through the authenticated GitHub
   connector.
-- Hosted focused/full tests, Ruff, Pyright, inventory and installed-wheel verification, and court
-  artifact receipts are not yet terminal at this entry.
 - One assistant performed separate procedural role passes; authenticated independent actors or
   judges are not claimed.
 - Any Phase 5H defect or inherited failure must be preserved and either fixed or carried forward.
+
+## Entry 6 — terminal hosted evidence
+
+- Exact source head tested: `045bc758213d9410642d6c9909b408dff0ffafc5`.
+- Constitutional CI run: `30680444662`.
+- Python 3.11 full deterministic suite: passed.
+- Python 3.12 full deterministic suite: passed.
+- Python 3.14 full deterministic suite: passed.
+- Build and installed-wheel verification through Phase 5D: passed.
+- SBOM, CodeQL, secret scan, and dependency/license review: passed.
+- Ruff failed only on the inherited Phase 5D Curator and Curator-test findings.
+- Global Pyright was skipped because Ruff failed first.
+- No Phase 5H file was reported by Ruff.
+- The complete terminal receipt is `docs/plan/PHASE5H_TERMINAL_RECEIPT.md`.
+
+## Entry 7 — carried-forward Phase 5H obligations
+
+The authoritative plan now contains `P5H-DEBT-01` through `P5H-DEBT-05`:
+
+1. no independently reconstructed exact ancestry and contract/evidence index;
+2. no chained Phase 5E–5H inventory or installed-wheel verification;
+3. no externally retained or authenticated independent court decision;
+4. ADR-015 and the P14–P20 program remain proposed and P14 remains unavailable; and
+5. no fully green or exact-final-head receipt exists.
+
+Inherited `P5D-DEBT-01` through `P5G-DEBT-05` remain open or reopened as recorded. The court does not
+close an item by repeating it, integrating it, or assigning a procedural role label.
+
+## Entry 8 — maintainer-authorized closeout and successor
+
+- The maintainer explicitly directed unresolved issues to be marked in the plan, carried forward,
+  and PR #58 to be normal-merged.
+- The required disposition remains `defer-non-release`.
+- The next step is Phase 5I Post-P13 Adoption Docket.
+- Phase 5I is not P14 implementation and is not P20 Release Readiness.
+- ADR-015 and `01_POST_P13_OVERVIEW.md` require an authenticated independent Curator, Judge, and
+  Orchestrator permitting disposition before P14 can begin under their own executor protocol.
+- Phase 5I may prepare and validate the adoption packet but may not fabricate identities, signatures,
+  external retention, credentials, authority, or a permitting decision.
+- The Phase 5H source branch must be preserved.
+- No release, production, deployment, promotion, superiority, P14, P20, or activation authority is
+  created by this closeout.
