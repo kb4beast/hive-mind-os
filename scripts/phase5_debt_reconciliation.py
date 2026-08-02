@@ -37,15 +37,6 @@ RESOLUTIONS: dict[str, Resolution] = {
             "run:30771265827",
         ),
     },
-    "P5D-DEBT-03": {
-        "reason": "claim and reclaim boundaries use observed scheduler time and fail closed at missed transitions",
-        "evidence": (
-            "commit:8ede2414f45210b3b6139850d7d0578e080a08d9",
-            "run:30772507451",
-            "run:30772516479",
-            "local:100-consecutive-worker-recovery-passes",
-        ),
-    },
     "P5D-DEBT-04": {
         "reason": "all three temporary write-capable Phase 5D workflows are absent",
         "evidence": (
@@ -172,7 +163,8 @@ def build_reconciliation(repository: Path) -> dict[str, Any]:
         "_read_claim_marker",
         "_wait_for_observed_lease_expiry",
         "self.assertNotEqual(claimed_id, \"none\")",
-        "self.assertTrue(\n                    Worker(",
+        "recovery_queue = Scheduler(self.root, lease_seconds=5.0)",
+        "heartbeat_interval=0.25",
     ):
         if required not in worker_test:
             raise RuntimeError(f"worker recovery repair is missing: {required!r}")

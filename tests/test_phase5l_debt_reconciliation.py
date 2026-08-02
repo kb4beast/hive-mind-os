@@ -39,7 +39,7 @@ class Phase5DebtReconciliationTests(unittest.TestCase):
         self.assertEqual(set(resolved) | set(active), set(ALL_DEBT_IDS))
         self.assertEqual(
             self.record["counts"],
-            {"prior_active": 35, "resolved": 10, "current_active": 25},
+            {"prior_active": 35, "resolved": 9, "current_active": 26},
         )
 
     def test_each_resolution_has_specific_receipts(self) -> None:
@@ -83,6 +83,7 @@ class Phase5DebtReconciliationTests(unittest.TestCase):
         self.assertTrue(set(NEXT_INTERNAL_DEBT_IDS).issubset(CURRENT_ACTIVE_DEBT_IDS))
         self.assertIn("P5H-DEBT-04", CURRENT_ACTIVE_DEBT_IDS)
         self.assertIn("P5J-DEBT-01", CURRENT_ACTIVE_DEBT_IDS)
+        self.assertIn("P5D-DEBT-03", CURRENT_ACTIVE_DEBT_IDS)
 
     def test_known_windows_failure_is_preserved_without_phase5_blame(self) -> None:
         local = self.record["local_release_validation"]

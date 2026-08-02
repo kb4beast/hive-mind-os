@@ -11,11 +11,12 @@
     "superiority_established": false
   },
   "counts": {
-    "current_active": 25,
+    "current_active": 26,
     "prior_active": 35,
-    "resolved": 10
+    "resolved": 9
   },
   "current_active_debt_ids": [
+    "P5D-DEBT-03",
     "P5E-DEBT-01",
     "P5E-DEBT-02",
     "P5E-DEBT-03",
@@ -117,7 +118,7 @@
     "P5J-DEBT-04",
     "P5J-DEBT-05"
   ],
-  "reconciliation_digest": "sha256:d6854c99dfc6daf622bf05e101a51cec9a015558770cab3169cf56b6a7f870f3",
+  "reconciliation_digest": "sha256:729c4f6147e021aac0b1a97943576b936f4fc54980abbe0a72f270d4054c3d45",
   "record_type": "phase5-debt-reconciliation",
   "release_run_ids": [
     "30772648692",
@@ -142,16 +143,6 @@
         "run:30771265827"
       ],
       "reason": "concrete-dict normalization preserves validation and passes Pyright 1.1.411"
-    },
-    {
-      "debt_id": "P5D-DEBT-03",
-      "evidence": [
-        "commit:8ede2414f45210b3b6139850d7d0578e080a08d9",
-        "run:30772507451",
-        "run:30772516479",
-        "local:100-consecutive-worker-recovery-passes"
-      ],
-      "reason": "claim and reclaim boundaries use observed scheduler time and fail closed at missed transitions"
     },
     {
       "debt_id": "P5D-DEBT-04",

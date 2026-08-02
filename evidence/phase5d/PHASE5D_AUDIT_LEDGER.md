@@ -98,3 +98,20 @@ Append-only record for the inert Curator deep-playbook candidate.
 - `P5D-DEBT-03` remains open at this entry until the exact candidate head passes repeated hosted
   Python 3.11, 3.12, and 3.14 runs. No authenticated-independence, adoption, release-readiness,
   production-readiness, deployment, promotion, or superiority claim is created.
+
+## Entry 8 — recovery-execution lease refinement
+
+- PR #64 run `30772864947` passed Python 3.11 and 3.14 but failed Python 3.12 at the new exact-job
+  assertion: the crash-claimed job remained `leased` after `Worker.run_once()` returned.
+- The refined root cause is two separate lease budgets being conflated. A 0.15-second lease is useful
+  for making the killed crash claim promptly reclaimable, but it is not a sound execution lease for
+  the recovery worker under hosted load. If the executor and heartbeat thread exceed that window,
+  stale completion is rejected correctly and the worker leaves the job leased for another attempt.
+- The successor keeps the 0.15-second crash lease, then opens a separate scheduler connection with a
+  5-second recovery lease and a 0.25-second heartbeat. The test still requires the exact killed job
+  to be reclaimed, completed, deduplicated, and cleared before the next iteration.
+- Local CPython 3.14 successor evidence: 100 consecutive process-kill sweeps passed in 110.855
+  seconds; the full worker module and Phase 5L reconciliation tests also passed; Ruff 0.16.0 passed;
+  and Pyright 1.1.411 reported zero findings on the changed Python files.
+- The failed run is retained. `P5D-DEBT-03` remains open pending repeated exact-successor hosted
+  Python 3.11, 3.12, and 3.14 passes.

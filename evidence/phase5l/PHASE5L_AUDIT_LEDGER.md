@@ -14,10 +14,11 @@
 - Stabilization commit `af9ac00a5959b96260fb3bcdfb0958ce0640ae04` and runs
   `30771264748`/`30771265827` support `P5D-DEBT-01`, `-02`, and `-04`.
 - Worker repair commit `8ede2414f45210b3b6139850d7d0578e080a08d9`, 100 consecutive
-  local repetitions, and runs `30772507451`/`30772516479` support `P5D-DEBT-03`.
+  local repetitions, and runs `30772507451`/`30772516479` remain valid evidence, but PR #64 run
+  `30772864947` exposed a recovery-execution lease expiry; `P5D-DEBT-03` remains open.
 - Exact release runs `30772648692`/`30772650299` support `P5D-DEBT-05` and the five
   integrated-validation debt exits.
-- Result: 10 resolved and 25 active; the partition is machine checked and digest bound.
+- Result: 9 resolved and 26 active; the partition is machine checked and digest bound.
 
 ## Entry 3 — dissent and limits
 

@@ -112,9 +112,18 @@ class WorkerTests(unittest.TestCase):
                         connection.close()
                     return str(job.payload["mission_id"])
 
-                self.assertTrue(
-                    Worker(queue, f"recovery-{index}", executor=execute).run_once()
-                )
+                recovery_queue = Scheduler(self.root, lease_seconds=5.0)
+                try:
+                    self.assertTrue(
+                        Worker(
+                            recovery_queue,
+                            f"recovery-{index}",
+                            executor=execute,
+                            heartbeat_interval=0.25,
+                        ).run_once()
+                    )
+                finally:
+                    recovery_queue.close()
                 self.assertEqual(queue.get(claimed_id).state, "done")
             self.assertTrue(all(job.state == "done" for job in queue.jobs()))
             connection = sqlite3.connect(effects)
