@@ -27,7 +27,7 @@
 
 The rows below remain the preserved point-in-time findings. Their current disposition is recorded
 additively in [`PHASE5L_DEBT_RECONCILIATION.md`](PHASE5L_DEBT_RECONCILIATION.md) and
-`evidence/phase5l/phase5_debt_reconciliation.json`: 9 items have later resolving evidence and 26
+`evidence/phase5l/phase5_debt_reconciliation.json`: 10 items have later resolving evidence and 25
 remain active. Historical findings and adverse receipts are not deleted or rewritten.
 
 ## Phase 5D carried-forward items

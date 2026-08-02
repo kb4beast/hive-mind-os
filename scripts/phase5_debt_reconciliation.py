@@ -37,6 +37,15 @@ RESOLUTIONS: dict[str, Resolution] = {
             "run:30771265827",
         ),
     },
+    "P5D-DEBT-03": {
+        "reason": "crash and recovery leases are separated and the exact successor passes repeated hosted matrices",
+        "evidence": (
+            "commit:349f717aaee0deb3b65ab761e16307ca48ad57db",
+            "run:30773159161",
+            "run:30773160521",
+            "local:100-consecutive-refined-worker-recovery-passes",
+        ),
+    },
     "P5D-DEBT-04": {
         "reason": "all three temporary write-capable Phase 5D workflows are absent",
         "evidence": (

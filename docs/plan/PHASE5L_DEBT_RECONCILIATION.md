@@ -3,7 +3,7 @@
 - **Subject release commit:** `0ff332249e7830464724ca9b5a0ebcc6fc43c741`
 - **Hosted exact-subject runs:** `30772648692`, `30772650299`
 - **Prior register:** 35 Phase 5D–5J items
-- **Disposition:** 9 resolved, 26 active
+- **Disposition:** 10 resolved, 25 active
 - **Authority and activation:** none; inert current-state evidence only
 
 ## Purpose
@@ -17,7 +17,7 @@ packets, audit ledgers, adverse runs, or historical active-debt lists. The machi
 
 The reconciliation resolves:
 
-- `P5D-DEBT-01`, `P5D-DEBT-02`, `P5D-DEBT-04`, and `P5D-DEBT-05` after stabilization;
+- `P5D-DEBT-01` through `P5D-DEBT-05` after stabilization and the refined worker repair;
 - `P5E-DEBT-04`, `P5F-DEBT-04`, and `P5G-DEBT-04` through fully green integrated evidence; and
 - `P5I-DEBT-04` and `P5J-DEBT-04` through the same exact release-head evidence.
 
@@ -26,9 +26,9 @@ repetition receipts. Passing Linux CI does not erase the Windows process-tier fa
 
 ## Still active
 
-Twenty-six items remain active. `P5D-DEBT-03` remains open after PR #64 run `30772864947`
-distinguished a recovery-execution lease expiry from the original missed-transition symptom. The
-next internally actionable set also covers:
+Twenty-five items remain active. The failed PR #64 run `30772864947` remains preserved; successor
+commit `349f717aaee0deb3b65ab761e16307ca48ad57db` resolved its distinct recovery-execution lease
+expiry in repeated runs `30773159161` and `30773160521`. The next internally actionable set covers:
 
 1. missing Integrator, Steward, and Optimizer outputs;
 2. chained Phase 5E–5J inventories and installed-wheel verification;

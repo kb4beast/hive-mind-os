@@ -19,7 +19,7 @@ externally retained independent actors.
 
 ## Advocate
 
-The repair commits and exact hosted runs satisfy nine literal exit conditions. Keeping those items
+The repair commits and exact hosted runs satisfy ten literal exit conditions. Keeping those items
 active would misstate current evidence and obscure the remaining work.
 
 ## Cross-examination
@@ -37,6 +37,6 @@ resolution to retained receipts. It does not query GitHub or authenticate the re
 
 ## Verdict
 
-`adapt`: adopt the additive current-state partition of 9 resolved and 26 active items. Preserve all
+`adapt`: adopt the additive current-state partition of 10 resolved and 25 active items. Preserve all
 earlier adverse evidence and historical active lists. Keep external and P14/P20 gates closed. This is
 not an independent adoption, release-readiness, production-readiness, or superiority verdict.

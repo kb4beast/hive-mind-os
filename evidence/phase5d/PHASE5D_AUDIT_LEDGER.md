@@ -115,3 +115,16 @@ Append-only record for the inert Curator deep-playbook candidate.
   and Pyright 1.1.411 reported zero findings on the changed Python files.
 - The failed run is retained. `P5D-DEBT-03` remains open pending repeated exact-successor hosted
   Python 3.11, 3.12, and 3.14 passes.
+
+## Entry 9 — worker recovery debt closure receipt
+
+- Exact successor: `349f717aaee0deb3b65ab761e16307ca48ad57db`.
+- Exact-head push run `30773159161`: Python 3.11, 3.12, and 3.14 plus static/type, build/SBOM,
+  CodeQL, and secret scanning passed; dependency review was correctly skipped for a push event.
+- Exact-head PR run `30773160521`: Python 3.11, 3.12, and 3.14 plus static/type, build/SBOM,
+  CodeQL, secret scanning, and dependency/license review passed.
+- Together with the retained adverse run, refined root-cause record, and 100 consecutive local
+  successor passes, these receipts satisfy the literal `P5D-DEBT-03` exit condition.
+- Closure is limited to the deterministic worker process-kill recovery test. It does not satisfy
+  `B-OPS-08`, hard isolation, authenticated independence, P14/P20, release readiness, production
+  readiness, deployment, promotion, or superiority.

@@ -11,12 +11,11 @@
     "superiority_established": false
   },
   "counts": {
-    "current_active": 26,
+    "current_active": 25,
     "prior_active": 35,
-    "resolved": 9
+    "resolved": 10
   },
   "current_active_debt_ids": [
-    "P5D-DEBT-03",
     "P5E-DEBT-01",
     "P5E-DEBT-02",
     "P5E-DEBT-03",
@@ -118,7 +117,7 @@
     "P5J-DEBT-04",
     "P5J-DEBT-05"
   ],
-  "reconciliation_digest": "sha256:729c4f6147e021aac0b1a97943576b936f4fc54980abbe0a72f270d4054c3d45",
+  "reconciliation_digest": "sha256:981832a1a900b98883c4eea3e052c666df5c084a6719038d6657a7c8b0357dcc",
   "record_type": "phase5-debt-reconciliation",
   "release_run_ids": [
     "30772648692",
@@ -143,6 +142,16 @@
         "run:30771265827"
       ],
       "reason": "concrete-dict normalization preserves validation and passes Pyright 1.1.411"
+    },
+    {
+      "debt_id": "P5D-DEBT-03",
+      "evidence": [
+        "commit:349f717aaee0deb3b65ab761e16307ca48ad57db",
+        "run:30773159161",
+        "run:30773160521",
+        "local:100-consecutive-refined-worker-recovery-passes"
+      ],
+      "reason": "crash and recovery leases are separated and the exact successor passes repeated hosted matrices"
     },
     {
       "debt_id": "P5D-DEBT-04",
