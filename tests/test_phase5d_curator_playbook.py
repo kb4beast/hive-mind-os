@@ -5,6 +5,7 @@ import inspect
 import math
 import unittest
 from pathlib import Path
+from types import MappingProxyType
 from unittest.mock import patch
 
 import hive_mind_os
@@ -52,7 +53,9 @@ from hive_mind_os.foundation.orchestrator_playbook import (
     compile_orchestrator_plan,
     example_orchestrator_request,
 )
-from hive_mind_os.foundation.orchestrator_playbook_contracts import validate_orchestrator
+from hive_mind_os.foundation.orchestrator_playbook_contracts import (
+    validate_orchestrator,
+)
 
 REPOSITORY = Path(__file__).parents[1]
 
@@ -562,6 +565,14 @@ class CuratorOutputTests(unittest.TestCase):
 
 
 class CuratorCompatibilityTests(unittest.TestCase):
+    def test_builder_envelope_normalization_accepts_read_only_mapping(self) -> None:
+        source = example_curator_request()["builder_envelope"]
+        normalized = curator_module._normalized_builder_envelope(MappingProxyType(source))
+
+        self.assertIsInstance(normalized, dict)
+        self.assertEqual(normalized, source)
+        self.assertIsNot(normalized, source)
+
     def test_builder_architect_and_orchestrator_still_compile_and_validate(self) -> None:
         builder = compile_builder_implementation(example_builder_request())
         self.assertTrue(validate_builder("builder-implementation-envelope-v1", builder).valid)
