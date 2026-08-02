@@ -73,3 +73,28 @@ Append-only record for the inert Curator deep-playbook candidate.
   full-suite, cross-version, build, security, and provenance verdict.
 - This entry does not resolve P5D-DEBT-03, authenticated independence, external adoption evidence,
   release readiness, production readiness, deployment authority, or any P5E–P5K completeness debt.
+
+## Entry 7 — worker recovery timing root cause and repair candidate
+
+- Historical hosted failures: Constitutional CI runs `30679862330` (Python 3.12) and
+  `30681039055` (Python 3.11) both reached the final assertion in
+  `test_seeded_process_kill_sweep_reclaims_without_duplicate_effects` with at least one queue job
+  still not `done`. The logs did not identify which claim/reclaim transition was skipped.
+- Root cause: the test used a fixed `time.monotonic()` sleep to predict expiry of leases whose
+  durable eligibility is evaluated by `Scheduler.clock.now()` (`time.time()` for the system
+  scheduler). A wall-clock correction can therefore leave the lease unexpired after the fixed
+  sleep. The test also accepted a crash-worker marker containing `none` and ignored the Boolean
+  result of the recovery worker, allowing a missed claim to surface only as the final ambiguous
+  queue-state failure.
+- Repair: wait until the claimed lease is observed expired through the scheduler clock, require a
+  nonempty and non-`none` crash claim, require the recovery worker to claim work, verify the exact
+  claimed job reaches `done`, and fail each iteration if any prior lease remains. Duplicate-effect,
+  final-state, and cleared-lease assertions remain unchanged.
+- Runtime scheduler semantics, lease duration, retry limits, and authority are unchanged. The test
+  now checks the durable state boundary directly instead of inferring it from another clock.
+- Local evidence on CPython 3.14: the repaired process-kill test passed 100 consecutive runs in
+  123.718 seconds; the complete three-test worker module passed; Ruff 0.16.0 passed the changed
+  file; and Pyright 1.1.411 completed with zero findings.
+- `P5D-DEBT-03` remains open at this entry until the exact candidate head passes repeated hosted
+  Python 3.11, 3.12, and 3.14 runs. No authenticated-independence, adoption, release-readiness,
+  production-readiness, deployment, promotion, or superiority claim is created.
