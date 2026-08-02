@@ -24,11 +24,49 @@ class WorkerTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def _read_claim_marker(self, marker: Path, *, timeout: float = 5.0) -> str:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                claimed_id = marker.read_text(encoding="utf-8")
+            except (FileNotFoundError, PermissionError):
+                claimed_id = ""
+            if claimed_id:
+                return claimed_id
+            time.sleep(0.01)
+        self.fail(f"crash worker did not publish a claim marker: {marker}")
+
+    def _wait_for_observed_lease_expiry(
+        self,
+        queue: Scheduler,
+        job_id: str,
+        *,
+        timeout: float = 5.0,
+    ) -> None:
+        job = queue.get(job_id)
+        self.assertEqual(job.state, "leased")
+        self.assertIsNotNone(job.lease_expiry)
+        lease_expiry = job.lease_expiry
+        assert lease_expiry is not None
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if queue.clock.now() > lease_expiry:
+                return
+            time.sleep(0.01)
+        self.fail(
+            "lease did not expire against the scheduler clock: "
+            f"job={job_id} expiry={lease_expiry} now={queue.clock.now()}"
+        )
+
     def test_seeded_process_kill_sweep_reclaims_without_duplicate_effects(self) -> None:
         queue = Scheduler(self.root, lease_seconds=0.15)
         effects = self.root / "effects.sqlite3"
         try:
             for index in range(3):
+                self.assertFalse(
+                    any(job.state == "leased" for job in queue.jobs()),
+                    "the prior recovery iteration left a leased job behind",
+                )
                 queue.enqueue(
                     "test",
                     {
@@ -52,13 +90,12 @@ class WorkerTests(unittest.TestCase):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                deadline = time.monotonic() + 5
-                while not marker.exists() and time.monotonic() < deadline:
-                    time.sleep(0.01)
-                self.assertTrue(marker.exists())
+                claimed_id = self._read_claim_marker(marker)
+                self.assertNotEqual(claimed_id, "none")
+                self.assertEqual(queue.get(claimed_id).lease_owner, "crash-worker")
                 process.terminate() if index < 2 else process.kill()
                 process.wait(timeout=5)
-                time.sleep(0.18)
+                self._wait_for_observed_lease_expiry(queue, claimed_id)
 
                 def execute(job, state_dir):
                     connection = sqlite3.connect(effects)
@@ -75,7 +112,10 @@ class WorkerTests(unittest.TestCase):
                         connection.close()
                     return str(job.payload["mission_id"])
 
-                Worker(queue, f"recovery-{index}", executor=execute).run_once()
+                self.assertTrue(
+                    Worker(queue, f"recovery-{index}", executor=execute).run_once()
+                )
+                self.assertEqual(queue.get(claimed_id).state, "done")
             self.assertTrue(all(job.state == "done" for job in queue.jobs()))
             connection = sqlite3.connect(effects)
             try:
