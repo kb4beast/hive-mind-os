@@ -26,7 +26,11 @@ from .curator_playbook_contracts import (
     RESOURCE_SECTIONS,
     validate_curator,
 )
-from .generation import GENERATOR_VERSION, compile_generation_zero_candidates, verify_generated_candidates
+from .generation import (
+    GENERATOR_VERSION,
+    compile_generation_zero_candidates,
+    verify_generated_candidates,
+)
 
 MAX_TEXT = 16_000
 MAX_NESTED_VALUES = 20_000
@@ -128,7 +132,7 @@ def _compile_unpinned_successor() -> dict[str, Any]:
     builtin_agent = _read_builtin_json(("agents", "curator.json"), BUILTIN_AGENT_DIGEST)
     _read_builtin_json(("prompts", "curator.json"), BUILTIN_PROMPT_DIGEST)
     builtin_skill = _read_builtin_json(("skills", "curator.json"), BUILTIN_SKILL_DIGEST)
-    builtin_instruction = _read_builtin_json(
+    _read_builtin_json(
         ("skills", "instructions", "curator.json"),
         BUILTIN_SKILL_INSTRUCTION_DIGEST,
     )
@@ -327,7 +331,9 @@ def _current_fingerprint(request: Mapping[str, Any]) -> str:
 
 
 def _normalized_builder_envelope(value: Mapping[str, Any]) -> dict[str, Any]:
-    normalized = deepcopy(value)
+    # Start from a concrete mutable container: callers may provide a read-only
+    # Mapping, while normalization deliberately replaces its outputs field.
+    normalized: dict[str, Any] = deepcopy(dict(value))
     outputs = normalized.get("outputs")
     if isinstance(outputs, Mapping):
         normalized["outputs"] = {

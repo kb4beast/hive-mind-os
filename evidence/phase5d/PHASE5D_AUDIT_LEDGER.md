@@ -52,3 +52,24 @@ Append-only record for the inert Curator deep-playbook candidate.
 - CI and ADR registry changes were included before the final Phase 5D inventory seal.
 - Temporary materialization automation is deleted from the published candidate tree.
 - Exact-head Constitutional CI remains required before the candidate can be called green.
+
+## Entry 6 — release-stack stabilization candidate
+
+- Successor base: `ca44bce4f118f62cd012693cd854b67bedef8846` (Phase 5K head).
+- P5D-DEBT-01 repair: Curator and Phase 5D test imports are formatted, and the unused
+  `builtin_instruction` local is removed without removing its packaged-resource digest check.
+- P5D-DEBT-02 repair: Builder-envelope normalization now copies a `Mapping` into a concrete
+  mutable dictionary before replacing the normalized outputs field; defensive-copy behavior and
+  exact-container validation remain covered by the focused suite.
+- P5D-DEBT-04 repair: the obsolete, branch-specific, `contents: write` Phase 5D materialization,
+  publication-remand, and cleanup workflows are removed. Their committed evidence and historical
+  GitHub run receipts remain retained.
+- Local evidence: Ruff `0.16.0` passed `src`, `tests`, and `scripts`; Pyright `1.1.411` completed
+  with zero errors; the Phase 5D focused suite passed 42 tests; the Phase 5K focused suite passed
+  12 tests; and the previously intermittent worker recovery test passed 40 consecutive local
+  repetitions.
+- The full local unittest discovery run exceeded the practical validation window and was stopped
+  without a result. It is not a passing receipt. Exact-head Constitutional CI remains the required
+  full-suite, cross-version, build, security, and provenance verdict.
+- This entry does not resolve P5D-DEBT-03, authenticated independence, external adoption evidence,
+  release readiness, production readiness, deployment authority, or any P5E–P5K completeness debt.
