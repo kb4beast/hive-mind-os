@@ -64,3 +64,13 @@ class CIContractTests(unittest.TestCase):
             "python -m pip install --disable-pip-version-check --no-deps -e .",
             workflow,
         )
+
+    def test_workflow_exercises_windows_with_python_3_12(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        windows_job = workflow.partition("  unit-tests-windows:\n")[2].partition(
+            "\n  quality:\n"
+        )[0]
+        self.assertTrue(windows_job, "Windows unit-test job is missing")
+        self.assertIn("runs-on: windows-latest", windows_job)
+        self.assertIn('python-version: ["3.12"]', windows_job)
+        self.assertIn(self._workflow_test_command(), windows_job)
