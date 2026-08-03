@@ -6,7 +6,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from hive_mind_os.receipts import FileReceiptValidator, ReceiptReference, sha256_digest
+from hive_mind_os.receipts import (
+    FileReceiptValidator,
+    ReceiptReference,
+    path_traverses_link_or_reparse_point,
+    sha256_digest,
+)
 
 
 class FileReceiptValidatorTests(unittest.TestCase):
@@ -95,6 +100,15 @@ class FileReceiptValidatorTests(unittest.TestCase):
         validation = self.validate(reference)
         self.assertFalse(validation.valid)
         self.assertIn("receipt path escapes the trusted root", validation.issues)
+
+    def test_link_detector_accepts_a_real_directory_and_rejects_a_symlink(self) -> None:
+        self.assertFalse(path_traverses_link_or_reparse_point(self.root))
+        linked = self.root / "linked"
+        try:
+            linked.symlink_to(self.root, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"symlink creation unavailable: {error}")
+        self.assertTrue(path_traverses_link_or_reparse_point(linked))
 
     def test_malformed_json_and_unknown_schema_fail(self) -> None:
         malformed_path = self.root / "malformed.json"

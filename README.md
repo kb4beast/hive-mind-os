@@ -126,6 +126,14 @@ The real model boundary, process sandbox, and local Git adapter are composed by
 repository-graph enforcement, mission control, and hard resource isolation remain later
 implementation slices.
 
+## Verify the checkout
+
+The CI gate is:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Deliver a verified local repository change
 
 The P05 vertical slice composes the model boundary, sandbox, local Git adapter, policy,

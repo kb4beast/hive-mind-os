@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
+import tempfile
+import unittest
 from pathlib import Path
-from typing import Any, Callable
-
-import pytest
 
 from hive_mind_os.package_system import (
     AgentManifest,
@@ -167,169 +166,149 @@ def _rewrite_and_rehash(root: Path, relative: str, document: object) -> None:
     _write_json(manifest_path, manifest)
 
 
-def test_third_party_agent_skill_tool_and_workflow_remain_inert(
-    tmp_path: Path,
-) -> None:
-    role_contracts_before = dict(ROLE_CONTRACTS)
-    lifecycle_before = DEFAULT_LIFECYCLE
-    root, _ = _third_party_package(tmp_path, "third-party")
-    catalog = PackageCatalog.from_roots((root,))
-    assert isinstance(catalog.component("agent.third-party"), AgentManifest)
-    assert isinstance(catalog.component("skill.third-party"), SkillManifest)
-    tool = catalog.component("tool.third-party")
-    assert isinstance(tool, ToolManifest)
-    assert not tool.side_effecting
-    assert isinstance(catalog.component("workflow.third-party"), WorkflowManifest)
-    assert not hasattr(catalog, "activate")
-    assert ROLE_CONTRACTS == role_contracts_before
-    assert DEFAULT_LIFECYCLE == lifecycle_before
+class PackageExtensionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_directory.cleanup)
+        self.tmp_path = Path(temporary_directory.name)
 
+    def test_third_party_agent_skill_tool_and_workflow_remain_inert(self) -> None:
+        role_contracts_before = dict(ROLE_CONTRACTS)
+        lifecycle_before = DEFAULT_LIFECYCLE
+        root, _ = _third_party_package(self.tmp_path, "third-party")
+        catalog = PackageCatalog.from_roots((root,))
+        assert isinstance(catalog.component("agent.third-party"), AgentManifest)
+        assert isinstance(catalog.component("skill.third-party"), SkillManifest)
+        tool = catalog.component("tool.third-party")
+        assert isinstance(tool, ToolManifest)
+        assert not tool.side_effecting
+        assert isinstance(catalog.component("workflow.third-party"), WorkflowManifest)
+        assert not hasattr(catalog, "activate")
+        assert ROLE_CONTRACTS == role_contracts_before
+        assert DEFAULT_LIFECYCLE == lifecycle_before
 
-@pytest.mark.parametrize(
-    ("skill_ids", "tool_ids", "match"),
-    [
-        (["skill.missing"], ["tool.boundary"], "missing component"),
-        (["workflow.boundary"], ["tool.boundary"], "expected .* to be skill"),
-        (["skill.boundary"], ["workflow.boundary"], "expected .* to be tool"),
-    ],
-)
-def test_missing_and_wrong_kind_agent_refs_fail_closed(
-    tmp_path: Path,
-    skill_ids: list[str],
-    tool_ids: list[str],
-    match: str,
-) -> None:
-    root, _ = _third_party_package(
-        tmp_path,
-        "boundary",
-        agent_skill_ids=skill_ids,
-        agent_tool_ids=tool_ids,
-    )
-    with pytest.raises(PackageValidationError, match=match):
-        PackageCatalog.from_roots((root,))
+    def test_missing_and_wrong_kind_agent_refs_fail_closed(self) -> None:
+        cases = (
+            (["skill.missing"], ["tool.boundary"], "missing component"),
+            (["workflow.boundary"], ["tool.boundary"], "expected .* to be skill"),
+            (["skill.boundary"], ["workflow.boundary"], "expected .* to be tool"),
+        )
+        for skill_ids, tool_ids, match in cases:
+            with self.subTest(match=match):
+                root, _ = _third_party_package(
+                    self.tmp_path,
+                    "boundary",
+                    agent_skill_ids=skill_ids,
+                    agent_tool_ids=tool_ids,
+                )
+                with self.assertRaisesRegex(PackageValidationError, match):
+                    PackageCatalog.from_roots((root,))
 
+    def test_skill_capability_escalation_fails_closed(self) -> None:
+        root, _ = _third_party_package(
+            self.tmp_path,
+            "escalation",
+            agent_capabilities=["read_repository"],
+            skill_capabilities=["read_repository", "network"],
+        )
+        with self.assertRaisesRegex(PackageValidationError, "escalates agent"):
+            PackageCatalog.from_roots((root,))
 
-def test_skill_capability_escalation_fails_closed(tmp_path: Path) -> None:
-    root, _ = _third_party_package(
-        tmp_path,
-        "escalation",
-        agent_capabilities=["read_repository"],
-        skill_capabilities=["read_repository", "network"],
-    )
-    with pytest.raises(PackageValidationError, match="escalates agent"):
-        PackageCatalog.from_roots((root,))
+    def test_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed(
+        self,
+    ) -> None:
+        provider, _ = _third_party_package(self.tmp_path, "provider")
+        consumer, _ = _third_party_package(
+            self.tmp_path,
+            "consumer",
+            agent_skill_ids=["skill.provider"],
+            agent_tool_ids=["tool.provider"],
+        )
+        with self.assertRaisesRegex(PackageValidationError, "undeclared package"):
+            PackageCatalog.from_roots((provider, consumer))
 
+        dependent_parent = self.tmp_path / "declared"
+        provider, provider_digest = _third_party_package(dependent_parent, "provider")
+        consumer, _ = _third_party_package(
+            dependent_parent,
+            "consumer",
+            agent_skill_ids=["skill.provider"],
+            agent_tool_ids=["tool.provider"],
+            requires=[
+                {
+                    "package_id": "provider",
+                    "version": "1.0.0",
+                    "manifest_digest": provider_digest,
+                }
+            ],
+        )
+        catalog = PackageCatalog.from_roots((consumer, provider))
+        agent = catalog.component("agent.consumer")
+        assert isinstance(agent, AgentManifest)
+        assert agent.skill_ids == ("skill.provider",)
 
-def test_undeclared_package_reach_is_rejected_but_exact_dependency_is_allowed(
-    tmp_path: Path,
-) -> None:
-    provider, _ = _third_party_package(tmp_path, "provider")
-    consumer, _ = _third_party_package(
-        tmp_path,
-        "consumer",
-        agent_skill_ids=["skill.provider"],
-        agent_tool_ids=["tool.provider"],
-    )
-    with pytest.raises(PackageValidationError, match="undeclared package"):
-        PackageCatalog.from_roots((provider, consumer))
+    def test_skill_instruction_and_tool_schema_resources_are_strict(self) -> None:
+        root, _ = _third_party_package(self.tmp_path, "hostile-resource")
+        instruction = json.loads((root / "instruction.json").read_text())
+        instruction.pop("deferred_obligations")
+        _rewrite_and_rehash(root, "instruction.json", instruction)
+        with self.assertRaisesRegex(PackageValidationError, "missing fields"):
+            PackageCatalog.from_roots((root,))
 
-    dependent_parent = tmp_path / "declared"
-    provider, provider_digest = _third_party_package(dependent_parent, "provider")
-    consumer, _ = _third_party_package(
-        dependent_parent,
-        "consumer",
-        agent_skill_ids=["skill.provider"],
-        agent_tool_ids=["tool.provider"],
-        requires=[
-            {
-                "package_id": "provider",
-                "version": "1.0.0",
-                "manifest_digest": provider_digest,
-            }
-        ],
-    )
-    catalog = PackageCatalog.from_roots((consumer, provider))
-    agent = catalog.component("agent.consumer")
-    assert isinstance(agent, AgentManifest)
-    assert agent.skill_ids == ("skill.provider",)
+        root, _ = _third_party_package(self.tmp_path, "hostile-schema")
+        schema = json.loads((root / "input.json").read_text())
+        schema["additionalProperties"] = True
+        _rewrite_and_rehash(root, "input.json", schema)
+        with self.assertRaisesRegex(PackageValidationError, "fail closed"):
+            PackageCatalog.from_roots((root,))
 
+        root, _ = _third_party_package(self.tmp_path, "referenced-schema")
+        schema = json.loads((root / "input.json").read_text())
+        schema["properties"]["path"]["$dynamicRef"] = "#/$defs/path"
+        schema["$defs"] = {"path": {"type": "string"}}
+        _rewrite_and_rehash(root, "input.json", schema)
+        with self.assertRaisesRegex(PackageValidationError, "schema references"):
+            PackageCatalog.from_roots((root,))
 
-def test_skill_instruction_and_tool_schema_resources_are_strict(
-    tmp_path: Path,
-) -> None:
-    root, _ = _third_party_package(tmp_path, "hostile-resource")
-    instruction = json.loads((root / "instruction.json").read_text())
-    instruction.pop("deferred_obligations")
-    _rewrite_and_rehash(root, "instruction.json", instruction)
-    with pytest.raises(PackageValidationError, match="missing fields"):
-        PackageCatalog.from_roots((root,))
-
-    root, _ = _third_party_package(tmp_path, "hostile-schema")
-    schema = json.loads((root / "input.json").read_text())
-    schema["additionalProperties"] = True
-    _rewrite_and_rehash(root, "input.json", schema)
-    with pytest.raises(PackageValidationError, match="fail closed"):
-        PackageCatalog.from_roots((root,))
-
-    root, _ = _third_party_package(tmp_path, "referenced-schema")
-    schema = json.loads((root / "input.json").read_text())
-    schema["properties"]["path"]["$dynamicRef"] = "#/$defs/path"
-    schema["$defs"] = {"path": {"type": "string"}}
-    _rewrite_and_rehash(root, "input.json", schema)
-    with pytest.raises(PackageValidationError, match="schema references"):
-        PackageCatalog.from_roots((root,))
-
-
-@pytest.mark.parametrize(
-    ("mutation", "match"),
-    [
-        (
-            lambda schema: schema["properties"].__setitem__(
-                "path", "not-a-schema"
+    def test_malformed_tool_schema_keywords_fail_closed(self) -> None:
+        cases = (
+            (
+                lambda schema: schema["properties"].__setitem__("path", "not-a-schema"),
+                "object or boolean schema",
             ),
-            "object or boolean schema",
-        ),
-        (
-            lambda schema: schema["properties"]["path"].__setitem__(
-                "minLength", "one"
+            (
+                lambda schema: schema["properties"]["path"].__setitem__(
+                    "minLength", "one"
+                ),
+                "nonnegative integer",
             ),
-            "nonnegative integer",
-        ),
-        (
-            lambda schema: schema["properties"]["path"].__setitem__(
-                "enum", "anything"
+            (
+                lambda schema: schema["properties"]["path"].__setitem__(
+                    "enum", "anything"
+                ),
+                "nonempty array",
             ),
-            "nonempty array",
-        ),
-        (
-            lambda schema: schema.__setitem__("$id", "not a uri"),
-            "absolute HTTP",
-        ),
-    ],
-)
-def test_malformed_tool_schema_keywords_fail_closed(
-    tmp_path: Path,
-    mutation: Callable[[dict[str, Any]], None],
-    match: str,
-) -> None:
-    root, _ = _third_party_package(tmp_path, "invalid-meta-schema")
-    schema = json.loads((root / "input.json").read_text())
-    mutation(schema)
-    _rewrite_and_rehash(root, "input.json", schema)
-    with pytest.raises(PackageValidationError, match=match):
-        PackageCatalog.from_roots((root,))
+            (lambda schema: schema.__setitem__("$id", "not a uri"), "absolute HTTP"),
+        )
+        for mutation, match in cases:
+            with self.subTest(match=match):
+                root, _ = _third_party_package(self.tmp_path, "invalid-meta-schema")
+                schema = json.loads((root / "input.json").read_text())
+                mutation(schema)
+                _rewrite_and_rehash(root, "input.json", schema)
+                with self.assertRaisesRegex(PackageValidationError, match):
+                    PackageCatalog.from_roots((root,))
 
-
-def test_source_docket_remains_fail_closed_after_extension_packaging() -> None:
-    audit = load_default_source_docket().audit()
-    assert not audit.release_ready
-    blockers = {issue.source_id for issue in audit.issues if issue.source_id}
-    assert {
-        "SRC-005",
-        "SRC-006",
-        "SRC-016",
-        "SRC-017",
-        "SRC-018",
-        "SRC-019",
-        "SRC-020",
-    } <= blockers
+    def test_source_docket_remains_fail_closed_after_extension_packaging(self) -> None:
+        audit = load_default_source_docket().audit()
+        assert not audit.release_ready
+        blockers = {issue.source_id for issue in audit.issues if issue.source_id}
+        assert {
+            "SRC-005",
+            "SRC-006",
+            "SRC-016",
+            "SRC-017",
+            "SRC-018",
+            "SRC-019",
+            "SRC-020",
+        } <= blockers

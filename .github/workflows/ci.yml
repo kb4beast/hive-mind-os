@@ -33,6 +33,31 @@ jobs:
       - name: Run deterministic test suite
         run: python -m unittest discover -s tests -v
 
+  unit-tests-windows:
+    name: unit-tests (Windows, Python 3.12)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - name: Checkout immutable workflow input
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Configure Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install exact local package
+        run: python -m pip install --disable-pip-version-check --no-deps -e .
+      - name: Compile bytecode
+        run: python -m compileall -q src tests
+      - name: Run deterministic test suite
+        run: python -m unittest discover -s tests -v
+
   quality:
     name: static-and-type-checks
     runs-on: ubuntu-latest

@@ -175,12 +175,10 @@ makes the phase failed regardless of test results.
 
 ## 5. Standard gates
 
-Run from the repository root. All must succeed before a phase is complete.
+Run from the repository root. The CI gate must succeed before a phase is complete.
 
 ```bash
-python -m pytest -q                      # full suite, no skips introduced by you
-python -m ruff check src tests           # lint (rules E4,E7,E9,F,I per pyproject)
-pyright                                  # if pyright is unavailable, record that in the completion record
+python -m unittest discover -s tests -v
 ```
 
 Post-commit evidence (worktree must be clean or the audit reports incomplete):

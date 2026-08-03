@@ -24,6 +24,7 @@ from .policy import Action, PolicyEngine
 from .receipts import (
     FileReceiptValidator,
     ReceiptReference,
+    path_traverses_link_or_reparse_point,
     portable_path_parts,
     sha256_digest,
 )
@@ -94,7 +95,7 @@ def _validated_delivery_target(
     parent = destination.parent
     if not parent.is_dir():
         raise ValueError("delivery parent must be an existing directory")
-    if parent.resolve() != parent:
+    if path_traverses_link_or_reparse_point(parent):
         raise ConfinementViolation(
             "delivery parent must not traverse a symlink or junction"
         )

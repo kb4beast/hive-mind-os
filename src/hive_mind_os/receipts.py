@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -43,6 +45,31 @@ def portable_path_parts(value: str) -> tuple[str, ...]:
     if normalized != value:
         raise ValueError("path must use canonical portable relative POSIX syntax")
     return tuple(raw_parts)
+
+
+def path_traverses_link_or_reparse_point(path: str | Path) -> bool:
+    """Return whether an existing path includes a symlink or Windows reparse point.
+
+    Do not compare ``Path.resolve()`` with the original spelling here: Windows can
+    canonicalize an ordinary 8.3 path alias without the path traversing a link.
+    """
+
+    candidate = Path(os.path.abspath(path))
+    current = Path(candidate.anchor)
+    reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    for component in candidate.parts[1:]:
+        current /= component
+        if current.is_symlink():
+            return True
+        if not reparse_point:
+            continue
+        try:
+            attributes = getattr(os.lstat(current), "st_file_attributes", 0)
+        except OSError:
+            return True
+        if attributes & reparse_point:
+            return True
+    return False
 
 
 class ReceiptResult(StrEnum):

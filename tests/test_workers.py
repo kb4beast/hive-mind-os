@@ -58,7 +58,12 @@ class WorkerTests(unittest.TestCase):
                 self.assertTrue(marker.exists())
                 process.terminate() if index < 2 else process.kill()
                 process.wait(timeout=5)
-                time.sleep(0.18)
+                lease_expiry = queue.get(
+                    marker.read_text(encoding="utf-8")
+                ).lease_expiry
+                self.assertIsNotNone(lease_expiry)
+                assert lease_expiry is not None
+                time.sleep(max(0.01, lease_expiry - time.time() + 0.01))
 
                 def execute(job, state_dir):
                     connection = sqlite3.connect(effects)
