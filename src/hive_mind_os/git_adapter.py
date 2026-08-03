@@ -927,6 +927,7 @@ class GitWorkspace:
             raise GitOperationFailed("delivery requires an isolated branch")
         delivery_root = _validated_delivery_target(out_dir, self.root)
         self._reverify_authenticated_source_custody()
+        self._validate_authenticated_source_receipt_bindings()
         if not self.status_clean():
             raise WorkspaceDirty("delivery requires a clean committed workspace")
         head_sha = self._git_text(
@@ -1061,6 +1062,21 @@ class GitWorkspace:
             raise GitOperationFailed(
                 "authenticated source evidence does not match the sealed workspace lock"
             )
+
+    def _validate_authenticated_source_receipt_bindings(self) -> None:
+        """Ensure every delivered receipt belongs to the source lock's mission/state."""
+
+        if self.source_lock is None:
+            return
+        for record in self.receipt_records:
+            if (
+                not isinstance(record, Mapping)
+                or record.get("mission_id") != self.source_lock.mission_id
+                or record.get("state_ref") != self.source_lock.state_ref
+            ):
+                raise GitOperationFailed(
+                    "authenticated source delivery receipt is outside the sealed mission state"
+                )
 
     def _copy_delivery_evidence(
         self,

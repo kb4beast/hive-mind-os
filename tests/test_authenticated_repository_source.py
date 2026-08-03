@@ -385,6 +385,17 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
             workspace.export_delivery(self.root / "non-strict-delivery")
         self.assertFalse((self.root / "non-strict-delivery").exists())
 
+    def test_delivery_rejects_receipts_outside_the_authenticated_source_state(self) -> None:
+        workspace = self.committed_authenticated_workspace("foreign-receipt")
+        foreign = dict(workspace.receipt_records[0])
+        foreign["mission_id"] = "M-foreign-receipt"
+        foreign["state_ref"] = "MISSION_STATE:M-foreign-receipt:1"
+        workspace.receipt_records.append(foreign)
+
+        with self.assertRaisesRegex(GitOperationFailed, "outside the sealed mission state"):
+            workspace.export_delivery(self.root / "foreign-receipt-delivery")
+        self.assertFalse((self.root / "foreign-receipt-delivery").exists())
+
     def test_delivery_rejects_source_evidence_that_expires_during_staging(self) -> None:
         workspace = self.committed_authenticated_workspace("staging")
         verify = self.harness.verifier.verify_for_materialization
