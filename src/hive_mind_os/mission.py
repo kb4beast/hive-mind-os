@@ -21,6 +21,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, TypeVar, cast
 from uuid import uuid4
 
+from .acceptance import (
+    AcceptanceSpecification,
+    AcceptanceSpecificationError,
+    normalize_acceptance_specifications,
+)
 from .autonomy import AutonomyBudget, BudgetExceeded, EpisodeAllowance
 from .contracts import tool_intent_digest
 from .curator import (
@@ -462,16 +467,30 @@ class CuratorCapabilities(_CapabilityBase):
         super().__init__(mission, Role.CURATOR, workspace)
         self.candidate = candidate
 
-    def run_tests(
+    def run_acceptance_check(
         self,
-        argv: Sequence[str],
+        check: AcceptanceCheck,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+        specification = (
+            None
+            if check.specification_id is None
+            else {
+                "id": check.specification_id,
+                "digest": str(check.specification_digest),
+            }
+        )
         return self._call(
             Action.RUN_COMMANDS,
             1,
-            lambda: self.workspace.run_tests(argv),
+            lambda: self.workspace.run_tests(
+                check.argv,
+                acceptance_specification=specification,
+            ),
             description="run Curator verification command",
-            details={"argv": list(argv)},
+            details={
+                "argv": list(check.argv),
+                "acceptance_specification": specification,
+            },
         )
 
     def verify_delivery(
@@ -497,6 +516,9 @@ class RepositoryMission:
         objective: str,
         *,
         acceptance_criteria: Sequence[str] = (),
+        acceptance_specifications: Sequence[
+            AcceptanceSpecification | Mapping[str, object]
+        ] = (),
         backend: AgentBackend | None = None,
         pin: str | None = None,
         output_dir: str | Path = "hive-mind-delivery",
@@ -516,11 +538,41 @@ class RepositoryMission:
         if not objective.strip():
             raise ValueError("objective is required")
         self.run_id = _run_id or str(uuid4())
+        try:
+            supplied_specifications = normalize_acceptance_specifications(
+                acceptance_specifications
+            )
+        except AcceptanceSpecificationError as error:
+            raise ValueError(f"invalid acceptance specifications: {error}") from None
+        declared_criteria = tuple(acceptance_criteria)
+        if supplied_specifications:
+            specification_criteria = tuple(
+                item.criterion for item in supplied_specifications
+            )
+            if declared_criteria and (
+                len(declared_criteria) != len(set(declared_criteria))
+                or set(declared_criteria) != set(specification_criteria)
+            ):
+                raise ValueError(
+                    "acceptance criteria must exactly match the typed specification set"
+                )
+            self.acceptance_specifications = supplied_specifications
+            declared_criteria = specification_criteria
+        elif declared_criteria:
+            raise ValueError(
+                "repository missions require typed executable acceptance "
+                "specifications for every acceptance criterion"
+            )
+        else:
+            raise ValueError(
+                "repository missions require at least one typed executable "
+                "acceptance specification"
+            )
         self.objective = Objective(
             objective,
             id=self.run_id,
             repository=str(self.repository),
-            acceptance_criteria=tuple(acceptance_criteria),
+            acceptance_criteria=declared_criteria,
         )
         self.backend = backend or ScriptedRepositoryBackend()
         self.pin = pin or _read_local_head(self.repository)
@@ -567,7 +619,10 @@ class RepositoryMission:
             config = {
                 "repository": str(self.repository),
                 "objective": objective,
-                "acceptance_criteria": list(acceptance_criteria),
+                "acceptance_criteria": list(self.objective.acceptance_criteria),
+                "acceptance_specifications": [
+                    item.to_dict() for item in self.acceptance_specifications
+                ],
                 "pin": self.pin,
                 "output_dir": str(self.output_dir),
                 "backend": "scripted",
@@ -647,6 +702,9 @@ class RepositoryMission:
                 "objective": self.objective.goal,
                 "repository": str(self.repository),
                 "output": str(final_output),
+                "acceptance_specifications": [
+                    item.to_dict() for item in self.acceptance_specifications
+                ],
             },
         )
 
@@ -873,8 +931,9 @@ class RepositoryMission:
                             objective=self.objective.goal,
                             acceptance_criteria=self.objective.acceptance_criteria,
                             base_workspace=explorer.workspace.root,
+                            acceptance_specifications=self.acceptance_specifications,
                         )
-                        review.seal(self._blind_acceptance_checks(result))
+                        review.seal(self._blind_acceptance_checks(explorer_test_argv))
                         verification_manifest = self._recorded_verification_manifest(
                             manifest
                         )
@@ -898,7 +957,7 @@ class RepositoryMission:
                         verdict, review_records = review.reproduce(
                             head_workspace=curator_workspace.root,
                             declared_paths=builder_declared_paths,
-                            command_runner=curator.run_tests,
+                            command_runner=curator.run_acceptance_check,
                             repository_test_argv=explorer_test_argv,
                             delivery_verifier=curator.verify_delivery,
                             provenance_resolves=self._provenance_resolves(),
@@ -2336,64 +2395,27 @@ class RepositoryMission:
 
     def _blind_acceptance_checks(
         self,
-        result: AgentResult,
+        repository_test_argv: Sequence[str],
     ) -> tuple[AcceptanceCheck, ...]:
-        for evidence in result.evidence:
-            content = evidence.payload.get("content")
-            if not isinstance(content, str):
-                continue
-            try:
-                document = json.loads(content)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(document, Mapping):
-                continue
-            raw_checks = document.get("acceptance_checks")
-            if not isinstance(raw_checks, list):
-                continue
-            checks: list[AcceptanceCheck] = []
-            for raw_check in raw_checks:
-                if not isinstance(raw_check, Mapping):
-                    raise MissionFailed(
-                        "Curator acceptance_checks entries must be objects"
-                    )
-                expected = _required_string(raw_check, "expected")
-                if expected not in {"succeeded", "failed"}:
-                    raise MissionFailed(
-                        "Curator acceptance check expected outcome is invalid"
-                    )
-                checks.append(
-                    AcceptanceCheck(
-                        name=_required_string(raw_check, "name"),
-                        argv=_string_argv(raw_check.get("argv")),
-                        expected=cast(CheckOutcome, expected),
-                    )
-                )
-            return tuple(checks)
+        """Seal supplied specifications, never model-selected criterion commands."""
 
-        if not isinstance(self.backend, ScriptedRepositoryBackend):
-            raise MissionFailed(
-                "model Curator blind output omitted acceptance_checks JSON"
+        checks = [
+            AcceptanceCheck(
+                "sealed-repository-regression",
+                tuple(repository_test_argv),
             )
-        checks = []
-        for index, action in enumerate(self._actions(result)):
-            name = action["action"]
-            if name == "run_tests":
-                checks.append(
-                    AcceptanceCheck(
-                        f"blind-repository-check-{index}",
-                        _string_argv(action.get("argv")),
-                    )
-                )
-            elif name == "run_criterion":
-                checks.append(
-                    AcceptanceCheck(
-                        f"blind-objective-check-{index}",
-                        _string_argv(action.get("argv")),
-                    )
-                )
-            elif name != "verify_delivery":
-                raise MissionFailed("Curator blind phase proposed an unsupported action")
+        ]
+        checks.extend(
+            AcceptanceCheck(
+                name=f"acceptance-{specification.identifier}",
+                argv=specification.argv,
+                expected=cast(CheckOutcome, specification.expected),
+                criteria=(specification.criterion,),
+                specification_id=specification.identifier,
+                specification_digest=specification.digest,
+            )
+            for specification in self.acceptance_specifications
+        )
         return tuple(checks)
 
     def _recorded_verification_manifest(

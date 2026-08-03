@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence
 from .receipts import portable_path_parts
 
 LEGACY_SCHEMA_NAMES = (
+    "acceptance-specification",
     "artifact-manifest",
     "capability-lease",
     "claim",

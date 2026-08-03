@@ -505,6 +505,7 @@ class GitWorkspace:
         role: Role,
         description: str,
         path_args: list[int] | None = None,
+        acceptance_specification: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         intent: dict[str, Any] = {
             "schema_version": 1,
@@ -525,6 +526,8 @@ class GitWorkspace:
             },
             "status": "proposed",
         }
+        if acceptance_specification is not None:
+            intent["acceptance_specification"] = dict(acceptance_specification)
         intent["action_digest"] = tool_intent_digest(intent)
         return runner.run(intent)
 
@@ -757,7 +760,12 @@ class GitWorkspace:
             "read committed head",
         )
 
-    def run_tests(self, argv: Sequence[str]) -> dict[str, Any]:
+    def run_tests(
+        self,
+        argv: Sequence[str],
+        *,
+        acceptance_specification: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         if not argv:
             raise ValueError("test argv is required")
         self._authorize(Action.RUN_COMMANDS)
@@ -776,6 +784,7 @@ class GitWorkspace:
                 mission_id=self.mission_id,
                 role=self.role,
                 description="run caller-declared repository tests",
+                acceptance_specification=acceptance_specification,
             )
         self._append_receipt(self.receipt_records, self.runner, receipt)
         return receipt

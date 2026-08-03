@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.contracts import tool_intent_digest, validate_contract
 from hive_mind_os.mission import RepositoryMission, ScriptedRepositoryBackend
 from hive_mind_os.mission_store import (
@@ -65,6 +66,13 @@ def _mission(
         fixture.root,
         "Fix the failing test",
         acceptance_criteria=("increment(1) returns 2",),
+        acceptance_specifications=(
+            AcceptanceSpecification(
+                "increment-returns-two",
+                "increment(1) returns 2",
+                FAST_CRITERION_ARGV,
+            ),
+        ),
         backend=_backend(),
         pin=fixture.commit_two,
         output_dir=output,

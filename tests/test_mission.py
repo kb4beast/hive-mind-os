@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.git_adapter import verify_delivery
 from hive_mind_os.mission import (
@@ -42,6 +43,19 @@ def _action(action: str, **payload: object) -> str:
         {"action": action, **payload},
         sort_keys=True,
         separators=(",", ":"),
+    )
+
+
+def _fixture_acceptance_specification() -> AcceptanceSpecification:
+    return AcceptanceSpecification(
+        "increment-returns-two",
+        "increment(1) returns 2",
+        (
+            sys.executable,
+            "-B",
+            "-c",
+            "from tiny_pkg.maths import increment; assert increment(1) == 2",
+        ),
     )
 
 
@@ -239,6 +253,7 @@ class RepositoryMissionTests(unittest.TestCase):
                 self.fixture.root,
                 "Fix the failing test",
                 acceptance_criteria=("increment(1) returns 2",),
+                acceptance_specifications=(_fixture_acceptance_specification(),),
                 backend=backend,
                 pin=self.fixture.commit_two,
                 output_dir=output,
@@ -599,6 +614,11 @@ class RepositoryMissionTests(unittest.TestCase):
             (str(Path(__file__).parents[1] / "src"), str(Path(__file__).parents[1]))
         )
         good_output = self.output("cli-good")
+        acceptance_specification = self.base / "increment-returns-two.json"
+        acceptance_specification.write_text(
+            json.dumps(_fixture_acceptance_specification().to_dict(), sort_keys=True),
+            encoding="utf-8",
+        )
         command = [
             sys.executable,
             "-m",
@@ -614,6 +634,8 @@ class RepositoryMissionTests(unittest.TestCase):
             "Fix the failing test",
             "--criterion",
             "increment(1) returns 2",
+            "--acceptance-spec",
+            str(acceptance_specification),
             "--output-dir",
             str(good_output),
         ]
@@ -666,6 +688,7 @@ class RepositoryMissionTests(unittest.TestCase):
         mission = RepositoryMission(
             self.fixture.root,
             "Fix the failing test",
+            acceptance_specifications=(_fixture_acceptance_specification(),),
             backend=ScriptedRepositoryBackend(),
             pin=self.fixture.commit_two,
             output_dir=linked / "delivery",

@@ -1035,6 +1035,7 @@ async def resume_mission(
         config["repository"],
         config["objective"],
         acceptance_criteria=tuple(config["acceptance_criteria"]),
+        acceptance_specifications=tuple(config.get("acceptance_specifications", ())),
         backend=backend,
         pin=config["pin"],
         output_dir=config["output_dir"],
