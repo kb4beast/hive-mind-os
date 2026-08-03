@@ -41,13 +41,13 @@
     "src/hive_mind_os/foundation/post_p13_adoption.py": "sha256:52ee9616c7de0ca23a4e65e4714b70ea65d8687b39981db2588c21a2e505d8dc",
     "src/hive_mind_os/foundation/post_p13_adoption_contracts.py": "sha256:965a06bdca4b24c436ee29ec037c1e1f5f72d311e06200fa31fae7cfbf986759",
     "tests/test_phase5i_post_p13_adoption.py": "sha256:e45d7850fefbdb84b107e7e778493ad53cc200b832e6035f99225848bd8af0be",
-    "tests/test_phase5m_evidence_inventory.py": "sha256:1ca699adfdca965edfd22433f6689fe6c2ad60d2a7fb22f2e88c31fb09540b9c"
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
   },
-  "inventory_digest": "sha256:3b5ebe25eacd52a407f4dc9fd23b95a37b55858135e398b635a62708ad538096",
+  "inventory_digest": "sha256:a2267799985c8f0755541eff91d5021f89c87973dc656e1c69601b534dbb1dd4",
   "phase": 5,
   "phase_item": "I",
   "predecessor": {
-    "inventory_digest": "sha256:8fe0edd8ddfb305abd2bae75342c0dd1e8dd24045f20995a3ba7f76107e1ce66",
+    "inventory_digest": "sha256:111ec56c58d8afeef994ed18a2ef8375ccd9c573afb6432e86f2d90c167f882c",
     "path": "evidence/phase5h/phase5h_role_deepening_inventory.json"
   },
   "production_ready": false,

@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from scripts.phase5d_curator_inventory import build_phase5d_inventory
 from scripts.phase5e_to_k_inventory import (
     PHASE5D_INVENTORY_PATH,
     _digest_json,
@@ -45,6 +46,12 @@ class Phase5EvidenceInventoryTests(unittest.TestCase):
             )
             predecessor_path = spec.output_path
             predecessor_digest = record["inventory_digest"]
+
+    def test_phase5d_root_matches_current_tree(self) -> None:
+        committed = json.loads(
+            (ROOT / PHASE5D_INVENTORY_PATH).read_text(encoding="utf-8")
+        )
+        self.assertEqual(build_phase5d_inventory(ROOT), committed)
 
     def test_each_inventory_digest_covers_the_complete_body(self) -> None:
         for record in self.records:

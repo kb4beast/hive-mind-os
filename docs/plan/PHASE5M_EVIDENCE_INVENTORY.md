@@ -38,7 +38,7 @@ The resulting JSON receipt is uploaded and attested with the existing wheel evid
 ## Local evidence
 
 - deterministic inventory tail:
-  `sha256:cd3b53358da061d40be56b475bcc598d7e691187fe8b8055ce1c790819ee74de`;
+  `sha256:4efbbe2e70e2d000fedde4dbf425df8ed5e7a6986778c8d52f0d3faf254d5ef8`;
 - 80 Phase 5E–5K inventory and contract tests passed;
 - Ruff passed on the new scripts and tests;
 - Pyright 1.1.411 reported zero findings;
@@ -49,6 +49,11 @@ The resulting JSON receipt is uploaded and attested with the existing wheel evid
 
 These receipts establish local implementation behavior only. They do not close the six debts until
 the exact committed head receives successful hosted push and pull-request runs.
+
+Initial exact-head runs `30773938617` and `30773951801` are retained failures. Python 3.11 and 3.14
+correctly detected that the new permanent CI step changed the workflow digest sealed by the older
+Phase 5A–5C inventories. The successor regenerates the complete Phase 5A–5K chain and updates each
+hard-coded A→D predecessor digest; those initial runs are not closure evidence.
 
 ## Threats and rollback
 

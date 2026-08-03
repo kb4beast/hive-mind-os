@@ -42,13 +42,13 @@
     "src/hive_mind_os/foundation/optimizer_playbook.py": "sha256:fa6644571b11498275b96b818004adb568ecc733310edcba207d13c6471c004e",
     "src/hive_mind_os/foundation/optimizer_playbook_contracts.py": "sha256:d4e2541d06a7bb544cd457bb2a67705bd130c5e92eb12ea05429fd8fa650c3d2",
     "tests/test_phase5g_optimizer_playbook.py": "sha256:4058d934b29d6335bbc698464a4b87f56ccbec8f8086482f7a08db49190fe56a",
-    "tests/test_phase5m_evidence_inventory.py": "sha256:1ca699adfdca965edfd22433f6689fe6c2ad60d2a7fb22f2e88c31fb09540b9c"
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
   },
-  "inventory_digest": "sha256:1258771ad87bd983deb86cf7b6c9e6e4af174187fb8dc22fbf873181f4931144",
+  "inventory_digest": "sha256:1f789f2205062027c7355f0550d12e0b2cb8abe7273d21caf5f88a9797ffed9f",
   "phase": 5,
   "phase_item": "G",
   "predecessor": {
-    "inventory_digest": "sha256:0aaebf9beb2bcb6556c7fcb7cc7abe2a5f1745b6df4a97579333e0676535ecdb",
+    "inventory_digest": "sha256:d0e9193279bedc48dea66d710bcf7a6e5889e2c5c3cac6c9854119b2d8d392fe",
     "path": "evidence/phase5f/phase5f_steward_inventory.json"
   },
   "production_ready": false,

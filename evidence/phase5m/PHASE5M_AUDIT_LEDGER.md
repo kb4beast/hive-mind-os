@@ -45,5 +45,22 @@ not authenticated external participants.
 - **Wheel digest:**
   `sha256:19b27f7688f7e523a099e93b3c55ac1fb2157a0b4145e4691619cce2bae6b75e`
 - **Inventory tail:**
-  `sha256:cd3b53358da061d40be56b475bcc598d7e691187fe8b8055ce1c790819ee74de`
+  `sha256:4efbbe2e70e2d000fedde4dbf425df8ed5e7a6986778c8d52f0d3faf254d5ef8`
 - **Limit:** the six debts remain active pending exact committed-head hosted receipts.
+
+## Entry 5 — failed hosted reconstruction and successor
+
+- **Failed receipts:** push run `30773938617` and pull-request run `30773951801` on
+  `5dc751af7c879768ce0ee59c4b8768470bd9fe29`
+- **Observed failure:** Python 3.11 and 3.14 each rejected the committed Phase 5A, Phase 5B, and
+  Phase 5C inventories as different from deterministic current-tree rebuilds.
+- **Root cause:** those historical generators deliberately include `.github/workflows/ci.yml` in
+  their implementation digests. Adding the Phase 5E–5K permanent verifier changed that protected
+  input, so the old artifacts became stale as designed.
+- **Successor action:** regenerate Phase 5A, update and regenerate the A→B predecessor digest,
+  repeat through Phase 5D, then regenerate Phase 5E–5K from the new verified Phase 5D tail.
+- **New chain digests:** Phase 5A
+  `sha256:6c8b884901bccab1988fd5fc9ffabecb231127c2af72aa4d897067e1e05e439c`;
+  Phase 5D `sha256:dc85f9729df4152f8a156f5ce779777711bda32b9b315d48f3a4e36a785052ad`;
+  Phase 5K `sha256:4efbbe2e70e2d000fedde4dbf425df8ed5e7a6986778c8d52f0d3faf254d5ef8`.
+- **Disposition:** retain both failed runs; require fresh exact-successor push and pull-request runs.

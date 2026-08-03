@@ -42,13 +42,13 @@
     "src/hive_mind_os/foundation/steward_playbook.py": "sha256:b819c2314900984f499b9bb0f5e8813200c31a9b4320b64ff518534ca25d4646",
     "src/hive_mind_os/foundation/steward_playbook_contracts.py": "sha256:c809bba6bd8b8e06511923cfc7a1d1bbfffa1bf123f93df96451d266938cfb3b",
     "tests/test_phase5f_steward_playbook.py": "sha256:13053452972c790a1d220ad0ed2bf7db5e337cea1df04f53faeda2cb84339e32",
-    "tests/test_phase5m_evidence_inventory.py": "sha256:1ca699adfdca965edfd22433f6689fe6c2ad60d2a7fb22f2e88c31fb09540b9c"
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
   },
-  "inventory_digest": "sha256:0aaebf9beb2bcb6556c7fcb7cc7abe2a5f1745b6df4a97579333e0676535ecdb",
+  "inventory_digest": "sha256:d0e9193279bedc48dea66d710bcf7a6e5889e2c5c3cac6c9854119b2d8d392fe",
   "phase": 5,
   "phase_item": "F",
   "predecessor": {
-    "inventory_digest": "sha256:bf16f3ba7a57fdc988f9893c409636361ea97cb4e1759f0f14a9d2109763f9f1",
+    "inventory_digest": "sha256:c2c9acaca57dec3227ca91249883c319b3d96d5219b034226e39f36b6cfcea0a",
     "path": "evidence/phase5e/phase5e_integrator_inventory.json"
   },
   "production_ready": false,
