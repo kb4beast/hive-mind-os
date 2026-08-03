@@ -37,18 +37,18 @@
   "implementation": {
     ".github/workflows/ci.yml": "sha256:95656026e760dec0055541f5bad71a018e45dc04bf33bded4394132b3254a429",
     "docs/architecture/PHASE5J_INDEPENDENT_ADOPTION_REVIEW_PACKET.md": "sha256:7233a43f69d13611de91020a13785ec7a2df0a1e75f9c5207499b4d990bd00a6",
-    "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
-    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
+    "scripts/phase5e_to_k_inventory.py": "sha256:8e3282af78779bcf2aab6514b806db99c5c28f846caefcb0e3ce8324ef79caf7",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:f549984f11d80d83fcbdc8ce0670b352b6ec3a13f6d9de49757c2f2eecd06157",
     "src/hive_mind_os/foundation/independent_adoption_review.py": "sha256:94004d9d44cf1d2e2a187f441db6b101189562a4de7d7aeece7da2d40df3610b",
     "src/hive_mind_os/foundation/independent_adoption_review_contracts.py": "sha256:155432020c412e69132f5afd3e5387bcf9d0b21bc2c8f8c8600b0b0c8294183b",
     "tests/test_phase5j_independent_adoption_review.py": "sha256:7b2ea618630708225e3eda1fd365beb276d191747dc778f197eec8390f42faa3",
     "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
   },
-  "inventory_digest": "sha256:c88588865cd83d9089d8c4362f828c532d8cd8ca4c3f78b6985ea3ba60bc8f4d",
+  "inventory_digest": "sha256:55dad7b923398dbe10fdc3eff6731b158f63a67e300157f20424195be3e0dc20",
   "phase": 5,
   "phase_item": "J",
   "predecessor": {
-    "inventory_digest": "sha256:9d5c78f1197b6f7fa7183f9b482aaf12267336ef5367fd98aec5aa6af95a704d",
+    "inventory_digest": "sha256:361f065c27629e660c834b5fb5429e0e3cb37e2fdd87c0d554038f38f4364e09",
     "path": "evidence/phase5i/phase5i_post_p13_adoption_inventory.json"
   },
   "production_ready": false,

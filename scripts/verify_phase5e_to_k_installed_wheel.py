@@ -8,6 +8,15 @@ from pathlib import Path
 from phase5e_to_k_inventory import _lookup, phase_specs
 
 from hive_mind_os.foundation.canonical import digest
+from hive_mind_os.foundation.full_role_output_contracts import (
+    OUTPUT_FIELDS_BY_ROLE,
+    validate_full_role_envelope,
+)
+from hive_mind_os.foundation.full_role_outputs import (
+    compile_integrator_full_outputs,
+    compile_optimizer_full_outputs,
+    compile_steward_full_outputs,
+)
 
 
 def main() -> int:
@@ -23,10 +32,14 @@ def main() -> int:
     for spec in phase_specs():
         imported_paths: list[str] = []
         for source_path in (spec.module_path, spec.contracts_path):
-            module_name = source_path.removeprefix("src/").removesuffix(".py").replace("/", ".")
+            module_name = (
+                source_path.removeprefix("src/").removesuffix(".py").replace("/", ".")
+            )
             module = importlib.import_module(module_name)
             if module.__file__ is None:
-                raise RuntimeError(f"Phase 5{spec.item} module {module_name} has no file")
+                raise RuntimeError(
+                    f"Phase 5{spec.item} module {module_name} has no file"
+                )
             imported_from = Path(module.__file__).resolve()
             if not imported_from.is_relative_to(installed_root):
                 raise RuntimeError(
@@ -66,12 +79,68 @@ def main() -> int:
             }
         )
 
+    supplementary_modules = (
+        "hive_mind_os.foundation.full_role_output_contracts",
+        "hive_mind_os.foundation.full_role_outputs",
+    )
+    supplementary_imports: list[str] = []
+    for module_name in supplementary_modules:
+        module = importlib.import_module(module_name)
+        if module.__file__ is None:
+            raise RuntimeError(f"Phase 5P module {module_name} has no file")
+        imported_from = Path(module.__file__).resolve()
+        if not imported_from.is_relative_to(installed_root):
+            raise RuntimeError(
+                f"Phase 5P imported from {imported_from}, not {installed_root}"
+            )
+        supplementary_imports.append(
+            imported_from.relative_to(installed_root).as_posix()
+        )
+
+    compilers = {
+        "integrator": compile_integrator_full_outputs,
+        "steward": compile_steward_full_outputs,
+        "optimizer": compile_optimizer_full_outputs,
+    }
+    full_role_results: list[dict[str, object]] = []
+    for role, compiler in compilers.items():
+        envelope = compiler()
+        validate_full_role_envelope(envelope)
+        if tuple(envelope["outputs"]) != OUTPUT_FIELDS_BY_ROLE[role]:
+            raise RuntimeError(f"installed Phase 5P {role} output order drifted")
+        if any(envelope["claims"].values()):
+            raise RuntimeError(f"installed Phase 5P {role} claim escalated")
+        for field, output in envelope["outputs"].items():
+            if output["authority"] != {
+                "authority": "none",
+                "execution_authorized": False,
+                "release_authorized": False,
+            }:
+                raise RuntimeError(
+                    f"installed Phase 5P {role}.{field} authority escalated"
+                )
+        full_role_results.append(
+            {
+                "role": role,
+                "envelope_digest": envelope["envelope_digest"],
+                "output_count": len(envelope["outputs"]),
+                "output_fields": list(envelope["outputs"]),
+                "authority_added": False,
+                "execution_performed": False,
+            }
+        )
+
     result = {
         "schema_version": 1,
         "verification": "phase5e-to-k-installed-wheel",
         "installed_root": str(installed_root),
         "phase_count": len(results),
         "phases": results,
+        "full_role_output_count": sum(
+            len(fields) for fields in OUTPUT_FIELDS_BY_ROLE.values()
+        ),
+        "full_role_outputs": full_role_results,
+        "supplementary_imported_paths": supplementary_imports,
         "authenticated_independence_claimed": False,
         "release_ready": False,
         "production_ready": False,

@@ -1,0 +1,159 @@
+{
+  "authenticated_independence_claimed": false,
+  "authority_added": false,
+  "base_head": "b82c1a2b9cb83e5f4207387ae279f0720c66fb00",
+  "deployment_authorized": false,
+  "execution_performed": false,
+  "external_dependencies_added": 0,
+  "external_sources_added": 0,
+  "implementation": {
+    "scripts/phase5e_to_k_inventory.py": "sha256:8e3282af78779bcf2aab6514b806db99c5c28f846caefcb0e3ce8324ef79caf7",
+    "scripts/phase5p_full_role_output_inventory.py": "sha256:a97c88e7b67eb4fb99a40f0e2715f0ddfc5ba6e14e0c77cc6f680d95316f7818",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:f549984f11d80d83fcbdc8ce0670b352b6ec3a13f6d9de49757c2f2eecd06157",
+    "src/hive_mind_os/foundation/full_role_output_contracts.py": "sha256:889542635d16d71ebcdc9c3b0602871282918a7dc274516cbe1425fdc8c8b19d",
+    "src/hive_mind_os/foundation/full_role_outputs.py": "sha256:031ad6f11456d4f9e5b2e5980c559950434db5ccc40c9b209ea0f4b8bf168f47",
+    "tests/test_phase5p_full_role_output_inventory.py": "sha256:2b8fe1b5cd71287c4503943f71f22791958415123378819640cd75ffa9838395",
+    "tests/test_phase5p_full_role_outputs.py": "sha256:662455ae5136dfbcb135723d0f8c1a624e7053dba8444a26c1681913cbcaf839"
+  },
+  "inventory_digest": "sha256:afb7a7d54357c5b50d6db276b064b97f1a803b33e495fd15adca455b0e5bdd38",
+  "output_count": 22,
+  "production_ready": false,
+  "promotion_authorized": false,
+  "record_type": "phase5p-full-role-output-inventory",
+  "release_ready": false,
+  "role_count": 3,
+  "roles": {
+    "integrator": {
+      "claims": {
+        "authenticated_independence": false,
+        "deployment_authorized": false,
+        "execution_performed": false,
+        "learning_established": false,
+        "production_ready": false,
+        "promotion_authorized": false,
+        "release_ready": false,
+        "superiority_established": false
+      },
+      "envelope_digest": "sha256:204c2afaf9ed89f18c4b5cd31cfa9b1ebbbf0105fb11bb507e8fe451fce93ed5",
+      "output_digests": {
+        "adapter_replacement_analysis": "sha256:059aae7e3ba936cc069b08b97f17462fea0d300ed6bea8a39f7e3cf842abe0b4",
+        "contract_inventory": "sha256:a6cbab7d73689c497d4d860bbb818d0ee3bdfaf3ad3a6e81bdeba0035aca48e3",
+        "data_lineage": "sha256:0b11eca2d3db652d85306eba48d0f2208cedfc0d476a0ec46911c47370c91bae",
+        "dependency_graph": "sha256:738991ffa983b65e02732d78b37c4d054ba1f7e01acf6c516509350fadf44f55",
+        "integration_receipt": "sha256:b172375969ed5c71a2debc7f793be39a8735efb9afffa2718007a3deb5c3913a",
+        "migration_ordering": "sha256:5a07e9663bc5d2fd0c019eb112582179d3106cad53aed06b9d32f086b4584752",
+        "rollback_mapping": "sha256:4e964eb187bf36658f557a843753ea8e64eeedcd9ee29b9c4c9deac1ec05b295"
+      },
+      "output_fields": [
+        "contract_inventory",
+        "dependency_graph",
+        "data_lineage",
+        "adapter_replacement_analysis",
+        "migration_ordering",
+        "rollback_mapping",
+        "integration_receipt"
+      ],
+      "output_schema_versions": {
+        "adapter_replacement_analysis": "phase5p-integrator-adapter-replacement-analysis/v1",
+        "contract_inventory": "phase5p-integrator-contract-inventory/v1",
+        "data_lineage": "phase5p-integrator-data-lineage/v1",
+        "dependency_graph": "phase5p-integrator-dependency-graph/v1",
+        "integration_receipt": "phase5p-integrator-integration-receipt/v1",
+        "migration_ordering": "phase5p-integrator-migration-ordering/v1",
+        "rollback_mapping": "phase5p-integrator-rollback-mapping/v1"
+      },
+      "schema_version": "phase5p-integrator-full-output-envelope/v1",
+      "scope_digest": "sha256:854cae78f87e8efc0ba829a24bae87a1f81ba2a8ec0fb91250636a1cfe17ba5e"
+    },
+    "optimizer": {
+      "claims": {
+        "authenticated_independence": false,
+        "deployment_authorized": false,
+        "execution_performed": false,
+        "learning_established": false,
+        "production_ready": false,
+        "promotion_authorized": false,
+        "release_ready": false,
+        "superiority_established": false
+      },
+      "envelope_digest": "sha256:4606ef0e652d2b5912c155309afa9b7904b7fc4f9fc9f24dcd024b10955fc6aa",
+      "output_digests": {
+        "comparator_results": "sha256:2511ee1305d1b2d876160cdb8224a79e125340a9688c91d3b23b55287ffe5688",
+        "experiment_design": "sha256:bd540327308804c15ae0964779d8257264f0f86e32a922d483403120f29c8ba7",
+        "experiment_receipts": "sha256:e6f6256eff6cae0a62118a9718d5cb248345be00b379fe3e9f20895e63960777",
+        "improvement_proposals": "sha256:a07a45bfb94c77426b0e888ae2761c574853428d840223d5a7076dbfb4975134",
+        "outcome_metrics": "sha256:29d7cff83a88a8ac442dd33be60d0d400ee602ef70a058f386f5b18a8a14cafc",
+        "regression_results": "sha256:cfef3cf0aad5bec12bde6828bf6c4deea47bb3eb2f200b03d8ab1921ccbef36f",
+        "resource_budget": "sha256:92b102a1d8b9bbef352f53979a4f83e5c2e08ad6f5720baf6902fa930e89b3c9",
+        "rollback_exercise": "sha256:44eb5f31a735666c083fe978e8fc577e0930f40455c1514c8831f411ea32aa82"
+      },
+      "output_fields": [
+        "outcome_metrics",
+        "experiment_design",
+        "resource_budget",
+        "comparator_results",
+        "regression_results",
+        "experiment_receipts",
+        "improvement_proposals",
+        "rollback_exercise"
+      ],
+      "output_schema_versions": {
+        "comparator_results": "phase5p-optimizer-comparator-results/v1",
+        "experiment_design": "phase5p-optimizer-experiment-design/v1",
+        "experiment_receipts": "phase5p-optimizer-experiment-receipts/v1",
+        "improvement_proposals": "phase5p-optimizer-improvement-proposals/v1",
+        "outcome_metrics": "phase5p-optimizer-outcome-metrics/v1",
+        "regression_results": "phase5p-optimizer-regression-results/v1",
+        "resource_budget": "phase5p-optimizer-resource-budget/v1",
+        "rollback_exercise": "phase5p-optimizer-rollback-exercise/v1"
+      },
+      "schema_version": "phase5p-optimizer-full-output-envelope/v1",
+      "scope_digest": "sha256:26d849ca54241eb2ce21ad845490d343bbb1bac27b6d9207f2eef4955b70d531"
+    },
+    "steward": {
+      "claims": {
+        "authenticated_independence": false,
+        "deployment_authorized": false,
+        "execution_performed": false,
+        "learning_established": false,
+        "production_ready": false,
+        "promotion_authorized": false,
+        "release_ready": false,
+        "superiority_established": false
+      },
+      "envelope_digest": "sha256:c8ec09be8f7946d369d23998a4fead2aba771b1a2f230f81ed9e8e1c38715f46",
+      "output_digests": {
+        "dependency_health": "sha256:bdae8ff1fa94e6d39e883af621e0ad8eaba7b8fd0bc1d41c9b485aa1ebb643d8",
+        "evidence_integrity": "sha256:63d3dae1c50ecd7da007c10dfc0914ece5d83ede10ee9156f8ca1b09e7f15c55",
+        "interruption_recovery": "sha256:32db6807d81e549894a83a9f9eec579e62b95775e8143037ba67e6c33bae52fe",
+        "maintenance_schedule": "sha256:9fc7d92e3eadbc608e5559d644bb1b8c63229cc396967e052d3d8e8d5332b7ff",
+        "observability_inventory": "sha256:640b3b0b25a7c1e019ae9dfa5bae8199ab52864530cacd085c2308224780f178",
+        "operational_runbook": "sha256:11726a70d97cb8cb54c8c2aaae57ea814529ebca62dfbbc8521984931ebfdbb7",
+        "reliability_assessment": "sha256:2d42ba0f6967bf893c17a2d3628fcee2968da9642ccc8b611c3b15b733a2b814"
+      },
+      "output_fields": [
+        "reliability_assessment",
+        "observability_inventory",
+        "dependency_health",
+        "operational_runbook",
+        "interruption_recovery",
+        "evidence_integrity",
+        "maintenance_schedule"
+      ],
+      "output_schema_versions": {
+        "dependency_health": "phase5p-steward-dependency-health/v1",
+        "evidence_integrity": "phase5p-steward-evidence-integrity/v1",
+        "interruption_recovery": "phase5p-steward-interruption-recovery/v1",
+        "maintenance_schedule": "phase5p-steward-maintenance-schedule/v1",
+        "observability_inventory": "phase5p-steward-observability-inventory/v1",
+        "operational_runbook": "phase5p-steward-operational-runbook/v1",
+        "reliability_assessment": "phase5p-steward-reliability-assessment/v1"
+      },
+      "schema_version": "phase5p-steward-full-output-envelope/v1",
+      "scope_digest": "sha256:b7249b15b02bb373b3fdbec890cc15f926ea5c2159a4a2738a21d8a876516297"
+    }
+  },
+  "runtime_binding_added": false,
+  "schema_version": 1,
+  "superiority_claimed": false
+}
