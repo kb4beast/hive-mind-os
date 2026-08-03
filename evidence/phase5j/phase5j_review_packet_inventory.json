@@ -1,0 +1,61 @@
+{
+  "authenticated_independence_claimed": false,
+  "authority_added": false,
+  "base_head": "8ca34497051a9b50927f3615df49506f79d0046e",
+  "boundary_assertions": {
+    "outputs.decision_templates.selected_decision": "none",
+    "outputs.decision_templates.signed_decision_present": false,
+    "outputs.external_handoff.authority": "none",
+    "outputs.external_handoff.deployment_authorized": false,
+    "outputs.external_handoff.handoff_status": "external-action-required",
+    "outputs.external_handoff.p14_eligible": false,
+    "outputs.external_handoff.release_ready": false,
+    "outputs.review_packet_manifest.review_status": "not-run"
+  },
+  "commands_executed_by_inventory": false,
+  "component": "independent-adoption-review-packet",
+  "contract_reproduction": {
+    "envelope_digest": "sha256:0d9c4d8fbd2d2ea57213f8bcad3b38953197378c8359d982b6cc0f988bcea376",
+    "envelope_valid": true,
+    "output_digests": {
+      "decision_templates": "sha256:23ecae2fcdfa141e56b03d346978803be706bfd15aa419861988b4314d6c2279",
+      "external_handoff": "sha256:ecde89b9832aa2f9c0a06cd33eb88b22ca5230a13ab0098f4c918fc9b401aee5",
+      "participant_requirements": "sha256:97a65614b09c7e990c59429d7ee6a36cfaba169cee25a8482ea13206ef68ca1e",
+      "review_packet_manifest": "sha256:1ea0097c19d80f3ebab95f0a87bcd59f141eb5650767d3f316ee3785652b812d"
+    },
+    "output_fields": [
+      "review_packet_manifest",
+      "participant_requirements",
+      "decision_templates",
+      "external_handoff"
+    ],
+    "request_digest": "sha256:181207efcad7595888b010c5e29f470b68cdcad72d2e803407e127d3387ed110",
+    "request_valid": true
+  },
+  "deployment_authorized": false,
+  "external_dependencies_added": 0,
+  "implementation": {
+    ".github/workflows/ci.yml": "sha256:71c8db71879efade996210ba1567d088d2303789a0852fcc2eaa7e358b6787b8",
+    "docs/architecture/PHASE5J_INDEPENDENT_ADOPTION_REVIEW_PACKET.md": "sha256:7233a43f69d13611de91020a13785ec7a2df0a1e75f9c5207499b4d990bd00a6",
+    "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
+    "src/hive_mind_os/foundation/independent_adoption_review.py": "sha256:94004d9d44cf1d2e2a187f441db6b101189562a4de7d7aeece7da2d40df3610b",
+    "src/hive_mind_os/foundation/independent_adoption_review_contracts.py": "sha256:155432020c412e69132f5afd3e5387bcf9d0b21bc2c8f8c8600b0b0c8294183b",
+    "tests/test_phase5j_independent_adoption_review.py": "sha256:7b2ea618630708225e3eda1fd365beb276d191747dc778f197eec8390f42faa3",
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
+  },
+  "inventory_digest": "sha256:607e7d5db45250e21952ee48eda3d40d66fbf097f373524fec5f9ddbf4a04eb7",
+  "phase": 5,
+  "phase_item": "J",
+  "predecessor": {
+    "inventory_digest": "sha256:a2267799985c8f0755541eff91d5021f89c87973dc656e1c69601b534dbb1dd4",
+    "path": "evidence/phase5i/phase5i_post_p13_adoption_inventory.json"
+  },
+  "production_ready": false,
+  "promotion_authorized": false,
+  "release_ready": false,
+  "runtime_binding_added": false,
+  "schema_version": 1,
+  "superiority_claimed": false,
+  "tests_executed_by_inventory": false
+}

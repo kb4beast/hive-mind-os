@@ -26,7 +26,7 @@ from scripts.phase1_surface_inventory import build_inventory, cli_inventory
 OUTPUT_PATH = Path("evidence/phase5b/phase5b_architect_inventory.json")
 BASE_HEAD = "ed1c0a76c52335e7cf92ba92b2f4d401116f85e1"
 PHASE5A_INVENTORY_DIGEST = (
-    "sha256:1319b302b7e895329a3e2ad3c123fcb0ff2db6c62a16ad89e002774fa033fc95"
+    "sha256:6c8b884901bccab1988fd5fc9ffabecb231127c2af72aa4d897067e1e05e439c"
 )
 
 

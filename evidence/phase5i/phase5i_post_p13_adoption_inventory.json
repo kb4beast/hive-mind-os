@@ -1,0 +1,60 @@
+{
+  "authenticated_independence_claimed": false,
+  "authority_added": false,
+  "base_head": "8ca34497051a9b50927f3615df49506f79d0046e",
+  "boundary_assertions": {
+    "outputs.adoption_disposition.authority": "none",
+    "outputs.adoption_disposition.deployment_authorized": false,
+    "outputs.adoption_disposition.disposition": "awaiting-independent-adoption",
+    "outputs.adoption_disposition.p14_eligible": false,
+    "outputs.adoption_disposition.p20_eligible": false,
+    "outputs.adoption_disposition.production_ready": false,
+    "outputs.adoption_disposition.release_ready": false
+  },
+  "commands_executed_by_inventory": false,
+  "component": "post-p13-adoption-docket",
+  "contract_reproduction": {
+    "envelope_digest": "sha256:7fc787d28928015196cea711d55739412436e8102be585b8bf4fcb18af38c7cb",
+    "envelope_valid": true,
+    "output_digests": {
+      "adoption_disposition": "sha256:440e9eefa437a92ba103796b1e05b0970157013e3aa3e2b15c151ad8c2985ecf",
+      "adoption_requirements": "sha256:e8b11d9831eb94b9be24433230442300d50802da4c93f97b002f5ccb565f645a",
+      "document_manifest": "sha256:9e50069f19b2c9ff25b2bd2b24322478ec4ae27d7bf287278c9914489d1f66fb",
+      "external_input_register": "sha256:7de5de599a5f5b24aecdf7dfd97316482008f0eb9f07e4c61e640c6e95decb8e"
+    },
+    "output_fields": [
+      "document_manifest",
+      "adoption_requirements",
+      "external_input_register",
+      "adoption_disposition"
+    ],
+    "request_digest": "sha256:fc8cf49e1e84e2d9ee93500eab624058e8a9027b366164fa4230ddb8eef7f54f",
+    "request_valid": true
+  },
+  "deployment_authorized": false,
+  "external_dependencies_added": 0,
+  "implementation": {
+    ".github/workflows/ci.yml": "sha256:71c8db71879efade996210ba1567d088d2303789a0852fcc2eaa7e358b6787b8",
+    "docs/architecture/PHASE5I_POST_P13_ADOPTION_DOCKET.md": "sha256:71d304febfefed8a6eb0bd634332c708a45d510483b6b252337289419e6485fa",
+    "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
+    "src/hive_mind_os/foundation/post_p13_adoption.py": "sha256:52ee9616c7de0ca23a4e65e4714b70ea65d8687b39981db2588c21a2e505d8dc",
+    "src/hive_mind_os/foundation/post_p13_adoption_contracts.py": "sha256:965a06bdca4b24c436ee29ec037c1e1f5f72d311e06200fa31fae7cfbf986759",
+    "tests/test_phase5i_post_p13_adoption.py": "sha256:e45d7850fefbdb84b107e7e778493ad53cc200b832e6035f99225848bd8af0be",
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
+  },
+  "inventory_digest": "sha256:a2267799985c8f0755541eff91d5021f89c87973dc656e1c69601b534dbb1dd4",
+  "phase": 5,
+  "phase_item": "I",
+  "predecessor": {
+    "inventory_digest": "sha256:111ec56c58d8afeef994ed18a2ef8375ccd9c573afb6432e86f2d90c167f882c",
+    "path": "evidence/phase5h/phase5h_role_deepening_inventory.json"
+  },
+  "production_ready": false,
+  "promotion_authorized": false,
+  "release_ready": false,
+  "runtime_binding_added": false,
+  "schema_version": 1,
+  "superiority_claimed": false,
+  "tests_executed_by_inventory": false
+}

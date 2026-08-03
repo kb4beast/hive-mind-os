@@ -1,0 +1,62 @@
+{
+  "authenticated_independence_claimed": false,
+  "authority_added": false,
+  "base_head": "8ca34497051a9b50927f3615df49506f79d0046e",
+  "boundary_assertions": {
+    "outputs.evidence_register.signed_decision_present": false,
+    "outputs.evidence_requirements.external_retention_status": "missing",
+    "outputs.evidence_requirements.trust_anchor_status": "missing",
+    "outputs.intake_disposition.authority": "none",
+    "outputs.intake_disposition.deployment_authorized": false,
+    "outputs.intake_disposition.disposition": "awaiting-external-evidence",
+    "outputs.intake_disposition.p14_eligible": false,
+    "outputs.intake_disposition.release_ready": false,
+    "outputs.verification_policy.policy_status": "defined-not-executed"
+  },
+  "commands_executed_by_inventory": false,
+  "component": "external-adoption-evidence-intake",
+  "contract_reproduction": {
+    "envelope_digest": "sha256:8f401014e69210d9ac7a47ad0cbcfbbba11cb8ef9ceb5062595f449856f9108f",
+    "envelope_valid": true,
+    "output_digests": {
+      "evidence_register": "sha256:743ce48ad3585124fdfa6f5679dbe64b84893bdd7f5ee7112fab3df2a12188d8",
+      "evidence_requirements": "sha256:920d0ee2f08c17ce5d35a155a3f1ff625c203db5b4a83d00ab897e02d34b6580",
+      "intake_disposition": "sha256:2b2dca70b4b820a836054d264f3cf4728d586bc9b2d3186300c40b34f3542888",
+      "verification_policy": "sha256:6892cb4511e7934127315bb8043e30439b6ac83e745830aef2615271709c9038"
+    },
+    "output_fields": [
+      "evidence_requirements",
+      "verification_policy",
+      "evidence_register",
+      "intake_disposition"
+    ],
+    "request_digest": "sha256:757bbaa94e003c7fcd0f3101a8218daeb49b550b8a9123cc0fe7b1fb0e7adf94",
+    "request_valid": true
+  },
+  "deployment_authorized": false,
+  "external_dependencies_added": 0,
+  "implementation": {
+    ".github/workflows/ci.yml": "sha256:71c8db71879efade996210ba1567d088d2303789a0852fcc2eaa7e358b6787b8",
+    "docs/architecture/PHASE5K_EXTERNAL_ADOPTION_EVIDENCE_INTAKE.md": "sha256:00ee35cd6c876f7b783d70a003e850bd070212663a4e8fdad076823af27ee227",
+    "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
+    "src/hive_mind_os/foundation/external_adoption_evidence.py": "sha256:f08cac64f477fcbcbdd6438826412d02a00e6c0537cf225f3af108f633291256",
+    "src/hive_mind_os/foundation/external_adoption_evidence_contracts.py": "sha256:21e64d04ac27b27f2b365306496a3d3edf9adafdc5941ab2a145246aaf9df0ad",
+    "tests/test_phase5k_external_adoption_evidence.py": "sha256:53f680c0f0d7f4828b87edc420f10400800765314de94bbd29ce036e0b18c734",
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
+  },
+  "inventory_digest": "sha256:4efbbe2e70e2d000fedde4dbf425df8ed5e7a6986778c8d52f0d3faf254d5ef8",
+  "phase": 5,
+  "phase_item": "K",
+  "predecessor": {
+    "inventory_digest": "sha256:607e7d5db45250e21952ee48eda3d40d66fbf097f373524fec5f9ddbf4a04eb7",
+    "path": "evidence/phase5j/phase5j_review_packet_inventory.json"
+  },
+  "production_ready": false,
+  "promotion_authorized": false,
+  "release_ready": false,
+  "runtime_binding_added": false,
+  "schema_version": 1,
+  "superiority_claimed": false,
+  "tests_executed_by_inventory": false
+}
