@@ -39,3 +39,13 @@
   changed that protected input. Phase 5N's D-root check exposed all four stale links.
 - Successor: regenerate Phase 5A, update each hard-coded predecessor digest through Phase 5D, then
   regenerate the Phase 5E–K chain. Preserve both failed runs; require fresh exact-head workflows.
+
+## Entry 5 — hosted closure receipt
+
+- Subject: `a576603b056c30156b88ea5dfa99d893afdf3cfc`
+- Push run: `30776259417`, fully successful
+- Pull-request run: `30776260598`, fully successful
+- Judgment: close only `P5E-DEBT-03`, `P5F-DEBT-03`, and `P5G-DEBT-03` as record-absence
+  obligations. Retain full-output, execution, external-input, release, and promotion debts.
+- Reconciliation:
+  `sha256:18de87d236e26a855fd79c4cd210f1eed8f45ca0dfeced984a54ff65369b6676`

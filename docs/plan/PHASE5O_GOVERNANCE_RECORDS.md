@@ -15,5 +15,7 @@ promotion records.
 The full-output debts `P5E/F/G-DEBT-01`, all execution/external-input debts, `B-OPS-08`, ADR-015,
 P14/P20, release/production readiness, deployment, promotion, and superiority remain active.
 
-The three governance debts remain candidates for closure until the exact implementation head passes
-both hosted workflows.
+Successor `a576603b056c30156b88ea5dfa99d893afdf3cfc` passed push run `30776259417`
+and pull-request run `30776260598`. The three governance debts are recorded as narrowly resolved;
+the full-output and external-input debts remain active. The additive reconciliation digest is
+`sha256:18de87d236e26a855fd79c4cd210f1eed8f45ca0dfeced984a54ff65369b6676`.

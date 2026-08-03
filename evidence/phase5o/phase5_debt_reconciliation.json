@@ -1,0 +1,294 @@
+{
+  "claims": {
+    "adr_015_adopted": false,
+    "authenticated_independence": false,
+    "deployment_authorized": false,
+    "p14_eligible": false,
+    "p20_eligible": false,
+    "production_ready": false,
+    "promotion_authorized": false,
+    "release_ready": false,
+    "superiority_established": false
+  },
+  "counts": {
+    "current_active": 14,
+    "prior_resolved": 18,
+    "resolved": 21,
+    "resolved_in_phase5o": 3,
+    "total": 35
+  },
+  "current_active_debt_ids": [
+    "P5E-DEBT-01",
+    "P5E-DEBT-05",
+    "P5F-DEBT-01",
+    "P5F-DEBT-05",
+    "P5G-DEBT-01",
+    "P5G-DEBT-05",
+    "P5H-DEBT-03",
+    "P5H-DEBT-04",
+    "P5I-DEBT-01",
+    "P5I-DEBT-03",
+    "P5I-DEBT-05",
+    "P5J-DEBT-01",
+    "P5J-DEBT-03",
+    "P5J-DEBT-05"
+  ],
+  "external_input_debt_ids": [
+    "P5E-DEBT-05",
+    "P5F-DEBT-05",
+    "P5G-DEBT-05",
+    "P5H-DEBT-03",
+    "P5H-DEBT-04",
+    "P5I-DEBT-01",
+    "P5I-DEBT-03",
+    "P5I-DEBT-05",
+    "P5J-DEBT-01",
+    "P5J-DEBT-03",
+    "P5J-DEBT-05"
+  ],
+  "governance_record_digest": "sha256:13499ff4a27a3e4f20a78c6e9695bb7ed83354ca4da7d3cd25b0e3699c2a83a6",
+  "local_release_validation": {
+    "blocker_ids": [
+      "B-OPS-08"
+    ],
+    "duration_seconds": 863.292,
+    "new_phase5_failures": 0,
+    "platform": "windows-cpython-3.14",
+    "result": "failed-known-blocker",
+    "tests_run": 946
+  },
+  "next_internal_debt_ids": [
+    "P5E-DEBT-01",
+    "P5F-DEBT-01",
+    "P5G-DEBT-01"
+  ],
+  "phase_item": "O",
+  "predecessor": {
+    "path": "evidence/phase5n/phase5_debt_reconciliation.json",
+    "reconciliation_digest": "sha256:dc6ee7ca0986d0cefe9df98a61bdcd8eea8a7985b3b725b27e0b7c564bfb04e4"
+  },
+  "reconciliation_digest": "sha256:18de87d236e26a855fd79c4cd210f1eed8f45ca0dfeced984a54ff65369b6676",
+  "record_type": "phase5-debt-reconciliation",
+  "resolved": [
+    {
+      "debt_id": "P5D-DEBT-01",
+      "evidence": [
+        "commit:af9ac00a5959b96260fb3bcdfb0958ce0640ae04",
+        "run:30771264748",
+        "run:30771265827"
+      ],
+      "reason": "committed Ruff repairs pass on the stabilized and integrated trees"
+    },
+    {
+      "debt_id": "P5D-DEBT-02",
+      "evidence": [
+        "commit:af9ac00a5959b96260fb3bcdfb0958ce0640ae04",
+        "run:30771264748",
+        "run:30771265827"
+      ],
+      "reason": "concrete-dict normalization preserves validation and passes Pyright 1.1.411"
+    },
+    {
+      "debt_id": "P5D-DEBT-03",
+      "evidence": [
+        "commit:349f717aaee0deb3b65ab761e16307ca48ad57db",
+        "run:30773159161",
+        "run:30773160521",
+        "local:100-consecutive-refined-worker-recovery-passes"
+      ],
+      "reason": "crash and recovery leases are separated and the exact successor passes repeated hosted matrices"
+    },
+    {
+      "debt_id": "P5D-DEBT-04",
+      "evidence": [
+        "commit:af9ac00a5959b96260fb3bcdfb0958ce0640ae04",
+        "run:30771264748",
+        "run:30771265827"
+      ],
+      "reason": "all three temporary write-capable Phase 5D workflows are absent"
+    },
+    {
+      "debt_id": "P5D-DEBT-05",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the integrated release head passes every Constitutional CI job"
+    },
+    {
+      "debt_id": "P5E-DEBT-02",
+      "evidence": [
+        "commit:da90b4430f8cb99113b58657db7539600e753395",
+        "run:30774229678",
+        "run:30774230905",
+        "artifact:evidence/phase5e/phase5e_integrator_inventory.json",
+        "artifact:dist/phase5e-to-k-installed-wheel.json"
+      ],
+      "reason": "the Integrator has a chained deterministic inventory and permanent isolated-wheel verification"
+    },
+    {
+      "debt_id": "P5E-DEBT-03",
+      "evidence": [
+        "commit:a576603b056c30156b88ea5dfa99d893afdf3cfc",
+        "run:30776259417",
+        "run:30776260598",
+        "artifact:evidence/phase5o/phase5_governance_records.json"
+      ],
+      "reason": "Integrator court, dissent, ADR, sources, migration/rollback, and procedural review are present and sealed"
+    },
+    {
+      "debt_id": "P5E-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the integrated exact release head supplies the required fully green receipt"
+    },
+    {
+      "debt_id": "P5F-DEBT-02",
+      "evidence": [
+        "commit:da90b4430f8cb99113b58657db7539600e753395",
+        "run:30774229678",
+        "run:30774230905",
+        "artifact:evidence/phase5f/phase5f_steward_inventory.json",
+        "artifact:dist/phase5e-to-k-installed-wheel.json"
+      ],
+      "reason": "the Steward inventory chains through Phase 5E and its installed package contract is permanently verified"
+    },
+    {
+      "debt_id": "P5F-DEBT-03",
+      "evidence": [
+        "commit:a576603b056c30156b88ea5dfa99d893afdf3cfc",
+        "run:30776259417",
+        "run:30776260598",
+        "artifact:evidence/phase5o/phase5_governance_records.json"
+      ],
+      "reason": "Steward court, dissent, ADR, sources, runbook, recovery template, rollback, and procedural review are present and sealed"
+    },
+    {
+      "debt_id": "P5F-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "global Pyright and all integrated hosted gates pass on the exact release head"
+    },
+    {
+      "debt_id": "P5G-DEBT-02",
+      "evidence": [
+        "commit:da90b4430f8cb99113b58657db7539600e753395",
+        "run:30774229678",
+        "run:30774230905",
+        "artifact:evidence/phase5g/phase5g_optimizer_inventory.json",
+        "artifact:dist/phase5e-to-k-installed-wheel.json"
+      ],
+      "reason": "the Optimizer inventory and package surface are chained, reproduced, retained, and exact-head validated"
+    },
+    {
+      "debt_id": "P5G-DEBT-03",
+      "evidence": [
+        "commit:a576603b056c30156b88ea5dfa99d893afdf3cfc",
+        "run:30776259417",
+        "run:30776260598",
+        "artifact:evidence/phase5o/phase5_governance_records.json"
+      ],
+      "reason": "Optimizer court, dissent, ADR, sources, custody, comparator, losing-result, evaluator, and defer-promotion records are present and sealed"
+    },
+    {
+      "debt_id": "P5G-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the corrected Optimizer source now has fully green integrated exact-head evidence"
+    },
+    {
+      "debt_id": "P5H-DEBT-01",
+      "evidence": [
+        "commit:a78fcdd3418565565aa82ae127957632e5ac08d8",
+        "run:30775103987",
+        "run:30775114316",
+        "artifact:evidence/phase5n/phase5_role_ancestry_index.json",
+        "artifact:dist/phase5-role-ancestry-installed-wheel.json"
+      ],
+      "reason": "all eight roles have exact Git ancestry, PR merge trees, contract/evidence indexes, and installed-wheel byte verification"
+    },
+    {
+      "debt_id": "P5H-DEBT-02",
+      "evidence": [
+        "commit:da90b4430f8cb99113b58657db7539600e753395",
+        "run:30774229678",
+        "run:30774230905",
+        "artifact:evidence/phase5h/phase5h_role_deepening_inventory.json",
+        "artifact:dist/phase5e-to-k-installed-wheel.json"
+      ],
+      "reason": "the consolidation court is included in the chained inventories and permanent installed-wheel gate"
+    },
+    {
+      "debt_id": "P5H-DEBT-05",
+      "evidence": [
+        "commit:da90b4430f8cb99113b58657db7539600e753395",
+        "run:30774229678",
+        "run:30774230905",
+        "artifact:evidence/phase5h/phase5h_role_deepening_inventory.json",
+        "artifact:evidence/phase5m/PHASE5M_AUDIT_LEDGER.md"
+      ],
+      "reason": "the exact final head passes chained inventory, installed-wheel, Ruff, Pyright, security, and every Python matrix gate"
+    },
+    {
+      "debt_id": "P5I-DEBT-02",
+      "evidence": [
+        "commit:da90b4430f8cb99113b58657db7539600e753395",
+        "run:30774229678",
+        "run:30774230905",
+        "artifact:evidence/phase5i/phase5i_post_p13_adoption_inventory.json",
+        "artifact:dist/phase5e-to-k-installed-wheel.json"
+      ],
+      "reason": "the adoption docket has a chained inventory, package reproduction, permanent CI step, and retained receipt"
+    },
+    {
+      "debt_id": "P5I-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "worker, Ruff, Pyright, and all Python matrices pass on the exact release head"
+    },
+    {
+      "debt_id": "P5J-DEBT-02",
+      "evidence": [
+        "commit:da90b4430f8cb99113b58657db7539600e753395",
+        "run:30774229678",
+        "run:30774230905",
+        "artifact:evidence/phase5j/phase5j_review_packet_inventory.json",
+        "artifact:dist/phase5e-to-k-installed-wheel.json"
+      ],
+      "reason": "the review packet completes the required Phase 5E-J chain and passes isolated installed-wheel verification"
+    },
+    {
+      "debt_id": "P5J-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the packet is included in a fully green integrated exact-head receipt"
+    }
+  ],
+  "resolved_in_phase5o": [
+    "P5E-DEBT-03",
+    "P5F-DEBT-03",
+    "P5G-DEBT-03"
+  ],
+  "schema_version": 1,
+  "subject_commit": "a576603b056c30156b88ea5dfa99d893afdf3cfc",
+  "subject_run_ids": [
+    "30776259417",
+    "30776260598"
+  ]
+}
