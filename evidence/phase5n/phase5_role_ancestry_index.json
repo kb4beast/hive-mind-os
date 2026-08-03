@@ -1,0 +1,390 @@
+{
+  "authenticated_independence_claimed": false,
+  "index_digest": "sha256:2b029c1f7c39b3b248b5b9e3e6a6a91ca46b93be01583e6a4c3760f427df2f9f",
+  "license": "MIT",
+  "production_ready": false,
+  "promotion_authorized": false,
+  "record_type": "phase5-role-ancestry-index",
+  "release_ready": false,
+  "repository": "https://github.com/kb4beast/hive-mind-os",
+  "retrieved_at": "2026-08-03T00:34:00Z",
+  "role_count": 8,
+  "roles": [
+    {
+      "contract": {
+        "git_blob": "4fe00257985565f402c61df66bf7009810eab5ab",
+        "path": "src/hive_mind_os/foundation/orchestrator_playbook_contracts.py",
+        "sha256": "sha256:688f237c75c5c9acbdc6c7ba68590d424bee6cf831db6ed892f53989cb3bf29c"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "6bc03fa177afc5fb8720c7a702b8b4a435359d1a",
+          "path": "evidence/phase5a/PHASE5A_AUDIT_LEDGER.md",
+          "sha256": "sha256:864f9888e7d6fbf61357a064a38e3ebf66ea87223a9525ac76ccc14b98942d04"
+        },
+        {
+          "git_blob": "11e67a3f1fd6a1b850dc5e25c6a13f1362b4e055",
+          "path": "evidence/courts/phase5a-orchestrator-playbook-court.md",
+          "sha256": "sha256:91276be218af835a360c0abcf242036b401cba3607fe316be7c5e721c9e0a2ce"
+        }
+      ],
+      "implementation": {
+        "git_blob": "156272c2f7713ad1fbb48ce3a2c682a983e3c5c5",
+        "path": "src/hive_mind_os/foundation/orchestrator_playbook.py",
+        "sha256": "sha256:98f9153be307ca79358dc4a3d658de9a54148478bbbc5f803e8232b876d8fa11"
+      },
+      "introduction_commit": "3abfb58f465c2d3581010d7c313ea12c57a34fe3",
+      "inventory": {
+        "git_blob": "3e27a78fd5a3026508893721404318e76291b879",
+        "inventory_digest": "sha256:6c8b884901bccab1988fd5fc9ffabecb231127c2af72aa4d897067e1e05e439c",
+        "path": "evidence/phase5a/phase5a_orchestrator_inventory.json",
+        "sha256": "sha256:f63613c9e01c342b5fb243b5db254fe92e2ea66d5fb6aa514a995e99362d03a2"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [],
+      "package_paths": [
+        "hive_mind_os/foundation/orchestrator_playbook.py",
+        "hive_mind_os/foundation/orchestrator_playbook_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "A",
+      "pull_request": {
+        "merge_commit": "cf4d4beb461d1c201b6eab9ced60db86389f3257",
+        "merge_tree": "7dc0fdbcf004ddf55f4b646b7914fcf452c1274e",
+        "number": 49,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/49"
+      },
+      "role": "Orchestrator"
+    },
+    {
+      "contract": {
+        "git_blob": "4d19f7732550927bbabaab4fd581c35e9325da4c",
+        "path": "src/hive_mind_os/foundation/architect_playbook_contracts.py",
+        "sha256": "sha256:0e6502181066d0c7744c7fc660ff9a065d350de21dcf63e852dafc98bb76f933"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "46393572c028fe115ba491483beddba3d78b2659",
+          "path": "evidence/phase5b/PHASE5B_AUDIT_LEDGER.md",
+          "sha256": "sha256:37d7de434d4fbe5f34177cb3fdcc38573556f93347ee0f0c4ba1eef87a5d8f72"
+        },
+        {
+          "git_blob": "5444572f8bf57e1b99a6946b0347eb9d5e0cb716",
+          "path": "evidence/courts/phase5b-architect-playbook-court.md",
+          "sha256": "sha256:0cf2faaa71a4737f05318558372edc6ad25e3822790d6b7be510a15607519a40"
+        }
+      ],
+      "implementation": {
+        "git_blob": "4255c12aa454143e1be33b6f86bb28d78537f687",
+        "path": "src/hive_mind_os/foundation/architect_playbook.py",
+        "sha256": "sha256:1051f92e5fb87301d336a970ccf78d0cbe42b9c213feab134d372200363ee072"
+      },
+      "introduction_commit": "db1430ffa2db152c019eeaa2cfdb3af7f7b431c5",
+      "inventory": {
+        "git_blob": "34dd6675b393ebb2309f5309d1e54b9103b42a37",
+        "inventory_digest": "sha256:61ac76210f37d46bae432a07462e4179b41d8e3913dedae4107fc1f0e86b00f4",
+        "path": "evidence/phase5b/phase5b_architect_inventory.json",
+        "sha256": "sha256:3e1a3d038f6489dd4191b1a8876bcbbd7b4137601fca9273dfaefd5f7ddfcf56"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [],
+      "package_paths": [
+        "hive_mind_os/foundation/architect_playbook.py",
+        "hive_mind_os/foundation/architect_playbook_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "B",
+      "pull_request": {
+        "merge_commit": "43db53de7a41d9bc02e987776edc260594def4c8",
+        "merge_tree": "13d5e797fea85d52824b6b18f5f6f8a578df39e4",
+        "number": 52,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/52"
+      },
+      "role": "Architect"
+    },
+    {
+      "contract": {
+        "git_blob": "7b77fb42f35e4d51bf8bd32ef033def366415876",
+        "path": "src/hive_mind_os/foundation/builder_playbook_contracts.py",
+        "sha256": "sha256:1263e50660fcb1fef6a45004afce5bf0b19b7a1b2af8685606dfaab95395a7f5"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "d58ff7f990b6a32ab4b79747fbbefe9844e73707",
+          "path": "evidence/phase5c/PHASE5C_AUDIT_LEDGER.md",
+          "sha256": "sha256:18aef099392925b158f6cedaaa439a4e01da0b8b3052be2cf42e300957045226"
+        },
+        {
+          "git_blob": "3406e083b7abc4492f6459b95f7ebfe85becd7c1",
+          "path": "evidence/courts/phase5c-builder-playbook-court.md",
+          "sha256": "sha256:10f0a16e024ecc6a84afaea3c1b2310299d7a1bcd6c948e568d06b6df4927f00"
+        }
+      ],
+      "implementation": {
+        "git_blob": "9ea8c91130055324ec1fb91a2dbd2df7dbeb7c38",
+        "path": "src/hive_mind_os/foundation/builder_playbook.py",
+        "sha256": "sha256:fae290d7bfc407ac376eab6efed072d4c1a63f5e5bf1838c0bbb9736371c49b4"
+      },
+      "introduction_commit": "b313fc7d06749feb36c52297d729f14a9a601638",
+      "inventory": {
+        "git_blob": "794a47485710f5ad9e15cd70279019f24fb2522e",
+        "inventory_digest": "sha256:c7609732b79f5c5f838a61a4e828ddce5cc80ad2023f99ce6ef81d811270a4c7",
+        "path": "evidence/phase5c/phase5c_builder_inventory.json",
+        "sha256": "sha256:f2d5fe603d31caba3afc8601887f2cf6199960aff9ef15bc9229cddfefe75774"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [],
+      "package_paths": [
+        "hive_mind_os/foundation/builder_playbook.py",
+        "hive_mind_os/foundation/builder_playbook_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "C",
+      "pull_request": {
+        "merge_commit": "92a7f6ed96186a2a1c8fd1fd55147663f25588d9",
+        "merge_tree": "7db233d7b85c8407454f4f87cb2e8f38aa56b4e4",
+        "number": 53,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/53"
+      },
+      "role": "Builder"
+    },
+    {
+      "contract": {
+        "git_blob": "1ca352735d8b0bb2e958be2e712bbed5a2281e4c",
+        "path": "src/hive_mind_os/foundation/curator_playbook_contracts.py",
+        "sha256": "sha256:b74ec7296c3f144d63056ee6ab2a73aa3ac792ef98574461fa7b5ac5bebb62bb"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "d1571e5ecf9c19a7817b6ea0986ee1fb1c13e7e2",
+          "path": "evidence/phase5d/PHASE5D_AUDIT_LEDGER.md",
+          "sha256": "sha256:0dcd05ca6f7abf41bfa1474f816ed85123a01a712e24dce9c7ed667cd964166f"
+        },
+        {
+          "git_blob": "feb2469291f2f30133c63ce801c12d21c80c25e9",
+          "path": "evidence/courts/phase5d-curator-playbook-court.md",
+          "sha256": "sha256:1432e9289a6ecf173358be1527c47d2624450694968518ecf4e474caca1b2e90"
+        }
+      ],
+      "implementation": {
+        "git_blob": "f2b0abb5d89c1242e694cdfe9aa55451908a265a",
+        "path": "src/hive_mind_os/foundation/curator_playbook.py",
+        "sha256": "sha256:fc253886d7d2e0bfc0b4e31cbb12b30783d9f98f6a5bca88f46b80710cded9a8"
+      },
+      "introduction_commit": "3b92d853cd2e63a2da2be40459cc995dd1366ed7",
+      "inventory": {
+        "git_blob": "73c078b139d5026e079956d7e23455b87d821bee",
+        "inventory_digest": "sha256:dc85f9729df4152f8a156f5ce779777711bda32b9b315d48f3a4e36a785052ad",
+        "path": "evidence/phase5d/phase5d_curator_inventory.json",
+        "sha256": "sha256:987fca86edc829123035809d068e7b0924bcc106459335e4bce852e4ad3ee240"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [],
+      "package_paths": [
+        "hive_mind_os/foundation/curator_playbook.py",
+        "hive_mind_os/foundation/curator_playbook_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "D",
+      "pull_request": {
+        "merge_commit": "38ecbd176f3ae5b63b116c6a182a2889cd5d16a6",
+        "merge_tree": "0392bc5cd4b4ee8b741ff9bc8d65cdf69e5b127a",
+        "number": 54,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/54"
+      },
+      "role": "Curator"
+    },
+    {
+      "contract": {
+        "git_blob": "7d15051494aaa2df0c4074c3dfe3fda2286845f7",
+        "path": "src/hive_mind_os/foundation/integrator_playbook_contracts.py",
+        "sha256": "sha256:e7ba71eaee8f8a6ddef66bd0075595111f03387b523f8f56b0b6bf15e734c014"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "3e6537e5ccdde1339a0c27dab1f9d21b4bd0d4fc",
+          "path": "evidence/phase5e/PHASE5E_AUDIT_LEDGER.md",
+          "sha256": "sha256:65b882b91ae9b7a11233e7286d345b55918e1d3fa52a8b7e243167aedef9dd59"
+        }
+      ],
+      "implementation": {
+        "git_blob": "ce832d742cc6cb654ea3cf176763c874e15eb2d0",
+        "path": "src/hive_mind_os/foundation/integrator_playbook.py",
+        "sha256": "sha256:2b23021b70d18e4c852255d81ddf1b5ea205b1b9c59ec96029eb95d2690d78f9"
+      },
+      "introduction_commit": "c05a77d7d3368ae5dc5d8acca6c450eb2144b1c4",
+      "inventory": {
+        "git_blob": "b9744d040bbbbe16a4f16d1cf41e0580f4879765",
+        "inventory_digest": "sha256:c2c9acaca57dec3227ca91249883c319b3d96d5219b034226e39f36b6cfcea0a",
+        "path": "evidence/phase5e/phase5e_integrator_inventory.json",
+        "sha256": "sha256:6c6b9519f1841c63bfa8012cfe8616604eb83e0ffdcb4b54b4d4f46a089fd4ed"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [
+        "dedicated-procedural-court-record"
+      ],
+      "package_paths": [
+        "hive_mind_os/foundation/integrator_playbook.py",
+        "hive_mind_os/foundation/integrator_playbook_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "E",
+      "pull_request": {
+        "merge_commit": "eccc8fce1bab5fb289279985198cb8753b3f171c",
+        "merge_tree": "99a3cf4600622d9c81fc5d097461875c2dd4d6fb",
+        "number": 55,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/55"
+      },
+      "role": "Integrator"
+    },
+    {
+      "contract": {
+        "git_blob": "34be79a1aafd1ebf2126b1511eacf8bfd3fe7425",
+        "path": "src/hive_mind_os/foundation/steward_playbook_contracts.py",
+        "sha256": "sha256:c809bba6bd8b8e06511923cfc7a1d1bbfffa1bf123f93df96451d266938cfb3b"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "0249c4682a41a8499dd68112d5d1eca7eace836c",
+          "path": "evidence/phase5f/PHASE5F_AUDIT_LEDGER.md",
+          "sha256": "sha256:3e373f57f0c1d77664ec09446cab130b2ca8466df005d2abff39b0c228d8de96"
+        }
+      ],
+      "implementation": {
+        "git_blob": "ee924f7191f98955a58f8ca06cd1c0597b00020a",
+        "path": "src/hive_mind_os/foundation/steward_playbook.py",
+        "sha256": "sha256:b819c2314900984f499b9bb0f5e8813200c31a9b4320b64ff518534ca25d4646"
+      },
+      "introduction_commit": "58a8b36d5c040775b1acafb6a3ec87854a36bc18",
+      "inventory": {
+        "git_blob": "0ca33a0467def925bc55693244511d18283d794e",
+        "inventory_digest": "sha256:d0e9193279bedc48dea66d710bcf7a6e5889e2c5c3cac6c9854119b2d8d392fe",
+        "path": "evidence/phase5f/phase5f_steward_inventory.json",
+        "sha256": "sha256:f72ce07da4e177f433520d82a630e63e20bce1c7b4e104939a39e4360f4fbb42"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [
+        "dedicated-procedural-court-record"
+      ],
+      "package_paths": [
+        "hive_mind_os/foundation/steward_playbook.py",
+        "hive_mind_os/foundation/steward_playbook_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "F",
+      "pull_request": {
+        "merge_commit": "eebda921352271c7d534009fe5ac8ba2306a2410",
+        "merge_tree": "00a82fda69671dea5cfd4b0cc52ed0db9f2bc674",
+        "number": 56,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/56"
+      },
+      "role": "Steward"
+    },
+    {
+      "contract": {
+        "git_blob": "153a450573c4ea30e067f7b3763d739ec10c6dc7",
+        "path": "src/hive_mind_os/foundation/optimizer_playbook_contracts.py",
+        "sha256": "sha256:d4e2541d06a7bb544cd457bb2a67705bd130c5e92eb12ea05429fd8fa650c3d2"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "73d8311f13510569b52a2b947ff4741936b244be",
+          "path": "evidence/phase5g/PHASE5G_AUDIT_LEDGER.md",
+          "sha256": "sha256:9ad8012013821e87e6ab03c6aba7228e25f6950bb480c43485056fc94c8d62b2"
+        }
+      ],
+      "implementation": {
+        "git_blob": "3357bd22851d5f5375d4624809e726323dfe73ff",
+        "path": "src/hive_mind_os/foundation/optimizer_playbook.py",
+        "sha256": "sha256:fa6644571b11498275b96b818004adb568ecc733310edcba207d13c6471c004e"
+      },
+      "introduction_commit": "af3bd37bc0df7092ca064bf61ef4d6852c9bcc83",
+      "inventory": {
+        "git_blob": "c944aae97c91ba29d95fec9f32d66fcad2d33062",
+        "inventory_digest": "sha256:1f789f2205062027c7355f0550d12e0b2cb8abe7273d21caf5f88a9797ffed9f",
+        "path": "evidence/phase5g/phase5g_optimizer_inventory.json",
+        "sha256": "sha256:10b45a637f9a8318baabb0b3bb3de8d4a2515ea94b1a90c7f6a8c2c7c60e0709"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [
+        "dedicated-procedural-court-record"
+      ],
+      "package_paths": [
+        "hive_mind_os/foundation/optimizer_playbook.py",
+        "hive_mind_os/foundation/optimizer_playbook_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "G",
+      "pull_request": {
+        "merge_commit": "e65be29ae1380743dfb6804e12c83af43abd291d",
+        "merge_tree": "7797d450c903bea7de9aaed768b7a2a84875fe34",
+        "number": 57,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/57"
+      },
+      "role": "Optimizer"
+    },
+    {
+      "contract": {
+        "git_blob": "04d914599b85e1695aa3fdc4b55c8447ff32bd44",
+        "path": "src/hive_mind_os/foundation/role_deepening_court_contracts.py",
+        "sha256": "sha256:b327c3f9adcfaddd5ff5454fcc79342cb60f3b1e66cc3b10435f413b37cb4e0d"
+      },
+      "current_tree_verified": true,
+      "evidence_receipts": [
+        {
+          "git_blob": "99ebbf4c5ababfaa4df07818dd698e8f1e658a25",
+          "path": "evidence/phase5h/PHASE5H_AUDIT_LEDGER.md",
+          "sha256": "sha256:43c3cad4e89d67bc98a0e87bed61881f54405d657c3884a53396ed56f76badf5"
+        }
+      ],
+      "implementation": {
+        "git_blob": "bb1e78b2d7c5942d825ea7d679a0cf310a4a95aa",
+        "path": "src/hive_mind_os/foundation/role_deepening_court.py",
+        "sha256": "sha256:617f40f00ee9c31e720f7deba614cddc7e85a7a4e2aba721c852de88dd63bf60"
+      },
+      "introduction_commit": "ff7b8c2334cfbd2048dec3f79f98c4a2bc3ea63e",
+      "inventory": {
+        "git_blob": "6125c8bd9543fc46a5ef113a0a8cdb84a693486a",
+        "inventory_digest": "sha256:111ec56c58d8afeef994ed18a2ef8375ccd9c573afb6432e86f2d90c167f882c",
+        "path": "evidence/phase5h/phase5h_role_deepening_inventory.json",
+        "sha256": "sha256:3f9f8a0cad1ea195e4631c2aa9435d0337ecc57542bcc1f9f9e63eb046cbb415"
+      },
+      "merge_ancestry_verified": true,
+      "missing_evidence": [
+        "dedicated-procedural-court-record"
+      ],
+      "package_paths": [
+        "hive_mind_os/foundation/role_deepening_court.py",
+        "hive_mind_os/foundation/role_deepening_court_contracts.py"
+      ],
+      "package_verification_required": true,
+      "phase_item": "H",
+      "pull_request": {
+        "merge_commit": "522d04fe76b53574a4f93256466df69de42f747a",
+        "merge_tree": "2f78dd3b5c935e972136a46e4b09efba64d4b0b1",
+        "number": 58,
+        "retrieved_at": "2026-08-03T00:34:00Z",
+        "url": "https://github.com/kb4beast/hive-mind-os/pull/58"
+      },
+      "role": "Consolidation Court"
+    }
+  ],
+  "schema_version": 1,
+  "subject_commit": "ebe5884e30f62834ca649b72495e0178280ec3b3",
+  "subject_tree": "8e0741ff28aa45c580746197878de71a547860b9",
+  "superiority_claimed": false
+}

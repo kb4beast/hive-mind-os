@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -114,11 +115,22 @@ def build_reconciliation(repository: Path) -> dict[str, Any]:
     if not set(NEW_RESOLUTIONS).issubset(prior_active):
         raise RuntimeError("a Phase 5M resolution is not active in the Phase 5L predecessor")
 
-    tail = json.loads(
-        (repository / "evidence/phase5k/phase5k_external_evidence_inventory.json").read_text(
-            encoding="utf-8"
-        )
+    tail_result = subprocess.run(
+        (
+            "git",
+            "show",
+            f"{SUBJECT_COMMIT}:evidence/phase5k/phase5k_external_evidence_inventory.json",
+        ),
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
     )
+    if tail_result.returncode != 0:
+        raise RuntimeError(
+            f"cannot reconstruct Phase 5M inventory tail: {tail_result.stderr.strip()}"
+        )
+    tail = json.loads(tail_result.stdout)
     if tail.get("inventory_digest") != INVENTORY_TAIL:
         raise RuntimeError("the Phase 5K inventory tail does not match the hosted subject")
     workflow = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")

@@ -35,7 +35,7 @@
   "deployment_authorized": false,
   "external_dependencies_added": 0,
   "implementation": {
-    ".github/workflows/ci.yml": "sha256:71c8db71879efade996210ba1567d088d2303789a0852fcc2eaa7e358b6787b8",
+    ".github/workflows/ci.yml": "sha256:95656026e760dec0055541f5bad71a018e45dc04bf33bded4394132b3254a429",
     "docs/architecture/PHASE5E_INTEGRATOR_CONTRACT.md": "sha256:9332ef6b1f454ce6f8051335bddfed66ee9e17325951dce67022b1dc30706000",
     "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
     "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
@@ -44,11 +44,11 @@
     "tests/test_phase5e_integrator_playbook.py": "sha256:ced63aa5b9eb97ff62be9bb570cef279abd003329259fef88ab73379d48cd816",
     "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
   },
-  "inventory_digest": "sha256:c2c9acaca57dec3227ca91249883c319b3d96d5219b034226e39f36b6cfcea0a",
+  "inventory_digest": "sha256:e5c6fd372e51395561bcb0ce9472a555daae581f6c6645c1ed47b22acd5fb0fd",
   "phase": 5,
   "phase_item": "E",
   "predecessor": {
-    "inventory_digest": "sha256:dc85f9729df4152f8a156f5ce779777711bda32b9b315d48f3a4e36a785052ad",
+    "inventory_digest": "sha256:bec3351391d25263fb959732e5024446fa527f9a32feb613aea6382c6b035f43",
     "path": "evidence/phase5d/phase5d_curator_inventory.json"
   },
   "production_ready": false,

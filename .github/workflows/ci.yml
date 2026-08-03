@@ -173,6 +173,12 @@ jobs:
           PYTHONPATH=.wheel-install python scripts/verify_phase5e_to_k_installed_wheel.py \
             --installed-root .wheel-install \
             --output dist/phase5e-to-k-installed-wheel.json
+      - name: Verify installed Phase 5 role ancestry
+        run: |
+          python scripts/verify_phase5_role_ancestry_installed_wheel.py \
+            --index evidence/phase5n/phase5_role_ancestry_index.json \
+            --installed-root .wheel-install \
+            --output dist/phase5-role-ancestry-installed-wheel.json
       - name: Install checksum-pinned Syft
         run: |
           curl --fail --show-error --silent --location \
@@ -233,6 +239,7 @@ jobs:
             dist/phase5c-installed-wheel.json
             dist/phase5d-installed-wheel.json
             dist/phase5e-to-k-installed-wheel.json
+            dist/phase5-role-ancestry-installed-wheel.json
           if-no-files-found: error
           retention-days: 30
       - name: Attest wheel, SBOM, and release audit provenance
@@ -248,3 +255,4 @@ jobs:
             dist/phase5c-installed-wheel.json
             dist/phase5d-installed-wheel.json
             dist/phase5e-to-k-installed-wheel.json
+            dist/phase5-role-ancestry-installed-wheel.json
