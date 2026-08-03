@@ -1954,6 +1954,8 @@ class RepositoryMission:
                 records=adopted["records"],
                 source_lock=self._source_lock,
                 source_lock_evidence=self._source_lock_evidence,
+                source_custody=self._source_custody,
+                require_source_custody=self._source_lock is not None,
             )
             self._record_workspace_receipts(workspace)
             return workspace

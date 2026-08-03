@@ -329,8 +329,19 @@ class GitWorkspace:
         receipts: list[dict[str, Any]],
         source_lock: SourceLock | None = None,
         source_lock_evidence: SourceLockEvidence | None = None,
+        source_custody: SourceCustodyVerifier | None = None,
+        require_source_custody: bool = False,
         state_ref: str | None = None,
     ) -> None:
+        source_context = (source_lock, source_lock_evidence, source_custody)
+        if any(item is not None for item in source_context) and not all(
+            item is not None for item in source_context
+        ):
+            raise ValueError("authenticated source workspace context is incomplete")
+        if require_source_custody and not all(
+            item is not None for item in source_context
+        ):
+            raise ValueError("strict source custody requires authenticated source context")
         self.root = root
         self.container_root = container_root
         self.trusted_root = trusted_root
@@ -347,6 +358,8 @@ class GitWorkspace:
         self.receipt_records = receipts
         self.source_lock = source_lock
         self.source_lock_evidence = source_lock_evidence
+        self.source_custody = source_custody
+        self.require_source_custody = require_source_custody
 
     @classmethod
     def materialize(
@@ -537,6 +550,8 @@ class GitWorkspace:
             receipts=receipts,
             source_lock=authenticated_source_lock,
             source_lock_evidence=source_lock if authenticated_source_lock is not None else None,
+            source_custody=source_custody if authenticated_source_lock is not None else None,
+            require_source_custody=require_source_custody,
             state_ref=source_state_ref if authenticated_source_lock is not None else None,
         )
         if authenticated_source_lock is not None:
@@ -902,6 +917,7 @@ class GitWorkspace:
         if self.branch_name is None:
             raise GitOperationFailed("delivery requires an isolated branch")
         delivery_root = _validated_delivery_target(out_dir, self.root)
+        self._reverify_authenticated_source_custody()
         if not self.status_clean():
             raise WorkspaceDirty("delivery requires a clean committed workspace")
         head_sha = self._git_text(
@@ -986,6 +1002,51 @@ class GitWorkspace:
             diff_digest,
             receipt_snapshot,
         )
+
+    def _reverify_authenticated_source_custody(self) -> None:
+        """Refuse to publish a source-custody manifest after its lock is no longer valid."""
+
+        source_context = (
+            self.source_lock,
+            self.source_lock_evidence,
+            self.source_custody,
+        )
+        if not any(item is not None for item in source_context):
+            if self.require_source_custody:
+                raise GitOperationFailed("strict source custody context is incomplete")
+            return
+        if not all(item is not None for item in source_context):
+            raise GitOperationFailed("authenticated source context is incomplete")
+        assert self.source_lock is not None
+        assert self.source_lock_evidence is not None
+        assert self.source_custody is not None
+        if (
+            self.require_source_custody
+            and (
+                not self.source_custody.provenance.is_durable
+                or not self.source_custody.custody_verifier.provenance.is_durable
+            )
+        ):
+            raise GitOperationFailed(
+                "strict source custody requires durable source and keyset provenance"
+            )
+        try:
+            verified_lock = self.source_custody.verify_for_materialization(
+                self.source_lock_evidence,
+                self.source_lock.repository_url,
+                self.base_sha,
+                mission_id=self.mission_id,
+                state_ref=self.state_ref,
+                allowed_hosts=self.source_custody.allowed_hosts,
+            )
+        except SourceCustodyError as error:
+            raise GitOperationFailed(
+                f"authenticated source custody was rejected before delivery: {error}"
+            ) from error
+        if verified_lock.to_dict() != self.source_lock.to_dict():
+            raise GitOperationFailed(
+                "authenticated source evidence does not match the sealed workspace lock"
+            )
 
     def _copy_delivery_evidence(
         self,

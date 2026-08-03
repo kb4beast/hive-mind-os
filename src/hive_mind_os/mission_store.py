@@ -176,15 +176,27 @@ def reopen_workspace(
     records: Sequence[Mapping[str, Any]],
     source_lock: SourceLock | None = None,
     source_lock_evidence: SourceLockEvidence | None = None,
+    source_custody: SourceCustodyVerifier | None = None,
+    require_source_custody: bool = False,
 ) -> Any:
     """Recreate the in-memory adapter around an already reconciled workspace."""
 
     from .git_adapter import GitWorkspace
     from .sandbox import SandboxRunner, SandboxSpec
 
-    if (source_lock is None) != (source_lock_evidence is None):
+    source_context = (source_lock, source_lock_evidence, source_custody)
+    if any(item is not None for item in source_context) and not all(
+        item is not None for item in source_context
+    ):
         raise ReconciliationError(
             "authenticated source recovery context is incomplete",
+            {"mission_id": mission_id, "container": str(container)},
+        )
+    if require_source_custody and not all(
+        item is not None for item in source_context
+    ):
+        raise ReconciliationError(
+            "strict authenticated source recovery context is incomplete",
             {"mission_id": mission_id, "container": str(container)},
         )
     if source_lock is not None:
@@ -254,6 +266,8 @@ def reopen_workspace(
         receipts=[dict(record) for record in records],
         source_lock=source_lock,
         source_lock_evidence=source_lock_evidence,
+        source_custody=source_custody,
+        require_source_custody=require_source_custody,
         state_ref=source_lock.state_ref if source_lock is not None else None,
     )
     branch = _git_text(repository, "branch", "--show-current")

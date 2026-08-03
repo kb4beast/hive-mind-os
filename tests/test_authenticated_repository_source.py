@@ -18,7 +18,7 @@ from hive_mind_os.custody import (
     Ed25519CustodyVerifier,
     TrustAnchor,
 )
-from hive_mind_os.git_adapter import GitWorkspace, verify_delivery
+from hive_mind_os.git_adapter import GitOperationFailed, GitWorkspace, verify_delivery
 from hive_mind_os.mission import RepositoryMission
 from hive_mind_os.mission_store import (
     MissionStore,
@@ -29,7 +29,7 @@ from hive_mind_os.mission_store import (
     resume_mission,
 )
 from hive_mind_os.models import AutonomyLevel, RiskTier, Role
-from hive_mind_os.policy import PolicyEngine
+from hive_mind_os.policy import Action, PolicyEngine
 from hive_mind_os.source_custody import (
     SOURCE_CUSTODY_AUDIENCE,
     SourceCustodyVerifier,
@@ -117,7 +117,12 @@ class _CustodyHarness:
             b"hive-mind-os/custody-keyset/v1\0",
         )
 
-    def source_lock(self) -> SourceLockEvidence:
+    def source_lock(
+        self,
+        *,
+        commit_sha: str = "a" * 40,
+        tree_sha: str = "b" * 40,
+    ) -> SourceLockEvidence:
         lock = SourceLock.from_dict(
             {
                 "schema_version": 1,
@@ -125,8 +130,8 @@ class _CustodyHarness:
                 "mission_id": self.mission_id,
                 "state_ref": f"MISSION_STATE:{self.mission_id}:1",
                 "repository_url": "https://github.com/octocat/hive-mind-os.git",
-                "commit_sha": "a" * 40,
-                "tree_sha": "b" * 40,
+                "commit_sha": commit_sha,
+                "tree_sha": tree_sha,
                 "source_identity": {
                     "provider": "github.com",
                     "repository_id": "github.com/octocat/hive-mind-os",
@@ -249,13 +254,21 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
             self.root / "evidence",
             source_mission_id=self.mission_id,
         )
+        base_tree = workspace._git_text(
+            ["rev-parse", "HEAD^{tree}"],
+            Action.READ_REPOSITORY,
+            "read fixture source tree for recovered source lock",
+        )
         workspace.create_branch("source/recovery-context")
         workspace.write_file(
             "tiny_pkg/maths.py",
             b"def increment(value: int) -> int:\n    return value + 1\n",
         )
         workspace.commit("fix: retain source custody through recovery")
-        evidence = self.harness.source_lock()
+        evidence = self.harness.source_lock(
+            commit_sha=fixture.commit_two,
+            tree_sha=base_tree,
+        )
 
         reopened = reopen_workspace(
             workspace.container_root,
@@ -269,6 +282,8 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
             records=workspace.receipt_records,
             source_lock=evidence.source_lock,
             source_lock_evidence=evidence,
+            source_custody=self.harness.verifier,
+            require_source_custody=True,
         )
         artifact = reopened.export_delivery(self.root / "delivery")
         manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
@@ -277,6 +292,40 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
         self.assertEqual(reopened.source_lock_evidence, evidence)
         self.assertEqual(reopened.state_ref, evidence.source_lock.state_ref)
         self.assertEqual(manifest["source_custody"]["digest"], evidence.digest())
+
+    def test_delivery_rejects_expired_authenticated_source_evidence(self) -> None:
+        fixture = build_fixture_repo(self.root / "expired-fixture")
+        workspace = GitWorkspace.materialize(
+            fixture.root,
+            fixture.commit_two,
+            self.root / "expired-workspace",
+            self.root / "expired-evidence",
+            source_mission_id=self.mission_id,
+        )
+        base_tree = workspace._git_text(
+            ["rev-parse", "HEAD^{tree}"],
+            Action.READ_REPOSITORY,
+            "read fixture source tree for expired delivery lock",
+        )
+        workspace.create_branch("source/expired-lock")
+        workspace.write_file(
+            "tiny_pkg/maths.py",
+            b"def increment(value: int) -> int:\n    return value + 1\n",
+        )
+        workspace.commit("fix: reject expired source custody before delivery")
+        evidence = self.harness.source_lock(
+            commit_sha=fixture.commit_two,
+            tree_sha=base_tree,
+        )
+        workspace.source_lock = evidence.source_lock
+        workspace.source_lock_evidence = evidence
+        workspace.source_custody = self.harness.verifier
+        workspace.require_source_custody = True
+        self.harness.now += timedelta(minutes=6)
+
+        with self.assertRaisesRegex(GitOperationFailed, "source custody was rejected"):
+            workspace.export_delivery(self.root / "expired-delivery")
+        self.assertFalse((self.root / "expired-delivery").exists())
 
     def test_reopened_workspace_rejects_mismatched_authenticated_source_bindings(self) -> None:
         evidence = self.harness.source_lock()
@@ -296,6 +345,8 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
                 records=(),
                 source_lock=evidence.source_lock,
                 source_lock_evidence=evidence,
+                source_custody=self.harness.verifier,
+                require_source_custody=True,
             )
 
     def test_durable_mission_reopen_passes_the_sealed_source_context(self) -> None:
@@ -335,6 +386,8 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
         _, kwargs = reopen.call_args
         self.assertIs(kwargs["source_lock"], mission._source_lock)
         self.assertIs(kwargs["source_lock_evidence"], mission._source_lock_evidence)
+        self.assertIs(kwargs["source_custody"], mission._source_custody)
+        self.assertTrue(kwargs["require_source_custody"])
 
     def test_authenticated_delivery_rejects_a_different_requested_repository_url(self) -> None:
         evidence = self.harness.source_lock()
