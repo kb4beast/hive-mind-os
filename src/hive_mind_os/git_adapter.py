@@ -1030,6 +1030,10 @@ class GitWorkspace:
         assert self.source_lock is not None
         assert self.source_lock_evidence is not None
         assert self.source_custody is not None
+        if not self.require_source_custody:
+            raise GitOperationFailed(
+                "authenticated source delivery requires strict source custody"
+            )
         if (
             self.require_source_custody
             and (
