@@ -13,7 +13,7 @@ from pathlib import Path
 from fixtures.fixture_repo import build_fixture_repo
 
 from hive_mind_os.scheduler import Scheduler
-from hive_mind_os.workers import Worker, serve
+from hive_mind_os.workers import Worker, execute_mission_job, serve
 
 
 class WorkerTests(unittest.TestCase):
@@ -259,6 +259,30 @@ class WorkerTests(unittest.TestCase):
             failed = queue.get(job.id)
             self.assertEqual(failed.state, "dead-letter")
             self.assertIn("full immutable pin", failed.last_error or "")
+        finally:
+            queue.close()
+
+    def test_repository_mission_job_rejects_unbound_or_pathlike_identity(self) -> None:
+        state_dir = self.root / "state"
+        queue = Scheduler(state_dir)
+        try:
+            pathlike = queue.enqueue(
+                "repository-mission",
+                {"mission_id": "../escaped"},
+                mission_id="../escaped",
+            )
+            with self.assertRaisesRegex(ValueError, "safe mission ID"):
+                execute_mission_job(pathlike, state_dir)
+            self.assertFalse((state_dir / "d").exists())
+
+            unbound = queue.enqueue(
+                "repository-mission",
+                {"mission_id": "M-payload"},
+                mission_id="M-scheduled",
+            )
+            with self.assertRaisesRegex(ValueError, "scheduled binding"):
+                execute_mission_job(unbound, state_dir)
+            self.assertFalse((state_dir / "d").exists())
         finally:
             queue.close()
 

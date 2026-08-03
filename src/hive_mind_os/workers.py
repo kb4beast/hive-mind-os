@@ -26,7 +26,18 @@ def execute_mission_job(job: Job, state_dir: Path) -> str:
     if job.kind != "repository-mission":
         raise ValueError(f"unsupported job kind: {job.kind}")
     payload = job.payload
-    mission_id = str(payload["mission_id"])
+    mission_id = payload.get("mission_id")
+    if (
+        not isinstance(mission_id, str)
+        or not mission_id
+        or "/" in mission_id
+        or "\\" in mission_id
+    ):
+        raise ValueError("queued repository mission must include a safe mission ID")
+    if job.mission_id != mission_id:
+        raise ValueError(
+            "queued repository mission identity does not match its scheduled binding"
+        )
     store = MissionStore(state_dir)
     try:
         if store.has_mission(mission_id):
