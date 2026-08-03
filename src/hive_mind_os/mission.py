@@ -1940,6 +1940,18 @@ class RepositoryMission:
         if checkpoint.state == "completed" and not missing:
             adopted = self._adopt_checkpoint(checkpoint)
             metadata = adopted["value"]
+            if not isinstance(metadata, Mapping):
+                raise MissionFailed("durable workspace checkpoint metadata is malformed")
+            workspace_mission_id = metadata.get("git_mission_id")
+            if (
+                not isinstance(workspace_mission_id, str)
+                or not workspace_mission_id.strip()
+                or "/" in workspace_mission_id
+                or "\\" in workspace_mission_id
+            ):
+                raise MissionFailed(
+                    "durable workspace checkpoint has an invalid Git mission identity"
+                )
             assert self._evidence_root is not None
             workspace = reopen_workspace(
                 root,
@@ -1952,7 +1964,7 @@ class RepositoryMission:
                     self.budget.max_tool_calls_per_episode,
                     self.budget.max_compute_units_per_episode,
                 ),
-                mission_id=str(metadata["git_mission_id"]),
+                mission_id=workspace_mission_id,
                 records=adopted["records"],
                 source_lock=self._source_lock,
                 source_lock_evidence=self._source_lock_evidence,

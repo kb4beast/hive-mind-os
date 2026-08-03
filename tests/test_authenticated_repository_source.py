@@ -19,7 +19,7 @@ from hive_mind_os.custody import (
     TrustAnchor,
 )
 from hive_mind_os.git_adapter import GitOperationFailed, GitWorkspace, verify_delivery
-from hive_mind_os.mission import RepositoryMission
+from hive_mind_os.mission import MissionFailed, RepositoryMission
 from hive_mind_os.mission_store import (
     MissionStore,
     MissionStoreError,
@@ -443,6 +443,37 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
         self.assertIs(kwargs["source_lock_evidence"], mission._source_lock_evidence)
         self.assertIs(kwargs["source_custody"], mission._source_custody)
         self.assertTrue(kwargs["require_source_custody"])
+
+    def test_durable_mission_reopen_rejects_a_malformed_workspace_identity(self) -> None:
+        mission = self.mission()
+        mission._evidence_root = self.root / "evidence"
+        checkpoint = StepCheckpoint(
+            self.mission_id,
+            1,
+            "a" * 64,
+            "completed",
+            {},
+            {"value": {"git_mission_id": self.mission_id}, "records": []},
+            {"path": "receipts/checkpoint.json", "digest": "sha256:" + "b" * 64},
+            1,
+        )
+        with (
+            patch.object(mission, "_next_durable_intent", return_value=(1, {})),
+            patch.object(mission, "_prepare_checkpoint", return_value=checkpoint),
+            patch.object(
+                mission,
+                "_adopt_checkpoint",
+                return_value={"value": {"git_mission_id": {"forged": "identity"}}},
+            ),
+            patch("hive_mind_os.mission_store.reopen_workspace") as reopen,
+        ):
+            with self.assertRaisesRegex(MissionFailed, "invalid Git mission identity"):
+                mission._durable_materialize(
+                    mission.pin,
+                    self.root / "recovered-workspace",
+                    Role.BUILDER,
+                )
+        reopen.assert_not_called()
 
     def test_authenticated_delivery_rejects_a_different_requested_repository_url(self) -> None:
         evidence = self.harness.source_lock()
