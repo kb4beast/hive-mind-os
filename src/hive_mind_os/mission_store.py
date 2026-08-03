@@ -174,11 +174,39 @@ def reopen_workspace(
     allowance: Any,
     mission_id: str,
     records: Sequence[Mapping[str, Any]],
+    source_lock: SourceLock | None = None,
+    source_lock_evidence: SourceLockEvidence | None = None,
 ) -> Any:
     """Recreate the in-memory adapter around an already reconciled workspace."""
 
     from .git_adapter import GitWorkspace
     from .sandbox import SandboxRunner, SandboxSpec
+
+    if (source_lock is None) != (source_lock_evidence is None):
+        raise ReconciliationError(
+            "authenticated source recovery context is incomplete",
+            {"mission_id": mission_id, "container": str(container)},
+        )
+    if source_lock is not None:
+        assert source_lock_evidence is not None
+        expected_state_ref = f"MISSION_STATE:{mission_id}:1"
+        if source_lock.to_dict() != source_lock_evidence.source_lock.to_dict():
+            raise ReconciliationError(
+                "authenticated source recovery lock does not match its sealed evidence",
+                {"mission_id": mission_id, "container": str(container)},
+            )
+        if (
+            source_lock.mission_id != mission_id
+            or source_lock.state_ref != expected_state_ref
+        ):
+            raise ReconciliationError(
+                "authenticated source recovery bindings do not match the workspace",
+                {
+                    "mission_id": mission_id,
+                    "state_ref": expected_state_ref,
+                    "container": str(container),
+                },
+            )
 
     root = Path(container).resolve()
     repository = root / "repo"
@@ -224,6 +252,9 @@ def reopen_workspace(
         risk=risk,
         mission_id=mission_id,
         receipts=[dict(record) for record in records],
+        source_lock=source_lock,
+        source_lock_evidence=source_lock_evidence,
+        state_ref=source_lock.state_ref if source_lock is not None else None,
     )
     branch = _git_text(repository, "branch", "--show-current")
     workspace.branch_name = branch or None

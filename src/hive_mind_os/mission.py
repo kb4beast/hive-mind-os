@@ -1952,6 +1952,8 @@ class RepositoryMission:
                 ),
                 mission_id=str(metadata["git_mission_id"]),
                 records=adopted["records"],
+                source_lock=self._source_lock,
+                source_lock_evidence=self._source_lock_evidence,
             )
             self._record_workspace_receipts(workspace)
             return workspace

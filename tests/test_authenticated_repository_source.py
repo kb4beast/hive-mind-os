@@ -6,11 +6,13 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from hive_mind_os.acceptance import AcceptanceSpecification
+from hive_mind_os.autonomy import EpisodeAllowance
 from hive_mind_os.custody import (
     CustodyProvenanceStore,
     Ed25519CustodyVerifier,
@@ -18,8 +20,16 @@ from hive_mind_os.custody import (
 )
 from hive_mind_os.git_adapter import GitWorkspace, verify_delivery
 from hive_mind_os.mission import RepositoryMission
-from hive_mind_os.mission_store import MissionStore, MissionStoreError, resume_mission
-from hive_mind_os.models import Role
+from hive_mind_os.mission_store import (
+    MissionStore,
+    MissionStoreError,
+    ReconciliationError,
+    StepCheckpoint,
+    reopen_workspace,
+    resume_mission,
+)
+from hive_mind_os.models import AutonomyLevel, RiskTier, Role
+from hive_mind_os.policy import PolicyEngine
 from hive_mind_os.source_custody import (
     SOURCE_CUSTODY_AUDIENCE,
     SourceCustodyVerifier,
@@ -27,6 +37,7 @@ from hive_mind_os.source_custody import (
     SourceLockEvidence,
     SourceLockProvenanceStore,
 )
+from tests.fixtures.fixture_repo import build_fixture_repo
 
 
 def _encoded(value: bytes) -> str:
@@ -228,6 +239,102 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
         self.assertIs(kwargs["source_custody"], self.harness.verifier)
         self.assertEqual(kwargs["source_mission_id"], self.mission_id)
         self.assertEqual(kwargs["source_state_ref"], f"MISSION_STATE:{self.mission_id}:1")
+
+    def test_reopened_workspace_retains_authenticated_source_context_for_delivery(self) -> None:
+        fixture = build_fixture_repo(self.root / "fixture")
+        workspace = GitWorkspace.materialize(
+            fixture.root,
+            fixture.commit_two,
+            self.root / "workspace",
+            self.root / "evidence",
+            source_mission_id=self.mission_id,
+        )
+        workspace.create_branch("source/recovery-context")
+        workspace.write_file(
+            "tiny_pkg/maths.py",
+            b"def increment(value: int) -> int:\n    return value + 1\n",
+        )
+        workspace.commit("fix: retain source custody through recovery")
+        evidence = self.harness.source_lock()
+
+        reopened = reopen_workspace(
+            workspace.container_root,
+            workspace.trusted_root,
+            base_sha=workspace.base_sha,
+            role=Role.BUILDER,
+            risk=RiskTier.MODERATE,
+            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+            allowance=EpisodeAllowance(200, 200.0),
+            mission_id=self.mission_id,
+            records=workspace.receipt_records,
+            source_lock=evidence.source_lock,
+            source_lock_evidence=evidence,
+        )
+        artifact = reopened.export_delivery(self.root / "delivery")
+        manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(reopened.source_lock, evidence.source_lock)
+        self.assertEqual(reopened.source_lock_evidence, evidence)
+        self.assertEqual(reopened.state_ref, evidence.source_lock.state_ref)
+        self.assertEqual(manifest["source_custody"]["digest"], evidence.digest())
+
+    def test_reopened_workspace_rejects_mismatched_authenticated_source_bindings(self) -> None:
+        evidence = self.harness.source_lock()
+        with self.assertRaisesRegex(
+            ReconciliationError,
+            "authenticated source recovery bindings",
+        ):
+            reopen_workspace(
+                self.root / "missing-workspace",
+                self.root / "evidence",
+                base_sha="a" * 40,
+                role=Role.BUILDER,
+                risk=RiskTier.MODERATE,
+                policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+                allowance=EpisodeAllowance(200, 200.0),
+                mission_id="M-a-different-mission",
+                records=(),
+                source_lock=evidence.source_lock,
+                source_lock_evidence=evidence,
+            )
+
+    def test_durable_mission_reopen_passes_the_sealed_source_context(self) -> None:
+        mission = self.mission()
+        mission._evidence_root = self.root / "evidence"
+        checkpoint = StepCheckpoint(
+            self.mission_id,
+            1,
+            "a" * 64,
+            "completed",
+            {},
+            {"value": {"git_mission_id": self.mission_id}, "records": []},
+            {"path": "receipts/checkpoint.json", "digest": "sha256:" + "b" * 64},
+            1,
+        )
+        reopened_workspace = SimpleNamespace(receipt_records=[])
+        with (
+            patch.object(mission, "_next_durable_intent", return_value=(1, {})),
+            patch.object(mission, "_prepare_checkpoint", return_value=checkpoint),
+            patch.object(
+                mission,
+                "_adopt_checkpoint",
+                return_value={"value": {"git_mission_id": self.mission_id}, "records": []},
+            ),
+            patch(
+                "hive_mind_os.mission_store.reopen_workspace",
+                return_value=reopened_workspace,
+            ) as reopen,
+        ):
+            observed = mission._durable_materialize(
+                mission.pin,
+                self.root / "recovered-workspace",
+                Role.BUILDER,
+            )
+
+        self.assertIs(observed, reopened_workspace)
+        _, kwargs = reopen.call_args
+        self.assertIs(kwargs["source_lock"], mission._source_lock)
+        self.assertIs(kwargs["source_lock_evidence"], mission._source_lock_evidence)
 
     def test_authenticated_delivery_rejects_a_different_requested_repository_url(self) -> None:
         evidence = self.harness.source_lock()
