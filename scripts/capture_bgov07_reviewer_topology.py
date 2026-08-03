@@ -25,6 +25,11 @@ def _digest_bytes(value: bytes) -> str:
     return f"sha256:{hashlib.sha256(value).hexdigest()}"
 
 
+def _canonical_text_bytes(value: bytes) -> bytes:
+    """Return UTF-8 text with Git-compatible LF line endings."""
+    return value.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n").encode()
+
+
 def _exact_dict(value: object, where: str) -> dict[str, Any]:
     if type(value) is not dict:
         raise ValueError(f"{where} must be an exact dict")
@@ -79,7 +84,7 @@ def capture(
     non_author = [login for login in write_capable if login != pr_author]
 
     codeowners_path = repository / ".github/CODEOWNERS"
-    codeowners_bytes = codeowners_path.read_bytes()
+    codeowners_bytes = _canonical_text_bytes(codeowners_path.read_bytes())
     codeowners = _codeowners(codeowners_bytes.decode("utf-8"))
     non_author_codeowners = [
         owner_id for owner_id in codeowners if owner_id != f"@{pr_author}"

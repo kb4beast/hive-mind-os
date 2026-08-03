@@ -3,13 +3,15 @@
 ## Entry 1 — live topology capture
 
 - Subject base: `a9bf98f01dddd51356b26897c997966f347670cd`
-- Capture time: `2026-08-03T02:30:53Z`
+- Capture time: `2026-08-03T02:38:29Z`
 - Raw collaborator response:
   `sha256:bfaf4fdf04ae37443797c086a3fdd75ff405aec4614af325c1b7056976f63748`
 - CODEOWNERS:
-  `sha256:64947a83e059cb4af3e871a7bcb179494461e2c92f16b782bbd5fe4c6f3f1213`
+  `sha256:1eab82d07892125ab5f0625979d27239d8e278923034f9f3c36d77529c6504d5`
 - Reconciliation receipt:
-  `sha256:488b4f8b446a116bfe7457aef802fe2f3fa2e5a695800441b9514763e5494a61`
+  `sha256:6f4e0096cee2efabdb7ac0b4431cad3d747fa9fd5baf9359e84282b90a5b05fc`
+- Text evidence is normalized to Git-compatible LF bytes before hashing so the digest is
+  reproducible on Windows and Linux checkouts.
 
 ## Entry 2 — bounded finding
 

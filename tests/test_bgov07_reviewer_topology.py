@@ -6,7 +6,11 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-from scripts.capture_bgov07_reviewer_topology import _canonical_bytes, _digest_bytes
+from scripts.capture_bgov07_reviewer_topology import (
+    _canonical_bytes,
+    _canonical_text_bytes,
+    _digest_bytes,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 RECEIPT_ROOT = ROOT / "evidence/live/B-GOV-07"
@@ -65,7 +69,14 @@ class Bgov07ReviewerTopologyTests(unittest.TestCase):
         codeowners = ROOT / self.receipt["codeowners"]["path"]
         self.assertEqual(
             self.receipt["codeowners"]["digest"],
-            _digest_bytes(codeowners.read_bytes()),
+            _digest_bytes(_canonical_text_bytes(codeowners.read_bytes())),
+        )
+
+    def test_codeowners_digest_is_line_ending_independent(self) -> None:
+        value = b"* @owner\n/docs/ @docs\n"
+        self.assertEqual(
+            _digest_bytes(_canonical_text_bytes(value)),
+            _digest_bytes(_canonical_text_bytes(value.replace(b"\n", b"\r\n"))),
         )
 
     def test_blocker_remains_open_and_hostile_reseal_fails(self) -> None:
