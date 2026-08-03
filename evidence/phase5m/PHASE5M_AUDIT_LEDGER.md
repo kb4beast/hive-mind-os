@@ -64,3 +64,18 @@ not authenticated external participants.
   Phase 5D `sha256:dc85f9729df4152f8a156f5ce779777711bda32b9b315d48f3a4e36a785052ad`;
   Phase 5K `sha256:4efbbe2e70e2d000fedde4dbf425df8ed5e7a6986778c8d52f0d3faf254d5ef8`.
 - **Disposition:** retain both failed runs; require fresh exact-successor push and pull-request runs.
+
+## Entry 6 — exact-successor closure receipts
+
+- **Subject:** `da90b4430f8cb99113b58657db7539600e753395`
+- **Push run:** `30774229678`, fully successful
+- **Pull-request run:** `30774230905`, fully successful
+- **Verified gates:** Python 3.11/3.12/3.14, Ruff, Pyright 1.1.411, CodeQL, secret scan,
+  dependency/license review where applicable, wheel build, installed Phase 5A–D verification,
+  installed Phase 5E–K verification, SPDX SBOM, artifact upload, and push attestation.
+- **Judge:** Phase5M-Closure-Judge
+- **Disposition:** adopt closure of `P5E-DEBT-02`, `P5F-DEBT-02`, `P5G-DEBT-02`,
+  `P5H-DEBT-02`, `P5H-DEBT-05`, `P5I-DEBT-02`, and `P5J-DEBT-02`; retain all other
+  active debt and every external gate.
+- **Successor reconciliation:**
+  `sha256:abc6a0ebcb0b676d13529ccf71330cf683a75464d1b017cef6fc7c75a6ecb701`

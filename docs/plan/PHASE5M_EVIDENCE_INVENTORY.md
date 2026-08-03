@@ -4,7 +4,7 @@
 - **Target branch:** `release/version_1.1`
 - **Originating debt:** `P5E-DEBT-02`, `P5F-DEBT-02`, `P5G-DEBT-02`,
   `P5H-DEBT-02`, `P5I-DEBT-02`, and `P5J-DEBT-02`
-- **Status:** implemented locally; debt closure awaits exact-head hosted receipts
+- **Status:** exact successor head validated; closure recorded additively in Phase 5M
 - **Authority:** none
 
 ## Outcome
@@ -54,6 +54,10 @@ Initial exact-head runs `30773938617` and `30773951801` are retained failures. P
 correctly detected that the new permanent CI step changed the workflow digest sealed by the older
 Phase 5A–5C inventories. The successor regenerates the complete Phase 5A–5K chain and updates each
 hard-coded A→D predecessor digest; those initial runs are not closure evidence.
+
+Successor `da90b4430f8cb99113b58657db7539600e753395` passed exact push run `30774229678`
+and pull-request run `30774230905`. The additive closure record is
+`docs/plan/PHASE5M_DEBT_RECONCILIATION.md`; Phase 5L is not rewritten.
 
 ## Threats and rollback
 
