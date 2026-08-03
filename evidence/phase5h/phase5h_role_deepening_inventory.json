@@ -1,0 +1,60 @@
+{
+  "authenticated_independence_claimed": false,
+  "authority_added": false,
+  "base_head": "8ca34497051a9b50927f3615df49506f79d0046e",
+  "boundary_assertions": {
+    "outputs.court_disposition.authority": "none",
+    "outputs.court_disposition.disposition": "defer-non-release",
+    "outputs.court_disposition.p20_eligible": false,
+    "outputs.court_disposition.production_ready": false,
+    "outputs.court_disposition.release_ready": false,
+    "outputs.evidence_coverage.overall_status": "incomplete",
+    "outputs.role_inventory.release_eligible": false
+  },
+  "commands_executed_by_inventory": false,
+  "component": "role-deepening-court",
+  "contract_reproduction": {
+    "envelope_digest": "sha256:b26c317a3c6afa79f543619b21547cdf6413acf24399c1102b50efec3fda62ab",
+    "envelope_valid": true,
+    "output_digests": {
+      "conflict_register": "sha256:6657cfd4ee84b974f3d0f9c78f8fa6c73fc9f96b4a8d6595d9a3bacfe9323421",
+      "court_disposition": "sha256:48c16be6f8267910247a8b2d778fc18b3c8c3d23827f6724eaeaa94fd298bc30",
+      "evidence_coverage": "sha256:3ef49134b9b38f71edc9db398606f1b80130f06adc1bd10e594fa16c88552740",
+      "role_inventory": "sha256:2008b2f1116519e1554a3ab89d5911e1e534d4c6bac2673123b97e69d6d2b274"
+    },
+    "output_fields": [
+      "role_inventory",
+      "evidence_coverage",
+      "conflict_register",
+      "court_disposition"
+    ],
+    "request_digest": "sha256:f55bc102d2fefc3bf110335ed4a5b395aa81ab6b3476235dafb8e98020cc0121",
+    "request_valid": true
+  },
+  "deployment_authorized": false,
+  "external_dependencies_added": 0,
+  "implementation": {
+    ".github/workflows/ci.yml": "sha256:71c8db71879efade996210ba1567d088d2303789a0852fcc2eaa7e358b6787b8",
+    "docs/architecture/PHASE5H_ROLE_DEEPENING_CONSOLIDATION_COURT.md": "sha256:182ec10623fc15c9a2bba4c016d2238ee8b8ccf93eb678cbc094951e6fea6d8d",
+    "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
+    "src/hive_mind_os/foundation/role_deepening_court.py": "sha256:617f40f00ee9c31e720f7deba614cddc7e85a7a4e2aba721c852de88dd63bf60",
+    "src/hive_mind_os/foundation/role_deepening_court_contracts.py": "sha256:b327c3f9adcfaddd5ff5454fcc79342cb60f3b1e66cc3b10435f413b37cb4e0d",
+    "tests/test_phase5h_role_deepening_court.py": "sha256:e1c7d6cd07b01c0a01c94fd000eae3aae73050d6ef05610800def72a0cc41211",
+    "tests/test_phase5m_evidence_inventory.py": "sha256:1ca699adfdca965edfd22433f6689fe6c2ad60d2a7fb22f2e88c31fb09540b9c"
+  },
+  "inventory_digest": "sha256:8fe0edd8ddfb305abd2bae75342c0dd1e8dd24045f20995a3ba7f76107e1ce66",
+  "phase": 5,
+  "phase_item": "H",
+  "predecessor": {
+    "inventory_digest": "sha256:1258771ad87bd983deb86cf7b6c9e6e4af174187fb8dc22fbf873181f4931144",
+    "path": "evidence/phase5g/phase5g_optimizer_inventory.json"
+  },
+  "production_ready": false,
+  "promotion_authorized": false,
+  "release_ready": false,
+  "runtime_binding_added": false,
+  "schema_version": 1,
+  "superiority_claimed": false,
+  "tests_executed_by_inventory": false
+}
