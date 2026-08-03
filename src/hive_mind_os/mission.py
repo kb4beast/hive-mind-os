@@ -1753,6 +1753,8 @@ class RepositoryMission:
         allowance = self._reserve(3)
         assert self._evidence_root is not None
         before = set((self._evidence_root / "receipts").glob("*.json"))
+        materialization_options = {"source_mission_id": self.run_id}
+        materialization_options.update(self._source_materialization_options())
         try:
             workspace = GitWorkspace.materialize(
                 self.repository,
@@ -1763,7 +1765,7 @@ class RepositoryMission:
                 role=role,
                 risk=self.objective.risk,
                 allowance=allowance,
-                **self._source_materialization_options(),
+                **materialization_options,
             )
         finally:
             after = set((self._evidence_root / "receipts").glob("*.json"))

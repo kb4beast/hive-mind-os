@@ -275,6 +275,34 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
         self.assertEqual(kwargs["source_mission_id"], self.mission_id)
         self.assertEqual(kwargs["source_state_ref"], f"MISSION_STATE:{self.mission_id}:1")
 
+    def test_local_mission_materialization_binds_workspace_to_mission_identity(self) -> None:
+        fixture = build_fixture_repo(self.root / "local-mission-fixture")
+        store = MissionStore(self.root / "local-mission-store")
+        self.addCleanup(store.close)
+        mission = RepositoryMission(
+            fixture.root,
+            "Bind local workspace receipts to the durable mission",
+            mission_id="M-local-workspace-identity-1",
+            acceptance_specifications=(_specification(),),
+            mission_store=store,
+            output_dir=self.root / "local-mission-delivery",
+        )
+        mission._evidence_root = self.root / "local-mission-evidence"
+        workspace = SimpleNamespace(
+            root=self.root / "local-mission-workspace" / "repo",
+            receipt_records=(),
+        )
+        with patch.object(GitWorkspace, "materialize", return_value=workspace) as materialize:
+            observed = mission._materialize_once(
+                mission.pin,
+                self.root / "local-mission-workspace",
+                Role.EXPLORER,
+            )
+
+        self.assertIs(observed, workspace)
+        _, kwargs = materialize.call_args
+        self.assertEqual(kwargs["source_mission_id"], mission.run_id)
+
     def test_reopened_workspace_retains_authenticated_source_context_for_delivery(self) -> None:
         fixture = build_fixture_repo(self.root / "fixture")
         workspace = GitWorkspace.materialize(
