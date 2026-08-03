@@ -154,6 +154,8 @@ weakened to obtain a passing run.
 - `SRC-010`, `SRC-011`, `SRC-014`, and `SRC-015` still need whole-repository commit/tree pins;
   all external sources need retrieval/license coverage appropriate to their use.
 - `SRC-023` lacks a verified reuse grant and complete chain of custody.
-- Active GitHub repository rules and genuinely independent approval remain unverified.
+- Current GitHub repository rules, including administrator enforcement, are verified by the
+  2026-08-03 `B-GOV-06` addendum. A protected `main` delivery without bypass and genuinely
+  independent approval remain unverified.
 - No signed external actor identity, durable append-only store, complete-mediation gateway,
   provider reconciliation, production operation, or superiority evidence is claimed.

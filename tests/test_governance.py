@@ -67,7 +67,7 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertTrue(pull_request["require_last_push_approval"])
         self.assertEqual(
             rules["verification_status"],
-            "blocked_on_remote_admin_enforcement",
+            "admin_enforcement_verified_pending_protected_delivery",
         )
         evidence = ROOT / rules["verification_evidence"]
         self.assertTrue(evidence.is_file())
@@ -75,9 +75,10 @@ class RepositoryGovernanceTests(unittest.TestCase):
             rules["verification_evidence_digest"],
             "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest(),
         )
-        self.assertIn("administrator", rules["blocking_obligation"])
-        self.assertIn("enforcement", rules["blocking_obligation"])
-        self.assertIn("one-maintainer", rules["verification_residual"])
+        self.assertIn("without administrator bypass", rules["blocking_obligation"])
+        self.assertIn("PR #48", rules["blocking_obligation"])
+        self.assertIn("enforce_admins=true", rules["verification_residual"])
+        self.assertIn("B-GOV-07", rules["verification_residual"])
 
     def test_build_backend_is_exactly_pinned(self) -> None:
         project = tomllib.loads((ROOT / "pyproject.toml").read_text())
