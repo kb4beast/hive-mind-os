@@ -28,3 +28,14 @@
 - Ruff passed; Pyright 1.1.411 reported zero findings.
 - Every required document path is present and SHA-256 sealed.
 - Limit: `P5E/F/G-DEBT-03` remain active pending exact-head hosted receipts.
+
+## Entry 4 — failed inventory reconstruction and successor
+
+- Failed push run: `30775991954`
+- Failed pull-request run: `30776007077`
+- Subject: `26c21db8df2c0b0b8574f874111f02794fa81322`
+- Observation: Python 3.11/3.12/3.14 rejected current-tree Phase 5A–D inventory reconstruction.
+- Root cause: Phase 5A–D intentionally seal `docs/architecture/ADR_INDEX.md`; adding ADR-037–039
+  changed that protected input. Phase 5N's D-root check exposed all four stale links.
+- Successor: regenerate Phase 5A, update each hard-coded predecessor digest through Phase 5D, then
+  regenerate the Phase 5E–K chain. Preserve both failed runs; require fresh exact-head workflows.

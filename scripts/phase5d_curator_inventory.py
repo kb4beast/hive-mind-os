@@ -26,7 +26,7 @@ from hive_mind_os.foundation.curator_playbook_contracts import (
 
 OUTPUT_PATH = Path("evidence/phase5d/phase5d_curator_inventory.json")
 BASE_HEAD = "92a7f6ed96186a2a1c8fd1fd55147663f25588d9"
-PHASE5C_INVENTORY_DIGEST = "sha256:95655303cf9f130d99c4aa64a1fa2a9e2ec0d9a2ce7cd464311520c6fbcd9034"
+PHASE5C_INVENTORY_DIGEST = "sha256:25df6bf7c5b6b479f197ea505272182f0a75eac4efc7a3f48355b0de1c2679d9"
 
 
 def _digest_bytes(value: bytes) -> str:

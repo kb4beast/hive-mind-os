@@ -45,11 +45,11 @@
     "tests/test_phase5k_external_adoption_evidence.py": "sha256:53f680c0f0d7f4828b87edc420f10400800765314de94bbd29ce036e0b18c734",
     "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
   },
-  "inventory_digest": "sha256:5d137ad1171a4a3184b56bb5a9531eef450781d9ace69f582296c34cf41273d1",
+  "inventory_digest": "sha256:6eacf88a195c518db64ac2faab61e195ae160dd321c4f19011f1fceb5468fc97",
   "phase": 5,
   "phase_item": "K",
   "predecessor": {
-    "inventory_digest": "sha256:21e5cbe31a5b2f0b353738f826e4c495adc307842961c01c61cc120852c1bb17",
+    "inventory_digest": "sha256:c88588865cd83d9089d8c4362f828c532d8cd8ca4c3f78b6985ea3ba60bc8f4d",
     "path": "evidence/phase5j/phase5j_review_packet_inventory.json"
   },
   "production_ready": false,
