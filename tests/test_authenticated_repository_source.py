@@ -183,6 +183,36 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
             output_dir=self.root / "delivery",
         )
 
+    def committed_authenticated_workspace(self, label: str) -> GitWorkspace:
+        fixture = build_fixture_repo(self.root / f"{label}-fixture")
+        workspace = GitWorkspace.materialize(
+            fixture.root,
+            fixture.commit_two,
+            self.root / f"{label}-workspace",
+            self.root / f"{label}-evidence",
+            source_mission_id=self.mission_id,
+        )
+        base_tree = workspace._git_text(
+            ["rev-parse", "HEAD^{tree}"],
+            Action.READ_REPOSITORY,
+            "read fixture source tree for authenticated delivery lock",
+        )
+        workspace.create_branch(f"source/{label}-lock")
+        workspace.write_file(
+            "tiny_pkg/maths.py",
+            b"def increment(value: int) -> int:\n    return value + 1\n",
+        )
+        workspace.commit(f"fix: prepare {label} source custody delivery")
+        evidence = self.harness.source_lock(
+            commit_sha=fixture.commit_two,
+            tree_sha=base_tree,
+        )
+        workspace.source_lock = evidence.source_lock
+        workspace.source_lock_evidence = evidence
+        workspace.source_custody = self.harness.verifier
+        workspace.require_source_custody = True
+        return workspace
+
     def test_remote_mission_rejects_a_git_pin_without_external_source_custody(self) -> None:
         store = MissionStore(self.root / "unattested-missions")
         self.addCleanup(store.close)
@@ -294,38 +324,35 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
         self.assertEqual(manifest["source_custody"]["digest"], evidence.digest())
 
     def test_delivery_rejects_expired_authenticated_source_evidence(self) -> None:
-        fixture = build_fixture_repo(self.root / "expired-fixture")
-        workspace = GitWorkspace.materialize(
-            fixture.root,
-            fixture.commit_two,
-            self.root / "expired-workspace",
-            self.root / "expired-evidence",
-            source_mission_id=self.mission_id,
-        )
-        base_tree = workspace._git_text(
-            ["rev-parse", "HEAD^{tree}"],
-            Action.READ_REPOSITORY,
-            "read fixture source tree for expired delivery lock",
-        )
-        workspace.create_branch("source/expired-lock")
-        workspace.write_file(
-            "tiny_pkg/maths.py",
-            b"def increment(value: int) -> int:\n    return value + 1\n",
-        )
-        workspace.commit("fix: reject expired source custody before delivery")
-        evidence = self.harness.source_lock(
-            commit_sha=fixture.commit_two,
-            tree_sha=base_tree,
-        )
-        workspace.source_lock = evidence.source_lock
-        workspace.source_lock_evidence = evidence
-        workspace.source_custody = self.harness.verifier
-        workspace.require_source_custody = True
+        workspace = self.committed_authenticated_workspace("expired")
         self.harness.now += timedelta(minutes=6)
 
         with self.assertRaisesRegex(GitOperationFailed, "source custody was rejected"):
             workspace.export_delivery(self.root / "expired-delivery")
         self.assertFalse((self.root / "expired-delivery").exists())
+
+    def test_delivery_rejects_source_evidence_that_expires_during_staging(self) -> None:
+        workspace = self.committed_authenticated_workspace("staging")
+        verify = self.harness.verifier.verify_for_materialization
+        calls = 0
+
+        def advance_clock_after_initial_check(*args: object, **kwargs: object) -> SourceLock:
+            nonlocal calls
+            calls += 1
+            result = verify(*args, **kwargs)
+            if calls == 1:
+                self.harness.now += timedelta(minutes=6)
+            return result
+
+        with patch.object(
+            self.harness.verifier,
+            "verify_for_materialization",
+            side_effect=advance_clock_after_initial_check,
+        ):
+            with self.assertRaisesRegex(GitOperationFailed, "source custody was rejected"):
+                workspace.export_delivery(self.root / "staging-delivery")
+        self.assertEqual(calls, 2)
+        self.assertFalse((self.root / "staging-delivery").exists())
 
     def test_reopened_workspace_rejects_mismatched_authenticated_source_bindings(self) -> None:
         evidence = self.harness.source_lock()

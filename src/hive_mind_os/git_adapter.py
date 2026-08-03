@@ -982,6 +982,7 @@ class GitWorkspace:
                 artifact_root=staging,
             ):
                 raise GitOperationFailed("delivery receipt index failed validation")
+            self._reverify_authenticated_source_custody()
             _atomic_write(
                 staging / "delivery.json",
                 json.dumps(
