@@ -18,7 +18,12 @@ from hive_mind_os.custody import (
     Ed25519CustodyVerifier,
     TrustAnchor,
 )
-from hive_mind_os.git_adapter import GitOperationFailed, GitWorkspace, verify_delivery
+from hive_mind_os.git_adapter import (
+    GitOperationFailed,
+    GitWorkspace,
+    PinViolation,
+    verify_delivery,
+)
 from hive_mind_os.mission import MissionFailed, RepositoryMission
 from hive_mind_os.mission_store import (
     MissionStore,
@@ -302,6 +307,19 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
         self.assertIs(observed, workspace)
         _, kwargs = materialize.call_args
         self.assertEqual(kwargs["source_mission_id"], mission.run_id)
+
+    def test_git_workspace_rejects_a_pathlike_mission_identity_before_materialization(self) -> None:
+        fixture = build_fixture_repo(self.root / "identity-fixture")
+        workspace_root = self.root / "identity-workspace"
+        with self.assertRaisesRegex(PinViolation, "mission identity"):
+            GitWorkspace.materialize(
+                fixture.root,
+                fixture.commit_two,
+                workspace_root,
+                self.root / "identity-evidence",
+                source_mission_id="M/foreign",
+            )
+        self.assertFalse(workspace_root.exists())
 
     def test_reopened_workspace_retains_authenticated_source_context_for_delivery(self) -> None:
         fixture = build_fixture_repo(self.root / "fixture")

@@ -389,6 +389,15 @@ class GitWorkspace:
         )
         pin = _full_sha(commit_sha)
         mission_id = source_mission_id or f"git-workspace-{uuid4()}"
+        if (
+            not isinstance(mission_id, str)
+            or not mission_id.strip()
+            or "/" in mission_id
+            or "\\" in mission_id
+        ):
+            raise PinViolation(
+                "workspace mission identity must be a nonempty identifier without path separators"
+            )
         authenticated_source_lock: SourceLock | None = None
         if source_lock is None:
             if source_custody is not None:
