@@ -47,3 +47,19 @@
   failure. It does not replace the 48 successful affected tests.
 - `B-OPS-08` remains open. Exact-head hosted Linux matrices are required before the three structural
   debts can close.
+
+## Entry 5 — exact-head hosted closure receipt
+
+- Subject: `4a80698a9c5a22569e79f936dda85c1921397bcb`
+- Push workflow: `30777962621`, fully successful
+- Pull-request workflow: `30777987391`, fully successful
+- Python 3.11, 3.12, and 3.14 deterministic suites; Ruff; Pyright; CodeQL; secret scan;
+  dependency/license review; build; installed-wheel checks; Phase 5 inventories; release audit;
+  SBOM; and build provenance passed as applicable to each event.
+- Full-output inventory:
+  `sha256:afb7a7d54357c5b50d6db276b064b97f1a803b33e495fd15adca455b0e5bdd38`
+- Judgment: close only `P5E-DEBT-01`, `P5F-DEBT-01`, and `P5G-DEBT-01`. Retain all eleven
+  external-input debts, `B-OPS-08`, ADR-015, P14/P20, and every false readiness, authority,
+  independence, learning, promotion, and superiority claim.
+- Reconciliation:
+  `sha256:1b40dd4045d7f7b036a025fad8f3bea79d08468cfd5d01e6d6bf52bb5e10b22c`
