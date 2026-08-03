@@ -321,3 +321,15 @@ evidence, not declaration; all external side effects are idempotent and token-sa
   review permits the repaired exact head. No release-readiness, independent-human-
   approval, source-completeness, signed-provider-identity, merge-authority,
   deployment-authority, or superiority claim is made.
+
+### B-GOV-06 administrator-enforcement addendum
+
+- On 2026-08-03, the repository adapter and a separate GitHub CLI REST capture both observed every
+  declared rule and `enforce_admins=true` on `main`.
+- The adapter report is
+  `sha256:74735dc048094b26deee7b17b58a465b00c649b0a9db082eb793ac324bec9041`;
+  the bounded reconciliation receipt is
+  `sha256:9a2e540a20d7fb83a84157031a63de42b4774c95c450a6e93c8069af48430188`.
+- This supersedes only the current host-setting residual. `B-GOV-06` remains open until PR #48
+  completes a protected `main` delivery without bypass. `B-GOV-07` and independent-human approval
+  remain unresolved.

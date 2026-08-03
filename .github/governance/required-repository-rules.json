@@ -31,10 +31,10 @@
     ]
   },
   "separation_requirement": "At least one approval must come from an identity that did not author, push, build, or judge the change.",
-  "verification_status": "blocked_on_remote_admin_enforcement",
-  "verification_evidence": "evidence/live/P07/github-receipts/github/protection/08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7.json",
-  "verification_evidence_digest": "sha256:08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7",
-  "verified_at": "2026-07-28",
-  "verification_residual": "The required checks and review rules are active, but one-maintainer review independence remains unresolved and the live branch protection reports enforce_admins=false. PR #27 was merged with no reviews while required unit checks were pending and later failed.",
-  "blocking_obligation": "A repository administrator must enable enforcement for administrators (GitHub's 'Do not allow bypassing the above settings'), then an independent Integrator must capture a matching ProtectionReport before protected-governance completion is reclaimed."
+  "verification_status": "admin_enforcement_verified_pending_protected_delivery",
+  "verification_evidence": "evidence/live/B-GOV-06/adapter/github/protection/74735dc048094b26deee7b17b58a465b00c649b0a9db082eb793ac324bec9041.json",
+  "verification_evidence_digest": "sha256:74735dc048094b26deee7b17b58a465b00c649b0a9db082eb793ac324bec9041",
+  "verified_at": "2026-08-03",
+  "verification_residual": "Two capture methods now agree that all declared rules are active and enforce_admins=true. B-GOV-06 remains open until PR #48 completes a protected main delivery without administrator bypass; B-GOV-07 reviewer and CODEOWNER independence remains unresolved.",
+  "blocking_obligation": "Complete PR #48 through all required checks, two non-author approvals, required code-owner approval, stale-review and last-push enforcement, and merge to main without administrator bypass; then capture the protected delivery receipt before closing B-GOV-06."
 }
