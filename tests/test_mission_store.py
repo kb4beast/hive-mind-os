@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.contracts import tool_intent_digest, validate_contract
 from hive_mind_os.mission import RepositoryMission, ScriptedRepositoryBackend
 from hive_mind_os.mission_store import (
@@ -65,6 +66,13 @@ def _mission(
         fixture.root,
         "Fix the failing test",
         acceptance_criteria=("increment(1) returns 2",),
+        acceptance_specifications=(
+            AcceptanceSpecification(
+                "increment-returns-two",
+                "increment(1) returns 2",
+                FAST_CRITERION_ARGV,
+            ),
+        ),
         backend=_backend(),
         pin=fixture.commit_two,
         output_dir=output,
@@ -135,9 +143,8 @@ def _case_kill_at_every_boundary_resumes_without_duplicate_effects(
         step_index,
         boundary,
     )
-    publish_effect_is_visible = (
-        step_index == 17
-        or (step_index == 16 and boundary == "after_effect")
+    publish_effect_is_visible = step_index == 17 or (
+        step_index == 16 and boundary == "after_effect"
     )
     assert output.exists() is publish_effect_is_visible
     report = asyncio.run(resume_mission(store, mission_id))
@@ -147,9 +154,7 @@ def _case_kill_at_every_boundary_resumes_without_duplicate_effects(
     assert len(checkpoints) == DURABLE_STEP_COUNT
     assert store.idempotency_count(mission_id) == DURABLE_STEP_COUNT
     receipt_files = list(
-        (
-            store.mission_root(mission_id) / "checkpoint-receipts"
-        ).glob("*.json")
+        (store.mission_root(mission_id) / "checkpoint-receipts").glob("*.json")
     )
     assert len(receipt_files) == DURABLE_STEP_COUNT
     assert all(checkpoint.execution_count == 1 for checkpoint in checkpoints)
@@ -162,9 +167,7 @@ def _case_workspace_drift_blocks_with_reconciliation_report(
     tmp_path: Path,
 ) -> None:
     store, mission_id, output = _interrupt(tmp_path, 4, "after_effect")
-    builder = Path(
-        store.mission(mission_id)["workspaces"]["builder"]["container"]
-    )
+    builder = Path(store.mission(mission_id)["workspaces"]["builder"]["container"])
     (builder / "repo" / "tiny_pkg" / "maths.py").write_text(
         "def increment(value: int) -> int:\n    return value + 99\n",
         encoding="utf-8",
@@ -183,9 +186,7 @@ def _case_workspace_drift_blocks_with_reconciliation_report(
 
 def _case_lost_workspace_rebuilds_and_completes(tmp_path: Path) -> None:
     store, mission_id, output = _interrupt(tmp_path, 4, "after_effect")
-    builder = Path(
-        store.mission(mission_id)["workspaces"]["builder"]["container"]
-    )
+    builder = Path(store.mission(mission_id)["workspaces"]["builder"]["container"])
     _remove_workspace_tree(builder)
     report = asyncio.run(resume_mission(store, mission_id))
     assert report.status is WorkStatus.SUCCEEDED
@@ -224,15 +225,53 @@ def _case_checkpoint_digest_tamper_fails_closed(tmp_path: Path) -> None:
     store.close()
 
 
+def _case_configuration_tamper_fails_closed(tmp_path: Path) -> None:
+    store, mission_id, output = _interrupt(tmp_path, 0, "after_intent")
+    with store._connection:
+        store._connection.execute(
+            "UPDATE missions SET config_json=? WHERE mission_id=?",
+            (
+                json.dumps(
+                    {
+                        "repository": "attacker/repository",
+                        "objective": "attacker objective",
+                    }
+                ),
+                mission_id,
+            ),
+        )
+    with _assert_raises(StoreIntegrityError, match="configuration"):
+        store.mission(mission_id)
+    assert not output.exists()
+    store.close()
+
+
+def _case_unstarted_effect_receipt_is_rejected(tmp_path: Path) -> None:
+    store, mission_id, output = _interrupt(tmp_path, 0, "after_intent")
+    checkpoint = store.checkpoint(mission_id, 0)
+    receipt_path = (
+        store.mission_root(mission_id)
+        / "checkpoint-receipts"
+        / f"{checkpoint.intent_digest.removeprefix('sha256:')}.json"
+    )
+    receipt_path.parent.mkdir(parents=True)
+    receipt_path.write_text(
+        json.dumps({"intent_digest": checkpoint.intent_digest}),
+        encoding="utf-8",
+    )
+    with _assert_raises(StoreIntegrityError, match="outcome or records"):
+        store.find_effect_receipt(checkpoint)
+    assert not output.exists()
+    store.close()
+
+
 def _case_store_version_fails_closed(tmp_path: Path) -> None:
     state = tmp_path / "state"
     store = MissionStore(state)
     store.close()
     connection = sqlite3.connect(state / "missions.sqlite3")
     with connection:
-        connection.execute(
-            "UPDATE metadata SET value='999' WHERE key='schema_version'"
-        )
+        connection.execute("UPDATE metadata SET value='999' WHERE key='schema_version'")
     connection.close()
     with _assert_raises(StoreVersionError, match="unsupported"):
         MissionStore(state)
@@ -374,12 +413,9 @@ def _case_raw_effect_receipt_is_adopted_without_reexecution(
     assert interrupted.state == "intent"
     assert interrupted.execution_count == 1
     raw_before = list(
-        (
-            store.mission_root(mission_id)
-            / "staging"
-            / "evidence"
-            / "receipts"
-        ).glob("*.json")
+        (store.mission_root(mission_id) / "staging" / "evidence" / "receipts").glob(
+            "*.json"
+        )
     )
     assert len(raw_before) == 4
 
@@ -388,23 +424,20 @@ def _case_raw_effect_receipt_is_adopted_without_reexecution(
     assert output.is_dir()
     assert store.checkpoint(mission_id, 1).execution_count == 1
     raw_after = list(
-        (
-            store.mission_root(mission_id)
-            / "staging"
-            / "evidence"
-            / "receipts"
-        ).glob("*.json")
+        (store.mission_root(mission_id) / "staging" / "evidence" / "receipts").glob(
+            "*.json"
+        )
     )
     assert len(raw_after) == 45
     assert len(report.receipts) == 45
     assert report.budget_consumption["tool_calls"] == 45
     assert store.mission(mission_id)["budget"]["tool_calls_used"] == 45
-    assert len(
-        {
-            (str(record["path"]), str(record["digest"]))
-            for record in report.receipts
-        }
-    ) == 45
+    assert (
+        len(
+            {(str(record["path"]), str(record["digest"])) for record in report.receipts}
+        )
+        == 45
+    )
     store.close()
 
 
@@ -437,6 +470,8 @@ for _case in (
     _case_lost_workspace_rebuilds_and_completes,
     _case_uncheckpointed_partial_workspace_rebuilds,
     _case_checkpoint_digest_tamper_fails_closed,
+    _case_configuration_tamper_fails_closed,
+    _case_unstarted_effect_receipt_is_rejected,
     _case_store_version_fails_closed,
     _case_store_crud_idempotency_and_state_schema,
     _case_completed_state_round_trips_and_validates,

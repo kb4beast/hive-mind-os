@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/hard-isolation-profile.schema.json",
+  "title": "Hive Mind OS Hard Isolation Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile_id", "runtime", "runtime_digest", "image_digest", "guest_executable_digest", "guest_executable_path", "source_snapshot_digest", "source_mount", "writable_overlay", "limits", "controller_identity", "credential_broker_identity", "rootfs_read_only", "source_read_only", "host_home_mounted", "host_evidence_mounted", "host_socket_mounted", "host_devices_mounted", "no_new_privileges", "egress_enforcement", "egress_proxy_identity", "egress_proxy_digest", "network_grants"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "runtime": {"enum": ["oci-container", "hyperv-container", "ephemeral-vm"]},
+    "runtime_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "guest_executable_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "guest_executable_path": {"type": "string", "format": "portable-relative-path"},
+    "source_snapshot_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_mount": {"type": "string", "format": "portable-relative-path"},
+    "writable_overlay": {"type": "string", "format": "portable-relative-path"},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu_millis", "memory_bytes", "process_count", "disk_bytes", "output_bytes", "wall_time_seconds", "file_count"],
+      "properties": {
+        "cpu_millis": {"type": "integer", "minimum": 1},
+        "memory_bytes": {"type": "integer", "minimum": 1},
+        "process_count": {"type": "integer", "minimum": 1},
+        "disk_bytes": {"type": "integer", "minimum": 1},
+        "output_bytes": {"type": "integer", "minimum": 1},
+        "wall_time_seconds": {"type": "integer", "minimum": 1},
+        "file_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "controller_identity": {"type": "string", "minLength": 1, "maxLength": 256},
+    "credential_broker_identity": {"type": "string", "minLength": 1, "maxLength": 256},
+    "rootfs_read_only": {"const": true},
+    "source_read_only": {"const": true},
+    "host_home_mounted": {"const": false},
+    "host_evidence_mounted": {"const": false},
+    "host_socket_mounted": {"const": false},
+    "host_devices_mounted": {"const": false},
+    "no_new_privileges": {"const": true},
+    "egress_enforcement": {"enum": ["deny-all", "pinned-egress-proxy"]},
+    "egress_proxy_identity": {"type": ["string", "null"], "maxLength": 256},
+    "egress_proxy_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "network_grants": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["protocol", "destination", "port", "dns_pin_digest"],
+        "properties": {
+          "protocol": {"enum": ["tcp", "udp"]},
+          "destination": {"type": "string", "minLength": 1, "maxLength": 253},
+          "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+          "dns_pin_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"network_grants": {"maxItems": 0}}}, "then": {"properties": {"egress_enforcement": {"const": "deny-all"}, "egress_proxy_identity": {"type": "null"}, "egress_proxy_digest": {"type": "null"}}}},
+    {"if": {"properties": {"network_grants": {"minItems": 1}}}, "then": {"properties": {"egress_enforcement": {"const": "pinned-egress-proxy"}, "egress_proxy_identity": {"type": "string", "minLength": 1}, "egress_proxy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}}
+  ]
+}

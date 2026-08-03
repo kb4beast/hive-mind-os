@@ -133,12 +133,34 @@ budget, ledger, all eight roles, and an independently re-executing Curator. The 
 backend is deterministic and offline; the model backend uses the configured P02 provider
 but executes its proposed actions through the same typed capabilities.
 
+Every delivery criterion requires a separately supplied executable acceptance
+specification. The specification is the allowed verification command, not a suggestion to
+the Curator. For example, save the following as `increment-returns-two.json` for the
+fixture objective:
+
+```json
+{
+  "schema_version": 1,
+  "id": "increment-returns-two",
+  "criterion": "increment(1) returns 2",
+  "command": {
+    "argv": ["/absolute/path/to/python", "-B", "-c", "from tiny_pkg.maths import increment; assert increment(1) == 2"],
+    "expected": "succeeded"
+  }
+}
+```
+
+The command's requested and resolved argv, specification digest, result, exit code, and
+output-truncation state are bound into the Curator receipt. A prose-only criterion, a
+substituted command, timeout, or truncated output cannot produce a delivery.
+
 ```bash
 hive-mind deliver \
   --repository /path/to/local/repository \
   --backend scripted \
   --objective "Fix the failing test" \
   --criterion "The previously failing test passes" \
+  --acceptance-spec /path/to/increment-returns-two.json \
   --output-dir /path/to/absent/delivery-directory
 ```
 

@@ -21,6 +21,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, TypeVar, cast
 from uuid import uuid4
 
+from .acceptance import (
+    AcceptanceSpecification,
+    AcceptanceSpecificationError,
+    normalize_acceptance_specifications,
+)
 from .autonomy import AutonomyBudget, BudgetExceeded, EpisodeAllowance
 from .contracts import tool_intent_digest
 from .curator import (
@@ -31,6 +36,7 @@ from .curator import (
     ReviewVerdict,
     check_context_manifest,
 )
+from .custody import ExternalCustodyAdapter
 from .git_adapter import (
     GitPolicyDenied,
     GitWorkspace,
@@ -43,6 +49,7 @@ from .models import (
     AutonomyLevel,
     Evidence,
     Objective,
+    RiskTier,
     Role,
     RunReport,
     WorkItem,
@@ -70,7 +77,7 @@ _SABOTAGE_TEST = (
     b"class MathsTests(unittest.TestCase):\n"
     b"    def test_increment_regression(self) -> None:\n"
     b"        self.assertEqual(increment(1), 0)\n\n\n"
-    b"if __name__ == \"__main__\":\n"
+    b'if __name__ == "__main__":\n'
     b"    unittest.main()\n"
 )
 _DEFAULT_TEST_ARGV = (
@@ -186,9 +193,7 @@ class MissionReport(RunReport):
         )
         payload["ledger_events"] = {
             "count": len(payload["ledger_events"]),
-            "actors": sorted(
-                {event["actor"] for event in payload["ledger_events"]}
-            ),
+            "actors": sorted({event["actor"] for event in payload["ledger_events"]}),
             "payloads": "<append-only-ledger-events>",
         }
         receipt_inventory: list[dict[str, Any]] = []
@@ -198,11 +203,15 @@ class MissionReport(RunReport):
                 record["action_kind"],
                 record["result"],
             )
-            if receipt_inventory and (
-                receipt_inventory[-1]["actor_id"],
-                receipt_inventory[-1]["action_kind"],
-                receipt_inventory[-1]["result"],
-            ) == key:
+            if (
+                receipt_inventory
+                and (
+                    receipt_inventory[-1]["actor_id"],
+                    receipt_inventory[-1]["action_kind"],
+                    receipt_inventory[-1]["result"],
+                )
+                == key
+            ):
                 receipt_inventory[-1]["count"] += 1
             else:
                 receipt_inventory.append(
@@ -461,16 +470,30 @@ class CuratorCapabilities(_CapabilityBase):
         super().__init__(mission, Role.CURATOR, workspace)
         self.candidate = candidate
 
-    def run_tests(
+    def run_acceptance_check(
         self,
-        argv: Sequence[str],
+        check: AcceptanceCheck,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+        specification = (
+            None
+            if check.specification_id is None
+            else {
+                "id": check.specification_id,
+                "digest": str(check.specification_digest),
+            }
+        )
         return self._call(
             Action.RUN_COMMANDS,
             1,
-            lambda: self.workspace.run_tests(argv),
+            lambda: self.workspace.run_tests(
+                check.argv,
+                acceptance_specification=specification,
+            ),
             description="run Curator verification command",
-            details={"argv": list(argv)},
+            details={
+                "argv": list(check.argv),
+                "acceptance_specification": specification,
+            },
         )
 
     def verify_delivery(
@@ -496,13 +519,18 @@ class RepositoryMission:
         objective: str,
         *,
         acceptance_criteria: Sequence[str] = (),
+        acceptance_specifications: Sequence[
+            AcceptanceSpecification | Mapping[str, object]
+        ] = (),
         backend: AgentBackend | None = None,
         pin: str | None = None,
         output_dir: str | Path = "hive-mind-delivery",
+        risk: RiskTier = RiskTier.MODERATE,
         policy: PolicyEngine | None = None,
         budget: AutonomyBudget | None = None,
         ledger: EvidenceLedger | None = None,
         mission_store: MissionStore | None = None,
+        custody: ExternalCustodyAdapter | None = None,
         github_delivery: GitHubDeliveryTarget | None = None,
         crash_hook: Callable[[int, str], None] | None = None,
         _run_id: str | None = None,
@@ -515,13 +543,44 @@ class RepositoryMission:
         if not objective.strip():
             raise ValueError("objective is required")
         self.run_id = _run_id or str(uuid4())
+        self.backend = backend or ScriptedRepositoryBackend()
+        try:
+            supplied_specifications = normalize_acceptance_specifications(
+                acceptance_specifications
+            )
+        except AcceptanceSpecificationError as error:
+            raise ValueError(f"invalid acceptance specifications: {error}") from None
+        declared_criteria = tuple(acceptance_criteria)
+        if supplied_specifications:
+            specification_criteria = tuple(
+                item.criterion for item in supplied_specifications
+            )
+            if declared_criteria and (
+                len(declared_criteria) != len(set(declared_criteria))
+                or set(declared_criteria) != set(specification_criteria)
+            ):
+                raise ValueError(
+                    "acceptance criteria must exactly match the typed specification set"
+                )
+            self.acceptance_specifications = supplied_specifications
+            declared_criteria = specification_criteria
+        elif declared_criteria:
+            raise ValueError(
+                "repository missions require typed executable acceptance "
+                "specifications for every acceptance criterion"
+            )
+        else:
+            raise ValueError(
+                "repository missions require at least one typed executable "
+                "acceptance specification"
+            )
         self.objective = Objective(
             objective,
             id=self.run_id,
             repository=str(self.repository),
-            acceptance_criteria=tuple(acceptance_criteria),
+            acceptance_criteria=declared_criteria,
+            risk=risk,
         )
-        self.backend = backend or ScriptedRepositoryBackend()
         self.pin = pin or _read_local_head(self.repository)
         self.output_dir = Path(os.path.abspath(output_dir))
         self.policy = policy or PolicyEngine(AutonomyLevel.REPOSITORY)
@@ -550,6 +609,7 @@ class RepositoryMission:
         self._context_manifests: list[dict[str, Any]] = []
         self._evidence_root: Path | None = None
         self.mission_store = mission_store
+        self.custody = custody
         self.github_delivery = github_delivery
         self.crash_hook = crash_hook
         self._resume = _resume
@@ -566,7 +626,11 @@ class RepositoryMission:
             config = {
                 "repository": str(self.repository),
                 "objective": objective,
-                "acceptance_criteria": list(acceptance_criteria),
+                "acceptance_criteria": list(self.objective.acceptance_criteria),
+                "acceptance_specifications": [
+                    item.to_dict() for item in self.acceptance_specifications
+                ],
+                "risk": self.objective.risk.name.lower(),
                 "pin": self.pin,
                 "output_dir": str(self.output_dir),
                 "backend": "scripted",
@@ -574,13 +638,9 @@ class RepositoryMission:
                 "test_argv": list(self.backend.test_argv),
                 "criterion_argv": list(self.backend.criterion_argv),
                 "source_pack_fingerprint": sha256_digest(
-                    (
-                        str(self.repository)
-                        + "\0"
-                        + self.pin
-                        + "\0"
-                        + objective
-                    ).encode("utf-8")
+                    (str(self.repository) + "\0" + self.pin + "\0" + objective).encode(
+                        "utf-8"
+                    )
                 ),
             }
             if self.github_delivery is not None:
@@ -598,21 +658,39 @@ class RepositoryMission:
                     "base": self.github_delivery.base,
                     "title": self.github_delivery.title,
                     "body": self.github_delivery.body,
-                    "desired_rules_path": str(
-                        self.github_delivery.desired_rules_path
-                    ),
-                    "max_check_attempts": (
-                        self.github_delivery.max_check_attempts
-                    ),
+                    "desired_rules_path": str(self.github_delivery.desired_rules_path),
+                    "max_check_attempts": (self.github_delivery.max_check_attempts),
                     "check_interval_s": self.github_delivery.check_interval_s,
                     "token_env": client.token_env,
                     "api_base": client.api_base,
                 }
-            if not self.mission_store.has_mission(self.run_id):
+            existing_mission = self.mission_store.has_mission(self.run_id)
+            if self.mission_store.require_authenticated_custody:
+                if self.custody is None:
+                    raise ValueError(
+                        "authenticated custody mission stores require an external custody adapter"
+                    )
+                if self.custody.verifier is not self.mission_store.custody_verifier:
+                    raise ValueError(
+                        "authenticated custody mission stores require the configured custody verifier"
+                    )
+                if existing_mission:
+                    stored = self.mission_store.mission(self.run_id)
+                    if stored["config"] != config:
+                        raise ValueError(
+                            "existing authenticated mission configuration differs from its sealed configuration"
+                        )
+            if not existing_mission:
+                configuration_attestation = (
+                    None
+                    if self.custody is None
+                    else self.custody.attest_configuration(self.run_id, config)
+                )
                 self.mission_store.register_mission(
                     self.run_id,
                     config,
                     self.budget,
+                    configuration_attestation=configuration_attestation,
                 )
 
     async def run(self) -> MissionReport:
@@ -646,6 +724,9 @@ class RepositoryMission:
                 "objective": self.objective.goal,
                 "repository": str(self.repository),
                 "output": str(final_output),
+                "acceptance_specifications": [
+                    item.to_dict() for item in self.acceptance_specifications
+                ],
             },
         )
 
@@ -672,9 +753,7 @@ class RepositoryMission:
                         prefix=f".{final_output.name}-mission-",
                     )
                 )
-                temporary_context = tempfile.TemporaryDirectory(
-                    prefix="hive-mind-p05-"
-                )
+                temporary_context = tempfile.TemporaryDirectory(prefix="hive-mind-p05-")
             candidate = staging_parent / (
                 "c" if self.mission_store is not None else "candidate"
             )
@@ -748,7 +827,9 @@ class RepositoryMission:
                         )
                         for action in self._actions(result):
                             if action["action"] != "run_tests":
-                                raise MissionFailed("Explorer proposed an unsupported action")
+                                raise MissionFailed(
+                                    "Explorer proposed an unsupported action"
+                                )
                             if explorer_test_argv is not None:
                                 raise MissionFailed(
                                     "Explorer must propose exactly one test command"
@@ -786,7 +867,9 @@ class RepositoryMission:
                         for action in self._actions(result):
                             name = action["action"]
                             if name == "create_branch":
-                                _, records = builder.create_branch(_required_string(action, "name"))
+                                _, records = builder.create_branch(
+                                    _required_string(action, "name")
+                                )
                                 action_receipts.extend(records)
                             elif name == "write_file":
                                 try:
@@ -811,9 +894,7 @@ class RepositoryMission:
                                     explorer_test_argv,
                                     Role.BUILDER,
                                 )
-                                receipt, records = builder.run_tests(
-                                    test_argv
-                                )
+                                receipt, records = builder.run_tests(test_argv)
                                 action_receipts.extend(records)
                                 builder_test_passed = receipt["result"] == "succeeded"
                                 if not builder_test_passed:
@@ -824,7 +905,9 @@ class RepositoryMission:
                                 )
                                 action_receipts.extend(records)
                             else:
-                                raise MissionFailed("Builder proposed an unsupported action")
+                                raise MissionFailed(
+                                    "Builder proposed an unsupported action"
+                                )
                         branch = active_builder.branch_name
                         if (
                             branch is None
@@ -872,8 +955,11 @@ class RepositoryMission:
                             objective=self.objective.goal,
                             acceptance_criteria=self.objective.acceptance_criteria,
                             base_workspace=explorer.workspace.root,
+                            acceptance_specifications=self.acceptance_specifications,
                         )
-                        review.seal(self._blind_acceptance_checks(result))
+                        review.seal(
+                            self._blind_acceptance_checks(explorer_test_argv)
+                        )
                         verification_manifest = self._recorded_verification_manifest(
                             manifest
                         )
@@ -897,7 +983,7 @@ class RepositoryMission:
                         verdict, review_records = review.reproduce(
                             head_workspace=curator_workspace.root,
                             declared_paths=builder_declared_paths,
-                            command_runner=curator.run_tests,
+                            command_runner=curator.run_acceptance_check,
                             repository_test_argv=explorer_test_argv,
                             delivery_verifier=curator.verify_delivery,
                             provenance_resolves=self._provenance_resolves(),
@@ -1000,12 +1086,8 @@ class RepositoryMission:
                         base=self.github_delivery.base,
                         title=self.github_delivery.title,
                         body=self.github_delivery.body,
-                        desired_rules_path=(
-                            self.github_delivery.desired_rules_path
-                        ),
-                        max_check_attempts=(
-                            self.github_delivery.max_check_attempts
-                        ),
+                        desired_rules_path=(self.github_delivery.desired_rules_path),
+                        max_check_attempts=(self.github_delivery.max_check_attempts),
                         check_interval_s=self.github_delivery.check_interval_s,
                     )
                     self._record_workspace_receipts(builder_workspace)
@@ -1025,8 +1107,7 @@ class RepositoryMission:
                         "draft": delivery.pull_request.draft,
                         "check_count": len(delivery.checks),
                         "check_receipt_digests": [
-                            check.receipt["digest"]
-                            for check in delivery.checks
+                            check.receipt["digest"] for check in delivery.checks
                         ],
                         "protection_matches": delivery.protection.matches,
                         "protection_report": {
@@ -1046,12 +1127,8 @@ class RepositoryMission:
                             "github.protection.mismatch",
                             Role.INTEGRATOR.value,
                             {
-                                "mismatches": list(
-                                    delivery.protection.mismatches
-                                ),
-                                "report": github_delivery_record[
-                                    "protection_report"
-                                ],
+                                "mismatches": list(delivery.protection.mismatches),
+                                "report": github_delivery_record["protection_report"],
                             },
                         )
                 if self.mission_store is None:
@@ -1062,9 +1139,7 @@ class RepositoryMission:
                         "write",
                         "bind mission evidence into candidate",
                         {"candidate": str(candidate)},
-                        lambda: self._copy_and_validate_mission_evidence(
-                            candidate
-                        ),
+                        lambda: self._copy_and_validate_mission_evidence(candidate),
                     )
                 if self.mission_store is None:
                     os.replace(candidate, final_output)
@@ -1223,9 +1298,8 @@ class RepositoryMission:
             raise ValueError("output parent must be an existing directory")
         if parent.resolve() != parent:
             raise ValueError("output parent must not traverse a symlink or junction")
-        if (
-            not allow_existing
-            and (self.output_dir.exists() or self.output_dir.is_symlink())
+        if not allow_existing and (
+            self.output_dir.exists() or self.output_dir.is_symlink()
         ):
             raise ValueError("output directory must not already exist")
         try:
@@ -1252,9 +1326,8 @@ class RepositoryMission:
 
     def _reserve(self, expected_calls: int) -> EpisodeAllowance:
         allowance = self.budget.issue_allowance()
-        if (
-            allowance.tool_calls < expected_calls
-            or allowance.compute_units < float(expected_calls)
+        if allowance.tool_calls < expected_calls or allowance.compute_units < float(
+            expected_calls
         ):
             raise BudgetExceeded(
                 f"mission allowance exhausted before {expected_calls} tool calls"
@@ -1306,6 +1379,7 @@ class RepositoryMission:
                 self._evidence_root,
                 policy=self.policy,
                 role=role,
+                risk=self.objective.risk,
                 allowance=allowance,
             )
         finally:
@@ -1342,9 +1416,7 @@ class RepositoryMission:
             details={"bundle_digest": sha256_digest(bundle)},
             workspace_key=Role.CURATOR.value,
         )
-        manifest = json.loads(
-            (candidate / "delivery.json").read_text(encoding="utf-8")
-        )
+        manifest = json.loads((candidate / "delivery.json").read_text(encoding="utf-8"))
         branch = _required_string(manifest, "branch_name")
         head_sha = _required_string(manifest, "head_sha")
         self._authorize(Role.CURATOR, Action.READ_REPOSITORY)
@@ -1441,9 +1513,7 @@ class RepositoryMission:
             if accounting_errors:
                 operation_error.add_note("; ".join(accounting_errors))
             raise
-        records = tuple(
-            dict(record) for record in workspace.receipt_records[before:]
-        )
+        records = tuple(dict(record) for record in workspace.receipt_records[before:])
         self._consume(allowance, len(records))
         self._record_workspace_receipts(workspace)
         return value, records
@@ -1474,6 +1544,7 @@ class RepositoryMission:
                 self._evidence_root,
                 base_sha=base_sha,
                 role=role,
+                risk=self.objective.risk,
                 policy=self.policy,
                 allowance=EpisodeAllowance(
                     self.budget.max_tool_calls_per_episode,
@@ -1748,9 +1819,7 @@ class RepositoryMission:
             found = self.mission_store.find_effect_receipt(checkpoint)
             if found is not None:
                 reference, wrapper = found
-                records = tuple(
-                    dict(record) for record in wrapper["records"]
-                )
+                records = tuple(dict(record) for record in wrapper["records"])
                 self._account_recovered_records(records)
                 self.mission_store.complete_step(
                     checkpoint,
@@ -1862,8 +1931,7 @@ class RepositoryMission:
         records: Sequence[Mapping[str, Any]],
     ) -> None:
         self._recovery_claimed_receipts.update(
-            (str(record["path"]), str(record["digest"]))
-            for record in records
+            (str(record["path"]), str(record["digest"])) for record in records
         )
 
     def _receipt_document(
@@ -1871,9 +1939,7 @@ class RepositoryMission:
         record: Mapping[str, Any],
     ) -> dict[str, Any]:
         assert self._evidence_root is not None
-        path = self._evidence_root / Path(
-            *portable_path_parts(str(record["path"]))
-        )
+        path = self._evidence_root / Path(*portable_path_parts(str(record["path"])))
         document = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(document, dict):
             raise MissionFailed("capability receipt is not a JSON object")
@@ -1934,16 +2000,16 @@ class RepositoryMission:
                 return True, snapshot["head_sha"]
         if description == "export reversible delivery candidate":
             candidate = details.get("candidate")
-            if isinstance(candidate, str) and (
-                Path(candidate) / "delivery.json"
-            ).is_file():
+            if (
+                isinstance(candidate, str)
+                and (Path(candidate) / "delivery.json").is_file()
+            ):
                 return True, None
         if description == "materialize candidate head for Curator":
             expected = details.get("head_sha")
             if (
                 isinstance(expected, str)
-                and workspace_snapshot(workspace.container_root)["head_sha"]
-                == expected
+                and workspace_snapshot(workspace.container_root)["head_sha"] == expected
             ):
                 return True, None
         return False, None
@@ -2003,10 +2069,7 @@ class RepositoryMission:
                 for key, item in value.items()
             }
         if isinstance(value, (list, tuple)):
-            return [
-                RepositoryMission._encode_durable_value(item)
-                for item in value
-            ]
+            return [RepositoryMission._encode_durable_value(item) for item in value]
         return {"__type__": "ignored", "value": type(value).__name__}
 
     @staticmethod
@@ -2024,8 +2087,7 @@ class RepositoryMission:
             }
         if isinstance(value, list):
             return tuple(
-                RepositoryMission._decode_durable_value(item)
-                for item in value
+                RepositoryMission._decode_durable_value(item) for item in value
             )
         return value
 
@@ -2055,11 +2117,12 @@ class RepositoryMission:
         os.replace(self._evidence_root, destination)
         validator = FileReceiptValidator(destination)
         for record in self._receipt_records:
+            reference = ReceiptReference(
+                str(record["path"]),
+                str(record["digest"]),
+            )
             validation = validator.validate(
-                ReceiptReference(
-                    str(record["path"]),
-                    str(record["digest"]),
-                ),
+                reference,
                 mission_id=str(record["mission_id"]),
                 state_ref=str(record["state_ref"]),
                 actor_id=str(record["actor_id"]),
@@ -2072,6 +2135,7 @@ class RepositoryMission:
                     "failed-run receipt failed validation: "
                     + "; ".join(validation.issues)
                 )
+            self._verify_custody_evidence(destination, record, reference)
         return str(destination)
 
     def _verify_candidate(
@@ -2097,6 +2161,7 @@ class RepositoryMission:
                 receipt_records=records,
                 policy=self.policy,
                 role=Role.CURATOR,
+                risk=self.objective.risk,
                 allowance=allowance,
             )
         finally:
@@ -2161,6 +2226,8 @@ class RepositoryMission:
             if key in self._seen_receipts:
                 continue
             copied = dict(record)
+            if self.custody is not None:
+                copied["custody_attestation"] = self._attest_or_verify_receipt(copied)
             self._seen_receipts.add(key)
             self._receipt_records.append(copied)
             self.ledger.append_event(
@@ -2169,6 +2236,49 @@ class RepositoryMission:
                 str(record["actor_id"]),
                 copied,
             )
+
+    def _attest_or_verify_receipt(
+        self,
+        record: Mapping[str, Any],
+    ) -> dict[str, object]:
+        if self._evidence_root is None:
+            raise MissionFailed("authenticated custody requires an initialized evidence root")
+        try:
+            reference = ReceiptReference(str(record["path"]), str(record["digest"]))
+            receipt_path = self._evidence_root / Path(*reference.path.split("/"))
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise MissionFailed(
+                "authenticated custody receipt bytes are unavailable"
+            ) from error
+        if not isinstance(receipt, Mapping):
+            raise MissionFailed("authenticated custody receipt is not an object")
+        validation = FileReceiptValidator(self._evidence_root).validate(
+            reference,
+            mission_id=str(record["mission_id"]),
+            state_ref=str(record["state_ref"]),
+            actor_id=str(record["actor_id"]),
+            action_id=str(record["action_id"]),
+            action_kind=str(record["action_kind"]),
+            action_digest=str(record["action_digest"]),
+        )
+        if not validation.valid:
+            raise MissionFailed(
+                "authenticated custody local receipt rejected: "
+                + "; ".join(validation.issues)
+            )
+        assert self.custody is not None
+        existing = record.get("custody_attestation")
+        try:
+            if isinstance(existing, Mapping):
+                return self.custody.verifier.verify_receipt(
+                    receipt,
+                    reference,
+                    existing,
+                )
+            return self.custody.attest_receipt(receipt, reference)
+        except (RuntimeError, ValueError) as error:
+            raise MissionFailed(f"authenticated custody receipt rejected: {error}") from None
 
     def _copy_and_validate_mission_evidence(self, candidate: Path) -> None:
         assert self._evidence_root is not None
@@ -2181,11 +2291,12 @@ class RepositoryMission:
     def _validate_mission_evidence(self, evidence_root: Path) -> None:
         validator = FileReceiptValidator(evidence_root)
         for record in self._receipt_records:
+            reference = ReceiptReference(
+                str(record["path"]),
+                str(record["digest"]),
+            )
             validation = validator.validate(
-                ReceiptReference(
-                    str(record["path"]),
-                    str(record["digest"]),
-                ),
+                reference,
                 mission_id=str(record["mission_id"]),
                 state_ref=str(record["state_ref"]),
                 actor_id=str(record["actor_id"]),
@@ -2195,29 +2306,56 @@ class RepositoryMission:
             )
             if not validation.valid:
                 raise MissionFailed(
-                    "mission receipt failed validation: "
-                    + "; ".join(validation.issues)
+                    "mission receipt failed validation: " + "; ".join(validation.issues)
                 )
+            self._verify_custody_evidence(evidence_root, record, reference)
 
     def _provenance_resolves(self) -> bool:
         if self._evidence_root is None or not self._receipt_records:
             return False
         validator = FileReceiptValidator(self._evidence_root)
-        return all(
-            validator.validate(
-                ReceiptReference(
+        try:
+            for record in self._receipt_records:
+                reference = ReceiptReference(
                     str(record["path"]),
                     str(record["digest"]),
-                ),
-                mission_id=str(record["mission_id"]),
-                state_ref=str(record["state_ref"]),
-                actor_id=str(record["actor_id"]),
-                action_id=str(record["action_id"]),
-                action_kind=str(record["action_kind"]),
-                action_digest=str(record["action_digest"]),
-            ).valid
-            for record in self._receipt_records
-        )
+                )
+                if not validator.validate(
+                    reference,
+                    mission_id=str(record["mission_id"]),
+                    state_ref=str(record["state_ref"]),
+                    actor_id=str(record["actor_id"]),
+                    action_id=str(record["action_id"]),
+                    action_kind=str(record["action_kind"]),
+                    action_digest=str(record["action_digest"]),
+                ).valid:
+                    return False
+                self._verify_custody_evidence(self._evidence_root, record, reference)
+        except (MissionFailed, OSError, ValueError):
+            return False
+        return True
+
+    def _verify_custody_evidence(
+        self,
+        evidence_root: Path,
+        record: Mapping[str, Any],
+        reference: ReceiptReference,
+    ) -> None:
+        if self.custody is None:
+            return
+        attestation = record.get("custody_attestation")
+        if not isinstance(attestation, Mapping):
+            raise MissionFailed("mission receipt lacks authenticated custody")
+        try:
+            receipt_path = evidence_root / Path(*reference.path.split("/"))
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, Mapping):
+                raise ValueError("receipt is not an object")
+            self.custody.verifier.verify_receipt(receipt, reference, attestation)
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+            raise MissionFailed(
+                f"mission receipt custody failed validation: {error}"
+            ) from None
 
     @staticmethod
     def _actions(result: AgentResult) -> tuple[dict[str, Any], ...]:
@@ -2303,13 +2441,9 @@ class RepositoryMission:
             if not isinstance(raw_identity, Mapping):
                 raise MissionFailed("backend provider identity must be an object")
             identity = {
-                "provider_kind": _required_string(
-                    raw_identity, "provider_kind"
-                ),
+                "provider_kind": _required_string(raw_identity, "provider_kind"),
                 "model_id": _required_string(raw_identity, "model_id"),
-                "configuration": _required_string(
-                    raw_identity, "configuration"
-                ),
+                "configuration": _required_string(raw_identity, "configuration"),
             }
         else:
             identity = {
@@ -2335,64 +2469,32 @@ class RepositoryMission:
 
     def _blind_acceptance_checks(
         self,
-        result: AgentResult,
+        repository_test_argv: Sequence[str],
     ) -> tuple[AcceptanceCheck, ...]:
-        for evidence in result.evidence:
-            content = evidence.payload.get("content")
-            if not isinstance(content, str):
-                continue
-            try:
-                document = json.loads(content)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(document, Mapping):
-                continue
-            raw_checks = document.get("acceptance_checks")
-            if not isinstance(raw_checks, list):
-                continue
-            checks: list[AcceptanceCheck] = []
-            for raw_check in raw_checks:
-                if not isinstance(raw_check, Mapping):
-                    raise MissionFailed(
-                        "Curator acceptance_checks entries must be objects"
-                    )
-                expected = _required_string(raw_check, "expected")
-                if expected not in {"succeeded", "failed"}:
-                    raise MissionFailed(
-                        "Curator acceptance check expected outcome is invalid"
-                    )
-                checks.append(
-                    AcceptanceCheck(
-                        name=_required_string(raw_check, "name"),
-                        argv=_string_argv(raw_check.get("argv")),
-                        expected=cast(CheckOutcome, expected),
-                    )
-                )
-            return tuple(checks)
+        """Seal control-plane specifications, never model-selected commands.
 
-        if not isinstance(self.backend, ScriptedRepositoryBackend):
-            raise MissionFailed(
-                "model Curator blind output omitted acceptance_checks JSON"
+        The Explorer-selected repository regression command remains a separate
+        non-criterion check.  Every stated criterion is reproduced only through the
+        exact command carried in its typed specification.
+        """
+
+        checks = [
+            AcceptanceCheck(
+                "sealed-repository-regression",
+                tuple(repository_test_argv),
             )
-        checks = []
-        for index, action in enumerate(self._actions(result)):
-            name = action["action"]
-            if name == "run_tests":
-                checks.append(
-                    AcceptanceCheck(
-                        f"blind-repository-check-{index}",
-                        _string_argv(action.get("argv")),
-                    )
-                )
-            elif name == "run_criterion":
-                checks.append(
-                    AcceptanceCheck(
-                        f"blind-objective-check-{index}",
-                        _string_argv(action.get("argv")),
-                    )
-                )
-            elif name != "verify_delivery":
-                raise MissionFailed("Curator blind phase proposed an unsupported action")
+        ]
+        checks.extend(
+            AcceptanceCheck(
+                name=f"acceptance-{specification.identifier}",
+                argv=specification.argv,
+                expected=cast(CheckOutcome, specification.expected),
+                criteria=(specification.criterion,),
+                specification_id=specification.identifier,
+                specification_digest=specification.digest,
+            )
+            for specification in self.acceptance_specifications
+        )
         return tuple(checks)
 
     def _recorded_verification_manifest(
@@ -2419,9 +2521,7 @@ class RepositoryMission:
         prior_results: Sequence[AgentResult],
         review: CuratorReview,
     ) -> None:
-        builder_results = [
-            item for item in prior_results if item.role is Role.BUILDER
-        ]
+        builder_results = [item for item in prior_results if item.role is Role.BUILDER]
         builder_digests = [
             str(record["digest"])
             for record in self._receipt_records
@@ -2463,8 +2563,7 @@ class RepositoryMission:
     @staticmethod
     def _checklist_passed(verdict: ReviewVerdict, key: str) -> bool:
         return any(
-            item.key == key and item.finding == "pass"
-            for item in verdict.checklist
+            item.key == key and item.finding == "pass" for item in verdict.checklist
         )
 
     @staticmethod
@@ -2478,10 +2577,10 @@ class RepositoryMission:
                 "(portable path plus base64 content), run_tests, and commit."
             ),
             Role.CURATOR: (
-                "Blindly define acceptance_checks before candidate access. Put a JSON "
-                "string shaped as {\"acceptance_checks\":[{\"name\":...,\"argv\":"
-                "[...],\"expected\":\"succeeded\"}]} in the verification report "
-                "output. Builder rationale, receipts, diff, and head are withheld."
+                "The control plane seals typed executable acceptance specifications "
+                "before candidate access. Assess their completeness, but do not define "
+                "or substitute verification commands. Builder rationale, receipts, "
+                "diff, and head are withheld."
             ),
         }
         return (
@@ -2624,3 +2723,15 @@ def _read_local_head(repository: Path) -> str:
             if name == reference and _is_full_sha(value):
                 return value.lower()
     raise MissionFailed("repository HEAD ref does not resolve to a full local SHA")
+
+
+def resolve_repository_pin(repository: Path, pin: str | None = None) -> str:
+    """Return the immutable revision a queued repository mission is bound to."""
+
+    try:
+        resolved = pin if pin is not None else _read_local_head(repository)
+    except (OSError, MissionFailed) as error:
+        raise ValueError(f"unable to resolve repository pin: {error}") from None
+    if not _is_full_sha(resolved):
+        raise ValueError("repository pin must be a full 40-hex SHA")
+    return resolved.lower()

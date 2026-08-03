@@ -20,7 +20,7 @@ from hive_mind_os.git_adapter import (
     WorkspaceDirty,
     verify_delivery,
 )
-from hive_mind_os.models import AutonomyLevel
+from hive_mind_os.models import AutonomyLevel, RiskTier
 from hive_mind_os.policy import Action, PolicyEngine
 from hive_mind_os.receipts import (
     FileReceiptValidator,
@@ -144,13 +144,7 @@ class GitAdapterTests(unittest.TestCase):
         )
         workspace = self.workspace()
         self.assertFalse(
-            (
-                workspace.container_root
-                / "source"
-                / ".git"
-                / "refs"
-                / "codex"
-            ).exists()
+            (workspace.container_root / "source" / ".git" / "refs" / "codex").exists()
         )
         self.assertEqual(
             workspace._git_text(
@@ -217,9 +211,7 @@ class GitAdapterTests(unittest.TestCase):
         workspace = self.workspace()
         workspace.create_branch("phase/fix-increment")
         hook = workspace.root / ".git" / "hooks" / "pre-commit"
-        hook.write_bytes(
-            b"#!/bin/sh\nprintf hook-ran > hook-ran.txt\nexit 1\n"
-        )
+        hook.write_bytes(b"#!/bin/sh\nprintf hook-ran > hook-ran.txt\nexit 1\n")
         try:
             hook.chmod(0o755)
         except OSError:
@@ -302,12 +294,9 @@ class GitAdapterTests(unittest.TestCase):
         self.validate_receipts(workspace)
 
         golden = json.loads(
-            (
-                Path(__file__).parent
-                / "fixtures"
-                / "git"
-                / "delivery.json"
-            ).read_text(encoding="utf-8")
+            (Path(__file__).parent / "fixtures" / "git" / "delivery.json").read_text(
+                encoding="utf-8"
+            )
         )
         normalized = deepcopy(manifest)
         normalized["bundle_digest"] = "<git-serialization-digest>"
@@ -352,6 +341,18 @@ class GitAdapterTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.assertFalse(verify_delivery(delivery.root, self.fixture.root))
+
+    def test_high_risk_delivery_verification_is_denied_before_execution(self) -> None:
+        workspace = self.fix_and_commit()
+        delivery = workspace.export_delivery(self.base / "delivery-high-risk")
+        self.assertFalse(
+            verify_delivery(
+                delivery.root,
+                self.fixture.root,
+                policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+                risk=RiskTier.HIGH,
+            )
+        )
 
     def test_dirty_workspace_cannot_export_delivery(self) -> None:
         workspace = self.workspace()
@@ -448,7 +449,9 @@ class GitAdapterTests(unittest.TestCase):
                 with self.assertRaisesRegex(GitPolicyDenied, "reserved"):
                     workspace.run_tests(argv)
         self.assertEqual(workspace.runner.spawn_count, before)
-        self.assertFalse((workspace.root / ".git" / "refs" / "heads" / "bypass").exists())
+        self.assertFalse(
+            (workspace.root / ".git" / "refs" / "heads" / "bypass").exists()
+        )
         self.assertFalse(
             (
                 workspace.container_root
@@ -464,15 +467,14 @@ class GitAdapterTests(unittest.TestCase):
         forbidden = [
             name
             for name in dir(GitWorkspace)
-            if any(
-                keyword in name.lower()
-                for keyword in ("merge", "rebase", "force")
-            )
+            if any(keyword in name.lower() for keyword in ("merge", "rebase", "force"))
         ]
         self.assertEqual(forbidden, [])
         self.assertEqual(
             [name for name in dir(GitWorkspace) if "push" in name.lower()],
             ["push_branch"],
         )
+
+
 if __name__ == "__main__":
     unittest.main()

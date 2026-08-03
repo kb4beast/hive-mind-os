@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/model-turn-plan.schema.json",
+  "title": "Hive Mind OS Durable Model Turn Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "logical_turn_id", "mission_id", "state_ref", "role", "work_item_id", "provider", "prompt_digest", "request_digest", "acceptance_specification_id", "acceptance_specification_digest", "role_contract_digest", "configuration_digest", "selection_digest", "policy_decision_ref", "lease_id", "redaction_policy_digest"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "logical_turn_id": {"type": "string", "pattern": "^MTURN-[0-9a-f]{64}$"},
+    "mission_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "state_ref": {"type": "string", "pattern": "^MISSION_STATE:[^:\\s]+:[1-9][0-9]*$"},
+    "role": {"type": "string", "enum": ["orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer"]},
+    "work_item_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "base_url_host", "model_id"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+        "base_url_host": {"type": "string", "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"},
+        "model_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}
+      }
+    },
+    "prompt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "request_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "acceptance_specification_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "acceptance_specification_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "role_contract_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "configuration_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "selection_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "policy_decision_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "lease_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "redaction_policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

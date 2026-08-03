@@ -264,6 +264,7 @@ class GitHubClient:
         ledger: EvidenceLedger | None = None,
         mission_store: MissionStore | None = None,
         mission_id: str | None = None,
+        risk: RiskTier = RiskTier.MODERATE,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], str] = utc_now,
     ) -> None:
@@ -288,6 +289,7 @@ class GitHubClient:
         self.ledger = ledger
         self.mission_store = mission_store
         self.mission_id = mission_id
+        self.risk = risk
         self.sleep = sleep
         self.clock = clock
 
@@ -305,7 +307,7 @@ class GitHubClient:
         return token
 
     def _authorize(self, action: Action) -> None:
-        decision = self.policy.decide(Role.BUILDER, action, RiskTier.MODERATE)
+        decision = self.policy.decide(Role.BUILDER, action, self.risk)
         if self.ledger is not None:
             self.ledger.append_event(
                 self.mission_id or "github-delivery",
@@ -316,6 +318,7 @@ class GitHubClient:
                     "allowed": decision.allowed,
                     "reason": decision.reason,
                     "autonomy_level": int(self.policy.autonomy),
+                    "risk": self.risk.name.lower(),
                 },
             )
         if not decision.allowed:
@@ -990,8 +993,7 @@ class GitHubClient:
         if ruleset.get("active") is True:
             ruleset_enforced = ruleset.get("enforce_admins") is True
             branch_enforced = (
-                branch.get("active") is True
-                and branch.get("enforce_admins") is True
+                branch.get("active") is True and branch.get("enforce_admins") is True
             )
             if ruleset_enforced and not branch_enforced:
                 return dict(ruleset)

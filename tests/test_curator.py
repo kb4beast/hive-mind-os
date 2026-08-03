@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.curator import (
     AcceptanceCheck,
     ContaminationError,
@@ -62,6 +63,7 @@ class _OneTurnProvider:
                         "name": "fixture-check",
                         "argv": [sys.executable, "-B", "-c", "pass"],
                         "expected": "succeeded",
+                        "criteria": [],
                     }
                 ]
             },
@@ -108,6 +110,13 @@ class CuratorReviewTests(unittest.TestCase):
                 self.fixture.root,
                 "Fix the failing test",
                 acceptance_criteria=("increment(1) returns 2",),
+                acceptance_specifications=(
+                    AcceptanceSpecification(
+                        "increment-returns-two",
+                        "increment(1) returns 2",
+                        (backend or ScriptedRepositoryBackend()).criterion_argv,
+                    ),
+                ),
                 backend=backend or ScriptedRepositoryBackend(),
                 pin=self.fixture.commit_two,
                 output_dir=output,
@@ -116,18 +125,40 @@ class CuratorReviewTests(unittest.TestCase):
         return report, output
 
     def review(self) -> CuratorReview:
+        specification = self.specification()
         return CuratorReview(
             "run",
             EvidenceLedger(),
             objective="objective",
             acceptance_criteria=("criterion",),
             base_workspace=self.fixture.root,
+            acceptance_specifications=(specification,),
+        )
+
+    @staticmethod
+    def specification() -> AcceptanceSpecification:
+        return AcceptanceSpecification(
+            "criterion-check",
+            "criterion",
+            (sys.executable, "-B", "-c", "pass"),
+        )
+
+    def check(self) -> AcceptanceCheck:
+        specification = self.specification()
+        return AcceptanceCheck(
+            "check",
+            specification.argv,
+            criteria=(specification.criterion,),
+            specification_id=specification.identifier,
+            specification_digest=specification.digest,
         )
 
     def test_blind_seal_precedes_head_access_and_reordering_is_rejected(self) -> None:
         review = self.review()
         review.seal(
-            [AcceptanceCheck("check", (sys.executable, "-B", "-c", "pass"))]
+            [
+                self.check()
+            ]
         )
         self.assertIsNotNone(review.seal_sequence)
         check_context_manifest(
@@ -178,17 +209,37 @@ class CuratorReviewTests(unittest.TestCase):
     def test_check_added_after_seal_is_rejected(self) -> None:
         review = self.review()
         review.seal(
-            [AcceptanceCheck("check", (sys.executable, "-B", "-c", "pass"))]
+            [
+                self.check()
+            ]
         )
         with self.assertRaisesRegex(ContaminationError, "after the blind seal"):
             review.add_check(
                 AcceptanceCheck("late", (sys.executable, "-B", "-c", "pass"))
             )
 
+    def test_blind_seal_requires_a_check_for_each_declared_criterion(self) -> None:
+        review = self.review()
+        with self.assertRaisesRegex(ContaminationError, "did not define executable"):
+            review.seal(
+                [AcceptanceCheck("unbound", (sys.executable, "-B", "-c", "pass"))]
+            )
+
+    def test_blind_seal_rejects_undeclared_criterion(self) -> None:
+        review = self.review()
+        with self.assertRaisesRegex(ContaminationError, "undeclared criteria"):
+            review.seal(
+                [
+                    AcceptanceCheck(
+                        "wrong-criterion",
+                        (sys.executable, "-B", "-c", "pass"),
+                        criteria=("not declared",),
+                    )
+                ]
+            )
+
     def test_sabotage_fails_sealed_check_and_test_weakening_heuristic(self) -> None:
-        report, output = self.run_mission(
-            backend=ScriptedRepositoryBackend("sabotage")
-        )
+        report, output = self.run_mission(backend=ScriptedRepositoryBackend("sabotage"))
         self.assertIs(report.status, WorkStatus.FAILED)
         self.assertFalse(output.exists())
         checklist_event = next(
@@ -250,6 +301,7 @@ class CuratorReviewTests(unittest.TestCase):
         )
         for field, value, remove in malformed_cases:
             with self.subTest(field=field):
+
                 class MalformedManifestMission(RepositoryMission):
                     def _context_manifest(self, role, context):
                         manifest = super()._context_manifest(role, context)
@@ -260,9 +312,7 @@ class CuratorReviewTests(unittest.TestCase):
                                 manifest[field] = value
                         return manifest
 
-                report, output = self.run_mission(
-                    mission_type=MalformedManifestMission
-                )
+                report, output = self.run_mission(mission_type=MalformedManifestMission)
                 self.assertIs(report.status, WorkStatus.FAILED)
                 self.assertFalse(output.exists())
                 failure = report.failure
@@ -279,9 +329,7 @@ class CuratorReviewTests(unittest.TestCase):
     def test_same_identity_verification_is_rejected(self) -> None:
         class SameIdentityBackend(ScriptedRepositoryBackend):
             async def execute(self, contract, work_item, objective, context):
-                result = await super().execute(
-                    contract, work_item, objective, context
-                )
+                result = await super().execute(contract, work_item, objective, context)
                 if contract.role is Role.CURATOR:
                     return AgentResult(
                         role=Role.BUILDER,
@@ -336,9 +384,7 @@ class CuratorReviewTests(unittest.TestCase):
         backend = ModelBackend(
             _OneTurnProvider(shared.config.model),
             ledger=ledger,
-            role_providers={
-                Role.CURATOR: _OneTurnProvider(curator.config.model)
-            },
+            role_providers={Role.CURATOR: _OneTurnProvider(curator.config.model)},
         )
         asyncio.run(
             backend.execute(

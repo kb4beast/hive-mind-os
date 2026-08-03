@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/hard-isolation-execution-plan.schema.json",
+  "title": "Hive Mind OS Sealed Hard Isolation Execution Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "execution_id", "tool_intent_digest", "profile_digest", "mission_id", "state_ref", "actor_id", "lease_id", "guest_argv", "credential_operation_id"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "execution_id": {"type": "string", "pattern": "^HIEXEC-[0-9a-f]{64}$"},
+    "tool_intent_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "profile_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "mission_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "state_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "actor_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "lease_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "guest_argv": {"type": "array", "minItems": 1, "maxItems": 128, "items": {"type": "string", "minLength": 1, "maxLength": 16384}},
+    "credential_operation_id": {"type": ["string", "null"], "maxLength": 256}
+  }
+}

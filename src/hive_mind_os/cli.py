@@ -4,10 +4,15 @@ import argparse
 import asyncio
 import json
 import sys
+from hashlib import sha256
 from pathlib import Path
 from typing import Sequence
-from uuid import uuid4
 
+from .acceptance import (
+    AcceptanceSpecification,
+    AcceptanceSpecificationError,
+    normalize_acceptance_specifications,
+)
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
 from .courtroom import CaseParticipants
@@ -19,7 +24,11 @@ from .current_state_audit import (
 from .experiment_runner import ExperimentRunner, FixtureMissionSurface
 from .ingestion import ExhibitStore, defer_obligation, register_exhibit
 from .ledger import EvidenceLedger
-from .mission import RepositoryMission, ScriptedRepositoryBackend
+from .mission import (
+    RepositoryMission,
+    ScriptedRepositoryBackend,
+    resolve_repository_pin,
+)
 from .mission_store import (
     MissionStore,
     MissionStoreError,
@@ -40,10 +49,17 @@ from .workers import serve
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="hive-mind", description="Run the Hive Mind OS bootstrap kernel")
+    parser = argparse.ArgumentParser(
+        prog="hive-mind", description="Run the Hive Mind OS bootstrap kernel"
+    )
     parser.add_argument("goal", help="Outcome for the specialist agent team")
     parser.add_argument("--repository", help="Optional owner/repository target")
-    parser.add_argument("--criterion", action="append", default=[], help="Acceptance criterion; repeatable")
+    parser.add_argument(
+        "--criterion",
+        action="append",
+        default=[],
+        help="Acceptance criterion; repeatable",
+    )
     parser.add_argument(
         "--backend",
         choices=("deterministic", "model"),
@@ -88,9 +104,13 @@ def build_ingest_parser() -> argparse.ArgumentParser:
         prog="hive-mind ingest",
         description="Capture one human-supplied source exhibit without adjudicating it",
     )
-    parser.add_argument("--source", required=True, help="Existing source id, such as SRC-005")
+    parser.add_argument(
+        "--source", required=True, help="Existing source id, such as SRC-005"
+    )
     parser.add_argument("--file", required=True, help="Human-supplied exhibit file")
-    parser.add_argument("--locator", required=True, help="Exact source URI and fragment/timestamp")
+    parser.add_argument(
+        "--locator", required=True, help="Exact source URI and fragment/timestamp"
+    )
     parser.add_argument("--media-type", required=True, help="IANA-style media type")
     parser.add_argument(
         "--license",
@@ -107,8 +127,12 @@ def build_ingest_parser() -> argparse.ArgumentParser:
         choices=("human-provided-file", "agent-derived"),
         default="human-provided-file",
     )
-    parser.add_argument("--parent-digest", help="Required SHA-256 digest for derived artifacts")
-    parser.add_argument("--expected-digest", help="Optional independently supplied SHA-256")
+    parser.add_argument(
+        "--parent-digest", help="Required SHA-256 digest for derived artifacts"
+    )
+    parser.add_argument(
+        "--expected-digest", help="Optional independently supplied SHA-256"
+    )
     parser.add_argument(
         "--evidence-root",
         default="evidence/sources",
@@ -129,8 +153,12 @@ def build_defer_parser() -> argparse.ArgumentParser:
         help="Existing source id; repeat for an aggregate obligation",
     )
     parser.add_argument("--obligation", help="Stable obligation id")
-    parser.add_argument("--reason", required=True, help="Specific uncaptured evidence obligation")
-    parser.add_argument("--review-by", required=True, help="Future review date (YYYY-MM-DD)")
+    parser.add_argument(
+        "--reason", required=True, help="Specific uncaptured evidence obligation"
+    )
+    parser.add_argument(
+        "--review-by", required=True, help="Future review date (YYYY-MM-DD)"
+    )
     parser.add_argument("--advocate", default="source-evidence-advocate")
     parser.add_argument("--cross-examiner", default="source-evidence-cross-examiner")
     parser.add_argument("--judge", default="source-evidence-judge")
@@ -162,6 +190,16 @@ def build_deliver_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="Acceptance criterion; repeatable",
+    )
+    parser.add_argument(
+        "--acceptance-spec",
+        action="append",
+        default=[],
+        metavar="FILE",
+        help=(
+            "JSON executable acceptance specification; repeat once per criterion "
+            "(required for model-backed criteria)"
+        ),
     )
     parser.add_argument(
         "--backend",
@@ -327,6 +365,13 @@ def build_enqueue_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repository", required=True)
     parser.add_argument("--objective", required=True)
     parser.add_argument("--criterion", action="append", default=[])
+    parser.add_argument(
+        "--acceptance-spec",
+        action="append",
+        default=[],
+        metavar="FILE",
+        help="JSON executable acceptance specification; repeat once per criterion",
+    )
     parser.add_argument("--backend", choices=("scripted",), default="scripted")
     parser.add_argument("--pin")
     parser.add_argument("--max-attempts", type=int, default=3)
@@ -372,9 +417,7 @@ async def _run(args: argparse.Namespace) -> int:
             backend = ModelBackend(
                 provider_from_env(),
                 ledger=ledger,
-                role_providers={
-                    Role.CURATOR: provider_from_env(role=Role.CURATOR)
-                },
+                role_providers={Role.CURATOR: provider_from_env(role=Role.CURATOR)},
             )
         except (ModelProviderError, ValueError) as error:
             raise SystemExit(f"model backend configuration failed: {error}") from None
@@ -413,9 +456,7 @@ async def _run_deliver(args: argparse.Namespace) -> int:
                 provider_from_env(),
                 ledger=ledger,
                 budget=budget,
-                role_providers={
-                    Role.CURATOR: provider_from_env(role=Role.CURATOR)
-                },
+                role_providers={Role.CURATOR: provider_from_env(role=Role.CURATOR)},
             )
         except (ModelProviderError, ValueError) as error:
             print(
@@ -432,6 +473,9 @@ async def _run_deliver(args: argparse.Namespace) -> int:
     else:
         backend = ScriptedRepositoryBackend(args.scripted_variant)
     try:
+        acceptance_specifications = _load_acceptance_specifications(
+            args.acceptance_spec
+        )
         repository = Path(args.repository).resolve()
         output_dir = (
             Path(args.output_dir)
@@ -442,6 +486,7 @@ async def _run_deliver(args: argparse.Namespace) -> int:
             repository,
             args.objective,
             acceptance_criteria=tuple(args.criterion),
+            acceptance_specifications=acceptance_specifications,
             backend=backend,
             pin=args.pin,
             output_dir=output_dir,
@@ -658,19 +703,56 @@ def _run_enqueue(args: argparse.Namespace) -> int:
     repository = Path(args.repository).resolve()
     if not repository.is_dir():
         raise SystemExit("repository must be an existing directory")
-    mission_id = f"M-{uuid4().hex[:16]}"
+    try:
+        pin = resolve_repository_pin(repository, args.pin)
+    except ValueError as error:
+        raise SystemExit(f"repository pin is invalid: {error}") from None
+    try:
+        acceptance_specifications = _load_acceptance_specifications(
+            args.acceptance_spec
+        )
+    except ValueError as error:
+        raise SystemExit(f"acceptance specification is invalid: {error}") from None
+    declared_criteria = tuple(args.criterion)
+    specification_criteria = tuple(item.criterion for item in acceptance_specifications)
+    if not acceptance_specifications:
+        raise SystemExit(
+            "queued repository missions require at least one typed executable "
+            "acceptance specification"
+        )
+    if declared_criteria and (
+        len(declared_criteria) != len(set(declared_criteria))
+        or set(declared_criteria) != set(specification_criteria)
+    ):
+        raise SystemExit(
+            "acceptance criteria must exactly match the typed specification set"
+        )
+    semantic_payload = {
+        "repository": str(repository),
+        "objective": args.objective,
+        "acceptance_criteria": list(specification_criteria),
+        "acceptance_specifications": [
+            item.to_dict() for item in acceptance_specifications
+        ],
+        "backend": args.backend,
+        "scripted_variant": "good",
+        "pin": pin,
+    }
+    encoded = json.dumps(
+        semantic_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    mission_id = f"M-{sha256(encoded).hexdigest()[:32]}"
     scheduler = Scheduler(args.state_dir)
     try:
         job = scheduler.enqueue(
             "repository-mission",
             {
                 "mission_id": mission_id,
-                "repository": str(repository),
-                "objective": args.objective,
-                "acceptance_criteria": list(args.criterion),
-                "backend": args.backend,
-                "scripted_variant": "good",
-                "pin": args.pin,
+                **semantic_payload,
             },
             max_attempts=args.max_attempts,
             mission_id=mission_id,
@@ -690,6 +772,30 @@ def _run_enqueue(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _load_acceptance_specifications(
+    paths: Sequence[str],
+) -> tuple[AcceptanceSpecification, ...]:
+    specifications: list[AcceptanceSpecification] = []
+    for raw_path in paths:
+        path = Path(raw_path)
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(
+                f"cannot read {path}: {type(error).__name__}: {error}"
+            ) from None
+        if not isinstance(document, dict):
+            raise ValueError(f"{path}: acceptance specification must be a JSON object")
+        try:
+            specifications.append(AcceptanceSpecification.from_dict(document))
+        except AcceptanceSpecificationError as error:
+            raise ValueError(f"{path}: {error}") from None
+    try:
+        return normalize_acceptance_specifications(specifications)
+    except AcceptanceSpecificationError as error:
+        raise ValueError(str(error)) from None
 
 
 def _run_serve(args: argparse.Namespace) -> int:
@@ -722,8 +828,12 @@ def _run_status(args: argparse.Namespace) -> int:
 
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     if bool(args.signing_key_file) != bool(args.signing_key_id):
-        raise SystemExit("--signing-key-file and --signing-key-id must be supplied together")
-    signing_key = Path(args.signing_key_file).read_bytes() if args.signing_key_file else None
+        raise SystemExit(
+            "--signing-key-file and --signing-key-id must be supplied together"
+        )
+    signing_key = (
+        Path(args.signing_key_file).read_bytes() if args.signing_key_file else None
+    )
     audit = collect_current_state_audit(
         args.repository,
         run_tests=not args.skip_tests,

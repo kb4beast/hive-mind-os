@@ -27,7 +27,13 @@ from .receipts import (
     portable_path_parts,
     sha256_digest,
 )
-from .sandbox import ConfinementViolation, SandboxRunner, SandboxSpec
+from .sandbox import ConfinementViolation, SandboxDenied, SandboxRunner, SandboxSpec
+from .source_custody import (
+    SourceCustodyError,
+    SourceCustodyVerifier,
+    SourceLock,
+    SourceLockEvidence,
+)
 
 _FULL_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
 _BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
@@ -158,7 +164,9 @@ def _github_remote(
         or len(path_parts) != 2
         or not all(re.fullmatch(r"[A-Za-z0-9_.-]+", part) for part in path_parts)
     ):
-        raise PinViolation("remote must be a credential-free HTTPS GitHub repository URL")
+        raise PinViolation(
+            "remote must be a credential-free HTTPS GitHub repository URL"
+        )
     repository = path_parts[1].removesuffix(".git")
     if not repository:
         raise PinViolation("remote repository name is required")
@@ -315,8 +323,12 @@ class GitWorkspace:
         runner: SandboxRunner,
         policy: PolicyEngine,
         role: Role,
+        risk: RiskTier,
         mission_id: str,
         receipts: list[dict[str, Any]],
+        source_lock: SourceLock | None = None,
+        source_lock_evidence: SourceLockEvidence | None = None,
+        state_ref: str | None = None,
     ) -> None:
         self.root = root
         self.container_root = container_root
@@ -327,10 +339,13 @@ class GitWorkspace:
         self.runner = runner
         self.policy = policy
         self.role = role
+        self.risk = risk
         self.mission_id = mission_id
-        self.state_ref = f"MISSION_STATE:{mission_id}:1"
+        self.state_ref = state_ref or f"MISSION_STATE:{mission_id}:1"
         self.branch_name: str | None = None
         self.receipt_records = receipts
+        self.source_lock = source_lock
+        self.source_lock_evidence = source_lock_evidence
 
     @classmethod
     def materialize(
@@ -342,10 +357,16 @@ class GitWorkspace:
         *,
         policy: PolicyEngine | None = None,
         role: Role = Role.BUILDER,
+        risk: RiskTier = RiskTier.MODERATE,
         allowance: EpisodeAllowance = EpisodeAllowance(200, 200.0),
         test_executables: tuple[str, ...] = (Path(sys.executable).name,),
         allow_remote: bool = False,
         allowed_hosts: tuple[str, ...] = ("github.com",),
+        source_lock: SourceLockEvidence | None = None,
+        source_custody: SourceCustodyVerifier | None = None,
+        require_source_custody: bool = False,
+        source_mission_id: str | None = None,
+        source_state_ref: str | None = None,
     ) -> GitWorkspace:
         source, remote = _materialization_source(
             source_path_or_url,
@@ -353,8 +374,49 @@ class GitWorkspace:
             allowed_hosts=allowed_hosts,
         )
         pin = _full_sha(commit_sha)
+        mission_id = source_mission_id or f"git-workspace-{uuid4()}"
+        authenticated_source_lock: SourceLock | None = None
+        if source_lock is None:
+            if source_custody is not None:
+                raise PinViolation("source custody verifier requires signed source-lock evidence")
+            if remote and require_source_custody:
+                raise PinViolation("remote source requires authenticated source-lock evidence")
+        else:
+            if source_custody is None:
+                raise PinViolation("signed source-lock evidence requires a source custody verifier")
+            if not remote:
+                raise PinViolation("authenticated source locks are only supported for remote sources")
+            if source_mission_id is None:
+                raise PinViolation(
+                    "authenticated source locks require a caller-supplied mission identity"
+                )
+            if source_state_ref is None:
+                raise PinViolation(
+                    "authenticated source locks require a caller-supplied state reference"
+                )
+            if (
+                require_source_custody
+                and (
+                    not source_custody.provenance.is_durable
+                    or not source_custody.custody_verifier.provenance.is_durable
+                )
+            ):
+                raise PinViolation(
+                    "strict source custody requires durable source and keyset provenance"
+                )
+            try:
+                authenticated_source_lock = source_custody.verify_for_materialization(
+                    source_lock,
+                    str(source),
+                    pin,
+                    mission_id=mission_id,
+                    state_ref=source_state_ref,
+                    allowed_hosts=allowed_hosts,
+                )
+            except SourceCustodyError as error:
+                raise PinViolation(f"authenticated source lock was rejected: {error}") from error
         engine = policy or PolicyEngine(AutonomyLevel.REPOSITORY)
-        decision = engine.decide(role, Action.READ_REPOSITORY, RiskTier.MODERATE)
+        decision = engine.decide(role, Action.READ_REPOSITORY, risk)
         if not decision.allowed:
             raise GitPolicyDenied(decision.reason)
 
@@ -368,7 +430,9 @@ class GitWorkspace:
         except ValueError:
             pass
         else:
-            raise ValueError("trusted receipt root must be outside the workspace container")
+            raise ValueError(
+                "trusted receipt root must be outside the workspace container"
+            )
 
         staged_source = container / "source"
         repository = container / "repo"
@@ -384,7 +448,6 @@ class GitWorkspace:
                 symlinks=True,
                 ignore=_ignore_local_app_refs,
             )
-        mission_id = f"git-workspace-{uuid4()}"
         receipts: list[dict[str, Any]] = []
         git_name = Path(shutil.which("git") or "git").name
         staging_runner = SandboxRunner(
@@ -405,11 +468,13 @@ class GitWorkspace:
             allowance,
             policy=engine,
             role=role,
+            risk=risk,
             runner_identity="git-sandbox-runner-v1",
         )
         clone_args = [
             "clone",
             "--no-hardlinks",
+            "--no-checkout",
             str(source) if remote else "source",
             "repo",
         ]
@@ -418,9 +483,10 @@ class GitWorkspace:
                 staging_runner,
                 cls._git_argv(hooks, clone_args),
                 mission_id=mission_id,
+                state_ref=source_state_ref if authenticated_source_lock is not None else None,
                 role=role,
-                description="clone approved local repository snapshot",
-                path_args=[10] if remote else [9, 10],
+                description="clone approved source without checkout",
+                path_args=[11] if remote else [10, 11],
             )
         cls._append_receipt(receipts, staging_runner, clone_receipt)
         if clone_receipt["result"] != "succeeded":
@@ -452,6 +518,7 @@ class GitWorkspace:
             remaining,
             policy=engine,
             role=role,
+            risk=risk,
             runner_identity="git-sandbox-runner-v1",
         )
         workspace = cls(
@@ -464,9 +531,19 @@ class GitWorkspace:
             runner=runner,
             policy=engine,
             role=role,
+            risk=risk,
             mission_id=mission_id,
             receipts=receipts,
+            source_lock=authenticated_source_lock,
+            source_lock_evidence=source_lock if authenticated_source_lock is not None else None,
+            state_ref=source_state_ref if authenticated_source_lock is not None else None,
         )
+        if authenticated_source_lock is not None:
+            cls._verify_authenticated_source_tree(
+                workspace,
+                f"{pin}^{{tree}}",
+                authenticated_source_lock,
+            )
         workspace._run_git(
             ["checkout", "--detach", pin],
             Action.READ_REPOSITORY,
@@ -479,7 +556,31 @@ class GitWorkspace:
         )
         if observed != pin:
             raise PinViolation(f"materialized HEAD {observed} does not match pin {pin}")
+        if authenticated_source_lock is not None:
+            cls._verify_authenticated_source_tree(
+                workspace,
+                "HEAD^{tree}",
+                authenticated_source_lock,
+            )
         return workspace
+
+    @staticmethod
+    def _verify_authenticated_source_tree(
+        workspace: GitWorkspace,
+        revision: str,
+        source_lock: SourceLock,
+    ) -> None:
+        materialized_tree = workspace._git_text(
+            ["rev-parse", revision],
+            Action.READ_REPOSITORY,
+            "verify authenticated source tree",
+        )
+        try:
+            source_lock.require_tree(materialized_tree)
+        except SourceCustodyError as error:
+            raise PinViolation(
+                f"materialized source does not match authenticated source lock: {error}"
+            ) from error
 
     @staticmethod
     def _git_argv(hooks_root: Path, args: Sequence[str]) -> list[str]:
@@ -501,15 +602,17 @@ class GitWorkspace:
         argv: list[str],
         *,
         mission_id: str,
+        state_ref: str | None = None,
         role: Role,
         description: str,
         path_args: list[int] | None = None,
+        acceptance_specification: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         intent: dict[str, Any] = {
             "schema_version": 1,
             "action_id": f"ACT-git-{uuid4()}",
             "mission_id": mission_id,
-            "state_ref": f"MISSION_STATE:{mission_id}:1",
+            "state_ref": state_ref or f"MISSION_STATE:{mission_id}:1",
             "actor_id": role.value,
             "kind": "command",
             "description": description,
@@ -524,6 +627,8 @@ class GitWorkspace:
             },
             "status": "proposed",
         }
+        if acceptance_specification is not None:
+            intent["acceptance_specification"] = dict(acceptance_specification)
         intent["action_digest"] = tool_intent_digest(intent)
         return runner.run(intent)
 
@@ -551,7 +656,7 @@ class GitWorkspace:
         )
 
     def _authorize(self, action: Action) -> None:
-        decision = self.policy.decide(self.role, action, RiskTier.MODERATE)
+        decision = self.policy.decide(self.role, action, self.risk)
         if not decision.allowed:
             raise GitPolicyDenied(decision.reason)
 
@@ -579,9 +684,7 @@ class GitWorkspace:
             [*extra_config, *args],
         )
         adjusted_paths = (
-            [index + 7 + len(extra_config) for index in path_args]
-            if path_args
-            else []
+            [index + 7 + len(extra_config) for index in path_args] if path_args else []
         )
         credential_context = (
             _git_http_credentials(credential[0], credential[1])
@@ -593,6 +696,7 @@ class GitWorkspace:
                 self.runner,
                 argv,
                 mission_id=self.mission_id,
+                state_ref=self.state_ref,
                 role=self.role,
                 description=description,
                 path_args=adjusted_paths,
@@ -602,7 +706,9 @@ class GitWorkspace:
         if receipt["execution"]["stdout"]["truncated"]:
             raise GitOperationFailed(f"{description} exceeded the Git output limit")
         if receipt["result"] != "succeeded" and not allow_failure:
-            stderr = self._artifact(receipt, "stderr").decode("utf-8", "replace").strip()
+            stderr = (
+                self._artifact(receipt, "stderr").decode("utf-8", "replace").strip()
+            )
             for secret in secrets:
                 stderr = stderr.replace(secret, "[REDACTED]")
             raise GitOperationFailed(f"{description} failed: {stderr}")
@@ -668,7 +774,9 @@ class GitWorkspace:
                 raise PinViolation("push remote must be an HTTPS GitHub repository URL")
             local = Path(remote_url).resolve()
             if not local.is_dir():
-                raise PinViolation("local test push remote must be a repository directory")
+                raise PinViolation(
+                    "local test push remote must be a repository directory"
+                )
             remote = str(local)
             credential = None
         _, existing = self._run_git(
@@ -756,14 +864,21 @@ class GitWorkspace:
             "read committed head",
         )
 
-    def run_tests(self, argv: Sequence[str]) -> dict[str, Any]:
+    def run_tests(
+        self,
+        argv: Sequence[str],
+        *,
+        acceptance_specification: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         if not argv:
             raise ValueError("test argv is required")
         self._authorize(Action.RUN_COMMANDS)
         requested = shutil.which(argv[0])
         git = shutil.which("git")
-        if requested is not None and git is not None and (
-            _normalized_executable(requested) == _normalized_executable(git)
+        if (
+            requested is not None
+            and git is not None
+            and (_normalized_executable(requested) == _normalized_executable(git))
         ):
             raise GitPolicyDenied(
                 "direct Git execution is reserved for typed adapter operations"
@@ -773,8 +888,10 @@ class GitWorkspace:
                 self.runner,
                 list(argv),
                 mission_id=self.mission_id,
+                state_ref=self.state_ref,
                 role=self.role,
                 description="run caller-declared repository tests",
+                acceptance_specification=acceptance_specification,
             )
         self._append_receipt(self.receipt_records, self.runner, receipt)
         return receipt
@@ -803,9 +920,7 @@ class GitWorkspace:
             "list delivery files",
         )
         files = [
-            line
-            for line in files_bytes.decode("utf-8", "strict").splitlines()
-            if line
+            line for line in files_bytes.decode("utf-8", "strict").splitlines() if line
         ]
         for relative in files:
             portable_path_parts(relative)
@@ -833,6 +948,12 @@ class GitWorkspace:
             "files": files,
             "receipts": list(receipt_snapshot),
         }
+        if self.source_lock_evidence is not None:
+            manifest["source_custody"] = {
+                "digest": self.source_lock_evidence.digest(),
+                "source_lock": self.source_lock_evidence.source_lock.to_dict(),
+                "attestation": dict(self.source_lock_evidence.attestation),
+            }
         with _staged_delivery(delivery_root) as staging:
             _atomic_write(staging / "changes.bundle", bundle)
             _atomic_write(staging / "changes.patch", patch)
@@ -879,7 +1000,9 @@ class GitWorkspace:
             try:
                 source.resolve().relative_to(trusted)
             except ValueError:
-                raise GitOperationFailed("delivery evidence source escapes trusted root")
+                raise GitOperationFailed(
+                    "delivery evidence source escapes trusted root"
+                )
             return source.read_bytes()
 
         def stage_copy(parts: tuple[str, ...], content: bytes) -> None:
@@ -887,7 +1010,9 @@ class GitWorkspace:
             try:
                 target.parent.resolve().relative_to(destination)
             except ValueError:
-                raise GitOperationFailed("delivery evidence destination escapes output root")
+                raise GitOperationFailed(
+                    "delivery evidence destination escapes output root"
+                )
             copies[target] = content
 
         for record in records:
@@ -1020,7 +1145,9 @@ def verify_delivery(
     receipt_records: list[dict[str, Any]] | None = None,
     policy: PolicyEngine | None = None,
     role: Role = Role.BUILDER,
+    risk: RiskTier = RiskTier.MODERATE,
     allowance: EpisodeAllowance = EpisodeAllowance(200, 200.0),
+    source_custody: SourceCustodyVerifier | None = None,
 ) -> bool:
     artifact_root = Path(artifact_dir).resolve()
     try:
@@ -1055,6 +1182,45 @@ def verify_delivery(
         head_tree = _full_sha(manifest["head_tree"])
         branch = _branch_name(manifest["branch_name"])
         source = _local_source(base_source)
+        source_custody_record = manifest.get("source_custody")
+        if source_custody_record is not None:
+            if not isinstance(source_custody_record, Mapping) or source_custody is None:
+                return False
+            source_lock_value = source_custody_record.get("source_lock")
+            attestation_value = source_custody_record.get("attestation")
+            digest_value = source_custody_record.get("digest")
+            if (
+                not isinstance(source_lock_value, Mapping)
+                or not isinstance(attestation_value, Mapping)
+                or not isinstance(digest_value, str)
+            ):
+                return False
+            source_evidence = SourceLockEvidence(
+                SourceLock.from_dict(
+                    source_lock_value,
+                    allowed_hosts=source_custody.allowed_hosts,
+                ),
+                attestation_value,
+            )
+            if source_evidence.digest() != digest_value:
+                return False
+            if source_evidence.source_lock.commit_sha != base_sha:
+                return False
+            source_custody.verify(source_evidence)
+            manifest_receipts = manifest["receipts"]
+            if (
+                not isinstance(manifest_receipts, list)
+                or not manifest_receipts
+                or any(
+                    not isinstance(record, Mapping)
+                    or record.get("mission_id")
+                    != source_evidence.source_lock.mission_id
+                    or record.get("state_ref")
+                    != source_evidence.source_lock.state_ref
+                    for record in manifest_receipts
+                )
+            ):
+                return False
         bundle = (artifact_root / "changes.bundle").read_bytes()
         patch = (artifact_root / "changes.patch").read_bytes()
         files = manifest["files"]
@@ -1070,7 +1236,7 @@ def verify_delivery(
             artifact_root=artifact_root,
         ):
             return False
-    except (GitOperationFailed, OSError, TypeError, ValueError):
+    except (GitOperationFailed, SourceCustodyError, OSError, TypeError, ValueError):
         return False
     if (
         sha256_digest(bundle) != manifest["bundle_digest"]
@@ -1097,6 +1263,7 @@ def verify_delivery(
                 verification_evidence,
                 policy=policy,
                 role=role,
+                risk=risk,
                 allowance=allowance,
             )
             verification_workspaces.append(workspace)
@@ -1153,6 +1320,7 @@ def verify_delivery(
                 verification_evidence,
                 policy=policy,
                 role=role,
+                risk=risk,
                 allowance=allowance,
             )
             verification_workspaces.append(patch_workspace)
@@ -1174,7 +1342,13 @@ def verify_delivery(
                 Action.READ_REPOSITORY,
                 "verify delivery patch tree",
             )
-        except (GitOperationFailed, ConfinementViolation, OSError, ValueError):
+        except (
+            GitOperationFailed,
+            ConfinementViolation,
+            SandboxDenied,
+            OSError,
+            ValueError,
+        ):
             return False
         return (
             observed_head == head_sha
@@ -1189,8 +1363,7 @@ def verify_delivery(
         if receipt_records is not None:
             for verification_workspace in verification_workspaces:
                 receipt_records.extend(
-                    dict(record)
-                    for record in verification_workspace.receipt_records
+                    dict(record) for record in verification_workspace.receipt_records
                 )
         if temporary_context is not None:
             temporary_context.cleanup()

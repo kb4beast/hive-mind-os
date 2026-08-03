@@ -40,6 +40,11 @@ from .current_state_audit import (
     verify_audit_artifact,
     write_audit_artifact,
 )
+from .durable_model_execution import (
+    DurableModelExecutionContext,
+    DurableModelExecutionError,
+    DurableModelRoleExecutor,
+)
 from .experiment_runner import (
     ExperimentRun,
     ExperimentRunner,
@@ -170,6 +175,9 @@ __all__ = [
     "Disposition",
     "DeferredObligation",
     "DEFAULT_PROJECTION_SCHEMA_VERSION",
+    "DurableModelExecutionContext",
+    "DurableModelExecutionError",
+    "DurableModelRoleExecutor",
     "EvolutionArena",
     "EvidenceLevel",
     "ExhibitStore",

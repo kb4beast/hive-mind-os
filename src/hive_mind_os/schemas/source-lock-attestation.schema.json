@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/source-lock-attestation.schema.json",
+  "title": "Hive Mind OS External Source Lock Attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "attestation_id", "authority_id", "keyset_sequence", "signer_identity", "key_id", "algorithm", "audience", "issued_at", "expires_at", "nonce", "source_lock", "signature"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "attestation_id": {"type": "string", "minLength": 1},
+    "authority_id": {"type": "string", "minLength": 1},
+    "keyset_sequence": {"type": "integer", "minimum": 1},
+    "signer_identity": {"type": "string", "minLength": 1},
+    "key_id": {"type": "string", "minLength": 1},
+    "algorithm": {"const": "ed25519"},
+    "audience": {"const": "hive-mind-os/source-custody/v1"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "nonce": {"type": "string", "minLength": 16, "maxLength": 256, "pattern": "^[A-Za-z0-9_-]+$"},
+    "source_lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "lock_id", "mission_id", "state_ref", "repository_url", "commit_sha", "tree_sha", "source_identity"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "lock_id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9._-]+$"},
+        "mission_id": {"type": "string", "minLength": 1},
+        "state_ref": {"type": "string", "minLength": 1},
+        "repository_url": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "tree_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "source_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "repository_id", "principal_id"],
+          "properties": {
+            "provider": {"type": "string", "minLength": 1},
+            "repository_id": {"type": "string", "minLength": 1},
+            "principal_id": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "signature": {"type": "string", "minLength": 86, "maxLength": 86, "pattern": "^[A-Za-z0-9_-]+$"}
+  }
+}

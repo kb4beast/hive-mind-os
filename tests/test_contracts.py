@@ -35,8 +35,8 @@ class ContractSchemaTests(unittest.TestCase):
 
     def test_catalog_is_complete_strict_and_draft_2020_12(self) -> None:
         self.assertEqual(len(LEGACY_SCHEMA_NAMES), 12)
-        self.assertEqual(len(EXTENSION_SCHEMA_NAMES), 8)
-        self.assertEqual(len(SCHEMA_NAMES), 20)
+        self.assertEqual(len(EXTENSION_SCHEMA_NAMES), 20)
+        self.assertEqual(len(SCHEMA_NAMES), 32)
         result = validate_schema_catalog()
         self.assertTrue(result.valid, result.issues)
         for name in SCHEMA_NAMES:

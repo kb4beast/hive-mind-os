@@ -12,6 +12,7 @@ from hive_mind_os.autonomy import (
 from hive_mind_os.models import AutonomyLevel, RiskTier, Role
 from hive_mind_os.policy import (
     ACTION_LEVEL,
+    ACTION_RISK_CEILING,
     EXTERNAL_GRANT_ACTIONS,
     PROHIBITED_ACTIONS,
     Action,
@@ -22,10 +23,13 @@ from hive_mind_os.policy import (
 class PolicyInvariantTests(unittest.TestCase):
     def test_every_action_has_an_explicit_policy_mapping(self) -> None:
         self.assertEqual(set(ACTION_LEVEL), set(Action))
+        self.assertEqual(set(ACTION_RISK_CEILING), set(Action))
         self.assertLessEqual(PROHIBITED_ACTIONS, set(Action))
         self.assertLessEqual(EXTERNAL_GRANT_ACTIONS, set(Action))
 
-    def test_non_delegable_actions_are_denied_for_every_actor_risk_and_authority(self) -> None:
+    def test_non_delegable_actions_are_denied_for_every_actor_risk_and_authority(
+        self,
+    ) -> None:
         for autonomy in AutonomyLevel:
             engine = PolicyEngine(autonomy)
             for role in Role:
@@ -41,7 +45,9 @@ class PolicyInvariantTests(unittest.TestCase):
                             self.assertFalse(decision.allowed)
                             self.assertIn("non-delegable", decision.reason)
 
-    def test_external_grant_actions_default_to_denied_without_a_grant_model(self) -> None:
+    def test_external_grant_actions_default_to_denied_without_a_grant_model(
+        self,
+    ) -> None:
         for autonomy in AutonomyLevel:
             engine = PolicyEngine(autonomy)
             for role in Role:
@@ -112,6 +118,19 @@ class PolicyInvariantTests(unittest.TestCase):
                 )
                 self.assertTrue(decision.allowed, decision.reason)
 
+    def test_risk_ceiling_denies_side_effects_and_critical_missions_fail_closed(
+        self,
+    ) -> None:
+        engine = PolicyEngine(AutonomyLevel.GOVERNED_FULL)
+        self.assertFalse(
+            engine.decide(Role.BUILDER, Action.RUN_COMMANDS, RiskTier.HIGH).allowed
+        )
+        critical_read = engine.decide(
+            Role.BUILDER, Action.READ_REPOSITORY, RiskTier.CRITICAL
+        )
+        self.assertFalse(critical_read.allowed)
+        self.assertIn("risk ceiling", critical_read.reason)
+
     def test_malformed_runtime_inputs_fail_closed(self) -> None:
         engine = PolicyEngine(AutonomyLevel.GOVERNED_FULL)
         malformed = (
@@ -130,7 +149,9 @@ class PolicyInvariantTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     PolicyEngine(autonomy)  # type: ignore[arg-type]
 
-    def test_blank_or_mismatched_charter_binding_is_ineligible_and_quarantined(self) -> None:
+    def test_blank_or_mismatched_charter_binding_is_ineligible_and_quarantined(
+        self,
+    ) -> None:
         charter = MissionCharter("Improve safely", ("owner/repo",))
         variant = AgentVariant(Role.BUILDER, "candidate")
         evaluator = FitnessEvaluator()
@@ -177,7 +198,10 @@ class PolicyInvariantTests(unittest.TestCase):
                 score = FitnessEvaluator().evaluate(outcome, charter)
                 self.assertFalse(score.eligible)
                 self.assertTrue(
-                    any("forbidden capability attempted" in reason for reason in score.reasons)
+                    any(
+                        "forbidden capability attempted" in reason
+                        for reason in score.reasons
+                    )
                 )
                 arena = EvolutionArena(charter)
                 arena.register(variant)

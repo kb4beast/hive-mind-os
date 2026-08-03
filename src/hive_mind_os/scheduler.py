@@ -56,6 +56,10 @@ class StaleLeaseError(RuntimeError):
     """A worker attempted to mutate a job after losing its lease."""
 
 
+class SchedulerIntegrityError(RuntimeError):
+    """A persisted job no longer binds to the payload it was approved with."""
+
+
 def _canonical_json(value: Mapping[str, Any]) -> str:
     return json.dumps(
         dict(value),
@@ -64,6 +68,11 @@ def _canonical_json(value: Mapping[str, Any]) -> str:
         separators=(",", ":"),
         allow_nan=False,
     )
+
+
+def _payload_digest(kind: str, payload: Mapping[str, Any]) -> str:
+    encoded = _canonical_json(payload)
+    return "sha256:" + sha256((kind + "\0" + encoded).encode()).hexdigest()
 
 
 class Scheduler:
@@ -138,8 +147,7 @@ class Scheduler:
         if not kind.strip() or max_attempts < 1:
             raise ValueError("job kind and positive max_attempts are required")
         encoded = _canonical_json(payload)
-        digest_value = sha256((kind + "\0" + encoded).encode()).hexdigest()
-        digest = f"sha256:{digest_value}"
+        digest = _payload_digest(kind, payload)
         now = self.clock.now()
         job_id = f"JOB-{uuid4()}"
         with self._lock, self._connection:
@@ -195,7 +203,7 @@ class Scheduler:
                 )
                 row = self._connection.execute(
                     """
-                    SELECT id FROM jobs
+                    SELECT * FROM jobs
                     WHERE attempts < max_attempts
                       AND (
                         (state='ready' AND not_before<=?)
@@ -209,6 +217,7 @@ class Scheduler:
                 if row is None:
                     self._connection.execute("COMMIT")
                     return None
+                self._job(row)
                 claimed = self._connection.execute(
                     """
                     UPDATE jobs
@@ -232,6 +241,11 @@ class Scheduler:
     def heartbeat(self, job_id: str, lease_token: str) -> Job:
         now = self.clock.now()
         with self._lock:
+            current = self._connection.execute(
+                "SELECT * FROM jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            if current is not None:
+                self._job(current)
             row = self._connection.execute(
                 """
                 UPDATE jobs SET lease_expiry=?,updated_at=?
@@ -253,6 +267,11 @@ class Scheduler:
     ) -> Job:
         now = self.clock.now()
         with self._lock:
+            current = self._connection.execute(
+                "SELECT * FROM jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            if current is not None:
+                self._job(current)
             row = self._connection.execute(
                 """
                 UPDATE jobs
@@ -329,10 +348,21 @@ class Scheduler:
 
     @staticmethod
     def _job(row: sqlite3.Row) -> Job:
+        try:
+            payload = json.loads(row["payload_json"])
+        except json.JSONDecodeError as error:
+            raise SchedulerIntegrityError("job payload is not valid JSON") from error
+        if not isinstance(payload, dict):
+            raise SchedulerIntegrityError("job payload is not an object")
+        observed = _payload_digest(str(row["kind"]), payload)
+        if row["payload_digest"] != observed:
+            raise SchedulerIntegrityError(
+                "job payload no longer binds its canonical digest"
+            )
         return Job(
             id=str(row["id"]),
             kind=str(row["kind"]),
-            payload=json.loads(row["payload_json"]),
+            payload=payload,
             payload_digest=str(row["payload_digest"]),
             state=str(row["state"]),
             attempts=int(row["attempts"]),

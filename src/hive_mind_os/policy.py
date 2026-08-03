@@ -51,6 +51,27 @@ ACTION_LEVEL: dict[Action, RequiredLevel] = {
     Action.CONCEAL_ACTIVITY: RequiredLevel.FULL,
 }
 
+# Authority answers who may execute an action.  This table answers whether the
+# action is proportionate to the mission's declared risk.  Critical-risk work
+# therefore fails closed before any capability can be exercised.
+ACTION_RISK_CEILING: dict[Action, RiskTier] = {
+    Action.READ_REPOSITORY: RiskTier.HIGH,
+    Action.SEARCH_WEB: RiskTier.MODERATE,
+    Action.WRITE_WORKSPACE: RiskTier.MODERATE,
+    Action.RUN_COMMANDS: RiskTier.MODERATE,
+    Action.CREATE_AGENT_VARIANT: RiskTier.LOW,
+    Action.CREATE_BRANCH: RiskTier.MODERATE,
+    Action.OPEN_PULL_REQUEST: RiskTier.MODERATE,
+    Action.MERGE_PULL_REQUEST: RiskTier.LOW,
+    Action.DEPLOY: RiskTier.LOW,
+    Action.MANAGE_SECRETS: RiskTier.LOW,
+    Action.SPEND_MONEY: RiskTier.LOW,
+    Action.SELF_REPLICATE_UNBOUNDED: RiskTier.LOW,
+    Action.MUTATE_MISSION_CHARTER: RiskTier.LOW,
+    Action.MUTATE_POLICY: RiskTier.LOW,
+    Action.CONCEAL_ACTIVITY: RiskTier.LOW,
+}
+
 PROHIBITED_ACTIONS = frozenset(
     {
         Action.SELF_REPLICATE_UNBOUNDED,
@@ -92,16 +113,30 @@ class PolicyEngine:
         if not isinstance(risk, RiskTier):
             return PolicyDecision(False, "invalid risk tier")
         if action in PROHIBITED_ACTIONS:
-            return PolicyDecision(False, f"{action} violates a non-delegable autonomy invariant")
+            return PolicyDecision(
+                False, f"{action} violates a non-delegable autonomy invariant"
+            )
         required = ACTION_LEVEL[action]
         if self.autonomy < required:
-            return PolicyDecision(False, f"{action} requires autonomy level {int(required)}")
+            return PolicyDecision(
+                False, f"{action} requires autonomy level {int(required)}"
+            )
         if action in EXTERNAL_GRANT_ACTIONS:
             return PolicyDecision(False, f"{action} requires an external policy grant")
+        maximum_risk = ACTION_RISK_CEILING[action]
+        if risk > maximum_risk:
+            return PolicyDecision(
+                False,
+                f"{action} exceeds the autonomous risk ceiling "
+                f"{risk.name.lower()} > {maximum_risk.name.lower()}",
+            )
         if role is Role.EXPLORER and action not in {
             Action.READ_REPOSITORY,
             Action.SEARCH_WEB,
             Action.RUN_COMMANDS,
         }:
             return PolicyDecision(False, "explorer is read-only by role contract")
-        return PolicyDecision(True, "allowed by autonomy level and role contract")
+        return PolicyDecision(
+            True,
+            "allowed by autonomy level, risk ceiling, and role contract",
+        )

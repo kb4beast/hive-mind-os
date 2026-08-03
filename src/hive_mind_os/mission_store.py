@@ -22,10 +22,11 @@ from typing import Any, Mapping, Sequence
 
 from .autonomy import AutonomyBudget
 from .contracts import tool_intent_digest, validate_contract
+from .custody import CustodyError, Ed25519CustodyVerifier, ExternalCustodyAdapter
 from .models import Role, utc_now
 from .receipts import sha256_digest
 
-STORE_SCHEMA_VERSION = 1
+STORE_SCHEMA_VERSION = 3
 
 
 class MissionStoreError(RuntimeError):
@@ -72,6 +73,10 @@ def _canonical_json(value: Any) -> str:
         separators=(",", ":"),
         allow_nan=False,
     )
+
+
+def _configuration_digest(config: Mapping[str, Any]) -> str:
+    return sha256_digest(_canonical_json(dict(config)).encode("utf-8"))
 
 
 def _atomic_write(path: Path, content: bytes) -> None:
@@ -153,6 +158,7 @@ def reopen_workspace(
     *,
     base_sha: str,
     role: Role,
+    risk: Any,
     policy: Any,
     allowance: Any,
     mission_id: str,
@@ -191,6 +197,7 @@ def reopen_workspace(
         allowance,
         policy=policy,
         role=role,
+        risk=risk,
         runner_identity="git-sandbox-runner-v1",
     )
     workspace = GitWorkspace(
@@ -203,6 +210,7 @@ def reopen_workspace(
         runner=runner,
         policy=policy,
         role=role,
+        risk=risk,
         mission_id=mission_id,
         receipts=[dict(record) for record in records],
     )
@@ -214,7 +222,17 @@ def reopen_workspace(
 class MissionStore:
     """SQLite current-state store plus immutable idempotency receipt index."""
 
-    def __init__(self, state_dir: str | Path) -> None:
+    def __init__(
+        self,
+        state_dir: str | Path,
+        *,
+        custody_verifier: Ed25519CustodyVerifier | None = None,
+        require_authenticated_custody: bool = False,
+    ) -> None:
+        if require_authenticated_custody and custody_verifier is None:
+            raise ValueError(
+                "authenticated custody mode requires an external custody verifier"
+            )
         self.state_dir = Path(state_dir).resolve()
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.state_dir / "missions.sqlite3"
@@ -224,6 +242,8 @@ class MissionStore:
             check_same_thread=False,
         )
         self._connection.row_factory = sqlite3.Row
+        self.custody_verifier = custody_verifier
+        self.require_authenticated_custody = require_authenticated_custody
         try:
             self._initialize()
         except BaseException:
@@ -244,6 +264,8 @@ class MissionStore:
                     mission_id TEXT PRIMARY KEY,
                     status TEXT NOT NULL,
                     config_json TEXT NOT NULL,
+                    config_digest TEXT NOT NULL,
+                    config_custody_json TEXT,
                     state_json TEXT NOT NULL,
                     roles_json TEXT NOT NULL,
                     workspaces_json TEXT NOT NULL,
@@ -283,15 +305,41 @@ class MissionStore:
             observed = self._connection.execute(
                 "SELECT value FROM metadata WHERE key='schema_version'"
             ).fetchone()
+            if observed is not None and observed["value"] not in {"1", "2", "3"}:
+                raise StoreVersionError(
+                    "unsupported mission-store schema version "
+                    f"{observed['value']}; expected {STORE_SCHEMA_VERSION}"
+                )
+            columns = {
+                str(row["name"])
+                for row in self._connection.execute("PRAGMA table_info(missions)")
+            }
+            if "config_digest" not in columns:
+                self._connection.execute(
+                    "ALTER TABLE missions ADD COLUMN config_digest TEXT"
+                )
+                rows = self._connection.execute(
+                    "SELECT mission_id,config_json FROM missions"
+                ).fetchall()
+                for row in rows:
+                    config = json.loads(row["config_json"])
+                    self._connection.execute(
+                        "UPDATE missions SET config_digest=? WHERE mission_id=?",
+                        (_configuration_digest(config), row["mission_id"]),
+                    )
+            if "config_custody_json" not in columns:
+                self._connection.execute(
+                    "ALTER TABLE missions ADD COLUMN config_custody_json TEXT"
+                )
             if observed is None:
                 self._connection.execute(
                     "INSERT INTO metadata(key,value) VALUES('schema_version',?)",
                     (str(STORE_SCHEMA_VERSION),),
                 )
-            elif observed["value"] != str(STORE_SCHEMA_VERSION):
-                raise StoreVersionError(
-                    "unsupported mission-store schema version "
-                    f"{observed['value']}; expected {STORE_SCHEMA_VERSION}"
+            elif observed["value"] in {"1", "2"}:
+                self._connection.execute(
+                    "UPDATE metadata SET value=? WHERE key='schema_version'",
+                    (str(STORE_SCHEMA_VERSION),),
                 )
 
     def close(self) -> None:
@@ -305,13 +353,34 @@ class MissionStore:
         mission_id: str,
         config: Mapping[str, Any],
         budget: AutonomyBudget,
+        *,
+        configuration_attestation: Mapping[str, object] | None = None,
     ) -> None:
         roles = {role.value: "pending" for role in Role}
+        config_payload = dict(config)
+        config_digest = _configuration_digest(config_payload)
+        custody_payload: dict[str, object] | None = None
+        if self.custody_verifier is not None:
+            if configuration_attestation is None:
+                if self.require_authenticated_custody:
+                    raise StoreIntegrityError(
+                        "authenticated custody mode requires a signed mission configuration"
+                    )
+            else:
+                custody_payload = self.custody_verifier.verify_configuration(
+                    mission_id,
+                    config_payload,
+                    configuration_attestation,
+                )
+        elif configuration_attestation is not None:
+            raise StoreIntegrityError(
+                "configuration custody was supplied without a custody verifier"
+            )
         budget_payload = self._budget_payload(budget)
         state = self._state_document(
             mission_id,
             "active",
-            config,
+            config_payload,
             roles,
             (),
             (),
@@ -320,21 +389,22 @@ class MissionStore:
         validation = validate_contract("mission-state", state)
         if not validation.valid:
             raise StoreIntegrityError(
-                "initial mission state violates schema: "
-                + "; ".join(validation.issues)
+                "initial mission state violates schema: " + "; ".join(validation.issues)
             )
         with self._lock, self._connection:
             self._connection.execute(
                 """
                 INSERT INTO missions(
-                    mission_id,status,config_json,state_json,roles_json,
+                    mission_id,status,config_json,config_digest,config_custody_json,state_json,roles_json,
                     workspaces_json,budget_json
-                ) VALUES(?,?,?,?,?,?,?)
+                ) VALUES(?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     mission_id,
                     "active",
-                    _canonical_json(dict(config)),
+                    _canonical_json(config_payload),
+                    config_digest,
+                    _canonical_json(custody_payload) if custody_payload is not None else None,
                     _canonical_json(state),
                     _canonical_json(roles),
                     "{}",
@@ -357,10 +427,16 @@ class MissionStore:
         ).fetchone()
         if row is None:
             raise KeyError(f"unknown mission: {mission_id}")
+        config = self._checked_config(row)
+        configuration_custody = self._checked_configuration_custody(
+            row,
+            config,
+        )
         return {
             "mission_id": row["mission_id"],
             "status": row["status"],
-            "config": json.loads(row["config_json"]),
+            "config": config,
+            "configuration_custody": configuration_custody,
             "state": json.loads(row["state_json"]),
             "roles": json.loads(row["roles_json"]),
             "workspaces": json.loads(row["workspaces_json"]),
@@ -371,19 +447,64 @@ class MissionStore:
 
     def list_missions(self) -> list[dict[str, Any]]:
         rows = self._connection.execute(
-            "SELECT mission_id,status,config_json,blocker FROM missions "
+            "SELECT mission_id,status,config_json,config_digest,blocker FROM missions "
             "ORDER BY mission_id"
         ).fetchall()
         return [
             {
                 "mission_id": row["mission_id"],
                 "status": row["status"],
-                "objective": json.loads(row["config_json"])["objective"],
-                "repository": json.loads(row["config_json"])["repository"],
+                "objective": self._checked_config(row)["objective"],
+                "repository": self._checked_config(row)["repository"],
                 "blocker": row["blocker"],
             }
             for row in rows
         ]
+
+    @staticmethod
+    def _checked_config(row: sqlite3.Row) -> dict[str, Any]:
+        config = json.loads(row["config_json"])
+        if not isinstance(config, dict):
+            raise StoreIntegrityError("mission configuration is not an object")
+        observed = _configuration_digest(config)
+        if row["config_digest"] != observed:
+            raise StoreIntegrityError(
+                "mission configuration no longer binds its canonical digest"
+            )
+        return config
+
+    def _checked_configuration_custody(
+        self,
+        row: sqlite3.Row,
+        config: Mapping[str, Any],
+    ) -> dict[str, object] | None:
+        encoded = row["config_custody_json"]
+        if encoded is None:
+            if self.require_authenticated_custody:
+                raise StoreIntegrityError(
+                    "authenticated custody mode cannot open a legacy unsigned configuration"
+                )
+            return None
+        try:
+            attestation = json.loads(encoded)
+        except json.JSONDecodeError as error:
+            raise StoreIntegrityError("mission configuration custody is malformed") from error
+        if not isinstance(attestation, dict):
+            raise StoreIntegrityError("mission configuration custody is not an object")
+        if self.custody_verifier is None:
+            raise StoreIntegrityError(
+                "mission stores a custody attestation but no verifier is configured"
+            )
+        try:
+            return self.custody_verifier.verify_configuration(
+                str(row["mission_id"]),
+                config,
+                attestation,
+            )
+        except (CustodyError, ValueError) as error:
+            raise StoreIntegrityError(
+                f"mission configuration custody is invalid: {error}"
+            ) from None
 
     def record_intent(
         self,
@@ -397,8 +518,7 @@ class MissionStore:
         validation = validate_contract("tool-intent", dict(intent))
         if not validation.valid:
             raise StoreIntegrityError(
-                "checkpoint intent violates schema: "
-                + "; ".join(validation.issues)
+                "checkpoint intent violates schema: " + "; ".join(validation.issues)
             )
         with self._lock, self._connection:
             existing = self._connection.execute(
@@ -439,8 +559,7 @@ class MissionStore:
         validation = validate_contract("tool-intent", dict(intent))
         if not validation.valid:
             raise StoreIntegrityError(
-                "checkpoint intent violates schema: "
-                + "; ".join(validation.issues)
+                "checkpoint intent violates schema: " + "; ".join(validation.issues)
             )
         with self._lock, self._connection:
             existing = self._connection.execute(
@@ -497,18 +616,13 @@ class MissionStore:
             raise KeyError((mission_id, step_index))
         intent = json.loads(row["intent_json"])
         observed = tool_intent_digest(intent)
-        if (
-            row["intent_digest"] != observed
-            or intent.get("action_digest") != observed
-        ):
+        if row["intent_digest"] != observed or intent.get("action_digest") != observed:
             raise StoreIntegrityError(
                 f"checkpoint {step_index} digest no longer binds its intent"
             )
         outcome = json.loads(row["outcome_json"]) if row["outcome_json"] else None
         receipt = (
-            json.loads(row["receipt_ref_json"])
-            if row["receipt_ref_json"]
-            else None
+            json.loads(row["receipt_ref_json"]) if row["receipt_ref_json"] else None
         )
         return StepCheckpoint(
             mission_id,
@@ -559,6 +673,15 @@ class MissionStore:
         outcome: Mapping[str, Any],
         records: Sequence[Mapping[str, Any]],
     ) -> dict[str, str]:
+        current = self.checkpoint(checkpoint.mission_id, checkpoint.step_index)
+        if (
+            current.intent_digest != checkpoint.intent_digest
+            or current.state != "intent"
+            or current.execution_count != 1
+        ):
+            raise StoreIntegrityError(
+                "checkpoint receipt may be written only after its single effect start"
+            )
         synthetic = {
             "schema_version": 1,
             "receipt_id": f"REC-P06-{checkpoint.mission_id}-{checkpoint.step_index}",
@@ -583,8 +706,7 @@ class MissionStore:
         validation = validate_contract("tool-receipt", synthetic)
         if not validation.valid:
             raise StoreIntegrityError(
-                "checkpoint receipt violates schema: "
-                + "; ".join(validation.issues)
+                "checkpoint receipt violates schema: " + "; ".join(validation.issues)
             )
         wrapper = {
             "intent_digest": checkpoint.intent_digest,
@@ -600,9 +722,7 @@ class MissionStore:
         )
         if path.exists():
             existing = path.read_bytes()
-            existing_wrapper = json.loads(existing)
-            if existing_wrapper.get("intent_digest") != checkpoint.intent_digest:
-                raise StoreIntegrityError("checkpoint receipt path was reused")
+            self._validated_effect_wrapper(current, json.loads(existing))
             encoded = existing
         else:
             _atomic_write(path, encoded)
@@ -615,6 +735,9 @@ class MissionStore:
         self,
         checkpoint: StepCheckpoint,
     ) -> tuple[dict[str, str], dict[str, Any]] | None:
+        current = self.checkpoint(checkpoint.mission_id, checkpoint.step_index)
+        if current.intent_digest != checkpoint.intent_digest:
+            raise StoreIntegrityError("checkpoint reference does not bind its intent")
         path = (
             self.mission_root(checkpoint.mission_id)
             / "checkpoint-receipts"
@@ -623,14 +746,64 @@ class MissionStore:
         if not path.is_file():
             return None
         content = path.read_bytes()
-        wrapper = json.loads(content)
-        if wrapper.get("intent_digest") != checkpoint.intent_digest:
-            raise StoreIntegrityError("effect receipt belongs to another intent")
+        wrapper = self._validated_effect_wrapper(current, json.loads(content))
         reference = {
             "path": path.relative_to(self.state_dir).as_posix(),
             "digest": sha256_digest(content),
         }
+        if current.execution_count != 1:
+            raise StoreIntegrityError(
+                "effect receipt exists before its effect was durably started"
+            )
+        if (
+            current.receipt_reference is not None
+            and current.receipt_reference != reference
+        ):
+            raise StoreIntegrityError("completed checkpoint receipt reference changed")
         return reference, wrapper
+
+    @staticmethod
+    def _validated_effect_wrapper(
+        checkpoint: StepCheckpoint,
+        wrapper: object,
+    ) -> dict[str, Any]:
+        if not isinstance(wrapper, dict):
+            raise StoreIntegrityError("checkpoint receipt is not an object")
+        if wrapper.get("intent_digest") != checkpoint.intent_digest:
+            raise StoreIntegrityError("effect receipt belongs to another intent")
+        outcome = wrapper.get("outcome")
+        records = wrapper.get("records")
+        receipt = wrapper.get("receipt")
+        if not isinstance(outcome, dict) or not isinstance(records, list):
+            raise StoreIntegrityError(
+                "checkpoint receipt outcome or records are malformed"
+            )
+        if any(not isinstance(record, dict) for record in records):
+            raise StoreIntegrityError("checkpoint receipt records are malformed")
+        if not isinstance(receipt, dict):
+            raise StoreIntegrityError("checkpoint receipt lacks a tool receipt")
+        validation = validate_contract("tool-receipt", receipt)
+        if not validation.valid:
+            raise StoreIntegrityError(
+                "checkpoint receipt violates schema: " + "; ".join(validation.issues)
+            )
+        bindings = {
+            "mission_id": checkpoint.mission_id,
+            "state_ref": checkpoint.intent["state_ref"],
+            "actor_id": checkpoint.intent["actor_id"],
+            "policy_decision_ref": checkpoint.intent["policy_decision_ref"],
+            "lease_id": checkpoint.intent["lease_id"],
+            "action_kind": checkpoint.intent["kind"],
+            "action_digest": checkpoint.intent_digest,
+        }
+        for field, expected in bindings.items():
+            if receipt.get(field) != expected:
+                raise StoreIntegrityError(
+                    f"checkpoint receipt {field} does not bind its intent"
+                )
+        if receipt.get("executed") is not True or receipt.get("result") != "succeeded":
+            raise StoreIntegrityError("checkpoint receipt does not record success")
+        return wrapper
 
     def complete_step(
         self,
@@ -640,6 +813,18 @@ class MissionStore:
         *,
         budget: AutonomyBudget | None = None,
     ) -> None:
+        found = self.find_effect_receipt(checkpoint)
+        if found is None:
+            raise StoreIntegrityError("completed checkpoint lacks its effect receipt")
+        observed_reference, wrapper = found
+        if dict(reference) != observed_reference:
+            raise StoreIntegrityError(
+                "checkpoint completion reference is not canonical"
+            )
+        if wrapper["outcome"] != dict(outcome):
+            raise StoreIntegrityError(
+                "checkpoint completion outcome differs from receipt"
+            )
         encoded_reference = _canonical_json(dict(reference))
         encoded_outcome = _canonical_json(dict(outcome))
         with self._lock, self._connection:
@@ -894,11 +1079,7 @@ class MissionStore:
                 ),
                 "active_role": role.value,
                 "status": (
-                    "complete"
-                    if complete
-                    else "blocked"
-                    if blocked
-                    else "active"
+                    "complete" if complete else "blocked" if blocked else "active"
                 ),
                 "source_pack_fingerprint": config["source_pack_fingerprint"],
             },
@@ -921,8 +1102,7 @@ class MissionStore:
             ],
             "court_cases": [],
             "evidence": [
-                {"kind": "checkpoint-receipt", "path": path}
-                for path in receipt_paths
+                {"kind": "checkpoint-receipt", "path": path} for path in receipt_paths
             ],
             "proposed_actions": [dict(intent) for intent in intents],
             "tool_receipts": [dict(receipt) for receipt in receipts],
@@ -962,9 +1142,7 @@ class MissionStore:
                 "unresolved_items": [blocker] if blocker else [],
                 "verified_artifacts": list(receipt_paths),
                 "next_action": (
-                    "retain verified result"
-                    if complete
-                    else "resume durable mission"
+                    "retain verified result" if complete else "resume durable mission"
                 ),
                 "resume_instruction": f"hive-mind resume {mission_id}",
                 "created_at": utc_now(),
@@ -975,16 +1153,22 @@ class MissionStore:
 async def resume_mission(
     store: MissionStore,
     mission_id: str,
+    *,
+    custody: ExternalCustodyAdapter | None = None,
 ) -> Any:
     """Reconcile and continue an interrupted scripted repository mission."""
 
     from .github_adapter import GitHubClient, GitHubDeliveryTarget
     from .ledger import EvidenceLedger
     from .mission import RepositoryMission, ScriptedRepositoryBackend
-    from .models import AutonomyLevel
+    from .models import AutonomyLevel, RiskTier
     from .policy import PolicyEngine
 
     mission = store.mission(mission_id)
+    if store.require_authenticated_custody and custody is None:
+        raise MissionStoreError(
+            "authenticated custody mission resumption requires an external custody adapter"
+        )
     if mission["status"] == "succeeded":
         raise MissionStoreError("mission is already complete")
     if mission["status"] == "blocked":
@@ -1035,6 +1219,8 @@ async def resume_mission(
         config["repository"],
         config["objective"],
         acceptance_criteria=tuple(config["acceptance_criteria"]),
+        acceptance_specifications=tuple(config.get("acceptance_specifications", ())),
+        risk=RiskTier[str(config.get("risk", "moderate")).upper()],
         backend=backend,
         pin=config["pin"],
         output_dir=config["output_dir"],
@@ -1042,6 +1228,7 @@ async def resume_mission(
         budget=budget,
         ledger=ledger,
         mission_store=store,
+        custody=custody,
         github_delivery=github_delivery,
         _run_id=mission_id,
         _resume=True,

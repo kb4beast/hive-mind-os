@@ -163,10 +163,30 @@ class ModelBackend:
         work_item: WorkItem,
         objective: Objective,
         context: tuple[AgentResult, ...],
+        *,
+        pinned_prompt_digest: str | None = None,
     ) -> tuple[str, str, bool, str]:
         system = generation_zero_prompt(contract)
         artifact_digest = prompt_digest(system)
-        if self.prompt_registry is not None:
+        if pinned_prompt_digest is not None:
+            if self.prompt_registry is None:
+                if pinned_prompt_digest != artifact_digest:
+                    raise ModelTurnError(
+                        "durable model execution requires an available pinned prompt artifact"
+                    )
+            else:
+                try:
+                    system = self.prompt_registry.read(pinned_prompt_digest)
+                except (KeyError, RuntimeError) as error:
+                    raise ModelTurnError(
+                        "durable model execution pinned prompt is unavailable or inconsistent"
+                    ) from error
+                artifact_digest = prompt_digest(system)
+                if artifact_digest != pinned_prompt_digest:
+                    raise ModelTurnError(
+                        "durable model execution prompt digest is inconsistent"
+                    )
+        elif self.prompt_registry is not None:
             try:
                 system, artifact_digest = self.prompt_registry.champion_prompt(
                     contract.role

@@ -5,12 +5,14 @@ import json
 import os
 import ssl
 import subprocess
+import sys
 import tempfile
 import unittest
 import urllib.parse
 from pathlib import Path
 from unittest.mock import patch
 
+from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.git_adapter import GitWorkspace, PinViolation
 from hive_mind_os.github_adapter import (
@@ -732,6 +734,18 @@ class GitHubAdapterTests(unittest.TestCase):
                 fixture.root,
                 "Fix the failing test",
                 acceptance_criteria=("increment(1) returns 2",),
+                acceptance_specifications=(
+                    AcceptanceSpecification(
+                        "increment-returns-two",
+                        "increment(1) returns 2",
+                        (
+                            sys.executable,
+                            "-B",
+                            "-c",
+                            "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                        ),
+                    ),
+                ),
                 pin=fixture.commit_two,
                 output_dir=self.root / "mission-output",
                 policy=PolicyEngine(AutonomyLevel.REPOSITORY),

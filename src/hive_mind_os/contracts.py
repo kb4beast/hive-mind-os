@@ -27,6 +27,18 @@ LEGACY_SCHEMA_NAMES = (
     "tool-receipt",
 )
 EXTENSION_SCHEMA_NAMES = (
+    "acceptance-specification",
+    "custody-attestation",
+    "custody-keyset",
+    "source-lock",
+    "source-lock-attestation",
+    "model-turn-plan",
+    "model-turn-result",
+    "model-role-result",
+    "hard-isolation-profile",
+    "hard-isolation-receipt",
+    "hard-isolation-execution-plan",
+    "hard-isolation-capability-attestation",
     "package-manifest",
     "agent-component",
     "skill-component",

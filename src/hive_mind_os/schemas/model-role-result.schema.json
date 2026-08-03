@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/model-role-result.schema.json",
+  "title": "Hive Mind OS Sanitized Resumable Model Role Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "logical_turn_id", "role", "work_item_id", "summary", "evidence", "proposed_actions", "lessons", "success", "completed_at", "redaction_policy_digest"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "logical_turn_id": {"type": "string", "pattern": "^MTURN-[0-9a-f]{64}$"},
+    "role": {"type": "string", "enum": ["orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer"]},
+    "work_item_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 8000},
+    "evidence": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "summary", "source", "content"],
+        "properties": {
+          "kind": {"type": "string", "minLength": 1, "maxLength": 128},
+          "summary": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "source": {"type": "string", "minLength": 1, "maxLength": 256},
+          "content": {"type": "string", "minLength": 1, "maxLength": 16384}
+        }
+      }
+    },
+    "proposed_actions": {"type": "array", "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 4000}},
+    "lessons": {"type": "array", "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 4000}},
+    "success": {"type": "boolean"},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "redaction_policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

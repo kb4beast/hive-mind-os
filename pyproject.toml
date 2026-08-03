@@ -12,6 +12,11 @@ license = { text = "MIT" }
 authors = [{ name = "Hive Mind OS contributors" }]
 dependencies = []
 
+[project.optional-dependencies]
+# Verification is public-key only.  Production signing material is deliberately outside
+# this package and must be supplied by a separately controlled custody service.
+custody = ["cryptography==47.0.0"]
+
 [project.scripts]
 hive-mind = "hive_mind_os.cli:main"
 

@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.git_adapter import verify_delivery
 from hive_mind_os.mission import (
@@ -42,6 +43,19 @@ def _action(action: str, **payload: object) -> str:
         {"action": action, **payload},
         sort_keys=True,
         separators=(",", ":"),
+    )
+
+
+def _fixture_acceptance_specification() -> AcceptanceSpecification:
+    return AcceptanceSpecification(
+        "increment-returns-two",
+        "increment(1) returns 2",
+        (
+            sys.executable,
+            "-B",
+            "-c",
+            "from tiny_pkg.maths import increment; assert increment(1) == 2",
+        ),
     )
 
 
@@ -124,6 +138,7 @@ class _RepositoryProvider:
                                         "name": "repository-regression",
                                         "argv": test_argv,
                                         "expected": "succeeded",
+                                        "criteria": [],
                                     },
                                     {
                                         "name": "objective-criterion",
@@ -137,13 +152,13 @@ class _RepositoryProvider:
                                             ),
                                         ],
                                         "expected": "succeeded",
+                                        "criteria": ["increment(1) returns 2"],
                                     },
                                 ]
                             },
                             sort_keys=True,
                         )
-                        if role is Role.CURATOR
-                        and name == "verification report"
+                        if role is Role.CURATOR and name == "verification report"
                         else f"model evidence for {name}"
                     )
                     for name in ROLE_CONTRACTS[role].required_outputs
@@ -231,6 +246,7 @@ class RepositoryMissionTests(unittest.TestCase):
         backend=None,
         policy: PolicyEngine | None = None,
         budget: AutonomyBudget | None = None,
+        risk: RiskTier = RiskTier.MODERATE,
         label: str = "artifact",
     ) -> tuple[MissionReport, Path]:
         output = self.output(label)
@@ -239,9 +255,11 @@ class RepositoryMissionTests(unittest.TestCase):
                 self.fixture.root,
                 "Fix the failing test",
                 acceptance_criteria=("increment(1) returns 2",),
+                acceptance_specifications=(_fixture_acceptance_specification(),),
                 backend=backend,
                 pin=self.fixture.commit_two,
                 output_dir=output,
+                risk=risk,
                 policy=policy,
                 budget=budget,
             ).run()
@@ -282,7 +300,9 @@ class RepositoryMissionTests(unittest.TestCase):
         report, output = self.run_mission()
         self.assertIs(report.status, WorkStatus.SUCCEEDED)
         self.assertEqual(report.curator_verdict, "adopt")
-        self.assertEqual(tuple(result.role for result in report.results), DEFAULT_LIFECYCLE)
+        self.assertEqual(
+            tuple(result.role for result in report.results), DEFAULT_LIFECYCLE
+        )
         for name in ("changes.bundle", "changes.patch", "delivery.json"):
             self.assertTrue((output / name).is_file())
         self.assertTrue(verify_delivery(output, self.fixture.root))
@@ -291,12 +311,25 @@ class RepositoryMissionTests(unittest.TestCase):
             len(report.receipts),
             report.budget_consumption["tool_calls"],
         )
+        reproduction = next(
+            event
+            for event in report.ledger_events
+            if event["event_type"] == "curator.reproduction.completed"
+        )
+        specification_results = [
+            item
+            for item in reproduction["payload"]["acceptance_results"]
+            if item["specification_id"] is not None
+        ]
+        self.assertEqual(len(specification_results), 1)
+        self.assertEqual(
+            specification_results[0]["specification_id"],
+            "increment-returns-two",
+        )
+        self.assertEqual(specification_results[0]["receipt_binding"], "matched")
         committed = json.loads(
             (
-                Path(__file__).parent
-                / "fixtures"
-                / "mission"
-                / "golden_report.json"
+                Path(__file__).parent / "fixtures" / "mission" / "golden_report.json"
             ).read_text(encoding="utf-8")
         )
         self.assertEqual(report.to_dict(normalize_volatile=True), committed)
@@ -343,9 +376,7 @@ class RepositoryMissionTests(unittest.TestCase):
             for record in report.receipts
             if record["actor_id"] == Role.BUILDER.value
         }
-        self.assertTrue(
-            builder_digests.isdisjoint(set(manifest["receipt_digests"]))
-        )
+        self.assertTrue(builder_digests.isdisjoint(set(manifest["receipt_digests"])))
         self.assertEqual(manifest["prior_roles"], [])
         self.assertEqual(manifest["provider_kind"], "scripted")
         self.assertEqual(manifest["model_id"], "scripted-repository")
@@ -376,6 +407,13 @@ class RepositoryMissionTests(unittest.TestCase):
         self.assertIs(report.status, WorkStatus.FAILED)
         self.assertFalse(output.exists())
         self.assertIn("requires autonomy level", report.failure["message"])
+
+    def test_high_risk_mission_cannot_reach_command_execution(self) -> None:
+        report, output = self.run_mission(risk=RiskTier.HIGH)
+        self.assertIs(report.status, WorkStatus.FAILED)
+        self.assertFalse(output.exists())
+        self.assertIsNotNone(report.failure)
+        self.assertIn("risk ceiling", report.failure["message"])
         self.assertEqual(report.event_types[:2], ("mission.started", "policy.decision"))
 
     def test_budget_exhaustion_is_recorded_and_exports_nothing(self) -> None:
@@ -538,10 +576,7 @@ class RepositoryMissionTests(unittest.TestCase):
         self.assertEqual(provider.index, 0)
         self.assertEqual(report.budget_consumption["tool_calls"], 0)
         self.assertFalse(
-            any(
-                event["event_type"] == "model.call"
-                for event in report.ledger_events
-            )
+            any(event["event_type"] == "model.call" for event in report.ledger_events)
         )
 
     def test_failed_git_operation_keeps_receipts_and_budget_accounting(self) -> None:
@@ -599,6 +634,14 @@ class RepositoryMissionTests(unittest.TestCase):
             (str(Path(__file__).parents[1] / "src"), str(Path(__file__).parents[1]))
         )
         good_output = self.output("cli-good")
+        acceptance_specification = self.base / "increment-returns-two.json"
+        acceptance_specification.write_text(
+            json.dumps(
+                _fixture_acceptance_specification().to_dict(),
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
         command = [
             sys.executable,
             "-m",
@@ -614,6 +657,8 @@ class RepositoryMissionTests(unittest.TestCase):
             "Fix the failing test",
             "--criterion",
             "increment(1) returns 2",
+            "--acceptance-spec",
+            str(acceptance_specification),
             "--output-dir",
             str(good_output),
         ]
@@ -665,11 +710,13 @@ class RepositoryMissionTests(unittest.TestCase):
             ).allowed
         )
         self.assertFalse(
-            PolicyEngine(AutonomyLevel.ADVISE).decide(
+            PolicyEngine(AutonomyLevel.ADVISE)
+            .decide(
                 Role.EXPLORER,
                 Action.RUN_COMMANDS,
                 RiskTier.MODERATE,
-            ).allowed
+            )
+            .allowed
         )
         self.assertFalse(
             sandbox.decide(

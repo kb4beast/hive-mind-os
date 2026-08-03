@@ -135,7 +135,10 @@ class WorkerTests(unittest.TestCase):
             finally:
                 connection.close()
             self.assertTrue(
-                all(job.lease_token is None and job.lease_owner is None for job in queue.jobs())
+                all(
+                    job.lease_token is None and job.lease_owner is None
+                    for job in queue.jobs()
+                )
             )
         finally:
             queue.close()
@@ -182,7 +185,9 @@ class WorkerTests(unittest.TestCase):
         finally:
             queue.close()
 
-    def test_worker_executes_real_durable_mission_with_unique_effect_adoption(self) -> None:
+    def test_worker_executes_real_durable_mission_with_unique_effect_adoption(
+        self,
+    ) -> None:
         fixture = build_fixture_repo(self.root)
         mission_id = "M-real-fixture"
         queue = Scheduler(self.root / "state")
@@ -193,29 +198,67 @@ class WorkerTests(unittest.TestCase):
                     "mission_id": mission_id,
                     "repository": str(fixture.root),
                     "objective": "Fix the failing test",
-                    "acceptance_criteria": [],
+                    "acceptance_criteria": ["increment(1) returns 2"],
+                    "acceptance_specifications": [
+                        {
+                            "schema_version": 1,
+                            "id": "increment-returns-two",
+                            "criterion": "increment(1) returns 2",
+                            "command": {
+                                "argv": [
+                                    sys.executable,
+                                    "-B",
+                                    "-c",
+                                    "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                                ],
+                                "expected": "succeeded",
+                            },
+                        }
+                    ],
                     "backend": "scripted",
                     "scripted_variant": "good",
-                    "pin": None,
+                    "pin": fixture.commit_two,
                 },
                 mission_id=mission_id,
             )
             self.assertTrue(Worker(queue, "real-worker").run_once())
             self.assertEqual(queue.jobs()[0].state, "done")
             self.assertTrue((self.root / "state" / "d" / mission_id).is_dir())
-            ledger = sqlite3.connect(
-                self.root / "state" / "evidence-ledger.sqlite3"
-            )
+            ledger = sqlite3.connect(self.root / "state" / "evidence-ledger.sqlite3")
             try:
                 rows = ledger.execute(
                     "SELECT payload FROM events WHERE event_type='receipt.recorded'"
                 ).fetchall()
-                digests = [
-                    json.loads(row[0])["action_digest"] for row in rows
-                ]
+                digests = [json.loads(row[0])["action_digest"] for row in rows]
                 self.assertEqual(len(digests), len(set(digests)))
             finally:
                 ledger.close()
+        finally:
+            queue.close()
+
+    def test_worker_dead_letters_an_unpinned_repository_mission(self) -> None:
+        fixture = build_fixture_repo(self.root)
+        queue = Scheduler(self.root / "state")
+        try:
+            job = queue.enqueue(
+                "repository-mission",
+                {
+                    "mission_id": "M-unpinned",
+                    "repository": str(fixture.root),
+                    "objective": "Fix the failing test",
+                    "acceptance_criteria": [],
+                    "acceptance_specifications": [],
+                    "backend": "scripted",
+                    "scripted_variant": "good",
+                    "pin": None,
+                },
+                max_attempts=1,
+                mission_id="M-unpinned",
+            )
+            self.assertTrue(Worker(queue, "pin-guard").run_once())
+            failed = queue.get(job.id)
+            self.assertEqual(failed.state, "dead-letter")
+            self.assertIn("full immutable pin", failed.last_error or "")
         finally:
             queue.close()
 

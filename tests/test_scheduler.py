@@ -5,7 +5,12 @@ import threading
 import unittest
 from pathlib import Path
 
-from hive_mind_os.scheduler import ManualClock, Scheduler, StaleLeaseError
+from hive_mind_os.scheduler import (
+    ManualClock,
+    Scheduler,
+    SchedulerIntegrityError,
+    StaleLeaseError,
+)
 
 
 class SchedulerTests(unittest.TestCase):
@@ -153,6 +158,20 @@ class SchedulerTests(unittest.TestCase):
         second = self._enqueue()
         self.assertEqual(first.id, second.id)
         self.assertEqual(len(self.scheduler.jobs()), 1)
+
+    def test_tampered_payload_is_rejected_before_a_lease_is_issued(self) -> None:
+        job = self._enqueue()
+        with self.scheduler._connection:
+            self.scheduler._connection.execute(
+                "UPDATE jobs SET payload_json=? WHERE id=?",
+                ('{"mission_id":"attacker","value":"attacker"}', job.id),
+            )
+        with self.assertRaisesRegex(SchedulerIntegrityError, "no longer binds"):
+            self.scheduler.claim("worker")
+        state = self.scheduler._connection.execute(
+            "SELECT state FROM jobs WHERE id=?", (job.id,)
+        ).fetchone()["state"]
+        self.assertEqual(state, "ready")
 
 
 if __name__ == "__main__":

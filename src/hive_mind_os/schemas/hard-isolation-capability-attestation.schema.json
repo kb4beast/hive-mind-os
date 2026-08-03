@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/hard-isolation-capability-attestation.schema.json",
+  "title": "Hive Mind OS External Hard Isolation Capability Attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "attestation_id", "authority_id", "keyset_sequence", "signer_identity", "key_id", "algorithm", "audience", "issued_at", "expires_at", "nonce", "subject", "signature"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "attestation_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "keyset_sequence": {"type": "integer", "minimum": 1},
+    "signer_identity": {"type": "string", "minLength": 1, "maxLength": 256},
+    "key_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "algorithm": {"const": "ed25519"},
+    "audience": {"const": "hive-mind-os/hard-isolation/v1"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "nonce": {"type": "string", "minLength": 16, "maxLength": 256, "pattern": "^[A-Za-z0-9_-]+$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_id", "adapter_identity", "adapter_version", "profile_digest", "runtime", "runtime_digest", "image_digest", "guest_executable_digest", "conformance_status"],
+      "properties": {
+        "capability_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "adapter_identity": {"type": "string", "minLength": 1, "maxLength": 256},
+        "adapter_version": {"type": "string", "minLength": 1, "maxLength": 256},
+        "profile_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "runtime": {"enum": ["oci-container", "hyperv-container", "ephemeral-vm"]},
+        "runtime_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "guest_executable_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "conformance_status": {"const": "passed"}
+      }
+    },
+    "signature": {"type": "string", "minLength": 86, "maxLength": 86, "pattern": "^[A-Za-z0-9_-]+$"}
+  }
+}

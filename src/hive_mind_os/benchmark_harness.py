@@ -139,6 +139,7 @@ class HiveMindLane:
             task.repository,
             task.objective,
             acceptance_criteria=task.acceptance_criteria,
+            acceptance_specifications=task.acceptance_specifications,
             backend=ScriptedRepositoryBackend(),
             pin=task.base_sha,
             output_dir=artifact,
