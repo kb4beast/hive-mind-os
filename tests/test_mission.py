@@ -296,6 +296,18 @@ class RepositoryMissionTests(unittest.TestCase):
         )
         self.assert_receipts_resolve(report)
 
+    def test_private_durable_run_id_rejects_a_pathlike_identity(self) -> None:
+        output = self.output("malformed-durable-identity")
+        with self.assertRaisesRegex(ValueError, "durable mission identity"):
+            RepositoryMission(
+                self.fixture.root,
+                "Reject malformed durable identity",
+                pin=self.fixture.commit_two,
+                output_dir=output,
+                _run_id="../outside-mission",
+            )
+        self.assertFalse(output.exists())
+
     def test_golden_scripted_delivery_and_report_fixture(self) -> None:
         report, output = self.run_mission()
         self.assertIs(report.status, WorkStatus.SUCCEEDED)

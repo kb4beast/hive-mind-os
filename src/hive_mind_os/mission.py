@@ -561,8 +561,22 @@ class RepositoryMission:
     ) -> None:
         if not objective.strip():
             raise ValueError("objective is required")
-        if mission_id is not None and (not mission_id.strip() or "/" in mission_id or "\\" in mission_id):
+        if mission_id is not None and (
+            not isinstance(mission_id, str)
+            or not mission_id.strip()
+            or "/" in mission_id
+            or "\\" in mission_id
+        ):
             raise ValueError("mission_id must be a nonempty identifier without path separators")
+        if _run_id is not None and (
+            not isinstance(_run_id, str)
+            or not _run_id.strip()
+            or "/" in _run_id
+            or "\\" in _run_id
+        ):
+            raise ValueError(
+                "durable mission identity must be a nonempty identifier without path separators"
+            )
         if _run_id is not None and mission_id is not None and _run_id != mission_id:
             raise ValueError("mission_id differs from the durable mission identity")
         self.run_id = _run_id or mission_id or str(uuid4())
