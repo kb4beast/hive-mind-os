@@ -418,14 +418,21 @@ class SourceCustodyVerifier:
         state_ref: str,
         allowed_hosts: Sequence[str],
     ) -> SourceLock:
-        lock = self.verify(evidence)
-        lock.require_materialization(
+        requested_lock = SourceLock.from_dict(
+            evidence.source_lock.to_dict(), allowed_hosts=self.allowed_hosts
+        )
+        requested_lock.require_materialization(
             repository_url,
             commit_sha,
             mission_id=mission_id,
             state_ref=state_ref,
             allowed_hosts=allowed_hosts,
         )
+        lock = self.verify(evidence)
+        if lock.to_dict() != requested_lock.to_dict():
+            raise SourceCustodyError(
+                "verified source lock differs from its requested materialization binding"
+            )
         return lock
 
 

@@ -37,6 +37,7 @@ from hive_mind_os.models import AutonomyLevel, RiskTier, Role
 from hive_mind_os.policy import Action, PolicyEngine
 from hive_mind_os.source_custody import (
     SOURCE_CUSTODY_AUDIENCE,
+    SourceCustodyError,
     SourceCustodyVerifier,
     SourceLock,
     SourceLockEvidence,
@@ -231,6 +232,19 @@ class AuthenticatedRepositorySourceTests(unittest.TestCase):
                 mission_store=store,
                 output_dir=self.root / "unattested-delivery",
             )
+
+    def test_foreign_signed_source_lock_is_rejected_before_provenance_admission(self) -> None:
+        evidence = self.harness.source_lock()
+        with self.assertRaisesRegex(SourceCustodyError, "commit does not match"):
+            self.harness.verifier.verify_for_materialization(
+                evidence,
+                evidence.source_lock.repository_url,
+                "c" * 40,
+                mission_id=self.mission_id,
+                state_ref=evidence.source_lock.state_ref,
+                allowed_hosts=self.harness.verifier.allowed_hosts,
+            )
+        self.assertEqual(self.harness.source_provenance.count(), 0)
 
     def test_authenticated_source_is_sealed_into_the_durable_mission_and_materialization(self) -> None:
         mission = self.mission()
