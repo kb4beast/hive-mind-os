@@ -53,6 +53,7 @@ from .policy import Action, PolicyEngine
 from .receipts import (
     FileReceiptValidator,
     ReceiptReference,
+    path_traverses_link_or_reparse_point,
     portable_path_parts,
     sha256_digest,
 )
@@ -1221,7 +1222,7 @@ class RepositoryMission:
         parent = self.output_dir.parent
         if not parent.is_dir():
             raise ValueError("output parent must be an existing directory")
-        if parent.resolve() != parent:
+        if path_traverses_link_or_reparse_point(parent):
             raise ValueError("output parent must not traverse a symlink or junction")
         if (
             not allow_existing

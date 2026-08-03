@@ -655,6 +655,24 @@ class RepositoryMissionTests(unittest.TestCase):
         self.assertEqual(json.loads(sabotage.stderr)["status"], "failed")
         self.assertFalse(sabotage_output.exists())
 
+    def test_output_parent_symlink_is_rejected_when_supported(self) -> None:
+        target = self.base / "output-target"
+        target.mkdir()
+        linked = self.base / "output-link"
+        try:
+            linked.symlink_to(target, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"symlink creation unavailable: {error}")
+        mission = RepositoryMission(
+            self.fixture.root,
+            "Fix the failing test",
+            backend=ScriptedRepositoryBackend(),
+            pin=self.fixture.commit_two,
+            output_dir=linked / "delivery",
+        )
+        with self.assertRaisesRegex(ValueError, "must not traverse"):
+            mission._validated_output()
+
     def test_explorer_command_is_bounded_but_writes_remain_denied(self) -> None:
         sandbox = PolicyEngine(AutonomyLevel.SANDBOX)
         self.assertTrue(
