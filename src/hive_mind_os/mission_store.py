@@ -90,6 +90,20 @@ def _configuration_digest(config: Mapping[str, Any]) -> str:
     return sha256_digest(_canonical_json(dict(config)).encode("utf-8"))
 
 
+def _safe_mission_identity(mission_id: object) -> str:
+    if (
+        not isinstance(mission_id, str)
+        or not mission_id.strip()
+        or mission_id in {".", ".."}
+        or "/" in mission_id
+        or "\\" in mission_id
+    ):
+        raise ValueError(
+            "mission_id must be a nonempty single-segment identifier without path separators"
+        )
+    return mission_id
+
+
 def _atomic_write(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
@@ -495,7 +509,7 @@ class MissionStore:
         self._connection.close()
 
     def mission_root(self, mission_id: str) -> Path:
-        return self.state_dir / "missions" / mission_id
+        return self.state_dir / "missions" / _safe_mission_identity(mission_id)
 
     def register_mission(
         self,
@@ -505,6 +519,7 @@ class MissionStore:
         *,
         configuration_attestation: Mapping[str, object] | None = None,
     ) -> None:
+        mission_id = _safe_mission_identity(mission_id)
         roles = {role.value: "pending" for role in Role}
         config_payload = dict(config)
         config_digest = _configuration_digest(config_payload)

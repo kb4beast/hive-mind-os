@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Iterator
 
 from hive_mind_os.acceptance import AcceptanceSpecification
+from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.contracts import tool_intent_digest, validate_contract
 from hive_mind_os.mission import RepositoryMission, ScriptedRepositoryBackend
 from hive_mind_os.mission_store import (
@@ -442,7 +443,26 @@ def _case_raw_effect_receipt_is_adopted_without_reexecution(
 
 
 class TestMissionStore(unittest.TestCase):
-    pass
+    def test_store_rejects_parent_mission_identity_before_registration(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="hive-mind-p06-test-") as root:
+            state_dir = Path(root) / "state"
+            store = MissionStore(state_dir)
+            try:
+                with self.assertRaisesRegex(ValueError, "single-segment"):
+                    store.register_mission(
+                        "..",
+                        {
+                            "objective": "Reject a path-like mission identity",
+                            "source_pack_fingerprint": f"sha256:{'1' * 64}",
+                        },
+                        AutonomyBudget(1, 1, 1.0),
+                    )
+                self.assertFalse(store.has_mission(".."))
+                self.assertFalse((state_dir / "missions").exists())
+                with self.assertRaisesRegex(ValueError, "single-segment"):
+                    store.mission_root("..")
+            finally:
+                store.close()
 
 
 def _temporary_case(case, *arguments):
