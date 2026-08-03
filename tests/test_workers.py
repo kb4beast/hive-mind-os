@@ -266,13 +266,13 @@ class WorkerTests(unittest.TestCase):
         state_dir = self.root / "state"
         queue = Scheduler(state_dir)
         try:
-            pathlike = queue.enqueue(
+            dot_segment = queue.enqueue(
                 "repository-mission",
-                {"mission_id": "../escaped"},
-                mission_id="../escaped",
+                {"mission_id": ".."},
+                mission_id="..",
             )
             with self.assertRaisesRegex(ValueError, "safe mission ID"):
-                execute_mission_job(pathlike, state_dir)
+                execute_mission_job(dot_segment, state_dir)
             self.assertFalse((state_dir / "d").exists())
 
             unbound = queue.enqueue(

@@ -304,7 +304,7 @@ class RepositoryMissionTests(unittest.TestCase):
                 "Reject malformed durable identity",
                 pin=self.fixture.commit_two,
                 output_dir=output,
-                _run_id="../outside-mission",
+                _run_id="..",
             )
         self.assertFalse(output.exists())
 

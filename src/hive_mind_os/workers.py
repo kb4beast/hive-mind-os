@@ -30,6 +30,7 @@ def execute_mission_job(job: Job, state_dir: Path) -> str:
     if (
         not isinstance(mission_id, str)
         or not mission_id
+        or mission_id in {".", ".."}
         or "/" in mission_id
         or "\\" in mission_id
     ):

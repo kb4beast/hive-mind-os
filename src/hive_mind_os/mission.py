@@ -564,6 +564,7 @@ class RepositoryMission:
         if mission_id is not None and (
             not isinstance(mission_id, str)
             or not mission_id.strip()
+            or mission_id in {".", ".."}
             or "/" in mission_id
             or "\\" in mission_id
         ):
@@ -571,6 +572,7 @@ class RepositoryMission:
         if _run_id is not None and (
             not isinstance(_run_id, str)
             or not _run_id.strip()
+            or _run_id in {".", ".."}
             or "/" in _run_id
             or "\\" in _run_id
         ):
