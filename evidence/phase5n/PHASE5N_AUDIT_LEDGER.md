@@ -30,3 +30,16 @@
 - Wheel: eight roles and 16 files matched Git subject; local wheel digest
   `sha256:c780fd01c5b2c3d67b8148000006f38de88cdbb693ae697b18856a22c8724f41`.
 - Limit: `P5H-DEBT-01` remains active pending exact-head hosted evidence.
+
+## Entry 4 — hosted closure receipt
+
+- Subject: `a78fcdd3418565565aa82ae127957632e5ac08d8`
+- Push run: `30775103987`, fully successful
+- Pull-request run: `30775114316`, fully successful
+- Verified: all Python matrices, Ruff, Pyright, build/SBOM, CodeQL, secrets, dependency review,
+  Phase 5A–K installed contracts, Git ancestry index, isolated-wheel byte equality, artifact upload,
+  and push attestation.
+- Judge: Phase5N-Ancestry-Judge
+- Disposition: close only `P5H-DEBT-01`; retain six internal and eleven external-input debts.
+- Reconciliation:
+  `sha256:dc6ee7ca0986d0cefe9df98a61bdcd8eea8a7985b3b725b27e0b7c564bfb04e4`

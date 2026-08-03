@@ -5,7 +5,7 @@
 - **Originating debt:** `P5H-DEBT-01`
 - **Index digest:**
   `sha256:2b029c1f7c39b3b248b5b9e3e6a6a91ca46b93be01583e6a4c3760f427df2f9f`
-- **Status:** implemented locally; closure awaits exact-head hosted receipts
+- **Status:** exact implementation head validated; closure recorded additively
 - **Authority:** none
 
 ## Evidence reconstruction
@@ -36,6 +36,10 @@ was copied.
 - the permanent build-evidence workflow now retains and attests the ancestry verification receipt.
 
 Hosted push and pull-request receipts are still required before closing `P5H-DEBT-01`.
+
+Exact implementation head `a78fcdd3418565565aa82ae127957632e5ac08d8` passed push run
+`30775103987` and pull-request run `30775114316`. The additive successor reconciliation is
+`docs/plan/PHASE5N_DEBT_RECONCILIATION.md`.
 
 ## Threats and rollback
 

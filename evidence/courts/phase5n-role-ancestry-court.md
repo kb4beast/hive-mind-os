@@ -25,3 +25,6 @@ claimed.
 Adopt the index and package verifier after exact-head hosted validation. Close only
 `P5H-DEBT-01`; do not infer closure of governance, output, external-input, release, or production
 obligations.
+
+Exact-head runs `30775103987` and `30775114316` passed. The conditional judgment is therefore
+effective for `P5H-DEBT-01` only.
