@@ -41,6 +41,14 @@ Burden rises from capture, to design, implementation, promotion, and superiority
 14. Routine work should resume after interruption without a human restating context or transferring findings between agents.
 15. Changes to the operating kernel, founding contract, courtroom, source docket, or burden of proof require tests and an architecture decision record.
 
+## CI gate
+
+The CI gate is:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Specialist roles
 
 - **Orchestrator:** outcomes, decomposition, budgets, tradeoffs, dependencies, recovery, stopping conditions, and court scheduling.
