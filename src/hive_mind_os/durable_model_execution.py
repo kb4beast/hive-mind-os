@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 from .acceptance import AcceptanceSpecification
 from .model_backend import ModelBackend, ModelTurnError
 from .model_provider import (
+    ModelProvider,
     ModelProviderError,
     ModelRequest,
     ModelResponse,
@@ -40,6 +41,7 @@ from .model_turn_state import (
     ModelTurnOutcome,
     ModelTurnPhase,
     ModelTurnPlan,
+    ModelTurnRecord,
     ModelTurnResult,
     ModelTurnStateError,
     ModelTurnStore,
@@ -160,6 +162,29 @@ class DurableModelExecutionContext:
             ) from error
 
 
+@dataclass(frozen=True, slots=True)
+class PreparedDurableModelTurn:
+    """In-memory only, sealed input for one admitted model turn.
+
+    This object intentionally has no serializer.  It carries the raw request only while
+    the caller is preparing its local mission journal, and must never be written to that
+    journal.  The durable stores receive the plan and digest-only projections instead.
+    """
+
+    contract: RoleContract
+    work_item: WorkItem
+    objective: Objective
+    prior_results: tuple[AgentResult, ...]
+    provider: ModelProvider
+    request: ModelRequest
+    request_body: bytes
+    truncated: bool
+    prompt_digest: str
+    plan: ModelTurnPlan
+    reservation: ModelTurnBudgetReservation
+    context_manifest: Mapping[str, object]
+
+
 class DurableModelRoleExecutor:
     """Run or safely rehydrate one logical role through a ``ModelTurnStore``.
 
@@ -186,6 +211,24 @@ class DurableModelRoleExecutor:
         objective: Objective,
         prior_results: tuple[AgentResult, ...] = (),
     ) -> AgentResult:
+        prepared = self.prepare(contract, work_item, objective, prior_results)
+        self.admit_prepared(prepared)
+        return await self.execute_admitted(prepared)
+
+    def prepare(
+        self,
+        contract: RoleContract,
+        work_item: WorkItem,
+        objective: Objective,
+        prior_results: tuple[AgentResult, ...] = (),
+    ) -> PreparedDurableModelTurn:
+        """Seal a request without admitting or dispatching it.
+
+        A repository mission records the returned plan's digest-only bindings before it
+        calls :meth:`execute_prepared`.  Keeping the operation split makes the crash
+        boundary explicit without giving a caller a serializable prompt or credential
+        escape hatch.
+        """
         if objective.id != self.context.mission_id:
             raise DurableModelExecutionError("objective ID does not bind the durable model mission")
         self._reject_configured_secrets_in_context(prior_results)
@@ -223,6 +266,40 @@ class DurableModelRoleExecutor:
             )
             / 1000.0,
         )
+        context_manifest = self.backend._context_manifest(  # noqa: SLF001 - same sealed adapter seam
+            prior_results,
+            role=contract.role,
+            provider=provider,
+        )
+        return PreparedDurableModelTurn(
+            contract=contract,
+            work_item=work_item,
+            objective=objective,
+            prior_results=prior_results,
+            provider=provider,
+            request=request,
+            request_body=request_body,
+            truncated=truncated,
+            prompt_digest=prompt_digest,
+            plan=plan,
+            reservation=reservation,
+            context_manifest=context_manifest,
+        )
+
+    async def execute_prepared(
+        self,
+        prepared: PreparedDurableModelTurn,
+    ) -> AgentResult:
+        """Admit exactly the prepared plan and perform at most one provider call."""
+
+        self.admit_prepared(prepared)
+        return await self.execute_admitted(prepared)
+
+    def admit_prepared(self, prepared: PreparedDurableModelTurn) -> ModelTurnRecord:
+        """Durably admit a plan and reservation before an external dispatch."""
+
+        plan = prepared.plan
+        reservation = prepared.reservation
         try:
             record = self.store.register_durable_plan(
                 plan,
@@ -236,6 +313,43 @@ class DurableModelRoleExecutor:
             )
         except ModelTurnStateError as error:
             raise DurableModelExecutionError(f"durable model admission failed: {error}") from error
+        if record.phase is ModelTurnPhase.DISPATCH_STARTED:
+            self.store.recover(plan.logical_turn_id)
+            raise DurableModelExecutionError(
+                "durable model turn was interrupted after dispatch and is quarantined"
+            )
+        if record.phase is ModelTurnPhase.AMBIGUOUS:
+            raise DurableModelExecutionError("durable model turn is quarantined as ambiguous")
+        if record.phase not in {ModelTurnPhase.PLANNED, ModelTurnPhase.COMPLETED}:
+            raise DurableModelExecutionError("durable model turn has an unknown phase")
+        return record
+
+    async def execute_admitted(
+        self,
+        prepared: PreparedDurableModelTurn,
+    ) -> AgentResult:
+        """Use an already witnessed admission; this method never creates one."""
+
+        contract = prepared.contract
+        work_item = prepared.work_item
+        objective = prepared.objective
+        provider = prepared.provider
+        request = prepared.request
+        request_body = prepared.request_body
+        truncated = prepared.truncated
+        prompt_digest = prepared.prompt_digest
+        plan = prepared.plan
+        reservation = prepared.reservation
+        try:
+            record = self.store.durable_record(
+                plan,
+                budget=self.context.budget,
+                reservation=reservation,
+            )
+        except ModelTurnStateError as error:
+            raise DurableModelExecutionError(
+                f"durable model admitted state is unavailable: {error}"
+            ) from error
 
         if record.phase is ModelTurnPhase.DISPATCH_STARTED:
             self.store.recover(plan.logical_turn_id)
@@ -262,11 +376,7 @@ class DurableModelRoleExecutor:
                 "durable model dispatch was rejected before provider invocation"
             ) from error
 
-        context_manifest = self.backend._context_manifest(  # noqa: SLF001 - same sealed adapter seam
-            prior_results,
-            role=contract.role,
-            provider=provider,
-        )
+        context_manifest = prepared.context_manifest
         try:
             response = await asyncio.to_thread(provider.complete_once, request)
         except ModelResponseError as error:
@@ -356,7 +466,7 @@ class DurableModelRoleExecutor:
         self,
         contract: RoleContract,
         work_item: WorkItem,
-        provider: object,
+        provider: ModelProvider,
         prompt_digest: str,
         request_body: bytes,
     ) -> ModelTurnPlan:

@@ -86,6 +86,9 @@ delivery and records its independent `adapt` disposition; it does not establish 
 predicate faithfully formalizes the original human prose. ADR-046 separately adapts a
 local opt-in, one-shot model-role recovery lane; it does not provide model-backed
 repository-mission lifecycle resumption, provider idempotency, or authentication.
+ADR-047 adapts an additive Python-injected repository-model recovery journal following
+separate Curator and Judge review; it does not widen CLI, worker, delivery,
+authentication, or isolation authority.
 External or threshold receipt authentication, repository locking, hostile-code isolation,
 production branch governance, and multi-host operation remain open P1/P2 work and must
 not be represented as completed by this ADR.

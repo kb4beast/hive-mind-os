@@ -1,9 +1,12 @@
-"""Local repository mission orchestration for the P05 vertical slice.
+"""Repository mission orchestration for the P05 vertical slice.
 
 The mission composes the model boundary, typed Git adapter, process sandbox, policy
 engine, append-only ledger, and fixed autonomy budget.  An optional P06 mission store
-adds local checkpoints and resume.  Remote repositories, credentials, pushes, pull
-requests, and hard hostile-code isolation remain later-phase work.
+adds local checkpoints and resume.  A remote repository is admitted only through the
+explicit authenticated-source boundary: an independently attested source lock, durable
+provenance, and a durable mission journal.  A Git SHA alone remains a local integrity
+and reproducibility locator, never a source-authentication claim.  Credentials, pushes,
+pull requests, and hard hostile-code isolation remain later-phase work.
 """
 
 from __future__ import annotations
@@ -37,6 +40,14 @@ from .curator import (
     check_context_manifest,
 )
 from .custody import ExternalCustodyAdapter
+from .durable_model_execution import DurableModelExecutionError
+from .durable_repository_model import (
+    DurableRepositoryModelBackend,
+    DurableRepositoryModelError,
+    agent_result_document,
+    agent_result_from_document,
+    document_digest,
+)
 from .git_adapter import (
     GitPolicyDenied,
     GitWorkspace,
@@ -44,6 +55,7 @@ from .git_adapter import (
 )
 from .github_adapter import GitHubDeliveryTarget
 from .ledger import EvidenceLedger
+from .mission_store import StoreIntegrityError
 from .models import (
     AgentResult,
     AutonomyLevel,
@@ -65,6 +77,13 @@ from .receipts import (
 )
 from .roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS, RoleContract
 from .runtime import AgentBackend, HiveKernel
+from .source_custody import (
+    SourceCustodyError,
+    SourceCustodyVerifier,
+    SourceLock,
+    SourceLockEvidence,
+    canonical_repository_url,
+)
 
 if TYPE_CHECKING:
     from .mission_store import MissionStore
@@ -511,13 +530,14 @@ class ArchitectCapabilities:
 
 
 class RepositoryMission:
-    """Walk all eight roles from a local objective to a verified delivery artifact."""
+    """Walk all eight roles from a local or authenticated remote source to delivery."""
 
     def __init__(
         self,
         repository: str | Path,
         objective: str,
         *,
+        mission_id: str | None = None,
         acceptance_criteria: Sequence[str] = (),
         acceptance_specifications: Sequence[
             AcceptanceSpecification | Mapping[str, object]
@@ -531,18 +551,87 @@ class RepositoryMission:
         ledger: EvidenceLedger | None = None,
         mission_store: MissionStore | None = None,
         custody: ExternalCustodyAdapter | None = None,
+        source_lock: SourceLockEvidence | None = None,
+        source_custody: SourceCustodyVerifier | None = None,
         github_delivery: GitHubDeliveryTarget | None = None,
         crash_hook: Callable[[int, str], None] | None = None,
         _run_id: str | None = None,
         _resume: bool = False,
         _missing_workspaces: set[str] | None = None,
     ) -> None:
-        self.repository = Path(repository).resolve()
-        if not self.repository.is_dir() or not (self.repository / ".git").exists():
-            raise ValueError("repository must be a local Git worktree")
         if not objective.strip():
             raise ValueError("objective is required")
-        self.run_id = _run_id or str(uuid4())
+        if mission_id is not None and (not mission_id.strip() or "/" in mission_id or "\\" in mission_id):
+            raise ValueError("mission_id must be a nonempty identifier without path separators")
+        if _run_id is not None and mission_id is not None and _run_id != mission_id:
+            raise ValueError("mission_id differs from the durable mission identity")
+        self.run_id = _run_id or mission_id or str(uuid4())
+        self._remote_source = False
+        self._source_lock: SourceLock | None = None
+        self._source_lock_evidence: SourceLockEvidence | None = None
+        self._source_custody: SourceCustodyVerifier | None = None
+        source_text = str(repository)
+        source_scheme = source_text.split(":", 1)[0].casefold()
+        if source_scheme in {"http", "https"}:
+            if mission_id is None and _run_id is None:
+                raise ValueError(
+                    "authenticated remote repository missions require an explicit mission_id"
+                )
+            if mission_store is None:
+                raise ValueError(
+                    "authenticated remote repository missions require a MissionStore journal"
+                )
+            if source_lock is None or source_custody is None:
+                raise ValueError(
+                    "remote repositories require externally authenticated source-lock evidence"
+                )
+            if (
+                not source_custody.provenance.is_durable
+                or not source_custody.custody_verifier.provenance.is_durable
+            ):
+                raise ValueError(
+                    "authenticated remote repository missions require durable source and keyset provenance"
+                )
+            try:
+                requested_repository = canonical_repository_url(
+                    source_text,
+                    allowed_hosts=source_custody.allowed_hosts,
+                )
+                unverified_lock = SourceLock.from_dict(
+                    source_lock.source_lock.to_dict(),
+                    allowed_hosts=source_custody.allowed_hosts,
+                )
+            except SourceCustodyError as error:
+                raise ValueError(f"remote repository source lock is malformed: {error}") from None
+            resolved_pin = pin or unverified_lock.commit_sha
+            try:
+                authenticated_lock = source_custody.verify_for_materialization(
+                    source_lock,
+                    requested_repository,
+                    resolved_pin,
+                    mission_id=self.run_id,
+                    state_ref=f"MISSION_STATE:{self.run_id}:1",
+                    allowed_hosts=source_custody.allowed_hosts,
+                )
+            except SourceCustodyError as error:
+                raise ValueError(
+                    f"remote repository source custody was rejected: {error}"
+                ) from None
+            self.repository: Path | str = requested_repository
+            self.pin = authenticated_lock.commit_sha
+            self._remote_source = True
+            self._source_lock = authenticated_lock
+            self._source_lock_evidence = source_lock
+            self._source_custody = source_custody
+        else:
+            if source_lock is not None or source_custody is not None:
+                raise ValueError(
+                    "source-lock custody is only available for explicit HTTPS remote repositories"
+                )
+            self.repository = Path(repository).resolve()
+            if not self.repository.is_dir() or not (self.repository / ".git").exists():
+                raise ValueError("repository must be a local Git worktree")
+            self.pin = pin or _read_local_head(self.repository)
         self.backend = backend or ScriptedRepositoryBackend()
         try:
             supplied_specifications = normalize_acceptance_specifications(
@@ -581,7 +670,6 @@ class RepositoryMission:
             acceptance_criteria=declared_criteria,
             risk=risk,
         )
-        self.pin = pin or _read_local_head(self.repository)
         self.output_dir = Path(os.path.abspath(output_dir))
         self.policy = policy or PolicyEngine(AutonomyLevel.REPOSITORY)
         backend_budget = getattr(self.backend, "budget", None)
@@ -618,12 +706,21 @@ class RepositoryMission:
         self._replaying_workspaces: set[str] = set()
         self._recovery_claimed_receipts: set[tuple[str, str]] = set()
         self._curator_head_access_sequence: int | None = None
+        self._durable_model_backend: DurableRepositoryModelBackend | None = None
+        self._active_model_role_input_digest: str | None = None
+        self._active_model_role_effect_ordinal = 0
+        if (
+            isinstance(self.backend, DurableRepositoryModelBackend)
+            and self.mission_store is None
+        ):
+            raise ValueError(
+                "durable repository model missions require a MissionStore admission journal"
+            )
         if self.mission_store is not None:
-            if not isinstance(self.backend, ScriptedRepositoryBackend):
-                raise ValueError(
-                    "P06 durable resume supports ScriptedRepositoryBackend only"
-                )
-            config = {
+            source_pack_material = (
+                str(self.repository) + "\0" + self.pin + "\0" + objective
+            )
+            config: dict[str, Any] = {
                 "repository": str(self.repository),
                 "objective": objective,
                 "acceptance_criteria": list(self.objective.acceptance_criteria),
@@ -633,16 +730,73 @@ class RepositoryMission:
                 "risk": self.objective.risk.name.lower(),
                 "pin": self.pin,
                 "output_dir": str(self.output_dir),
-                "backend": "scripted",
-                "scripted_variant": self.backend.variant,
-                "test_argv": list(self.backend.test_argv),
-                "criterion_argv": list(self.backend.criterion_argv),
                 "source_pack_fingerprint": sha256_digest(
-                    (str(self.repository) + "\0" + self.pin + "\0" + objective).encode(
-                        "utf-8"
-                    )
+                    source_pack_material.encode("utf-8")
                 ),
             }
+            if self._source_lock_evidence is not None:
+                source_pack_material += "\0" + self._source_lock_evidence.digest()
+                config["source_pack_fingerprint"] = sha256_digest(
+                    source_pack_material.encode("utf-8")
+                )
+                config["authenticated_source"] = {
+                    "evidence_digest": self._source_lock_evidence.digest(),
+                    "source_lock": self._source_lock_evidence.source_lock.to_dict(),
+                    "attestation": dict(self._source_lock_evidence.attestation),
+                }
+            if isinstance(self.backend, ScriptedRepositoryBackend):
+                config.update(
+                    {
+                        "backend": "scripted",
+                        "scripted_variant": self.backend.variant,
+                        "test_argv": list(self.backend.test_argv),
+                        "criterion_argv": list(self.backend.criterion_argv),
+                    }
+                )
+            elif isinstance(self.backend, DurableRepositoryModelBackend):
+                profile = self.backend.profile
+                if len(self.acceptance_specifications) != 1:
+                    raise ValueError(
+                        "durable repository model missions require exactly one typed acceptance specification"
+                    )
+                if profile.budget.mission_id != self.run_id:
+                    raise ValueError(
+                        "durable repository model budget must bind the durable mission ID"
+                    )
+                if profile.acceptance_specification.to_dict() != self.acceptance_specifications[0].to_dict():
+                    raise ValueError(
+                        "durable repository model profile specification differs from the mission specification"
+                    )
+                try:
+                    profile.verify_policy(self.policy)
+                except DurableRepositoryModelError as error:
+                    raise ValueError(str(error)) from None
+                expected_store = (
+                    self.mission_store.mission_root(self.run_id) / "model-turns.sqlite3"
+                ).resolve()
+                if Path(self.backend.store.path).resolve() != expected_store:
+                    raise ValueError(
+                        "durable repository model turn state must live under the mission root"
+                    )
+                if self.backend.admission_journal is not self.mission_store:
+                    raise ValueError(
+                        "durable repository model backend must use this mission store for admission"
+                    )
+                if self.github_delivery is not None:
+                    raise ValueError(
+                        "durable repository model missions do not authorize external delivery"
+                    )
+                self._durable_model_backend = self.backend
+                config.update(
+                    {
+                        "backend": "durable-model-repository-v1",
+                        "durable_model_profile": profile.to_dict(),
+                    }
+                )
+            else:
+                raise ValueError(
+                    "P06 durable resume supports only ScriptedRepositoryBackend or the sealed durable repository model adapter"
+                )
             if self.github_delivery is not None:
                 client = self.github_delivery.client
                 if (
@@ -692,6 +846,57 @@ class RepositoryMission:
                     self.budget,
                     configuration_attestation=configuration_attestation,
                 )
+            if self._durable_model_backend is not None:
+                self.mission_store.register_role_work_plans(
+                    self.run_id,
+                    self._durable_model_work_plans(
+                        config["source_pack_fingerprint"]
+                    ),
+                )
+
+    def _durable_model_work_plans(
+        self,
+        source_pack_fingerprint: str,
+    ) -> tuple[dict[str, Any], ...]:
+        """Create the deterministic work slots used by a sealed model mission."""
+
+        backend = self._durable_model_backend
+        if backend is None:
+            raise MissionFailed("durable model work plans require the sealed model adapter")
+        work_ids: list[str] = []
+        plans: list[dict[str, Any]] = []
+        for ordinal, role in enumerate(DEFAULT_LIFECYCLE):
+            dependencies = [] if role is Role.CURATOR else list(work_ids)
+            instruction = self._instruction_for(role)
+            work_payload = {
+                "mission_id": self.run_id,
+                "ordinal": ordinal,
+                "role": role.value,
+                "instruction": instruction,
+                "dependencies": dependencies,
+            }
+            work_item_id = "WORK-" + sha256_digest(
+                _canonical_details(work_payload).encode("utf-8")
+            ).removeprefix("sha256:")
+            plan = {
+                "schema_version": 1,
+                "ordinal": ordinal,
+                "role": role.value,
+                "work_item_id": work_item_id,
+                "instruction": instruction,
+                "dependencies": dependencies,
+                "role_contract_digest": sha256_digest(
+                    _canonical_details(asdict(ROLE_CONTRACTS[role])).encode("utf-8")
+                ),
+                "source_pack_fingerprint": source_pack_fingerprint,
+                "acceptance_specification_digest": (
+                    backend.profile.acceptance_specification.digest
+                ),
+                "profile_digest": backend.profile.digest,
+            }
+            plans.append(plan)
+            work_ids.append(work_item_id)
+        return tuple(plans)
 
     async def run(self) -> MissionReport:
         started_at = utc_now()
@@ -733,7 +938,12 @@ class RepositoryMission:
         try:
             if self.policy.autonomy < AutonomyLevel.REPOSITORY:
                 self._authorize(Role.BUILDER, Action.WRITE_WORKSPACE)
-            base_sha = self.pin or _read_local_head(self.repository)
+            if self._remote_source:
+                base_sha = self.pin
+            else:
+                if not isinstance(self.repository, Path):
+                    raise MissionFailed("local repository source is malformed")
+                base_sha = self.pin or _read_local_head(self.repository)
             if not _is_full_sha(base_sha):
                 raise MissionFailed("repository pin must be a full 40-hex SHA")
 
@@ -772,7 +982,13 @@ class RepositoryMission:
                 builder_declared_paths: list[str] = []
 
                 for role in DEFAULT_LIFECYCLE:
-                    if self.mission_store is not None:
+                    completed_model_role: Mapping[str, Any] | None = None
+                    if self._durable_model_backend is not None:
+                        assert self.mission_store is not None
+                        completed_model_role = self.mission_store.completed_model_role(
+                            self.run_id, role
+                        )
+                    if self.mission_store is not None and completed_model_role is None:
                         self.mission_store.mark_role(self.run_id, role, "running")
                     self._authorize(role, Action.READ_REPOSITORY)
                     context = self._context_for(role, results)
@@ -784,12 +1000,29 @@ class RepositoryMission:
                         role.value,
                         manifest,
                     )
-                    work_item = WorkItem(
-                        self.objective.id,
-                        role,
-                        self._instruction_for(role),
-                        dependencies=tuple(item.work_item_id for item in context),
-                    )
+                    if self._durable_model_backend is None:
+                        work_item = WorkItem(
+                            self.objective.id,
+                            role,
+                            self._instruction_for(role),
+                            dependencies=tuple(item.work_item_id for item in context),
+                        )
+                    else:
+                        assert self.mission_store is not None
+                        plan = self.mission_store.role_work_plan(self.run_id, role)
+                        if tuple(plan["dependencies"]) != tuple(
+                            item.work_item_id for item in context
+                        ):
+                            raise MissionFailed(
+                                "durable model role dependencies differ from the sealed work plan"
+                            )
+                        work_item = WorkItem(
+                            self.objective.id,
+                            role,
+                            str(plan["instruction"]),
+                            dependencies=tuple(plan["dependencies"]),
+                            id=str(plan["work_item_id"]),
+                        )
                     self.ledger.append_event(
                         self.run_id,
                         "role.started",
@@ -806,12 +1039,115 @@ class RepositoryMission:
                             self.objective,
                             repository=str(explorer.workspace.root),
                         )
-                    result = await self.backend.execute(
-                        ROLE_CONTRACTS[role],
-                        work_item,
-                        execution_objective,
-                        context,
-                    )
+                    prepared_model_turn = None
+                    if completed_model_role is not None:
+                        assert self._durable_model_backend is not None
+                        try:
+                            self._durable_model_backend.verify_completed_role(
+                                completed_model_role,
+                                role,
+                                work_item.id,
+                            )
+                        except DurableRepositoryModelError as error:
+                            raise MissionFailed(
+                                f"completed model role turn is invalid: {error}"
+                            ) from None
+                        stored_result = completed_model_role.get("agent_result")
+                        if not isinstance(stored_result, Mapping):
+                            raise MissionFailed("completed model role lacks its result projection")
+                        try:
+                            result = agent_result_from_document(stored_result)
+                        except DurableRepositoryModelError as error:
+                            raise MissionFailed(
+                                f"completed model role result is invalid: {error}"
+                            ) from None
+                        if result.role is not role or result.work_item_id != work_item.id:
+                            raise MissionFailed(
+                                "completed model role result differs from the sealed work plan"
+                            )
+                        self._active_model_role_input_digest = str(
+                            completed_model_role["input_digest"]
+                        )
+                    elif self._durable_model_backend is not None:
+                        assert self.mission_store is not None
+                        prepared_model_turn = self._durable_model_backend.prepare(
+                            ROLE_CONTRACTS[role],
+                            work_item,
+                            execution_objective,
+                            context,
+                        )
+                        prior_completion_digests: list[str] = []
+                        for prior in context:
+                            completion = self.mission_store.completed_model_role(
+                                self.run_id, prior.role
+                            )
+                            if completion is None:
+                                raise MissionFailed(
+                                    "durable model role context lacks a completed role journal"
+                                )
+                            prior_completion_digests.append(
+                                str(completion["completion_digest"])
+                            )
+                        role_input = self.mission_store.register_role_input(
+                            self.run_id,
+                            role,
+                            {
+                                "schema_version": 1,
+                                "role": role.value,
+                                "work_item_id": work_item.id,
+                                "work_plan_digest": self.mission_store.role_work_plan(
+                                    self.run_id, role
+                                )["plan_digest"],
+                                "prior_completion_digests": prior_completion_digests,
+                                "context_digest": document_digest(
+                                    {
+                                        "results": [
+                                            agent_result_document(item) for item in context
+                                        ]
+                                    }
+                                ),
+                                "execution_objective_digest": document_digest(
+                                    {
+                                        "goal": execution_objective.goal,
+                                        "repository": execution_objective.repository,
+                                        "acceptance_criteria": list(
+                                            execution_objective.acceptance_criteria
+                                        ),
+                                        "constraints": list(execution_objective.constraints),
+                                    }
+                                ),
+                                "model_turn_id": prepared_model_turn.plan.logical_turn_id,
+                                "model_turn_plan_digest": prepared_model_turn.plan.digest,
+                            },
+                        )
+                        self._active_model_role_input_digest = str(
+                            role_input["input_digest"]
+                        )
+                        admission = self.mission_store.role_admission(self.run_id, role)
+                        if admission is None:
+                            self._durable_model_backend.admit(
+                                prepared_model_turn,
+                                str(role_input["input_digest"]),
+                            )
+                        else:
+                            try:
+                                self._durable_model_backend.verify_admitted(
+                                    prepared_model_turn
+                                )
+                            except DurableRepositoryModelError as error:
+                                raise MissionFailed(
+                                    f"durable model admission is invalid: {error}"
+                                ) from None
+                        result = await self._durable_model_backend.execute_admitted(
+                            prepared_model_turn
+                        )
+                    else:
+                        result = await self.backend.execute(
+                            ROLE_CONTRACTS[role],
+                            work_item,
+                            execution_objective,
+                            context,
+                        )
                     action_receipts: list[dict[str, Any]] = []
 
                     if role is Role.EXPLORER:
@@ -1048,7 +1384,13 @@ class RepositoryMission:
                             f"{role.value} received no side-effect capability"
                         )
 
-                    result = self._with_receipt_evidence(result, action_receipts)
+                    if completed_model_role is None:
+                        if self._durable_model_backend is not None:
+                            action_receipts = self._durable_model_role_receipt_records(
+                                role,
+                                str(self._active_model_role_input_digest),
+                            )
+                        result = self._with_receipt_evidence(result, action_receipts)
                     HiveKernel._validate_result(role, result)
                     results.append(result)
                     self.ledger.append_event(
@@ -1062,12 +1404,41 @@ class RepositoryMission:
                         role.value,
                         result.lessons,
                     )
-                    if self.mission_store is not None:
+                    if (
+                        completed_model_role is None
+                        and self._durable_model_backend is not None
+                    ):
+                        assert self.mission_store is not None
+                        assert prepared_model_turn is not None
+                        model_record = self._durable_model_backend.store.record(
+                            prepared_model_turn.plan.logical_turn_id
+                        )
+                        if (
+                            model_record.role_result is None
+                            or model_record.result is None
+                            or model_record.plan.digest
+                            != prepared_model_turn.plan.digest
+                        ):
+                            raise MissionFailed(
+                                "durable model turn lacks its completed role result"
+                            )
+                        self.mission_store.complete_model_role(
+                            self.run_id,
+                            role,
+                            str(self._active_model_role_input_digest),
+                            model_turn_id=prepared_model_turn.plan.logical_turn_id,
+                            model_turn_plan_digest=prepared_model_turn.plan.digest,
+                            model_role_result_digest=model_record.role_result.digest,
+                            agent_result=agent_result_document(result),
+                        )
+                    elif self.mission_store is not None and completed_model_role is None:
                         self.mission_store.mark_role(
                             self.run_id,
                             role,
                             "succeeded",
                         )
+                    self._active_model_role_input_digest = None
+                    self._active_model_role_effect_ordinal = 0
 
                 if (
                     builder_workspace is None
@@ -1239,9 +1610,18 @@ class RepositoryMission:
                     Role.ORCHESTRATOR.value,
                     failure,
                 )
+            durable_blocked = self._durable_model_backend is not None and (
+                isinstance(error, DurableModelExecutionError)
+                and ("quarantined" in str(error) or "uncertain" in str(error))
+                or isinstance(error, MissionFailed)
+                and (
+                    "completed model role turn is invalid" in str(error)
+                    or "durable model admission is invalid" in str(error)
+                )
+            )
             self.ledger.append_event(
                 self.run_id,
-                "mission.failed",
+                "mission.blocked" if durable_blocked else "mission.failed",
                 Role.ORCHESTRATOR.value,
                 failure,
             )
@@ -1250,7 +1630,7 @@ class RepositoryMission:
             failure_receipt_root = self._preserve_failure_evidence(final_output)
             report = self._report(
                 results,
-                WorkStatus.FAILED,
+                WorkStatus.BLOCKED if durable_blocked else WorkStatus.FAILED,
                 started_at,
                 base_sha,
                 branch,
@@ -1279,7 +1659,7 @@ class RepositoryMission:
                 self.mission_store.update_budget(self.run_id, self.budget)
                 self.mission_store.mark_status(
                     self.run_id,
-                    "failed",
+                    "blocked" if durable_blocked else "failed",
                     blocker=f"{failure['type']}: {failure['message']}",
                     report=report.to_dict(),
                 )
@@ -1302,11 +1682,13 @@ class RepositoryMission:
             self.output_dir.exists() or self.output_dir.is_symlink()
         ):
             raise ValueError("output directory must not already exist")
-        try:
-            self.output_dir.relative_to(self.repository)
-        except ValueError:
-            return self.output_dir
-        raise ValueError("output directory must be outside the source repository")
+        if isinstance(self.repository, Path):
+            try:
+                self.output_dir.relative_to(self.repository)
+            except ValueError:
+                return self.output_dir
+            raise ValueError("output directory must be outside the source repository")
+        return self.output_dir
 
     def _authorize(self, role: Role, action: Action) -> None:
         decision = self.policy.decide(role, action, self.objective.risk)
@@ -1381,6 +1763,7 @@ class RepositoryMission:
                 role=role,
                 risk=self.objective.risk,
                 allowance=allowance,
+                **self._source_materialization_options(),
             )
         finally:
             after = set((self._evidence_root / "receipts").glob("*.json"))
@@ -1398,6 +1781,23 @@ class RepositoryMission:
             },
         )
         return workspace
+
+    def _source_materialization_options(self) -> dict[str, Any]:
+        """Return the strict source-custody bindings for an admitted remote mission."""
+
+        if self._source_lock_evidence is None:
+            return {}
+        if self._source_custody is None or self._source_lock is None:
+            raise MissionFailed("authenticated remote source custody is incomplete")
+        return {
+            "allow_remote": True,
+            "allowed_hosts": self._source_custody.allowed_hosts,
+            "source_lock": self._source_lock_evidence,
+            "source_custody": self._source_custody,
+            "require_source_custody": True,
+            "source_mission_id": self.run_id,
+            "source_state_ref": self._source_lock.state_ref,
+        }
 
     def _materialize_delivery(
         self,
@@ -1792,6 +2192,26 @@ class RepositoryMission:
         intent["action_digest"] = tool_intent_digest(intent)
         return step_index, intent
 
+    def _durable_model_role_receipt_records(
+        self,
+        role: Role,
+        input_digest: str,
+    ) -> list[dict[str, Any]]:
+        """Project every completed model-role capability receipt into final context."""
+
+        assert self.mission_store is not None
+        records: list[dict[str, Any]] = []
+        for effect in self.mission_store.role_effects(self.run_id, role, input_digest):
+            checkpoint = self.mission_store.checkpoint(
+                self.run_id, int(effect["step_index"])
+            )
+            found = self.mission_store.find_effect_receipt(checkpoint)
+            if found is None:
+                raise MissionFailed("model role capability receipt is missing")
+            _, wrapper = found
+            records.extend(dict(record) for record in wrapper["records"])
+        return records
+
     def _prepare_checkpoint(
         self,
         step_index: int,
@@ -1815,6 +2235,20 @@ class RepositoryMission:
             raise MissionFailed(
                 f"durable step {step_index} intent changed across resume"
             )
+        if self._active_model_role_input_digest is not None:
+            try:
+                self.mission_store.bind_role_effect_intent(
+                    self.run_id,
+                    Role(checkpoint.intent["actor_id"].removeprefix("agent-")),
+                    self._active_model_role_input_digest,
+                    self._active_model_role_effect_ordinal,
+                    checkpoint,
+                )
+            except (StoreIntegrityError, ValueError) as error:
+                raise MissionFailed(
+                    f"durable model capability binding failed: {error}"
+                ) from None
+            self._active_model_role_effect_ordinal += 1
         if checkpoint.state == "intent":
             found = self.mission_store.find_effect_receipt(checkpoint)
             if found is not None:
@@ -2163,6 +2597,7 @@ class RepositoryMission:
                 role=Role.CURATOR,
                 risk=self.objective.risk,
                 allowance=allowance,
+                source_custody=self._source_custody,
             )
         finally:
             self._consume(allowance, len(records))

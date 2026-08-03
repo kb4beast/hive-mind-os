@@ -23,10 +23,21 @@ from typing import Any, Mapping, Sequence
 from .autonomy import AutonomyBudget
 from .contracts import tool_intent_digest, validate_contract
 from .custody import CustodyError, Ed25519CustodyVerifier, ExternalCustodyAdapter
+from .durable_repository_model import (
+    DurableRepositoryModelError,
+    agent_result_document,
+    agent_result_from_document,
+)
 from .models import Role, utc_now
 from .receipts import sha256_digest
+from .source_custody import (
+    SourceCustodyError,
+    SourceCustodyVerifier,
+    SourceLock,
+    SourceLockEvidence,
+)
 
-STORE_SCHEMA_VERSION = 3
+STORE_SCHEMA_VERSION = 5
 
 
 class MissionStoreError(RuntimeError):
@@ -300,12 +311,105 @@ class MissionStore:
                 CREATE TRIGGER IF NOT EXISTS idempotency_no_delete
                 BEFORE DELETE ON idempotency
                 BEGIN SELECT RAISE(ABORT, 'idempotency records are immutable'); END;
+                CREATE TABLE IF NOT EXISTS mission_role_work_plans (
+                    mission_id TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    work_item_id TEXT NOT NULL,
+                    plan_digest TEXT NOT NULL,
+                    plan_json TEXT NOT NULL,
+                    recorded_at TEXT NOT NULL,
+                    PRIMARY KEY(mission_id, role),
+                    UNIQUE(mission_id, ordinal),
+                    UNIQUE(mission_id, work_item_id),
+                    FOREIGN KEY(mission_id) REFERENCES missions(mission_id)
+                );
+                CREATE TABLE IF NOT EXISTS mission_role_inputs (
+                    mission_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    work_plan_digest TEXT NOT NULL,
+                    input_digest TEXT NOT NULL,
+                    input_json TEXT NOT NULL,
+                    recorded_at TEXT NOT NULL,
+                    PRIMARY KEY(mission_id, role),
+                    UNIQUE(mission_id, input_digest),
+                    FOREIGN KEY(mission_id, role)
+                        REFERENCES mission_role_work_plans(mission_id, role)
+                );
+                CREATE TABLE IF NOT EXISTS mission_role_effects (
+                    mission_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    input_digest TEXT NOT NULL,
+                    effect_ordinal INTEGER NOT NULL,
+                    step_index INTEGER NOT NULL,
+                    intent_digest TEXT NOT NULL,
+                    PRIMARY KEY(mission_id, role, effect_ordinal),
+                    UNIQUE(mission_id, step_index),
+                    FOREIGN KEY(mission_id, role)
+                        REFERENCES mission_role_inputs(mission_id, role),
+                    FOREIGN KEY(mission_id, step_index)
+                        REFERENCES checkpoints(mission_id, step_index)
+                );
+                CREATE TABLE IF NOT EXISTS mission_role_completions (
+                    mission_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    input_digest TEXT NOT NULL,
+                    completion_digest TEXT NOT NULL,
+                    completion_json TEXT NOT NULL,
+                    recorded_at TEXT NOT NULL,
+                    PRIMARY KEY(mission_id, role),
+                    UNIQUE(mission_id, completion_digest),
+                    FOREIGN KEY(mission_id, role)
+                        REFERENCES mission_role_inputs(mission_id, role)
+                );
+                CREATE TABLE IF NOT EXISTS mission_role_admissions (
+                    mission_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    input_digest TEXT NOT NULL,
+                    admission_digest TEXT NOT NULL,
+                    admission_json TEXT NOT NULL,
+                    recorded_at TEXT NOT NULL,
+                    PRIMARY KEY(mission_id, role),
+                    UNIQUE(mission_id, admission_digest),
+                    FOREIGN KEY(mission_id, role)
+                        REFERENCES mission_role_inputs(mission_id, role)
+                );
+                CREATE TRIGGER IF NOT EXISTS mission_role_work_plans_no_update
+                BEFORE UPDATE ON mission_role_work_plans
+                BEGIN SELECT RAISE(ABORT, 'model role work plans are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_work_plans_no_delete
+                BEFORE DELETE ON mission_role_work_plans
+                BEGIN SELECT RAISE(ABORT, 'model role work plans are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_inputs_no_update
+                BEFORE UPDATE ON mission_role_inputs
+                BEGIN SELECT RAISE(ABORT, 'model role inputs are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_inputs_no_delete
+                BEFORE DELETE ON mission_role_inputs
+                BEGIN SELECT RAISE(ABORT, 'model role inputs are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_effects_no_update
+                BEFORE UPDATE ON mission_role_effects
+                BEGIN SELECT RAISE(ABORT, 'model role effects are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_effects_no_delete
+                BEFORE DELETE ON mission_role_effects
+                BEGIN SELECT RAISE(ABORT, 'model role effects are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_completions_no_update
+                BEFORE UPDATE ON mission_role_completions
+                BEGIN SELECT RAISE(ABORT, 'model role completions are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_completions_no_delete
+                BEFORE DELETE ON mission_role_completions
+                BEGIN SELECT RAISE(ABORT, 'model role completions are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_admissions_no_update
+                BEFORE UPDATE ON mission_role_admissions
+                BEGIN SELECT RAISE(ABORT, 'model role admissions are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS mission_role_admissions_no_delete
+                BEFORE DELETE ON mission_role_admissions
+                BEGIN SELECT RAISE(ABORT, 'model role admissions are append-only'); END;
                 """
             )
             observed = self._connection.execute(
                 "SELECT value FROM metadata WHERE key='schema_version'"
             ).fetchone()
-            if observed is not None and observed["value"] not in {"1", "2", "3"}:
+            if observed is not None and observed["value"] not in {"1", "2", "3", "4", "5"}:
                 raise StoreVersionError(
                     "unsupported mission-store schema version "
                     f"{observed['value']}; expected {STORE_SCHEMA_VERSION}"
@@ -336,7 +440,7 @@ class MissionStore:
                     "INSERT INTO metadata(key,value) VALUES('schema_version',?)",
                     (str(STORE_SCHEMA_VERSION),),
                 )
-            elif observed["value"] in {"1", "2"}:
+            elif observed["value"] in {"1", "2", "3", "4"}:
                 self._connection.execute(
                     "UPDATE metadata SET value=? WHERE key='schema_version'",
                     (str(STORE_SCHEMA_VERSION),),
@@ -930,6 +1034,492 @@ class MissionStore:
                 )
         return missing
 
+    @staticmethod
+    def _checked_journal_document(
+        encoded: str,
+        digest: str,
+        label: str,
+    ) -> dict[str, Any]:
+        try:
+            document = json.loads(encoded)
+        except json.JSONDecodeError as error:
+            raise StoreIntegrityError(f"{label} is malformed") from error
+        if not isinstance(document, dict):
+            raise StoreIntegrityError(f"{label} is not an object")
+        if _configuration_digest(document) != digest:
+            raise StoreIntegrityError(f"{label} no longer binds its canonical digest")
+        return document
+
+    def register_role_work_plans(
+        self,
+        mission_id: str,
+        plans: Sequence[Mapping[str, Any]],
+    ) -> None:
+        """Append deterministic model work plans, or verify exact prior records."""
+
+        if len(plans) != len(Role):
+            raise StoreIntegrityError("durable model missions require every lifecycle work plan")
+        normalized: list[tuple[int, str, str, str, str]] = []
+        observed_roles: set[str] = set()
+        for ordinal, plan in enumerate(plans):
+            document = dict(plan)
+            if set(document) != {
+                "schema_version",
+                "ordinal",
+                "role",
+                "work_item_id",
+                "instruction",
+                "dependencies",
+                "role_contract_digest",
+                "source_pack_fingerprint",
+                "acceptance_specification_digest",
+                "profile_digest",
+            }:
+                raise StoreIntegrityError("durable model work plan has an unknown shape")
+            role = document.get("role")
+            work_item_id = document.get("work_item_id")
+            if (
+                document.get("schema_version") != 1
+                or document.get("ordinal") != ordinal
+                or role not in {item.value for item in Role}
+                or not isinstance(work_item_id, str)
+                or not work_item_id.startswith("WORK-")
+                or not isinstance(document.get("instruction"), str)
+                or not isinstance(document.get("dependencies"), list)
+                or any(not isinstance(item, str) for item in document["dependencies"])
+            ):
+                raise StoreIntegrityError("durable model work plan is malformed")
+            for field in (
+                "role_contract_digest",
+                "source_pack_fingerprint",
+                "acceptance_specification_digest",
+                "profile_digest",
+            ):
+                value = document.get(field)
+                if not isinstance(value, str) or not value.startswith("sha256:"):
+                    raise StoreIntegrityError("durable model work plan lacks a digest binding")
+            if role in observed_roles:
+                raise StoreIntegrityError("durable model work plan repeats a role")
+            observed_roles.add(role)
+            normalized.append(
+                (
+                    ordinal,
+                    role,
+                    work_item_id,
+                    _configuration_digest(document),
+                    _canonical_json(document),
+                )
+            )
+        with self._lock, self._connection:
+            for ordinal, role, work_item_id, digest, encoded in normalized:
+                existing = self._connection.execute(
+                    "SELECT plan_digest,plan_json FROM mission_role_work_plans "
+                    "WHERE mission_id=? AND role=?",
+                    (mission_id, role),
+                ).fetchone()
+                if existing is None:
+                    self._connection.execute(
+                        """
+                        INSERT INTO mission_role_work_plans(
+                            mission_id,ordinal,role,work_item_id,plan_digest,plan_json,recorded_at
+                        ) VALUES(?,?,?,?,?,?,?)
+                        """,
+                        (mission_id, ordinal, role, work_item_id, digest, encoded, utc_now()),
+                    )
+                elif existing["plan_digest"] != digest or existing["plan_json"] != encoded:
+                    raise StoreIntegrityError("durable model work plan differs from its sealed plan")
+
+    def role_work_plan(self, mission_id: str, role: Role) -> dict[str, Any]:
+        row = self._connection.execute(
+            "SELECT plan_digest,plan_json FROM mission_role_work_plans "
+            "WHERE mission_id=? AND role=?",
+            (mission_id, role.value),
+        ).fetchone()
+        if row is None:
+            raise KeyError((mission_id, role.value))
+        document = self._checked_journal_document(
+            str(row["plan_json"]), str(row["plan_digest"]), "durable model work plan"
+        )
+        document["plan_digest"] = str(row["plan_digest"])
+        return document
+
+    def register_role_input(
+        self,
+        mission_id: str,
+        role: Role,
+        document: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Seal one model request projection before model-turn admission."""
+
+        payload = dict(document)
+        required = {
+            "schema_version",
+            "role",
+            "work_item_id",
+            "work_plan_digest",
+            "prior_completion_digests",
+            "context_digest",
+            "execution_objective_digest",
+            "model_turn_id",
+            "model_turn_plan_digest",
+        }
+        if set(payload) != required or payload.get("schema_version") != 1:
+            raise StoreIntegrityError("durable model role input has an unknown shape")
+        plan = self.role_work_plan(mission_id, role)
+        if (
+            payload.get("role") != role.value
+            or payload.get("work_item_id") != plan["work_item_id"]
+            or payload.get("work_plan_digest") != plan["plan_digest"]
+            or not isinstance(payload.get("prior_completion_digests"), list)
+            or any(not isinstance(item, str) or not item.startswith("sha256:") for item in payload["prior_completion_digests"])
+        ):
+            raise StoreIntegrityError("durable model role input does not bind its work plan")
+        for field in (
+            "context_digest",
+            "execution_objective_digest",
+            "model_turn_plan_digest",
+        ):
+            value = payload.get(field)
+            if not isinstance(value, str) or not value.startswith("sha256:"):
+                raise StoreIntegrityError("durable model role input lacks a digest binding")
+        if not isinstance(payload.get("model_turn_id"), str) or not str(
+            payload["model_turn_id"]
+        ).startswith("MTURN-"):
+            raise StoreIntegrityError("durable model role input lacks its model turn ID")
+        digest = _configuration_digest(payload)
+        encoded = _canonical_json(payload)
+        with self._lock, self._connection:
+            existing = self._connection.execute(
+                "SELECT input_digest,input_json FROM mission_role_inputs "
+                "WHERE mission_id=? AND role=?",
+                (mission_id, role.value),
+            ).fetchone()
+            if existing is None:
+                self._connection.execute(
+                    """
+                    INSERT INTO mission_role_inputs(
+                        mission_id,role,work_plan_digest,input_digest,input_json,recorded_at
+                    ) VALUES(?,?,?,?,?,?)
+                    """,
+                    (
+                        mission_id,
+                        role.value,
+                        str(payload["work_plan_digest"]),
+                        digest,
+                        encoded,
+                        utc_now(),
+                    ),
+                )
+            elif existing["input_digest"] != digest or existing["input_json"] != encoded:
+                raise StoreIntegrityError("durable model role input differs from its sealed input")
+        return {**payload, "input_digest": digest}
+
+    def role_input(self, mission_id: str, role: Role) -> dict[str, Any]:
+        row = self._connection.execute(
+            "SELECT input_digest,input_json FROM mission_role_inputs "
+            "WHERE mission_id=? AND role=?",
+            (mission_id, role.value),
+        ).fetchone()
+        if row is None:
+            raise KeyError((mission_id, role.value))
+        document = self._checked_journal_document(
+            str(row["input_json"]), str(row["input_digest"]), "durable model role input"
+        )
+        document["input_digest"] = str(row["input_digest"])
+        return document
+
+    def register_role_admission(
+        self,
+        mission_id: str,
+        role: Role,
+        input_digest: str,
+    ) -> dict[str, Any]:
+        """Witness model-store admission before any provider dispatch is permitted."""
+
+        input_record = self.role_input(mission_id, role)
+        if input_record["input_digest"] != input_digest:
+            raise StoreIntegrityError("model role admission references another role input")
+        document = {
+            "schema_version": 1,
+            "role": role.value,
+            "input_digest": input_digest,
+            "model_turn_id": input_record["model_turn_id"],
+            "model_turn_plan_digest": input_record["model_turn_plan_digest"],
+        }
+        digest = _configuration_digest(document)
+        encoded = _canonical_json(document)
+        with self._lock, self._connection:
+            existing = self._connection.execute(
+                "SELECT admission_digest,admission_json FROM mission_role_admissions "
+                "WHERE mission_id=? AND role=?",
+                (mission_id, role.value),
+            ).fetchone()
+            if existing is None:
+                self._connection.execute(
+                    """
+                    INSERT INTO mission_role_admissions(
+                        mission_id,role,input_digest,admission_digest,admission_json,recorded_at
+                    ) VALUES(?,?,?,?,?,?)
+                    """,
+                    (mission_id, role.value, input_digest, digest, encoded, utc_now()),
+                )
+            elif existing["admission_digest"] != digest or existing["admission_json"] != encoded:
+                raise StoreIntegrityError("model role admission differs from its sealed admission")
+        return {**document, "admission_digest": digest}
+
+    def role_admission(self, mission_id: str, role: Role) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            "SELECT admission_digest,admission_json FROM mission_role_admissions "
+            "WHERE mission_id=? AND role=?",
+            (mission_id, role.value),
+        ).fetchone()
+        if row is None:
+            return None
+        document = self._checked_journal_document(
+            str(row["admission_json"]),
+            str(row["admission_digest"]),
+            "durable model role admission",
+        )
+        input_record = self.role_input(mission_id, role)
+        if (
+            document.get("input_digest") != input_record["input_digest"]
+            or document.get("model_turn_id") != input_record["model_turn_id"]
+            or document.get("model_turn_plan_digest")
+            != input_record["model_turn_plan_digest"]
+        ):
+            raise StoreIntegrityError("model role admission no longer binds its input")
+        document["admission_digest"] = str(row["admission_digest"])
+        return document
+
+    def bind_role_effect_intent(
+        self,
+        mission_id: str,
+        role: Role,
+        input_digest: str,
+        effect_ordinal: int,
+        checkpoint: StepCheckpoint,
+    ) -> None:
+        """Bind a P06 checkpoint to one sealed model-role input before its effect."""
+
+        if checkpoint.mission_id != mission_id or effect_ordinal < 0:
+            raise StoreIntegrityError("durable model effect binding is invalid")
+        input_record = self.role_input(mission_id, role)
+        if input_record["input_digest"] != input_digest:
+            raise StoreIntegrityError("durable model effect references another role input")
+        with self._lock, self._connection:
+            existing = self._connection.execute(
+                """
+                SELECT input_digest,step_index,intent_digest FROM mission_role_effects
+                WHERE mission_id=? AND role=? AND effect_ordinal=?
+                """,
+                (mission_id, role.value, effect_ordinal),
+            ).fetchone()
+            values = (input_digest, checkpoint.step_index, checkpoint.intent_digest)
+            if existing is None:
+                existing_completion = self._connection.execute(
+                    "SELECT 1 FROM mission_role_completions WHERE mission_id=? AND role=?",
+                    (mission_id, role.value),
+                ).fetchone()
+                if existing_completion is not None:
+                    raise StoreIntegrityError(
+                        "completed model role cannot acquire another capability effect"
+                    )
+                self._connection.execute(
+                    """
+                    INSERT INTO mission_role_effects(
+                        mission_id,role,input_digest,effect_ordinal,step_index,intent_digest
+                    ) VALUES(?,?,?,?,?,?)
+                    """,
+                    (mission_id, role.value, input_digest, effect_ordinal, checkpoint.step_index, checkpoint.intent_digest),
+                )
+            elif tuple(existing) != values:
+                raise StoreIntegrityError("durable model effect differs from its sealed binding")
+
+    def role_effects(self, mission_id: str, role: Role, input_digest: str) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            """
+            SELECT effect_ordinal,step_index,intent_digest FROM mission_role_effects
+            WHERE mission_id=? AND role=? AND input_digest=? ORDER BY effect_ordinal
+            """,
+            (mission_id, role.value, input_digest),
+        ).fetchall()
+        effects: list[dict[str, Any]] = []
+        for expected, row in enumerate(rows):
+            if int(row["effect_ordinal"]) != expected:
+                raise StoreIntegrityError("durable model effect ordinals are not contiguous")
+            checkpoint = self.checkpoint(mission_id, int(row["step_index"]))
+            if checkpoint.intent_digest != row["intent_digest"]:
+                raise StoreIntegrityError("durable model effect no longer binds its checkpoint")
+            effects.append(
+                {
+                    "effect_ordinal": expected,
+                    "step_index": checkpoint.step_index,
+                    "intent_digest": checkpoint.intent_digest,
+                    "state": checkpoint.state,
+                    "receipt_reference": checkpoint.receipt_reference,
+                }
+            )
+        return effects
+
+    def _model_role_receipt_bindings(
+        self,
+        mission_id: str,
+        role: Role,
+        input_digest: str,
+    ) -> tuple[list[dict[str, str]], list[str]]:
+        """Validate effect wrappers and return their synthetic refs and raw digests."""
+
+        references: list[dict[str, str]] = []
+        raw_digests: list[str] = []
+        for effect in self.role_effects(mission_id, role, input_digest):
+            if effect["state"] != "completed" or not isinstance(effect["receipt_reference"], Mapping):
+                raise StoreIntegrityError("model role completion lacks a completed capability receipt")
+            checkpoint = self.checkpoint(mission_id, int(effect["step_index"]))
+            found = self.find_effect_receipt(checkpoint)
+            if found is None:
+                raise StoreIntegrityError("model role capability receipt is missing")
+            reference, wrapper = found
+            if dict(effect["receipt_reference"]) != reference:
+                raise StoreIntegrityError("model role capability receipt reference changed")
+            references.append(reference)
+            for record in wrapper["records"]:
+                digest = record.get("digest")
+                if not isinstance(digest, str) or not digest.startswith("sha256:"):
+                    raise StoreIntegrityError("model role raw capability receipt is malformed")
+                raw_digests.append(digest)
+        return references, raw_digests
+
+    @staticmethod
+    def _validate_model_role_result_receipts(
+        result: Mapping[str, Any],
+        expected_digests: Sequence[str],
+    ) -> None:
+        try:
+            typed = agent_result_from_document(result)
+        except (DurableRepositoryModelError, TypeError, ValueError) as error:
+            raise StoreIntegrityError("model role completion result is malformed") from error
+        if agent_result_document(typed) != dict(result):
+            raise StoreIntegrityError("model role completion result is noncanonical")
+        observed_lists: list[list[str]] = []
+        for evidence in typed.evidence:
+            values = evidence.payload.get("receipt_digests")
+            if values is None:
+                continue
+            if not isinstance(values, list) or any(
+                not isinstance(value, str) or not value.startswith("sha256:")
+                for value in values
+            ):
+                raise StoreIntegrityError("model role receipt evidence is malformed")
+            observed_lists.append(values)
+        if expected_digests:
+            if not observed_lists or any(values != list(expected_digests) for values in observed_lists):
+                raise StoreIntegrityError(
+                    "model role receipt evidence does not bind completed capability receipts"
+                )
+        elif observed_lists:
+            raise StoreIntegrityError("effect-free model role has receipt evidence")
+
+    def complete_model_role(
+        self,
+        mission_id: str,
+        role: Role,
+        input_digest: str,
+        *,
+        model_turn_id: str,
+        model_turn_plan_digest: str,
+        model_role_result_digest: str,
+        agent_result: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Atomically retain the final context projection and mark the role successful."""
+
+        input_record = self.role_input(mission_id, role)
+        if (
+            input_record["input_digest"] != input_digest
+            or input_record["model_turn_id"] != model_turn_id
+            or input_record["model_turn_plan_digest"] != model_turn_plan_digest
+        ):
+            raise StoreIntegrityError("model role completion differs from its sealed input")
+        admission = self.role_admission(mission_id, role)
+        if admission is None:
+            raise StoreIntegrityError("model role completion lacks a pre-dispatch admission witness")
+        plan = self.role_work_plan(mission_id, role)
+        result = dict(agent_result)
+        if result.get("role") != role.value or result.get("work_item_id") != plan["work_item_id"]:
+            raise StoreIntegrityError("model role completion result does not bind its work plan")
+        receipt_references, raw_receipt_digests = self._model_role_receipt_bindings(
+            mission_id, role, input_digest
+        )
+        self._validate_model_role_result_receipts(result, raw_receipt_digests)
+        document = {
+            "schema_version": 1,
+            "role": role.value,
+            "input_digest": input_digest,
+            "model_turn_id": model_turn_id,
+            "model_turn_plan_digest": model_turn_plan_digest,
+            "model_role_result_digest": model_role_result_digest,
+            "agent_result": result,
+            "agent_result_digest": _configuration_digest(result),
+            "capability_receipts": receipt_references,
+        }
+        digest = _configuration_digest(document)
+        encoded = _canonical_json(document)
+        with self._lock, self._connection:
+            existing = self._connection.execute(
+                "SELECT completion_digest,completion_json FROM mission_role_completions "
+                "WHERE mission_id=? AND role=?",
+                (mission_id, role.value),
+            ).fetchone()
+            if existing is None:
+                self._connection.execute(
+                    """
+                    INSERT INTO mission_role_completions(
+                        mission_id,role,input_digest,completion_digest,completion_json,recorded_at
+                    ) VALUES(?,?,?,?,?,?)
+                    """,
+                    (mission_id, role.value, input_digest, digest, encoded, utc_now()),
+                )
+                mission = self.mission(mission_id)
+                roles = mission["roles"]
+                roles[role.value] = "succeeded"
+                self._connection.execute(
+                    "UPDATE missions SET roles_json=? WHERE mission_id=?",
+                    (_canonical_json(roles), mission_id),
+                )
+            elif existing["completion_digest"] != digest or existing["completion_json"] != encoded:
+                raise StoreIntegrityError("model role completion differs from its sealed completion")
+        return {**document, "completion_digest": digest}
+
+    def completed_model_role(self, mission_id: str, role: Role) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            "SELECT completion_digest,completion_json FROM mission_role_completions "
+            "WHERE mission_id=? AND role=?",
+            (mission_id, role.value),
+        ).fetchone()
+        if row is None:
+            return None
+        document = self._checked_journal_document(
+            str(row["completion_json"]), str(row["completion_digest"]), "model role completion"
+        )
+        result = document.get("agent_result")
+        if not isinstance(result, dict) or document.get("agent_result_digest") != _configuration_digest(result):
+            raise StoreIntegrityError("model role completion result no longer binds its digest")
+        input_record = self.role_input(mission_id, role)
+        if document.get("input_digest") != input_record["input_digest"]:
+            raise StoreIntegrityError("model role completion no longer binds its input")
+        if self.role_admission(mission_id, role) is None:
+            raise StoreIntegrityError("model role completion lacks its admission witness")
+        receipts = document.get("capability_receipts")
+        if not isinstance(receipts, list):
+            raise StoreIntegrityError("model role completion receipts are malformed")
+        observed, raw_receipt_digests = self._model_role_receipt_bindings(
+            mission_id, role, str(input_record["input_digest"])
+        )
+        if receipts != observed:
+            raise StoreIntegrityError("model role completion receipt list no longer binds effects")
+        self._validate_model_role_result_receipts(result, raw_receipt_digests)
+        document["completion_digest"] = str(row["completion_digest"])
+        return document
+
     def mark_role(self, mission_id: str, role: Role, status: str) -> None:
         mission = self.mission(mission_id)
         roles = mission["roles"]
@@ -1155,9 +1745,15 @@ async def resume_mission(
     mission_id: str,
     *,
     custody: ExternalCustodyAdapter | None = None,
+    source_custody: SourceCustodyVerifier | None = None,
+    model_backend_resolver: Any | None = None,
 ) -> Any:
-    """Reconcile and continue an interrupted scripted repository mission."""
+    """Reconcile a scripted mission or an explicitly injected model profile."""
 
+    from .durable_repository_model import (
+        DurableRepositoryModelBackend,
+        DurableRepositoryModelProfile,
+    )
     from .github_adapter import GitHubClient, GitHubDeliveryTarget
     from .ledger import EvidenceLedger
     from .mission import RepositoryMission, ScriptedRepositoryBackend
@@ -1180,17 +1776,73 @@ async def resume_mission(
             },
         )
     config = mission["config"]
-    if config.get("backend") != "scripted":
-        raise MissionStoreError("P06 resume supports scripted repository missions only")
+    backend_kind = config.get("backend")
+    if backend_kind not in {"scripted", "durable-model-repository-v1"}:
+        raise MissionStoreError("P06 resume does not recognize this repository backend")
     missing = store.reconcile_workspaces(mission_id)
     budget_data = mission["budget"]
     budget = AutonomyBudget(**budget_data)
+    if backend_kind == "scripted":
+        backend: Any = ScriptedRepositoryBackend(
+            config["scripted_variant"],
+            test_argv=config["test_argv"],
+            criterion_argv=config["criterion_argv"],
+        )
+    else:
+        profile_data = config.get("durable_model_profile")
+        if not isinstance(profile_data, Mapping):
+            raise MissionStoreError("durable model mission lacks its sealed profile")
+        profile = DurableRepositoryModelProfile.from_dict(profile_data)
+        if profile.budget.mission_id != mission_id:
+            raise MissionStoreError("durable model profile does not bind the mission ID")
+        if model_backend_resolver is None:
+            raise MissionStoreError(
+                "durable model repository resumption requires an injected backend resolver"
+            )
+        backend = model_backend_resolver(profile)
+        if not isinstance(backend, DurableRepositoryModelBackend):
+            raise MissionStoreError(
+                "durable model repository resolver returned an unsealed backend"
+            )
+        if backend.profile.to_dict() != profile.to_dict():
+            raise MissionStoreError(
+                "durable model repository resolver differs from the sealed profile"
+            )
+    source_lock: SourceLockEvidence | None = None
+    authenticated_source = config.get("authenticated_source")
+    if authenticated_source is not None:
+        if source_custody is None:
+            raise MissionStoreError(
+                "authenticated source mission resumption requires a source custody verifier"
+            )
+        if not isinstance(authenticated_source, Mapping):
+            raise MissionStoreError("authenticated source configuration is malformed")
+        lock_value = authenticated_source.get("source_lock")
+        attestation_value = authenticated_source.get("attestation")
+        evidence_digest = authenticated_source.get("evidence_digest")
+        if (
+            not isinstance(lock_value, Mapping)
+            or not isinstance(attestation_value, Mapping)
+            or not isinstance(evidence_digest, str)
+        ):
+            raise MissionStoreError("authenticated source configuration is incomplete")
+        try:
+            source_lock = SourceLockEvidence(
+                SourceLock.from_dict(
+                    lock_value,
+                    allowed_hosts=source_custody.allowed_hosts,
+                ),
+                dict(attestation_value),
+            )
+        except SourceCustodyError as error:
+            raise MissionStoreError(
+                f"authenticated source configuration is malformed: {error}"
+            ) from error
+        if source_lock.digest() != evidence_digest:
+            raise StoreIntegrityError(
+                "authenticated source configuration digest does not bind source evidence"
+            )
     ledger = EvidenceLedger(store.state_dir / "evidence-ledger.sqlite3")
-    backend = ScriptedRepositoryBackend(
-        config["scripted_variant"],
-        test_argv=config["test_argv"],
-        criterion_argv=config["criterion_argv"],
-    )
     github_delivery = None
     github_config = config.get("github_delivery")
     policy = PolicyEngine(AutonomyLevel.REPOSITORY)
@@ -1215,26 +1867,32 @@ async def resume_mission(
             int(github_config["max_check_attempts"]),
             float(github_config["check_interval_s"]),
         )
-    runner = RepositoryMission(
-        config["repository"],
-        config["objective"],
-        acceptance_criteria=tuple(config["acceptance_criteria"]),
-        acceptance_specifications=tuple(config.get("acceptance_specifications", ())),
-        risk=RiskTier[str(config.get("risk", "moderate")).upper()],
-        backend=backend,
-        pin=config["pin"],
-        output_dir=config["output_dir"],
-        policy=policy,
-        budget=budget,
-        ledger=ledger,
-        mission_store=store,
-        custody=custody,
-        github_delivery=github_delivery,
-        _run_id=mission_id,
-        _resume=True,
-        _missing_workspaces=missing,
-    )
+    if backend_kind == "durable-model-repository-v1" and github_delivery is not None:
+        raise MissionStoreError(
+            "durable model repository resumption does not authorize external delivery"
+        )
     try:
+        runner = RepositoryMission(
+            config["repository"],
+            config["objective"],
+            acceptance_criteria=tuple(config["acceptance_criteria"]),
+            acceptance_specifications=tuple(config.get("acceptance_specifications", ())),
+            risk=RiskTier[str(config.get("risk", "moderate")).upper()],
+            backend=backend,
+            pin=config["pin"],
+            output_dir=config["output_dir"],
+            policy=policy,
+            budget=budget,
+            ledger=ledger,
+            mission_store=store,
+            custody=custody,
+            source_lock=source_lock,
+            source_custody=source_custody,
+            github_delivery=github_delivery,
+            _run_id=mission_id,
+            _resume=True,
+            _missing_workspaces=missing,
+        )
         return await runner.run()
     finally:
         ledger.close()

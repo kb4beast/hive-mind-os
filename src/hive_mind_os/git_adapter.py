@@ -33,6 +33,7 @@ from .source_custody import (
     SourceCustodyVerifier,
     SourceLock,
     SourceLockEvidence,
+    canonical_repository_url,
 )
 
 _FULL_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
@@ -1181,8 +1182,9 @@ def verify_delivery(
         head_sha = _full_sha(manifest["head_sha"])
         head_tree = _full_sha(manifest["head_tree"])
         branch = _branch_name(manifest["branch_name"])
-        source = _local_source(base_source)
         source_custody_record = manifest.get("source_custody")
+        source_evidence: SourceLockEvidence | None = None
+        materialization_options: dict[str, Any] = {}
         if source_custody_record is not None:
             if not isinstance(source_custody_record, Mapping) or source_custody is None:
                 return False
@@ -1207,6 +1209,21 @@ def verify_delivery(
             if source_evidence.source_lock.commit_sha != base_sha:
                 return False
             source_custody.verify(source_evidence)
+            if canonical_repository_url(
+                str(base_source),
+                allowed_hosts=source_custody.allowed_hosts,
+            ) != source_evidence.source_lock.repository_url:
+                return False
+            source = source_evidence.source_lock.repository_url
+            materialization_options = {
+                "allow_remote": True,
+                "allowed_hosts": source_custody.allowed_hosts,
+                "source_lock": source_evidence,
+                "source_custody": source_custody,
+                "require_source_custody": True,
+                "source_mission_id": source_evidence.source_lock.mission_id,
+                "source_state_ref": source_evidence.source_lock.state_ref,
+            }
             manifest_receipts = manifest["receipts"]
             if (
                 not isinstance(manifest_receipts, list)
@@ -1221,6 +1238,8 @@ def verify_delivery(
                 )
             ):
                 return False
+        else:
+            source = _local_source(base_source)
         bundle = (artifact_root / "changes.bundle").read_bytes()
         patch = (artifact_root / "changes.patch").read_bytes()
         files = manifest["files"]
@@ -1265,6 +1284,7 @@ def verify_delivery(
                 role=role,
                 risk=risk,
                 allowance=allowance,
+                **materialization_options,
             )
             verification_workspaces.append(workspace)
             workspace.write_file("changes.bundle", bundle)
@@ -1322,6 +1342,7 @@ def verify_delivery(
                 role=role,
                 risk=risk,
                 allowance=allowance,
+                **materialization_options,
             )
             verification_workspaces.append(patch_workspace)
             patch_workspace.write_file("changes.patch", patch)
