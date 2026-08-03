@@ -1,0 +1,173 @@
+{
+  "claims": {
+    "authenticated_independence": false,
+    "evaluation_executed": false,
+    "production_ready": false,
+    "promotion_authorized": false,
+    "recovery_executed": false,
+    "release_ready": false,
+    "superiority_established": false
+  },
+  "documents": {
+    "E": {
+      "docs/architecture/ADR-037-INTEGRATOR-GOVERNANCE-BOUNDARY.md": "sha256:875ea36324d78827edd126ad07b97f2744bdeaf87982f4fb1791b7e2cfde63d2",
+      "docs/architecture/PHASE5E_MIGRATION_AND_ROLLBACK.md": "sha256:60f1484d429aa33ef6af4ff409b1cc9de1b8d9d4e74038bd2d2596260bc5adc6",
+      "evidence/courts/phase5e-integrator-governance-court.md": "sha256:f75165078bcda1b340c213a32b5f350d3a1093da331035a0a85be710aadb6e26",
+      "evidence/phase5e/PHASE5E_DISSENT.md": "sha256:81a655952763b616b8a259f79574dd4981a6db065b30db0eee0d2e11b86fa2b0",
+      "evidence/sources/PHASE5E_INTEGRATOR_SOURCE_REGISTER.md": "sha256:597c6a91881cbe76d798688a577b8f1a7152d3bd2e6e117cb17a142596805896"
+    },
+    "F": {
+      "docs/architecture/ADR-038-STEWARD-OPERATIONS-BOUNDARY.md": "sha256:9f871ffd9c50dec2eadb6d8d303fa59a22e53f572f8ce521c406890c1be635c3",
+      "docs/architecture/PHASE5F_MIGRATION_AND_ROLLBACK.md": "sha256:0ed11752f192fcfce02c8f5be98498057f160414fb666e3e73dda52b9c9e5e1a",
+      "docs/operations/PHASE5F_STEWARD_RUNBOOK.md": "sha256:464acbb8b24e6500b35ba3bddf4ea7014a3af870119352adccd96b5d55798251",
+      "evidence/courts/phase5f-steward-governance-court.md": "sha256:4c3805057972b8a8cd147c00039bd05fd6f9e3ea8a2652d9980e971bd2347df4",
+      "evidence/phase5f/PHASE5F_DISSENT.md": "sha256:dd97e34d0f740d750aa7b53e0b9429ad643f30a50ecf6d8a836e06e37e1610d0",
+      "evidence/sources/PHASE5F_STEWARD_SOURCE_REGISTER.md": "sha256:faf0c05cb067403c54b3759e3655d7bd591be01925967139430a0bded9029363"
+    },
+    "G": {
+      "docs/architecture/ADR-039-OPTIMIZER-EVALUATION-CUSTODY.md": "sha256:d93fa4fc536b44a307c6709663c71b0ecd153f10706cc87570bce42bebe9f12a",
+      "evidence/courts/phase5g-optimizer-governance-court.md": "sha256:36ea8bb330ef12779798cdb1101b9f17914f658eff072fbac53752d28e169221",
+      "evidence/phase5g/PHASE5G_DISSENT.md": "sha256:13a5d760826ff913b0d594c6e4bfe6355bfc04da29958c0a40ab39574d813ec1",
+      "evidence/sources/PHASE5G_OPTIMIZER_SOURCE_REGISTER.md": "sha256:a512bef7226988b9e64cca3572d9af8f8258ee6fb80950fce12cfb69afb5df62"
+    }
+  },
+  "phase5e": {
+    "compatibility_execution_status": "not-run",
+    "migration_status": "defined-not-executed",
+    "procedural_role_review": {
+      "actors": [
+        {
+          "actor_id": "procedural:p5o-e-clerk",
+          "role": "clerk"
+        },
+        {
+          "actor_id": "procedural:p5o-e-advocate",
+          "role": "advocate"
+        },
+        {
+          "actor_id": "procedural:p5o-e-cross-examiner",
+          "role": "cross-examiner"
+        },
+        {
+          "actor_id": "procedural:p5o-e-expert-witness",
+          "role": "expert-witness"
+        },
+        {
+          "actor_id": "procedural:p5o-e-judge",
+          "role": "judge"
+        }
+      ],
+      "authenticated_distinct_actors": false,
+      "authority": "none",
+      "independence_claimed": false,
+      "phase": "5E",
+      "release_authorized": false,
+      "same_assistant_performed_procedural_passes": true
+    },
+    "rollback_status": "defined-not-executed"
+  },
+  "phase5f": {
+    "procedural_role_review": {
+      "actors": [
+        {
+          "actor_id": "procedural:p5o-f-clerk",
+          "role": "clerk"
+        },
+        {
+          "actor_id": "procedural:p5o-f-advocate",
+          "role": "advocate"
+        },
+        {
+          "actor_id": "procedural:p5o-f-cross-examiner",
+          "role": "cross-examiner"
+        },
+        {
+          "actor_id": "procedural:p5o-f-expert-witness",
+          "role": "expert-witness"
+        },
+        {
+          "actor_id": "procedural:p5o-f-judge",
+          "role": "judge"
+        }
+      ],
+      "authenticated_distinct_actors": false,
+      "authority": "none",
+      "independence_claimed": false,
+      "phase": "5F",
+      "release_authorized": false,
+      "same_assistant_performed_procedural_passes": true
+    },
+    "recovery_exercise": {
+      "authority_supplied": false,
+      "commands_executed": false,
+      "evidence_deletion_authorized": false,
+      "exercise_id": "phase5f-recovery-exercise-template-v1",
+      "known_blockers": [
+        "B-OPS-08"
+      ],
+      "recovery_claimed": false,
+      "status": "designed-not-executed"
+    },
+    "runbook_status": "defined-not-executed"
+  },
+  "phase5g": {
+    "comparator_manifest": {
+      "comparators": [],
+      "status": "awaiting-pinned-comparators"
+    },
+    "independent_evaluator_record": {
+      "actor_id": null,
+      "signature": null,
+      "status": "required-not-authenticated"
+    },
+    "losing_result_archive": {
+      "results": [],
+      "status": "empty-no-evaluations-run"
+    },
+    "procedural_role_review": {
+      "actors": [
+        {
+          "actor_id": "procedural:p5o-g-clerk",
+          "role": "clerk"
+        },
+        {
+          "actor_id": "procedural:p5o-g-advocate",
+          "role": "advocate"
+        },
+        {
+          "actor_id": "procedural:p5o-g-cross-examiner",
+          "role": "cross-examiner"
+        },
+        {
+          "actor_id": "procedural:p5o-g-expert-witness",
+          "role": "expert-witness"
+        },
+        {
+          "actor_id": "procedural:p5o-g-judge",
+          "role": "judge"
+        }
+      ],
+      "authenticated_distinct_actors": false,
+      "authority": "none",
+      "independence_claimed": false,
+      "phase": "5G",
+      "release_authorized": false,
+      "same_assistant_performed_procedural_passes": true
+    },
+    "promotion_court_disposition": {
+      "disposition": "defer",
+      "evaluation_status": "not-run",
+      "promotion_authorized": false,
+      "superiority_established": false
+    },
+    "protected_holdout_custody": {
+      "contents_present": false,
+      "external_custodian_authenticated": false,
+      "status": "sealed-not-accessed"
+    }
+  },
+  "record_digest": "sha256:13499ff4a27a3e4f20a78c6e9695bb7ed83354ca4da7d3cd25b0e3699c2a83a6",
+  "record_type": "phase5-governance-records",
+  "schema_version": 1,
+  "subject_base": "60b76a3ea858f20d1cd126cc223573adb2857c5e"
+}
