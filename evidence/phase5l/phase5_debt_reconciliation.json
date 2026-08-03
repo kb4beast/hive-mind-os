@@ -1,0 +1,225 @@
+{
+  "claims": {
+    "adr_015_adopted": false,
+    "authenticated_independence": false,
+    "deployment_authorized": false,
+    "p14_eligible": false,
+    "p20_eligible": false,
+    "production_ready": false,
+    "promotion_authorized": false,
+    "release_ready": false,
+    "superiority_established": false
+  },
+  "counts": {
+    "current_active": 25,
+    "prior_active": 35,
+    "resolved": 10
+  },
+  "current_active_debt_ids": [
+    "P5E-DEBT-01",
+    "P5E-DEBT-02",
+    "P5E-DEBT-03",
+    "P5E-DEBT-05",
+    "P5F-DEBT-01",
+    "P5F-DEBT-02",
+    "P5F-DEBT-03",
+    "P5F-DEBT-05",
+    "P5G-DEBT-01",
+    "P5G-DEBT-02",
+    "P5G-DEBT-03",
+    "P5G-DEBT-05",
+    "P5H-DEBT-01",
+    "P5H-DEBT-02",
+    "P5H-DEBT-03",
+    "P5H-DEBT-04",
+    "P5H-DEBT-05",
+    "P5I-DEBT-01",
+    "P5I-DEBT-02",
+    "P5I-DEBT-03",
+    "P5I-DEBT-05",
+    "P5J-DEBT-01",
+    "P5J-DEBT-02",
+    "P5J-DEBT-03",
+    "P5J-DEBT-05"
+  ],
+  "external_input_debt_ids": [
+    "P5E-DEBT-05",
+    "P5F-DEBT-05",
+    "P5G-DEBT-05",
+    "P5H-DEBT-03",
+    "P5H-DEBT-04",
+    "P5I-DEBT-01",
+    "P5I-DEBT-03",
+    "P5I-DEBT-05",
+    "P5J-DEBT-01",
+    "P5J-DEBT-03",
+    "P5J-DEBT-05"
+  ],
+  "local_release_validation": {
+    "blocker_ids": [
+      "B-OPS-08"
+    ],
+    "duration_seconds": 863.292,
+    "new_phase5_failures": 0,
+    "platform": "windows-cpython-3.14",
+    "result": "failed-known-blocker",
+    "tests_run": 946
+  },
+  "next_internal_debt_ids": [
+    "P5E-DEBT-01",
+    "P5E-DEBT-02",
+    "P5E-DEBT-03",
+    "P5F-DEBT-01",
+    "P5F-DEBT-02",
+    "P5F-DEBT-03",
+    "P5G-DEBT-01",
+    "P5G-DEBT-02",
+    "P5G-DEBT-03",
+    "P5H-DEBT-01",
+    "P5H-DEBT-02",
+    "P5I-DEBT-02",
+    "P5J-DEBT-02"
+  ],
+  "prior_active_debt_ids": [
+    "P5D-DEBT-01",
+    "P5D-DEBT-02",
+    "P5D-DEBT-03",
+    "P5D-DEBT-04",
+    "P5D-DEBT-05",
+    "P5E-DEBT-01",
+    "P5E-DEBT-02",
+    "P5E-DEBT-03",
+    "P5E-DEBT-04",
+    "P5E-DEBT-05",
+    "P5F-DEBT-01",
+    "P5F-DEBT-02",
+    "P5F-DEBT-03",
+    "P5F-DEBT-04",
+    "P5F-DEBT-05",
+    "P5G-DEBT-01",
+    "P5G-DEBT-02",
+    "P5G-DEBT-03",
+    "P5G-DEBT-04",
+    "P5G-DEBT-05",
+    "P5H-DEBT-01",
+    "P5H-DEBT-02",
+    "P5H-DEBT-03",
+    "P5H-DEBT-04",
+    "P5H-DEBT-05",
+    "P5I-DEBT-01",
+    "P5I-DEBT-02",
+    "P5I-DEBT-03",
+    "P5I-DEBT-04",
+    "P5I-DEBT-05",
+    "P5J-DEBT-01",
+    "P5J-DEBT-02",
+    "P5J-DEBT-03",
+    "P5J-DEBT-04",
+    "P5J-DEBT-05"
+  ],
+  "reconciliation_digest": "sha256:981832a1a900b98883c4eea3e052c666df5c084a6719038d6657a7c8b0357dcc",
+  "record_type": "phase5-debt-reconciliation",
+  "release_run_ids": [
+    "30772648692",
+    "30772650299"
+  ],
+  "release_subject_commit": "0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+  "resolved": [
+    {
+      "debt_id": "P5D-DEBT-01",
+      "evidence": [
+        "commit:af9ac00a5959b96260fb3bcdfb0958ce0640ae04",
+        "run:30771264748",
+        "run:30771265827"
+      ],
+      "reason": "committed Ruff repairs pass on the stabilized and integrated trees"
+    },
+    {
+      "debt_id": "P5D-DEBT-02",
+      "evidence": [
+        "commit:af9ac00a5959b96260fb3bcdfb0958ce0640ae04",
+        "run:30771264748",
+        "run:30771265827"
+      ],
+      "reason": "concrete-dict normalization preserves validation and passes Pyright 1.1.411"
+    },
+    {
+      "debt_id": "P5D-DEBT-03",
+      "evidence": [
+        "commit:349f717aaee0deb3b65ab761e16307ca48ad57db",
+        "run:30773159161",
+        "run:30773160521",
+        "local:100-consecutive-refined-worker-recovery-passes"
+      ],
+      "reason": "crash and recovery leases are separated and the exact successor passes repeated hosted matrices"
+    },
+    {
+      "debt_id": "P5D-DEBT-04",
+      "evidence": [
+        "commit:af9ac00a5959b96260fb3bcdfb0958ce0640ae04",
+        "run:30771264748",
+        "run:30771265827"
+      ],
+      "reason": "all three temporary write-capable Phase 5D workflows are absent"
+    },
+    {
+      "debt_id": "P5D-DEBT-05",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the integrated release head passes every Constitutional CI job"
+    },
+    {
+      "debt_id": "P5E-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the integrated exact release head supplies the required fully green receipt"
+    },
+    {
+      "debt_id": "P5F-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "global Pyright and all integrated hosted gates pass on the exact release head"
+    },
+    {
+      "debt_id": "P5G-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the corrected Optimizer source now has fully green integrated exact-head evidence"
+    },
+    {
+      "debt_id": "P5I-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "worker, Ruff, Pyright, and all Python matrices pass on the exact release head"
+    },
+    {
+      "debt_id": "P5J-DEBT-04",
+      "evidence": [
+        "commit:0ff332249e7830464724ca9b5a0ebcc6fc43c741",
+        "run:30772648692",
+        "run:30772650299"
+      ],
+      "reason": "the packet is included in a fully green integrated exact-head receipt"
+    }
+  ],
+  "schema_version": 1,
+  "source_registers": [
+    "docs/plan/PHASE5_CARRIED_FORWARD_DEBT.md",
+    "docs/plan/PHASE5J_CARRIED_FORWARD_DEBT.md"
+  ]
+}

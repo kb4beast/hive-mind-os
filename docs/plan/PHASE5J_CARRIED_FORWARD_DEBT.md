@@ -10,6 +10,10 @@
 This addendum extends `docs/plan/PHASE5_CARRIED_FORWARD_DEBT.md`. All thirty Phase 5D–5I open or
 reopened items remain active. The following five Phase 5J items are additional and open.
 
+That sentence is the preserved Phase 5J point-in-time state. The additive current disposition is
+maintained by [`PHASE5L_DEBT_RECONCILIATION.md`](PHASE5L_DEBT_RECONCILIATION.md); no historical
+Phase 5J packet or active-debt list is retroactively changed.
+
 | ID | Finding and evidence | Current impact | Required resolution / exit condition | Status |
 |---|---|---|---|---|
 | P5J-DEBT-01 | Phase 5J creates a frozen packet manifest, reviewer requirements, unsigned decision templates, and an `external-action-required` handoff. No authenticated external review was run and no outcome was selected or signed. | ADR-015 remains proposed and P14 remains blocked. | Obtain distinct authenticated Curator, Judge, and Orchestrator evidence through the external handoff. Verify signatures, role separation, scope, expiry, revocation, replay protection, and external retention before admitting any decision. | open |
