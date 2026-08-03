@@ -26,7 +26,7 @@ from hive_mind_os.foundation.builder_playbook_contracts import (
 
 OUTPUT_PATH = Path("evidence/phase5c/phase5c_builder_inventory.json")
 BASE_HEAD = "43db53de7a41d9bc02e987776edc260594def4c8"
-PHASE5B_INVENTORY_DIGEST = "sha256:193ad19a5a0ff9438d9c288a4dda7e23ce0c4df416520817126e1dbbd936c166"
+PHASE5B_INVENTORY_DIGEST = "sha256:77aaf996821b6cf8f1b00a8b603ff12303ec00cb844c2f615aa65e47ab095f71"
 
 
 def _digest_bytes(value: bytes) -> str:

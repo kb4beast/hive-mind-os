@@ -44,11 +44,11 @@
     "tests/test_phase5g_optimizer_playbook.py": "sha256:4058d934b29d6335bbc698464a4b87f56ccbec8f8086482f7a08db49190fe56a",
     "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
   },
-  "inventory_digest": "sha256:83acb02e4fcff95c7a3149788213babaf55556c43673accd94700a7644202e8e",
+  "inventory_digest": "sha256:62463b2c110b6e5cb6dbb93aa712c66308fc4de07467708b4d30ad5a8654b393",
   "phase": 5,
   "phase_item": "G",
   "predecessor": {
-    "inventory_digest": "sha256:1f407e929b24d49538058fae7bdc9a20dba20225de835c75609777a6c0a8bde4",
+    "inventory_digest": "sha256:4ed300d365431291eb2b7c2b0a3eb57563ea25b0919f18576189e8d5da1e162c",
     "path": "evidence/phase5f/phase5f_steward_inventory.json"
   },
   "production_ready": false,

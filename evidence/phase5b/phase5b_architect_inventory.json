@@ -30,28 +30,28 @@
   "implementation": {
     ".github/workflows/ci.yml": "sha256:95656026e760dec0055541f5bad71a018e45dc04bf33bded4394132b3254a429",
     "docs/architecture/ADR-034-ARCHITECT-DEEP-PLAYBOOK.md": "sha256:382450d0bd895d47f2a2c6ebb201453a357a9003baf7f78835b76396d060646c",
-    "docs/architecture/ADR_INDEX.md": "sha256:365bf7ac33159537d9ff6db015151b66a06b35f8b583beddd476e6c568368ec4",
+    "docs/architecture/ADR_INDEX.md": "sha256:da5ed1fb44af75180dca941ddda40ccdef79639a62ad14da1e8dd3ae46b044f6",
     "docs/architecture/PHASE5B_ARCHITECT_CONTRACT.md": "sha256:7e33117cdbbe54817626ab3973f7fb2c7dff40dfd2fa172e49d7d42a3183dc7e",
     "docs/architecture/PHASE5B_MIGRATION_AND_ROLLBACK.md": "sha256:99444c61dd49dc9cf04a6773f0a8be41b57e5ab3ea4007b09f9eb92824a287aa",
     "evidence/courts/phase5b-architect-playbook-court.md": "sha256:0cf2faaa71a4737f05318558372edc6ad25e3822790d6b7be510a15607519a40",
-    "evidence/phase5a/phase5a_orchestrator_inventory.json": "sha256:0e93b886967e2034748b411a1f76e84e5405f81b4c264c801047279fb60a85e1",
+    "evidence/phase5a/phase5a_orchestrator_inventory.json": "sha256:3537d116cc5e20e5b6c9dc6d7244c116026880a3b78ee03dc9f09820e35a5d82",
     "evidence/phase5b/PHASE5B_AUDIT_LEDGER.md": "sha256:37d7de434d4fbe5f34177cb3fdcc38573556f93347ee0f0c4ba1eef87a5d8f72",
     "evidence/phase5b/PHASE5B_DISSENT.md": "sha256:5747e4c937044e3c9fb534ea82de87e62bb351b1d588cb51e4561d18b045abd0",
     "evidence/phase5b/PHASE5B_INSTALLED_WHEEL_RECEIPT.md": "sha256:c04723e8998e7f4fa481fa0129a5c134e1f121214df4382141ad0763d9e4ed91",
     "evidence/phase5b/procedural-role-review.json": "sha256:63f8de9356394b70133007a8b3a97c42124f7bfec3ef261d3c31cbd013181656",
     "evidence/sources/PHASE5B_ARCHITECT_SOURCE_REGISTER.md": "sha256:051ddad63475e259211eaab60164c9e5f32203d303a549c10e94d17b3c1b8941",
-    "scripts/phase5b_architect_inventory.py": "sha256:d6f58d4afd528d450071049382a3bc1faaf6bab20951556d6e06e09b85215778",
+    "scripts/phase5b_architect_inventory.py": "sha256:e34a3ded440c8fcd567a31c88eee0482bf877884fbdcc7f6b48e50857b500312",
     "scripts/verify_phase5b_installed_wheel.py": "sha256:0e5ee9fb757a7e5095c1b8b161cb1a25575bebc26eb8be9360fe012e57bc7d63",
     "src/hive_mind_os/foundation/architect_playbook.py": "sha256:1051f92e5fb87301d336a970ccf78d0cbe42b9c213feab134d372200363ee072",
     "src/hive_mind_os/foundation/architect_playbook_contracts.py": "sha256:0e6502181066d0c7744c7fc660ff9a065d350de21dcf63e852dafc98bb76f933",
     "tests/test_phase5b_architect_playbook.py": "sha256:5721eba0a8e3f5b66934530b41e96faab7a252f55fff099c1bf7c3536db43f74"
   },
-  "inventory_digest": "sha256:193ad19a5a0ff9438d9c288a4dda7e23ce0c4df416520817126e1dbbd936c166",
+  "inventory_digest": "sha256:77aaf996821b6cf8f1b00a8b603ff12303ec00cb844c2f615aa65e47ab095f71",
   "json_resources_added": 0,
   "learning_claimed": false,
   "phase": 5,
   "phase5a_input": {
-    "inventory_digest": "sha256:573632f533fb98a58b44fbc3f0eaad89cbeffa62760cab575b791a503f5dbb6c"
+    "inventory_digest": "sha256:0c5a20db168e8fbf4cee0ee1e3615cbe1d8b4b39369534116f1a7e27ee9d73fe"
   },
   "phase_item": "B",
   "production_ready": false,
