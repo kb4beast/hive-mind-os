@@ -37,18 +37,21 @@
   "implementation": {
     ".github/workflows/ci.yml": "sha256:95656026e760dec0055541f5bad71a018e45dc04bf33bded4394132b3254a429",
     "docs/architecture/PHASE5F_STEWARD_CONTRACT.md": "sha256:d778721a4ad663e1a6ccae7e312098e75f558e33855c996d5b8e8907c7cbc00d",
-    "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
-    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
+    "scripts/phase5e_to_k_inventory.py": "sha256:8e3282af78779bcf2aab6514b806db99c5c28f846caefcb0e3ce8324ef79caf7",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:f549984f11d80d83fcbdc8ce0670b352b6ec3a13f6d9de49757c2f2eecd06157",
+    "src/hive_mind_os/foundation/full_role_output_contracts.py": "sha256:889542635d16d71ebcdc9c3b0602871282918a7dc274516cbe1425fdc8c8b19d",
+    "src/hive_mind_os/foundation/full_role_outputs.py": "sha256:031ad6f11456d4f9e5b2e5980c559950434db5ccc40c9b209ea0f4b8bf168f47",
     "src/hive_mind_os/foundation/steward_playbook.py": "sha256:b819c2314900984f499b9bb0f5e8813200c31a9b4320b64ff518534ca25d4646",
     "src/hive_mind_os/foundation/steward_playbook_contracts.py": "sha256:c809bba6bd8b8e06511923cfc7a1d1bbfffa1bf123f93df96451d266938cfb3b",
     "tests/test_phase5f_steward_playbook.py": "sha256:13053452972c790a1d220ad0ed2bf7db5e337cea1df04f53faeda2cb84339e32",
-    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3",
+    "tests/test_phase5p_full_role_outputs.py": "sha256:662455ae5136dfbcb135723d0f8c1a624e7053dba8444a26c1681913cbcaf839"
   },
-  "inventory_digest": "sha256:4ed300d365431291eb2b7c2b0a3eb57563ea25b0919f18576189e8d5da1e162c",
+  "inventory_digest": "sha256:8c08254dc8e7dbc8ee371d0415a9bce69e8db3beea39978f2fd922fb60c0885d",
   "phase": 5,
   "phase_item": "F",
   "predecessor": {
-    "inventory_digest": "sha256:7d2f472d97f922a435fec98e9020f9bc22d771c30dfc67bc81ac812f3a3553c9",
+    "inventory_digest": "sha256:ee29aa55a6034d459ce2ff60a0c06a2757384189f927cce042e043791341ec00",
     "path": "evidence/phase5e/phase5e_integrator_inventory.json"
   },
   "production_ready": false,

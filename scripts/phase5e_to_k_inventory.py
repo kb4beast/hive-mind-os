@@ -95,7 +95,9 @@ def _digest_bytes(value: bytes) -> str:
 
 def _digest_json(value: Any) -> str:
     return _digest_bytes(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        json.dumps(
+            value, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode()
     )
 
 
@@ -203,7 +205,10 @@ def phase_specs() -> tuple[PhaseSpec, ...]:
                 ("authority", "none"),
                 ("activation", "inert"),
                 ("outputs.challenger_plan.execution_status", "not-run"),
-                ("outputs.evaluation_plan.holdout_exposure_status", "sealed-not-accessed"),
+                (
+                    "outputs.evaluation_plan.holdout_exposure_status",
+                    "sealed-not-accessed",
+                ),
                 ("outputs.evaluation_plan.execution_status", "not-run"),
                 ("outputs.promotion_handoff.eligible", False),
                 ("outputs.promotion_handoff.promotion_authorized", False),
@@ -247,7 +252,10 @@ def phase_specs() -> tuple[PhaseSpec, ...]:
             validate_adoption_request,
             validate_post_p13_adoption_docket,
             (
-                ("outputs.adoption_disposition.disposition", "awaiting-independent-adoption"),
+                (
+                    "outputs.adoption_disposition.disposition",
+                    "awaiting-independent-adoption",
+                ),
                 ("outputs.adoption_disposition.p14_eligible", False),
                 ("outputs.adoption_disposition.p20_eligible", False),
                 ("outputs.adoption_disposition.release_ready", False),
@@ -298,7 +306,10 @@ def phase_specs() -> tuple[PhaseSpec, ...]:
                 ("outputs.evidence_requirements.external_retention_status", "missing"),
                 ("outputs.verification_policy.policy_status", "defined-not-executed"),
                 ("outputs.evidence_register.signed_decision_present", False),
-                ("outputs.intake_disposition.disposition", "awaiting-external-evidence"),
+                (
+                    "outputs.intake_disposition.disposition",
+                    "awaiting-external-evidence",
+                ),
                 ("outputs.intake_disposition.p14_eligible", False),
                 ("outputs.intake_disposition.release_ready", False),
                 ("outputs.intake_disposition.deployment_authorized", False),
@@ -332,17 +343,29 @@ def build_inventory(
                 f"Phase 5{spec.item} boundary {path} drifted: "
                 f"{boundary_values[path]!r} != {expected!r}"
             )
+    supplementary_paths = (
+        (
+            "src/hive_mind_os/foundation/full_role_output_contracts.py",
+            "src/hive_mind_os/foundation/full_role_outputs.py",
+            "tests/test_phase5p_full_role_outputs.py",
+        )
+        if spec.item in {"E", "F", "G"}
+        else ()
+    )
     implementation_paths = (
         ".github/workflows/ci.yml",
         spec.module_path,
         spec.contracts_path,
         spec.test_path,
+        *supplementary_paths,
         *spec.document_paths,
         "scripts/phase5e_to_k_inventory.py",
         "scripts/verify_phase5e_to_k_installed_wheel.py",
         "tests/test_phase5m_evidence_inventory.py",
     )
-    missing = [path for path in implementation_paths if not (repository / path).is_file()]
+    missing = [
+        path for path in implementation_paths if not (repository / path).is_file()
+    ]
     if missing:
         raise RuntimeError(f"Phase 5{spec.item} inventory paths are missing: {missing}")
     body = {
@@ -390,9 +413,7 @@ def build_inventory_chain(repository: Path) -> tuple[dict[str, Any], ...]:
     predecessor_path = PHASE5D_INVENTORY_PATH
     records: list[dict[str, Any]] = []
     for spec in phase_specs():
-        record = build_inventory(
-            repository, spec, predecessor_path, predecessor_digest
-        )
+        record = build_inventory(repository, spec, predecessor_path, predecessor_digest)
         records.append(record)
         predecessor_path = spec.output_path
         predecessor_digest = record["inventory_digest"]

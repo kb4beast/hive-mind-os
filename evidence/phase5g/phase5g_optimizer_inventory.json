@@ -37,18 +37,21 @@
   "implementation": {
     ".github/workflows/ci.yml": "sha256:95656026e760dec0055541f5bad71a018e45dc04bf33bded4394132b3254a429",
     "docs/architecture/PHASE5G_OPTIMIZER_CONTRACT.md": "sha256:fb65049a147f4a91821d1fa1f9445914a938fe5f8b9c3940f037b40a2803e3c4",
-    "scripts/phase5e_to_k_inventory.py": "sha256:d6a12012a9a2f0fdf9c06602cf809e52fc4d11d57d200bb3eed4b32d7cf05926",
-    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:b05fdf4a136e032edb8c79f979747ba93e41189087d13b1807ff9181c3f568b8",
+    "scripts/phase5e_to_k_inventory.py": "sha256:8e3282af78779bcf2aab6514b806db99c5c28f846caefcb0e3ce8324ef79caf7",
+    "scripts/verify_phase5e_to_k_installed_wheel.py": "sha256:f549984f11d80d83fcbdc8ce0670b352b6ec3a13f6d9de49757c2f2eecd06157",
+    "src/hive_mind_os/foundation/full_role_output_contracts.py": "sha256:889542635d16d71ebcdc9c3b0602871282918a7dc274516cbe1425fdc8c8b19d",
+    "src/hive_mind_os/foundation/full_role_outputs.py": "sha256:031ad6f11456d4f9e5b2e5980c559950434db5ccc40c9b209ea0f4b8bf168f47",
     "src/hive_mind_os/foundation/optimizer_playbook.py": "sha256:fa6644571b11498275b96b818004adb568ecc733310edcba207d13c6471c004e",
     "src/hive_mind_os/foundation/optimizer_playbook_contracts.py": "sha256:d4e2541d06a7bb544cd457bb2a67705bd130c5e92eb12ea05429fd8fa650c3d2",
     "tests/test_phase5g_optimizer_playbook.py": "sha256:4058d934b29d6335bbc698464a4b87f56ccbec8f8086482f7a08db49190fe56a",
-    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3"
+    "tests/test_phase5m_evidence_inventory.py": "sha256:2d6c81def6740705a171bf324b172c8469a44049888315928015d45c42bea3c3",
+    "tests/test_phase5p_full_role_outputs.py": "sha256:662455ae5136dfbcb135723d0f8c1a624e7053dba8444a26c1681913cbcaf839"
   },
-  "inventory_digest": "sha256:62463b2c110b6e5cb6dbb93aa712c66308fc4de07467708b4d30ad5a8654b393",
+  "inventory_digest": "sha256:cd02f50d1c7167072dcfe096b364ef645c0d96447631095520da6c7a57fd0c70",
   "phase": 5,
   "phase_item": "G",
   "predecessor": {
-    "inventory_digest": "sha256:4ed300d365431291eb2b7c2b0a3eb57563ea25b0919f18576189e8d5da1e162c",
+    "inventory_digest": "sha256:8c08254dc8e7dbc8ee371d0415a9bce69e8db3beea39978f2fd922fb60c0885d",
     "path": "evidence/phase5f/phase5f_steward_inventory.json"
   },
   "production_ready": false,
