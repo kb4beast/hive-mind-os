@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 from hive_mind_os.receipts import (
     FileReceiptValidator,
     ReceiptReference,
+    filesystem_path,
     path_traverses_link_or_reparse_point,
     sha256_digest,
 )
@@ -85,6 +87,36 @@ class FileReceiptValidatorTests(unittest.TestCase):
     def test_missing_directory_and_escape_paths_fail_closed(self) -> None:
         missing = ReceiptReference("missing.json", f"sha256:{'0' * 64}")
         self.assertFalse(self.validate(missing).valid)
+
+    def test_long_windows_path_receipt_validates(self) -> None:
+        long_root = self.root / ("a" * 80) / ("b" * 80) / ("c" * 80)
+        self.assertGreater(len(str(long_root)), 260)
+        access_root = filesystem_path(long_root)
+        access_root.mkdir(parents=True)
+        try:
+            artifact = filesystem_path(long_root / "r" / "artifact.txt")
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text("observed state", encoding="utf-8")
+            content = json.dumps(
+                self.document(
+                    artifacts=[
+                        {
+                            "path": "r/artifact.txt",
+                            "digest": sha256_digest(artifact.read_bytes()),
+                        }
+                    ]
+                ),
+                sort_keys=True,
+            ).encode("utf-8")
+            receipt = filesystem_path(long_root / "r" / "receipt.json")
+            receipt.write_bytes(content)
+            validation = FileReceiptValidator(access_root).validate(
+                ReceiptReference("r/receipt.json", sha256_digest(content)),
+                **self.bindings,
+            )
+            self.assertTrue(validation.valid, validation.issues)
+        finally:
+            shutil.rmtree(access_root)
 
     def test_symlink_escape_fails_closed_when_supported(self) -> None:
         outside_directory = tempfile.TemporaryDirectory()

@@ -1,5 +1,26 @@
 # Hive Mind OS
 
+## Status: early. Here is exactly what works.
+
+| Capability | Status |
+|---|---|
+| Verify a local agent-authored change against sealed checks (`hive-mind deliver --backend scripted`) | Works offline and deterministically |
+| Real model drives the change (`--backend model`) | Not ready for routine use |
+| Remote push / pull requests | Local Git only |
+| Production use | No release, tag, or user validation yet |
+
+## Quick start
+
+```bash
+python -m pip install --no-deps -e .
+hive-mind deliver --help
+```
+
+The scripted delivery path requires a local Git repository and one typed executable
+acceptance-specification JSON file. `hive-mind deliver --help` lists the required flags.
+
+## What this prototype is
+
 Hive Mind OS is an evidence-driven agentic operating system for autonomous product and software delivery. It converts the AI-native successor to the traditional SDLC into eight independent specialist agents aligned around customer value:
 
 | Agent | Responsibility |
@@ -14,6 +35,8 @@ Hive Mind OS is an evidence-driven agentic operating system for autonomous produ
 | Optimizer | Measures outcomes, teaches validated lessons, and promotes proven improvements |
 
 The target is autonomous discovery through verified delivery and continuous learning—not a collection of chat personas. Routine reversible work should require no discretionary human supervision. Every agent works through typed contracts, bounded authority, isolated execution, immutable evidence, independent evaluation, and resumable workflows.
+
+The remaining sections explain the prototype's design and evidence model.
 
 ## Courtroom-governed synthesis
 
@@ -155,6 +178,29 @@ machine-readable mission report. Policy denial, budget exhaustion, Builder test 
 Curator divergence, or artifact-verification failure publishes no delivery directory.
 Remote repositories, pushes, pull requests, durable resume, stronger Curator isolation,
 and hard hostile-code isolation remain later-phase obligations.
+
+## Using a real model
+
+The model backend is opt-in. Keep the API key in the environment; there is deliberately
+no API-key command-line flag.
+
+```bash
+# OpenAI-compatible endpoint
+export HIVE_MIND_MODEL_PROVIDER=openai_compatible
+export HIVE_MIND_MODEL_BASE_URL=https://api.openai.com/v1
+export HIVE_MIND_MODEL_MODEL=your-model-id
+export OPENAI_API_KEY=your-key
+
+# Anthropic endpoint
+export HIVE_MIND_MODEL_PROVIDER=anthropic
+export HIVE_MIND_MODEL_BASE_URL=https://api.anthropic.com/v1
+export HIVE_MIND_MODEL_MODEL=your-model-id
+export ANTHROPIC_API_KEY=your-key
+```
+
+Run `hive-mind deliver --backend model` after setting one provider block. `--provider`,
+`--base-url`, and `--model` override their environment variables for one invocation;
+the API key remains environment-only.
 
 ## Audit the current state
 

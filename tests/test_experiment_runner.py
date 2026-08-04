@@ -611,7 +611,7 @@ class ExperimentRunnerTests(unittest.TestCase):
                         "expected": expected,
                         "observed": observed,
                     }
-                if "/receipts/" not in raw_path or not raw_path.endswith(".json"):
+                if "/r/" not in raw_path or not raw_path.endswith(".json"):
                     continue
                 receipt = json.loads(content.decode("utf-8"))
                 receipt_root = Path(raw_path).parent.parent

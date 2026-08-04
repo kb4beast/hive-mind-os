@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import shutil
 import stat
 import sys
@@ -43,6 +44,7 @@ from .git_adapter import (
 )
 from .github_adapter import GitHubDeliveryTarget
 from .ledger import EvidenceLedger
+from .model_backend import ModelBackend, RepositoryContext
 from .models import (
     AgentResult,
     AutonomyLevel,
@@ -404,6 +406,15 @@ class ExplorerCapabilities(_CapabilityBase):
             details={"argv": list(argv)},
         )
 
+    def repository_diff(self) -> tuple[tuple[bytes, str], tuple[dict[str, Any], ...]]:
+        return self._call(
+            Action.READ_REPOSITORY,
+            1,
+            self.workspace.diff,
+            description="read repository diff for Builder context",
+            details={},
+        )
+
 
 class BuilderCapabilities(_CapabilityBase):
     """Typed branch, write, test, and commit capabilities for the Builder only."""
@@ -691,6 +702,7 @@ class RepositoryMission:
             allow_existing=self.mission_store is not None and self._resume
         )
         explorer_test_argv: tuple[str, ...] | None = None
+        repository_context: RepositoryContext | None = None
         if self.mission_store is not None:
             self.mission_store.mark_status(self.run_id, "active")
         self.ledger.append_event(
@@ -786,12 +798,23 @@ class RepositoryMission:
                             self.objective,
                             repository=str(explorer.workspace.root),
                         )
-                    result = await self.backend.execute(
-                        ROLE_CONTRACTS[role],
-                        work_item,
-                        execution_objective,
-                        context,
-                    )
+                    if isinstance(self.backend, ModelBackend):
+                        result = await self.backend.execute(
+                            ROLE_CONTRACTS[role],
+                            work_item,
+                            execution_objective,
+                            context,
+                            repository_context=(
+                                repository_context if role is Role.BUILDER else None
+                            ),
+                        )
+                    else:
+                        result = await self.backend.execute(
+                            ROLE_CONTRACTS[role],
+                            work_item,
+                            execution_objective,
+                            context,
+                        )
                     action_receipts: list[dict[str, Any]] = []
 
                     if role is Role.EXPLORER:
@@ -818,6 +841,14 @@ class RepositoryMission:
                             if receipt["result"] != "failed":
                                 raise MissionFailed(
                                     "Explorer did not reproduce a failing repository test"
+                                )
+                            if isinstance(self.backend, ModelBackend):
+                                (diff, _), diff_records = explorer.repository_diff()
+                                action_receipts.extend(diff_records)
+                                repository_context = self._builder_repository_context(
+                                    explorer.workspace.root,
+                                    records[-1],
+                                    diff,
                                 )
                         if explorer_test_argv is None:
                             raise MissionFailed(
@@ -1215,7 +1246,7 @@ class RepositoryMission:
         except Exception as error:
             failure = {
                 "type": type(error).__name__,
-                "message": str(error),
+                "message": f"mission failed because {error}",
             }
             if isinstance(error, BudgetExceeded) or "allowance" in str(error).lower():
                 self.ledger.append_event(
@@ -1232,7 +1263,14 @@ class RepositoryMission:
             )
             if published and final_output.exists():
                 shutil.rmtree(final_output)
-            failure_receipt_root = self._preserve_failure_evidence(final_output)
+            try:
+                failure_receipt_root = self._preserve_failure_evidence(final_output)
+            except Exception as evidence_error:
+                failure_receipt_root = None
+                failure["message"] += (
+                    "; additionally, evidence preservation failed because "
+                    f"{type(evidence_error).__name__}: {evidence_error}"
+                )
             report = self._report(
                 results,
                 WorkStatus.FAILED,
@@ -1953,6 +1991,64 @@ class RepositoryMission:
         )
         return path.read_text(encoding="utf-8").strip()
 
+    def _builder_repository_context(
+        self,
+        workspace_root: Path,
+        test_record: Mapping[str, Any],
+        diff: bytes,
+    ) -> RepositoryContext:
+        """Extract bounded Builder facts from the Explorer's receipted failing test."""
+
+        stdout = self._receipt_artifact_bytes(test_record, "stdout")
+        stderr = self._receipt_artifact_bytes(test_record, "stderr")
+        named_files: list[tuple[str, str]] = []
+        root = workspace_root.resolve()
+        for raw_path in re.findall(r"File [\"']([^\"']+)[\"']", stderr.decode("utf-8", "replace")):
+            candidate = Path(raw_path)
+            resolved = (candidate if candidate.is_absolute() else root / candidate).resolve()
+            try:
+                relative = resolved.relative_to(root)
+            except ValueError:
+                continue
+            if ".git" in relative.parts or not resolved.is_file():
+                continue
+            rendered = relative.as_posix()
+            if any(path == rendered for path, _ in named_files):
+                continue
+            named_files.append((rendered, _bounded_text(resolved.read_bytes(), 8_000)))
+            if len(named_files) >= 8:
+                break
+        file_tree = tuple(
+            path.relative_to(root).as_posix()
+            for path in sorted(root.rglob("*"))
+            if path.is_file() and ".git" not in path.relative_to(root).parts
+        )[:256]
+        return RepositoryContext(
+            failing_test_stdout=_bounded_text(stdout, 12_000),
+            failing_test_stderr=_bounded_text(stderr, 12_000),
+            named_files=tuple(named_files),
+            file_tree=file_tree,
+            current_diff=None if not diff else _bounded_text(diff, 8_000),
+        )
+
+    def _receipt_artifact_bytes(
+        self,
+        record: Mapping[str, Any],
+        artifact_id: str,
+    ) -> bytes:
+        receipt = self._receipt_document(record)
+        artifacts = receipt.get("artifacts")
+        if not isinstance(artifacts, list):
+            raise MissionFailed("capability receipt lacks output evidence")
+        for artifact in artifacts:
+            if not isinstance(artifact, Mapping) or artifact.get("artifact_id") != artifact_id:
+                continue
+            path = self._evidence_root / Path(
+                *portable_path_parts(_required_string(artifact, "path"))
+            )
+            return path.read_bytes()
+        raise MissionFailed(f"capability receipt lacks {artifact_id} evidence")
+
     def _recover_workspace_effect(
         self,
         workspace: GitWorkspace,
@@ -2606,6 +2702,13 @@ def _string_argv(value: object) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _bounded_text(content: bytes, maximum_bytes: int) -> str:
+    if len(content) <= maximum_bytes:
+        return content.decode("utf-8", "replace")
+    prefix = content[:maximum_bytes].decode("utf-8", "replace")
+    return f"{prefix}\n[truncated after {maximum_bytes} bytes]"
+
+
 def _is_full_sha(value: object) -> bool:
     return (
         isinstance(value, str)
@@ -2647,3 +2750,15 @@ def _read_local_head(repository: Path) -> str:
             if name == reference and _is_full_sha(value):
                 return value.lower()
     raise MissionFailed("repository HEAD ref does not resolve to a full local SHA")
+
+
+def resolve_repository_pin(repository: Path, pin: str | None = None) -> str:
+    """Return the immutable revision a queued repository mission is bound to."""
+
+    try:
+        resolved = pin if pin is not None else _read_local_head(repository)
+    except (OSError, MissionFailed) as error:
+        raise ValueError(f"unable to resolve repository pin: {error}") from None
+    if not _is_full_sha(resolved):
+        raise ValueError("repository pin must be a full 40-hex SHA")
+    return resolved.lower()
