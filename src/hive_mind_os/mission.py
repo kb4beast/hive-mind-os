@@ -2647,3 +2647,15 @@ def _read_local_head(repository: Path) -> str:
             if name == reference and _is_full_sha(value):
                 return value.lower()
     raise MissionFailed("repository HEAD ref does not resolve to a full local SHA")
+
+
+def resolve_repository_pin(repository: Path, pin: str | None = None) -> str:
+    """Return the immutable revision a queued repository mission is bound to."""
+
+    try:
+        resolved = pin if pin is not None else _read_local_head(repository)
+    except (OSError, MissionFailed) as error:
+        raise ValueError(f"unable to resolve repository pin: {error}") from None
+    if not _is_full_sha(resolved):
+        raise ValueError("repository pin must be a full 40-hex SHA")
+    return resolved.lower()

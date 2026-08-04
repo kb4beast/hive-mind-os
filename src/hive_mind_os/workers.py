@@ -9,7 +9,11 @@ from typing import Callable
 
 from .autonomy import AutonomyBudget
 from .ledger import EvidenceLedger
-from .mission import RepositoryMission, ScriptedRepositoryBackend
+from .mission import (
+    RepositoryMission,
+    ScriptedRepositoryBackend,
+    resolve_repository_pin,
+)
 from .mission_store import MissionStore, resume_mission
 from .models import AutonomyLevel
 from .policy import PolicyEngine
@@ -43,15 +47,21 @@ def execute_mission_job(job: Job, state_dir: Path) -> str:
                 backend = ScriptedRepositoryBackend(str(payload["scripted_variant"]))
                 output = state_dir / "d" / mission_id
                 output.parent.mkdir(parents=True, exist_ok=True)
+                repository = Path(str(payload["repository"])).resolve()
+                raw_pin = payload.get("pin")
+                if not isinstance(raw_pin, str):
+                    raise ValueError(
+                        "queued repository mission must include a full immutable pin"
+                    )
                 mission = RepositoryMission(
-                    str(payload["repository"]),
+                    repository,
                     str(payload["objective"]),
                     acceptance_criteria=tuple(payload["acceptance_criteria"]),
                     acceptance_specifications=tuple(
                         payload.get("acceptance_specifications", ())
                     ),
                     backend=backend,
-                    pin=payload.get("pin"),
+                    pin=resolve_repository_pin(repository, raw_pin),
                     output_dir=output,
                     policy=PolicyEngine(AutonomyLevel.REPOSITORY),
                     budget=budget,
