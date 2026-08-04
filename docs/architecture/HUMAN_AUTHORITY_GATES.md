@@ -22,6 +22,22 @@ G8 is a truth boundary: separately prompted agent identities are procedural sepa
 not authenticated independent human review. The current blocker backlog remains
 [BLOCKERS.md](../plan/BLOCKERS.md); this file records only authority dependencies.
 
+## Owner decisions recorded on 2026-08-04
+
+The repository owner selected the verification-first recommendation for G1–G7. The
+controlling decision and evidence are [ADR-043](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md).
+
+| Gate | Current owner decision |
+| --- | --- |
+| G1 | Resolved without a merge: P0.4 heads are already represented in `main`; preserve their refs as history. |
+| G2 | No real model API key, spend, or mission is authorized. P1.5 remains closed. |
+| G3 | No stable or production-positioned release until an externally controlled signing identity exists. |
+| G4 | No external append-only evidence store is authorized. |
+| G5 | No production pilot is authorized. |
+| G6 | Read-only intake is authorized for the three pinned MIT comparator records in ADR-043; executing them and a qualifying court remain blocked. |
+| G7 | Existing unresolved source and license obligations remain non-promoting deferrals. |
+| G8 | No decision recorded; independent human review remains open. |
+
 ## Deferred program
 
 The owner-owned, untracked `NEXT_SESSION_HANDOFF_OBSIDIAN_AGENT_REDESIGN.md` program
