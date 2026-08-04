@@ -122,8 +122,7 @@ Modified files:
   attachment, add one with tests rather than editing docket constants).
 - `docs/plan/BLOCKERS.md` — every open source row moved to `resolved` or
   `deferred (review by …)` with evidence pointers.
-- `docs/architecture/STAGE_0_STATUS.md` — additive note that ingestion is now
-  executable and which obligations moved.
+- `docs/plan/BLOCKERS.md` — the current source-obligation status and evidence pointers.
 
 ## 8. Implementation steps
 
