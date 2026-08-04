@@ -1,6 +1,10 @@
 # P14 — Real-Provider Capability Appeal
 
-Status: pending in `01_POST_P13_OVERVIEW.md` | Depends on: P05, P07, P08 | Unlocks: P15, P18, P19
+> **Withdrawn as an executable phase by P5.2 (2026-08-03).** Do not schedule this
+> work. Its required external authority is retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
+Status: withdrawn | Historical dependencies: P05, P07, P08
 
 ## 1. Objective
 
@@ -81,4 +85,3 @@ authority, removes disposable provider/runtime state, and preserves all evidence
 Do not use a deterministic fallback, equate TLS with provider authentication, reuse Builder
 conclusions as Curator evidence, broaden authority after success, or claim production
 readiness.
-

@@ -1,6 +1,10 @@
 # P18 — Bounded Production Pilot
 
-Status: pending in `01_POST_P13_OVERVIEW.md` | Depends on: P14–P17 and applicable source appeals | Unlocks: P20
+> **Withdrawn as an executable phase by P5.2 (2026-08-03).** Do not schedule this
+> work. Its required external authority is retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
+Status: withdrawn | Historical dependencies: P14–P17 and applicable source appeals
 
 ## 1. Objective
 
@@ -72,4 +76,3 @@ preserves all records.
 
 Do not use synthetic traffic as customer-outcome proof, erase failed runs, expand the cohort
 after success, or describe a bounded permit as general production readiness.
-

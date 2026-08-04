@@ -1,8 +1,13 @@
 # Hive Mind OS — Post-P13 Production and Trust Program
 
+> **Withdrawn as an executable program by P5.2 (2026-08-03).** Do not schedule P14–P20
+> from this document. Its authority dependencies are retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md); the current
+> product-delivery plan is the owner-owned `EXECUTION_PLAN_v3.md` working-copy artifact.
+
 - **Plan version:** 2.0-proposed
 - **Date established:** 2026-07-28
-- **Status:** PROPOSED — preserved for independent adoption review under ADR-015
+- **Status:** WITHDRAWN — retained as historical context only
 - **Predecessor:** [`00_OVERVIEW.md`](00_OVERVIEW.md), P01–P13 complete
 - **Authority:** [ADR-015](../architecture/ADR-015-POST-P13-PRODUCTION-AND-TRUST-PROGRAM.md)
 
@@ -19,13 +24,13 @@ superiority remain separate final court decisions.
 
 | Phase | Title | Depends on | Primary blockers | Branch | Status |
 |---|---|---|---|---|---|
-| [P14](P14_REAL_PROVIDER_CAPABILITY_APPEAL.md) | Real-provider capability appeal | P05, P07, P08 | B-OPS-03 | `phase/P14-real-provider-capability` | pending |
-| [P15](P15_AUTHENTICATED_IDENTITY_AND_RECEIPTS.md) | Authenticated identities and provider receipts | P14 | B-GOV-02, B-GOV-03 | `phase/P15-authenticated-identity-receipts` | pending |
-| [P16](P16_EXTERNAL_EVIDENCE_RETENTION.md) | External append-only evidence retention | P15 | B-GOV-04 | `phase/P16-external-evidence-retention` | pending |
-| [P17](P17_HARD_ISOLATION.md) | Hard isolation for hostile workloads | P03 | B-OPS-06 | `phase/P17-hard-isolation` | pending |
-| [P18](P18_BOUNDED_PRODUCTION_PILOT.md) | Bounded production pilot | P14–P17; applicable source appeals | B-OPS-04 | `phase/P18-bounded-production-pilot` | pending |
-| [P19](P19_MULTI_COMPARATOR_COURT.md) | Multi-comparator benchmark court | P14, P15, P17 | B-OPS-05 | `phase/P19-multi-comparator-court` | pending |
-| [P20](P20_RELEASE_READINESS_COURT.md) | Release-readiness court | P18, P19; applicable source appeals | aggregate | `phase/P20-release-readiness-court` | pending |
+| [P14](P14_REAL_PROVIDER_CAPABILITY_APPEAL.md) | Real-provider capability appeal | P05, P07, P08 | B-OPS-03 | `phase/P14-real-provider-capability` | withdrawn |
+| [P15](P15_AUTHENTICATED_IDENTITY_AND_RECEIPTS.md) | Authenticated identities and provider receipts | P14 | B-GOV-02, B-GOV-03 | `phase/P15-authenticated-identity-receipts` | withdrawn |
+| [P16](P16_EXTERNAL_EVIDENCE_RETENTION.md) | External append-only evidence retention | P15 | B-GOV-04 | `phase/P16-external-evidence-retention` | withdrawn |
+| [P17](P17_HARD_ISOLATION.md) | Hard isolation for hostile workloads | P03 | B-OPS-06 | `phase/P17-hard-isolation` | withdrawn |
+| [P18](P18_BOUNDED_PRODUCTION_PILOT.md) | Bounded production pilot | P14–P17; applicable source appeals | B-OPS-04 | `phase/P18-bounded-production-pilot` | withdrawn |
+| [P19](P19_MULTI_COMPARATOR_COURT.md) | Multi-comparator benchmark court | P14, P15, P17 | B-OPS-05 | `phase/P19-multi-comparator-court` | withdrawn |
+| [P20](P20_RELEASE_READINESS_COURT.md) | Release-readiness court | P18, P19; applicable source appeals | `aggregate` | `phase/P20-release-readiness-court` | withdrawn |
 
 Source completion remains a sequence of additive P12 appeals, one source or tightly coupled
 source set per branch. Deferred source evidence is never reclassified by a capability phase.
@@ -99,4 +104,3 @@ independent permitting disposition. Until then, all rows remain pending proposal
 Rollback removes the new plan pointer while retaining ADR-015, this plan, phase documents,
 review evidence, and dissent as historical records. Rollback never changes the completed
 P01–P13 boundary or silently closes a blocker.
-
