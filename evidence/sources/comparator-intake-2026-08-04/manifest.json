@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-04T13:47:07Z",
+  "authority": "repository owner decision recorded in conversation:2026-08-04",
+  "disposition": "adopt_read_only_intake",
+  "purpose": "Preserve public license evidence for future comparator design without executing, copying, or claiming results from the referenced systems.",
+  "comparators": [
+    {
+      "founding_source_id": "SRC-003",
+      "source_relation": "direct repository source",
+      "name": "Operator OS",
+      "repository": "https://github.com/rangerrick337/operator-os",
+      "commit": "150004fc630505045a301cce32a4781824f89ac6",
+      "license_spdx": "MIT",
+      "license_path_at_commit": "LICENSE",
+      "license_git_blob_sha": "dbf1e853b4593b628a25bff0371be7c229690488",
+      "license_sha256": "sha256:01286469df5307f2dee8f53886a79b72e7b2949dedbef5816a17df6c850a627d",
+      "captured_license": "raw/operator-os-LICENSE"
+    },
+    {
+      "founding_source_id": "SRC-004",
+      "source_relation": "direct repository source",
+      "name": "Hermes Agent",
+      "repository": "https://github.com/NousResearch/hermes-agent",
+      "commit": "f5be9236e00ddf2f2a412697f267078fc4ee068e",
+      "license_spdx": "MIT",
+      "license_path_at_commit": "LICENSE",
+      "license_git_blob_sha": "75410e73319c72cd3e991a501c5455eb78f38375",
+      "license_sha256": "sha256:821556e6336796450ab852d375117b48a4887e71d255794fd6318d99982a5ab6",
+      "captured_license": "raw/hermes-agent-LICENSE"
+    },
+    {
+      "founding_source_id": "SRC-009",
+      "source_relation": "related OpenHands paper; code repository captured separately by this intake record",
+      "name": "OpenHands",
+      "repository": "https://github.com/OpenHands/OpenHands",
+      "commit": "1a88ae637757758241c8cf571923fdab7839a89b",
+      "license_spdx": "MIT",
+      "license_path_at_commit": "LICENSE",
+      "license_git_blob_sha": "f6f60f52368bcc96f82fbe59ec65049c2c3af9db",
+      "license_sha256": "sha256:e1d1fa9f3a8d7bef24449d488fcd8f00f8f272cac297bb9bed161eb6175b876a",
+      "captured_license": "raw/openhands-LICENSE"
+    }
+  ],
+  "cross_examination": [
+    "The observed MIT license files do not establish rights to third-party models, datasets, hosted services, or trademarks.",
+    "No comparator code was executed, copied, installed, or used to establish a performance result.",
+    "This record does not resolve B-OPS-05 or permit a superiority claim."
+  ],
+  "authorized_scope": [
+    "Read public repository and license metadata at the listed immutable commits.",
+    "Design future benchmark intake and reproducibility requirements."
+  ],
+  "prohibited_scope": [
+    "Execute comparator workloads.",
+    "Copy comparator code into Hive Mind OS.",
+    "Make capability, benchmark, or superiority claims from this record."
+  ]
+}
