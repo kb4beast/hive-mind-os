@@ -21,11 +21,10 @@ tests_actually_run:
   - "python -m compileall -q src (passed)"
   - "git diff --check (passed)"
   - >-
-    python -m unittest discover -s tests -v was started twice before the final
-    diagnostic run; the first two observations timed out at 124 and 604 seconds.
+    python -m unittest discover -s tests -v completed in 711.678 seconds:
+    472 tests ran; 18 failed, 42 errored, and 6 were skipped.
 tests_not_run:
   - "Clean Linux and macOS reproduction"
-  - "A complete passing repository gate; the diagnostic full gate is still pending"
 files_changed:
   - "src/hive_mind_os/verify.py"
   - "src/hive_mind_os/cli.py"
@@ -48,9 +47,11 @@ receipts:
   - "Focused test and static-check outputs were observed in this implementation session."
 known_failures:
   - >-
-    The diagnostic full gate previously recorded failures in benchmark harness,
-    experiment runner, mission, mission-store, and point-in-time oracle tests.
-    Their final classifications require the completed post-fix full-gate receipt.
+    The completed full gate has 18 failures and 42 errors. The affected suites are
+    benchmark_harness, ci_contract, current_state_audit, experiment_runner,
+    github_adapter, governance, mission, mission_store, pit_oracle, policy_invariants,
+    projection, and war_room_projection. These failures are unclassified; no failing
+    test, policy, evidence rule, or acceptance criterion was changed in this workstream.
 unresolved_dissent: "None recorded on PR #106."
 rollback: >-
   Revert commit f3048aafc55eebf7172e0f38edf90315706e1e53 to restore the prior
@@ -59,6 +60,6 @@ rollback: >-
 human_gates:
   - "Independent Linux/macOS reproduction remains required before claiming cross-platform completion."
 next_exact_action: >-
-  Capture the final diagnostic full-gate result, classify every failure against
-  the unchanged main baseline, and have a separate Curator identity reproduce the
-  immutable bundle on a clean supported platform before promotion.
+  Classify every full-gate failure against the unchanged main baseline, then have a
+  separate Curator identity reproduce the immutable bundle on clean Linux and macOS
+  before promotion.
