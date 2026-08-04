@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -218,6 +219,22 @@ class PromptRegistryTests(unittest.TestCase):
                 expected_current=None,
             )
         self.assertIsNone(self.registry.champion_digest(Role.BUILDER))
+
+    def test_raw_pointer_write_without_promotion_is_rejected(self) -> None:
+        rogue = self.registry.register(
+            Role.BUILDER,
+            "attacker-selected prompt",
+            parent_digest=self._bootstrap_builder(),
+            created_by="attacker:test",
+        )
+        self.registry.pointer_path.write_text(
+            json.dumps(
+                {"schema_version": 1, "champions": {Role.BUILDER.value: rogue}}
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(RuntimeError, "resolving promotion"):
+            self.registry.champion_prompt(Role.BUILDER)
 
     def test_generation_zero_bootstrap_rejects_noncanonical_content_and_actor(self) -> None:
         invalid = self.registry.register(

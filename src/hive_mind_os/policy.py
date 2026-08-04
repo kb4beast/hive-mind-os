@@ -110,13 +110,15 @@ class PolicyDecision:
     reason: str
 
 
+@dataclass(frozen=True, slots=True)
 class PolicyEngine:
     """Fail-closed authority checks for every side effect."""
 
-    def __init__(self, autonomy: AutonomyLevel = AutonomyLevel.SANDBOX) -> None:
-        if not isinstance(autonomy, AutonomyLevel):
+    autonomy: AutonomyLevel = AutonomyLevel.SANDBOX
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.autonomy, AutonomyLevel):
             raise ValueError("autonomy must be an AutonomyLevel")
-        self.autonomy = autonomy
 
     def decide(self, role: Role, action: Action, risk: RiskTier) -> PolicyDecision:
         if not isinstance(role, Role):
