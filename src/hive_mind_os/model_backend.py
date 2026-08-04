@@ -64,6 +64,17 @@ def _digest(content: bytes) -> str:
     return f"sha256:{sha256(content).hexdigest()}"
 
 
+def _render_context(
+    prior_roles: list[dict[str, object]], omitted_roles: list[str]
+) -> str:
+    return json.dumps(
+        {"prior_roles": prior_roles, "omitted_roles": omitted_roles},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
 class ModelBackend:
     def __init__(
         self,
@@ -214,22 +225,20 @@ class ModelBackend:
                     experiment_id="generation-0",
                     expected_current=None,
                 )
-        rendered = json.dumps(
-            [
-                {
-                    "role": item.role.value,
-                    "summary": item.summary,
-                    "evidence": [asdict(evidence) for evidence in item.evidence],
-                }
-                for item in context
-            ],
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        truncated = len(rendered) > self.context_limit_chars
-        if truncated:
-            rendered = rendered[: self.context_limit_chars]
+        prior_roles = [
+            {
+                "role": item.role.value,
+                "summary": item.summary,
+                "evidence": [asdict(evidence) for evidence in item.evidence],
+            }
+            for item in context
+        ]
+        omitted_roles: list[str] = []
+        rendered = _render_context(prior_roles, omitted_roles)
+        while prior_roles and len(rendered) > self.context_limit_chars:
+            omitted_roles.append(str(prior_roles.pop(0)["role"]))
+            rendered = _render_context(prior_roles, omitted_roles)
+        truncated = bool(omitted_roles)
         user = json.dumps(
             {
                 "objective": objective.goal,

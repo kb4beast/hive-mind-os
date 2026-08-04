@@ -209,18 +209,41 @@ class ModelBackendTests(unittest.TestCase):
             f"sha256:{sha256(raw).hexdigest()}",
         )
 
-    def test_context_truncation_is_actual_and_deterministic(self) -> None:
-        prior = AgentResult(
-            Role.EXPLORER, "prior", "x" * 100,
-            (Evidence("contract-output", "problem statement", "test", {"large": "y" * 100}),),
+    def test_context_budget_evicts_whole_records_and_is_deterministic(self) -> None:
+        prior = (
+            AgentResult(
+                Role.EXPLORER,
+                "prior",
+                "x" * 100,
+                (
+                    Evidence(
+                        "contract-output",
+                        "problem statement",
+                        "test",
+                        {"large": "y" * 100},
+                    ),
+                ),
+            ),
+            AgentResult(Role.ARCHITECT, "recent", "recent", ()),
         )
         ledgers = [EvidenceLedger(), EvidenceLedger()]
+        providers = []
         for ledger in ledgers:
+            provider = FakeProvider([valid_turn(Role.ARCHITECT)])
+            providers.append(provider)
             execute_once(
-                ModelBackend(FakeProvider([valid_turn(Role.ARCHITECT)]), ledger=ledger, context_limit_chars=4),
-                context=(prior,),
+                ModelBackend(provider, ledger=ledger, context_limit_chars=110),
+                context=prior,
             )
             self.assertTrue(ledger.events()[0]["payload"]["context_truncated"])
+        payload = json.loads(providers[0].calls[0].user)
+        context = json.loads(payload["prior_context_json"])
+        self.assertLessEqual(len(payload["prior_context_json"]), 110)
+        self.assertEqual(context["omitted_roles"], [Role.EXPLORER.value])
+        self.assertEqual(
+            [record["role"] for record in context["prior_roles"]],
+            [Role.ARCHITECT.value],
+        )
         self.assertEqual(
             ledgers[0].events()[0]["payload"]["request_digest"],
             ledgers[1].events()[0]["payload"]["request_digest"],
