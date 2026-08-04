@@ -57,6 +57,12 @@ class DeliverProviderConfigurationTests(unittest.TestCase):
         self.assertIn("HIVE_MIND_MODEL_MODEL", rendered)
         self.assertIn("OPENAI_API_KEY", rendered)
 
+    def test_experiment_run_fails_until_a_real_evaluation_surface_exists(self) -> None:
+        error = io.StringIO()
+        with redirect_stderr(error):
+            self.assertEqual(cli._run_experiment(argparse.Namespace()), 1)
+        self.assertIn("evaluation surface not implemented", error.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

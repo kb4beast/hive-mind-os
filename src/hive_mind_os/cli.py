@@ -22,7 +22,7 @@ from .current_state_audit import (
     create_audit_artifact,
     write_audit_artifact,
 )
-from .experiment_runner import ExperimentRunner, FixtureMissionSurface
+from .experiment_runner import EVALUATION_SURFACE_UNAVAILABLE
 from .ingestion import ExhibitStore, defer_obligation, register_exhibit
 from .ledger import EvidenceLedger
 from .mission import (
@@ -320,7 +320,7 @@ def build_pit_episode_parser() -> argparse.ArgumentParser:
 def build_experiment_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hive-mind experiment run",
-        description="Evaluate one role-prompt challenger against the active champion",
+        description="Unavailable until prompts are evaluated through a real backend",
     )
     parser.add_argument("action", choices=("run",), help="Experiment action")
     parser.add_argument(
@@ -741,50 +741,14 @@ def _run_pit_episode(args: argparse.Namespace) -> int:
 
 
 def _run_experiment(args: argparse.Namespace) -> int:
-    state_dir = Path(args.state_dir).resolve()
-    state_dir.mkdir(parents=True, exist_ok=True)
-    registry = PromptRegistry(state_dir / "prompts")
-    try:
-        registry.bootstrap(Path.cwd() / "prompts")
-        result = ExperimentRunner(
-            registry,
-            args.evidence_root,
-            state_path=state_dir / "runner-state.json",
-        ).run(
-            Role(args.role),
-            Path(args.challenger).read_bytes(),
-            surface=FixtureMissionSurface(
-                Path(args.evidence_root) / "_artifacts" / "f"
-            ),
-            repetitions=args.repetitions,
-        )
-    except (OSError, RuntimeError, TypeError, ValueError) as error:
-        print(
-            json.dumps(
-                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
-                indent=2,
-            ),
-            file=sys.stderr,
-        )
-        return 1
-    finally:
-        registry.close()
     print(
         json.dumps(
-            {
-                "status": "completed",
-                "experiment_id": result.experiment_id,
-                "verdict": result.decision.verdict.value,
-                "evidence_path": str(result.evidence_path),
-                "champion_before": result.champion_before,
-                "champion_after": result.champion_after,
-                "promotion_pending": result.promotion_pending,
-            },
+            {"status": "failed", "error": EVALUATION_SURFACE_UNAVAILABLE},
             indent=2,
-            sort_keys=True,
-        )
+        ),
+        file=sys.stderr,
     )
-    return 0
+    return 1
 
 
 def _run_enqueue(args: argparse.Namespace) -> int:
