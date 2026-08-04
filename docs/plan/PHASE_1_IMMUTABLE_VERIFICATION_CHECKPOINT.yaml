@@ -1,0 +1,64 @@
+phase: "Phase 1 — Establish the truthful product and verification boundary"
+workstream: "Repair standalone immutable verification"
+base_sha: "d7707258dc1fe4645090c278519c8a844d9f508a"
+head_sha: "f3048aafc55eebf7172e0f38edf90315706e1e53"
+status: "BLOCKED"
+objective: >-
+  Make hive-mind verify seal an acceptance contract before candidate access,
+  resolve an immutable candidate commit and tree, execute only fresh isolated
+  workspaces, and atomically publish a self-verifying evidence bundle.
+acceptance_tests:
+  - "tests.test_verify.StandaloneVerificationTests"
+  - "tests.test_verify_example.VerificationExampleTests"
+  - "tests.test_sandbox.SandboxTests"
+  - "tests.test_contracts.ContractSchemaTests"
+tests_actually_run:
+  - >-
+    PYTHONPATH=src python -m unittest tests.test_verify tests.test_verify_example
+    tests.test_sandbox tests.test_contracts -v
+    (54 passed; 2 platform capability skips)
+  - "python -m ruff check on all changed Python files (passed)"
+  - "python -m compileall -q src (passed)"
+  - "git diff --check (passed)"
+  - >-
+    python -m unittest discover -s tests -v was started twice before the final
+    diagnostic run; the first two observations timed out at 124 and 604 seconds.
+tests_not_run:
+  - "Clean Linux and macOS reproduction"
+  - "A complete passing repository gate; the diagnostic full gate is still pending"
+files_changed:
+  - "src/hive_mind_os/verify.py"
+  - "src/hive_mind_os/cli.py"
+  - "src/hive_mind_os/sandbox.py"
+  - "src/hive_mind_os/schemas/tool-intent.schema.json"
+  - "src/hive_mind_os/schemas/tool-receipt.schema.json"
+  - "tests/test_verify.py"
+  - "tests/test_sandbox.py"
+  - "examples/verify-an-agent-change/run_example.py"
+behavior_added:
+  - "Full-SHA candidate input and sealed immutable object binding"
+  - "Fresh, detached no-hardlink base and candidate Git workspaces"
+  - "Source-worktree, filter, hook, LFS, symlink, junction, and sparse-checkout rejection"
+  - "Candidate-bound receipts, integrity manifest, self-verification, and atomic publication"
+authority_added: "None"
+authority_not_added:
+  - "No merge, auto-merge, push-to-main, deployment, credential, network, or spending authority"
+receipts:
+  - "PR #106 was reviewed through GitHub; it is already merged and has no comments, reviews, or review threads."
+  - "Focused test and static-check outputs were observed in this implementation session."
+known_failures:
+  - >-
+    The diagnostic full gate previously recorded failures in benchmark harness,
+    experiment runner, mission, mission-store, and point-in-time oracle tests.
+    Their final classifications require the completed post-fix full-gate receipt.
+unresolved_dissent: "None recorded on PR #106."
+rollback: >-
+  Revert commit f3048aafc55eebf7172e0f38edf90315706e1e53 to restore the prior
+  mutable-worktree verifier and its three-argument Python API. This is not a
+  recommended operational rollback because it restores the Phase 1 contamination defect.
+human_gates:
+  - "Independent Linux/macOS reproduction remains required before claiming cross-platform completion."
+next_exact_action: >-
+  Capture the final diagnostic full-gate result, classify every failure against
+  the unchanged main baseline, and have a separate Curator identity reproduce the
+  immutable bundle on a clean supported platform before promotion.
