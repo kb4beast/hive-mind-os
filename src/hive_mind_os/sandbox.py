@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -50,11 +51,26 @@ def _normalized_executable(value: str) -> str:
     return name.removesuffix(".exe")
 
 
+_INTERPRETER_FLAGS = {
+    "python": frozenset({"-c", "-m"}),
+    "python3": frozenset({"-c", "-m"}),
+    "pypy": frozenset({"-c", "-m"}),
+    "pypy3": frozenset({"-c", "-m"}),
+    "node": frozenset({"-e", "--eval", "-p", "--print"}),
+    "ruby": frozenset({"-e"}),
+    "perl": frozenset({"-e"}),
+    "sh": frozenset({"-c"}),
+    "bash": frozenset({"-c"}),
+}
+_SIMPLE_PATH_TOKEN = re.compile(r"[^/\\\s]+\.[A-Za-z0-9]{1,10}\Z")
+
+
 @dataclass(frozen=True, slots=True)
 class SandboxSpec:
     root: Path
     writable: tuple[str, ...] = ()
     argv_allowlist: tuple[str, ...] = ("python",)
+    allow_interpreter_flags: bool = False
     env_allowlist: tuple[str, ...] = ()
     timeout_s: float = 30.0
     max_output_bytes: int = 1_000_000
@@ -68,6 +84,8 @@ class SandboxSpec:
         object.__setattr__(self, "root", root)
         if not self.argv_allowlist or self.timeout_s <= 0 or self.max_output_bytes < 1:
             raise ValueError("sandbox allowlist and limits must be positive")
+        if type(self.allow_interpreter_flags) is not bool:
+            raise ValueError("allow_interpreter_flags must be boolean")
         if self.cpu_seconds is not None and self.cpu_seconds < 1:
             raise ValueError("CPU limit must be positive")
         if self.memory_bytes is not None and self.memory_bytes < 1:
@@ -85,6 +103,7 @@ class SandboxSpec:
             "root": self.root.as_posix(),
             "writable": list(self.writable),
             "argv_allowlist": sorted(_normalized_executable(v) for v in self.argv_allowlist),
+            "allow_interpreter_flags": self.allow_interpreter_flags,
             "env_allowlist": sorted(self.env_allowlist),
             "timeout_s": self.timeout_s,
             "max_output_bytes": self.max_output_bytes,
@@ -153,6 +172,11 @@ class SandboxRunner:
         }:
             self._deny(intent, "executable is not allowlisted")
         argv[0] = str(Path(resolved).resolve())
+        forbidden_flags = _INTERPRETER_FLAGS.get(_normalized_executable(argv[0]), frozenset())
+        if not self.spec.allow_interpreter_flags and any(
+            argument in forbidden_flags for argument in argv[1:]
+        ):
+            self._deny(intent, "inline interpreter execution is not allowed by default")
         self._validate_paths(intent, argv, command["path_args"])
         if intent["actor_id"] == self.runner_identity:
             self._deny(intent, "runner identity must differ from acting identity")
@@ -251,7 +275,13 @@ class SandboxRunner:
         argv: list[str],
         indexes: list[int],
     ) -> None:
-        for index in indexes:
+        path_indexes = set(indexes)
+        path_indexes.update(
+            index
+            for index, argument in enumerate(argv[1:], start=1)
+            if self._is_path_like(argument)
+        )
+        for index in sorted(path_indexes):
             if index < 1 or index >= len(argv):
                 self._deny(
                     intent,
@@ -272,6 +302,14 @@ class SandboxRunner:
                     ConfinementViolation,
                 )
             argv[index] = str(resolved)
+
+    @staticmethod
+    def _is_path_like(argument: str) -> bool:
+        if argument in {".", ".."} or argument.startswith(("/", "\\", "~")):
+            return True
+        if "/" in argument or "\\" in argument or re.match(r"^[A-Za-z]:", argument):
+            return True
+        return not argument.startswith("-") and bool(_SIMPLE_PATH_TOKEN.fullmatch(argument))
 
     def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
         kwargs: dict[str, Any] = {
@@ -631,6 +669,12 @@ class SandboxRunner:
             "result": "succeeded" if outcome == "succeeded" else "failed",
             "observed_at": observed_at,
             "artifacts": artifacts,
+            "enforced": {
+                "filesystem": "none",
+                "network": "none",
+                "resources": "posix-rlimit-only",
+                "executable_identity": "name-allowlist-only",
+            },
             "execution": execution,
             "verified_by": self.runner_identity,
         }

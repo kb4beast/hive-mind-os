@@ -22,6 +22,17 @@
     "result": {"enum": ["succeeded", "failed", "unknown"]},
     "observed_at": {"type": "string", "format": "date-time"},
     "artifacts": {"type": "array", "items": {"$ref": "artifact-manifest.schema.json"}},
+    "enforced": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filesystem", "network", "resources", "executable_identity"],
+      "properties": {
+        "filesystem": {"const": "none"},
+        "network": {"const": "none"},
+        "resources": {"const": "posix-rlimit-only"},
+        "executable_identity": {"const": "name-allowlist-only"}
+      }
+    },
     "execution": {
       "type": "object",
       "additionalProperties": false,
@@ -66,5 +77,11 @@
       }
     },
     "verified_by": {"type": "string", "minLength": 1}
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"provider": {"const": "hive-mind-process-sandbox"}}},
+      "then": {"required": ["enforced"]}
+    }
+  ]
 }

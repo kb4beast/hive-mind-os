@@ -26,7 +26,11 @@ class StandaloneVerificationTests(unittest.TestCase):
             "def value() -> int:\n    return 1\n",
             encoding="utf-8",
         )
-        self._git("add", "app.py")
+        (self.repository / "check_value.py").write_text(
+            "from app import value\nassert value() == 2\n",
+            encoding="utf-8",
+        )
+        self._git("add", "app.py", "check_value.py")
         self._git("commit", "-m", "base")
         (self.repository / "app.py").write_text(
             "def value() -> int:\n    return 2\n",
@@ -60,8 +64,7 @@ class StandaloneVerificationTests(unittest.TestCase):
                     "command": {
                         "argv": [
                             sys.executable,
-                            "-c",
-                            "from app import value; assert value() == 2",
+                            "check_value.py",
                         ],
                         "expected": "succeeded",
                     },
@@ -90,7 +93,7 @@ class StandaloneVerificationTests(unittest.TestCase):
                     "id": "value-is-two",
                     "criterion": "value returns two",
                     "command": {
-                        "argv": [sys.executable, "-c", "from app import value; assert value() == 2"],
+                        "argv": [sys.executable, "check_value.py"],
                         "expected": "succeeded",
                     },
                     "declared_paths": ["app.py"],
