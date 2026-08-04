@@ -28,12 +28,13 @@ refused to overwrite it. The repaired rule removes only a local workspace whose 
 has no completed checkpoint or matching receipt, then rematerializes it. A recorded
 workspace with digest drift remains blocked and is never silently rebuilt.
 
-The first post-commit audit preserved in `evidence/audits/P06-post-timeout.json` exposed a
-second concrete boundary: the audit runner's 300-second command ceiling terminated the
-now-mandatory full suite, whose durable Windows recovery sweep takes about nine minutes.
-The audit remained fail-closed and marked itself incomplete. The repaired ceiling is 1,200
-seconds; timeout, output, process-tree termination, and result-recognition controls remain
-unchanged.
+The first post-commit audit, preserved in the [P5.1 evidence
+archive](../../evidence/ARCHIVE.md) at tag `archive/evidence-corpus-2026-08-03` under
+`audits/P06-post-timeout.json`, exposed a second concrete boundary: the audit runner's
+300-second command ceiling terminated the now-mandatory full suite, whose durable Windows
+recovery sweep takes about nine minutes. The audit remained fail-closed and marked itself
+incomplete. The repaired ceiling is 1,200 seconds; timeout, output, process-tree termination,
+and result-recognition controls remain unchanged.
 
 ## Court record
 
