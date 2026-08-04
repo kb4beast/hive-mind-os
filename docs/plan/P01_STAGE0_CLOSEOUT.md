@@ -24,7 +24,7 @@ decisions instead of an open-ended gate on all capability work.
 ## 3. Required reading
 
 1. `docs/plan/00_OVERVIEW.md`
-2. `docs/architecture/STAGE_0_STATUS.md`
+2. `docs/plan/BLOCKERS.md`
 3. `docs/architecture/ADR-005-STAGE-0-FAIL-CLOSED-APPEAL.md` (especially "Open obligations")
 4. `docs/architecture/RECURSIVE_SELF_IMPROVEMENT_DOCKET.md` (stopping rules)
 5. `README.md` (sections "Courtroom-governed synthesis" and "Audit the current state")
@@ -48,7 +48,7 @@ In scope:
 - A blocker backlog file, `docs/plan/BLOCKERS.md`.
 - One new ADR declaring the Stage 0 exit posture.
 - A short additive pointer in each superseded sequencing section.
-- A closing section in `STAGE_0_STATUS.md`.
+- A closing status record in `docs/plan/BLOCKERS.md`.
 
 Non-goals (explicitly out):
 
@@ -76,7 +76,8 @@ New files:
   infrastructure obligations (GitHub rule activation, signed identities, external
   ledger), `B-OPS-NN` for operational-maturity obligations (E2E/production receipts).
   Status values: exactly one of `open`, `resolved`, `deferred (review by YYYY-MM-DD)`.
-  Seed it from ADR-005 "Open obligations" and `STAGE_0_STATUS.md`; at minimum it must
+  Seed it from ADR-005 "Open obligations" and the historical Stage 0 snapshot archived
+  by P5.1; at minimum it must
   contain rows for: the seven incomplete video sources (transcript/artifact ingestion);
   unresolved source licenses and external commit pins; the sibling-pack authorship and
   `imgo.jpg` chain of custody; GitHub host-side rule activation being unverified; signed
@@ -105,8 +106,7 @@ section, reading in substance "Sequencing for this work is now owned by
 - `docs/architecture/HARDENED_VISION_CONTRACT.md` — after "Implementation sequence".
 - `docs/architecture/MASTER_IMPLEMENTATION_PROMPT.md` — in the "Maintainer note" section
   only (do not edit inside the BEGIN/END MASTER PROMPT block).
-- `docs/architecture/STAGE_0_STATUS.md` — closing section titled "Exit posture (ADR-006)"
-  linking to the ADR and `BLOCKERS.md`.
+- `docs/plan/BLOCKERS.md` — current exit posture and links to ADR-006.
 - `README.md` — one sentence in the audit section pointing to `docs/plan/00_OVERVIEW.md`
   as the active roadmap.
 
@@ -114,7 +114,7 @@ section, reading in substance "Sequencing for this work is now owned by
 
 1. Verify prerequisites (section 4). Create branch `phase/P01-stage0-closeout`.
 2. Enumerate open obligations: extract every unresolved item from ADR-005 "Open
-   obligations", `STAGE_0_STATUS.md` right-hand column, and README's courtroom section.
+   obligations", the archived Stage 0 snapshot, and README's courtroom section.
    Cross-check against the latest audit artifact under `evidence/audits/` if present.
 3. Write `docs/plan/BLOCKERS.md` with one row per obligation. Do not invent resolution
    evidence; `Status` starts as `open` for every row.
@@ -136,7 +136,7 @@ lost). Record both counts in the completion record.
 test -f docs/plan/BLOCKERS.md                                  # exists
 test -f docs/architecture/ADR-006-STAGE-0-EXIT.md              # exists
 grep -c '| open |' docs/plan/BLOCKERS.md                       # >= 7 (at least the seeded obligations)
-grep -l '00_OVERVIEW.md' docs/architecture/FOUNDATION_PLAN.md docs/architecture/CONGLOMERATED_SYSTEM.md docs/architecture/BOUNDED_EVOLUTION.md docs/architecture/HARDENED_VISION_CONTRACT.md docs/architecture/MASTER_IMPLEMENTATION_PROMPT.md docs/architecture/STAGE_0_STATUS.md README.md   # lists all seven files
+grep -l '00_OVERVIEW.md' docs/architecture/FOUNDATION_PLAN.md docs/architecture/CONGLOMERATED_SYSTEM.md docs/architecture/BOUNDED_EVOLUTION.md docs/architecture/HARDENED_VISION_CONTRACT.md docs/architecture/MASTER_IMPLEMENTATION_PROMPT.md README.md   # lists the historical plan pointers
 git diff main --numstat -- docs/architecture/ | awk '{if ($2>5) print}'   # empty: no architecture doc lost more than 5 lines (additive edits only; small whitespace shifts tolerated)
 python -m pytest -q && python -m ruff check src tests          # pass
 hive-mind audit --output evidence/audits/P01-post.json         # runs; incompleteness only from pre-existing blockers
