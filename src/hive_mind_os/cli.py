@@ -4,9 +4,9 @@ import argparse
 import asyncio
 import json
 import sys
+from hashlib import sha256
 from pathlib import Path
 from typing import Sequence
-from uuid import uuid4
 
 from .acceptance import (
     AcceptanceSpecification,
@@ -24,7 +24,11 @@ from .current_state_audit import (
 from .experiment_runner import ExperimentRunner, FixtureMissionSurface
 from .ingestion import ExhibitStore, defer_obligation, register_exhibit
 from .ledger import EvidenceLedger
-from .mission import RepositoryMission, ScriptedRepositoryBackend
+from .mission import (
+    RepositoryMission,
+    ScriptedRepositoryBackend,
+    resolve_repository_pin,
+)
 from .mission_store import (
     MissionStore,
     MissionStoreError,
@@ -339,6 +343,13 @@ def build_enqueue_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repository", required=True)
     parser.add_argument("--objective", required=True)
     parser.add_argument("--criterion", action="append", default=[])
+    parser.add_argument(
+        "--acceptance-spec",
+        action="append",
+        default=[],
+        metavar="FILE",
+        help="Typed executable acceptance specification JSON; repeatable",
+    )
     parser.add_argument("--backend", choices=("scripted",), default="scripted")
     parser.add_argument("--pin")
     parser.add_argument("--max-attempts", type=int, default=3)
@@ -698,19 +709,58 @@ def _run_enqueue(args: argparse.Namespace) -> int:
     repository = Path(args.repository).resolve()
     if not repository.is_dir():
         raise SystemExit("repository must be an existing directory")
-    mission_id = f"M-{uuid4().hex[:16]}"
+    try:
+        pin = resolve_repository_pin(repository, args.pin)
+    except ValueError as error:
+        raise SystemExit(f"repository pin is invalid: {error}") from None
+    try:
+        acceptance_specifications = _load_acceptance_specifications(
+            args.acceptance_spec
+        )
+    except ValueError as error:
+        raise SystemExit(f"acceptance specification is invalid: {error}") from None
+    declared_criteria = tuple(args.criterion)
+    specification_criteria = tuple(
+        item.criterion for item in acceptance_specifications
+    )
+    if not acceptance_specifications:
+        raise SystemExit(
+            "queued repository missions require at least one typed executable "
+            "acceptance specification"
+        )
+    if declared_criteria and (
+        len(declared_criteria) != len(set(declared_criteria))
+        or set(declared_criteria) != set(specification_criteria)
+    ):
+        raise SystemExit(
+            "acceptance criteria must exactly match the typed specification set"
+        )
+    semantic_payload = {
+        "repository": str(repository),
+        "objective": args.objective,
+        "acceptance_criteria": list(specification_criteria),
+        "acceptance_specifications": [
+            item.to_dict() for item in acceptance_specifications
+        ],
+        "backend": args.backend,
+        "scripted_variant": "good",
+        "pin": pin,
+    }
+    encoded = json.dumps(
+        semantic_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    mission_id = f"M-{sha256(encoded).hexdigest()[:32]}"
     scheduler = Scheduler(args.state_dir)
     try:
         job = scheduler.enqueue(
             "repository-mission",
             {
                 "mission_id": mission_id,
-                "repository": str(repository),
-                "objective": args.objective,
-                "acceptance_criteria": list(args.criterion),
-                "backend": args.backend,
-                "scripted_variant": "good",
-                "pin": args.pin,
+                **semantic_payload,
             },
             max_attempts=args.max_attempts,
             mission_id=mission_id,

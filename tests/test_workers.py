@@ -168,7 +168,7 @@ class WorkerTests(unittest.TestCase):
                     ],
                     "backend": "scripted",
                     "scripted_variant": "good",
-                    "pin": None,
+                    "pin": fixture.commit_two,
                 },
                 mission_id=mission_id,
             )
@@ -188,6 +188,32 @@ class WorkerTests(unittest.TestCase):
                 self.assertEqual(len(digests), len(set(digests)))
             finally:
                 ledger.close()
+        finally:
+            queue.close()
+
+    def test_worker_dead_letters_an_unpinned_repository_mission(self) -> None:
+        fixture = build_fixture_repo(self.root)
+        queue = Scheduler(self.root / "state")
+        try:
+            job = queue.enqueue(
+                "repository-mission",
+                {
+                    "mission_id": "M-unpinned",
+                    "repository": str(fixture.root),
+                    "objective": "Fix the failing test",
+                    "acceptance_criteria": [],
+                    "acceptance_specifications": [],
+                    "backend": "scripted",
+                    "scripted_variant": "good",
+                    "pin": None,
+                },
+                max_attempts=1,
+                mission_id="M-unpinned",
+            )
+            self.assertTrue(Worker(queue, "pin-guard").run_once())
+            failed = queue.get(job.id)
+            self.assertEqual(failed.state, "dead-letter")
+            self.assertIn("full immutable pin", failed.last_error or "")
         finally:
             queue.close()
 
