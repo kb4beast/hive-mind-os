@@ -807,6 +807,11 @@ class RepositoryMission:
                             repository_context=(
                                 repository_context if role is Role.BUILDER else None
                             ),
+                            result_validator=(
+                                self._validate_builder_action_protocol
+                                if role is Role.BUILDER
+                                else None
+                            ),
                         )
                     else:
                         result = await self.backend.execute(
@@ -2393,6 +2398,53 @@ class RepositoryMission:
         return tuple(actions)
 
     @staticmethod
+    def _validate_builder_action_protocol(result: AgentResult) -> None:
+        """Reject malformed Builder actions before the model turn is accepted."""
+
+        try:
+            actions = RepositoryMission._actions(result)
+        except MissionFailed as error:
+            raise ValueError(str(error)) from None
+        expected_fields = {
+            "create_branch": {"action", "name"},
+            "write_file": {"action", "path", "content_base64"},
+            "run_tests": {"action", "argv"},
+            "commit": {"action", "message"},
+        }
+        names: list[str] = []
+        for action in actions:
+            name = action["action"]
+            if name not in expected_fields:
+                raise ValueError(f"Builder action is unsupported: {name}")
+            if set(action) != expected_fields[name]:
+                raise ValueError(
+                    f"Builder {name} action has unexpected or missing fields"
+                )
+            try:
+                if name == "run_tests":
+                    _string_argv(action.get("argv"))
+                elif name == "write_file":
+                    _required_string(action, "path")
+                    base64.b64decode(
+                        _required_string(action, "content_base64"), validate=True
+                    )
+                elif name == "create_branch":
+                    _required_string(action, "name")
+                else:
+                    _required_string(action, "message")
+            except (ValueError, MissionFailed) as error:
+                raise ValueError(f"Builder {name} action is malformed: {error}") from None
+            names.append(name)
+        required = {"create_branch", "write_file", "run_tests", "commit"}
+        if not required.issubset(names):
+            raise ValueError(
+                "Builder actions must include create_branch, write_file, run_tests, and commit"
+            )
+        for name in ("create_branch", "run_tests", "commit"):
+            if names.count(name) != 1:
+                raise ValueError(f"Builder actions must include exactly one {name}")
+
+    @staticmethod
     def _bound_test_argv(
         action: Mapping[str, Any],
         explorer_test_argv: tuple[str, ...] | None,
@@ -2593,8 +2645,12 @@ class RepositoryMission:
                 "Use only a JSON-string proposed action named run_tests with argv."
             ),
             Role.BUILDER: (
-                "Use JSON-string proposed actions create_branch, write_file "
-                "(portable path plus base64 content), run_tests, and commit."
+                "Put JSON strings in proposed_actions. Use exactly one "
+                "create_branch {\"action\":\"create_branch\",\"name\":\"phase/fix\"}, "
+                "one or more write_file {\"action\":\"write_file\",\"path\":\"pkg/file.py\","
+                "\"content_base64\":\"...\"}, one run_tests {\"action\":\"run_tests\","
+                "\"argv\":[\"python\",\"-m\",\"unittest\"]}, and one commit "
+                "{\"action\":\"commit\",\"message\":\"fix: outcome\"}."
             ),
             Role.CURATOR: (
                 "Blindly define acceptance_checks before candidate access. Put a JSON "
