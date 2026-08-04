@@ -307,8 +307,15 @@ class SandboxRunner:
     def _is_path_like(argument: str) -> bool:
         if argument in {".", ".."} or argument.startswith(("/", "\\", "~")):
             return True
-        if "/" in argument or "\\" in argument or re.match(r"^[A-Za-z]:", argument):
+        if "=" in argument:
+            return False
+        if "\\" in argument or re.match(r"^[A-Za-z]:", argument):
             return True
+        if "/" in argument:
+            final_segment = argument.rsplit("/", 1)[-1]
+            return argument.startswith(("./", "../")) or bool(
+                _SIMPLE_PATH_TOKEN.fullmatch(final_segment)
+            )
         return not argument.startswith("-") and bool(_SIMPLE_PATH_TOKEN.fullmatch(argument))
 
     def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:

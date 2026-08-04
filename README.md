@@ -4,7 +4,8 @@
 
 | Capability | Status |
 |---|---|
-| Verify a local agent-authored change against sealed checks (`hive-mind deliver --backend scripted`) | Works offline and deterministically |
+| Verify a local agent-authored change against sealed checks (`hive-mind verify`) | Works offline and deterministically |
+| See a complete deterministic fixture delivery (`hive-mind demo`) | Works offline; not a general coding agent |
 | Real model drives the change (`--backend model`) | Not ready for routine use |
 | Remote push / pull requests | Local Git only |
 | Production use | No release, tag, or user validation yet |
@@ -13,11 +14,12 @@
 
 ```bash
 python -m pip install --no-deps -e .
-hive-mind deliver --help
+hive-mind demo
 ```
 
-The scripted delivery path requires a local Git repository and one typed executable
-acceptance-specification JSON file. `hive-mind deliver --help` lists the required flags.
+The demo creates a temporary repository with one known regression, repairs it, and writes
+a receipt bundle to `./demo-out`. Its `fixture-demo` backend only knows that bundled
+fixture layout; it does not inspect or repair an arbitrary repository.
 
 ## Verify an existing change
 
@@ -168,14 +170,15 @@ python -m unittest discover -s tests -v
 ## Deliver a verified local repository change
 
 The local delivery slice composes the model boundary, sandbox, local Git adapter, policy,
-budget, ledger, its three implemented roles, and an independently re-executing Curator. The scripted
-backend is deterministic and offline; the model backend uses the configured P02 provider
-but executes its proposed actions through the same typed capabilities.
+budget, ledger, its three implemented roles, and a Curator that re-executes sealed checks in
+a separate local workspace. The `fixture-demo` backend is deterministic and offline but only
+repairs the bundled fixture layout; the model backend uses the configured P02 provider but
+is not ready for routine use.
 
 ```bash
 hive-mind deliver \
   --repository /path/to/local/repository \
-  --backend scripted \
+  --backend fixture-demo \
   --objective "Fix the failing test" \
   --criterion "The previously failing test passes" \
   --output-dir /path/to/absent/delivery-directory

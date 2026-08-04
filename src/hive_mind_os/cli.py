@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import sys
+import tempfile
 from hashlib import sha256
 from pathlib import Path
 from typing import Sequence
@@ -22,6 +23,7 @@ from .current_state_audit import (
     create_audit_artifact,
     write_audit_artifact,
 )
+from .demo_fixture import build_fixture_repo
 from .experiment_runner import EVALUATION_SURFACE_UNAVAILABLE
 from .ingestion import ExhibitStore, defer_obligation, register_exhibit
 from .ledger import EvidenceLedger
@@ -183,9 +185,9 @@ def build_deliver_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--backend",
-        choices=("scripted", "model"),
-        default="scripted",
-        help="Repository backend (default: deterministic offline scripted backend)",
+        choices=("fixture-demo", "model"),
+        default="fixture-demo",
+        help="Repository backend (default: deterministic offline fixture demonstration)",
     )
     parser.add_argument(
         "--provider",
@@ -218,6 +220,19 @@ def build_deliver_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--state-dir",
         help="Persist checkpoints and receipts here for later resume",
+    )
+    return parser
+
+
+def build_demo_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind demo",
+        description="Run the deterministic offline fixture delivery demonstration",
+    )
+    parser.add_argument(
+        "--output",
+        default="demo-out",
+        help="Absent directory for the delivery receipt bundle (default: ./demo-out)",
     )
     return parser
 
@@ -532,6 +547,71 @@ async def _run_deliver(args: argparse.Namespace) -> int:
         file=stream,
     )
     return 0 if report.status.value == "succeeded" else 1
+
+
+async def _run_demo(args: argparse.Namespace) -> int:
+    """Run the one deterministic fixture repair and print a human-readable result."""
+
+    output_dir = Path(args.output).resolve()
+    if output_dir.exists():
+        print(
+            f"demo output directory already exists: {output_dir}",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        with tempfile.TemporaryDirectory(prefix="hive-mind-demo-") as temporary:
+            fixture = build_fixture_repo(Path(temporary))
+            report = await RepositoryMission(
+                fixture.root,
+                "Repair the known fixture regression",
+                acceptance_criteria=("The fixture regression test passes",),
+                acceptance_specifications=(
+                    AcceptanceSpecification(
+                        "fixture-regression",
+                        "The fixture regression test passes",
+                        (
+                            sys.executable,
+                            "-B",
+                            "-c",
+                            "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                        ),
+                        declared_paths=("tiny_pkg/maths.py",),
+                    ),
+                ),
+                backend=ScriptedRepositoryBackend(),
+                pin=fixture.commit_two,
+                output_dir=output_dir,
+                policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+                budget=AutonomyBudget(
+                    max_episodes=1000,
+                    max_tool_calls=500,
+                    max_compute_units=500.0,
+                    max_tool_calls_per_episode=100,
+                    max_compute_units_per_episode=100.0,
+                ),
+                ledger=EvidenceLedger(":memory:"),
+            ).run()
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"demo failed: {type(error).__name__}: {error}", file=sys.stderr)
+        return 1
+    if report.status.value != "succeeded":
+        print("demo failed before publishing a receipt bundle", file=sys.stderr)
+        return 1
+
+    output_label = "./demo-out" if args.output == "demo-out" else str(Path(args.output))
+    print("Fixture regression repaired with the deterministic offline demo backend.")
+    print("Curator re-ran the sealed checks in a separate local workspace.")
+    print(f"Receipt bundle: {output_label}")
+    print(
+        "Try the same limited fixture backend: hive-mind deliver "
+        "--repository <path> --backend fixture-demo --objective <objective> "
+        "--criterion <criterion> --output-dir <bundle-dir>"
+    )
+    print(
+        "fixture-demo only edits the bundled fixture layout; it does not inspect or repair arbitrary repositories."
+    )
+    return 0
 
 
 def _provider_from_arguments(
@@ -1014,6 +1094,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "deliver":
         args = build_deliver_parser().parse_args(arguments[1:])
         raise SystemExit(asyncio.run(_run_deliver(args)))
+    if arguments and arguments[0] == "demo":
+        args = build_demo_parser().parse_args(arguments[1:])
+        raise SystemExit(asyncio.run(_run_demo(args)))
     if arguments and arguments[0] == "resume":
         args = build_resume_parser().parse_args(arguments[1:])
         raise SystemExit(asyncio.run(_run_resume(args)))
