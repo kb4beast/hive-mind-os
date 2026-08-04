@@ -373,8 +373,8 @@ class GitWorkspace:
 
         staged_source = container / "source"
         repository = container / "repo"
-        hooks = container / "disabled-hooks"
-        hooks.mkdir()
+        staging_hooks = container / "disabled-hooks"
+        staging_hooks.mkdir()
         staging_config = container / "isolated-gitconfig"
         _atomic_write(staging_config, b"")
         if not remote:
@@ -417,7 +417,7 @@ class GitWorkspace:
         with _isolated_git_config(staging_config):
             clone_receipt = cls._execute(
                 staging_runner,
-                cls._git_argv(hooks, clone_args),
+                cls._git_argv(staging_hooks, clone_args),
                 mission_id=mission_id,
                 role=role,
                 description="clone approved local repository snapshot",
@@ -433,10 +433,17 @@ class GitWorkspace:
         )
         git_config = repository / ".git" / "hive-mind-isolated-config"
         _atomic_write(git_config, b"")
+        hooks = repository / ".hive-mind-disabled-hooks"
+        if hooks.exists() and (not hooks.is_dir() or any(hooks.iterdir())):
+            raise WorkspaceDirty(
+                "reserved disabled-hooks directory must be absent or empty"
+            )
+        hooks.mkdir(exist_ok=True)
         runner = SandboxRunner(
             SandboxSpec(
                 repository,
                 argv_allowlist=(git_name, *test_executables),
+                allow_interpreter_flags=True,
                 env_allowlist=(
                     "GIT_AUTHOR_DATE",
                     "GIT_COMMITTER_DATE",
@@ -488,7 +495,7 @@ class GitWorkspace:
         return [
             git,
             "-c",
-            f"core.hooksPath={hooks_root}",
+            f"core.hooksPath={hooks_root.name}",
             "-c",
             "core.autocrlf=false",
             "-c",
