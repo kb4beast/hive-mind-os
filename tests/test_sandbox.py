@@ -223,6 +223,26 @@ class SandboxTests(unittest.TestCase):
             [b"present"],
         )
 
+    def test_fixed_environment_is_digest_bound_without_inheriting_host_values(self) -> None:
+        name = "HIVE_MIND_SANDBOX_FIXED"
+        code = f"import os;print(os.environ.get({name!r}, 'absent'))"
+        with patch.dict(os.environ, {name: "host-value"}):
+            runner = self.runner(
+                spec=self.spec(fixed_environment=((name, "sealed-value"),)),
+                trusted=self.base / "fixed-evidence",
+            )
+            receipt = runner.run(
+                self.intent([sys.executable, "-c", code], action_id="ACT-env-fixed")
+            )
+        self.assertEqual(
+            self.stdout(receipt, self.base / "fixed-evidence").splitlines(),
+            [b"sealed-value"],
+        )
+        self.assertNotEqual(
+            self.spec().spec_digest(),
+            runner.spec.spec_digest(),
+        )
+
     def test_timeout_kills_process_tree_and_leaves_failed_receipt(self) -> None:
         marker = self.root / "survived.txt"
         child = (

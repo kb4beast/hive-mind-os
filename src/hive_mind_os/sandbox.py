@@ -72,6 +72,7 @@ class SandboxSpec:
     argv_allowlist: tuple[str, ...] = ("python",)
     allow_interpreter_flags: bool = False
     env_allowlist: tuple[str, ...] = ()
+    fixed_environment: tuple[tuple[str, str], ...] = ()
     timeout_s: float = 30.0
     max_output_bytes: int = 1_000_000
     cpu_seconds: int | None = None
@@ -86,6 +87,19 @@ class SandboxSpec:
             raise ValueError("sandbox allowlist and limits must be positive")
         if type(self.allow_interpreter_flags) is not bool:
             raise ValueError("allow_interpreter_flags must be boolean")
+        fixed_names: set[str] = set()
+        for name, value in self.fixed_environment:
+            if (
+                not isinstance(name, str)
+                or not name
+                or "=" in name
+                or "\x00" in name
+                or not isinstance(value, str)
+                or "\x00" in value
+                or name in fixed_names
+            ):
+                raise ValueError("fixed environment entries must have unique safe names and values")
+            fixed_names.add(name)
         if self.cpu_seconds is not None and self.cpu_seconds < 1:
             raise ValueError("CPU limit must be positive")
         if self.memory_bytes is not None and self.memory_bytes < 1:
@@ -99,7 +113,7 @@ class SandboxSpec:
                 raise ValueError("writable path escapes sandbox root") from None
 
     def spec_digest(self) -> str:
-        payload = {
+        payload: dict[str, object] = {
             "root": self.root.as_posix(),
             "writable": list(self.writable),
             "argv_allowlist": sorted(_normalized_executable(v) for v in self.argv_allowlist),
@@ -110,6 +124,8 @@ class SandboxSpec:
             "cpu_seconds": self.cpu_seconds,
             "memory_bytes": self.memory_bytes,
         }
+        if self.fixed_environment:
+            payload["fixed_environment"] = sorted(self.fixed_environment)
         raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return sha256_digest(raw)
 
@@ -319,9 +335,15 @@ class SandboxRunner:
         return not argument.startswith("-") and bool(_SIMPLE_PATH_TOKEN.fullmatch(argument))
 
     def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
+        environment = {
+            name: os.environ[name]
+            for name in self.spec.env_allowlist
+            if name in os.environ
+        }
+        environment.update(dict(self.spec.fixed_environment))
         kwargs: dict[str, Any] = {
             "cwd": self.spec.root,
-            "env": {name: os.environ[name] for name in self.spec.env_allowlist if name in os.environ},
+            "env": environment,
             "stdin": subprocess.DEVNULL,
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
