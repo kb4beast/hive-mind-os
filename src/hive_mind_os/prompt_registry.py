@@ -231,6 +231,8 @@ class PromptRegistry:
             return None
         if not isinstance(value, str) or not self.artifact_path(value).is_file():
             raise RuntimeError("champion pointer does not resolve to an artifact")
+        if not self._champion_promotion_resolves(role_value, value):
+            raise RuntimeError("champion pointer lacks a resolving promotion record")
         return value
 
     def champion_prompt(self, role: Role | str) -> tuple[str, str]:
@@ -343,6 +345,53 @@ class PromptRegistry:
                 "promotion lacks a matching artifact registration"
             )
         return registrations[-1]
+
+    def _champion_promotion_resolves(self, role_value: str, digest: str) -> bool:
+        """Require the pointer to be anchored by a still-resolving promotion."""
+
+        promotions = [
+            record
+            for record in self.lineage(digest)
+            if record.get("kind") == "promotion"
+            and record.get("role") == role_value
+            and record.get("artifact_digest") == digest
+        ]
+        for record in reversed(promotions):
+            experiment_id = record.get("experiment_id")
+            if not isinstance(experiment_id, str) or not experiment_id:
+                continue
+            sequence = record.get("decision_event_sequence")
+            if experiment_id == "generation-0" and sequence is None:
+                if any(
+                    event.get("event_type") == "prompt.promoted"
+                    and event.get("run_id") == experiment_id
+                    and event.get("payload") == record
+                    for event in self.ledger.events(experiment_id)
+                ):
+                    return True
+                continue
+            try:
+                self._validate_decision_event(
+                    role_value=role_value,
+                    digest=digest,
+                    promoted_by=str(record.get("created_by", "")),
+                    experiment_id=experiment_id,
+                    expected_current=record.get("parent_digest"),
+                    registration=self._promotion_registration(
+                        role_value,
+                        digest,
+                        experiment_id=experiment_id,
+                        expected_current=record.get("parent_digest"),
+                        promoted_by=str(record.get("created_by", "")),
+                    ),
+                    decision_event_sequence=(
+                        sequence if isinstance(sequence, int) else None
+                    ),
+                )
+            except RuntimeError:
+                continue
+            return True
+        return False
 
     def _validate_decision_event(
         self,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import FrozenInstanceError
 
 from hive_mind_os.autonomy import (
     AgentVariant,
@@ -129,6 +130,11 @@ class PolicyInvariantTests(unittest.TestCase):
             with self.subTest(autonomy=autonomy):
                 with self.assertRaises(ValueError):
                     PolicyEngine(autonomy)  # type: ignore[arg-type]
+
+    def test_autonomy_cannot_be_mutated_after_construction(self) -> None:
+        policy = PolicyEngine(AutonomyLevel.SANDBOX)
+        with self.assertRaises(FrozenInstanceError):
+            policy.autonomy = AutonomyLevel.GOVERNED_FULL  # type: ignore[misc]
 
     def test_blank_or_mismatched_charter_binding_is_ineligible_and_quarantined(self) -> None:
         charter = MissionCharter("Improve safely", ("owner/repo",))
