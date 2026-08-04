@@ -1,5 +1,30 @@
 # Hive Mind OS
 
+> **Don't trust your coding agent. Verify it.**
+
+**For developers and teams shipping AI-authored code, Hive Mind OS produces a
+tamper-evident receipt bundle proving what an agent actually did — the commands it
+ran, their exit codes, the diff it produced, and whether an independently sealed
+check passed — unlike CI, which runs only after you've decided to trust the change,
+and unlike agent frameworks, which orchestrate work but prove nothing.**
+
+## Start in 60 seconds
+
+Run the offline demonstration from a checkout:
+
+```bash
+python -m pip install --no-deps -e .
+hive-mind demo
+```
+
+The demo creates a temporary repository with a known regression, repairs it, and
+writes a receipt bundle to `./demo-out`. It prints the repair result, the Curator's
+independent sealed-check result, and the location of the bundle.
+
+`demo` uses the deterministic `fixture-demo` backend. It knows only the bundled
+fixture layout; it does **not** inspect or repair an arbitrary repository. The output
+directory must not already exist.
+
 ## Status: early. Here is exactly what works.
 
 | Capability | Status |
@@ -10,252 +35,78 @@
 | Remote push / pull requests | Local Git only |
 | Production use | No release, tag, or user validation yet |
 
-## Quick start
-
-```bash
-python -m pip install --no-deps -e .
-hive-mind demo
-```
-
-The demo creates a temporary repository with one known regression, repairs it, and writes
-a receipt bundle to `./demo-out`. Its `fixture-demo` backend only knows that bundled
-fixture layout; it does not inspect or repair an arbitrary repository.
-
 ## Verify an existing change
 
-Use `hive-mind verify --repository <path> --spec <acceptance-spec.json> --output <bundle-dir>`
-to run a sealed check against the latest commit. The acceptance specification must include
-`declared_paths`, the complete set of paths changed by that commit.
+To verify the latest commit in a local repository, provide an executable acceptance
+specification that was sealed before the candidate change:
 
-## What this prototype is
+```bash
+hive-mind verify \
+  --repository /path/to/local/repository \
+  --spec /path/to/acceptance-spec.json \
+  --output /path/to/absent/receipt-bundle
+```
 
-Hive Mind OS is an evidence-driven operating-system prototype for autonomous product and software delivery. Its architecture defines eight specialist contracts; the local repository-delivery workflow currently executes only Explorer, Builder, and Curator. The other five remain planned.
+The specification must declare the complete set of paths changed by that commit in
+`declared_paths`. A successful run writes the evidence bundle; a failed validation
+does not publish one.
 
-It converts the AI-native successor to the traditional SDLC into eight independent specialist agents aligned around customer value:
+## Architecture
+
+Hive Mind OS is an evidence-driven operating-system prototype for autonomous product
+and software delivery. Its target architecture has eight independent specialist
+roles. The local repository-delivery workflow currently executes Explorer, Builder,
+and Curator; the other roles are planned.
 
 | Agent | Status | Responsibility |
-|---|---|
-| Orchestrator | Planned | Sets direction, decomposes outcomes, manages risk, budgets, recovery, and dependencies |
+|---|---|---|
+| Orchestrator | Planned | Sets direction, decomposes outcomes, and manages risk, budgets, recovery, and dependencies |
 | Explorer | Implemented | Reproduces the repository failure through a typed test capability |
 | Architect | Planned | Designs scalable, secure, evolvable solutions with explicit threats and rollback |
 | Builder | Implemented | Creates a branch, writes the change, tests it, and commits it locally |
 | Curator | Implemented | Independently re-executes sealed checks against the candidate delivery |
-| Integrator | Planned | Connects systems, data, tools, repositories, and workflows through stable contracts |
+| Integrator | Planned | Connects systems, data, repositories, and workflows through stable contracts |
 | Steward | Planned | Maintains reliability, dependencies, code health, observability, and recoverability |
 | Optimizer | Planned | Measures outcomes, teaches validated lessons, and promotes proven improvements |
 
-The target is autonomous discovery through verified delivery and continuous learning—not a collection of chat personas. Routine reversible work should require no discretionary human supervision. Every agent works through typed contracts, bounded authority, isolated execution, immutable evidence, independent evaluation, and resumable workflows.
+The delivery workflow binds model use, a policy boundary, budgets, a local Git adapter,
+and a Curator that reruns sealed checks in a separate local workspace. On success it
+publishes a reversible bundle containing a patch, manifest, validated receipt store,
+and machine-readable mission report. It does not yet support remote delivery,
+durable resume, hostile-code isolation, or routine model-driven changes.
 
-The remaining sections explain the prototype's design and evidence model.
+## Evidence, courtroom, and source records
 
-## Courtroom-governed synthesis
+The evidence model is deliberately detailed. Its courtroom process, source dockets,
+architecture decisions, and known release blockers live in the architecture records:
 
-Every user requirement and external source is treated as evidence, not inspiration that may disappear during summarization. Each atomic idea receives:
+- [Courtroom synthesis](docs/architecture/COURTROOM_SYNTHESIS.md) — decisions, dissent, evidence burdens, and appeals.
+- [Conglomerated system](docs/architecture/CONGLOMERATED_SYSTEM.md) — target architecture and replaceable boundaries.
+- [Hardened vision contract](docs/architecture/HARDENED_VISION_CONTRACT.md) — machine-checkable product constraints.
+- [Source-docket record](src/hive_mind_os/founding_docket.py) and [additional-video docket](docs/architecture/ADDITIONAL_VIDEO_DOCKET.md) — preserved source and claim inventory.
+- [Foundation plan](docs/architecture/FOUNDATION_PLAN.md) and [active implementation roadmap](docs/plan/00_OVERVIEW.md) — staged implementation and blockers.
 
-- a source and chain of custody;
-- an advocate brief;
-- adversarial cross-examination;
-- independent expert findings;
-- a burden of proof;
-- an `adopt`, `adapt`, `defer`, `reject`, or `quarantine` verdict;
-- architecture, acceptance-test, metric, rollback, and implementation mappings;
-- an append-only appeal path.
+The project does not claim production readiness, complete source ingestion, hard
+hostile-code isolation, or superiority over other systems. Those claims require
+independent evidence and reproducible evaluation.
 
-The additive docket currently records **23 sources and 84 atomic claims**. The original
-22-source/80-claim record remains conserved; the separately captured sibling classic-GPT
-pack adds `SRC-023` and `CLM-081`–`CLM-084`. The inventory is complete, but the evidence is
-not release-ready. Seven video sources remain incomplete, several historical pins/digests or
-licenses remain unresolved, and every dependent claim is machine-blocked at the affected
-burden rather than silently promoted.
+## More commands and development details
 
-- Courtroom engine: `src/hive_mind_os/courtroom.py`
-- Docket loader and completeness audit: `src/hive_mind_os/source_docket.py`
-- Machine-readable source/claim dockets: `src/hive_mind_os/founding_docket.py` and the specialized docket modules
-- Full case record: [Courtroom Synthesis](docs/architecture/COURTROOM_SYNTHESIS.md)
-- Best-of-all-sources architecture: [Conglomerated System](docs/architecture/CONGLOMERATED_SYSTEM.md)
+`hive-mind deliver --backend fixture-demo` runs the same limited fixture backend
+against its expected fixture layout. `hive-mind deliver --backend model` is opt-in,
+but remains experimental; its provider configuration is documented in the
+[model-adapter plan](docs/plan/P02_MODEL_ADAPTER.md).
 
-“Stronger than another autonomous system” is a highest-burden court claim. It requires pinned comparators, equal budgets, reproducible tasks, independent judges, security and recovery floors, raw results, and statistical uncertainty. Marketing comparisons are forbidden.
-
-## Hardened founding vision
-
-The original product prompt, supplied “New Team Model” images, reference repositories, mission-control reference, research, linked videos, recursive-improvement evidence, and classic-GPT simulation requirement are preserved as a normative, machine-checkable product constitution.
-
-- Human-readable contract: [Hardened Founding Vision Contract](docs/architecture/HARDENED_VISION_CONTRACT.md)
-- Machine-readable contract and compliance gate: `src/hive_mind_os/vision.py`
-- Competitive-autonomy threat model: [Bounded Evolutionary Autonomy](docs/architecture/BOUNDED_EVOLUTION.md)
-- License-aware repository scouting and anti-cheat historical curriculum: `src/hive_mind_os/repository_learning.py`
-
-A run fails full-autonomy compliance when it omits a specialist or lifecycle stage, lacks source or courtroom evidence, uses future repository knowledge, permits self-approval, lacks provenance or rollback evidence, violates policy, makes an unbenchmarked superiority claim, or depends on discretionary human supervision for routine work.
-
-## Classic GPT simulation pack
-
-For a single classic GPT or custom GPT, load the files in `gpt_sources/manifest.json` order. The pack externalizes mission state, labels all eight role passes, enforces courtroom identities, distinguishes proposed actions from external receipts, and makes handoff and resume explicit.
-
-The Python gate in `src/hive_mind_os/classic_gpt.py` validates source-pack integrity, evidence, identity separation, receipted side effects, and completion. A text-only simulation cannot claim persistent memory, distributed independence, sandbox execution, Git changes, messages, deployments, or other side effects without external evidence.
-
-Side-effect receipts are content-addressed files under an explicitly trusted root. The gate
-rejects provider-style labels by themselves and validates the receipt bytes, artifact bytes,
-mission/state/action/actor binding, policy decision, lease, execution result, timestamp, and
-independent verifier. This is a local structural verifier; authenticated provider identities
-and the non-bypassable enforcement gateway remain later kernel stages.
-
-The portable classic-GPT state/protocol is version 3. The byte-hashed version-3 manifest
-fails on additions, removals, substitutions, reorder, or schema drift. Formal Draft 2020-12
-contracts for source, claim, event, identity, lease, policy decision, tool intent/receipt,
-mission state, handoff, and artifacts ship under `src/hive_mind_os/schemas/`; the runtime
-validator adds cross-record receipt, role, verifier, state, and completion checks.
-
-## Prototype inventory
-
-The foundation includes the following typed or executable prototypes. The current-state audit
-classifies them no higher than `structurally_prototyped`; it does not claim complete
-mediation, distributed independence, durable external enforcement, production operation, or
-customer-outcome proof:
-
-- Typed objectives, work items, evidence, results, risks, and autonomy levels.
-- Contracts for all eight specialist agents.
-- A runnable lifecycle kernel and provider-neutral backend interface.
-- An append-only SQLite evidence and learning ledger.
-- A fail-closed policy engine for side effects.
-- Point-in-time commit replay that prevents future leakage.
-- A first-commit-forward curriculum with explicit hidden target/future sets and access validation.
-- License- and provenance-gated ranking of strong public repository learning sources.
-- Abstract pattern lessons tied to repository, commit, license, source URI, and evaluations.
-- A fingerprinted founding-vision contract covering every role, lifecycle stage, autonomous capability, source, and courtroom requirement.
-- A compliance gate for role/lifecycle completeness, source inventory, courtroom review, provenance, independent verification, rollback, anti-cheat history, benchmark claims, and unsupervised routine work.
-- A courtroom decision engine with independent identities, evidence burdens, adversarial challenge, quarantine, and appeal-ready verdict records.
-- A machine-readable founding source docket with completeness audits.
-- Champion/challenger promotion gates for self-improvement.
-- Immutable mission charters and fingerprint-based mutation detection.
-- Fixed episode, tool-call, and compute budgets with per-episode allowances.
-- A bounded evolution arena for competing agent strategies.
-- Automatic quarantine for unsafe, deceptive, or unsupported variants.
-- Evidence-supported teaching packets for cross-agent learning.
-- A persistent autonomous mission loop that stops on completion, policy failure, or budget exhaustion.
-- A bounded recursive-improvement gate with repeated measurements, noise floors, hard guardrails, retained lineage, rollback, quarantine, and deterministic stopping.
-- A load-ordered classic GPT source pack with portable state, role/court protocols, receipt-backed side effects, and fail-closed completion.
-- Tests and commit-pinned GitHub Actions CI, plus a machine-checked repository-protection
-  contract. Host-side rule activation remains explicitly unverified until independently
-  observed on GitHub.
-
-## Bounded evolutionary autonomy
-
-Hive Mind OS adopts the useful parts of competitive autonomous-agent systems—persistent operation, variation, feedback, selection, resource awareness, and learning—without giving agents survival, concealment, replication, authority-seeking, or unrestricted profit incentives.
-
-Fitness combines customer value, quality, trust, cooperation, efficiency, recovery, evidence completeness, and successful delivery. Policy violations, charter mutation, concealed activity, unbounded self-replication, future-data leakage, self-approval, and missing evidence are hard disqualifiers rather than score penalties. Higher capability never grants higher authority.
-
-## Run the bootstrap kernel
-
-```bash
-python -m pip install -e .
-hive-mind "Improve repository reliability" --repository owner/repo \
-  --criterion "All tests pass" \
-  --criterion "The change is reversible"
-```
-
-The bootstrap command still exercises the role lifecycle without repository side effects.
-The real model boundary, process sandbox, and local Git adapter are composed by
-`hive-mind deliver` below; remote delivery, source ingestion, durable scheduling,
-repository-graph enforcement, mission control, and hard resource isolation remain later
-implementation slices.
-
-## Verify the checkout
-
-The CI gate is:
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-## Deliver a verified local repository change
-
-The local delivery slice composes the model boundary, sandbox, local Git adapter, policy,
-budget, ledger, its three implemented roles, and a Curator that re-executes sealed checks in
-a separate local workspace. The `fixture-demo` backend is deterministic and offline but only
-repairs the bundled fixture layout; the model backend uses the configured P02 provider but
-is not ready for routine use.
-
-```bash
-hive-mind deliver \
-  --repository /path/to/local/repository \
-  --backend fixture-demo \
-  --objective "Fix the failing test" \
-  --criterion "The previously failing test passes" \
-  --output-dir /path/to/absent/delivery-directory
-```
-
-Success publishes a reversible bundle, patch, manifest, validated receipt store, and
-machine-readable mission report. Policy denial, budget exhaustion, Builder test failure,
-Curator divergence, or artifact-verification failure publishes no delivery directory.
-Remote repositories, pushes, pull requests, durable resume, stronger Curator isolation,
-and hard hostile-code isolation remain later-phase obligations.
-
-## Using a real model
-
-The model backend is opt-in. Keep the API key in the environment; there is deliberately
-no API-key command-line flag.
-
-```bash
-# OpenAI-compatible endpoint
-export HIVE_MIND_MODEL_PROVIDER=openai_compatible
-export HIVE_MIND_MODEL_BASE_URL=https://api.openai.com/v1
-export HIVE_MIND_MODEL_MODEL=your-model-id
-export OPENAI_API_KEY=your-key
-
-# Anthropic endpoint
-export HIVE_MIND_MODEL_PROVIDER=anthropic
-export HIVE_MIND_MODEL_BASE_URL=https://api.anthropic.com/v1
-export HIVE_MIND_MODEL_MODEL=your-model-id
-export ANTHROPIC_API_KEY=your-key
-```
-
-Run `hive-mind deliver --backend model` after setting one provider block. `--provider`,
-`--base-url`, and `--model` override their environment variables for one invocation;
-the API key remains environment-only.
-
-## Audit the current state
-
-The Stage 0 audit command records the Git history and worktree, full source/claim coverage,
-machine-blocked claims, capability maturity, implementation evidence classes, docket counts
-and blockers, broken code/test/benchmark references, tool versions, exact command outputs,
-baseline discrepancies, and content-digested reference receipts in a canonical SHA-256
-envelope. Each cited test file is executed explicitly, and a dirty worktree or an
-unrecognized test command keeps the audit incomplete:
+For a current-state evidence artifact, run:
 
 ```bash
 hive-mind audit --output evidence/audits/current-state.json
 ```
 
-Pass `--signing-key-file` and `--signing-key-id` to add a local HMAC signature. Without an
-external signing authority, the artifact remains explicitly unsigned but is always digested
-and independently integrity-checkable. A matching self-digest is not proof that the payload
-preserved the real docket. Schema 6 semantic verification therefore also requires a trusted
-context independently reconstructed from the exact repository with
-`build_audit_verification_context`, then supplied to `verify_audit_artifact`. That context
-binds Git HEAD, tracked bytes, docket identity/counts, source metadata, claim mappings, and
-maturity partitions. Test and command claims still require independent reproduction or
-authenticated execution receipts.
+The repository CI gate is:
 
-The active implementation roadmap and fail-closed Stage 0 blocker routing are maintained in
-[`docs/plan/00_OVERVIEW.md`](docs/plan/00_OVERVIEW.md).
+```bash
+python -m unittest discover -s tests -v
+```
 
-## Core guarantees
-
-1. Evidence before authority.
-2. No source or idea silently disappears.
-3. Every material idea is argued, challenged, judged, and traceable to tests.
-4. No target or future knowledge in point-in-time learning.
-5. Independent verification rather than self-approval.
-6. Append-only provenance for sources, decisions, actions, lessons, outcomes, and appeals.
-7. Self-improvement through challengers and measured promotion—not live prompt mutation.
-8. Deny-by-default side effects and explicit autonomy levels.
-9. Mission, policy, and founding-product boundaries cannot be rewritten by the governed agent.
-10. Resource budgets are finite, explicit, and external to agent incentives.
-11. Unsafe variants are quarantined even when they produce high-value results.
-12. External learning is license-aware, provenance-bearing, and pattern-oriented rather than silent code copying.
-13. Routine work is designed to recover and resume without repeated human prompting.
-14. Superiority requires a reproducible comparator court.
-15. Models, tools, sandboxes, storage, schedulers, Git providers, research providers, and interfaces remain replaceable.
-16. A classic GPT simulation cannot convert generated text into a claim of real execution without a matching external receipt.
-
-See the [foundation plan](docs/architecture/FOUNDATION_PLAN.md), [hardened vision contract](docs/architecture/HARDENED_VISION_CONTRACT.md), [courtroom synthesis](docs/architecture/COURTROOM_SYNTHESIS.md), [conglomerated architecture](docs/architecture/CONGLOMERATED_SYSTEM.md), [classic GPT source-pack manifest](gpt_sources/manifest.json), and [agent instructions](AGENTS.md).
+See [AGENTS.md](AGENTS.md) for the governing delivery and evidence rules.
