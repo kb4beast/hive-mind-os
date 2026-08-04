@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import unittest
+import urllib.error
 from collections.abc import Mapping
 from unittest.mock import patch
 
 from hive_mind_os.model_provider import (
+    MAX_HTTP_RESPONSE_BYTES,
     AnthropicProvider,
+    HttpTransport,
     MissingModelCredential,
     ModelRequest,
     ModelTransportError,
@@ -38,6 +42,65 @@ def config(kind: ProviderKind, retries: int = 2) -> ProviderConfig:
 
 
 class ModelProviderTests(unittest.TestCase):
+    def test_provider_config_rejects_plaintext_or_ambiguous_urls(self) -> None:
+        for base_url in (
+            "http://attacker.example/v1",
+            "ftp://models.example/v1",
+            "https://user:secret@models.example/v1",
+            "https://models.example/v1?redirect=attacker",
+            "https://models.example/v1#fragment",
+        ):
+            with self.subTest(base_url=base_url):
+                with self.assertRaises(ValueError):
+                    ProviderConfig(
+                        ProviderKind.OPENAI_COMPATIBLE,
+                        base_url,
+                        "test-model",
+                        "TEST_MODEL_KEY",
+                    )
+
+    def test_http_transport_caps_response_bytes_before_reading(self) -> None:
+        class OversizedResponse:
+            headers = {"Content-Length": str(MAX_HTTP_RESPONSE_BYTES + 1)}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def read(self, _size: int) -> bytes:
+                self.fail("transport should reject Content-Length before reading")
+                return b""
+
+            def fail(self, message: str) -> None:
+                raise AssertionError(message)
+
+        with patch("urllib.request.urlopen", return_value=OversizedResponse()):
+            with self.assertRaisesRegex(ModelTransportError, "byte limit"):
+                HttpTransport().post(
+                    "https://models.example/v1/chat/completions",
+                    {"Authorization": "Bearer sentinel-secret"},
+                    b"{}",
+                    1.0,
+                )
+
+    def test_http_error_body_is_capped_before_parsing(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://models.example/v1/chat/completions",
+            413,
+            "Payload Too Large",
+            {},
+            io.BytesIO(b"x" * (MAX_HTTP_RESPONSE_BYTES + 1)),
+        )
+        provider = OpenAICompatibleProvider(
+            config(ProviderKind.OPENAI_COMPATIBLE, retries=0),
+            FakeTransport([error]),
+        )
+        with patch.dict(os.environ, {"TEST_MODEL_KEY": "sentinel-secret"}):
+            with self.assertRaisesRegex(ModelTransportError, "byte limit"):
+                provider.complete(ModelRequest("system", "user"))
+
     def test_openai_compatible_request_and_response(self) -> None:
         raw = json.dumps({
             "choices": [{"message": {"content": "{\"success\":true}"}}],
