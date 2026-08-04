@@ -5,7 +5,7 @@ import json
 import unittest
 from pathlib import Path
 
-from hive_mind_os.classic_gpt import ClassicGptSourcePack
+from hive_mind_os.reference.classic_gpt import ClassicGptSourcePack
 from hive_mind_os.contracts import (
     LEGACY_SCHEMA_NAMES,
     ROLE_NAMES,
@@ -16,7 +16,7 @@ from hive_mind_os.contracts import (
     validate_runtime_state,
     validate_schema_catalog,
 )
-from hive_mind_os.package_system import OODAState, validate_ooda_contract
+from hive_mind_os.reference.package_system import OODAState, validate_ooda_contract
 from hive_mind_os.source_docket import load_default_source_docket
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,7 +105,13 @@ class ContractSchemaTests(unittest.TestCase):
 
         for mutation, expected in (
             (
-                lambda value: value["role_runs"].pop(),
+                lambda value: value["role_runs"].remove(
+                    next(
+                        item
+                        for item in value["role_runs"]
+                        if item["role"] == "builder"
+                    )
+                ),
                 "missing successful role runs",
             ),
             (

@@ -1,3 +1,5 @@
+"""Reference implementation. No runtime consumer. Not a gate."""
+
 from __future__ import annotations
 
 import json
@@ -7,8 +9,8 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Mapping
 
-from .models import Role
-from .receipts import ReceiptReference, ReceiptValidator
+from ..models import Role
+from ..receipts import ReceiptReference, ReceiptValidator
 
 
 class SimulationPhase(StrEnum):

@@ -7,7 +7,7 @@ from .autonomy import (
     EvolutionArena,
     MissionCharter,
 )
-from .classic_gpt import (
+from .reference.classic_gpt import (
     ActionKind,
     ClassicGptSimulationGate,
     ClassicGptSourcePack,
@@ -74,7 +74,7 @@ from .mission_store import (
     resume_mission,
 )
 from .models import AutonomyLevel, Objective, RiskTier, Role
-from .package_system import (
+from .reference.package_system import (
     AgentManifest,
     CatalogSnapshot,
     ComponentKind,
@@ -142,7 +142,7 @@ from .source_docket import (
     load_default_source_docket,
     load_source_docket,
 )
-from .vision import HardenedVisionContract, VisionComplianceGate
+from .reference.vision import HardenedVisionContract, VisionComplianceGate
 from .workers import Worker, serve
 
 __all__ = [

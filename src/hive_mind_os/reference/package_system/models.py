@@ -8,7 +8,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from ..receipts import portable_path_parts
+from ...receipts import portable_path_parts
 
 _IDENTIFIER = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?\Z")
 _SEMVER = re.compile(

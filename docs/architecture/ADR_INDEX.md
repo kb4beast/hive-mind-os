@@ -15,6 +15,7 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-015` | [Post-P13 production and trust program](ADR-015-POST-P13-PRODUCTION-AND-TRUST-PROGRAM.md) | P14–P20 | proposed; independent adoption review required |
 | `ADR-016` | [Governed extension packages and portable host projections](ADR-016-GOVERNED-EXTENSION-PACKAGES.md) | Slice 1 | bounded structural candidate accepted/adapted; promotion deferred |
 | `ADR-017` | [Inert constitutional skills, read-only tools, and host evidence](ADR-017-INERT-SKILLS-TOOLS-AND-HOST-EVIDENCE.md) | Slice 2 | adapted bounded candidate; promotion and host support blocked |
+| `ADR-018` | [Runtime surface disposition](ADR-018-RUNTIME-SURFACE-DISPOSITION.md) | P2.2 | adopted |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-018; it must be unique at creation time.
+is ADR-019; it must be unique at creation time.

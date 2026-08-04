@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hive_mind_os.contracts import validate_contract
-from hive_mind_os.package_system import (
+from hive_mind_os.reference.package_system import (
     ConformanceStatus,
     EvidenceLevel,
     HostCapability,
@@ -16,7 +16,7 @@ from hive_mind_os.package_system import (
     load_builtin_host_profile,
     load_builtin_host_profiles,
 )
-from hive_mind_os.package_system.builtins import hive_core_catalog, hive_core_root
+from hive_mind_os.reference.package_system.builtins import hive_core_catalog, hive_core_root
 
 
 class HostCapabilityProfileTests(unittest.TestCase):
@@ -198,11 +198,11 @@ class HostCapabilityProfileTests(unittest.TestCase):
 
         with (
             patch(
-                "hive_mind_os.package_system.builtins.hive_core_catalog",
+                "hive_mind_os.reference.package_system.builtins.hive_core_catalog",
                 return_value=catalog,
             ),
             patch(
-                "hive_mind_os.package_system.builtins.hive_core_root",
+                "hive_mind_os.reference.package_system.builtins.hive_core_root",
                 return_value=copied,
             ),
             self.assertRaisesRegex(ValueError, "digest changed"),
