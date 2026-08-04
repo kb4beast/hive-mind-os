@@ -1,0 +1,12 @@
+diff --git a/discounts.py b/discounts.py
+--- a/discounts.py
++++ b/discounts.py
+@@ -1,5 +1,7 @@
+ def checkout_total(subtotal_cents: int, *, nonprofit: bool) -> int:
+     """Return the checkout total in cents."""
+ 
+-    # TODO: nonprofit organizations receive the documented 20 percent discount.
++    if nonprofit:
++        return subtotal_cents * 80 // 100
++
+     return subtotal_cents
