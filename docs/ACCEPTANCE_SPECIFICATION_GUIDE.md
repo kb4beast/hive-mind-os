@@ -35,7 +35,7 @@ has this shape:
 | `declared_paths` | The complete, unique set of portable relative paths the candidate commit is allowed to change. |
 
 For the local `verify` workflow, `declared_paths` must be present and nonempty.
-The candidate's changed paths must exactly match that list; an omitted or extra
+Every changed path in the candidate must appear in that list; an omitted changed
 path rejects the verification. Use `/`-separated relative paths such as
 `src/pricing.py`, never absolute paths or `..` segments.
 
