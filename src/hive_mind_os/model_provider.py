@@ -9,12 +9,15 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Iterable, Mapping, Protocol
 
 from .models import Role
+
+MAX_HTTP_RESPONSE_BYTES = 4_000_000
 
 
 class ProviderKind(StrEnum):
@@ -54,8 +57,13 @@ class ProviderConfig:
     max_retries: int = 2
 
     def __post_init__(self) -> None:
-        if not self.base_url.startswith(("http://", "https://")):
-            raise ValueError("model base URL must use http or https")
+        parsed = urllib.parse.urlsplit(self.base_url)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise ValueError("model base URL must use HTTPS with a hostname")
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("model base URL must not contain credentials")
+        if parsed.query or parsed.fragment:
+            raise ValueError("model base URL must not contain a query or fragment")
         if not self.model.strip() or not self.api_key_env.strip():
             raise ValueError("model and API-key environment name are required")
         if self.timeout_s <= 0 or self.max_output_tokens < 1 or self.max_retries < 0:
@@ -98,9 +106,33 @@ class HttpTransport:
         body: bytes,
         timeout_s: float,
     ) -> bytes:
-        request = urllib.request.Request(url, data=body, headers=dict(headers), method="POST")
+        request = urllib.request.Request(
+            url, data=body, headers=dict(headers), method="POST"
+        )
         with urllib.request.urlopen(request, timeout=timeout_s) as response:
-            return response.read()
+            return _read_http_body(response)
+
+
+def _read_http_body(response: object) -> bytes:
+    """Read at most the provider-response limit, including error bodies."""
+
+    headers = getattr(response, "headers", None)
+    raw_length = headers.get("Content-Length") if headers is not None else None
+    if raw_length is not None:
+        try:
+            if int(raw_length) > MAX_HTTP_RESPONSE_BYTES:
+                raise ModelTransportError("model provider response exceeds byte limit")
+        except (TypeError, ValueError):
+            pass
+    read = getattr(response, "read", None)
+    if not callable(read):
+        raise ModelTransportError("model provider response is not readable")
+    raw = read(MAX_HTTP_RESPONSE_BYTES + 1)
+    if not isinstance(raw, bytes):
+        raise ModelTransportError("model provider response is not bytes")
+    if len(raw) > MAX_HTTP_RESPONSE_BYTES:
+        raise ModelTransportError("model provider response exceeds byte limit")
+    return raw
 
 
 class ModelProvider(Protocol):
@@ -186,7 +218,7 @@ class _BaseProvider:
             )
         except urllib.error.HTTPError as error:
             try:
-                raw = error.read()
+                raw = _read_http_body(error)
             finally:
                 error.close()
             message = redact(
