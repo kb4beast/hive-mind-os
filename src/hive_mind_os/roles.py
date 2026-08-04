@@ -30,7 +30,13 @@ ROLE_CONTRACTS: dict[Role, RoleContract] = {
         Role.EXPLORER,
         "Find the highest-value problems using repository, user, product, and external evidence.",
         ("problem statement", "evidence map", "ranked opportunities"),
-        ("read_repository", "search_web", "inspect_history", "run_analysis"),
+        (
+            "read_repository",
+            "search_web",
+            "inspect_history",
+            "run_analysis",
+            "run_commands",
+        ),
         ("problem is evidence-backed", "alternatives were considered"),
     ),
     Role.ARCHITECT: RoleContract(
@@ -44,14 +50,27 @@ ROLE_CONTRACTS: dict[Role, RoleContract] = {
         Role.BUILDER,
         "Implement the smallest complete change and ship it with executable verification.",
         ("implementation", "tests", "change summary"),
-        ("write_workspace", "run_commands", "create_branch", "open_pull_request"),
+        (
+            "read_repository",
+            "write_workspace",
+            "run_commands",
+            "create_branch",
+            "open_pull_request",
+        ),
         ("tests pass", "change is traceable to the objective"),
     ),
     Role.CURATOR: RoleContract(
         Role.CURATOR,
         "Protect quality, trust, compliance, and factual integrity.",
         ("verification report", "defect findings", "release recommendation"),
-        ("read_repository", "run_tests", "inspect_diff", "security_scan"),
+        (
+            "read_repository",
+            "write_workspace",
+            "run_tests",
+            "run_commands",
+            "inspect_diff",
+            "security_scan",
+        ),
         ("claims have evidence", "critical regressions are absent"),
     ),
     Role.INTEGRATOR: RoleContract(
@@ -86,4 +105,15 @@ DEFAULT_LIFECYCLE: tuple[Role, ...] = (
     Role.INTEGRATOR,
     Role.STEWARD,
     Role.OPTIMIZER,
+)
+
+# The architecture retains all eight specialist contracts.  Only these roles have
+# executable repository-mission capabilities today; the remainder are planned.
+IMPLEMENTED_REPOSITORY_ROLES: tuple[Role, ...] = (
+    Role.EXPLORER,
+    Role.BUILDER,
+    Role.CURATOR,
+)
+PLANNED_ROLES: tuple[Role, ...] = tuple(
+    role for role in Role if role not in IMPLEMENTED_REPOSITORY_ROLES
 )

@@ -21,18 +21,20 @@ acceptance-specification JSON file. `hive-mind deliver --help` lists the require
 
 ## What this prototype is
 
-Hive Mind OS is an evidence-driven agentic operating system for autonomous product and software delivery. It converts the AI-native successor to the traditional SDLC into eight independent specialist agents aligned around customer value:
+Hive Mind OS is an evidence-driven operating-system prototype for autonomous product and software delivery. Its architecture defines eight specialist contracts; the local repository-delivery workflow currently executes only Explorer, Builder, and Curator. The other five remain planned.
 
-| Agent | Responsibility |
+It converts the AI-native successor to the traditional SDLC into eight independent specialist agents aligned around customer value:
+
+| Agent | Status | Responsibility |
 |---|---|
-| Orchestrator | Sets direction, decomposes outcomes, manages risk, budgets, recovery, and dependencies |
-| Explorer | Finds evidence-backed problems and ideas through repository, history, user-signal, and web research |
-| Architect | Designs scalable, secure, evolvable solutions with explicit threats and rollback |
-| Builder | Implements complete changes with executable tests, branches, commits, and pull requests |
-| Curator | Independently verifies quality, trust, security, compliance, provenance, and claims |
-| Integrator | Connects systems, data, tools, repositories, and workflows through stable contracts |
-| Steward | Maintains reliability, dependencies, code health, observability, and recoverability |
-| Optimizer | Measures outcomes, teaches validated lessons, and promotes proven improvements |
+| Orchestrator | Planned | Sets direction, decomposes outcomes, manages risk, budgets, recovery, and dependencies |
+| Explorer | Implemented | Reproduces the repository failure through a typed test capability |
+| Architect | Planned | Designs scalable, secure, evolvable solutions with explicit threats and rollback |
+| Builder | Implemented | Creates a branch, writes the change, tests it, and commits it locally |
+| Curator | Implemented | Independently re-executes sealed checks against the candidate delivery |
+| Integrator | Planned | Connects systems, data, tools, repositories, and workflows through stable contracts |
+| Steward | Planned | Maintains reliability, dependencies, code health, observability, and recoverability |
+| Optimizer | Planned | Measures outcomes, teaches validated lessons, and promotes proven improvements |
 
 The target is autonomous discovery through verified delivery and continuous learning—not a collection of chat personas. Routine reversible work should require no discretionary human supervision. Every agent works through typed contracts, bounded authority, isolated execution, immutable evidence, independent evaluation, and resumable workflows.
 
@@ -159,8 +161,8 @@ python -m unittest discover -s tests -v
 
 ## Deliver a verified local repository change
 
-The P05 vertical slice composes the model boundary, sandbox, local Git adapter, policy,
-budget, ledger, all eight roles, and an independently re-executing Curator. The scripted
+The local delivery slice composes the model boundary, sandbox, local Git adapter, policy,
+budget, ledger, its three implemented roles, and an independently re-executing Curator. The scripted
 backend is deterministic and offline; the model backend uses the configured P02 provider
 but executes its proposed actions through the same typed capabilities.
 
