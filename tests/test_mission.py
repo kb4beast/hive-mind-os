@@ -28,7 +28,10 @@ from hive_mind_os.model_provider import (
 from hive_mind_os.models import AutonomyLevel, RiskTier, Role, WorkStatus
 from hive_mind_os.policy import Action, PolicyEngine
 from hive_mind_os.receipts import FileReceiptValidator, ReceiptReference
-from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
+from hive_mind_os.roles import (
+    IMPLEMENTED_REPOSITORY_ROLES,
+    ROLE_CONTRACTS,
+)
 from hive_mind_os.runtime import HiveKernel
 from tests.fixtures.fixture_repo import (
     GOOD_FIX,
@@ -83,7 +86,7 @@ class _RepositoryProvider:
         ).encode()
 
     def complete_once(self, request: ModelRequest) -> ModelResponse:
-        role = DEFAULT_LIFECYCLE[self.index]
+        role = IMPLEMENTED_REPOSITORY_ROLES[self.index]
         self.index += 1
         test_argv = [
             sys.executable,
@@ -177,7 +180,7 @@ class _RepositoryProvider:
 
 class _SelfApprovingProvider(_RepositoryProvider):
     def complete_once(self, request: ModelRequest) -> ModelResponse:
-        role = DEFAULT_LIFECYCLE[self.index]
+        role = IMPLEMENTED_REPOSITORY_ROLES[self.index]
         self.index += 1
         real_tests = [
             sys.executable,
@@ -297,7 +300,10 @@ class RepositoryMissionTests(unittest.TestCase):
         report, output = self.run_mission()
         self.assertIs(report.status, WorkStatus.SUCCEEDED)
         self.assertEqual(report.curator_verdict, "adopt")
-        self.assertEqual(tuple(result.role for result in report.results), DEFAULT_LIFECYCLE)
+        self.assertEqual(
+            tuple(result.role for result in report.results),
+            IMPLEMENTED_REPOSITORY_ROLES,
+        )
         for name in ("changes.bundle", "changes.patch", "delivery.json"):
             self.assertTrue((output / name).is_file())
         self.assertTrue(verify_delivery(output, self.fixture.root))
@@ -432,14 +438,14 @@ class RepositoryMissionTests(unittest.TestCase):
             label="model",
         )
         self.assertIs(report.status, WorkStatus.SUCCEEDED)
-        self.assertEqual(provider.index, len(DEFAULT_LIFECYCLE))
+        self.assertEqual(provider.index, len(IMPLEMENTED_REPOSITORY_ROLES))
         self.assertTrue(verify_delivery(output, self.fixture.root))
         model_calls = [
             event
             for event in report.ledger_events
             if event["event_type"] == "model.call"
         ]
-        self.assertEqual(len(model_calls), len(DEFAULT_LIFECYCLE))
+        self.assertEqual(len(model_calls), len(IMPLEMENTED_REPOSITORY_ROLES))
         curator_call = next(
             event
             for event in model_calls

@@ -18,7 +18,16 @@ import tempfile
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Mapping,
+    Protocol,
+    Sequence,
+    TypeVar,
+    cast,
+)
 from uuid import uuid4
 
 from .acceptance import (
@@ -62,7 +71,11 @@ from .receipts import (
     portable_path_parts,
     sha256_digest,
 )
-from .roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS, RoleContract
+from .roles import (
+    IMPLEMENTED_REPOSITORY_ROLES,
+    ROLE_CONTRACTS,
+    RoleContract,
+)
 from .runtime import AgentBackend, HiveKernel
 
 if TYPE_CHECKING:
@@ -274,7 +287,7 @@ class ScriptedRepositoryBackend:
         self.test_argv = tuple(test_argv)
         self.criterion_argv = tuple(criterion_argv)
         self.contexts: dict[Role, list[dict[str, Any]]] = {
-            role: [] for role in DEFAULT_LIFECYCLE
+            role: [] for role in IMPLEMENTED_REPOSITORY_ROLES
         }
 
     async def execute(
@@ -507,8 +520,20 @@ class ArchitectCapabilities:
         self.explorer_evidence = explorer_evidence
 
 
+class RoleExecutor(Protocol):
+    """Runs an implemented repository role through the configured backend."""
+
+    async def __call__(
+        self,
+        contract: RoleContract,
+        work_item: WorkItem,
+        objective: Objective,
+        context: tuple[AgentResult, ...],
+    ) -> AgentResult: ...
+
+
 class RepositoryMission:
-    """Walk all eight roles from a local objective to a verified delivery artifact."""
+    """Run the implemented repository roles to a verified delivery artifact."""
 
     def __init__(
         self,
@@ -611,6 +636,10 @@ class RepositoryMission:
         self._replaying_workspaces: set[str] = set()
         self._recovery_claimed_receipts: set[tuple[str, str]] = set()
         self._curator_head_access_sequence: int | None = None
+        self._role_executors: dict[Role, RoleExecutor] = {
+            role: self._execute_role_turn
+            for role in IMPLEMENTED_REPOSITORY_ROLES
+        }
         if self.mission_store is not None:
             if not isinstance(self.backend, ScriptedRepositoryBackend):
                 raise ValueError(
@@ -671,7 +700,21 @@ class RepositoryMission:
                     self.budget,
                 )
 
+    async def _execute_role_turn(
+        self,
+        contract: RoleContract,
+        work_item: WorkItem,
+        objective: Objective,
+        context: tuple[AgentResult, ...],
+    ) -> AgentResult:
+        return await self.backend.execute(contract, work_item, objective, context)
+
     async def run(self) -> MissionReport:
+        """Execute the repository delivery lifecycle."""
+
+        return await self._run_delivery()
+
+    async def _run_delivery(self) -> MissionReport:
         started_at = utc_now()
         results: list[AgentResult] = []
         base_sha: str | None = None
@@ -751,7 +794,7 @@ class RepositoryMission:
                 delivery_verified = False
                 builder_declared_paths: list[str] = []
 
-                for role in DEFAULT_LIFECYCLE:
+                for role in IMPLEMENTED_REPOSITORY_ROLES:
                     if self.mission_store is not None:
                         self.mission_store.mark_role(self.run_id, role, "running")
                     self._authorize(role, Action.READ_REPOSITORY)
@@ -786,7 +829,7 @@ class RepositoryMission:
                             self.objective,
                             repository=str(explorer.workspace.root),
                         )
-                    result = await self.backend.execute(
+                    result = await self._role_executors[role](
                         ROLE_CONTRACTS[role],
                         work_item,
                         execution_objective,

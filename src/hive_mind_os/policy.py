@@ -9,8 +9,25 @@ from .models import AutonomyLevel, RiskTier, Role
 class Action(StrEnum):
     READ_REPOSITORY = "read_repository"
     SEARCH_WEB = "search_web"
+    QUERY_AGENTS = "query_agents"
+    CREATE_WORK_ITEMS = "create_work_items"
+    INSPECT_HISTORY = "inspect_history"
+    RUN_ANALYSIS = "run_analysis"
+    MODEL_SYSTEM = "model_system"
+    WRITE_DESIGN = "write_design"
     WRITE_WORKSPACE = "write_workspace"
     RUN_COMMANDS = "run_commands"
+    RUN_TESTS = "run_tests"
+    INSPECT_DIFF = "inspect_diff"
+    SECURITY_SCAN = "security_scan"
+    INSPECT_INTERFACES = "inspect_interfaces"
+    WRITE_ADAPTERS = "write_adapters"
+    RUN_CONTRACT_TESTS = "run_contract_tests"
+    INSPECT_RUNTIME = "inspect_runtime"
+    MANAGE_DEPENDENCIES = "manage_dependencies"
+    QUERY_LEDGER = "query_ledger"
+    RUN_EVALUATIONS = "run_evaluations"
+    PROPOSE_SKILL_CHANGE = "propose_skill_change"
     CREATE_AGENT_VARIANT = "create_agent_variant"
     CREATE_BRANCH = "create_branch"
     OPEN_PULL_REQUEST = "open_pull_request"
@@ -36,8 +53,25 @@ class RequiredLevel(IntEnum):
 ACTION_LEVEL: dict[Action, RequiredLevel] = {
     Action.READ_REPOSITORY: RequiredLevel.READ,
     Action.SEARCH_WEB: RequiredLevel.READ,
+    Action.QUERY_AGENTS: RequiredLevel.ADVISE,
+    Action.CREATE_WORK_ITEMS: RequiredLevel.ADVISE,
+    Action.INSPECT_HISTORY: RequiredLevel.READ,
+    Action.RUN_ANALYSIS: RequiredLevel.SANDBOX,
+    Action.MODEL_SYSTEM: RequiredLevel.SANDBOX,
+    Action.WRITE_DESIGN: RequiredLevel.SANDBOX,
     Action.WRITE_WORKSPACE: RequiredLevel.SANDBOX,
     Action.RUN_COMMANDS: RequiredLevel.SANDBOX,
+    Action.RUN_TESTS: RequiredLevel.SANDBOX,
+    Action.INSPECT_DIFF: RequiredLevel.READ,
+    Action.SECURITY_SCAN: RequiredLevel.SANDBOX,
+    Action.INSPECT_INTERFACES: RequiredLevel.READ,
+    Action.WRITE_ADAPTERS: RequiredLevel.REPOSITORY,
+    Action.RUN_CONTRACT_TESTS: RequiredLevel.SANDBOX,
+    Action.INSPECT_RUNTIME: RequiredLevel.READ,
+    Action.MANAGE_DEPENDENCIES: RequiredLevel.REPOSITORY,
+    Action.QUERY_LEDGER: RequiredLevel.READ,
+    Action.RUN_EVALUATIONS: RequiredLevel.SANDBOX,
+    Action.PROPOSE_SKILL_CHANGE: RequiredLevel.SANDBOX,
     Action.CREATE_AGENT_VARIANT: RequiredLevel.SANDBOX,
     Action.CREATE_BRANCH: RequiredLevel.REPOSITORY,
     Action.OPEN_PULL_REQUEST: RequiredLevel.REPOSITORY,
@@ -101,7 +135,12 @@ class PolicyEngine:
         if role is Role.EXPLORER and action not in {
             Action.READ_REPOSITORY,
             Action.SEARCH_WEB,
+            Action.RUN_ANALYSIS,
             Action.RUN_COMMANDS,
         }:
             return PolicyDecision(False, "explorer is read-only by role contract")
+        from .roles import ROLE_CONTRACTS
+
+        if action.value not in ROLE_CONTRACTS[role].default_capabilities:
+            return PolicyDecision(False, f"{action} is not declared for {role.value}")
         return PolicyDecision(True, "allowed by autonomy level and role contract")
