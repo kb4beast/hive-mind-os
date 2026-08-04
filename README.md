@@ -156,6 +156,29 @@ Curator divergence, or artifact-verification failure publishes no delivery direc
 Remote repositories, pushes, pull requests, durable resume, stronger Curator isolation,
 and hard hostile-code isolation remain later-phase obligations.
 
+## Using a real model
+
+The model backend is opt-in. Keep the API key in the environment; there is deliberately
+no API-key command-line flag.
+
+```bash
+# OpenAI-compatible endpoint
+export HIVE_MIND_MODEL_PROVIDER=openai_compatible
+export HIVE_MIND_MODEL_BASE_URL=https://api.openai.com/v1
+export HIVE_MIND_MODEL_MODEL=your-model-id
+export OPENAI_API_KEY=your-key
+
+# Anthropic endpoint
+export HIVE_MIND_MODEL_PROVIDER=anthropic
+export HIVE_MIND_MODEL_BASE_URL=https://api.anthropic.com/v1
+export HIVE_MIND_MODEL_MODEL=your-model-id
+export ANTHROPIC_API_KEY=your-key
+```
+
+Run `hive-mind deliver --backend model` after setting one provider block. `--provider`,
+`--base-url`, and `--model` override their environment variables for one invocation;
+the API key remains environment-only.
+
 ## Audit the current state
 
 The Stage 0 audit command records the Git history and worktree, full source/claim coverage,

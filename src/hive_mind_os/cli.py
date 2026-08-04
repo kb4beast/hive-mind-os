@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -180,6 +181,19 @@ def build_deliver_parser() -> argparse.ArgumentParser:
         choices=("scripted", "model"),
         default="scripted",
         help="Repository backend (default: deterministic offline scripted backend)",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=("openai_compatible", "anthropic"),
+        help="Model provider; overrides HIVE_MIND_MODEL_PROVIDER",
+    )
+    parser.add_argument(
+        "--base-url",
+        help="Provider HTTPS base URL; overrides HIVE_MIND_MODEL_BASE_URL",
+    )
+    parser.add_argument(
+        "--model",
+        help="Provider model identifier; overrides HIVE_MIND_MODEL_MODEL",
     )
     parser.add_argument(
         "--pin",
@@ -421,12 +435,17 @@ async def _run_deliver(args: argparse.Namespace) -> int:
     )
     if args.backend == "model":
         try:
+            missing = _missing_model_configuration(args)
+            if missing:
+                raise ModelProviderError(
+                    "missing required variables: " + ", ".join(missing)
+                )
             backend = ModelBackend(
-                provider_from_env(),
+                _provider_from_arguments(args),
                 ledger=ledger,
                 budget=budget,
                 role_providers={
-                    Role.CURATOR: provider_from_env(role=Role.CURATOR)
+                    Role.CURATOR: _provider_from_arguments(args, role=Role.CURATOR)
                 },
             )
         except (ModelProviderError, ValueError) as error:
@@ -490,6 +509,69 @@ async def _run_deliver(args: argparse.Namespace) -> int:
         file=stream,
     )
     return 0 if report.status.value == "succeeded" else 1
+
+
+def _provider_from_arguments(
+    args: argparse.Namespace,
+    *,
+    role: Role | None = None,
+):
+    """Build one provider while letting non-secret CLI flags override the environment."""
+
+    overrides = {
+        "HIVE_MIND_MODEL_PROVIDER": args.provider,
+        "HIVE_MIND_MODEL_BASE_URL": args.base_url,
+        "HIVE_MIND_MODEL_MODEL": args.model,
+    }
+    prior: dict[str, str | None] = {}
+    for name, value in overrides.items():
+        if value is None:
+            continue
+        scoped = f"{name}__{role.value.upper()}" if role is not None else name
+        prior[scoped] = os.environ.get(scoped)
+        os.environ[scoped] = value
+    try:
+        return provider_from_env(role=role)
+    finally:
+        for name, value in prior.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def _missing_model_configuration(args: argparse.Namespace) -> tuple[str, ...]:
+    """List every absent model input before constructing the provider adapters."""
+
+    missing: list[str] = []
+    defaults = {
+        "openai_compatible": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+    }
+    for role in (None, Role.CURATOR):
+        suffix = "" if role is None else f"__{role.value.upper()}"
+
+        def configured(name: str) -> str | None:
+            if role is not None:
+                scoped = os.environ.get(f"{name}{suffix}")
+                if scoped is not None:
+                    return scoped
+            return os.environ.get(name)
+
+        provider = args.provider or configured("HIVE_MIND_MODEL_PROVIDER") or "openai_compatible"
+        if provider not in defaults:
+            continue
+        model = args.model or configured("HIVE_MIND_MODEL_MODEL") or configured(
+            "HIVE_MIND_MODEL_ID"
+        )
+        if not model or not model.strip():
+            name = "HIVE_MIND_MODEL_MODEL (or HIVE_MIND_MODEL_ID)"
+            if name not in missing:
+                missing.append(name)
+        api_key_env = configured("HIVE_MIND_MODEL_API_KEY_ENV") or defaults[provider]
+        if not os.environ.get(api_key_env) and api_key_env not in missing:
+            missing.append(api_key_env)
+    return tuple(missing)
 
 
 def _load_acceptance_specifications(
