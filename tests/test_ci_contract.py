@@ -31,6 +31,16 @@ class CIContractTests(unittest.TestCase):
             with self.subTest(document=document):
                 self.assertIn(command, (ROOT / document).read_text(encoding="utf-8"))
 
+    def test_readme_starts_with_status_and_a_runnable_entry_point(self) -> None:
+        opening = "\n".join(
+            (ROOT / "README.md").read_text(encoding="utf-8").splitlines()[:40]
+        ).lower()
+        self.assertIn("## status: early. here is exactly what works.", opening)
+        self.assertIn("hive-mind deliver --help", opening)
+        for forbidden in ("docket", "atomic claim", "burden", "stage 0", "courtroom"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, opening)
+
     def test_no_test_module_imports_third_party(self) -> None:
         local_roots = {"hive_mind_os", "tests"}
         local_roots.update(
