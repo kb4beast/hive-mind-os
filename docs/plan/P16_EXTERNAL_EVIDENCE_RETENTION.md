@@ -1,6 +1,10 @@
 # P16 — External Append-Only Evidence Retention
 
-Status: pending in `01_POST_P13_OVERVIEW.md` | Depends on: P15 | Unlocks: P18, P20
+> **Withdrawn as an executable phase by P5.2 (2026-08-03).** Do not schedule this
+> work. Its required external authority is retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
+Status: withdrawn | Historical dependency: P15
 
 ## 1. Objective
 
@@ -66,4 +70,3 @@ all retained evidence; it never deletes remote evidence merely to revert code.
 
 Do not call ordinary mutable object storage append-only without enforcement and recovery
 proof, or treat repository Git history as external disaster recovery.
-

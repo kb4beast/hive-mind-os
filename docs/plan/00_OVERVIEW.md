@@ -1,5 +1,10 @@
 # Hive Mind OS — Canonical Implementation Plan
 
+> **Historical plan — P01–P13 complete.** The proposed P14–P20 program is withdrawn;
+> do not schedule work from it. The current product-delivery plan is maintained as the
+> owner-owned `EXECUTION_PLAN_v3.md` working-copy artifact. Human and external authority
+> dependencies are recorded in [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
 - **Plan version:** 1.1
 - **Date established:** 2026-07-27
 - **Status:** COMPLETE — P01–P13 are merged; this document remains the historical executor

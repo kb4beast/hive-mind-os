@@ -1,6 +1,10 @@
 # P15 — Authenticated Identities and Provider Receipts
 
-Status: pending in `01_POST_P13_OVERVIEW.md` | Depends on: P14 | Unlocks: P16, P18, P19
+> **Withdrawn as an executable phase by P5.2 (2026-08-03).** Do not schedule this
+> work. Its required external authority is retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
+Status: withdrawn | Historical dependency: P14
 
 ## 1. Objective
 
@@ -68,4 +72,3 @@ it must not silently accept unsigned legacy evidence.
 
 Do not treat role strings, shared API keys, TLS, repository accounts, or locally generated
 self-signed keys as authenticated independence.
-

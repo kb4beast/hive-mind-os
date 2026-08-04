@@ -1,6 +1,10 @@
 # P19 — Multi-Comparator Benchmark Court
 
-Status: pending in `01_POST_P13_OVERVIEW.md` | Depends on: P14, P15, P17 | Unlocks: P20 and narrowly scoped superiority claims
+> **Withdrawn as an executable phase by P5.2 (2026-08-03).** Do not schedule this
+> work. Its required external authority is retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
+Status: withdrawn | Historical dependencies: P14, P15, P17
 
 ## 1. Objective
 
@@ -75,4 +79,3 @@ P13 no-claim guard and preserves all measurements.
 Do not cherry-pick tasks, tune after reveal, omit losses, compare unequal authority, use one
 comparator/family, infer production value from benchmark success, or generalize beyond the
 court-bound statement.
-

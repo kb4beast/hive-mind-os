@@ -1,6 +1,10 @@
 # P17 — Hard Isolation for Hostile Workloads
 
-Status: pending in `01_POST_P13_OVERVIEW.md` | Depends on: P03 | Unlocks: P18, P19
+> **Withdrawn as an executable phase by P5.2 (2026-08-03).** Do not schedule this
+> work. Its required external authority is retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
+Status: withdrawn | Historical dependency: P03
 
 ## 1. Objective
 
@@ -65,4 +69,3 @@ retains process-tier mode only for trusted commands.
 
 Do not represent subprocess checks, path validation, user namespaces alone, or an unpinned
 container image as a hostile-code security boundary.
-

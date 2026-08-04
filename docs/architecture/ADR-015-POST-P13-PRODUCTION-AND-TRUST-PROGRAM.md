@@ -1,6 +1,6 @@
 # ADR-015 — Post-P13 Production and Trust Program
 
-- **Status:** proposed
+- **Status:** withdrawn as an executable program by P5.2 (2026-08-03)
 - **Date:** 2026-07-28
 - **Decision:** `adapt`
 - **Supersedes:** no prior architecture decision
@@ -29,9 +29,10 @@ These are different evidence burdens. Combining them into one delivery would obs
 authority boundaries, make rollback unsafe, and prevent independent review from isolating
 failures.
 
-## Decision
+## Historical decision and withdrawal
 
-Adopt a second, post-P13 implementation program with separate PR-sized phases:
+This ADR originally adapted a second, post-P13 implementation program with separate
+PR-sized phases:
 
 1. P14 proves one real-provider, reversible objective-to-delivery mission.
 2. P15 authenticates role identities and provider execution receipts.
@@ -44,9 +45,10 @@ Adopt a second, post-P13 implementation program with separate PR-sized phases:
 Source and license reconciliation continues as additive, source-specific P12 appeals. It may
 run independently, but unresolved sources cannot support production or superiority claims.
 
-The canonical dependency order and phase branches are defined in
-[`01_POST_P13_OVERVIEW.md`](../plan/01_POST_P13_OVERVIEW.md). Each phase retains its own
-evidence, rollback, dissent, exact-candidate audit, and independent courtroom disposition.
+P5.2 withdraws that program. P14–P20 are retained as historical documents only and
+must not be scheduled. Their external authority dependencies now live in
+[Human Authority Gates](HUMAN_AUTHORITY_GATES.md), while the current blocker backlog
+remains [`BLOCKERS.md`](../plan/BLOCKERS.md).
 
 ## Trust boundaries
 
@@ -104,7 +106,6 @@ Costs:
 
 ## Adoption gate
 
-This ADR remains proposed until an independent Curator, Judge, and Orchestrator review the
-complete documentation candidate and issue a permitting disposition. Merging the proposal
-preserves the program but does not itself satisfy any blocker.
-
+This ADR is retained as historical context. No permitting disposition can reactivate the
+withdrawn P14–P20 program; any future proposal must start as a new, independently reviewed
+decision without silently reusing this authority.

@@ -1,6 +1,10 @@
 # P20 — Release-Readiness Court
 
-Status: pending in `01_POST_P13_OVERVIEW.md` | Depends on: P18, P19 and applicable source appeals | Unlocks: a narrowly scoped release decision
+> **Withdrawn as an executable phase by P5.2 (2026-08-03).** Do not schedule this
+> work. Its required external authority is retained in
+> [Human Authority Gates](../architecture/HUMAN_AUTHORITY_GATES.md).
+
+Status: withdrawn | Historical dependencies: P18, P19, and applicable source appeals
 
 ## 1. Objective
 
@@ -70,4 +74,3 @@ court record.
 Do not equate green CI, a merged PR, one real-provider mission, a successful pilot, or a
 benchmark win with general release readiness. Do not mark the repository blocker-free when
 excluded or deferred obligations remain.
-
