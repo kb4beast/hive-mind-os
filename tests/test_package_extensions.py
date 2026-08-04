@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from hive_mind_os.package_system import (
+from hive_mind_os.reference.package_system import (
     AgentManifest,
     PackageCatalog,
     PackageValidationError,

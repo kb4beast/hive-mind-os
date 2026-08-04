@@ -7,12 +7,12 @@ from importlib.resources import files
 import hive_mind_os
 from hive_mind_os.contracts import validate_contract
 from hive_mind_os.models import Role
-from hive_mind_os.package_system import (
+from hive_mind_os.reference.package_system import (
     AgentManifest,
     ComponentKind,
     WorkflowManifest,
 )
-from hive_mind_os.package_system.builtins import hive_core_catalog, hive_core_root
+from hive_mind_os.reference.package_system.builtins import hive_core_catalog, hive_core_root
 from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 
 EXPECTED_ROLE_DATA = {

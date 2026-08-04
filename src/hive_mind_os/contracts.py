@@ -11,6 +11,7 @@ from pathlib import PurePosixPath
 from typing import Any, Mapping, Sequence
 
 from .receipts import portable_path_parts
+from .roles import IMPLEMENTED_REPOSITORY_ROLES
 
 LEGACY_SCHEMA_NAMES = (
     "acceptance-specification",
@@ -256,13 +257,6 @@ def validate_contract(name: str, document: Any) -> ContractValidation:
     except (KeyError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         return ContractValidation(False, (f"schema unavailable: {type(error).__name__}: {error}",))
     _validate_node(document, schema, "$", issues)
-    if name == "host-capability-profile":
-        from .package_system.host_profiles import HostCapabilityProfile
-
-        try:
-            HostCapabilityProfile.from_contract(document)
-        except ValueError as error:
-            issues.append(f"$: semantic host-profile validation failed: {error}")
     return ContractValidation(not issues, tuple(dict.fromkeys(issues)))
 
 
@@ -419,7 +413,9 @@ def validate_runtime_state(
             for run in role_runs or ()
             if isinstance(run, Mapping) and run.get("status") == "succeeded"
         }
-        missing_roles = ROLE_NAMES - succeeded_roles
+        missing_roles = {
+            role.value for role in IMPLEMENTED_REPOSITORY_ROLES
+        } - succeeded_roles
         if missing_roles:
             issues.append(
                 "completion is missing successful role runs: "

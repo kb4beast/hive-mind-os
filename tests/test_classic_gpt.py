@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from hive_mind_os.classic_gpt import (
+from hive_mind_os.reference.classic_gpt import (
     ActionKind,
     ClassicGptSimulationGate,
     ClassicGptSourcePack,

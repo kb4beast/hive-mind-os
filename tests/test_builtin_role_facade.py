@@ -4,13 +4,13 @@ import importlib
 
 import hive_mind_os.roles as legacy_roles
 from hive_mind_os.models import Role
-from hive_mind_os.package_system import (
+from hive_mind_os.reference.package_system import (
     AgentManifest,
     SkillManifest,
     ToolManifest,
     WorkflowManifest,
 )
-from hive_mind_os.package_system.builtins import hive_core_catalog
+from hive_mind_os.reference.package_system.builtins import hive_core_catalog
 from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 
 
@@ -39,7 +39,7 @@ def test_legacy_role_facade_does_not_load_optional_extension_resources(
         raise AssertionError("optional package loader crossed the runtime import boundary")
 
     monkeypatch.setattr(
-        "hive_mind_os.package_system.builtins.hive_core_catalog",
+        "hive_mind_os.reference.package_system.builtins.hive_core_catalog",
         fail_if_loaded,
     )
     reloaded = importlib.reload(legacy_roles)

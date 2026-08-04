@@ -21,7 +21,11 @@ from threading import RLock
 from typing import Any, Mapping, Sequence
 
 from .autonomy import AutonomyBudget
-from .contracts import tool_intent_digest, validate_contract
+from .contracts import (
+    tool_intent_digest,
+    validate_contract,
+    validate_runtime_state,
+)
 from .models import Role, utc_now
 from .receipts import sha256_digest
 
@@ -317,7 +321,7 @@ class MissionStore:
             (),
             None,
         )
-        validation = validate_contract("mission-state", state)
+        validation = validate_runtime_state(state)
         if not validation.valid:
             raise StoreIntegrityError(
                 "initial mission state violates schema: "
@@ -819,7 +823,7 @@ class MissionStore:
                 if checkpoint.receipt_reference is not None
             ],
         )
-        validation = validate_contract("mission-state", state)
+        validation = validate_runtime_state(state)
         if not validation.valid:
             raise StoreIntegrityError(
                 "persisted mission state violates schema: "

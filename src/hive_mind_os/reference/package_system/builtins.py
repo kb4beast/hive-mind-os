@@ -8,7 +8,7 @@ from .catalog import PackageCatalog
 def hive_core_root() -> Path:
     """Return the explicit built-in package root without loading or activating it."""
 
-    return Path(__file__).resolve().parents[1] / "builtin_packages" / "hive-core"
+    return Path(__file__).resolve().parents[2] / "builtin_packages" / "hive-core"
 
 
 def hive_core_catalog() -> PackageCatalog:

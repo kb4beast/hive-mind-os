@@ -15,7 +15,11 @@ from pathlib import Path
 from typing import Iterator
 
 from hive_mind_os.acceptance import AcceptanceSpecification
-from hive_mind_os.contracts import tool_intent_digest, validate_contract
+from hive_mind_os.contracts import (
+    tool_intent_digest,
+    validate_contract,
+    validate_runtime_state,
+)
 from hive_mind_os.mission import RepositoryMission, ScriptedRepositoryBackend
 from hive_mind_os.mission_store import (
     MissionStore,
@@ -303,7 +307,7 @@ def _case_completed_state_round_trips_and_validates(tmp_path: Path) -> None:
     report = asyncio.run(mission.run())
     assert report.status is WorkStatus.SUCCEEDED
     state = store.mission(mission.run_id)["state"]
-    validation = validate_contract("mission-state", state)
+    validation = validate_runtime_state(state)
     assert validation.valid, validation.issues
     encoded = json.dumps(state, sort_keys=True, separators=(",", ":"))
     assert json.loads(encoded) == state

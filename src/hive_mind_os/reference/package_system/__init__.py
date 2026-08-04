@@ -1,4 +1,4 @@
-"""Inert, content-addressed packages for portable Hive Mind components."""
+"""Reference implementation. No runtime consumer. Not a gate."""
 
 from .catalog import PackageCatalog, PackageValidationError, load_package
 from .host_profiles import (

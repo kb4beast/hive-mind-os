@@ -1,10 +1,12 @@
+"""Reference implementation. No runtime consumer. Not a gate."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
 from hashlib import sha256
 
-from .models import Role
+from ..models import Role
 
 
 class LifecycleStage(StrEnum):
