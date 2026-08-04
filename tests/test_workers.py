@@ -149,7 +149,23 @@ class WorkerTests(unittest.TestCase):
                     "mission_id": mission_id,
                     "repository": str(fixture.root),
                     "objective": "Fix the failing test",
-                    "acceptance_criteria": [],
+                    "acceptance_criteria": ["increment(1) returns 2"],
+                    "acceptance_specifications": [
+                        {
+                            "schema_version": 1,
+                            "id": "increment-returns-two",
+                            "criterion": "increment(1) returns 2",
+                            "command": {
+                                "argv": [
+                                    sys.executable,
+                                    "-B",
+                                    "-c",
+                                    "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                                ],
+                                "expected": "succeeded",
+                            },
+                        }
+                    ],
                     "backend": "scripted",
                     "scripted_variant": "good",
                     "pin": None,

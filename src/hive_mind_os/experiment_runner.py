@@ -6,12 +6,14 @@ import asyncio
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Sequence
 from uuid import uuid4
 
+from .acceptance import AcceptanceSpecification
 from .ledger import EvidenceLedger
 from .mission import RepositoryMission, ScriptedRepositoryBackend
 from .models import Role, WorkStatus, utc_now
@@ -123,6 +125,18 @@ class FixtureMissionSurface:
                     repository,
                     "Fix the failing increment regression",
                     acceptance_criteria=("increment(1) returns 2",),
+                    acceptance_specifications=(
+                        AcceptanceSpecification(
+                            "increment-returns-two",
+                            "increment(1) returns 2",
+                            (
+                                sys.executable,
+                                "-B",
+                                "-c",
+                                "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                            ),
+                        ),
+                    ),
                     backend=ScriptedRepositoryBackend(),
                     pin=pin,
                     output_dir=output_root,

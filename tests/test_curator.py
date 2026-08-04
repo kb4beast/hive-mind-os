@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.curator import (
     AcceptanceCheck,
     ContaminationError,
@@ -108,6 +109,18 @@ class CuratorReviewTests(unittest.TestCase):
                 self.fixture.root,
                 "Fix the failing test",
                 acceptance_criteria=("increment(1) returns 2",),
+                acceptance_specifications=(
+                    AcceptanceSpecification(
+                        "increment-returns-two",
+                        "increment(1) returns 2",
+                        (
+                            sys.executable,
+                            "-B",
+                            "-c",
+                            "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                        ),
+                    ),
+                ),
                 backend=backend or ScriptedRepositoryBackend(),
                 pin=self.fixture.commit_two,
                 output_dir=output,
@@ -120,7 +133,7 @@ class CuratorReviewTests(unittest.TestCase):
             "run",
             EvidenceLedger(),
             objective="objective",
-            acceptance_criteria=("criterion",),
+            acceptance_criteria=(),
             base_workspace=self.fixture.root,
         )
 

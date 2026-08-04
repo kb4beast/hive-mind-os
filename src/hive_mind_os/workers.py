@@ -47,6 +47,9 @@ def execute_mission_job(job: Job, state_dir: Path) -> str:
                     str(payload["repository"]),
                     str(payload["objective"]),
                     acceptance_criteria=tuple(payload["acceptance_criteria"]),
+                    acceptance_specifications=tuple(
+                        payload.get("acceptance_specifications", ())
+                    ),
                     backend=backend,
                     pin=payload.get("pin"),
                     output_dir=output,

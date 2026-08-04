@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from .acceptance import AcceptanceSpecification
 from .autonomy import AutonomyBudget
 from .receipts import sha256_digest
 
@@ -51,6 +53,7 @@ class TaskManifest:
     family: str
     objective: str
     acceptance_criteria: tuple[str, ...]
+    acceptance_specifications: tuple[AcceptanceSpecification, ...]
     budget: BudgetSpec
     allowed_backends: tuple[str, ...]
     hidden_check_digest: str
@@ -58,6 +61,9 @@ class TaskManifest:
     def to_dict(self) -> dict[str, object]:
         payload = asdict(self)
         payload["acceptance_criteria"] = list(self.acceptance_criteria)
+        payload["acceptance_specifications"] = [
+            item.to_dict() for item in self.acceptance_specifications
+        ]
         payload["allowed_backends"] = list(self.allowed_backends)
         return payload
 
@@ -77,6 +83,7 @@ class CorpusTask:
             base_sha=self.base_sha,
             objective=self.manifest.objective,
             acceptance_criteria=self.manifest.acceptance_criteria,
+            acceptance_specifications=self.manifest.acceptance_specifications,
             allowed_backends=self.manifest.allowed_backends,
         )
 
@@ -90,6 +97,7 @@ class LaneTask:
     base_sha: str
     objective: str
     acceptance_criteria: tuple[str, ...]
+    acceptance_specifications: tuple[AcceptanceSpecification, ...]
     allowed_backends: tuple[str, ...]
 
 
@@ -104,6 +112,7 @@ class _TaskSeed:
     task_id: str
     objective: str
     acceptance_criteria: tuple[str, ...]
+    acceptance_specifications: tuple[AcceptanceSpecification, ...]
     files: Mapping[str, bytes]
     checker_id: str
 
@@ -136,11 +145,30 @@ if __name__ == "__main__":
     unittest.main()
 """
 
+
+def _specification(
+    identifier: str,
+    criterion: str,
+    assertion: str,
+) -> AcceptanceSpecification:
+    return AcceptanceSpecification(
+        identifier,
+        criterion,
+        (sys.executable, "-B", "-c", assertion),
+    )
+
 _TASKS = (
     _TaskSeed(
         "failing-test-fix",
         "Repair increment so the failing documented example passes.",
         ("increment(1) returns 2",),
+        (
+            _specification(
+                "increment-returns-two",
+                "increment(1) returns 2",
+                "from tiny_pkg.maths import increment; assert increment(1) == 2",
+            ),
+        ),
         {
             "tiny_pkg/__init__.py": b"from .maths import increment\n",
             "tiny_pkg/maths.py": b"def increment(value: int) -> int:\n    return value - 1\n",
@@ -152,6 +180,13 @@ _TASKS = (
         "off-by-one-green-tests",
         "Correct the off-by-one behavior despite the weak green smoke test.",
         ("increment adds exactly one for ordinary integers",),
+        (
+            _specification(
+                "increment-ordinary-integers",
+                "increment adds exactly one for ordinary integers",
+                "from tiny_pkg.maths import increment; assert all(increment(value) == value + 1 for value in (-3, 0, 1, 7))",
+            ),
+        ),
         {
             "tiny_pkg/__init__.py": b"from .maths import increment\n",
             "tiny_pkg/maths.py": b"def increment(value: int) -> int:\n    return value\n",
@@ -163,6 +198,13 @@ _TASKS = (
         "missing-edge-case",
         "Repair the missing negative-input edge case without regressing positive inputs.",
         ("increment handles both positive and negative integers",),
+        (
+            _specification(
+                "negative-integer-contract",
+                "increment handles both positive and negative integers",
+                "from tiny_pkg.maths import increment; assert all(increment(value) == value + 1 for value in (-3, -1, 0, 4))",
+            ),
+        ),
         {
             "tiny_pkg/__init__.py": b"from .maths import increment\n",
             "tiny_pkg/maths.py": (
@@ -177,6 +219,13 @@ _TASKS = (
         "doc-code-drift",
         "Bring the implementation back into agreement with the documented increment API.",
         ("README and implementation both describe adding one",),
+        (
+            _specification(
+                "readme-api-contract",
+                "README and implementation both describe adding one",
+                "from pathlib import Path; from tiny_pkg.maths import increment; assert 'adds one' in Path('README.md').read_text(encoding='utf-8'); assert increment(1) == 2",
+            ),
+        ),
         {
             "README.md": b"# Tiny package\n\n`increment(value)` adds one.\n",
             "tiny_pkg/__init__.py": b"from .maths import increment\n",
@@ -189,6 +238,13 @@ _TASKS = (
         "dependency-free-refactor",
         "Inline the increment behavior and remove the obsolete local implementation dependency.",
         ("behavior remains locked while legacy.py is eliminated",),
+        (
+            _specification(
+                "obsolete-module-removed",
+                "behavior remains locked while legacy.py is eliminated",
+                "from pathlib import Path; from tiny_pkg.maths import increment; assert increment(1) == 2; assert not Path('tiny_pkg/legacy.py').exists()",
+            ),
+        ),
         {
             "tiny_pkg/__init__.py": b"from .maths import increment\n",
             "tiny_pkg/legacy.py": (
@@ -288,6 +344,7 @@ def build_corpus(
             family="repository-issue-to-verified-delivery",
             objective=seed.objective,
             acceptance_criteria=seed.acceptance_criteria,
+            acceptance_specifications=seed.acceptance_specifications,
             budget=budget,
             allowed_backends=("scripted",),
             hidden_check_digest=_checker_digest(seed.checker_id),

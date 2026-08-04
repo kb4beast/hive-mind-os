@@ -7,7 +7,6 @@ from pathlib import Path
 
 from hive_mind_os.classic_gpt import ClassicGptSourcePack
 from hive_mind_os.contracts import (
-    EXTENSION_SCHEMA_NAMES,
     LEGACY_SCHEMA_NAMES,
     ROLE_NAMES,
     SCHEMA_NAMES,
@@ -34,9 +33,13 @@ class ContractSchemaTests(unittest.TestCase):
         return state
 
     def test_catalog_is_complete_strict_and_draft_2020_12(self) -> None:
-        self.assertEqual(len(LEGACY_SCHEMA_NAMES), 12)
-        self.assertEqual(len(EXTENSION_SCHEMA_NAMES), 8)
-        self.assertEqual(len(SCHEMA_NAMES), 20)
+        schema_names_on_disk = {
+            path.name.removesuffix(".schema.json")
+            for path in (ROOT / "src" / "hive_mind_os" / "schemas").glob(
+                "*.schema.json"
+            )
+        }
+        self.assertEqual(set(SCHEMA_NAMES), schema_names_on_disk)
         result = validate_schema_catalog()
         self.assertTrue(result.valid, result.issues)
         for name in SCHEMA_NAMES:

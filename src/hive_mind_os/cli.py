@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Sequence
 from uuid import uuid4
 
+from .acceptance import (
+    AcceptanceSpecification,
+    AcceptanceSpecificationError,
+    normalize_acceptance_specifications,
+)
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
 from .courtroom import CaseParticipants
@@ -162,6 +167,13 @@ def build_deliver_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="Acceptance criterion; repeatable",
+    )
+    parser.add_argument(
+        "--acceptance-spec",
+        action="append",
+        default=[],
+        metavar="FILE",
+        help="JSON executable acceptance specification; repeat once per criterion",
     )
     parser.add_argument(
         "--backend",
@@ -432,6 +444,9 @@ async def _run_deliver(args: argparse.Namespace) -> int:
     else:
         backend = ScriptedRepositoryBackend(args.scripted_variant)
     try:
+        acceptance_specifications = _load_acceptance_specifications(
+            args.acceptance_spec
+        )
         repository = Path(args.repository).resolve()
         output_dir = (
             Path(args.output_dir)
@@ -442,6 +457,7 @@ async def _run_deliver(args: argparse.Namespace) -> int:
             repository,
             args.objective,
             acceptance_criteria=tuple(args.criterion),
+            acceptance_specifications=acceptance_specifications,
             backend=backend,
             pin=args.pin,
             output_dir=output_dir,
@@ -474,6 +490,30 @@ async def _run_deliver(args: argparse.Namespace) -> int:
         file=stream,
     )
     return 0 if report.status.value == "succeeded" else 1
+
+
+def _load_acceptance_specifications(
+    paths: Sequence[str],
+) -> tuple[AcceptanceSpecification, ...]:
+    specifications: list[AcceptanceSpecification] = []
+    for raw_path in paths:
+        path = Path(raw_path)
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(
+                f"cannot read {path}: {type(error).__name__}: {error}"
+            ) from None
+        if not isinstance(document, dict):
+            raise ValueError(f"{path}: acceptance specification must be a JSON object")
+        try:
+            specifications.append(AcceptanceSpecification.from_dict(document))
+        except AcceptanceSpecificationError as error:
+            raise ValueError(f"{path}: {error}") from None
+    try:
+        return normalize_acceptance_specifications(specifications)
+    except AcceptanceSpecificationError as error:
+        raise ValueError(str(error)) from None
 
 
 async def _run_resume(args: argparse.Namespace) -> int:

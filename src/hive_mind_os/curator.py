@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import ast
 import json
+import shutil
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Callable, Literal, Mapping, Sequence, TypedDict
 
+from .acceptance import AcceptanceSpecification, normalize_acceptance_specifications
 from .ledger import EvidenceLedger
 
 CheckOutcome = Literal["succeeded", "failed"]
@@ -35,11 +37,14 @@ class ContaminationError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class AcceptanceCheck:
-    """One sealed, argv-form command and its expected process outcome."""
+    """One sealed command, optionally bound to a typed acceptance specification."""
 
     name: str
     argv: tuple[str, ...]
     expected: CheckOutcome = "succeeded"
+    criteria: tuple[str, ...] = ()
+    specification_id: str | None = None
+    specification_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -48,6 +53,19 @@ class AcceptanceCheck:
             raise ValueError("acceptance check argv must be a nonempty string tuple")
         if self.expected not in {"succeeded", "failed"}:
             raise ValueError("acceptance check expectation must be succeeded or failed")
+        if any(not isinstance(item, str) or not item.strip() for item in self.criteria):
+            raise ValueError("acceptance check criteria must be non-empty strings")
+        if len(set(self.criteria)) != len(self.criteria):
+            raise ValueError("acceptance check criteria must not contain duplicates")
+        if self.specification_id is None and self.specification_digest is not None:
+            raise ValueError("acceptance check digest requires a specification id")
+        if self.specification_id is not None and not self.specification_id.strip():
+            raise ValueError("acceptance check specification id must not be empty")
+        if self.specification_digest is not None and (
+            not self.specification_digest.startswith("sha256:")
+            or len(self.specification_digest) != 71
+        ):
+            raise ValueError("acceptance check specification digest must be SHA-256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,11 +226,32 @@ class CuratorReview:
         objective: str,
         acceptance_criteria: Sequence[str],
         base_workspace: Path,
+        acceptance_specifications: Sequence[
+            AcceptanceSpecification | Mapping[str, object]
+        ] = (),
     ) -> None:
         self.run_id = run_id
         self.ledger = ledger
         self.objective = objective
-        self.acceptance_criteria = tuple(acceptance_criteria)
+        self.acceptance_specifications = normalize_acceptance_specifications(
+            acceptance_specifications
+        )
+        specification_criteria = tuple(
+            item.criterion for item in self.acceptance_specifications
+        )
+        declared_criteria = tuple(acceptance_criteria)
+        if declared_criteria and not self.acceptance_specifications:
+            raise ContaminationError(
+                "declared acceptance criteria require typed executable specifications"
+            )
+        if self.acceptance_specifications and declared_criteria and (
+            len(declared_criteria) != len(set(declared_criteria))
+            or set(declared_criteria) != set(specification_criteria)
+        ):
+            raise ContaminationError(
+                "typed acceptance specifications must exactly match the declared criterion set"
+            )
+        self.acceptance_criteria = specification_criteria
         self.base_workspace = base_workspace.resolve()
         self._checks: tuple[AcceptanceCheck, ...] = ()
         self._seal_digest: str | None = None
@@ -238,6 +277,7 @@ class CuratorReview:
         frozen = tuple(checks)
         if not frozen:
             raise ContaminationError("blind phase produced no acceptance checks")
+        self._validate_specification_bindings(frozen)
         digest = acceptance_checks_digest(frozen)
         sequence = self.ledger.append_event(
             self.run_id,
@@ -248,6 +288,9 @@ class CuratorReview:
                 "digest": digest,
                 "check_count": len(frozen),
                 "checks": [asdict(check) for check in frozen],
+                "acceptance_specifications": [
+                    item.to_dict() for item in self.acceptance_specifications
+                ],
                 "objective_digest": _text_digest(self.objective),
                 "acceptance_criteria_digest": _text_digest(
                     json.dumps(
@@ -279,7 +322,8 @@ class CuratorReview:
         head_workspace: Path,
         declared_paths: Sequence[str],
         command_runner: Callable[
-            [Sequence[str]], tuple[Mapping[str, object], Sequence[Mapping[str, object]]]
+            [AcceptanceCheck],
+            tuple[Mapping[str, object], Sequence[Mapping[str, object]]],
         ],
         repository_test_argv: Sequence[str],
         delivery_verifier: Callable[
@@ -297,38 +341,61 @@ class CuratorReview:
 
         evidence_records: list[Mapping[str, object]] = []
         acceptance_results: list[Mapping[str, object]] = []
-        observed_by_argv: dict[tuple[str, ...], str] = {}
+        observed_by_argv: dict[tuple[str, ...], dict[str, object]] = {}
         for check in self._checks:
-            receipt, records = command_runner(check.argv)
+            receipt, records = command_runner(check)
             evidence_records.extend(records)
             observed = str(receipt.get("result", "unknown"))
-            observed_by_argv.setdefault(check.argv, observed)
+            receipt_binding = _evaluate_check_receipt(check, receipt)
+            evaluation = {
+                "observed": observed,
+                "matched": receipt_binding == "matched",
+                "receipt_binding": receipt_binding,
+            }
+            observed_by_argv.setdefault(check.argv, evaluation)
             acceptance_results.append(
                 {
                     "name": check.name,
                     "argv": list(check.argv),
                     "expected": check.expected,
+                    "criteria": list(check.criteria),
+                    "specification_id": check.specification_id,
+                    "specification_digest": check.specification_digest,
                     "observed": observed,
-                    "matched": observed == check.expected,
+                    "matched": evaluation["matched"],
+                    "receipt_binding": receipt_binding,
                     "sealed_digest": self._seal_digest,
                 }
             )
 
         repository_argv = tuple(repository_test_argv)
-        repository_observed = observed_by_argv.get(repository_argv)
+        repository_evaluation = observed_by_argv.get(repository_argv)
         verification_source = "sealed-acceptance-check"
-        if repository_observed is None:
-            repository_receipt, repository_records = command_runner(repository_argv)
+        if repository_evaluation is None:
+            repository_check = AcceptanceCheck("repository-own-tests", repository_argv)
+            repository_receipt, repository_records = command_runner(repository_check)
             evidence_records.extend(repository_records)
-            repository_observed = str(repository_receipt.get("result", "unknown"))
+            receipt_binding = _evaluate_check_receipt(
+                repository_check, repository_receipt
+            )
+            repository_evaluation = {
+                "observed": str(repository_receipt.get("result", "unknown")),
+                "matched": receipt_binding == "matched",
+                "receipt_binding": receipt_binding,
+            }
             verification_source = "repository-command"
+        assert repository_evaluation is not None
         acceptance_results.append(
             {
                 "name": "repository-own-tests",
                 "argv": list(repository_argv),
                 "expected": "succeeded",
-                "observed": repository_observed,
-                "matched": repository_observed == "succeeded",
+                "criteria": [],
+                "specification_id": None,
+                "specification_digest": None,
+                "observed": repository_evaluation["observed"],
+                "matched": repository_evaluation["matched"],
+                "receipt_binding": repository_evaluation["receipt_binding"],
                 "sealed_digest": self._seal_digest,
                 "verification_source": verification_source,
             }
@@ -371,6 +438,61 @@ class CuratorReview:
             },
         )
         return verdict, tuple(evidence_records)
+
+    def _validate_specification_bindings(
+        self,
+        checks: Sequence[AcceptanceCheck],
+    ) -> None:
+        """Require one exact sealed check per declared typed specification."""
+
+        if not self.acceptance_specifications:
+            return
+        by_identifier = {
+            item.identifier: item for item in self.acceptance_specifications
+        }
+        bound: dict[str, list[AcceptanceCheck]] = {
+            identifier: [] for identifier in by_identifier
+        }
+        for check in checks:
+            if check.specification_id is None:
+                if check.criteria:
+                    raise ContaminationError(
+                        "criterion-scoped acceptance checks must bind a specification"
+                    )
+                continue
+            specification = by_identifier.get(check.specification_id)
+            if specification is None:
+                raise ContaminationError(
+                    "acceptance check refers to an unknown specification: "
+                    + check.specification_id
+                )
+            if check.specification_digest != specification.digest:
+                raise ContaminationError(
+                    "acceptance check specification digest does not bind the declared command"
+                )
+            if (
+                check.argv != specification.argv
+                or check.expected != specification.expected
+                or check.criteria != (specification.criterion,)
+            ):
+                raise ContaminationError(
+                    "acceptance check does not exactly match its typed specification: "
+                    + specification.identifier
+                )
+            bound[specification.identifier].append(check)
+        missing = sorted(identifier for identifier, items in bound.items() if not items)
+        if missing:
+            raise ContaminationError(
+                "typed acceptance specifications lack sealed checks: " + ", ".join(missing)
+            )
+        duplicated = sorted(
+            identifier for identifier, items in bound.items() if len(items) > 1
+        )
+        if duplicated:
+            raise ContaminationError(
+                "typed acceptance specifications have multiple sealed checks: "
+                + ", ".join(duplicated)
+            )
 
     def _checklist(
         self,
@@ -423,6 +545,72 @@ class CuratorReview:
                 },
             ),
         )
+
+
+def _evaluate_check_receipt(
+    check: AcceptanceCheck,
+    receipt: Mapping[str, object],
+) -> str:
+    """Return a stable reason unless a receipt proves the sealed check ran."""
+
+    execution = receipt.get("execution")
+    if not isinstance(execution, Mapping):
+        return "missing-execution"
+    requested = execution.get("requested_argv")
+    actual = execution.get("argv")
+    if not _string_argv_matches(requested, check.argv):
+        return "requested-argv-mismatch"
+    if not _executed_argv_matches(actual, check.argv):
+        return "executed-argv-mismatch"
+    if check.specification_id is not None:
+        binding = execution.get("acceptance_specification")
+        if not isinstance(binding, Mapping):
+            return "missing-specification-binding"
+        if binding.get("id") != check.specification_id:
+            return "specification-id-mismatch"
+        if binding.get("digest") != check.specification_digest:
+            return "specification-digest-mismatch"
+    outcome = execution.get("outcome")
+    exit_code = execution.get("exit_code")
+    if outcome not in {"succeeded", "failed"}:
+        return "invalid-execution-outcome"
+    if receipt.get("result") != outcome:
+        return "receipt-result-mismatch"
+    if type(exit_code) is not int:
+        return "missing-exit-code"
+    stdout = execution.get("stdout")
+    stderr = execution.get("stderr")
+    if not isinstance(stdout, Mapping) or not isinstance(stderr, Mapping):
+        return "missing-output-metadata"
+    if stdout.get("truncated") is True or stderr.get("truncated") is True:
+        return "truncated-output"
+    if check.expected == "succeeded" and (outcome != "succeeded" or exit_code != 0):
+        return "unexpected-process-outcome"
+    if check.expected == "failed" and (outcome != "failed" or exit_code == 0):
+        return "unexpected-process-outcome"
+    return "matched"
+
+
+def _string_argv_matches(value: object, expected: Sequence[str]) -> bool:
+    return isinstance(value, (list, tuple)) and all(
+        isinstance(item, str) for item in value
+    ) and tuple(value) == tuple(expected)
+
+
+def _executed_argv_matches(value: object, expected: Sequence[str]) -> bool:
+    if _string_argv_matches(value, expected):
+        return True
+    if not isinstance(value, (list, tuple)) or not all(
+        isinstance(item, str) for item in value
+    ):
+        return False
+    if len(value) != len(expected) or tuple(value[1:]) != tuple(expected[1:]):
+        return False
+    return _resolved_executable(value[0]) == _resolved_executable(expected[0])
+
+
+def _resolved_executable(value: str) -> Path:
+    return Path(shutil.which(value) or value).resolve()
 
 
 def _required_string_list(

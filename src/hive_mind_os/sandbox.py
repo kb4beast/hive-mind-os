@@ -600,6 +600,20 @@ class SandboxRunner:
                     "provenance_refs": [intent["action_digest"]],
                 }
             )
+        execution: dict[str, Any] = {
+            "argv": argv,
+            "requested_argv": list(intent["command"]["argv"]),
+            "exit_code": exit_code,
+            "duration_ms": round(duration_s * 1000, 3),
+            "outcome": outcome,
+            "stdout": {"digest": artifacts[0]["digest"], "bytes": len(stdout), "truncated": truncated[0]},
+            "stderr": {"digest": artifacts[1]["digest"], "bytes": len(stderr), "truncated": truncated[1]},
+            "sandbox_spec_digest": self.spec.spec_digest(),
+            "runner_identity": self.runner_identity,
+        }
+        acceptance_specification = intent.get("acceptance_specification")
+        if isinstance(acceptance_specification, Mapping):
+            execution["acceptance_specification"] = dict(acceptance_specification)
         receipt = {
             "schema_version": 1,
             "receipt_id": f"REC-{uuid4()}",
@@ -617,16 +631,7 @@ class SandboxRunner:
             "result": "succeeded" if outcome == "succeeded" else "failed",
             "observed_at": observed_at,
             "artifacts": artifacts,
-            "execution": {
-                "argv": argv,
-                "exit_code": exit_code,
-                "duration_ms": round(duration_s * 1000, 3),
-                "outcome": outcome,
-                "stdout": {"digest": artifacts[0]["digest"], "bytes": len(stdout), "truncated": truncated[0]},
-                "stderr": {"digest": artifacts[1]["digest"], "bytes": len(stderr), "truncated": truncated[1]},
-                "sandbox_spec_digest": self.spec.spec_digest(),
-                "runner_identity": self.runner_identity,
-            },
+            "execution": execution,
             "verified_by": self.runner_identity,
         }
         validation = validate_contract("tool-receipt", receipt)
