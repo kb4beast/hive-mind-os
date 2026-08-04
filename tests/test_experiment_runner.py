@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import cast
 
 from hive_mind_os.experiment_runner import (
+    EVALUATION_SURFACE_UNAVAILABLE,
+    EvaluationSurfaceUnavailable,
     ExperimentRunner,
     FixtureMissionSurface,
     PITEpisodeSurface,
@@ -561,18 +563,13 @@ class ExperimentRunnerTests(unittest.TestCase):
         self.assertEqual(observation.evidence_completeness, 1.0)
         self.assertEqual(oracle.targets, ["a" * 40, "b" * 40])
 
-    def test_fixture_surface_runs_real_mission_and_reuses_bound_receipts(self) -> None:
+    def test_fixture_surface_is_disabled_until_it_uses_a_real_backend(self) -> None:
         surface = FixtureMissionSurface(self.root / "fixture-surface")
-        prompt = generation_zero_prompt(ROLE_CONTRACTS[Role.BUILDER])
-        first = surface.evaluate(prompt, Role.BUILDER, 0)
-        second = surface.evaluate(prompt, Role.BUILDER, 0)
-        self.assertEqual(first.evidence_completeness, 1.0)
-        self.assertEqual(first.artifact_refs, second.artifact_refs)
-        self.assertGreater(len(first.artifact_refs), 1)
-        for reference in first.artifact_refs:
-            path, _, digest = reference.rpartition("#")
-            self.assertTrue(Path(path).is_file())
-            self.assertEqual(sha256_digest(Path(path).read_bytes()), digest)
+        with self.assertRaisesRegex(
+            EvaluationSurfaceUnavailable,
+            EVALUATION_SURFACE_UNAVAILABLE,
+        ):
+            surface.evaluate("prompt", Role.BUILDER, 0)
 
     def test_committed_experiment_artifacts_match_git_bytes_or_adverse_manifest(
         self,

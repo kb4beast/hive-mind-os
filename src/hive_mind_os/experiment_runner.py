@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import subprocess
@@ -13,10 +12,8 @@ from pathlib import Path
 from typing import Any, Protocol, Sequence
 from uuid import uuid4
 
-from .acceptance import AcceptanceSpecification
 from .ledger import EvidenceLedger
-from .mission import RepositoryMission, ScriptedRepositoryBackend
-from .models import Role, WorkStatus, utc_now
+from .models import Role, utc_now
 from .pit_oracle import PointInTimeOracle
 from .prompt_registry import PromptRegistry
 from .receipts import FileReceiptValidator, ReceiptReference, sha256_digest
@@ -31,10 +28,14 @@ from .recursive_improvement import (
     RecursiveImprovementContract,
     RecursiveImprovementGate,
 )
-from .roles import ROLE_CONTRACTS
 
 SCRIPTED_EVALUATOR_ID = "evaluator:scripted-harness"
 SCRIPTED_JUDGE_ID = "judge:recursive-improvement"
+EVALUATION_SURFACE_UNAVAILABLE = "evaluation surface not implemented"
+
+
+class EvaluationSurfaceUnavailable(RuntimeError):
+    """Raised until a surface evaluates prompts through a real backend."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +59,7 @@ class EvaluationSurface(Protocol):
 
 
 class FixtureMissionSurface:
-    """Deterministic prompt checks backed by real P05 fixture missions and receipts."""
+    """Disabled placeholder for the former keyword-scored fixture surface."""
 
     name: str = "fixture-missions"
     episode_ids: tuple[str, ...] = (
@@ -71,12 +72,7 @@ class FixtureMissionSurface:
         self,
         artifact_root: str | Path = ".hive-mind-experiments/fixture-missions",
     ) -> None:
-        self.artifact_root = Path(artifact_root).resolve() / uuid4().hex[:12]
-        self.artifact_root.mkdir(parents=True, exist_ok=False)
-        self._mission_cache: dict[
-            int,
-            tuple[float, float, tuple[str, ...]],
-        ] = {}
+        self.artifact_root = Path(artifact_root).resolve()
 
     def evaluate(
         self,
@@ -84,96 +80,7 @@ class FixtureMissionSurface:
         role: Role,
         repetition: int,
     ) -> SurfaceObservation:
-        mission_success, completeness, artifact_refs = self._mission_observation(
-            repetition
-        )
-        contract = ROLE_CONTRACTS[role]
-        checks = (
-            ("Return only a JSON object" in prompt, 0.25),
-            (f"role {role.value}" in prompt, 0.10),
-            (all(name in prompt for name in contract.required_outputs), 0.25),
-            (all(gate in prompt for gate in contract.quality_gates), 0.20),
-            ("verify every required output" in prompt.casefold(), 0.10),
-            ("receipt" in prompt.casefold(), 0.10),
-        )
-        prompt_score = sum(weight for passed, weight in checks if passed)
-        success = round(
-            0.5 * mission_success + 0.5 * prompt_score,
-            6,
-        )
-        return SurfaceObservation(
-            task_success=success,
-            token_cost=max(1.0, len(prompt.encode("utf-8")) / 4.0),
-            evidence_completeness=completeness,
-            artifact_refs=artifact_refs,
-        )
-
-    def _mission_observation(
-        self,
-        repetition: int,
-    ) -> tuple[float, float, tuple[str, ...]]:
-        cached = self._mission_cache.get(repetition)
-        if cached is not None:
-            return cached
-        episode_root = self.artifact_root / str(repetition)
-        episode_root.mkdir(parents=True, exist_ok=False)
-        output_root = episode_root / "d"
-        with tempfile.TemporaryDirectory(prefix="hmos-p10-") as temporary:
-            repository, pin = _build_fixture_repository(Path(temporary))
-            report = asyncio.run(
-                RepositoryMission(
-                    repository,
-                    "Fix the failing increment regression",
-                    acceptance_criteria=("increment(1) returns 2",),
-                    acceptance_specifications=(
-                        AcceptanceSpecification(
-                            "increment-returns-two",
-                            "increment(1) returns 2",
-                            (
-                                sys.executable,
-                                "-B",
-                                "-c",
-                                "from tiny_pkg.maths import increment; assert increment(1) == 2",
-                            ),
-                        ),
-                    ),
-                    backend=ScriptedRepositoryBackend(),
-                    pin=pin,
-                    output_dir=output_root,
-                ).run()
-            )
-        report_root = report.artifact_directory or report.receipt_root
-        report_path = (
-            None if report_root is None else Path(report_root) / "mission-report.json"
-        )
-        receipt_complete, receipt_paths = _validate_receipt_records(
-            report.receipt_root,
-            report.receipts,
-        )
-        mission_complete = (
-            report.status is WorkStatus.SUCCEEDED
-            and report.curator_verdict == "adopt"
-            and report_path is not None
-            and report_path.is_file()
-            and receipt_complete
-        )
-        retained_paths = list(receipt_paths)
-        if report_path is not None and report_path.is_file():
-            retained_paths.insert(
-                0,
-                (report_path, sha256_digest(report_path.read_bytes())),
-            )
-        references = tuple(
-            _artifact_reference(path, digest)
-            for path, digest in retained_paths
-        )
-        observation = (
-            float(report.status is WorkStatus.SUCCEEDED),
-            float(mission_complete),
-            references,
-        )
-        self._mission_cache[repetition] = observation
-        return observation
+        raise EvaluationSurfaceUnavailable(EVALUATION_SURFACE_UNAVAILABLE)
 
 
 class PITEpisodeSurface:
@@ -306,6 +213,8 @@ class ExperimentRunner:
         judge_id: str = SCRIPTED_JUDGE_ID,
         contract: RecursiveImprovementContract | None = None,
     ) -> ExperimentRun:
+        if isinstance(surface, FixtureMissionSurface):
+            raise EvaluationSurfaceUnavailable(EVALUATION_SURFACE_UNAVAILABLE)
         role_value = Role(role)
         if repetitions < 2:
             raise ValueError("experiments require at least two repetitions")
