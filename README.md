@@ -33,7 +33,7 @@ directory must not already exist.
 | See a complete deterministic fixture delivery (`hive-mind demo`) | Works offline; not a general coding agent |
 | Real model drives the change (`--backend model`) | Not ready for routine use |
 | Remote push / pull requests | Local Git only |
-| Production use | No release, tag, or user validation yet |
+| Production use | Prototype release only; no production use or user validation |
 
 ## Verify an existing change
 
