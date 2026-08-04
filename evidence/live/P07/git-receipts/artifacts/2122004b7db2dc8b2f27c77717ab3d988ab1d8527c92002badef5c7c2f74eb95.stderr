@@ -1,1 +1,0 @@
-fatal: unable to access 'https://github.com/kb4beast/hive-mind-os.git/': schannel: next InitializeSecurityContext failed: CRYPT_E_NO_REVOCATION_CHECK (0x80092012) - The revocation function was unable to check revocation for the certificate.

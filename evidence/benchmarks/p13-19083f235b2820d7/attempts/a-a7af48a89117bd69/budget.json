@@ -1,1 +1,0 @@
-{"consumed":{"compute_units":4.0,"episodes":2,"tool_calls":4},"exceeded":false,"issued":{"max_compute_units":500.0,"max_compute_units_per_episode":100.0,"max_episodes":1000,"max_tool_calls":500,"max_tool_calls_per_episode":100},"schema_version":1,"within_budget":true}
