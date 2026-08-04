@@ -639,7 +639,7 @@ class SandboxRunner:
             raise SandboxError("; ".join(validation.issues))
         raw = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
         digest = sha256_digest(raw)
-        path = f"receipts/{digest.removeprefix('sha256:')}.json"
+        path = f"r/{digest.removeprefix('sha256:')}.json"
         self._atomic_write(path, raw)
         self.last_reference = ReceiptReference(path, digest)
         return receipt

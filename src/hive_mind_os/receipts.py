@@ -23,6 +23,20 @@ _WINDOWS_RESERVED_NAMES = frozenset(
 )
 
 
+def filesystem_path(path: str | Path) -> Path:
+    """Return a Windows long-path spelling for an absolute local filesystem path."""
+
+    candidate = Path(path)
+    if os.name != "nt" or not candidate.is_absolute():
+        return candidate
+    value = os.fspath(candidate)
+    if value.startswith("\\\\?\\"):
+        return candidate
+    if value.startswith("\\\\"):
+        return Path("\\\\?\\UNC\\" + value[2:])
+    return Path("\\\\?\\" + value)
+
+
 def portable_path_parts(value: str) -> tuple[str, ...]:
     if (
         not value
@@ -123,7 +137,7 @@ class FileReceiptValidator:
 
     def __init__(self, trusted_root: str | Path) -> None:
         root = Path(trusted_root).resolve()
-        if not root.is_dir():
+        if not filesystem_path(root).is_dir():
             raise ValueError("trusted receipt root must be an existing directory")
         self.trusted_root = root
 
@@ -150,11 +164,12 @@ class FileReceiptValidator:
             resolved.relative_to(self.trusted_root)
         except ValueError:
             return None, [f"{label} path escapes the trusted root"]
-        if not resolved.is_file():
+        readable = filesystem_path(resolved)
+        if not readable.is_file():
             return None, [f"{label} path is not a regular file"]
 
         try:
-            content = resolved.read_bytes()
+            content = readable.read_bytes()
         except OSError as error:
             return None, [f"{label} could not be read: {type(error).__name__}"]
         observed_digest = sha256_digest(content)

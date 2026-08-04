@@ -14,6 +14,7 @@ from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.git_adapter import verify_delivery
 from hive_mind_os.mission import (
+    MissionFailed,
     MissionReport,
     RepositoryMission,
     ScriptedRepositoryBackend,
@@ -392,6 +393,28 @@ class RepositoryMissionTests(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertIn("requires autonomy level", report.failure["message"])
         self.assertEqual(report.event_types[:2], ("mission.started", "policy.decision"))
+
+    def test_failure_report_retains_the_mission_cause_when_evidence_fails(self) -> None:
+        class BrokenEvidenceMission(RepositoryMission):
+            def _preserve_failure_evidence(self, final_output: Path) -> str | None:
+                raise MissionFailed("receipt validation failed")
+
+        output = self.output("broken-evidence")
+        report = asyncio.run(
+            BrokenEvidenceMission(
+                self.fixture.root,
+                "Fix the failing test",
+                acceptance_criteria=("increment(1) returns 2",),
+                acceptance_specifications=(_fixture_acceptance_specification(),),
+                pin=self.fixture.commit_two,
+                output_dir=output,
+                policy=PolicyEngine(AutonomyLevel.ADVISE),
+            ).run()
+        )
+        self.assertIs(report.status, WorkStatus.FAILED)
+        self.assertIn("mission failed because", report.failure["message"])
+        self.assertIn("requires autonomy level", report.failure["message"])
+        self.assertIn("additionally, evidence preservation failed", report.failure["message"])
 
     def test_budget_exhaustion_is_recorded_and_exports_nothing(self) -> None:
         report, output = self.run_mission(
