@@ -1215,7 +1215,7 @@ class RepositoryMission:
         except Exception as error:
             failure = {
                 "type": type(error).__name__,
-                "message": str(error),
+                "message": f"mission failed because {error}",
             }
             if isinstance(error, BudgetExceeded) or "allowance" in str(error).lower():
                 self.ledger.append_event(
@@ -1232,7 +1232,14 @@ class RepositoryMission:
             )
             if published and final_output.exists():
                 shutil.rmtree(final_output)
-            failure_receipt_root = self._preserve_failure_evidence(final_output)
+            try:
+                failure_receipt_root = self._preserve_failure_evidence(final_output)
+            except Exception as evidence_error:
+                failure_receipt_root = None
+                failure["message"] += (
+                    "; additionally, evidence preservation failed because "
+                    f"{type(evidence_error).__name__}: {evidence_error}"
+                )
             report = self._report(
                 results,
                 WorkStatus.FAILED,

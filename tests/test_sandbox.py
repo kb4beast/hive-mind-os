@@ -403,7 +403,7 @@ class SandboxTests(unittest.TestCase):
     def test_interrupted_publish_leaves_no_receipt_claim(self) -> None:
         class InterruptedRunner(SandboxRunner):
             def _atomic_write(self, relative: str, content: bytes) -> None:
-                if relative.startswith("receipts/"):
+                if relative.startswith("r/"):
                     raise OSError("simulated receipt publish interruption")
                 super()._atomic_write(relative, content)
 
@@ -418,7 +418,7 @@ class SandboxTests(unittest.TestCase):
         receipts = self.trusted / "receipts"
         self.assertFalse(receipts.exists() and any(receipts.iterdir()))
         absent = ReceiptReference(
-            f"receipts/{'0' * 64}.json",
+            f"r/{'0' * 64}.json",
             f"sha256:{'0' * 64}",
         )
         validation = FileReceiptValidator(self.trusted).validate(
