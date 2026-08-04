@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from hashlib import sha256
 from typing import Any, Mapping
 from urllib.parse import urlsplit
@@ -33,6 +33,31 @@ from .roles import RoleContract
 
 class ModelTurnError(RuntimeError):
     """Raised after bounded retries cannot produce a valid structured turn."""
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryContext:
+    """Bounded repository facts supplied only to a repository Builder turn."""
+
+    failing_test_stdout: str
+    failing_test_stderr: str
+    named_files: tuple[tuple[str, str], ...]
+    file_tree: tuple[str, ...]
+    current_diff: str | None
+
+    def to_prompt(self) -> dict[str, object]:
+        return {
+            "failing_test": {
+                "stdout": self.failing_test_stdout,
+                "stderr": self.failing_test_stderr,
+            },
+            "named_files": [
+                {"path": path, "content": content}
+                for path, content in self.named_files
+            ],
+            "file_tree": list(self.file_tree),
+            "current_diff": self.current_diff,
+        }
 
 
 def _digest(content: bytes) -> str:
@@ -69,9 +94,11 @@ class ModelBackend:
         work_item: WorkItem,
         objective: Objective,
         context: tuple[AgentResult, ...],
+        *,
+        repository_context: RepositoryContext | None = None,
     ) -> AgentResult:
         system, user, truncated, prompt_artifact_digest = self._prompt(
-            contract, work_item, objective, context
+            contract, work_item, objective, context, repository_context
         )
         corrective: str | None = None
         last_error = "model did not return a valid turn"
@@ -163,6 +190,7 @@ class ModelBackend:
         work_item: WorkItem,
         objective: Objective,
         context: tuple[AgentResult, ...],
+        repository_context: RepositoryContext | None,
     ) -> tuple[str, str, bool, str]:
         system = generation_zero_prompt(contract)
         artifact_digest = prompt_digest(system)
@@ -211,6 +239,9 @@ class ModelBackend:
                 "work_item": work_item.instruction,
                 "prior_context_json": rendered,
                 "context_truncated": truncated,
+                "repository_context": (
+                    None if repository_context is None else repository_context.to_prompt()
+                ),
             },
             ensure_ascii=False,
             sort_keys=True,

@@ -13,7 +13,7 @@ from unittest.mock import patch
 from hive_mind_os.autonomy import AutonomyBudget, BudgetExceeded
 from hive_mind_os.cli import build_parser
 from hive_mind_os.ledger import EvidenceLedger
-from hive_mind_os.model_backend import ModelBackend, ModelTurnError
+from hive_mind_os.model_backend import ModelBackend, ModelTurnError, RepositoryContext
 from hive_mind_os.model_provider import (
     ModelRequest,
     ModelResponse,
@@ -82,10 +82,23 @@ class BackendTransport:
         return self.response
 
 
-def execute_once(backend: ModelBackend, role: Role = Role.ARCHITECT, context=()):
+def execute_once(
+    backend: ModelBackend,
+    role: Role = Role.ARCHITECT,
+    context=(),
+    repository_context: RepositoryContext | None = None,
+):
     objective = Objective("Produce a verified change")
     work_item = WorkItem(objective.id, role, "Do bounded work")
-    return asyncio.run(backend.execute(ROLE_CONTRACTS[role], work_item, objective, context))
+    return asyncio.run(
+        backend.execute(
+            ROLE_CONTRACTS[role],
+            work_item,
+            objective,
+            context,
+            repository_context=repository_context,
+        )
+    )
 
 
 class ModelBackendTests(unittest.TestCase):
@@ -211,6 +224,29 @@ class ModelBackendTests(unittest.TestCase):
         self.assertEqual(
             ledgers[0].events()[0]["payload"]["request_digest"],
             ledgers[1].events()[0]["payload"]["request_digest"],
+        )
+
+    def test_builder_prompt_includes_failing_test_output_and_named_files(self) -> None:
+        provider = FakeProvider([valid_turn(Role.BUILDER)])
+        execute_once(
+            ModelBackend(provider),
+            role=Role.BUILDER,
+            repository_context=RepositoryContext(
+                failing_test_stdout="collected 1 item",
+                failing_test_stderr='File "tests/test_maths.py", line 8\nAssertionError: 1 != 2',
+                named_files=(
+                    ("tests/test_maths.py", "assert increment(1) == 2"),
+                ),
+                file_tree=("tests/test_maths.py", "tiny_pkg/maths.py"),
+                current_diff=None,
+            ),
+        )
+        payload = json.loads(provider.calls[0].user)
+        repository_context = payload["repository_context"]
+        self.assertIn("AssertionError: 1 != 2", repository_context["failing_test"]["stderr"])
+        self.assertEqual(
+            repository_context["named_files"][0]["content"],
+            "assert increment(1) == 2",
         )
 
     def test_corrective_body_is_included_in_pre_call_budget(self) -> None:
