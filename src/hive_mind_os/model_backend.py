@@ -12,7 +12,7 @@ import json
 import time
 from dataclasses import asdict
 from hashlib import sha256
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 from urllib.parse import urlsplit
 
 from .autonomy import AutonomyBudget, BudgetExceeded
@@ -33,6 +33,10 @@ from .roles import RoleContract
 
 class ModelTurnError(RuntimeError):
     """Raised after bounded retries cannot produce a valid structured turn."""
+
+
+class BuilderActionProtocolError(ModelTurnError):
+    """A structurally valid Builder turn has invalid executable actions."""
 
 
 def _digest(content: bytes) -> str:
@@ -69,6 +73,8 @@ class ModelBackend:
         work_item: WorkItem,
         objective: Objective,
         context: tuple[AgentResult, ...],
+        *,
+        result_validator: Callable[[AgentResult], None] | None = None,
     ) -> AgentResult:
         system, user, truncated, prompt_artifact_digest = self._prompt(
             contract, work_item, objective, context
@@ -84,8 +90,11 @@ class ModelBackend:
         allowance = self.budget.issue_allowance()
         used_calls = 0
         used_compute = 0.0
+        retry_index = 0
+        ordinary_failures = 0
+        builder_correction_used = False
         try:
-            for retry_index in range(provider.config.max_retries + 1):
+            while True:
                 request = ModelRequest(system, user, corrective)
                 body = provider.build_request_body(request)
                 response: ModelResponse | None = None
@@ -106,6 +115,12 @@ class ModelBackend:
                         provider.complete_once, request
                     )
                     turn = self._parse_turn(response.content, contract)
+                    result = self._to_result(turn, contract, work_item)
+                    if result_validator is not None:
+                        try:
+                            result_validator(result)
+                        except ValueError as error:
+                            raise BuilderActionProtocolError(str(error)) from None
                     self._record_call(
                         objective,
                         contract,
@@ -120,7 +135,28 @@ class ModelBackend:
                         context_manifest,
                         prompt_artifact_digest,
                     )
-                    return self._to_result(turn, contract, work_item)
+                    return result
+                except BuilderActionProtocolError as error:
+                    last_error = str(error)
+                    self._record_call(
+                        objective, contract, work_item, body, response, retry_index,
+                        time.monotonic() - started, "invalid_output", truncated,
+                        provider, context_manifest,
+                        prompt_artifact_digest,
+                        error=last_error,
+                    )
+                    if builder_correction_used:
+                        raise ModelTurnError(
+                            "Builder action protocol remained invalid after one correction: "
+                            + last_error
+                        ) from None
+                    builder_correction_used = True
+                    invalid_output = response.content[:4_000] if response else ""
+                    corrective = (
+                        "Your previous Builder response had invalid proposed actions. "
+                        "Return a corrected complete JSON turn. Invalid output:\n"
+                        f"{invalid_output}\nValidation error: {last_error}"
+                    )
                 except ModelTurnError as error:
                     last_error = str(error)
                     self._record_call(
@@ -134,6 +170,12 @@ class ModelBackend:
                         "Your previous response was invalid. Return only JSON matching the "
                         f"required contract. Validation error: {last_error}"
                     )
+                    ordinary_failures += 1
+                    if builder_correction_used or ordinary_failures > provider.config.max_retries:
+                        raise ModelTurnError(
+                            f"model output remained invalid after {retry_index + 1} attempts: "
+                            + last_error
+                        ) from None
                 except ModelProviderError as error:
                     if isinstance(error, ModelResponseError):
                         response = ModelResponse("", error.raw_body, None, None)
@@ -145,12 +187,9 @@ class ModelBackend:
                         prompt_artifact_digest,
                         error=last_error,
                     )
-                    if retry_index >= provider.config.max_retries:
+                    if builder_correction_used or retry_index >= provider.config.max_retries:
                         raise
-            raise ModelTurnError(
-                f"model output remained invalid after "
-                f"{provider.config.max_retries + 1} attempts: {last_error}"
-            )
+                retry_index += 1
         finally:
             if used_calls:
                 self.budget.consume(

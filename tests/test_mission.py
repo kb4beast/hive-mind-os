@@ -175,6 +175,35 @@ class _RepositoryProvider:
         return self.complete_once(request)
 
 
+class _CorrectingBuilderProvider(_RepositoryProvider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.requests: list[ModelRequest] = []
+        self.invalid_builder_turn_sent = False
+
+    def complete_once(self, request: ModelRequest) -> ModelResponse:
+        self.requests.append(request)
+        role = DEFAULT_LIFECYCLE[self.index]
+        response = super().complete_once(request)
+        if role is Role.BUILDER and not self.invalid_builder_turn_sent:
+            self.invalid_builder_turn_sent = True
+            self.index -= 1
+            turn = json.loads(response.content)
+            turn["proposed_actions"][1] = _action(
+                "write_file",
+                path="tiny_pkg/maths.py",
+                content="not-base64-field",
+            )
+            content = json.dumps(turn, sort_keys=True)
+            return ModelResponse(
+                content,
+                json.dumps({"content": content}, sort_keys=True).encode(),
+                10,
+                5,
+            )
+        return response
+
+
 class _SelfApprovingProvider(_RepositoryProvider):
     def complete_once(self, request: ModelRequest) -> ModelResponse:
         role = DEFAULT_LIFECYCLE[self.index]
@@ -455,6 +484,40 @@ class RepositoryMissionTests(unittest.TestCase):
             report.budget_consumption["tool_calls"],
             len(report.receipts) + len(model_calls),
         )
+
+    def test_builder_invalid_action_json_is_corrected_not_fatal(self) -> None:
+        budget = AutonomyBudget(
+            1000,
+            500,
+            500.0,
+            max_tool_calls_per_episode=100,
+            max_compute_units_per_episode=100.0,
+        )
+        provider = _CorrectingBuilderProvider()
+        report, output = self.run_mission(
+            backend=ModelBackend(provider, budget=budget),
+            budget=budget,
+            label="builder-correction",
+        )
+
+        self.assertIs(report.status, WorkStatus.SUCCEEDED)
+        self.assertTrue(verify_delivery(output, self.fixture.root))
+        builder_calls = [
+            event["payload"]
+            for event in report.ledger_events
+            if event["event_type"] == "model.call"
+            and event["payload"]["role"] == Role.BUILDER.value
+        ]
+        self.assertEqual(
+            [call["outcome"] for call in builder_calls],
+            ["invalid_output", "succeeded"],
+        )
+        self.assertEqual([call["retry_index"] for call in builder_calls], [0, 1])
+        correction = next(
+            request for request in provider.requests if request.corrective_message
+        )
+        self.assertIn("not-base64-field", correction.corrective_message or "")
+        self.assertIn("unexpected or missing fields", correction.corrective_message or "")
 
     def test_model_backend_cannot_substitute_self_approving_test_commands(self) -> None:
         budget = AutonomyBudget(
