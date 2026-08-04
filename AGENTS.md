@@ -1,5 +1,13 @@
 # Hive Mind OS Agent Instructions
 
+## Contributing as a human
+
+For a typo, formatting, or low-risk documentation correction, start with
+[CONTRIBUTING.md](CONTRIBUTING.md). Its governance-lite path explains the focused
+validation and one-review process; you do not need to absorb this full constitution
+before making that kind of contribution. Code, policy, evidence, architecture, and
+automation changes remain governed work and must follow the requirements below.
+
 ## Mission
 
 Build an evidence-driven operating system in which independent specialist agents can discover, design, implement, validate, integrate, maintain, measure, and improve software with no discretionary human supervision for routine reversible work.
