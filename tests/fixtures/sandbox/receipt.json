@@ -40,6 +40,12 @@
       ]
     }
   ],
+  "enforced": {
+    "filesystem": "none",
+    "network": "none",
+    "resources": "posix-rlimit-only",
+    "executable_identity": "name-allowlist-only"
+  },
   "execution": {
     "argv": [
       "<python>",

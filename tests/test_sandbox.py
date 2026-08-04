@@ -50,6 +50,7 @@ class SandboxTests(unittest.TestCase):
         values: dict[str, Any] = {
             "root": self.root,
             "argv_allowlist": (self.python_name,),
+            "allow_interpreter_flags": True,
             "timeout_s": 5.0,
             "max_output_bytes": 4096,
         }
@@ -114,6 +115,15 @@ class SandboxTests(unittest.TestCase):
         intent = self.intent([sys.executable, "-c", "print('hi')"])
         receipt = runner.run(intent)
         self.assertTrue(validate_contract("tool-receipt", receipt).valid)
+        self.assertEqual(
+            receipt["enforced"],
+            {
+                "filesystem": "none",
+                "network": "none",
+                "resources": "posix-rlimit-only",
+                "executable_identity": "name-allowlist-only",
+            },
+        )
         self.assertEqual(self.stdout(receipt).splitlines(), [b"hi"])
         self.assertIsNotNone(runner.last_reference)
         assert runner.last_reference is not None
@@ -128,6 +138,20 @@ class SandboxTests(unittest.TestCase):
         )
         self.assertTrue(validation.valid, validation.issues)
         self.assertTrue(validation.succeeded)
+
+    def test_default_rejects_inline_python_execution(self) -> None:
+        runner = self.runner(spec=SandboxSpec(root=self.root))
+        with self.assertRaisesRegex(SandboxDenied, "inline interpreter"):
+            runner.run(self.intent([sys.executable, "-c", "print('no spawn')"]))
+        self.assertEqual(runner.spawn_count, 0)
+
+    def test_undeclared_path_like_argument_is_confined(self) -> None:
+        runner = self.runner()
+        with self.assertRaises(ConfinementViolation):
+            runner.run(
+                self.intent([sys.executable, "-c", "print('no spawn')", "../outside.txt"])
+            )
+        self.assertEqual(runner.spawn_count, 0)
 
     def test_intent_digest_binds_every_declared_field(self) -> None:
         runner = self.runner()
