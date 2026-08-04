@@ -9,6 +9,7 @@ from hashlib import sha256
 from typing import Mapping, Sequence
 
 from .contracts import validate_contract
+from .receipts import portable_path_parts
 
 CheckOutcome = str
 _IDENTIFIER = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
@@ -26,6 +27,7 @@ class AcceptanceSpecification:
     criterion: str
     argv: tuple[str, ...]
     expected: CheckOutcome = "succeeded"
+    declared_paths: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if _IDENTIFIER.fullmatch(self.identifier) is None:
@@ -58,9 +60,23 @@ class AcceptanceSpecification:
             raise AcceptanceSpecificationError(
                 "acceptance specification expected outcome is invalid"
             )
+        try:
+            normalized_paths = tuple(
+                "/".join(portable_path_parts(path))
+                for path in self.declared_paths
+            )
+        except ValueError as error:
+            raise AcceptanceSpecificationError(
+                f"declared paths must be portable relative paths: {error}"
+            ) from None
+        if len(normalized_paths) != len(set(normalized_paths)):
+            raise AcceptanceSpecificationError(
+                "acceptance specification declared paths must be unique"
+            )
+        object.__setattr__(self, "declared_paths", normalized_paths)
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        document: dict[str, object] = {
             "schema_version": 1,
             "id": self.identifier,
             "criterion": self.criterion,
@@ -69,6 +85,9 @@ class AcceptanceSpecification:
                 "expected": self.expected,
             },
         }
+        if self.declared_paths:
+            document["declared_paths"] = list(self.declared_paths)
+        return document
 
     @property
     def digest(self) -> str:
@@ -92,11 +111,14 @@ class AcceptanceSpecification:
         assert isinstance(argv, list)
         expected = command["expected"]
         assert isinstance(expected, str)
+        declared_paths = document.get("declared_paths", [])
+        assert isinstance(declared_paths, list)
         return cls(
             identifier=str(document["id"]),
             criterion=str(document["criterion"]),
             argv=tuple(str(item) for item in argv),
             expected=expected,
+            declared_paths=tuple(str(item) for item in declared_paths),
         )
 
 

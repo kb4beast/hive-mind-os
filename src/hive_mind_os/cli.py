@@ -43,6 +43,7 @@ from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .projection import build_projection, projection_json, write_projection_html
 from .prompt_registry import PromptRegistry
+from .verify import VerificationError, verify_repository
 from .runtime import HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
@@ -346,6 +347,17 @@ def build_experiment_parser() -> argparse.ArgumentParser:
         default="evidence/experiments",
         help="Append-only experiment record directory",
     )
+    return parser
+
+
+def build_verify_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind verify",
+        description="Verify a committed change against one sealed acceptance specification",
+    )
+    parser.add_argument("--repository", required=True)
+    parser.add_argument("--spec", required=True, help="Acceptance specification JSON")
+    parser.add_argument("--output", required=True, help="New receipt bundle directory")
     return parser
 
 
@@ -751,6 +763,31 @@ def _run_experiment(args: argparse.Namespace) -> int:
     return 1
 
 
+def _run_verify(args: argparse.Namespace) -> int:
+    try:
+        report = verify_repository(args.repository, args.spec, args.output)
+    except (OSError, ValueError, VerificationError) as error:
+        print(
+            json.dumps({"status": "failed", "error": str(error)}, indent=2),
+            file=sys.stderr,
+        )
+        return 1
+    print(
+        json.dumps(
+            {
+                "status": report.verdict,
+                "report": str(report.report_path),
+                "changed_paths": list(report.changed_paths),
+                "undeclared_paths": list(report.undeclared_paths),
+                "weakened_tests": list(report.weakened_tests),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0 if report.verdict == "adopt" else 1
+
+
 def _run_enqueue(args: argparse.Namespace) -> int:
     repository = Path(args.repository).resolve()
     if not repository.is_dir():
@@ -998,6 +1035,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "experiment":
         args = build_experiment_parser().parse_args(arguments[1:])
         raise SystemExit(_run_experiment(args))
+    if arguments and arguments[0] == "verify":
+        args = build_verify_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_verify(args))
     if arguments and arguments[0] == "enqueue":
         args = build_enqueue_parser().parse_args(arguments[1:])
         raise SystemExit(_run_enqueue(args))

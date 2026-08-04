@@ -19,6 +19,12 @@ hive-mind deliver --help
 The scripted delivery path requires a local Git repository and one typed executable
 acceptance-specification JSON file. `hive-mind deliver --help` lists the required flags.
 
+## Verify an existing change
+
+Use `hive-mind verify --repository <path> --spec <acceptance-spec.json> --output <bundle-dir>`
+to run a sealed check against the latest commit. The acceptance specification must include
+`declared_paths`, the complete set of paths changed by that commit.
+
 ## What this prototype is
 
 Hive Mind OS is an evidence-driven operating-system prototype for autonomous product and software delivery. Its architecture defines eight specialist contracts; the local repository-delivery workflow currently executes only Explorer, Builder, and Curator. The other five remain planned.
