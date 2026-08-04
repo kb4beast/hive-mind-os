@@ -12,7 +12,7 @@
     "required_linear_history": true,
     "required_signed_commits": true,
     "pull_request": {
-      "required_approving_review_count": 2,
+      "required_approving_review_count": 1,
       "require_code_owner_review": true,
       "dismiss_stale_reviews_on_push": true,
       "require_last_push_approval": true,
@@ -31,9 +31,9 @@
   },
   "separation_requirement": "At least one approval must come from an identity that did not author, push, build, or judge the change.",
   "verification_status": "verified_on_remote",
-  "verification_evidence": "evidence/live/P07/github-receipts/github/protection/08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7.json",
-  "verification_evidence_digest": "sha256:08a83cef968780637af62692028800ae7d612766a8a33a2ecf141a73b9fa16e7",
-  "verified_at": "2026-07-28",
-  "verification_residual": "The host rules are active, but one-maintainer review independence and administrator bypass are not resolved by configuration alone.",
+  "verification_evidence": "evidence/live/P07/github-receipts/github/protection/90f4ab64b41fb07dfe23a48a2c81d6bce2a8eade1a51f64f82fa2fc5d1dfb092.json",
+  "verification_evidence_digest": "sha256:90f4ab64b41fb07dfe23a48a2c81d6bce2a8eade1a51f64f82fa2fc5d1dfb092",
+  "verified_at": "2026-08-03",
+  "verification_residual": "One approval is intentionally required while the project has one maintainer. The code-owner requirement means that approval must be from a code owner. This enables outside contributions but does not establish review independence; administrator bypass is also not resolved by configuration alone.",
   "blocking_obligation": null
 }

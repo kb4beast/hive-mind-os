@@ -16,6 +16,8 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-016` | [Governed extension packages and portable host projections](ADR-016-GOVERNED-EXTENSION-PACKAGES.md) | Slice 1 | bounded structural candidate accepted/adapted; promotion deferred |
 | `ADR-017` | [Inert constitutional skills, read-only tools, and host evidence](ADR-017-INERT-SKILLS-TOOLS-AND-HOST-EVIDENCE.md) | Slice 2 | adapted bounded candidate; promotion and host support blocked |
 | `ADR-018` | [Runtime surface disposition](ADR-018-RUNTIME-SURFACE-DISPOSITION.md) | P2.2 | adopted |
+| `ADR-041` | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md) | P3.4 | adapted |
+| `ADR-042` | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md) | P4.05 | adopted |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-019; it must be unique at creation time.
+is ADR-043; it must be unique at creation time.

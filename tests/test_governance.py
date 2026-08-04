@@ -61,7 +61,7 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertEqual(rules["rules"]["deletion"], "blocked")
         self.assertEqual(rules["rules"]["force_push"], "blocked")
         pull_request = rules["rules"]["pull_request"]
-        self.assertGreaterEqual(pull_request["required_approving_review_count"], 2)
+        self.assertEqual(pull_request["required_approving_review_count"], 1)
         self.assertTrue(pull_request["require_code_owner_review"])
         self.assertTrue(pull_request["require_last_push_approval"])
         self.assertEqual(rules["verification_status"], "verified_on_remote")
@@ -72,7 +72,30 @@ class RepositoryGovernanceTests(unittest.TestCase):
             "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest(),
         )
         self.assertIsNone(rules["blocking_obligation"])
-        self.assertIn("one-maintainer", rules["verification_residual"])
+        self.assertIn("One approval", rules["verification_residual"])
+
+    def test_contributor_material_and_lite_path_are_present(self) -> None:
+        for path in (
+            "CONTRIBUTING.md",
+            "CODE_OF_CONDUCT.md",
+            "SECURITY.md",
+            "CHANGELOG.md",
+            ".github/ISSUE_TEMPLATE/bug_report.md",
+            ".github/ISSUE_TEMPLATE/docs_improvement.md",
+            ".github/pull_request_template.md",
+        ):
+            self.assertTrue((ROOT / path).is_file(), path)
+
+        contributing = (ROOT / "CONTRIBUTING.md").read_text()
+        self.assertIn("Governance-lite", contributing)
+        self.assertIn("one approving review", contributing)
+        for heavyweight_area in (
+            "kernel",
+            "policy",
+            "courtroom",
+            "schemas",
+        ):
+            self.assertIn(heavyweight_area, contributing)
 
     def test_build_backend_is_exactly_pinned(self) -> None:
         project = (ROOT / "pyproject.toml").read_text()
