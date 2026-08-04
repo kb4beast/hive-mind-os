@@ -51,6 +51,10 @@ The specification must declare the complete set of paths changed by that commit 
 `declared_paths`. A successful run writes the evidence bundle; a failed validation
 does not publish one.
 
+For a complete offline walkthrough that creates a local Git repository, commits an
+agent-authored patch, and inspects the resulting verification bundle, see
+[Verify an agent-authored change](examples/verify-an-agent-change/README.md).
+
 ## Architecture
 
 Hive Mind OS is an evidence-driven operating-system prototype for autonomous product
