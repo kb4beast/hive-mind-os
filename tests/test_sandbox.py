@@ -316,6 +316,25 @@ class SandboxTests(unittest.TestCase):
             {300, 301},
         )
 
+    def test_windows_timeout_kill_never_uses_unfiltered_taskkill_tree(self) -> None:
+        class FinishedProcess:
+            pid = 100
+
+            def poll(self) -> int:
+                return 0
+
+            def kill(self) -> None:
+                self.fail("finished root process must not be killed")
+
+        process = FinishedProcess()
+        with (
+            patch("hive_mind_os.sandbox.os.name", "nt"),
+            patch.object(SandboxRunner, "_windows_descendants", return_value=set()),
+            patch("hive_mind_os.sandbox.subprocess.run") as run,
+        ):
+            SandboxRunner._kill_tree(process)  # type: ignore[arg-type]
+        run.assert_not_called()
+
     @unittest.skipUnless(os.name == "nt", "Windows-specific PID-reuse regression")
     def test_short_lived_windows_commands_do_not_false_timeout(self) -> None:
         runner = self.runner(spec=self.spec(timeout_s=1.0))
