@@ -324,7 +324,7 @@ class SandboxTests(unittest.TestCase):
                 return 0
 
             def kill(self) -> None:
-                self.fail("finished root process must not be killed")
+                raise AssertionError("finished root process must not be killed")
 
         process = FinishedProcess()
         with (
