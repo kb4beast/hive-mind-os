@@ -258,7 +258,8 @@ def write_packet(packet: Mapping[str, Any], output: str | Path, repository: str 
     """Write one new packet outside its bound repository without overwriting evidence."""
 
     root = _repository_root(repository)
-    target = Path(output).resolve()
+    requested = Path(output)
+    target = requested.resolve()
     try:
         target.relative_to(root)
     except ValueError:
@@ -275,4 +276,4 @@ def write_packet(packet: Mapping[str, Any], output: str | Path, repository: str 
             stream.write(encoded)
     except FileExistsError as error:
         raise ContinuationPacketError("packet output already exists") from error
-    return target
+    return requested
