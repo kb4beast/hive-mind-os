@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "Reused root identity is rejected; genuine post-exit child cleanup is preserved; audit and focused suite passed."
+}
