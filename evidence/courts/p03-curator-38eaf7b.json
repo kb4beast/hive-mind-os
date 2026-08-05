@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The pinned repair uses creation-time-filtered and identity-rechecked Windows descendant termination, retains documented process-tier limits, and the focused sandbox suite passed on Windows."
+}

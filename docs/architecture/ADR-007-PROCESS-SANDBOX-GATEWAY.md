@@ -113,9 +113,14 @@ against a hostile allowed executable.
 
 - POSIX starts a new session, kills the process group on timeout, and applies configured
   `RLIMIT_CPU`/`RLIMIT_AS`.
-- Windows starts a new process group and uses `taskkill /T /F`, with a Toolhelp
-  parent-process snapshot and direct termination as fallback. It does not use a Job Object
-  or implement CPU/memory limits.
+- Windows starts a new process group and uses a Toolhelp parent-process snapshot filtered
+  by process creation time, as specified by ADR-008. On timeout it stops the root, takes
+  up to two post-root snapshots, and directly terminates only eligible descendants whose
+  opened-handle creation time still matches the snapshot. `taskkill /T` is prohibited
+  because its parent-PID traversal bypasses that filter. Unknown creation-time metadata
+  remains conservatively eligible; PID reuse or process creation between snapshot and
+  handle inspection is therefore a documented best-effort race, not an isolation claim.
+  It does not use a Job Object or implement CPU/memory limits.
 - The environment is scrubbed, but the process tier does **not** block network syscalls.
 - Declared path arguments are confined and replaced with their checked resolved targets.
   An allowed program can still synthesize an undeclared absolute path internally.

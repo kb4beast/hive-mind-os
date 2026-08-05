@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from hive_mind_os.autonomy import EpisodeAllowance
 from hive_mind_os.contracts import (
@@ -315,6 +315,87 @@ class SandboxTests(unittest.TestCase):
             ),
             {300, 301},
         )
+
+    def test_windows_timeout_kill_never_uses_unfiltered_taskkill_tree(self) -> None:
+        class FinishedProcess:
+            pid = 100
+
+            def poll(self) -> int:
+                return 0
+
+            def kill(self) -> None:
+                raise AssertionError("finished root process must not be killed")
+
+        process = FinishedProcess()
+        with (
+            patch("hive_mind_os.sandbox.os.name", "nt"),
+            patch.object(
+                SandboxRunner,
+                "_windows_descendant_identities",
+                return_value={},
+            ),
+            patch("hive_mind_os.sandbox.subprocess.run") as run,
+        ):
+            SandboxRunner._kill_tree(process)  # type: ignore[arg-type]
+        run.assert_not_called()
+
+    def test_windows_timeout_termination_rechecks_opened_process_identity(self) -> None:
+        kernel32 = Mock()
+        kernel32.OpenProcess.side_effect = [2000, 3000]
+        with patch.object(
+            SandboxRunner,
+            "_windows_process_creation_time_from_handle",
+            side_effect=[1100, 901],
+        ):
+            SandboxRunner._terminate_windows_descendant_identities(
+                {200: 1100, 201: 900},
+                1000,
+                kernel32=kernel32,
+            )
+        self.assertEqual(kernel32.TerminateProcess.call_args_list, [((2000, 1),)])
+        self.assertEqual(kernel32.CloseHandle.call_args_list, [((2000,),), ((3000,),)])
+
+    def test_windows_timeout_termination_keeps_unknown_metadata_conservative(self) -> None:
+        kernel32 = Mock()
+        kernel32.OpenProcess.return_value = 2000
+        with patch.object(
+            SandboxRunner,
+            "_windows_process_creation_time_from_handle",
+            return_value=None,
+        ):
+            SandboxRunner._terminate_windows_descendant_identities(
+                {200: None},
+                1000,
+                kernel32=kernel32,
+            )
+        kernel32.TerminateProcess.assert_called_once_with(2000, 1)
+
+    def test_windows_timeout_rescans_after_root_termination(self) -> None:
+        class RunningProcess:
+            pid = 100
+
+            def __init__(self) -> None:
+                self.killed = False
+
+            def poll(self) -> int | None:
+                return None if not self.killed else 0
+
+            def kill(self) -> None:
+                self.killed = True
+
+        process = RunningProcess()
+        with (
+            patch("hive_mind_os.sandbox.os.name", "nt"),
+            patch.object(
+                SandboxRunner,
+                "_windows_descendant_identities",
+                side_effect=[{200: 1100}, {201: 1101}],
+            ),
+            patch.object(SandboxRunner, "_terminate_windows_descendant_identities") as terminate,
+        ):
+            SandboxRunner._kill_tree(process)  # type: ignore[arg-type]
+        self.assertTrue(process.killed)
+        self.assertEqual(terminate.call_count, 2)
 
     @unittest.skipUnless(os.name == "nt", "Windows-specific PID-reuse regression")
     def test_short_lived_windows_commands_do_not_false_timeout(self) -> None:
