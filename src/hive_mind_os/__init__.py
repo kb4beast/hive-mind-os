@@ -83,6 +83,12 @@ from .mission_store import (
     StepCheckpoint,
     resume_mission,
 )
+from .model_action_adapter import (
+    ModelActionAdapterError,
+    ModelActionProposal,
+    ModelProviderActionAdapter,
+    ProviderAction,
+)
 from .models import AutonomyLevel, Objective, RiskTier, Role
 from .projection import (
     DEFAULT_PROJECTION_SCHEMA_VERSION,
@@ -222,6 +228,9 @@ __all__ = [
     "MetricObservation",
     "MetricSpec",
     "MissionCharter",
+    "ModelActionAdapterError",
+    "ModelActionProposal",
+    "ModelProviderActionAdapter",
     "MissionBudget",
     "MissionEvent",
     "MissionLoop",
@@ -247,6 +256,7 @@ __all__ = [
     "PackageValidationError",
     "PullRequestResult",
     "PromptRegistry",
+    "ProviderAction",
     "PushResult",
     "RecursiveImprovementContract",
     "RecursiveImprovementController",

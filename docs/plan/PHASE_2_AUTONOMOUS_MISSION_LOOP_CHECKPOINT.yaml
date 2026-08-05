@@ -14,29 +14,33 @@ implementation_scope:
   - "Iterative Builder actions in a fresh no-hardlink local Git workspace"
   - "Curator remand/adopt decisions through the Phase 1 immutable verifier"
   - "Atomic self-verifying local mission bundle; no remote delivery operation exists"
+  - "Receipted model-provider action adapter whose digest-only attempts are independently policy-checked before Builder action execution"
+  - "Reject-then-correct model-action fixtures for Node/TypeScript, C#, monorepo, no-test, green-suite hidden-defect, and misleading-README repositories"
 acceptance_tests:
   - "tests.test_mission_loop.MissionStateReducerTests"
   - "tests.test_mission_loop.OrchestratorTests"
   - "tests.test_mission_loop.MissionLoopAdversarialTests"
+  - "tests.test_mission_loop_provider.ModelProviderActionAdapterTests"
 tests_actually_run:
   - >-
-    PYTHONPATH=src python -m unittest tests.test_mission_loop -v
-    (11 passed after the final implementation change; focused Phase 2 smoke test)
-  - >-
-    python -m ruff check --fix src/hive_mind_os/mission_loop.py
-    src/hive_mind_os/__init__.py tests/test_mission_loop.py
-    (five import-only style findings fixed; zero remained)
-  - "python -m compileall -q src/hive_mind_os/mission_loop.py (passed)"
-  - "git diff --check (passed)"
+    PYTHONPATH=src python -m unittest tests.test_mission_loop
+    tests.test_mission_loop_provider -v
+    (20 passed; focused Phase 2 smoke test)
 tests_not_run:
   - "Repository-wide unittest gate, per user instruction to smoke-test only touched work"
   - "Independent clean Linux and macOS Phase 1 reproduction"
-  - "Equivalent integrated Node/TypeScript, C#, monorepo, no-test, and misleading-README scenarios"
-  - "A model-provider action adapter covering provider retry, model refusal, and model timeout"
+  - "A real credentialed/provider-funded model action run; the covered provider attempts use test transports only"
+  - "A C# compiler/runtime execution; the C# command family is covered through a constrained local dotnet-compatible fixture because this host has no dotnet SDK"
+  - "Repository-wide lint, type, packaging, security, and cross-platform sweeps, per user instruction"
 files_changed:
   - "src/hive_mind_os/mission_loop.py"
+  - "src/hive_mind_os/model_action_adapter.py"
+  - "src/hive_mind_os/roles.py"
+  - "src/hive_mind_os/sandbox.py"
+  - "src/hive_mind_os/verify.py"
   - "src/hive_mind_os/__init__.py"
   - "tests/test_mission_loop.py"
+  - "tests/test_mission_loop_provider.py"
 behavior_added:
   - "Stale and illegal mission transitions fail closed before execution"
   - "Explorer cannot write, commit, push, alter acceptance, or treat repository text as authority"
@@ -45,12 +49,17 @@ behavior_added:
   - "Curator receives the exact candidate and sealed specifications through a fresh Phase 1 verification materialization"
   - "Curator remands append a new Builder work item; prior history is not rewritten"
   - "Published bundles hash every mission artifact and self-verify before atomic rename"
+  - "A model provider can only propose exact JSON actions or an explicit refusal; prompt/response bodies never enter public mission receipts"
+  - "Provider retry index, model refusal, timeout, request/response digests, token metadata, and action digest are retained as Builder receipts before any proposed action is executed"
+  - "Equivalent bounded reject-then-correct scenarios cover Node/TypeScript, C# command shape, monorepo path confinement, no-test sealed validation, green visible tests with a failing hidden probe, and misleading README guidance"
 authority_added: "Local, isolated candidate commits only"
 authority_not_added:
-  - "No push, pull-request creation, merge, auto-merge, deployment, credential, spending, or network authority"
+  - "No push, pull-request creation, merge, auto-merge, deployment, credential, spending, or real-provider network authority"
   - "No mutation of the original objective, sealed acceptance specifications, policy, or live caller worktree"
 receipts:
   - "Focused adversarial integration test creates Phase 1 Curator bundles and verifies their candidate commit/tree bindings."
+  - "Focused provider-action tests retain digest-only provider attempts and verify that retry, refusal, and timeout cannot cause unvalidated Builder effects."
+  - "The Node/TypeScript scenario exercises the sealed verifier with Node type stripping; the C# scenario exercises the dotnet command family through a controlled local fixture, not an installed SDK."
   - "The test teardown removes its temporary fixture artifacts; this checkpoint records the observed command and result, not a fabricated durable receipt path."
 development_failures_preserved:
   - >-
@@ -65,19 +74,21 @@ known_failures:
     projection, governance, and policy-invariant suites. This workstream did not alter
     those tests or claim they are baseline failures.
 unresolved_dissent: >-
-  The plan requires several task-family scenarios and a model-provider action loop.
-  Only the Python reject-then-correct integrated scenario is implemented and exercised
-  here. Phase 2 must not be represented as exit-gate complete.
+  The bounded model-provider action adapter and all requested repository-family
+  fixtures are exercised locally, but no real credentialed/provider-funded call,
+  C# compiler run, independent reproduction, durable worker path, or complete
+  repository gate has been demonstrated. Phase 2 must not be represented as
+  exit-gate complete.
 rollback: >-
   Revert the commits after 064222e6b04835a5f4257318b7045b7848e06bab that add
-  mission_loop.py, its public exports, and its tests. This removes the Phase 2 API
-  while leaving the Phase 1 verifier unchanged.
+  mission_loop.py, the model action adapter, the Windows verifier-environment
+  compatibility adjustment, public exports, and focused tests. This removes the
+  Phase 2 API while leaving the Phase 1 verifier unchanged.
 human_gates:
   - "High and critical risk plans cannot complete automatically; they retain explicit external Steward and human authority gates."
   - "Do not promote Phase 1 or Phase 2 while their independent reproduction and scenario obligations remain open."
 next_exact_action: >-
-  Add a receipted model-provider action adapter, then run and preserve equivalent
-  reject-then-correct scenarios for Node/TypeScript, C#, monorepo, green-test hidden
-  defect, no-test, and misleading-README repositories. Independently reproduce the
-  Phase 1 bundle on clean Linux and macOS and classify its existing full-gate failures
-  against unchanged main before any promotion.
+  Independently reproduce the Phase 1 bundle on clean Linux and macOS, run an
+  actual C# compiler/runtime scenario on a host with the required SDK, and classify
+  the existing full-gate failures against unchanged main before any promotion. Do
+  not make a credentialed/provider-funded call without owner authority.

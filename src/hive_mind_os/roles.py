@@ -52,6 +52,7 @@ ROLE_CONTRACTS: dict[Role, RoleContract] = {
         ("implementation", "tests", "change summary"),
         (
             "read_repository",
+            "model_system",
             "write_workspace",
             "run_commands",
             "create_branch",

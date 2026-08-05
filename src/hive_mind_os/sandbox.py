@@ -48,7 +48,7 @@ class SandboxTimeout(SandboxError):
 
 def _normalized_executable(value: str) -> str:
     name = Path(value).name.casefold()
-    return name.removesuffix(".exe")
+    return name.removesuffix(".exe").removesuffix(".cmd").removesuffix(".bat")
 
 
 _INTERPRETER_FLAGS = {

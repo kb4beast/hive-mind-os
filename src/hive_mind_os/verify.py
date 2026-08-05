@@ -438,7 +438,7 @@ def _sealed_contract(
         "candidate_reference": candidate_reference,
         "environment": {
             "inherited_allowlist": [],
-            "fixed": {"PYTHONDONTWRITEBYTECODE": "1"},
+            "fixed": dict(_verification_fixed_environment()),
             "credential_inheritance": "disabled",
         },
         "sandbox": {
@@ -488,6 +488,18 @@ def _git_environment() -> dict[str, str]:
             if name in os.environ:
                 environment[name] = os.environ[name]
     return environment
+
+
+def _verification_fixed_environment() -> tuple[tuple[str, str], ...]:
+    """Minimal non-secret environment needed to start allowlisted tools on Windows."""
+
+    values = [("PYTHONDONTWRITEBYTECODE", "1")]
+    if os.name == "nt":
+        for name in ("SYSTEMROOT", "WINDIR", "COMSPEC"):
+            value = os.environ.get(name)
+            if value:
+                values.append((name, value))
+    return tuple(values)
 
 
 def _git(root: Path, *arguments: str, allow_failure: bool = False) -> bytes:
@@ -808,7 +820,7 @@ def _run_check(
         SandboxSpec(
             root=candidate_workspace,
             argv_allowlist=(executable_name,),
-            fixed_environment=(("PYTHONDONTWRITEBYTECODE", "1"),),
+            fixed_environment=_verification_fixed_environment(),
             timeout_s=_CHECK_TIMEOUT_SECONDS,
             max_output_bytes=_CHECK_MAX_OUTPUT_BYTES,
         ),

@@ -24,6 +24,7 @@ from typing import Mapping, Sequence
 from uuid import uuid4
 
 from .acceptance import AcceptanceSpecification, normalize_acceptance_specifications
+from .model_action_adapter import ModelProviderActionAdapter
 from .models import AutonomyLevel, RiskTier, Role
 from .policy import Action, PolicyEngine
 from .receipts import portable_path_parts, sha256_digest
@@ -1404,7 +1405,78 @@ class MissionLoop:
                 if not isinstance(payload.get("reason"), str) or not str(payload.get("reason")).strip():
                     raise MissionLoopError("Builder remand requires a reason")
 
+    def _model_context(self) -> dict[str, object]:
+        """Return bounded, digest-safe Builder context for one provider action turn."""
+
+        return {
+            "mission_id": self._state.mission_id,
+            "state_revision": self._state.revision,
+            "objective": self.objective.goal,
+            "objective_digest": self.objective.digest,
+            "base_commit": self.base_commit,
+            "candidate_commit": self._candidate,
+            "allowed_paths": list(self.plan.allowed_paths),
+            "acceptance": [item.to_dict() for item in self.objective.acceptance],
+            "discovery": None if self._discovery is None else self._discovery.to_dict(),
+            "architecture": None if self._design is None else self._design.to_dict(),
+            "prior_receipts": [
+                {
+                    "ref": receipt.ref,
+                    "action": receipt.action,
+                    "outcome": receipt.outcome,
+                    "observation_digest": receipt.observation_digest,
+                }
+                for receipt in self._receipts[-16:]
+            ],
+        }
+
+    def build_from_provider(self, adapter: ModelProviderActionAdapter) -> MissionState:
+        """Request one receipted Builder action turn, then execute only valid proposals."""
+
+        if not isinstance(adapter, ModelProviderActionAdapter):
+            raise TypeError("Builder model action adapter is required")
+        item = self._resume_or_start_builder()
+        self._builder_turns += 1
+        context = self._model_context()
+        proposal_holder: dict[str, object] = {}
+
+        def request_actions() -> tuple[str, dict[str, object]]:
+            proposal = adapter.propose(context)
+            proposal_holder["proposal"] = proposal
+            outcome = "succeeded" if proposal.outcome == "proposed" else (
+                "refused" if proposal.outcome == "refused" else "failed"
+            )
+            return outcome, proposal.observation()
+
+        self._record_builder_action(
+            "model_provider_turn",
+            {
+                "context_digest": _digest(context),
+                **adapter.identity,
+            },
+            Action.MODEL_SYSTEM,
+            request_actions,
+        )
+        proposal = proposal_holder.get("proposal")
+        if proposal is None:  # pragma: no cover - executor closure always assigns
+            raise MissionLoopError("model provider did not produce an attempt receipt")
+        if proposal.outcome != "proposed":
+            return self._state
+        actions = tuple(
+            BuilderAction(action.name, dict(action.payload))
+            for action in proposal.actions
+        )
+        return self._build_actions(actions, item=item)
+
     def build(self, actions: Sequence[BuilderAction]) -> MissionState:
+        return self._build_actions(actions)
+
+    def _build_actions(
+        self,
+        actions: Sequence[BuilderAction],
+        *,
+        item: WorkItemState | None = None,
+    ) -> MissionState:
         self._validate_builder_actions(actions)
         fingerprint = _digest(
             [
@@ -1425,8 +1497,9 @@ class MissionLoop:
             )
             raise MissionLoopError(reason)
         self._progress_fingerprints[fingerprint] = repeats
-        item = self._resume_or_start_builder()
-        self._builder_turns += 1
+        if item is None:
+            item = self._resume_or_start_builder()
+            self._builder_turns += 1
         workspace = self._builder_workspace_for_turn()
         finish = False
         for proposed in actions:
