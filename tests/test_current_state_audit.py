@@ -17,6 +17,7 @@ from hive_mind_os.current_state_audit import (
     CommandObservation,
     _artifact_docket_projection_digest,
     _broken_references,
+    _load_repository_docket,
     _parse_test_result,
     build_audit_verification_context,
     collect_current_state_audit,
@@ -166,6 +167,80 @@ class CurrentStateAuditTests(unittest.TestCase):
         }
         audit.update(overrides)
         return audit
+
+    def repository_with_source_docket(self, directory: str, body: str) -> Path:
+        repository = Path(directory)
+        package_path = repository / "src" / "hive_mind_os"
+        package_path.mkdir(parents=True)
+        (package_path / "source_docket.py").write_text(body, encoding="utf-8")
+        return repository
+
+    def test_repository_docket_loader_passes_repository_when_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = self.repository_with_source_docket(
+                directory,
+                "def load_source_docket(repository):\n"
+                "    return {'mode': 'repository', 'value': str(repository)}\n",
+            )
+
+            self.assertEqual(
+                _load_repository_docket(repository),
+                {"mode": "repository", "value": str(repository)},
+            )
+
+    def test_repository_docket_loader_supports_legacy_zero_argument_loader(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = self.repository_with_source_docket(
+                directory,
+                "def load_source_docket():\n"
+                "    return {'mode': 'legacy'}\n",
+            )
+
+            self.assertEqual(
+                _load_repository_docket(repository), {"mode": "legacy"}
+            )
+
+    def test_repository_docket_loader_rejects_unsupported_signature(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = self.repository_with_source_docket(
+                directory,
+                "def load_source_docket(first, second):\n"
+                "    return {'mode': 'unsupported'}\n",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "must accept either the repository argument or no arguments",
+            ):
+                _load_repository_docket(repository)
+
+    def test_repository_docket_loader_rejects_uninspectable_signature(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = self.repository_with_source_docket(
+                directory,
+                "def load_source_docket(repository):\n"
+                "    return {'mode': 'repository'}\n",
+            )
+
+            with patch(
+                "hive_mind_os.current_state_audit.inspect.signature",
+                side_effect=ValueError("uninspectable"),
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, "uninspectable signature"
+                ):
+                    _load_repository_docket(repository)
+
+    def test_repository_docket_loader_preserves_internal_type_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = self.repository_with_source_docket(
+                directory,
+                "def load_source_docket(repository):\n"
+                "    raise TypeError('loader body failed')\n",
+            )
+
+            with self.assertRaisesRegex(TypeError, "loader body failed"):
+                _load_repository_docket(repository)
 
     def test_collects_repository_docket_without_broken_receipts_or_running_tests(self) -> None:
         audit = collect_current_state_audit(

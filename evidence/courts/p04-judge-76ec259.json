@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The candidate stages delivery in a fresh external directory, rejects workspace and symlink/junction escapes, validates evidence source and destination containment, and the isolated git-adapter suite passed."
+}
