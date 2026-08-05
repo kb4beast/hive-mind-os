@@ -26,6 +26,7 @@ from typing import Any, Callable, Iterator, Mapping, Protocol, Sequence
 from uuid import uuid4
 
 from .contracts import validate_contract
+from .models import utc_now
 from .pit_oracle import PointInTimeOracle
 from .receipts import sha256_digest
 
@@ -277,9 +278,23 @@ class AutonomousBrain:
                     target_sha TEXT NOT NULL,
                     payload_json TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS pit_claims (
+                    run_id TEXT NOT NULL,
+                    target_sha TEXT NOT NULL,
+                    claimed_at TEXT NOT NULL,
+                    PRIMARY KEY(run_id, target_sha)
+                );
                 """
             )
-            for table in ("runs", "events", "feedback", "pit_grades"):
+            duplicates = self._connection.execute(
+                "SELECT run_id, target_sha FROM pit_grades GROUP BY run_id, target_sha HAVING COUNT(*) > 1"
+            ).fetchone()
+            if duplicates is not None:
+                raise AutonomousRunError("existing PIT grades are not unique per run and target")
+            self._connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS pit_grades_run_target ON pit_grades(run_id, target_sha)"
+            )
+            for table in ("runs", "events", "feedback", "pit_grades", "pit_claims"):
                 self._connection.executescript(
                     f"""
                     CREATE TRIGGER IF NOT EXISTS {table}_no_update
@@ -969,7 +984,7 @@ class AutonomousBrain:
         )
         if ancestor.returncode:
             raise AutonomousRunError("human final commit does not descend from the run start")
-        targets = tuple(
+        candidate_targets = tuple(
             item
             for item in self._git(
                 root, "rev-list", "--reverse", f"{candidate}..{human_final_commit}"
@@ -981,6 +996,15 @@ class AutonomousBrain:
             ).fetchone()
             is None
         )
+        targets: list[str] = []
+        for target in candidate_targets:
+            with self._connection:
+                claimed = self._connection.execute(
+                    "INSERT OR IGNORE INTO pit_claims(run_id, target_sha, claimed_at) VALUES(?, ?, ?)",
+                    (run_id, target, utc_now()),
+                )
+            if claimed.rowcount:
+                targets.append(target)
         oracle = PointInTimeOracle(root, self.state_dir / "pit" / run_id)
         records: list[dict[str, Any]] = []
         try:

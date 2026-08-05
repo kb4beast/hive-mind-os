@@ -269,6 +269,38 @@ class AutonomousBrainTests(unittest.TestCase):
                 len([event for event in events if event["kind"] == "human_outcome_pit_graded"]), 2
             )
 
+    def test_pit_targets_are_claimed_once_before_any_duplicate_grade(self) -> None:
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository, "Improve app behavior.", "codex", run_id="AR-pit-claim"
+            )
+            target = _commit(self.repository, "app.py", "VALUE = 2\n", "human correction")
+            with brain._connection:
+                brain._connection.execute(
+                    "INSERT INTO pit_claims(run_id, target_sha, claimed_at) VALUES(?, ?, ?)",
+                    (run["run_id"], target, "2026-08-05T00:00:00Z"),
+                )
+
+            def predictor(_environment: Path) -> list[str]:
+                self.fail("an already claimed target must not start another PIT prediction")
+
+            self.assertEqual(
+                brain.learn_from_human_outcome(run["run_id"], target, predictor), ()
+            )
+            connection = sqlite3.connect(self.state / "autonomous-brain.sqlite3")
+            try:
+                connection.execute(
+                    "INSERT INTO pit_grades(episode_id, run_id, target_sha, payload_json) VALUES(?, ?, ?, ?)",
+                    ("episode-one", run["run_id"], target, "{}"),
+                )
+                with self.assertRaises(sqlite3.IntegrityError):
+                    connection.execute(
+                        "INSERT INTO pit_grades(episode_id, run_id, target_sha, payload_json) VALUES(?, ?, ?, ?)",
+                        ("episode-two", run["run_id"], target, "{}"),
+                    )
+            finally:
+                connection.close()
+
     def test_bounded_supervision_handles_pr_feedback_and_local_human_commits(self) -> None:
         gateway = FakeCommentGateway(
             [{"id": 42, "user": {"login": "reviewer"}, "body": "Please explain the test."}]
