@@ -610,13 +610,14 @@ class SandboxRunner:
         if kernel32 is None:
             win_dll: Any = getattr(ctypes, "windll")
             kernel32 = win_dll.kernel32
-        open_process = kernel32.OpenProcess
+        active_kernel32: Any = kernel32
+        open_process = active_kernel32.OpenProcess
         open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         open_process.restype = wintypes.HANDLE
-        terminate_process = kernel32.TerminateProcess
+        terminate_process = active_kernel32.TerminateProcess
         terminate_process.argtypes = [wintypes.HANDLE, wintypes.UINT]
         terminate_process.restype = wintypes.BOOL
-        close_handle = kernel32.CloseHandle
+        close_handle = active_kernel32.CloseHandle
         close_handle.argtypes = [wintypes.HANDLE]
         close_handle.restype = wintypes.BOOL
         access = 0x0001 | 0x1000  # PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION
