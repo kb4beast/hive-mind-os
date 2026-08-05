@@ -18,6 +18,12 @@ from .acceptance import (
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
 from .courtroom import CaseParticipants
+from .continuation import (
+    ContinuationPacketError,
+    export_packet,
+    validate_packet,
+    write_packet,
+)
 from .current_state_audit import (
     collect_current_state_audit,
     create_audit_artifact,
@@ -425,6 +431,22 @@ def build_status_parser() -> argparse.ArgumentParser:
     output.add_argument("--json", action="store_true", dest="json_output")
     output.add_argument("--html", help="Write a self-contained static status page")
     parser.add_argument("--state-dir", default=".hive-mind-state")
+    return parser
+
+
+def build_continuation_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind continuation",
+        description="Export or validate a local-only autonomous continuation packet",
+    )
+    commands = parser.add_subparsers(dest="action", required=True)
+    export = commands.add_parser("export")
+    export.add_argument("--repository", required=True, help="Clean local Git worktree")
+    export.add_argument("--input", required=True, help="Short structured packet source JSON")
+    export.add_argument("--output", required=True, help="New packet path outside the repository")
+    validate = commands.add_parser("validate")
+    validate.add_argument("--repository", required=True, help="Bound local Git worktree")
+    validate.add_argument("--packet", required=True, help="Existing continuation packet JSON")
     return parser
 
 
@@ -983,6 +1005,50 @@ def _run_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_packet_json(path: str) -> dict[str, object]:
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContinuationPacketError(
+            f"packet JSON could not be read: {type(error).__name__}"
+        ) from None
+    if not isinstance(document, dict):
+        raise ContinuationPacketError("packet JSON must be an object")
+    return document
+
+
+def _run_continuation(args: argparse.Namespace) -> int:
+    try:
+        if args.action == "export":
+            packet = export_packet(_read_packet_json(args.input), args.repository)
+            output = write_packet(packet, args.output, args.repository)
+            print(
+                json.dumps(
+                    {
+                        "status": "exported",
+                        "packet": str(output),
+                        "canonical_digest": packet["integrity"]["canonical_digest"],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        packet = _read_packet_json(args.packet)
+        validation = validate_packet(packet, args.repository)
+        print(
+            json.dumps(
+                {"status": "valid" if validation.valid else "rejected", "issues": list(validation.issues)},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0 if validation.valid else 1
+    except ContinuationPacketError as error:
+        print(json.dumps({"status": "rejected", "error": str(error)}, indent=2), file=sys.stderr)
+        return 1
+
+
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     if bool(args.signing_key_file) != bool(args.signing_key_id):
         raise SystemExit("--signing-key-file and --signing-key-id must be supplied together")
@@ -1140,6 +1206,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "status":
         args = build_status_parser().parse_args(arguments[1:])
         raise SystemExit(_run_status(args))
+    if arguments and arguments[0] == "continuation":
+        args = build_continuation_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_continuation(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 
