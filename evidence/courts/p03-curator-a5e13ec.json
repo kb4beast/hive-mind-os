@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The suspended process is assigned to a kill-on-close Job Object before resumption, timeout termination targets that Job rather than PIDs, and accounting-query errors force fail-closed timeout handling."
+}
