@@ -9,7 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 EXAMPLE_ROOT = Path(__file__).resolve().parent
 BASE_REPOSITORY = EXAMPLE_ROOT / "repository"
 AGENT_PATCH = EXAMPLE_ROOT / "agent-change.patch"
@@ -34,12 +33,17 @@ def _run_git(repository: Path, *arguments: str) -> None:
 def _prepare_repository(output: Path) -> Path:
     repository = output / "nonprofit-checkout"
     shutil.copytree(BASE_REPOSITORY, repository)
+    for relative in ("discounts.py", "check_discount.py"):
+        path = repository / relative
+        path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
     _run_git(repository, "init", "--quiet")
     _run_git(repository, "config", "user.name", "Example Maintainer")
     _run_git(repository, "config", "user.email", "maintainer@example.invalid")
     _run_git(repository, "add", "discounts.py", "check_discount.py")
     _run_git(repository, "commit", "--quiet", "-m", "baseline checkout rule")
-    _run_git(repository, "apply", "--whitespace=error", str(AGENT_PATCH))
+    normalized_patch = output / "agent-change.normalized.patch"
+    normalized_patch.write_bytes(AGENT_PATCH.read_bytes().replace(b"\r\n", b"\n"))
+    _run_git(repository, "apply", "--whitespace=error", str(normalized_patch))
     _run_git(repository, "add", "discounts.py")
     _run_git(
         repository,
@@ -70,6 +74,16 @@ def main() -> int:
     output.mkdir(parents=True)
     try:
         repository = _prepare_repository(output)
+        candidate = subprocess.run(
+            ("git", "-C", str(repository), "rev-parse", "HEAD"),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=True,
+        )
+        if candidate.returncode != 0:
+            raise RuntimeError("could not resolve the example candidate commit")
         bundle = output / "receipt-bundle"
         completed = subprocess.run(
             (
@@ -81,6 +95,8 @@ def main() -> int:
                 str(repository),
                 "--spec",
                 str(ACCEPTANCE_SPECIFICATION),
+                "--candidate",
+                candidate.stdout.strip(),
                 "--output",
                 str(bundle),
             ),

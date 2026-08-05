@@ -46,7 +46,9 @@
           "required": ["id", "digest"],
           "properties": {
             "id": {"type": "string", "minLength": 1},
-            "digest": {"type": "string", "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"}
+            "digest": {"type": "string", "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
+            "candidate_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+            "candidate_tree": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
           }
         },
         "exit_code": {"type": ["integer", "null"]},

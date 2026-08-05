@@ -372,6 +372,11 @@ def build_verify_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repository", required=True)
     parser.add_argument("--spec", required=True, help="Acceptance specification JSON")
+    parser.add_argument(
+        "--candidate",
+        required=True,
+        help="Full 40-hex immutable candidate commit SHA",
+    )
     parser.add_argument("--output", required=True, help="New receipt bundle directory")
     return parser
 
@@ -845,7 +850,12 @@ def _run_experiment(args: argparse.Namespace) -> int:
 
 def _run_verify(args: argparse.Namespace) -> int:
     try:
-        report = verify_repository(args.repository, args.spec, args.output)
+        report = verify_repository(
+            args.repository,
+            args.spec,
+            args.output,
+            args.candidate,
+        )
     except (OSError, ValueError, VerificationError) as error:
         print(
             json.dumps({"status": "failed", "error": str(error)}, indent=2),
