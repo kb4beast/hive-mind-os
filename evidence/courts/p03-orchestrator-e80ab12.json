@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "e80ab129 is a bounded, reversible P03 repair: it removes unfiltered taskkill traversal, uses creation-time-bound direct termination with two rescans and handle rechecks, and documents the residual best-effort race. Its clean sealed audit passed 528 tests, exact GitHub CI including Windows Python 3.12 passed, and current main c7b24a8 is an ancestor for a narrow PR."
+}
