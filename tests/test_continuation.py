@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from hive_mind_os import cli
 from hive_mind_os.continuation import (
@@ -93,6 +94,25 @@ class ContinuationPacketTests(unittest.TestCase):
             cli.main(("continuation", "validate", "--repository", str(self.repository), "--packet", str(output)))
         self.assertEqual(raised.exception.code, 0)
         self.assertEqual(json.loads(stdout.getvalue())["status"], "valid")
+
+    def test_write_packet_returns_the_requested_path_when_windows_resolution_uses_an_alias(self) -> None:
+        packet = self.packet()
+        requested = self.root / "requested-continuation.json"
+        resolved = self.root / "resolved-continuation.json"
+        original_resolve = Path.resolve
+
+        def aliasing_resolve(path: Path, *args: object, **kwargs: object) -> Path:
+            if path == requested:
+                return resolved
+            return original_resolve(path, *args, **kwargs)
+
+        with patch(
+            "hive_mind_os.continuation.Path.resolve",
+            autospec=True,
+            side_effect=aliasing_resolve,
+        ):
+            self.assertEqual(write_packet(packet, requested, self.repository), requested)
+        self.assertTrue(resolved.is_file())
 
     def test_packet_tampering_unknown_fields_and_unsafe_paths_are_rejected(self) -> None:
         tampered = self.packet()
