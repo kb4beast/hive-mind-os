@@ -632,7 +632,6 @@ class PointInTimeOracle:
                 )
                 (build_root / "ancestor.bundle").unlink()
                 bundle_in_environment.unlink()
-                (build_root / "ancestor.bundle").unlink()
                 self._command(
                     runner,
                     ["git", "-C", "environment", "checkout", "--detach", parents[0]],
