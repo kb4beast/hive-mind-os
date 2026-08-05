@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import importlib
+import inspect
 import json
 import os
 import platform
@@ -481,7 +482,25 @@ def _load_repository_docket(repository: Path) -> Any:
     sys.modules[package_name] = package
     try:
         source_docket = importlib.import_module(f"{package_name}.source_docket")
-        return source_docket.load_source_docket(repository)
+        loader = source_docket.load_source_docket
+        try:
+            signature = inspect.signature(loader)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "source docket loader has an uninspectable signature"
+            ) from error
+        try:
+            signature.bind(repository)
+        except TypeError:
+            try:
+                signature.bind()
+            except TypeError as error:
+                raise ValueError(
+                    "source docket loader must accept either the repository "
+                    "argument or no arguments"
+                ) from error
+            return loader()
+        return loader(repository)
     finally:
         for module_name in tuple(sys.modules):
             if module_name == package_name or module_name.startswith(f"{package_name}."):
