@@ -326,6 +326,11 @@ class PointInTimeOracle:
             SandboxSpec(
                 root,
                 argv_allowlist=(self._git_name, Path(sys.executable).name),
+                # PIT verification uses a fixed, receipt-bound Python probe to
+                # inspect its isolated learner environment.  Interpreter flags
+                # stay denied for the default sandbox and are opted into only by
+                # this bounded oracle runner.
+                allow_interpreter_flags=True,
                 env_allowlist=(
                     "GIT_CONFIG_GLOBAL",
                     "GIT_CONFIG_NOSYSTEM",
@@ -601,6 +606,12 @@ class PointInTimeOracle:
                     "initialize empty learner repository",
                     records,
                 )
+                # `git -C environment fetch ../ancestor.bundle` would cross the
+                # sandbox boundary at the command layer.  Place the generated
+                # bundle in the learner workspace instead, then remove it before
+                # that workspace becomes an observable learner environment.
+                bundle_in_environment = build_root / "environment" / "ancestor.bundle"
+                shutil.copyfile(build_root / "ancestor.bundle", bundle_in_environment)
                 fetch_specs = [
                     f"{ref}:{ref}"
                     for ref in refs
@@ -619,6 +630,8 @@ class PointInTimeOracle:
                     "import ancestor closure into learner repository",
                     records,
                 )
+                (build_root / "ancestor.bundle").unlink()
+                bundle_in_environment.unlink()
                 (build_root / "ancestor.bundle").unlink()
                 self._command(
                     runner,
@@ -724,7 +737,7 @@ class PointInTimeOracle:
             receipt, _, _ = self._environment_command(
                 environment,
                 ["cat-file", "-e", object_id],
-                "prove physical absence of one target or hidden object",
+                "prove physical absence of one target, tree, or hidden commit object",
                 allow_failure=True,
             )
             if receipt["result"] == "succeeded":

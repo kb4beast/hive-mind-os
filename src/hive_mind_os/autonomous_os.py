@@ -638,6 +638,12 @@ class AutonomousBrain:
             if completed.returncode:
                 raise AutonomousRunError("isolated repository clone could not be created")
             self._git(worktree, "checkout", "-b", branch, start_commit)
+            # A clone does not inherit the source repository's local author
+            # configuration.  Set a fixed, non-secret identity only on the
+            # isolated run branch so governed commits work on clean runners
+            # without exposing a host user's identity.
+            self._git(worktree, "config", "user.name", "Hive Mind OS")
+            self._git(worktree, "config", "user.email", "hive-mind-os@users.noreply.github.com")
             self._remove_clone_remote(worktree)
             with self._connection:
                 self._connection.execute(

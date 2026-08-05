@@ -89,7 +89,7 @@ class FileReceiptValidatorTests(unittest.TestCase):
         self.assertFalse(self.validate(missing).valid)
 
     def test_long_windows_path_receipt_validates(self) -> None:
-        long_root = self.root / ("a" * 80) / ("b" * 80) / ("c" * 80)
+        long_root = self.root / ("a" * 80) / ("b" * 80) / ("c" * 80) / ("d" * 80)
         self.assertGreater(len(str(long_root)), 260)
         access_root = filesystem_path(long_root)
         access_root.mkdir(parents=True)
@@ -116,7 +116,7 @@ class FileReceiptValidatorTests(unittest.TestCase):
             )
             self.assertTrue(validation.valid, validation.issues)
         finally:
-            shutil.rmtree(access_root)
+            shutil.rmtree(filesystem_path(self.root))
 
     def test_symlink_escape_fails_closed_when_supported(self) -> None:
         outside_directory = tempfile.TemporaryDirectory()

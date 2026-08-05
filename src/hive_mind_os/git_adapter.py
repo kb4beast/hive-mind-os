@@ -677,10 +677,21 @@ class GitWorkspace:
         else:
             if not allow_local:
                 raise PinViolation("push remote must be an HTTPS GitHub repository URL")
-            local = Path(remote_url).resolve()
+            supplied = Path(remote_url)
+            local = (
+                supplied.resolve()
+                if supplied.is_absolute()
+                else (self.root / supplied).resolve()
+            )
             if not local.is_dir():
                 raise PinViolation("local test push remote must be a repository directory")
-            remote = str(local)
+            try:
+                relative = local.relative_to(self.root)
+            except ValueError:
+                raise PinViolation(
+                    "local test push remote must remain inside the Git workspace"
+                ) from None
+            remote = relative.as_posix()
             credential = None
         _, existing = self._run_git(
             ["ls-remote", "--heads", remote, f"refs/heads/{target_branch}"],

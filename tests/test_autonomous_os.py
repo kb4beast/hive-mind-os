@@ -283,6 +283,11 @@ class AutonomousBrainTests(unittest.TestCase):
                 allow_remote_push=True,
             )
             worktree = brain._worktree_path(run["run_id"])
+            self.assertEqual(_git(worktree, "config", "--local", "--get", "user.name"), "Hive Mind OS")
+            self.assertEqual(
+                _git(worktree, "config", "--local", "--get", "user.email"),
+                "hive-mind-os@users.noreply.github.com",
+            )
             _commit(worktree, "app.py", "VALUE = 3\n", "isolated change")
             result = brain.open_draft_pull_request(
                 run["run_id"],

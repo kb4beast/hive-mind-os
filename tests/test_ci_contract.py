@@ -36,7 +36,7 @@ class CIContractTests(unittest.TestCase):
             (ROOT / "README.md").read_text(encoding="utf-8").splitlines()[:40]
         ).lower()
         self.assertIn("## status: early. here is exactly what works.", opening)
-        self.assertIn("hive-mind deliver --help", opening)
+        self.assertIn("hive-mind demo", opening)
         for forbidden in ("docket", "atomic claim", "burden", "stage 0", "courtroom"):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, opening)

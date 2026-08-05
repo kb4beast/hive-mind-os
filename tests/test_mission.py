@@ -719,7 +719,7 @@ class RepositoryMissionTests(unittest.TestCase):
             "--repository",
             str(self.fixture.root),
             "--backend",
-            "scripted",
+                "fixture-demo",
             "--pin",
             self.fixture.commit_two,
             "--objective",
