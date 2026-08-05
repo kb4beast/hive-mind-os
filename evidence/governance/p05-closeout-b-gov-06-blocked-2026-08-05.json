@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "receipt_id": "P05-CLOSEOUT-B-GOV-06-BLOCKED-2026-08-05",
+  "phase": "P05",
+  "candidate_commit": "b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9",
+  "observed_at": "2026-08-05T22:10:17Z",
+  "decision": "blocked",
+  "safe_reason": "GitHub Actions are disabled and main has non-strict protection with no required checks; the B-GOV-06 re-enable verification cannot pass.",
+  "observation_commands": [
+    "gh api 'repos/kb4beast/hive-mind-os/actions/permissions'",
+    "gh api 'repos/kb4beast/hive-mind-os/branches/main/protection'",
+    "git rev-parse origin/main",
+    "git merge-base --is-ancestor b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9 origin/main",
+    "rg -n -i -C 2 'windows|3\\.12|unit-tests' .github"
+  ],
+  "observed_results": {
+    "origin_main": "3c07be4051752c47d7f7516376d5145218bfbca5",
+    "candidate_represented_in_origin_main": true,
+    "actions_enabled": false,
+    "main_required_status_checks_strict": false,
+    "main_required_status_check_contexts": [],
+    "main_required_status_check_checks": [],
+    "workflow_declares_windows_python_312_job": true,
+    "windows_python_312_job_observed_in_new_run": false,
+    "new_constitutional_ci_run_triggered": false
+  },
+  "required_b_gov_06_state": {
+    "expected_required_checks": [
+      "unit-tests (Python 3.11)",
+      "unit-tests (Python 3.12)",
+      "unit-tests (Python 3.14)",
+      "static-and-type-checks",
+      "codeql-security",
+      "secret-scan",
+      "dependency-and-license-review",
+      "sbom-and-build-provenance"
+    ],
+    "windows_job": "unit-tests (Windows, Python 3.12) (3.12)",
+    "verification_completed_cleanly": false
+  },
+  "historical_evidence_preserved": {
+    "github_constitutional_ci_run": "30989265377",
+    "candidate_commit": "b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9",
+    "conclusion": "success",
+    "qualification": "Historical exact-candidate CI does not satisfy the required newly triggered post-re-enable run."
+  },
+  "unperformed_after_fail_closed_gate": [
+    "Clean exact-candidate post-commit P05 audit",
+    "Sequential Curator review",
+    "Sequential Judge review",
+    "Sequential Orchestrator review",
+    "New applicable Constitutional CI run"
+  ],
+  "scope_limits": {
+    "p05_closed": false,
+    "b_gov_06_resolved": false,
+    "b_ops_03_resolved": false,
+    "real_provider_or_production_claim": false,
+    "provider_credentials_or_live_calls_used": false
+  },
+  "historical_receipts_modified": false,
+  "external_state_changed_by_this_verification": false
+}
