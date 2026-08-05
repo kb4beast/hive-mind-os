@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The immutable candidate's independent audit and exact CI pass support draft-PR delivery, required Curator and Judge receipts are present, and authorized integration into main remains pending."
+}
