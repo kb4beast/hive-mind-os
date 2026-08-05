@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "8d00b9bc1fa1c2bfccca932c4699bab1dd27906f",
+  "reviewer_role": "curator",
+  "decision": "not-approved",
+  "reason": "A crash during PIT setup can leave an incomplete saved episode that blocks retry, so exactly one grade per later commit is not guaranteed.",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or test-suite instruction",
+  "focused_validation": {
+    "result": "not-run-by-curator"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T11:00:00Z"
+}

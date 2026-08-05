@@ -17,7 +17,10 @@ from hive_mind_os.reference.package_system import (
     content_digest,
     load_package,
 )
-from hive_mind_os.reference.package_system.builtins import hive_core_catalog, hive_core_root
+from hive_mind_os.reference.package_system.builtins import (
+    hive_core_catalog,
+    hive_core_root,
+)
 
 
 def _write_json(path: Path, document: object) -> None:

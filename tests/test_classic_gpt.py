@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hive_mind_os.models import Role
+from hive_mind_os.receipts import FileReceiptValidator, ReceiptReference, sha256_digest
 from hive_mind_os.reference.classic_gpt import (
     ActionKind,
     ClassicGptSimulationGate,
@@ -12,8 +14,6 @@ from hive_mind_os.reference.classic_gpt import (
     SimulatedAction,
     SimulationPhase,
 )
-from hive_mind_os.models import Role
-from hive_mind_os.receipts import FileReceiptValidator, ReceiptReference, sha256_digest
 
 
 class ClassicGptSimulationTests(unittest.TestCase):

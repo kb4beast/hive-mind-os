@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "f3f7bbdc40255182a4c9b9c302f91abbc29361e2",
+  "reviewer_role": "curator",
+  "decision": "blocked",
+  "reason": "Independent Curator could not inspect the candidate because Windows could not launch its sandbox; Claude Code has no local sign-in.",
+  "attempts": [
+    {
+      "reviewer": "headless-codex-curator",
+      "host": "codex",
+      "mode": "read-only",
+      "decision": "blocked",
+      "reason": "Read-only shell access failed before any repository inspection."
+    },
+    {
+      "reviewer": "headless-codex-curator-retry",
+      "host": "codex",
+      "mode": "detached-workspace-write",
+      "decision": "blocked",
+      "reason": "Windows sandbox session failed before any repository file or test could be inspected."
+    },
+    {
+      "reviewer": "alternate-claude-curator",
+      "host": "claude-code",
+      "decision": "blocked",
+      "reason": "Claude Code reported that no local sign-in is available."
+    }
+  ],
+  "focused_validation": {
+    "command": "PYTHONPATH=src python -m unittest tests.test_autonomous_os tests.test_contracts tests.test_roles tests.test_pit_oracle.PointInTimeOracleTests.test_ancestor_set_equals_exact_fixture_dag_closure tests.test_pit_oracle.PointInTimeOracleTests.test_cheating_probes_fail_and_every_attempt_has_a_receipt -v",
+    "result": "passed",
+    "tests": 22
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T09:29:00Z"
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "a212902ead17892c3c0e841b457f0b4e371bce22",
+  "reviewer_role": "curator",
+  "decision": "not-approved",
+  "reason": "Protected branches are only checked after a host turn, so a host can merge them before detection.",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or test-suite instruction",
+  "focused_validation": {
+    "result": "not-run-by-curator"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T10:38:00Z"
+}

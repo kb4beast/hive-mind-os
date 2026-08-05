@@ -5,7 +5,6 @@ import json
 import unittest
 from pathlib import Path
 
-from hive_mind_os.reference.classic_gpt import ClassicGptSourcePack
 from hive_mind_os.contracts import (
     LEGACY_SCHEMA_NAMES,
     ROLE_NAMES,
@@ -16,6 +15,7 @@ from hive_mind_os.contracts import (
     validate_runtime_state,
     validate_schema_catalog,
 )
+from hive_mind_os.reference.classic_gpt import ClassicGptSourcePack
 from hive_mind_os.reference.package_system import OODAState, validate_ooda_contract
 from hive_mind_os.source_docket import load_default_source_docket
 

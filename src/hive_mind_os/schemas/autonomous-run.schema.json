@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/autonomous-run.schema.json",
+  "title": "Hive Mind OS Autonomous Repository Run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "created_at", "repository", "start_commit", "branch", "host", "prompt_digest", "prompt_summary", "protected_branches", "authority", "status"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 8, "maxLength": 96, "pattern": "AR-[A-Za-z0-9._-]+\\Z"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "repository": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "start_commit": {"type": "string", "pattern": "[0-9a-f]{40}\\Z"},
+    "branch": {"type": "string", "minLength": 3, "maxLength": 160, "pattern": "hive-mind/[A-Za-z0-9._/-]+\\Z"},
+    "host": {"enum": ["codex", "claude-code"]},
+    "prompt_digest": {"type": "string", "pattern": "sha256:[0-9a-f]{64}\\Z"},
+    "prompt_summary": {"type": "string", "minLength": 1, "maxLength": 240},
+    "protected_branches": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"enum": ["main", "master", "staging"]}},
+    "authority": {"type": "object", "additionalProperties": false, "required": ["allow_remote_push", "allow_pr_comments"], "properties": {"allow_remote_push": {"type": "boolean"}, "allow_pr_comments": {"type": "boolean"}}},
+    "status": {"enum": ["prepared", "active", "blocked", "complete"]}
+  }
+}

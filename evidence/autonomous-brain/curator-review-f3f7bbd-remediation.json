@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "f3f7bbdc40255182a4c9b9c302f91abbc29361e2",
+  "reviewer_role": "curator",
+  "decision": "not-approved",
+  "reason": "Host turns were not prevented from pushing protected remote refs, and PIT hosts were not confined to ancestor worktrees.",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or broad-test instruction",
+  "remediation_candidate": "4318c1e9afce4de035d08895a988246448aa4ddd",
+  "remediation": [
+    "Host turns now use an isolated clone with no configured remote and restricted GitHub/Git credential environment.",
+    "PIT host predictions now use a disposable remote-free clone of the verified ancestor environment."
+  ],
+  "focused_validation": {
+    "result": "passed",
+    "tests": 23
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T09:35:00Z"
+}

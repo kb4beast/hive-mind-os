@@ -79,33 +79,68 @@ class BenchmarkHarnessTests(unittest.TestCase):
         )
         self.assertEqual(len(first.tasks), 5)
 
-    def test_committed_benchmark_receipts_survive_clean_checkout(self) -> None:
+    def test_archived_benchmark_receipts_are_retained_by_immutable_tag(self) -> None:
         repository = Path.cwd()
-        benchmark_root = repository / "evidence" / "benchmarks"
-        summaries = sorted(benchmark_root.glob("*/summary.json"))
-        self.assertTrue(summaries, "no committed benchmark summary found")
+        archive_ref = "archive/evidence-corpus-2026-08-03"
+        paths = self._git_paths(repository, archive_ref, "evidence/benchmarks")
+        summaries = [path for path in paths if path.endswith("/summary.json")]
+        self.assertTrue(summaries, "no archived benchmark summary found")
+
+        attributes = self._git_blob(repository, archive_ref, ".gitattributes").decode(
+            "utf-8"
+        )
+        self.assertIn("evidence/benchmarks/** -text -diff", attributes)
 
         for summary_path in summaries:
-            summary = json.loads(summary_path.read_text(encoding="utf-8"))
-            verdict_path = summary_path.with_name("verdict.json")
-            verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
-            raw_path = repository / "evidence" / "benchmarks" / summary["raw_results"]
-            actual_digest = "sha256:" + hashlib.sha256(raw_path.read_bytes()).hexdigest()
+            summary = json.loads(
+                self._git_blob(repository, archive_ref, summary_path).decode("utf-8")
+            )
+            verdict_path = summary_path.removesuffix("summary.json") + "verdict.json"
+            verdict = json.loads(
+                self._git_blob(repository, archive_ref, verdict_path).decode("utf-8")
+            )
+            raw_path = "evidence/benchmarks/" + str(summary["raw_results"])
+            raw = self._git_blob(repository, archive_ref, raw_path)
+            actual_digest = "sha256:" + hashlib.sha256(raw).hexdigest()
 
             self.assertEqual(actual_digest, summary["results_digest"])
             self.assertEqual(actual_digest, verdict["results_digest"])
 
-            relative = raw_path.relative_to(repository).as_posix()
-            attributes = subprocess.run(
-                ["git", "check-attr", "text", "diff", "--", relative],
-                cwd=repository,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                shell=False,
-            ).stdout.decode("utf-8")
-            self.assertIn(f"{relative}: text: unset", attributes)
-            self.assertIn(f"{relative}: diff: unset", attributes)
+    @staticmethod
+    def _git_paths(repository: Path, revision: str, root: str) -> tuple[str, ...]:
+        completed = subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", revision, "--", root],
+            cwd=repository,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            shell=False,
+        )
+        if completed.returncode != 0:
+            raise AssertionError(
+                f"benchmark archive is unavailable: {revision}: "
+                + completed.stderr.decode("utf-8", "replace")
+            )
+        return tuple(
+            path for path in completed.stdout.decode("utf-8").splitlines() if path
+        )
+
+    @staticmethod
+    def _git_blob(repository: Path, revision: str, path: str) -> bytes:
+        completed = subprocess.run(
+            ["git", "show", f"{revision}:{path}"],
+            cwd=repository,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            shell=False,
+        )
+        if completed.returncode != 0:
+            raise AssertionError(
+                f"benchmark artifact is absent from Git archive: {path}: "
+                + completed.stderr.decode("utf-8", "replace")
+            )
+        return completed.stdout
 
     def test_hidden_checks_are_not_materialized_for_lanes(self) -> None:
         corpus = build_corpus(self.root / "corpus")

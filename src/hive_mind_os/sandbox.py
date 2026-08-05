@@ -65,6 +65,16 @@ _INTERPRETER_FLAGS = {
 _SIMPLE_PATH_TOKEN = re.compile(r"[^/\\\s]+\.[A-Za-z0-9]{1,10}\Z")
 
 
+def _interpreter_flags(executable: str) -> frozenset[str]:
+    normalized = _normalized_executable(executable)
+    direct = _INTERPRETER_FLAGS.get(normalized)
+    if direct is not None:
+        return direct
+    if re.fullmatch(r"(?:python|pypy)\d+(?:\.\d+)*", normalized):
+        return frozenset({"-c", "-m"})
+    return frozenset()
+
+
 @dataclass(frozen=True, slots=True)
 class SandboxSpec:
     root: Path
@@ -188,7 +198,7 @@ class SandboxRunner:
         }:
             self._deny(intent, "executable is not allowlisted")
         argv[0] = str(Path(resolved).resolve())
-        forbidden_flags = _INTERPRETER_FLAGS.get(_normalized_executable(argv[0]), frozenset())
+        forbidden_flags = _interpreter_flags(argv[0])
         if not self.spec.allow_interpreter_flags and any(
             argument in forbidden_flags for argument in argv[1:]
         ):

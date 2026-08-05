@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "7880840aef88d7a4ee2118bb89028c73bb93b2fc",
+  "reviewer_role": "curator",
+  "decision": "not-approved",
+  "reason": "Remote-removal failures were ignored, so a host or PIT predictor could run with origin still configured instead of failing closed.",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or broad-test instruction",
+  "remediation_candidate": "035669f1d9953823aa82f66472e623d39545e522",
+  "remediation": [
+    "Both host clone paths now require exactly one origin remote, remove it without suppressing failure, and prove the remote list is empty.",
+    "Focused tests cover successful removal plus missing-origin and extra-remote failure paths."
+  ],
+  "focused_validation": {
+    "result": "passed",
+    "tests": 25
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T09:54:00Z"
+}

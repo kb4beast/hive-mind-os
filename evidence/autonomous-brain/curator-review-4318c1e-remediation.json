@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "4318c1e9afce4de035d08895a988246448aa4ddd",
+  "reviewer_role": "curator",
+  "decision": "not-approved",
+  "reason": "Host environments retained inherited Git configuration variables, so Git credential paths were not fail-closed.",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or broad-test instruction",
+  "remediation_candidate": "7880840aef88d7a4ee2118bb89028c73bb93b2fc",
+  "remediation": [
+    "The host environment now removes every inherited GIT_, GH_, GITHUB_, and SSH_ variable before setting its minimal safe Git configuration.",
+    "A focused regression test injects credential-helper, GitHub token, and SSH-agent variables and verifies none reach the host."
+  ],
+  "focused_validation": {
+    "result": "passed",
+    "tests": 24
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T09:47:00Z"
+}

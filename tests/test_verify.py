@@ -202,6 +202,17 @@ class StandaloneVerificationTests(unittest.TestCase):
             verify_repository(self.repository, self._specification(), output, "HEAD")
         self.assertFalse(output.exists())
 
+    def test_cleanup_uses_the_python_311_callback_name(self) -> None:
+        with (
+            patch.object(verification.sys, "version_info", (3, 11, 0)),
+            patch.object(verification.shutil, "rmtree") as remove_tree,
+        ):
+            verification._rmtree(self.root / "private-worktree")
+
+        self.assertEqual(remove_tree.call_count, 1)
+        self.assertIn("onerror", remove_tree.call_args.kwargs)
+        self.assertNotIn("onexc", remove_tree.call_args.kwargs)
+
     def test_rejects_external_git_filter_configuration_before_materialization(self) -> None:
         self._git("config", "filter.hive-test.smudge", "echo contaminated")
         output = self.root / "filter-bundle"

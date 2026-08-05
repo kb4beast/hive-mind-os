@@ -20,11 +20,11 @@ from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 from uuid import uuid4
 
 from .acceptance import AcceptanceSpecification, normalize_acceptance_specifications
-from .model_action_adapter import ModelProviderActionAdapter
+from .model_action_adapter import ModelActionProposal, ModelProviderActionAdapter
 from .models import AutonomyLevel, RiskTier, Role
 from .policy import Action, PolicyEngine
 from .receipts import portable_path_parts, sha256_digest
@@ -37,6 +37,9 @@ class MissionLoopError(RuntimeError):
 
 class StaleMissionState(MissionLoopError):
     """A proposed event was based on an older immutable state revision."""
+
+
+_ToolOperation = Callable[[], tuple[str, Mapping[str, object]]]
 
 
 class MissionStatus(StrEnum):
@@ -283,9 +286,14 @@ class MissionEvent:
 def _event_work_item(payload: Mapping[str, object]) -> WorkItemState:
     try:
         role = Role(str(payload["role"]))
+        raw_allowed_paths = payload.get("allowed_paths", ())
+        if not isinstance(raw_allowed_paths, Sequence) or isinstance(
+            raw_allowed_paths, (str, bytes)
+        ):
+            raise ValueError("allowed paths must be a list")
         allowed_paths = tuple(
             "/".join(portable_path_parts(str(item)))
-            for item in payload.get("allowed_paths", ())
+            for item in raw_allowed_paths
         )
         return WorkItemState(
             id=str(payload["work_item_id"]),
@@ -1013,7 +1021,7 @@ class MissionLoop:
         name: str,
         action: Action,
         payload: Mapping[str, object],
-        operation: callable,
+        operation: _ToolOperation,
     ) -> ToolReceipt:
         self._policy(role, action, name, payload)
         self._consume("tool_call", 1, role)
@@ -1182,6 +1190,8 @@ class MissionLoop:
         item = self._start_role(Role.EXPLORER)
         if self._explorer_workspace is None:
             self._explorer_workspace = self._clone(self._workspace_root / "explorer", self.base_commit)
+        explorer_workspace = self._explorer_workspace
+        assert explorer_workspace is not None
         supporting: list[str] = []
         conflicting: list[str] = []
         relevant: set[str] = set()
@@ -1207,8 +1217,8 @@ class MissionLoop:
             if proposal.name == "list_tree":
                 def list_tree() -> tuple[str, dict[str, object]]:
                     paths = sorted(
-                        path.relative_to(self._explorer_workspace).as_posix()
-                        for path in self._explorer_workspace.rglob("*")
+                        path.relative_to(explorer_workspace).as_posix()
+                        for path in explorer_workspace.rglob("*")
                         if path.is_file() and ".git" not in path.parts
                     )[:500]
                     relevant.update(paths)
@@ -1217,7 +1227,7 @@ class MissionLoop:
             elif proposal.name in {"read_file", "read_file_range"}:
                 relative = self._safe_relative(payload.get("path"))
                 def read_file(relative: str = relative) -> tuple[str, dict[str, object]]:
-                    file = self._path(self._explorer_workspace, relative)
+                    file = self._path(explorer_workspace, relative)
                     if not file.is_file():
                         return "failed", {"error": "file does not exist", "path": relative}
                     raw = file.read_bytes()
@@ -1240,12 +1250,12 @@ class MissionLoop:
                     raise MissionLoopError("search requires a non-empty query")
                 def search(query: str = query) -> tuple[str, dict[str, object]]:
                     matches: list[str] = []
-                    for file in self._explorer_workspace.rglob("*"):
+                    for file in explorer_workspace.rglob("*"):
                         if not file.is_file() or ".git" in file.parts or file.is_symlink():
                             continue
                         try:
                             if query in file.read_text(encoding="utf-8", errors="ignore"):
-                                matches.append(file.relative_to(self._explorer_workspace).as_posix())
+                                matches.append(file.relative_to(explorer_workspace).as_posix())
                         except OSError:
                             continue
                     relevant.update(matches)
@@ -1256,25 +1266,25 @@ class MissionLoop:
                 argv = self._allowed_command(payload.get("argv"))
                 outcome_holder: dict[str, object] = {}
                 def run_command(argv: tuple[str, ...] = argv) -> tuple[str, dict[str, object]]:
-                    outcome, observation = self._command(self._explorer_workspace, argv)
+                    outcome, observation = self._command(explorer_workspace, argv)
                     outcome_holder.update(observation)
                     return outcome, observation
                 receipt = self._tool(Role.EXPLORER, proposal.name, Action.RUN_COMMANDS, payload, run_command)
                 commands.append(argv)
                 supporting.append(f"read-only command {receipt.outcome}")
             elif proposal.name == "inspect_git_status":
-                self._tool(Role.EXPLORER, proposal.name, Action.INSPECT_HISTORY, payload, lambda: self._git_observation(self._explorer_workspace, ("status", "--porcelain")))
+                self._tool(Role.EXPLORER, proposal.name, Action.INSPECT_HISTORY, payload, lambda: self._git_observation(explorer_workspace, ("status", "--porcelain")))
             elif proposal.name == "inspect_git_history":
-                self._tool(Role.EXPLORER, proposal.name, Action.INSPECT_HISTORY, payload, lambda: self._git_observation(self._explorer_workspace, ("log", "--oneline", "-n", "20")))
+                self._tool(Role.EXPLORER, proposal.name, Action.INSPECT_HISTORY, payload, lambda: self._git_observation(explorer_workspace, ("log", "--oneline", "-n", "20")))
             elif proposal.name == "inspect_commit":
                 commit = payload.get("commit", self.base_commit)
                 if commit != self.base_commit:
                     raise MissionLoopError("Explorer may inspect only the sealed base commit")
-                self._tool(Role.EXPLORER, proposal.name, Action.INSPECT_HISTORY, payload, lambda: self._git_observation(self._explorer_workspace, ("show", "--no-patch", str(commit))))
+                self._tool(Role.EXPLORER, proposal.name, Action.INSPECT_HISTORY, payload, lambda: self._git_observation(explorer_workspace, ("show", "--no-patch", str(commit))))
             elif proposal.name == "inspect_build_configuration":
                 def inspect_config() -> tuple[str, dict[str, object]]:
                     names = ("pyproject.toml", "package.json", "*.csproj", "Directory.Build.props")
-                    found = [name for name in names if list(self._explorer_workspace.glob(name))]
+                    found = [name for name in names if list(explorer_workspace.glob(name))]
                     relevant.update(found)
                     return "succeeded", {"configuration": found}
                 self._tool(Role.EXPLORER, proposal.name, Action.READ_REPOSITORY, payload, inspect_config)
@@ -1353,7 +1363,7 @@ class MissionLoop:
         name: str,
         payload: Mapping[str, object],
         action: Action,
-        operation: callable,
+        operation: _ToolOperation,
     ) -> ToolReceipt:
         self._check_builder_limits()
         self._builder_calls += 1
@@ -1438,7 +1448,7 @@ class MissionLoop:
         item = self._resume_or_start_builder()
         self._builder_turns += 1
         context = self._model_context()
-        proposal_holder: dict[str, object] = {}
+        proposal_holder: dict[str, ModelActionProposal] = {}
 
         def request_actions() -> tuple[str, dict[str, object]]:
             proposal = adapter.propose(context)

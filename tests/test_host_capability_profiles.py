@@ -16,7 +16,10 @@ from hive_mind_os.reference.package_system import (
     load_builtin_host_profile,
     load_builtin_host_profiles,
 )
-from hive_mind_os.reference.package_system.builtins import hive_core_catalog, hive_core_root
+from hive_mind_os.reference.package_system.builtins import (
+    hive_core_catalog,
+    hive_core_root,
+)
 
 
 class HostCapabilityProfileTests(unittest.TestCase):

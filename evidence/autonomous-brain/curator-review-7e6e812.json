@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "7e6e8127a4cce59cfb12e8cc23e58b8f9b1c401b",
+  "reviewer_role": "curator",
+  "decision": "approved",
+  "review_mode": "detached full-access headless Codex process with no edit, network, push, PR, merge, or test-suite instruction",
+  "review_scope": [
+    "versioned Python and PyPy names deny inline interpreter flags by default",
+    "explicit interpreter opt-in remains unchanged",
+    "sandbox decision record and regression coverage preserve fail-closed behavior"
+  ],
+  "focused_validation": {
+    "command": "PYTHONPATH=src py -3.12 -m unittest tests.test_sandbox -v",
+    "result": "25 tests passed"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T12:01:37Z"
+}

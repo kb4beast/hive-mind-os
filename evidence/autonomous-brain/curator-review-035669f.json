@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "035669f1d9953823aa82f66472e623d39545e522",
+  "reviewer_role": "curator",
+  "decision": "approved",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or test-suite instruction",
+  "review_scope": [
+    "no merge surface and protected-ref checks",
+    "fail-closed remote removal in host and PIT clones",
+    "Git, GitHub, and SSH environment scrubbing",
+    "ancestor-only remote-free PIT host workspace"
+  ],
+  "focused_validation": {
+    "result": "passed",
+    "tests": 25
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T09:56:00Z"
+}

@@ -1,5 +1,12 @@
 """Hive Mind OS agent kernel."""
 
+from .autonomous_os import (
+    AutonomousBrain,
+    AutonomousRunError,
+    HostKind,
+    HostRunResult,
+    PullRequestCommentGateway,
+)
 from .autonomy import (
     AgentVariant,
     AutonomousMissionLoop,
@@ -172,7 +179,9 @@ from .workers import Worker, serve
 __all__ = [
     "ActionKind",
     "AgentManifest",
+    "AutonomousBrain",
     "AgentVariant",
+    "AutonomousRunError",
     "AutonomyBudget",
     "AutonomyLevel",
     "ArchitectDesign",
@@ -215,6 +224,8 @@ __all__ = [
     "HiveKernel",
     "HostCapability",
     "HostCapabilityProfile",
+    "HostKind",
+    "HostRunResult",
     "Job",
     "GovernedSourceAudit",
     "GitHubClient",
@@ -255,6 +266,7 @@ __all__ = [
     "PackagePin",
     "PackageValidationError",
     "PullRequestResult",
+    "PullRequestCommentGateway",
     "PromptRegistry",
     "ProviderAction",
     "PushResult",

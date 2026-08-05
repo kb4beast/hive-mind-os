@@ -84,6 +84,24 @@ class MissionStateReducerTests(unittest.TestCase):
         self.assertEqual(remanded.work_items[1].parent_id, "W-original")
         self.assertEqual(remanded.work_items[1].status, "pending")
 
+    def test_work_item_rejects_a_scalar_allowed_path(self) -> None:
+        state = MissionState.intake("M-3", "OBJ-3", risk_lane="moderate")
+        with self.assertRaisesRegex(MissionLoopError, "allowed paths"):
+            reduce_mission_state(
+                state,
+                MissionEvent(
+                    "work.created",
+                    Role.ORCHESTRATOR,
+                    0,
+                    {
+                        "work_item_id": "W-invalid",
+                        "role": "builder",
+                        "instruction": "fix",
+                        "allowed_paths": "app.py",
+                    },
+                ),
+            )
+
 
 class OrchestratorTests(unittest.TestCase):
     def test_refuses_untestable_or_contradictory_intake(self) -> None:

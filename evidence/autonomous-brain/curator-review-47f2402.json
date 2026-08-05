@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "47f240203b307122d4674882fe9512e71515da21",
+  "reviewer_role": "curator",
+  "decision": "approved",
+  "review_mode": "detached full-access headless Codex process with no edit, network, push, PR, merge, or test-suite instruction",
+  "review_scope": [
+    "PIT bundle cleanup removes each temporary copy exactly once",
+    "parent environment handoff contains no temporary bundle",
+    "architecture record and focused regression evidence preserve fail-closed behavior"
+  ],
+  "focused_validation": {
+    "command": "PYTHONPATH=src py -3.12 -m unittest tests.test_pit_oracle -v",
+    "result": "13 tests passed"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T11:55:30Z"
+}

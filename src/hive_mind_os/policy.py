@@ -31,6 +31,7 @@ class Action(StrEnum):
     CREATE_AGENT_VARIANT = "create_agent_variant"
     CREATE_BRANCH = "create_branch"
     OPEN_PULL_REQUEST = "open_pull_request"
+    COMMENT_PULL_REQUEST = "comment_pull_request"
     MERGE_PULL_REQUEST = "merge_pull_request"
     DEPLOY = "deploy"
     MANAGE_SECRETS = "manage_secrets"
@@ -75,6 +76,7 @@ ACTION_LEVEL: dict[Action, RequiredLevel] = {
     Action.CREATE_AGENT_VARIANT: RequiredLevel.SANDBOX,
     Action.CREATE_BRANCH: RequiredLevel.REPOSITORY,
     Action.OPEN_PULL_REQUEST: RequiredLevel.REPOSITORY,
+    Action.COMMENT_PULL_REQUEST: RequiredLevel.REPOSITORY,
     Action.MERGE_PULL_REQUEST: RequiredLevel.DELIVERY,
     Action.DEPLOY: RequiredLevel.DELIVERY,
     Action.MANAGE_SECRETS: RequiredLevel.FULL,

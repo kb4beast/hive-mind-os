@@ -12,7 +12,10 @@ from hive_mind_os.reference.package_system import (
     ComponentKind,
     WorkflowManifest,
 )
-from hive_mind_os.reference.package_system.builtins import hive_core_catalog, hive_core_root
+from hive_mind_os.reference.package_system.builtins import (
+    hive_core_catalog,
+    hive_core_root,
+)
 from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 
 EXPECTED_ROLE_DATA = {
@@ -45,10 +48,12 @@ EXPECTED_ROLE_DATA = {
         ("implementation", "tests", "change summary"),
         (
             "read_repository",
+            "model_system",
             "write_workspace",
             "run_commands",
             "create_branch",
             "open_pull_request",
+            "comment_pull_request",
         ),
         ("tests pass", "change is traceable to the objective"),
     ),
@@ -80,7 +85,12 @@ EXPECTED_ROLE_DATA = {
     Role.OPTIMIZER: (
         "Measure outcomes, run controlled experiments, and improve the system.",
         ("metrics", "experiment result", "improvement proposal"),
-        ("query_ledger", "run_evaluations", "propose_skill_change"),
+        (
+            "query_ledger",
+            "run_evaluations",
+            "run_commands",
+            "propose_skill_change",
+        ),
         ("improvement beats baseline", "regressions stay within budget"),
     ),
 }
