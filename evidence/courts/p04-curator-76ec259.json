@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The pinned candidate stages delivery into a new validated root, confines evidence sources and destinations by resolved roots, rejects unsafe paths, and passes the focused git-adapter tests."
+}
