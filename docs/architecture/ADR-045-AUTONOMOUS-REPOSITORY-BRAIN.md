@@ -47,6 +47,27 @@ has six deliberate layers rather than one opaque memory blob:
 6. **Learning memory:** one sealed, ancestor-only Point-in-Time (PIT) grade per later
    commit. A lesson is a measured candidate, not an automatic policy or model change.
 
+## Carry-forward requirement gate
+
+The complete autonomous-repository requirement bundle is sealed at kickoff, rather
+than inferred again from a later, abbreviated restatement. The append-only manifest
+contains these seven atomic obligations and their enforcement/test references:
+
+1. one user prompt starts an autonomous run for a selected repository;
+2. locally signed-in Codex and Claude Code work without API keys;
+3. `main`, `master`, and `staging` are never merged or written;
+4. the run has a durable, append-only brain;
+5. PR feedback and the human-selected final state become learning input;
+6. every later human commit gets one recoverable PIT prediction and grade; and
+7. while supervision is active, each new bound PR comment is implemented, answered,
+   refuted, or safely blocked, with safe answers/refutations posted back to the PR.
+
+Every later autonomous action loads and checks that exact manifest before it can run.
+If even one binding is absent or altered, the run blocks rather than silently treating
+a shortened follow-up prompt as a replacement for the original objective. The safe
+`hive-mind autonomous requirements` view exposes the sealed bundle without retaining
+raw model output or raw PR-comment bodies.
+
 ## Host and delivery boundary
 
 `hive-mind autonomous kickoff` accepts one prompt and creates an isolated local clone
@@ -129,6 +150,7 @@ or host profile.
 | Human correction lost | Every later commit receives a distinct sealed PIT episode and measured grade |
 | Host sees a future PIT target | The host receives a disposable remote-free clone made only from the oracle's verified ancestor environment |
 | Feedback replay/duplicate reply | Remote comment IDs are append-only deduplication keys |
+| Earlier requirement omitted in a follow-up prompt | The complete kickoff requirement bundle is sealed and checked before every later autonomous action |
 | Concurrent or interrupted PIT supervision | Stable run/target episode reservations, durable pre-seal predictions, retained incomplete-workspace quarantine, seal/grade recovery, a transactional grade gate, and a unique grade record prevent duplicate episodes while allowing retry |
 | Autonomous policy mutation | Authority is immutable per run; learning does not change policy or prompts |
 

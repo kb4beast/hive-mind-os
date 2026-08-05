@@ -514,6 +514,12 @@ def build_autonomous_parser() -> argparse.ArgumentParser:
     events = commands.add_parser("events", help="Print the run's safe append-only event ledger")
     events.add_argument("--run-id", required=True)
     events.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    requirements = commands.add_parser(
+        "requirements",
+        help="Print the sealed carry-forward requirements for an autonomous run",
+    )
+    requirements.add_argument("--run-id", required=True)
+    requirements.add_argument("--state-dir", default=".hive-mind-state/autonomous")
     return parser
 
 
@@ -1215,6 +1221,19 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                     ),
                 )
                 print(json.dumps({"status": "supervised", **result}, indent=2, sort_keys=True))
+                return 0
+            if args.action == "requirements":
+                print(
+                    json.dumps(
+                        {
+                            "status": "sealed",
+                            "run_id": args.run_id,
+                            "requirements": brain.requirements(args.run_id),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
                 return 0
             print(json.dumps({"status": "unknown-action"}, indent=2), file=sys.stderr)
             return 1

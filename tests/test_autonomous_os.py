@@ -161,6 +161,38 @@ class AutonomousBrainTests(unittest.TestCase):
                 {branch: _git(self.repository, "rev-parse", branch) for branch in source_refs}, source_refs
             )
 
+    def test_kickoff_seals_the_complete_carry_forward_requirement_bundle(self) -> None:
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository, "Run the operating system autonomously.", "codex", run_id="AR-requirements"
+            )
+            requirements = brain.requirements(run["run_id"])
+            self.assertEqual(
+                [item["id"] for item in requirements],
+                [
+                    "autonomous-pr-comment-dialogue",
+                    "durable-brain",
+                    "host-neutral-local-sign-in",
+                    "human-outcome-learning",
+                    "one-pit-grade-per-later-commit",
+                    "prompt-kickoff",
+                    "protected-branch-no-merge",
+                ],
+            )
+            pr_dialogue = next(item for item in requirements if item["id"] == "autonomous-pr-comment-dialogue")
+            self.assertIn("implemented, answered, refuted, or safely blocked", pr_dialogue["statement"])
+            self.assertIn(
+                "requirements_sealed", [event["kind"] for event in brain.events(run["run_id"])]
+            )
+            unsealed = {**run, "run_id": "AR-unsealed", "branch": "hive-mind/ar-unsealed"}
+            with brain._connection:
+                brain._connection.execute(
+                    "INSERT INTO runs(run_id, contract_json) VALUES(?, ?)",
+                    ("AR-unsealed", json.dumps(unsealed, sort_keys=True, separators=(",", ":"))),
+                )
+            with self.assertRaisesRegex(AutonomousRunError, "carry-forward requirement bundle"):
+                brain.get_run("AR-unsealed")
+
     def test_pr_feedback_is_untrusted_deduplicated_and_can_reply_without_raw_retention(self) -> None:
         gateway = FakeCommentGateway(
             [
@@ -548,6 +580,24 @@ class AutonomousBrainTests(unittest.TestCase):
         )
         self.assertEqual(supervision.action, "supervise")
         self.assertEqual(supervision.polls, 2)
+        requirements = build_autonomous_parser().parse_args(
+            ["requirements", "--run-id", "AR-cli-run", "--state-dir", str(self.state)]
+        )
+        self.assertEqual(requirements.action, "requirements")
+        output = io.StringIO()
+        with redirect_stdout(output), self.assertRaises(SystemExit) as success:
+            main(
+                [
+                    "autonomous",
+                    "requirements",
+                    "--run-id",
+                    "AR-cli-run",
+                    "--state-dir",
+                    str(self.state),
+                ]
+            )
+        self.assertEqual(success.exception.code, 0)
+        self.assertEqual(len(json.loads(output.getvalue())["requirements"]), 7)
         with AutonomousBrain(self.state) as brain:
             with self.assertRaises(AutonomousRunError):
                 brain.start_run(

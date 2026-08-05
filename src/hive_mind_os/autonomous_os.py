@@ -67,6 +67,62 @@ class HostRunResult:
     changed_paths: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class RequirementBinding:
+    """One carry-forward user requirement and its executable enforcement evidence."""
+
+    identifier: str
+    statement: str
+    enforcement: str
+    focused_test: str
+
+
+AUTONOMOUS_REQUIREMENTS = (
+    RequirementBinding(
+        "prompt-kickoff",
+        "A user prompt kicks off an autonomous run on a chosen local repository.",
+        "AutonomousBrain.start_run and the autonomous kickoff CLI route",
+        "test_cli_kickoff_is_a_prompt_entrypoint_and_rejects_secret_like_prompts",
+    ),
+    RequirementBinding(
+        "host-neutral-local-sign-in",
+        "The run supports locally signed-in Codex and Claude Code without API keys.",
+        "HostKind command adapter and scrubbed host environment",
+        "test_prompt_kickoff_uses_an_isolated_nonprotected_branch_for_each_host",
+    ),
+    RequirementBinding(
+        "protected-branch-no-merge",
+        "The operating system never merges or writes main, master, or staging.",
+        "Read-only or plan-only hosts plus controlled non-protected branch commits",
+        "test_read_only_host_patch_is_committed_only_to_the_isolated_run_branch",
+    ),
+    RequirementBinding(
+        "durable-brain",
+        "The run keeps a durable, append-only brain for charter, work, events, feedback, outcomes, and learning.",
+        "AutonomousBrain SQLite charter, event, feedback, outcome, and PIT records",
+        "test_kickoff_seals_the_complete_carry_forward_requirement_bundle",
+    ),
+    RequirementBinding(
+        "human-outcome-learning",
+        "The run learns from PR feedback and the human-selected final repository state.",
+        "Bound PR feedback handling and human-outcome PIT learning",
+        "test_bounded_supervision_handles_pr_feedback_and_local_human_commits",
+    ),
+    RequirementBinding(
+        "one-pit-grade-per-later-commit",
+        "Every later human commit receives one recoverable point-in-time prediction and grade.",
+        "Stable PIT episode reservation, durable prediction, recovery, and unique grade",
+        "test_interrupted_pit_episode_recovers_without_duplicate_oracle_events",
+    ),
+    RequirementBinding(
+        "autonomous-pr-comment-dialogue",
+        "While autonomous supervision is active, each new bound PR comment is implemented, answered, refuted, or safely blocked; safe answers and refutations are posted back to the PR.",
+        "handle_pull_request_feedback and bounded supervise loop",
+        "test_pr_feedback_is_untrusted_deduplicated_and_can_reply_without_raw_retention",
+    ),
+)
+
+
 class PullRequestCommentGateway(Protocol):
     """Narrow gateway: comments only; it has no merge or branch-protection method."""
 
@@ -293,6 +349,15 @@ class AutonomousBrain:
                     payload_json TEXT NOT NULL,
                     FOREIGN KEY(episode_id) REFERENCES pit_episodes(episode_id)
                 );
+                CREATE TABLE IF NOT EXISTS requirements (
+                    run_id TEXT NOT NULL,
+                    requirement_id TEXT NOT NULL,
+                    statement TEXT NOT NULL,
+                    enforcement TEXT NOT NULL,
+                    focused_test TEXT NOT NULL,
+                    source_prompt_digest TEXT NOT NULL,
+                    PRIMARY KEY(run_id, requirement_id)
+                );
                 """
             )
             duplicates = self._connection.execute(
@@ -303,7 +368,15 @@ class AutonomousBrain:
             self._connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS pit_grades_run_target ON pit_grades(run_id, target_sha)"
             )
-            for table in ("runs", "events", "feedback", "pit_grades", "pit_episodes", "pit_predictions"):
+            for table in (
+                "runs",
+                "events",
+                "feedback",
+                "pit_grades",
+                "pit_episodes",
+                "pit_predictions",
+                "requirements",
+            ):
                 self._connection.executescript(
                     f"""
                     CREATE TRIGGER IF NOT EXISTS {table}_no_update
@@ -367,6 +440,52 @@ class AutonomousBrain:
                 "INSERT INTO events(run_id, created_at, kind, payload_json) VALUES(?, ?, ?, ?)",
                 (run_id, _now(), kind, _canonical(dict(payload))),
             )
+
+    @staticmethod
+    def _requirement_rows(prompt_digest: str) -> tuple[tuple[str, str, str, str, str], ...]:
+        return tuple(
+            (
+                requirement.identifier,
+                requirement.statement,
+                requirement.enforcement,
+                requirement.focused_test,
+                prompt_digest,
+            )
+            for requirement in AUTONOMOUS_REQUIREMENTS
+        )
+
+    def _assert_requirement_bundle(self, run_id: str, prompt_digest: str) -> None:
+        observed = tuple(
+            tuple(str(value) for value in row)
+            for row in self._connection.execute(
+                "SELECT requirement_id, statement, enforcement, focused_test, source_prompt_digest "
+                "FROM requirements WHERE run_id = ? ORDER BY requirement_id",
+                (run_id,),
+            ).fetchall()
+        )
+        expected = tuple(sorted(self._requirement_rows(prompt_digest)))
+        if observed != expected:
+            raise AutonomousRunError("sealed carry-forward requirement bundle is missing or altered")
+
+    def requirements(self, run_id: str) -> tuple[dict[str, str], ...]:
+        """Return the safe, immutable requirements every later run action must retain."""
+
+        contract = self.get_run(run_id)
+        rows = self._connection.execute(
+            "SELECT requirement_id, statement, enforcement, focused_test FROM requirements "
+            "WHERE run_id = ? ORDER BY requirement_id",
+            (run_id,),
+        ).fetchall()
+        return tuple(
+            {
+                "id": str(row["requirement_id"]),
+                "statement": str(row["statement"]),
+                "enforcement": str(row["enforcement"]),
+                "focused_test": str(row["focused_test"]),
+                "source_prompt_digest": str(contract["prompt_digest"]),
+            }
+            for row in rows
+        )
 
     def _task_path(self, run_id: str) -> Path:
         return self.state_dir / "tasks" / f"{run_id}.txt"
@@ -449,6 +568,7 @@ class AutonomousBrain:
         document = json.loads(str(row["contract_json"]))
         if not isinstance(document, dict) or not validate_contract("autonomous-run", document).valid:
             raise AutonomousRunError("autonomous run contract is corrupt")
+        self._assert_requirement_bundle(run_id, str(document["prompt_digest"]))
         return document
 
     def start_run(
@@ -524,10 +644,42 @@ class AutonomousBrain:
                     "INSERT INTO runs(run_id, contract_json) VALUES(?, ?)",
                     (identifier, _canonical(contract)),
                 )
+                self._connection.executemany(
+                    "INSERT INTO requirements("
+                    "run_id, requirement_id, statement, enforcement, focused_test, source_prompt_digest"
+                    ") VALUES(?, ?, ?, ?, ?, ?)",
+                    (
+                        (identifier, *requirement)
+                        for requirement in self._requirement_rows(str(contract["prompt_digest"]))
+                    ),
+                )
+            self._assert_requirement_bundle(identifier, str(contract["prompt_digest"]))
             self._append(
                 identifier,
                 "kickoff_prepared",
                 {"worktree": self._worktree_path(identifier).as_posix(), "protected_refs": self._protected_refs(root)},
+            )
+            self._append(
+                identifier,
+                "requirements_sealed",
+                {
+                    "requirement_ids": [item.identifier for item in AUTONOMOUS_REQUIREMENTS],
+                    "manifest_digest": sha256_digest(
+                        _canonical(
+                            {
+                                "requirements": [
+                                    {
+                                        "id": item.identifier,
+                                        "statement": item.statement,
+                                        "enforcement": item.enforcement,
+                                        "focused_test": item.focused_test,
+                                    }
+                                    for item in AUTONOMOUS_REQUIREMENTS
+                                ]
+                            }
+                        ).encode("utf-8")
+                    ),
+                },
             )
         except Exception:
             task_path.unlink(missing_ok=True)
