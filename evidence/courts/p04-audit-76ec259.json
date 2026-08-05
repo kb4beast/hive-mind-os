@@ -1,0 +1,4 @@
+{
+  "decision": "blocked",
+  "safe_reason": "The candidate's source docket only supports the legacy zero-argument loader while its audit requires a repository argument, so no clean exact-candidate audit can be produced."
+}
