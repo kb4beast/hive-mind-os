@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "P04 candidate 76ec259a69912a0e9a4f6324aa62353eba05feaf is represented in origin/main with sealed 186-test audit, exact successful CI, and usable Curator, Judge, and Orchestrator approvals."
+}
