@@ -37,6 +37,8 @@ _SECRET = re.compile(
     r"sk-[a-z0-9_-]{8,}|gh[pousr]_[a-z0-9_]{8,})"
 )
 _SAFE_REPLY = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .,:;()/_'" + '"' + r"-]*\Z")
+_PATCH_BEGIN = "HIVE_MIND_PATCH_BEGIN"
+_PATCH_END = "HIVE_MIND_PATCH_END"
 
 
 class AutonomousRunError(RuntimeError):
@@ -536,8 +538,8 @@ class AutonomousBrain:
         if executable is None:
             raise AutonomousRunError(f"{host.value} executable is unavailable")
         if host is HostKind.CODEX:
-            return (executable, "exec", "--sandbox", "workspace-write", "--color", "never", prompt)
-        return (executable, "--print", "--output-format", "json", "--permission-mode", "acceptEdits", prompt)
+            return (executable, "exec", "--sandbox", "read-only", "--color", "never", prompt)
+        return (executable, "--print", "--output-format", "json", "--permission-mode", "plan", prompt)
 
     @staticmethod
     def _host_instruction(task: str, feedback: str | None = None) -> str:
@@ -548,16 +550,18 @@ class AutonomousBrain:
             else ""
         )
         return (
-            "You are Hive Mind OS's isolated Builder. Work only in the current worktree. "
-            "Never run git merge, rebase, reset, push, or any command that changes main, master, or staging. "
-            "Do not use credentials, APIs, or network services. Make the smallest evidence-backed local change and run focused tests. "
+            "You are Hive Mind OS's read-only Builder. Inspect only the current isolated worktree. "
+            "Do not edit files, run commands that write, use credentials, APIs, network services, or Git merge, rebase, reset, or push. "
+            "For an implementation, propose the smallest evidence-backed unified Git patch between the exact patch markers below. "
+            "The trusted controller, not you, validates, applies, and commits that patch only to the isolated run branch. "
             "At the end emit exactly HIVE_MIND_ACTION: implement, answer, refute, or blocked. "
+            "For implement, emit exactly one HIVE_MIND_PATCH_BEGIN line, a relative-path unified Git patch, and one HIVE_MIND_PATCH_END line. "
             "For answer or refute, also emit one short plain-English line HIVE_MIND_REPLY: followed by the proposed response.\n"
             "<kickoff-task>\n" + task + "\n</kickoff-task>\n" + feedback_block
         )
 
     @staticmethod
-    def _parse_host_output(output: bytes) -> tuple[str, str | None]:
+    def _parse_host_output(output: bytes) -> tuple[str, str | None, bytes | None]:
         text = output.decode("utf-8", "replace")
         try:
             structured = json.loads(text)
@@ -567,7 +571,25 @@ class AutonomousBrain:
             text = structured["result"]
         action = "blocked"
         reply: str | None = None
+        patches: list[bytes] = []
+        collecting_patch = False
+        patch_lines: list[str] = []
         for line in text.splitlines():
+            if line == _PATCH_BEGIN:
+                if collecting_patch:
+                    return "blocked", None, None
+                collecting_patch = True
+                patch_lines = []
+                continue
+            if line == _PATCH_END:
+                if not collecting_patch:
+                    return "blocked", None, None
+                patches.append(("\n".join(patch_lines) + "\n").encode("utf-8"))
+                collecting_patch = False
+                continue
+            if collecting_patch:
+                patch_lines.append(line)
+                continue
             if line.startswith("HIVE_MIND_ACTION:"):
                 proposed = line.partition(":")[2].strip().casefold()
                 if proposed in {"implement", "answer", "refute", "blocked"}:
@@ -576,7 +598,61 @@ class AutonomousBrain:
                 reply = _safe_reply(line.partition(":")[2])
         if action in {"answer", "refute"} and reply is None:
             action = "blocked"
-        return action, reply
+        if action == "implement":
+            if collecting_patch or len(patches) != 1 or not patches[0].startswith(b"diff --git "):
+                return "blocked", None, None
+            return action, reply, patches[0]
+        return action, reply, None
+
+    @staticmethod
+    def _apply_host_patch(worktree: Path, patch: bytes, environment: Mapping[str, str]) -> None:
+        """Apply only a checked, relative-path patch in the isolated run worktree."""
+
+        if not patch or len(patch) > 200_000:
+            raise AutonomousRunError("host patch is missing or exceeds the safe size limit")
+        for operation, arguments in (
+            ("check", ("apply", "--check", "--recount", "--ignore-space-change", "--whitespace=error")),
+            ("apply", ("apply", "--recount", "--ignore-space-change", "--whitespace=error")),
+            ("stage", ("add", "--all")),
+        ):
+            is_apply = arguments[0] == "apply"
+            completed = subprocess.run(
+                ("git", "-C", str(worktree), *arguments),
+                input=patch if is_apply else None,
+                stdin=None if is_apply else subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=dict(environment),
+                check=False,
+                shell=False,
+                timeout=60,
+            )
+            if completed.returncode:
+                raise AutonomousRunError(f"host patch {operation} failed")
+        committed = subprocess.run(
+            (
+                "git",
+                "-C",
+                str(worktree),
+                "-c",
+                "user.name=Hive Mind OS",
+                "-c",
+                "user.email=hive-mind-os@localhost.invalid",
+                "commit",
+                "--no-verify",
+                "-m",
+                "hive-mind: apply governed host patch",
+            ),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=dict(environment),
+            check=False,
+            shell=False,
+            timeout=60,
+        )
+        if committed.returncode:
+            raise AutonomousRunError("governed host patch did not create an isolated commit")
 
     def _assert_protected_refs(self, contract: Mapping[str, Any], before: Mapping[str, str | None]) -> None:
         root = Path(str(contract["repository"]))
@@ -626,7 +702,9 @@ class AutonomousBrain:
         else:
             execution = executor(command, worktree, environment)
         self._assert_protected_refs(contract, before)
-        action, reply = self._parse_host_output(execution.stdout)
+        action, reply, patch = self._parse_host_output(execution.stdout)
+        if patch is not None:
+            self._apply_host_patch(worktree, patch, environment)
         changed_paths = self._changed_paths(worktree, str(contract["start_commit"]))
         digest = sha256_digest(execution.stdout + b"\\0" + execution.stderr)
         result = HostRunResult(run_id, action, reply, execution.returncode, digest, changed_paths)

@@ -122,7 +122,43 @@ class AutonomousBrainTests(unittest.TestCase):
                 brain.run_host_turn(codex["run_id"], executor=executor)
                 brain.run_host_turn(claude["run_id"], executor=executor)
             self.assertEqual(seen[0][:2], ("codex", "exec"))
+            self.assertEqual(seen[0][2:4], ("--sandbox", "read-only"))
             self.assertEqual(seen[1][:3], ("claude", "--print", "--output-format"))
+            self.assertIn("plan", seen[1])
+
+    def test_read_only_host_patch_is_committed_only_to_the_isolated_run_branch(self) -> None:
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository, "Change the isolated app value.", "codex", run_id="AR-governed-patch"
+            )
+            source_refs = {
+                branch: _git(self.repository, "rev-parse", branch)
+                for branch in ("main", "staging")
+            }
+
+            def executor(_command, _worktree, _environment):
+                return HostExecution(
+                    0,
+                    b"HIVE_MIND_ACTION: implement\n"
+                    b"HIVE_MIND_PATCH_BEGIN\n"
+                    b"diff --git a/app.py b/app.py\n"
+                    b"--- a/app.py\n"
+                    b"+++ b/app.py\n"
+                    b"@@ -1 +1 @@\n"
+                    b"-VALUE = 1\n"
+                    b"+VALUE = 2\n"
+                    b"HIVE_MIND_PATCH_END\n",
+                    b"not retained",
+                )
+
+            with patch("hive_mind_os.autonomous_os.shutil.which", return_value="codex"):
+                result = brain.run_host_turn(run["run_id"], executor=executor)
+            self.assertEqual(result.action, "implement")
+            self.assertEqual(result.changed_paths, ("app.py",))
+            self.assertEqual((brain._worktree_path(run["run_id"]) / "app.py").read_text(), "VALUE = 2\n")
+            self.assertEqual(
+                {branch: _git(self.repository, "rev-parse", branch) for branch in source_refs}, source_refs
+            )
 
     def test_pr_feedback_is_untrusted_deduplicated_and_can_reply_without_raw_retention(self) -> None:
         gateway = FakeCommentGateway(

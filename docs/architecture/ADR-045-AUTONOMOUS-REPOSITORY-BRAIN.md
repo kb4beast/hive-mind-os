@@ -52,14 +52,16 @@ has six deliberate layers rather than one opaque memory blob:
 `hive-mind autonomous kickoff` accepts one prompt and creates an isolated local clone
 with no configured Git remote.
 `turn` invokes either the locally signed-in `codex exec` or `claude --print` CLI. The
-adapter removes token/API-key environment variables, uses no API key itself, places
-the host in that clone, removes all inherited Git, GitHub, and SSH configuration
-variables plus normal GitHub/Git credential configuration, and checks
-local `main`, `master`, and `staging` refs immediately before and after the turn. It
-also supplies a command-scoped Git `reference-transaction` hook that rejects a write
-to any of those refs before Git completes it, including a mistaken direct command
-against the source repository. The host receives an explicit no-merge/no-rebase/no-push
-instruction. A mismatch blocks the run.
+adapter removes token/API-key environment variables and uses no API key itself. Codex
+runs with its read-only sandbox; Claude Code runs in its plan mode, which cannot edit
+files or execute commands. Neither host is given write authority. Instead, an
+implementation host returns one bounded unified Git patch as data. The trusted
+controller checks and applies that relative-path patch, then creates a commit only in
+the isolated non-protected run branch. It removes all inherited Git, GitHub, and SSH
+configuration variables plus normal GitHub/Git credential configuration, checks local
+`main`, `master`, and `staging` refs immediately before and after the turn, and supplies
+a Git transaction hook as defense in depth for its controlled Git processes. A mismatch
+blocks the run.
 The clone must begin with exactly one `origin` remote, remove it successfully, and
 prove that its remote list is empty; any other condition blocks before host launch.
 
@@ -113,7 +115,7 @@ or host profile.
 
 | Threat | Control |
 |---|---|
-| Merge to main/staging | No merge surface; a command-scoped Git transaction hook rejects protected-ref writes before completion, with independent before/after ref checks |
+| Merge to main/staging | Hosts have no write authority (Codex read-only sandbox; Claude Code plan mode); the controller can apply/commit only to the stored `hive-mind/` branch, with transaction-hook and before/after ref defenses |
 | Direct protected push | Host clones have no remote or inherited GitHub/Git credentials; controlled delivery pushes only the stored `hive-mind/` branch, never force, and defaults off |
 | Prompt/comment injection | Comments are declared untrusted, redacted, bounded, and never replayed from memory |
 | Secret or raw-output retention | Secret-like kickoff text is rejected; model output and raw comments are held only in memory; ledger keeps digests and safe summaries |
