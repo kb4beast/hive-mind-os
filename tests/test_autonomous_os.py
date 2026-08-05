@@ -279,6 +279,33 @@ class AutonomousBrainTests(unittest.TestCase):
             finally:
                 oracle.close()
 
+    def test_host_environment_scrubs_inherited_git_github_and_ssh_configuration(self) -> None:
+        with AutonomousBrain(self.state) as brain, patch.dict(
+            "os.environ",
+            {
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "credential.helper",
+                "GIT_CONFIG_VALUE_0": "manager",
+                "GIT_SSH_COMMAND": "ssh",
+                "GH_TOKEN": "not-retained",
+                "GITHUB_TOKEN": "not-retained",
+                "SSH_AUTH_SOCK": "not-retained",
+            },
+        ):
+            environment = brain._host_environment("AR-scrubbed-environment")
+            for name in (
+                "GIT_CONFIG_COUNT",
+                "GIT_CONFIG_KEY_0",
+                "GIT_CONFIG_VALUE_0",
+                "GIT_SSH_COMMAND",
+                "GH_TOKEN",
+                "GITHUB_TOKEN",
+                "SSH_AUTH_SOCK",
+            ):
+                self.assertNotIn(name, environment)
+            self.assertEqual(environment["GIT_CONFIG_NOSYSTEM"], "1")
+            self.assertTrue(environment["GIT_CONFIG_GLOBAL"].endswith("AR-scrubbed-environment.gitconfig"))
+
     def test_cli_kickoff_is_a_prompt_entrypoint_and_rejects_secret_like_prompts(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output), self.assertRaises(SystemExit) as success:

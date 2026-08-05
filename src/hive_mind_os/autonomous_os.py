@@ -354,9 +354,10 @@ class AutonomousBrain:
         environment = {
             key: value
             for key, value in os.environ.items()
-            if not any(
+            if not key.upper().startswith(("GIT_", "GH_", "GITHUB_", "SSH_"))
+            and not any(
                 marker in key.upper()
-                for marker in ("TOKEN", "API_KEY", "AUTHORIZATION", "GITHUB", "SSH_AUTH")
+                for marker in ("TOKEN", "API_KEY", "AUTHORIZATION", "CREDENTIAL")
             )
         }
         environment.update(

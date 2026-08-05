@@ -53,7 +53,8 @@ has six deliberate layers rather than one opaque memory blob:
 with no configured Git remote.
 `turn` invokes either the locally signed-in `codex exec` or `claude --print` CLI. The
 adapter removes token/API-key environment variables, uses no API key itself, places
-the host in that clone, removes normal GitHub/Git credential configuration, and checks
+the host in that clone, removes all inherited Git, GitHub, and SSH configuration
+variables plus normal GitHub/Git credential configuration, and checks
 local `main`, `master`, and `staging` refs before and after the turn. The host receives
 an explicit no-merge/no-rebase/no-push instruction. A mismatch blocks the run.
 
