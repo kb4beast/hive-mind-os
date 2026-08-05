@@ -316,6 +316,23 @@ class SandboxTests(unittest.TestCase):
             {300, 301},
         )
 
+    def test_windows_descendants_reject_reused_root_pid(self) -> None:
+        creation_times = {100: 2000, 200: 2001, 201: 2002}
+        with (
+            patch.object(
+                SandboxRunner,
+                "_windows_process_table",
+                return_value={200: 100, 201: 200},
+            ),
+            patch.object(
+                SandboxRunner,
+                "_windows_pid_creation_time",
+                side_effect=creation_times.get,
+            ),
+        ):
+            descendants = SandboxRunner._windows_descendants(100, 1000)
+        self.assertEqual(descendants, set())
+
     def test_windows_timeout_kill_never_uses_unfiltered_taskkill_tree(self) -> None:
         class FinishedProcess:
             pid = 100

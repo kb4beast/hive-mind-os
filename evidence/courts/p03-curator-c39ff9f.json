@@ -1,0 +1,4 @@
+{
+  "decision": "blocked",
+  "safe_reason": "Replacement descendant selection can follow a reused root PID and target an unrelated process tree."
+}
