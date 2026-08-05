@@ -390,7 +390,7 @@ def _case_raw_effect_receipt_is_adopted_without_reexecution(
             store.mission_root(mission_id)
             / "staging"
             / "evidence"
-            / "receipts"
+            / "r"
         ).glob("*.json")
     )
     assert len(raw_before) == 4
@@ -404,7 +404,7 @@ def _case_raw_effect_receipt_is_adopted_without_reexecution(
             store.mission_root(mission_id)
             / "staging"
             / "evidence"
-            / "receipts"
+            / "r"
         ).glob("*.json")
     )
     assert len(raw_after) == 45

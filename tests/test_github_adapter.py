@@ -114,12 +114,11 @@ class LocalDeliveryClient(GitHubClient):
     def __init__(
         self,
         *args: object,
-        remote: Path,
         transport: FakeGitHubTransport,
         **kwargs: object,
     ) -> None:
         super().__init__(*args, transport=transport, **kwargs)  # type: ignore[arg-type]
-        self.local_remote = remote
+        self.local_remote: Path | None = None
         self.fake_transport = transport
 
     def push_branch(
@@ -130,10 +129,18 @@ class LocalDeliveryClient(GitHubClient):
         remote_url: str | Path | None = None,
         allow_local_test_remote: bool = False,
     ):
+        remote = workspace.root / ".git" / "hive-mind-mission-test-remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", str(remote)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.local_remote = remote
         result = super().push_branch(
             workspace,
             branch=branch,
-            remote_url=self.local_remote,
+            remote_url=Path(".git") / remote.name,
             allow_local_test_remote=True,
         )
         branch_name = result.branch
@@ -477,7 +484,7 @@ class GitHubAdapterTests(unittest.TestCase):
             b"def increment(value: int) -> int:\n    return value + 1\n",
         )
         workspace.commit("fix: restore increment")
-        bare = self.root / "remote.git"
+        bare = workspace.root / ".git" / "hive-mind-test-remote.git"
         subprocess.run(
             ["git", "init", "--bare", str(bare)],
             check=True,
@@ -492,7 +499,7 @@ class GitHubAdapterTests(unittest.TestCase):
         ).push_branch(
             workspace,
             branch="phase/P07-live-fixture",
-            remote_url=bare,
+            remote_url=Path(".git") / bare.name,
             allow_local_test_remote=True,
         )
         self.assertEqual(
@@ -675,13 +682,6 @@ class GitHubAdapterTests(unittest.TestCase):
 
     def test_repository_mission_delivers_after_curator_adoption(self) -> None:
         fixture = build_fixture_repo(self.root / "mission-fixture")
-        remote = self.root / "mission-remote.git"
-        subprocess.run(
-            ["git", "init", "--bare", str(remote)],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
         mission_id = "mission-p07-integration"
         store = MissionStore(self.root / "mission-state")
         self.addCleanup(store.close)
@@ -691,7 +691,6 @@ class GitHubAdapterTests(unittest.TestCase):
             "octocat",
             "hive-mind-os",
             evidence,
-            remote=remote,
             transport=transport,
             policy=PolicyEngine(AutonomyLevel.REPOSITORY),
             mission_store=store,
@@ -738,12 +737,13 @@ class GitHubAdapterTests(unittest.TestCase):
         self.assertIsNotNone(report.github_delivery)
         self.assertTrue(report.github_delivery["draft"])
         self.assertIn("github.delivery.completed", report.event_types)
+        self.assertIsNotNone(client.local_remote)
         self.assertEqual(
             subprocess.run(
                 [
                     "git",
                     "--git-dir",
-                    str(remote),
+                    str(client.local_remote),
                     "rev-parse",
                     "refs/heads/phase/mission-delivery",
                 ],
