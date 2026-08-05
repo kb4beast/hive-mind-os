@@ -106,6 +106,9 @@ after sealing, a retry rebuilds the same recorded ancestor environment, rehydrat
 same durable seal, and finishes that episode rather than making another one. Thus N
 later local commits produce N separate sealed grades, even when they are discovered
 across multiple polling leases or a retry follows interruption.
+If setup was interrupted before the environment record existed, the incomplete
+workspace is moved into a retained quarantine area and the same episode identity is
+rebuilt; no PIT evidence is deleted or replaced.
 
 The selected Codex or Claude host can serve as the read-only predictor only from a
 fresh remote-free clone of the oracle's verified ancestor environment. A malformed
@@ -126,7 +129,7 @@ or host profile.
 | Human correction lost | Every later commit receives a distinct sealed PIT episode and measured grade |
 | Host sees a future PIT target | The host receives a disposable remote-free clone made only from the oracle's verified ancestor environment |
 | Feedback replay/duplicate reply | Remote comment IDs are append-only deduplication keys |
-| Concurrent or interrupted PIT supervision | Stable run/target episode reservations, durable pre-seal predictions, seal recovery, a transactional grade gate, and a unique grade record prevent duplicate episodes while allowing retry |
+| Concurrent or interrupted PIT supervision | Stable run/target episode reservations, durable pre-seal predictions, retained incomplete-workspace quarantine, seal/grade recovery, a transactional grade gate, and a unique grade record prevent duplicate episodes while allowing retry |
 | Autonomous policy mutation | Authority is immutable per run; learning does not change policy or prompts |
 
 Acceptance is a focused test proving the charter contract, protected branch refusal,

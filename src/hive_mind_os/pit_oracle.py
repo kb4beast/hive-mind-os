@@ -424,6 +424,22 @@ class PointInTimeOracle:
     def _environment_record_path(self, episode_id: str) -> Path:
         return self.state_dir / "environment-records" / f"{episode_id}.json"
 
+    def _quarantine_incomplete_environment(self, episode_id: str, root: Path) -> None:
+        """Preserve an unrecorded partial workspace, then make the episode resumable."""
+
+        quarantine = self.state_dir / "abandoned-environments" / f"{episode_id}-{uuid4()}"
+        quarantine.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.move(str(root), str(quarantine))
+        except OSError as error:
+            raise LeakageError("incomplete PIT environment could not be quarantined") from error
+        self.ledger.append_event(
+            episode_id,
+            "pit.environment.quarantined",
+            Role.OPTIMIZER.value,
+            {"reason": "incomplete materialization before durable environment record"},
+        )
+
     def _resume_environment(self, target: str, episode_id: str) -> PITEnvironment | None:
         record_path = self._environment_record_path(episode_id)
         if not record_path.is_file():
@@ -491,7 +507,7 @@ class PointInTimeOracle:
         records: list[dict[str, Any]] = []
         stable_root = self.state_dir / "environments" / identifier
         if stable_root.exists():
-            raise LeakageError("episode environment path already exists")
+            self._quarantine_incomplete_environment(identifier, stable_root)
 
         with self._source_session(identifier, records) as (build_root, runner):
             _, target_line, _ = self._command(

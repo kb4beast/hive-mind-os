@@ -370,6 +370,24 @@ class AutonomousBrainTests(unittest.TestCase):
             self.assertEqual(len(oracle_grades), 1)
             self.assertEqual(records[0]["episode_id"], seals[0]["run_id"])
 
+    def test_incomplete_pit_workspace_is_quarantined_and_the_same_episode_completes(self) -> None:
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository, "Improve app behavior.", "codex", run_id="AR-pit-setup-recovery"
+            )
+            target = _commit(self.repository, "app.py", "VALUE = 2\n", "human correction")
+            episode_id = brain._pit_episode_id(run["run_id"], target)
+            incomplete = self.state / "pit" / run["run_id"] / "environments" / episode_id
+            incomplete.mkdir(parents=True)
+            (incomplete / "partial.txt").write_text("interrupted setup\n", encoding="utf-8")
+            records = brain.learn_from_human_outcome(
+                run["run_id"], target, lambda _environment: ["app.py"]
+            )
+            quarantine = self.state / "pit" / run["run_id"] / "abandoned-environments"
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["episode_id"], episode_id)
+            self.assertTrue(any(quarantine.iterdir()))
+
     def test_bounded_supervision_handles_pr_feedback_and_local_human_commits(self) -> None:
         gateway = FakeCommentGateway(
             [{"id": 42, "user": {"login": "reviewer"}, "body": "Please explain the test."}]
