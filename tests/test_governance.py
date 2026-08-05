@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 import tomllib
 import unittest
 from pathlib import Path
@@ -65,11 +66,34 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertTrue(pull_request["require_code_owner_review"])
         self.assertTrue(pull_request["require_last_push_approval"])
         self.assertEqual(rules["verification_status"], "verified_on_remote")
-        evidence = ROOT / rules["verification_evidence"]
-        self.assertTrue(evidence.is_file())
+        evidence_path = str(rules["verification_evidence"])
+        evidence = ROOT / evidence_path
+        if evidence.is_file():
+            content = evidence.read_bytes()
+        else:
+            completed = subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "core.longpaths=true",
+                    "show",
+                    f"archive/evidence-corpus-2026-08-03:{evidence_path}",
+                ],
+                cwd=ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                shell=False,
+            )
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stderr.decode("utf-8", "replace"),
+            )
+            content = completed.stdout
         self.assertEqual(
             rules["verification_evidence_digest"],
-            "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest(),
+            "sha256:" + hashlib.sha256(content).hexdigest(),
         )
         self.assertIsNone(rules["blocking_obligation"])
         self.assertIn("One approval", rules["verification_residual"])

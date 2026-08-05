@@ -181,6 +181,10 @@ def reopen_workspace(
         SandboxSpec(
             repository,
             argv_allowlist=(git_name, Path(sys.executable).name),
+            # The restored runner must preserve the original workspace contract:
+            # fixture and acceptance commands may use the explicitly configured
+            # interpreter flags that the fresh materialization runner permits.
+            allow_interpreter_flags=True,
             env_allowlist=(
                 "GIT_AUTHOR_DATE",
                 "GIT_COMMITTER_DATE",

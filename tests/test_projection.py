@@ -11,6 +11,7 @@ from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.cli import main
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.mission_store import MissionStore
+from hive_mind_os.models import Role
 from hive_mind_os.projection import build_projection, projection_html, projection_json
 from hive_mind_os.scheduler import Scheduler
 
@@ -42,6 +43,8 @@ class ProjectionTests(unittest.TestCase):
 
     def test_store_success_without_ledger_completion_is_unknown(self) -> None:
         self._register("gap")
+        for role in (Role.EXPLORER, Role.BUILDER, Role.CURATOR):
+            self.store.mark_role("gap", role, "succeeded")
         self.store.mark_status("gap", "succeeded")
         model = build_projection(self.root)
         self.assertEqual(model["missions"][0]["state"], "unknown")

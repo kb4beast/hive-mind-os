@@ -283,6 +283,11 @@ class PointInTimeOracle:
     ) -> Iterator[tuple[Path, SandboxRunner]]:
         with tempfile.TemporaryDirectory(prefix="hive-pit-source-") as directory:
             root = Path(directory)
+            # The oracle's configured source is trusted input, but the sandboxed
+            # Git process may only receive paths beneath its own root.  Stage a
+            # byte-for-byte local copy first rather than handing Git an absolute
+            # path outside the process sandbox.
+            shutil.copytree(self.repository, root / "source", symlinks=True)
             runner = self._runner(root, tool_calls=400)
             self._command(
                 runner,
@@ -291,7 +296,7 @@ class PointInTimeOracle:
                     "clone",
                     "--mirror",
                     "--no-hardlinks",
-                    str(self.repository),
+                    "source",
                     "source.git",
                 ],
                 episode_id,
@@ -305,6 +310,11 @@ class PointInTimeOracle:
             SandboxSpec(
                 root,
                 argv_allowlist=(self._git_name, Path(sys.executable).name),
+                # PIT verification uses a fixed, receipt-bound Python probe to
+                # inspect its isolated learner environment.  Interpreter flags
+                # stay denied for the default sandbox and are opted into only by
+                # this bounded oracle runner.
+                allow_interpreter_flags=True,
                 env_allowlist=(
                     "GIT_CONFIG_GLOBAL",
                     "GIT_CONFIG_NOSYSTEM",
@@ -509,6 +519,12 @@ class PointInTimeOracle:
                     "initialize empty learner repository",
                     records,
                 )
+                # `git -C environment fetch ../ancestor.bundle` would cross the
+                # sandbox boundary at the command layer.  Place the generated
+                # bundle in the learner workspace instead, then remove it before
+                # that workspace becomes an observable learner environment.
+                bundle_in_environment = build_root / "environment" / "ancestor.bundle"
+                shutil.copyfile(build_root / "ancestor.bundle", bundle_in_environment)
                 fetch_specs = [
                     f"{ref}:{ref}"
                     for ref in refs
@@ -520,13 +536,14 @@ class PointInTimeOracle:
                         "-C",
                         "environment",
                         "fetch",
-                        "../ancestor.bundle",
+                        "ancestor.bundle",
                         *fetch_specs,
                     ],
                     episode_id,
                     "import ancestor closure into learner repository",
                     records,
                 )
+                bundle_in_environment.unlink()
                 self._command(
                     runner,
                     ["git", "-C", "environment", "checkout", "--detach", parents[0]],
@@ -611,37 +628,21 @@ class PointInTimeOracle:
             *((sha_value, "hidden commit") for sha_value in environment.hidden_shas),
         )
         unique_probes = tuple(dict.fromkeys(object_id for object_id, _ in probes))
-        git_executable = str(Path(shutil.which("git") or "git").resolve())
-        for offset in range(0, len(unique_probes), 100):
-            batch = unique_probes[offset : offset + 100]
-            runner = self._runner(environment.root)
-            _, found_output, _ = self._command(
-                runner,
-                [
-                    sys.executable,
-                    "-B",
-                    "-c",
-                    (
-                        "import subprocess,sys; git=sys.argv[1]; "
-                        "found=[v for v in sys.argv[2:] if subprocess.run("
-                        "[git,'cat-file','-e',v],stdin=subprocess.DEVNULL,"
-                        "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,"
-                        "shell=False,check=False).returncode==0]; "
-                        "print(*found,sep='\\n')"
-                    ),
-                    git_executable,
-                    *batch,
-                ],
-                environment.episode_id,
-                "prove physical absence of target, tree, and hidden commit objects",
-                environment.receipt_records,
+        found: list[str] = []
+        for object_id in unique_probes:
+            receipt, _, _ = self._environment_command(
+                environment,
+                ["cat-file", "-e", object_id],
+                "prove physical absence of one target, tree, or hidden commit object",
+                allow_failure=True,
             )
-            found = self._lines(found_output)
-            if found:
-                raise LeakageError(
-                    "learner repository contains forbidden object(s): "
-                    + ", ".join(found)
-                )
+            if receipt["result"] == "succeeded":
+                found.append(object_id)
+        if found:
+            raise LeakageError(
+                "learner repository contains forbidden object(s): "
+                + ", ".join(found)
+            )
 
     def seal_prediction(
         self,

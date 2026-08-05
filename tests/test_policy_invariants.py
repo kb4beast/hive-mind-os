@@ -60,6 +60,7 @@ class PolicyInvariantTests(unittest.TestCase):
         nonmutating_actions = {
             Action.READ_REPOSITORY,
             Action.SEARCH_WEB,
+            Action.RUN_ANALYSIS,
             Action.RUN_COMMANDS,
         }
         for autonomy in AutonomyLevel:
@@ -97,17 +98,18 @@ class PolicyInvariantTests(unittest.TestCase):
 
     def test_known_low_risk_actions_are_not_accidentally_denied(self) -> None:
         allowed_cases = (
-            (AutonomyLevel.OBSERVE, Action.READ_REPOSITORY),
-            (AutonomyLevel.OBSERVE, Action.SEARCH_WEB),
-            (AutonomyLevel.SANDBOX, Action.WRITE_WORKSPACE),
-            (AutonomyLevel.SANDBOX, Action.RUN_COMMANDS),
-            (AutonomyLevel.REPOSITORY, Action.CREATE_BRANCH),
-            (AutonomyLevel.REPOSITORY, Action.OPEN_PULL_REQUEST),
+            (Role.BUILDER, AutonomyLevel.OBSERVE, Action.READ_REPOSITORY),
+            (Role.EXPLORER, AutonomyLevel.OBSERVE, Action.SEARCH_WEB),
+            (Role.BUILDER, AutonomyLevel.SANDBOX, Action.WRITE_WORKSPACE),
+            (Role.BUILDER, AutonomyLevel.SANDBOX, Action.RUN_COMMANDS),
+            (Role.OPTIMIZER, AutonomyLevel.SANDBOX, Action.RUN_COMMANDS),
+            (Role.BUILDER, AutonomyLevel.REPOSITORY, Action.CREATE_BRANCH),
+            (Role.BUILDER, AutonomyLevel.REPOSITORY, Action.OPEN_PULL_REQUEST),
         )
-        for autonomy, action in allowed_cases:
-            with self.subTest(autonomy=autonomy, action=action):
+        for role, autonomy, action in allowed_cases:
+            with self.subTest(role=role, autonomy=autonomy, action=action):
                 decision = PolicyEngine(autonomy).decide(
-                    Role.BUILDER,
+                    role,
                     action,
                     RiskTier.LOW,
                 )

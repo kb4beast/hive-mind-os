@@ -8,6 +8,7 @@ from typing import Any, cast
 from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.mission_store import MissionStore
+from hive_mind_os.models import Role
 from hive_mind_os.projection import (
     build_projection,
     build_war_room_projection,
@@ -310,6 +311,8 @@ class WarRoomProjectionTests(unittest.TestCase):
         unknown = build_war_room_projection(self.root)["war_room"]["mission_rooms"][0]
         self.assertEqual(unknown["status"], "unknown")
 
+        for role in (Role.EXPLORER, Role.BUILDER, Role.CURATOR):
+            self.store.mark_role("mission-1", role, "succeeded")
         self.store.mark_status("mission-1", "succeeded")
         self.ledger.append_event(
             "mission-1",
