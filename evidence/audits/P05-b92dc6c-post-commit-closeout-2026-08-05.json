@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "receipt_id": "P05-B92DC6C-POST-COMMIT-CLOSEOUT-AUDIT-2026-08-05",
+  "phase": "P05",
+  "audit_scope": "Deterministic/local vertical-slice evidence only; no real provider or production claim.",
+  "candidate_commit": "b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9",
+  "audit_worktree": "clean detached worktree at the exact candidate",
+  "started_at": "2026-08-05T22:37:43Z",
+  "completed_at": "2026-08-05T22:40:38Z",
+  "commands": [
+    {
+      "command": "python -m pip install --no-deps -e .",
+      "result": "success",
+      "exit_code": 0
+    },
+    {
+      "command": "python -m compileall -q src tests",
+      "result": "success",
+      "exit_code": 0
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_mission.py -v",
+      "result": "14 tests passed in 74.370s",
+      "exit_code": 0
+    },
+    {
+      "command": "python -m unittest discover -s tests -v",
+      "result": "202 tests passed in 91.208s; 2 skipped",
+      "exit_code": 0
+    },
+    {
+      "command": "pyright",
+      "result": "0 errors, 0 warnings, 0 informations",
+      "exit_code": 0
+    }
+  ],
+  "cleanliness": {
+    "head_verified_before_and_after": true,
+    "working_tree_clean_after_commands": true,
+    "completed_cleanly": true
+  },
+  "ci_evidence": {
+    "historical_exact_candidate_run": "30989265377",
+    "historical_exact_candidate_conclusion": "success",
+    "historical_exact_candidate_workflow": "GitHub Constitutional CI",
+    "qualification": "The historical exact-candidate CI is retained separately; this audit is a new local exact-candidate reproduction."
+  },
+  "scope_limits": {
+    "provider_credentials_or_live_calls_used": false,
+    "b_ops_03_resolved": false,
+    "production_or_real_provider_claim": false
+  },
+  "integrity": {
+    "canonicalization": "json-sort-keys-utf8-v1 excluding integrity.digest",
+    "digest": "sha256:0955120f24bdb3bcf40ee625a5a3383298a11077463db377caa8cf4b9d4fefdf"
+  }
+}

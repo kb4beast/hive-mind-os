@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "receipt_id": "B-GOV-06-REENABLE-VERIFICATION-2026-08-05",
+  "observed_at": "2026-08-05T22:41:00Z",
+  "decision": "approved",
+  "safe_reason": "GitHub Actions, strict main protection, the exact eight required checks, and a new Constitutional CI run including Windows Python 3.12 all verified successfully.",
+  "live_repository_state": {
+    "actions_enabled": true,
+    "main_required_status_checks_strict": true,
+    "required_checks": [
+      "unit-tests (Python 3.11)",
+      "unit-tests (Python 3.12)",
+      "unit-tests (Python 3.14)",
+      "static-and-type-checks",
+      "codeql-security",
+      "secret-scan",
+      "dependency-and-license-review",
+      "sbom-and-build-provenance"
+    ]
+  },
+  "new_constitutional_ci": {
+    "run_id": "31052166744",
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/31052166744",
+    "workflow": "Constitutional CI",
+    "head_sha": "d09288517ebd6fd8723ec418218ac900f85f1b85",
+    "conclusion": "success",
+    "windows_python_312_job": "unit-tests (Windows, Python 3.12) (3.12)",
+    "windows_python_312_conclusion": "success"
+  },
+  "verification_commands": [
+    "gh api 'repos/kb4beast/hive-mind-os/actions/permissions'",
+    "gh api 'repos/kb4beast/hive-mind-os/branches/main/protection/required_status_checks'",
+    "gh run view 31052166744 --repo kb4beast/hive-mind-os --json status,conclusion,url,headSha,workflowName,jobs"
+  ],
+  "b_gov_06_exit_condition_reproduced": true,
+  "scope_limits": {
+    "p05_closed": false,
+    "b_ops_03_resolved": false,
+    "provider_credentials_or_live_calls_used": false
+  }
+}
