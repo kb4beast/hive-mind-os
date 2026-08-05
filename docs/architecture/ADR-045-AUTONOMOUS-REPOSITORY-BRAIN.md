@@ -131,6 +131,11 @@ If setup was interrupted before the environment record existed, the incomplete
 workspace is moved into a retained quarantine area and the same episode identity is
 rebuilt; no PIT evidence is deleted or replaced.
 
+For a parent target, the oracle creates one ancestor bundle in its private staging
+area and one temporary copy in the learner environment for the local fetch. Each is
+removed exactly once before the learner environment is handed off. The focused PIT
+test proves that the parent environment is returned without a bundle file.
+
 The selected Codex or Claude host can serve as the read-only predictor only from a
 fresh remote-free clone of the oracle's verified ancestor environment. A malformed
 prediction, missing local sign-in, or any oracle failure blocks the learning run; it
