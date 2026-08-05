@@ -382,9 +382,6 @@ class AutonomousBrainTests(unittest.TestCase):
         ):
             environment = brain._host_environment("AR-scrubbed-environment")
             for name in (
-                "GIT_CONFIG_COUNT",
-                "GIT_CONFIG_KEY_0",
-                "GIT_CONFIG_VALUE_0",
                 "GIT_SSH_COMMAND",
                 "GH_TOKEN",
                 "GITHUB_TOKEN",
@@ -393,6 +390,29 @@ class AutonomousBrainTests(unittest.TestCase):
                 self.assertNotIn(name, environment)
             self.assertEqual(environment["GIT_CONFIG_NOSYSTEM"], "1")
             self.assertTrue(environment["GIT_CONFIG_GLOBAL"].endswith("AR-scrubbed-environment.gitconfig"))
+            self.assertEqual(environment["GIT_CONFIG_COUNT"], "1")
+            self.assertEqual(environment["GIT_CONFIG_KEY_0"], "core.hooksPath")
+            self.assertTrue(Path(environment["GIT_CONFIG_VALUE_0"]).is_dir())
+
+    def test_host_environment_rejects_a_protected_merge_before_it_updates_the_ref(self) -> None:
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository, "Make a small safe change.", "codex", run_id="AR-protected-guard"
+            )
+            _git(self.repository, "checkout", "staging")
+            _commit(self.repository, "staging-only.txt", "guarded\n", "staging change")
+            _git(self.repository, "checkout", "main")
+            main_before = _git(self.repository, "rev-parse", "main")
+            completed = subprocess.run(
+                ("git", "-C", str(self.repository), "merge", "--no-ff", "staging", "-m", "blocked merge"),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=brain._host_environment(run["run_id"]),
+                check=False,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertEqual(_git(self.repository, "rev-parse", "main"), main_before)
 
     def test_clone_remote_removal_fails_closed_for_missing_or_extra_remotes(self) -> None:
         clone = self.root / "clone"

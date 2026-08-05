@@ -361,8 +361,36 @@ class AutonomousBrain:
     def _worktree_path(self, run_id: str) -> Path:
         return self.state_dir / "worktrees" / run_id
 
+    def _protected_ref_hook(self) -> Path:
+        """Create the Git transaction hook that rejects protected-ref writes.
+
+        The hook is supplied to the coding host as command-scoped Git configuration,
+        so it protects even a mistaken ``git -C <source> merge`` before that Git
+        command can update a protected local ref.  The process still performs the
+        before/after ref checks as an independent tamper-evident control.
+        """
+
+        hooks = self.state_dir / "protected-ref-hooks"
+        hooks.mkdir(parents=True, exist_ok=True)
+        hook = hooks / "reference-transaction"
+        hook.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$1\" = prepared ]; then\n"
+            "  while read old new ref; do\n"
+            "    case \"$ref\" in\n"
+            "      refs/heads/main|refs/heads/master|refs/heads/staging) exit 1 ;;\n"
+            "    esac\n"
+            "  done\n"
+            "fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        hook.chmod(0o700)
+        return hooks
+
     def _host_environment(self, run_id: str) -> dict[str, str]:
-        """Remove normal GitHub/Git credential paths before a coding host starts."""
+        """Remove credential paths and install a protected-ref Git transaction guard."""
 
         configuration = self.state_dir / "host-gitconfig" / f"{run_id}.gitconfig"
         configuration.parent.mkdir(parents=True, exist_ok=True)
@@ -374,6 +402,7 @@ class AutonomousBrain:
         (self.state_dir / "disabled-hooks").mkdir(parents=True, exist_ok=True)
         github_config = self.state_dir / "empty-github-config" / run_id
         github_config.mkdir(parents=True, exist_ok=True)
+        hooks = self._protected_ref_hook()
         environment = {
             key: value
             for key, value in os.environ.items()
@@ -389,6 +418,9 @@ class AutonomousBrain:
                 "GIT_CONFIG_NOSYSTEM": "1",
                 "GIT_CONFIG_GLOBAL": str(configuration),
                 "GIT_ASKPASS": "",
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "core.hooksPath",
+                "GIT_CONFIG_VALUE_0": str(hooks),
                 "GH_CONFIG_DIR": str(github_config),
                 "HIVE_MIND_PROTECTED_BRANCHES": ",".join(PROTECTED_BRANCHES),
             }
@@ -577,6 +609,7 @@ class AutonomousBrain:
         instruction = self._host_instruction(task, _redact_untrusted_comment(feedback) if feedback else None)
         command = self._host_command(HostKind(contract["host"]), instruction)
         environment = self._host_environment(run_id)
+        self._assert_protected_refs(contract, before)
         if executor is None:
             completed = subprocess.run(
                 command,

@@ -55,8 +55,11 @@ with no configured Git remote.
 adapter removes token/API-key environment variables, uses no API key itself, places
 the host in that clone, removes all inherited Git, GitHub, and SSH configuration
 variables plus normal GitHub/Git credential configuration, and checks
-local `main`, `master`, and `staging` refs before and after the turn. The host receives
-an explicit no-merge/no-rebase/no-push instruction. A mismatch blocks the run.
+local `main`, `master`, and `staging` refs immediately before and after the turn. It
+also supplies a command-scoped Git `reference-transaction` hook that rejects a write
+to any of those refs before Git completes it, including a mistaken direct command
+against the source repository. The host receives an explicit no-merge/no-rebase/no-push
+instruction. A mismatch blocks the run.
 The clone must begin with exactly one `origin` remote, remove it successfully, and
 prove that its remote list is empty; any other condition blocks before host launch.
 
@@ -110,7 +113,7 @@ or host profile.
 
 | Threat | Control |
 |---|---|
-| Merge to main/staging | No merge surface; protected local refs checked before/after every host and push turn |
+| Merge to main/staging | No merge surface; a command-scoped Git transaction hook rejects protected-ref writes before completion, with independent before/after ref checks |
 | Direct protected push | Host clones have no remote or inherited GitHub/Git credentials; controlled delivery pushes only the stored `hive-mind/` branch, never force, and defaults off |
 | Prompt/comment injection | Comments are declared untrusted, redacted, bounded, and never replayed from memory |
 | Secret or raw-output retention | Secret-like kickoff text is rejected; model output and raw comments are held only in memory; ledger keeps digests and safe summaries |
