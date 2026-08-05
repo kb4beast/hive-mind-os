@@ -49,12 +49,13 @@ has six deliberate layers rather than one opaque memory blob:
 
 ## Host and delivery boundary
 
-`hive-mind autonomous kickoff` accepts one prompt and creates an isolated worktree.
+`hive-mind autonomous kickoff` accepts one prompt and creates an isolated local clone
+with no configured Git remote.
 `turn` invokes either the locally signed-in `codex exec` or `claude --print` CLI. The
 adapter removes token/API-key environment variables, uses no API key itself, places
-the host in that worktree, and checks local `main`, `master`, and `staging` refs
-before and after the turn. The host receives an explicit no-merge/no-rebase/no-push
-instruction. A mismatch blocks the run.
+the host in that clone, removes normal GitHub/Git credential configuration, and checks
+local `main`, `master`, and `staging` refs before and after the turn. The host receives
+an explicit no-merge/no-rebase/no-push instruction. A mismatch blocks the run.
 
 There is intentionally no merge API, CLI command, or gateway. The only optional Git
 write to a remote is a non-force push of the run's own `hive-mind/` branch, and that
@@ -81,7 +82,8 @@ start and enumerates every commit in `start..final`. For each of the N commits i
 3. reveals the target only after the seal;
 4. grades overlap and appends the result.
 
-The selected Codex or Claude host can serve as the read-only predictor. A malformed
+The selected Codex or Claude host can serve as the read-only predictor only from a
+fresh remote-free clone of the oracle's verified ancestor environment. A malformed
 prediction, missing local sign-in, or any oracle failure blocks the learning run; it
 does not fabricate a grade. Grades produce evidence for a versioned challenger under
 the existing recursive-improvement gate. They never self-promote a prompt, policy,
@@ -92,11 +94,12 @@ or host profile.
 | Threat | Control |
 |---|---|
 | Merge to main/staging | No merge surface; protected local refs checked before/after every host and push turn |
-| Direct protected push | Branch must be the stored `hive-mind/` branch; no force push; remote push defaults off |
+| Direct protected push | Host clones have no remote or inherited GitHub/Git credentials; controlled delivery pushes only the stored `hive-mind/` branch, never force, and defaults off |
 | Prompt/comment injection | Comments are declared untrusted, redacted, bounded, and never replayed from memory |
 | Secret or raw-output retention | Secret-like kickoff text is rejected; model output and raw comments are held only in memory; ledger keeps digests and safe summaries |
 | Host/provider lock-in | `HostKind` selects Codex or Claude Code through a replaceable invocation boundary |
 | Human correction lost | Every later commit receives a distinct sealed PIT episode and measured grade |
+| Host sees a future PIT target | The host receives a disposable remote-free clone made only from the oracle's verified ancestor environment |
 | Feedback replay/duplicate reply | Remote comment IDs are append-only deduplication keys |
 | Autonomous policy mutation | Authority is immutable per run; learning does not change policy or prompts |
 

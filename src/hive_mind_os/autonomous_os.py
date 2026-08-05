@@ -14,13 +14,15 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import tempfile
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Callable, Mapping, Protocol, Sequence
+from typing import Any, Callable, Iterator, Mapping, Protocol, Sequence
 from uuid import uuid4
 
 from .contracts import validate_contract
@@ -336,6 +338,39 @@ class AutonomousBrain:
     def _worktree_path(self, run_id: str) -> Path:
         return self.state_dir / "worktrees" / run_id
 
+    def _host_environment(self, run_id: str) -> dict[str, str]:
+        """Remove normal GitHub/Git credential paths before a coding host starts."""
+
+        configuration = self.state_dir / "host-gitconfig" / f"{run_id}.gitconfig"
+        configuration.parent.mkdir(parents=True, exist_ok=True)
+        configuration.write_text(
+            "[credential]\n\thelper =\n[core]\n\thooksPath = " + (self.state_dir / "disabled-hooks").as_posix() + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        (self.state_dir / "disabled-hooks").mkdir(parents=True, exist_ok=True)
+        github_config = self.state_dir / "empty-github-config" / run_id
+        github_config.mkdir(parents=True, exist_ok=True)
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not any(
+                marker in key.upper()
+                for marker in ("TOKEN", "API_KEY", "AUTHORIZATION", "GITHUB", "SSH_AUTH")
+            )
+        }
+        environment.update(
+            {
+                "GIT_TERMINAL_PROMPT": "0",
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": str(configuration),
+                "GIT_ASKPASS": "",
+                "GH_CONFIG_DIR": str(github_config),
+                "HIVE_MIND_PROTECTED_BRANCHES": ",".join(PROTECTED_BRANCHES),
+            }
+        )
+        return environment
+
     def get_run(self, run_id: str) -> dict[str, Any]:
         row = self._connection.execute(
             "SELECT contract_json FROM runs WHERE run_id = ?", (run_id,)
@@ -400,7 +435,21 @@ class AutonomousBrain:
             raise AutonomousRunError("autonomous run contract is invalid: " + "; ".join(validation.issues))
         task_path.write_text(safe_prompt, encoding="utf-8", newline="\n")
         try:
-            self._git(root, "worktree", "add", "-b", branch, str(self._worktree_path(identifier)), start_commit)
+            worktree = self._worktree_path(identifier)
+            worktree.parent.mkdir(parents=True, exist_ok=True)
+            completed = subprocess.run(
+                ("git", "clone", "--no-local", "--no-hardlinks", "--no-checkout", str(root), str(worktree)),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                shell=False,
+                timeout=120,
+            )
+            if completed.returncode:
+                raise AutonomousRunError("isolated repository clone could not be created")
+            self._git(worktree, "checkout", "-b", branch, start_commit)
+            self._git(worktree, "remote", "remove", "origin", allow_failure=True)
             with self._connection:
                 self._connection.execute(
                     "INSERT INTO runs(run_id, contract_json) VALUES(?, ?)",
@@ -503,13 +552,7 @@ class AutonomousBrain:
         before = self._protected_refs(Path(str(contract["repository"])))
         instruction = self._host_instruction(task, _redact_untrusted_comment(feedback) if feedback else None)
         command = self._host_command(HostKind(contract["host"]), instruction)
-        environment = {
-            key: value
-            for key, value in os.environ.items()
-            if not any(marker in key.upper() for marker in ("TOKEN", "API_KEY", "AUTHORIZATION", "GITHUB"))
-        }
-        environment["GIT_TERMINAL_PROMPT"] = "0"
-        environment["HIVE_MIND_PROTECTED_BRANCHES"] = ",".join(PROTECTED_BRANCHES)
+        environment = self._host_environment(run_id)
         if executor is None:
             completed = subprocess.run(
                 command,
@@ -688,12 +731,17 @@ class AutonomousBrain:
             raise AutonomousRunError("only the run's non-protected branch may be pushed")
         worktree = self._worktree_path(run_id)
         before = self._protected_refs(Path(str(contract["repository"])))
+        if not _SIMPLE_NAME.fullmatch(remote):
+            raise AutonomousRunError("remote name is unsafe")
+        remote_url = self._git(Path(str(contract["repository"])), "remote", "get-url", remote)
+        if not remote_url:
+            raise AutonomousRunError("configured source remote is unavailable")
         completed = subprocess.run(
-            ("git", "-C", str(worktree), "push", remote, f"HEAD:refs/heads/{branch}"),
+            ("git", "-C", str(worktree), "push", remote_url, f"HEAD:refs/heads/{branch}"),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            env=self._host_environment(run_id),
             check=False,
             shell=False,
             timeout=120,
@@ -713,54 +761,98 @@ class AutonomousBrain:
         host = HostKind(contract["host"])
 
         def predict(environment: Path) -> Sequence[str]:
-            instruction = (
-                "You are a point-in-time learning witness. Inspect only the current repository, "
-                "which contains an ancestor-only history. Do not write files, use network services, "
-                "or infer hidden commits. Predict the next change's paths. Return exactly one JSON object "
-                'with a changed_paths array of safe relative paths and no other text.\\n<task>\\n'
-                + task
-                + "\\n</task>"
-            )
-            executable = shutil.which("codex" if host is HostKind.CODEX else "claude")
-            if executable is None:
-                raise AutonomousRunError(f"{host.value} executable is unavailable")
-            command = (
-                (executable, "exec", "--sandbox", "read-only", "--color", "never", instruction)
-                if host is HostKind.CODEX
-                else (executable, "--print", "--output-format", "json", "--permission-mode", "plan", instruction)
-            )
-            environment_variables = {
-                key: value
-                for key, value in os.environ.items()
-                if not any(marker in key.upper() for marker in ("TOKEN", "API_KEY", "AUTHORIZATION", "GITHUB"))
-            }
-            environment_variables["GIT_TERMINAL_PROMPT"] = "0"
+            with self._isolated_pit_host_workspace(environment) as host_root:
+                instruction = (
+                    "You are a point-in-time learning witness. Inspect only the current repository, "
+                    "which contains an ancestor-only history. Do not write files, use network services, "
+                    "or infer hidden commits. Predict the next change's paths. Return exactly one JSON object "
+                    'with a changed_paths array of safe relative paths and no other text.\n<task>\n'
+                    + task
+                    + "\n</task>"
+                )
+                executable = shutil.which("codex" if host is HostKind.CODEX else "claude")
+                if executable is None:
+                    raise AutonomousRunError(f"{host.value} executable is unavailable")
+                command = (
+                    (
+                        executable,
+                        "exec",
+                        "--cd",
+                        str(host_root),
+                        "--sandbox",
+                        "read-only",
+                        "--color",
+                        "never",
+                        instruction,
+                    )
+                    if host is HostKind.CODEX
+                    else (
+                        executable,
+                        "--print",
+                        "--output-format",
+                        "json",
+                        "--permission-mode",
+                        "plan",
+                        instruction,
+                    )
+                )
+                completed = subprocess.run(
+                    command,
+                    cwd=host_root,
+                    env=self._host_environment(run_id),
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                    shell=False,
+                    timeout=1_200,
+                )
+                if completed.returncode:
+                    raise AutonomousRunError("host PIT prediction failed")
+                text = completed.stdout.decode("utf-8", "replace")
+                try:
+                    document = json.loads(text)
+                    if isinstance(document, Mapping) and isinstance(document.get("result"), str):
+                        document = json.loads(document["result"])
+                except json.JSONDecodeError as error:
+                    raise AutonomousRunError("host PIT prediction was not strict JSON") from error
+                paths = document.get("changed_paths") if isinstance(document, Mapping) else None
+                if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+                    raise AutonomousRunError("host PIT prediction lacks changed_paths")
+                return paths
+
+        return predict
+
+    @contextmanager
+    def _isolated_pit_host_workspace(self, ancestor_environment: Path) -> Iterator[Path]:
+        """Give a host a disposable clone of only an already-verified ancestor environment."""
+
+        if not ancestor_environment.is_dir():
+            raise AutonomousRunError("PIT ancestor environment is unavailable")
+        with tempfile.TemporaryDirectory(prefix="hive-pit-host-") as directory:
+            host_root = Path(directory) / "repository"
             completed = subprocess.run(
-                command,
-                cwd=environment,
-                env=environment_variables,
+                (
+                    "git",
+                    "clone",
+                    "--no-local",
+                    "--no-hardlinks",
+                    "--no-checkout",
+                    str(ancestor_environment),
+                    str(host_root),
+                ),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
                 shell=False,
-                timeout=1_200,
+                timeout=120,
             )
             if completed.returncode:
-                raise AutonomousRunError("host PIT prediction failed")
-            text = completed.stdout.decode("utf-8", "replace")
-            try:
-                document = json.loads(text)
-                if isinstance(document, Mapping) and isinstance(document.get("result"), str):
-                    document = json.loads(document["result"])
-            except json.JSONDecodeError as error:
-                raise AutonomousRunError("host PIT prediction was not strict JSON") from error
-            paths = document.get("changed_paths") if isinstance(document, Mapping) else None
-            if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
-                raise AutonomousRunError("host PIT prediction lacks changed_paths")
-            return paths
-
-        return predict
+                raise AutonomousRunError("isolated PIT host workspace could not be created")
+            self._git(host_root, "checkout", "--detach", "HEAD")
+            self._git(host_root, "remote", "remove", "origin", allow_failure=True)
+            yield host_root
 
     def learn_from_human_outcome(
         self,

@@ -17,17 +17,18 @@ from hive_mind_os.autonomous_os import (
 )
 from hive_mind_os.cli import main
 from hive_mind_os.contracts import validate_contract
+from hive_mind_os.pit_oracle import PointInTimeOracle
 
 
-def _git(repository: Path, *arguments: str) -> str:
+def _git(repository: Path, *arguments: str, check: bool = True):
     completed = subprocess.run(
         ("git", "-C", str(repository), *arguments),
-        check=True,
+        check=check,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
-    return completed.stdout.strip()
+    return completed.stdout.strip() if check else completed
 
 
 def _commit(repository: Path, path: str, content: str, message: str) -> str:
@@ -102,6 +103,18 @@ class AutonomousBrainTests(unittest.TestCase):
                 seen.append(command)
                 self.assertEqual(environment["GIT_TERMINAL_PROMPT"], "0")
                 self.assertNotIn("GITHUB_TOKEN", environment)
+                self.assertEqual(environment["GIT_CONFIG_NOSYSTEM"], "1")
+                self.assertTrue(environment["GH_CONFIG_DIR"].endswith(worktree.name))
+                self.assertEqual(_git(worktree, "remote"), "")
+                self.assertNotEqual(
+                    subprocess.run(
+                        ("git", "-C", str(worktree), "push"),
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        check=False,
+                    ).returncode,
+                    0,
+                )
                 return HostExecution(0, b"HIVE_MIND_ACTION: implement\n", b"unretained")
 
             with patch("hive_mind_os.autonomous_os.shutil.which", side_effect=lambda name: name):
@@ -246,6 +259,25 @@ class AutonomousBrainTests(unittest.TestCase):
             self.assertEqual(
                 len([event for event in events if event["kind"] == "human_outcome_pit_graded"]), 2
             )
+
+    def test_pit_host_workspace_has_no_remote_or_target_object(self) -> None:
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository, "Learn only from past commits.", "codex", run_id="AR-pit-host"
+            )
+            target = _commit(self.repository, "app.py", "VALUE = 4\n", "human correction")
+            oracle = PointInTimeOracle(self.repository, self.root / "oracle-state")
+            try:
+                environment = oracle.build_environment(target)
+                with brain._isolated_pit_host_workspace(environment.root) as host_root:
+                    self.assertEqual(_git(host_root, "remote"), "")
+                    self.assertNotEqual(
+                        _git(host_root, "cat-file", "-e", target, check=False).returncode,
+                        0,
+                    )
+                    self.assertNotEqual(host_root, Path(run["repository"]))
+            finally:
+                oracle.close()
 
     def test_cli_kickoff_is_a_prompt_entrypoint_and_rejects_secret_like_prompts(self) -> None:
         output = io.StringIO()
