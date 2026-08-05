@@ -608,7 +608,8 @@ class SandboxRunner:
         from ctypes import wintypes
 
         if kernel32 is None:
-            kernel32 = ctypes.windll.kernel32
+            win_dll: Any = getattr(ctypes, "windll")
+            kernel32 = win_dll.kernel32
         open_process = kernel32.OpenProcess
         open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         open_process.restype = wintypes.HANDLE
