@@ -1,0 +1,4 @@
+{
+  "decision": "blocked",
+  "safe_reason": "PID lineage cannot prove descendants after root exit; a stable Windows job handle is required."
+}

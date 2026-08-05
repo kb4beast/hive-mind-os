@@ -7,7 +7,6 @@ import sys
 import tempfile
 import threading
 import time
-import types
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -294,141 +293,25 @@ class SandboxTests(unittest.TestCase):
         time.sleep(1.0)
         self.assertFalse(marker.exists())
 
-    def test_windows_descendants_exclude_stale_parent_pid_records(self) -> None:
-        table = {
-            200: 100,
-            201: 200,
-            300: 100,
-            301: 300,
-        }
-        creation_times = {
-            200: 900,
-            201: 1100,
-            300: 1001,
-            301: 1002,
-        }
+    def test_windows_spawn_assigns_process_to_job_before_resume(self) -> None:
+        runner = self.runner()
+        process = Mock()
+        job = Mock()
+        with (
+            patch("hive_mind_os.sandbox.os.name", "nt"),
+            patch("hive_mind_os.sandbox._WindowsJob", return_value=job),
+            patch("hive_mind_os.sandbox.subprocess.Popen", return_value=process) as popen,
+        ):
+            spawned = runner._spawn([sys.executable, "-c", "pass"])
+        self.assertIs(spawned, process)
         self.assertEqual(
-            SandboxRunner._descendants_from_table(
-                100,
-                1000,
-                table,
-                creation_times,
-            ),
-            {300, 301},
+            popen.call_args.kwargs["creationflags"] & 0x00000004,
+            0x00000004,
         )
+        job.assign_and_resume.assert_called_once_with(process)
+        self.assertIs(getattr(process, "_hive_mind_windows_job"), job)
 
-    def test_windows_descendants_reject_reused_root_pid(self) -> None:
-        creation_times = {100: 2000, 200: 2001, 201: 2002}
-        with (
-            patch.object(
-                SandboxRunner,
-                "_windows_process_table",
-                return_value={100: 4, 200: 100, 201: 200},
-            ),
-            patch.object(
-                SandboxRunner,
-                "_windows_pid_creation_time",
-                side_effect=creation_times.get,
-            ),
-        ):
-            descendants = SandboxRunner._windows_descendants(100, 1000)
-        self.assertEqual(descendants, set())
-
-    def test_windows_descendants_reject_present_root_without_identity(self) -> None:
-        creation_times = {100: None, 200: 1001}
-        with (
-            patch.object(
-                SandboxRunner,
-                "_windows_process_table",
-                return_value={100: 4, 200: 100},
-            ),
-            patch.object(
-                SandboxRunner,
-                "_windows_pid_creation_time",
-                side_effect=creation_times.get,
-            ),
-        ):
-            descendants = SandboxRunner._windows_descendants(100, 1000)
-        self.assertEqual(descendants, set())
-
-    def test_windows_descendants_preserve_children_after_root_exit(self) -> None:
-        with (
-            patch.object(
-                SandboxRunner,
-                "_windows_process_table",
-                return_value={200: 100},
-            ),
-            patch.object(
-                SandboxRunner,
-                "_windows_pid_creation_time",
-                return_value=1001,
-            ),
-        ):
-            descendants = SandboxRunner._windows_descendants(100, 1000)
-        self.assertEqual(descendants, {200})
-
-    def test_windows_descendants_reject_unknown_descendant_identity(self) -> None:
-        creation_times = {100: 1000, 200: None}
-        with (
-            patch.object(
-                SandboxRunner,
-                "_windows_process_table",
-                return_value={100: 4, 200: 100},
-            ),
-            patch.object(
-                SandboxRunner,
-                "_windows_pid_creation_time",
-                side_effect=creation_times.get,
-            ),
-        ):
-            descendants = SandboxRunner._windows_descendants(100, 1000)
-        self.assertEqual(descendants, set())
-
-    def test_windows_termination_revalidates_handle_identity(self) -> None:
-        kernel32 = Mock()
-        kernel32.OpenProcess.return_value = 42
-        fake_ctypes = types.SimpleNamespace(
-            c_ulong=object,
-            c_int=object,
-            c_void_p=object,
-            windll=types.SimpleNamespace(kernel32=kernel32),
-        )
-        with (
-            patch("hive_mind_os.sandbox.os.name", "nt"),
-            patch.dict(sys.modules, {"ctypes": fake_ctypes}),
-            patch.object(
-                SandboxRunner,
-                "_windows_process_creation_time_from_handle",
-                return_value=2000,
-            ),
-        ):
-            SandboxRunner._terminate_windows_pid_if_identity_matches(200, 1001)
-        kernel32.TerminateProcess.assert_not_called()
-        kernel32.CloseHandle.assert_called_once_with(42)
-
-    def test_windows_termination_allows_matching_handle_identity(self) -> None:
-        kernel32 = Mock()
-        kernel32.OpenProcess.return_value = 42
-        fake_ctypes = types.SimpleNamespace(
-            c_ulong=object,
-            c_int=object,
-            c_void_p=object,
-            windll=types.SimpleNamespace(kernel32=kernel32),
-        )
-        with (
-            patch("hive_mind_os.sandbox.os.name", "nt"),
-            patch.dict(sys.modules, {"ctypes": fake_ctypes}),
-            patch.object(
-                SandboxRunner,
-                "_windows_process_creation_time_from_handle",
-                return_value=1001,
-            ),
-        ):
-            SandboxRunner._terminate_windows_pid_if_identity_matches(200, 1001)
-        kernel32.TerminateProcess.assert_called_once_with(42, 1)
-        kernel32.CloseHandle.assert_called_once_with(42)
-
-    def test_windows_timeout_kill_never_uses_unfiltered_taskkill_tree(self) -> None:
+    def test_windows_timeout_terminates_job_not_pid_tree(self) -> None:
         class FinishedProcess:
             pid = 100
 
@@ -439,13 +322,33 @@ class SandboxTests(unittest.TestCase):
                 self.fail("finished root process must not be killed")
 
         process = FinishedProcess()
+        job = Mock()
+        setattr(process, "_hive_mind_windows_job", job)
         with (
             patch("hive_mind_os.sandbox.os.name", "nt"),
-            patch.object(SandboxRunner, "_windows_descendants", return_value=set()),
             patch("hive_mind_os.sandbox.subprocess.run") as run,
         ):
             SandboxRunner._kill_tree(process)  # type: ignore[arg-type]
+        job.terminate.assert_called_once_with()
         run.assert_not_called()
+
+    def test_windows_job_reports_background_child_liveness(self) -> None:
+        process = Mock()
+        process.poll.return_value = 0
+        job = Mock()
+        job.has_active_processes.return_value = True
+        setattr(process, "_hive_mind_windows_job", job)
+        with patch("hive_mind_os.sandbox.os.name", "nt"):
+            self.assertTrue(SandboxRunner._tree_alive(process))
+        job.has_active_processes.assert_called_once_with()
+
+    def test_windows_job_is_closed_after_execution(self) -> None:
+        process = Mock()
+        job = Mock()
+        setattr(process, "_hive_mind_windows_job", job)
+        SandboxRunner._close_windows_job(process)
+        job.close.assert_called_once_with()
+        self.assertIsNone(getattr(process, "_hive_mind_windows_job"))
 
     @unittest.skipUnless(os.name == "nt", "Windows-specific PID-reuse regression")
     def test_short_lived_windows_commands_do_not_false_timeout(self) -> None:

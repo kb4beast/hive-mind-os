@@ -254,6 +254,14 @@ class _WindowsJob:
         self._kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
         self._kernel32.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
         self._kernel32.TerminateJobObject.restype = wintypes.BOOL
+        self._kernel32.QueryInformationJobObject.argtypes = (
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+        )
+        self._kernel32.QueryInformationJobObject.restype = wintypes.BOOL
         self._kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
         self._kernel32.CloseHandle.restype = wintypes.BOOL
         self._ntdll.NtResumeProcess.argtypes = (wintypes.HANDLE,)
@@ -288,6 +296,36 @@ class _WindowsJob:
     def terminate(self) -> None:
         if self.handle:
             self._kernel32.TerminateJobObject(self.handle, 1)
+
+    def has_active_processes(self) -> bool:
+        import ctypes
+        from ctypes import wintypes
+
+        class BasicAccountingInformation(ctypes.Structure):
+            _fields_ = [
+                ("TotalUserTime", ctypes.c_longlong),
+                ("TotalKernelTime", ctypes.c_longlong),
+                ("ThisPeriodTotalUserTime", ctypes.c_longlong),
+                ("ThisPeriodTotalKernelTime", ctypes.c_longlong),
+                ("TotalPageFaultCount", wintypes.DWORD),
+                ("TotalProcesses", wintypes.DWORD),
+                ("ActiveProcesses", wintypes.DWORD),
+                ("TotalTerminatedProcesses", wintypes.DWORD),
+            ]
+
+        if not self.handle:
+            return False
+        information = BasicAccountingInformation()
+        returned = wintypes.DWORD()
+        if not self._kernel32.QueryInformationJobObject(
+            self.handle,
+            1,
+            ctypes.byref(information),
+            ctypes.sizeof(information),
+            ctypes.byref(returned),
+        ):
+            raise OSError(self._get_last_error(), "QueryInformationJobObject failed")
+        return bool(information.ActiveProcesses)
 
     def close(self) -> None:
         if self.handle:

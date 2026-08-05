@@ -22,6 +22,7 @@ from uuid import uuid4
 
 from .autonomy import EpisodeAllowance
 from .contracts import tool_intent_digest, validate_contract
+from .current_state_audit import _WindowsJob
 from .ledger import EvidenceLedger
 from .models import RiskTier, Role, utc_now
 from .policy import Action, PolicyEngine
@@ -259,6 +260,7 @@ class SandboxRunner:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
+        self._close_windows_job(process)
         for reader in readers:
             reader.join(timeout=0.5)
         if process.stdout is not None:
@@ -359,6 +361,7 @@ class SandboxRunner:
             "stderr": subprocess.PIPE,
             "shell": False,
         }
+        windows_job: _WindowsJob | None = None
         if os.name == "posix":
             kwargs["start_new_session"] = True
             if self.spec.cpu_seconds is not None or self.spec.memory_bytes is not None:
@@ -375,16 +378,27 @@ class SandboxRunner:
 
                 kwargs["preexec_fn"] = set_limits
         else:
+            windows_job = _WindowsJob()
             kwargs["creationflags"] = getattr(
                 subprocess, "CREATE_NEW_PROCESS_GROUP", 0
-            )
-        process = cast(subprocess.Popen[bytes], subprocess.Popen(argv, **kwargs))
-        if os.name == "nt":
-            setattr(
-                process,
-                "_hive_mind_creation_time",
-                self._windows_process_creation_time(process),
-            )
+            ) | 0x00000004
+        try:
+            process = cast(subprocess.Popen[bytes], subprocess.Popen(argv, **kwargs))
+        except Exception:
+            if windows_job is not None:
+                windows_job.close()
+            raise
+        if windows_job is not None:
+            try:
+                windows_job.assign_and_resume(process)
+            except Exception:
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+                windows_job.close()
+                raise
+            setattr(process, "_hive_mind_windows_job", windows_job)
         return process
 
     def _read_capped(
@@ -411,219 +425,15 @@ class SandboxRunner:
             if len(chunk) > accepted_bytes:
                 truncated[stream_index] = True
 
-    @staticmethod
-    def _windows_process_table() -> dict[int, int]:
-        if os.name != "nt":
-            return {}
-        import ctypes
-
-        class ProcessEntry(ctypes.Structure):
-            _fields_ = [
-                ("size", ctypes.c_ulong),
-                ("usage", ctypes.c_ulong),
-                ("pid", ctypes.c_ulong),
-                ("default_heap", ctypes.c_size_t),
-                ("module_id", ctypes.c_ulong),
-                ("threads", ctypes.c_ulong),
-                ("parent_pid", ctypes.c_ulong),
-                ("priority", ctypes.c_long),
-                ("flags", ctypes.c_ulong),
-                ("executable", ctypes.c_wchar * 260),
-            ]
-
-        kernel32 = ctypes.windll.kernel32
-        create_snapshot = kernel32.CreateToolhelp32Snapshot
-        create_snapshot.argtypes = [ctypes.c_ulong, ctypes.c_ulong]
-        create_snapshot.restype = ctypes.c_void_p
-        first_process = kernel32.Process32FirstW
-        first_process.argtypes = [ctypes.c_void_p, ctypes.POINTER(ProcessEntry)]
-        first_process.restype = ctypes.c_int
-        next_process = kernel32.Process32NextW
-        next_process.argtypes = [ctypes.c_void_p, ctypes.POINTER(ProcessEntry)]
-        next_process.restype = ctypes.c_int
-        close_handle = kernel32.CloseHandle
-        close_handle.argtypes = [ctypes.c_void_p]
-        close_handle.restype = ctypes.c_int
-        snapshot = create_snapshot(0x00000002, 0)
-        invalid_handle = ctypes.c_void_p(-1).value
-        if snapshot == invalid_handle:
-            return {}
-        table: dict[int, int] = {}
-        try:
-            entry = ProcessEntry()
-            entry.size = ctypes.sizeof(ProcessEntry)
-            success = first_process(snapshot, ctypes.byref(entry))
-            while success:
-                table[int(entry.pid)] = int(entry.parent_pid)
-                success = next_process(snapshot, ctypes.byref(entry))
-        finally:
-            close_handle(snapshot)
-        return table
-
-    @staticmethod
-    def _windows_process_creation_time_from_handle(handle: int) -> int | None:
-        if os.name != "nt":
-            return None
-        import ctypes
-
-        class FileTime(ctypes.Structure):
-            _fields_ = [
-                ("low", ctypes.c_ulong),
-                ("high", ctypes.c_ulong),
-            ]
-
-        kernel32 = ctypes.windll.kernel32
-        get_process_times = kernel32.GetProcessTimes
-        get_process_times.argtypes = [
-            ctypes.c_void_p,
-            ctypes.POINTER(FileTime),
-            ctypes.POINTER(FileTime),
-            ctypes.POINTER(FileTime),
-            ctypes.POINTER(FileTime),
-        ]
-        get_process_times.restype = ctypes.c_int
-        created = FileTime()
-        exited = FileTime()
-        kernel = FileTime()
-        user = FileTime()
-        if not get_process_times(
-            ctypes.c_void_p(handle),
-            ctypes.byref(created),
-            ctypes.byref(exited),
-            ctypes.byref(kernel),
-            ctypes.byref(user),
-        ):
-            return None
-        return (int(created.high) << 32) | int(created.low)
-
-    @classmethod
-    def _windows_process_creation_time(
-        cls,
-        process: subprocess.Popen[bytes],
-    ) -> int | None:
-        handle = getattr(process, "_handle", None)
-        if handle is None:
-            return None
-        return cls._windows_process_creation_time_from_handle(int(handle))
-
-    @classmethod
-    def _windows_pid_creation_time(cls, pid: int) -> int | None:
-        if os.name != "nt":
-            return None
-        import ctypes
-
-        kernel32 = ctypes.windll.kernel32
-        open_process = kernel32.OpenProcess
-        open_process.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
-        open_process.restype = ctypes.c_void_p
-        close_handle = kernel32.CloseHandle
-        close_handle.argtypes = [ctypes.c_void_p]
-        close_handle.restype = ctypes.c_int
-        handle = open_process(0x1000, False, pid)
-        if not handle:
-            return None
-        try:
-            return cls._windows_process_creation_time_from_handle(int(handle))
-        finally:
-            close_handle(handle)
-
-    @staticmethod
-    def _descendants_from_table(
-        root_pid: int,
-        root_creation_time: int | None,
-        table: Mapping[int, int],
-        creation_times: Mapping[int, int | None],
-    ) -> set[int]:
-        def eligible(pid: int) -> bool:
-            created = creation_times.get(pid)
-            return created is not None and created >= root_creation_time
-
-        descendants: set[int] = set()
-        frontier = {root_pid}
-        while frontier:
-            children = {
-                pid
-                for pid, parent_pid in table.items()
-                if parent_pid in frontier
-                and pid not in descendants
-                and eligible(pid)
-            }
-            descendants.update(children)
-            frontier = children
-        return descendants
-
-    @classmethod
-    def _windows_descendants(
-        cls,
-        root_pid: int,
-        root_creation_time: int | None,
-    ) -> set[int]:
-        if root_creation_time is None:
-            return set()
-        table = cls._windows_process_table()
-        if root_pid in table:
-            current_root_creation_time = cls._windows_pid_creation_time(root_pid)
-            if current_root_creation_time != root_creation_time:
-                return set()
-        candidates: set[int] = set()
-        frontier = {root_pid}
-        while frontier:
-            children = {
-                pid
-                for pid, parent_pid in table.items()
-                if parent_pid in frontier and pid not in candidates
-            }
-            candidates.update(children)
-            frontier = children
-        creation_times = {
-            pid: cls._windows_pid_creation_time(pid) for pid in candidates
-        }
-        return cls._descendants_from_table(
-            root_pid,
-            root_creation_time,
-            table,
-            creation_times,
-        )
-
-    @classmethod
-    def _root_creation_time(
-        cls,
-        process: subprocess.Popen[bytes],
-    ) -> int | None:
-        creation_time = getattr(process, "_hive_mind_creation_time", None)
-        if isinstance(creation_time, int):
-            return creation_time
-        return cls._windows_process_creation_time(process)
-
-    @classmethod
-    def _terminate_windows_pid_if_identity_matches(
-        cls,
-        pid: int,
-        expected_creation_time: int | None,
-    ) -> None:
-        if os.name != "nt" or expected_creation_time is None:
-            return
-        import ctypes
-
-        kernel32 = ctypes.windll.kernel32
-        open_process = kernel32.OpenProcess
-        open_process.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
-        open_process.restype = ctypes.c_void_p
-        close_handle = kernel32.CloseHandle
-        close_handle.argtypes = [ctypes.c_void_p]
-        close_handle.restype = ctypes.c_int
-        handle = open_process(0x0001 | 0x1000, False, pid)
-        if not handle:
-            return
-        try:
-            if cls._windows_process_creation_time_from_handle(int(handle)) != expected_creation_time:
-                return
-            kernel32.TerminateProcess(handle, 1)
-        finally:
-            close_handle(handle)
-
     @classmethod
     def _tree_alive(cls, process: subprocess.Popen[bytes]) -> bool:
+        if os.name == "nt":
+            job = getattr(process, "_hive_mind_windows_job", None)
+            if job is not None:
+                try:
+                    return job.has_active_processes()
+                except OSError:
+                    return True
         if process.poll() is None:
             return True
         if os.name == "posix":
@@ -634,12 +444,14 @@ class SandboxRunner:
             except PermissionError:
                 return True
             return True
-        return bool(
-            cls._windows_descendants(
-                process.pid,
-                cls._root_creation_time(process),
-            )
-        )
+        return False
+
+    @staticmethod
+    def _close_windows_job(process: subprocess.Popen[bytes]) -> None:
+        job = getattr(process, "_hive_mind_windows_job", None)
+        if job is not None:
+            job.close()
+            setattr(process, "_hive_mind_windows_job", None)
 
     @classmethod
     def _kill_tree(cls, process: subprocess.Popen[bytes]) -> None:
@@ -649,20 +461,9 @@ class SandboxRunner:
             except ProcessLookupError:
                 pass
         else:
-            # taskkill /T follows a parent PID without validating its creation time.
-            # That can kill an unrelated process after Windows reuses the root PID.
-            descendants = cls._windows_descendants(
-                process.pid,
-                cls._root_creation_time(process),
-            )
-            creation_times = {
-                pid: cls._windows_pid_creation_time(pid) for pid in descendants
-            }
-            for pid in sorted(descendants):
-                cls._terminate_windows_pid_if_identity_matches(
-                    pid,
-                    creation_times[pid],
-                )
+            job = getattr(process, "_hive_mind_windows_job", None)
+            if job is not None:
+                job.terminate()
             if process.poll() is None:
                 process.kill()
 
