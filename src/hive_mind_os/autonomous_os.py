@@ -282,6 +282,17 @@ class AutonomousBrain:
                     target_sha TEXT NOT NULL,
                     payload_json TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS pit_episodes (
+                    episode_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    target_sha TEXT NOT NULL,
+                    UNIQUE(run_id, target_sha)
+                );
+                CREATE TABLE IF NOT EXISTS pit_predictions (
+                    episode_id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    FOREIGN KEY(episode_id) REFERENCES pit_episodes(episode_id)
+                );
                 """
             )
             duplicates = self._connection.execute(
@@ -292,7 +303,7 @@ class AutonomousBrain:
             self._connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS pit_grades_run_target ON pit_grades(run_id, target_sha)"
             )
-            for table in ("runs", "events", "feedback", "pit_grades"):
+            for table in ("runs", "events", "feedback", "pit_grades", "pit_episodes", "pit_predictions"):
                 self._connection.executescript(
                     f"""
                     CREATE TRIGGER IF NOT EXISTS {table}_no_update
@@ -1065,6 +1076,12 @@ class AutonomousBrain:
             self._remove_clone_remote(host_root)
             yield host_root
 
+    @staticmethod
+    def _pit_episode_id(run_id: str, target_sha: str) -> str:
+        """Derive the one resumable episode identity for one run/target pair."""
+
+        return "PIT-" + sha256_digest(f"{run_id}\0{target_sha}".encode("utf-8")).removeprefix("sha256:")
+
     def learn_from_human_outcome(
         self,
         run_id: str,
@@ -1103,6 +1120,8 @@ class AutonomousBrain:
         try:
             all_history = tuple(self._git(root, "rev-list", "--topo-order", "--reverse", "--all").splitlines())
             for target in targets:
+                target_position = all_history.index(target)
+                episode_id = self._pit_episode_id(run_id, target)
                 self._connection.execute("BEGIN IMMEDIATE")
                 try:
                     existing = self._connection.execute(
@@ -1112,23 +1131,102 @@ class AutonomousBrain:
                     if existing is not None:
                         self._connection.execute("COMMIT")
                         continue
-                    environment = oracle.build_environment(target)
-                    predicted_paths = tuple(predictor(environment.root))
-                    if not all(
-                        isinstance(path, str) and path and "\\" not in path
-                        for path in predicted_paths
+                    claimed = self._connection.execute(
+                        "SELECT episode_id FROM pit_episodes WHERE run_id = ? AND target_sha = ?",
+                        (run_id, target),
+                    ).fetchone()
+                    if claimed is None:
+                        self._connection.execute(
+                            "INSERT INTO pit_episodes(episode_id, run_id, target_sha) VALUES(?, ?, ?)",
+                            (episode_id, run_id, target),
+                        )
+                    elif str(claimed["episode_id"]) != episode_id:
+                        raise AutonomousRunError("stored PIT episode identity does not match the run and target")
+                    self._connection.execute("COMMIT")
+                except BaseException:
+                    if self._connection.in_transaction:
+                        self._connection.execute("ROLLBACK")
+                    raise
+
+                self._connection.execute("BEGIN IMMEDIATE")
+                try:
+                    existing = self._connection.execute(
+                        "SELECT 1 FROM pit_grades WHERE run_id = ? AND target_sha = ?",
+                        (run_id, target),
+                    ).fetchone()
+                    if existing is not None:
+                        self._connection.execute("COMMIT")
+                        continue
+                    prediction_row = self._connection.execute(
+                        "SELECT payload_json FROM pit_predictions WHERE episode_id = ?", (episode_id,)
+                    ).fetchone()
+                    if prediction_row is None:
+                        environment = oracle.build_environment(target, episode_id=episode_id)
+                        predicted_paths = tuple(predictor(environment.root))
+                        if not all(
+                            isinstance(path, str) and path and "\\" not in path
+                            for path in predicted_paths
+                        ):
+                            raise AutonomousRunError("PIT predictor must return safe portable changed paths")
+                        prediction = {
+                            "target_sha": target,
+                            "target_position": target_position,
+                            "learner_identity": learner_identity,
+                            "changed_paths": list(predicted_paths),
+                        }
+                        self._connection.execute(
+                            "INSERT INTO pit_predictions(episode_id, payload_json) VALUES(?, ?)",
+                            (episode_id, _canonical(prediction)),
+                        )
+                    self._connection.execute("COMMIT")
+                except BaseException:
+                    if self._connection.in_transaction:
+                        self._connection.execute("ROLLBACK")
+                    raise
+
+                self._connection.execute("BEGIN IMMEDIATE")
+                try:
+                    existing = self._connection.execute(
+                        "SELECT 1 FROM pit_grades WHERE run_id = ? AND target_sha = ?",
+                        (run_id, target),
+                    ).fetchone()
+                    if existing is not None:
+                        self._connection.execute("COMMIT")
+                        continue
+                    prediction_row = self._connection.execute(
+                        "SELECT payload_json FROM pit_predictions WHERE episode_id = ?", (episode_id,)
+                    ).fetchone()
+                    if prediction_row is None:
+                        raise AutonomousRunError("PIT episode has no durable pre-seal prediction")
+                    prediction = json.loads(str(prediction_row["payload_json"]))
+                    if (
+                        not isinstance(prediction, dict)
+                        or prediction.get("target_sha") != target
+                        or prediction.get("target_position") != target_position
+                        or not isinstance(prediction.get("learner_identity"), str)
+                        or not isinstance(prediction.get("changed_paths"), list)
+                        or not all(isinstance(path, str) and path and "\\" not in path for path in prediction["changed_paths"])
                     ):
-                        raise AutonomousRunError("PIT predictor must return safe portable changed paths")
-                    sealed = oracle.seal_prediction(
+                        raise AutonomousRunError("stored PIT prediction is invalid")
+                    environment = oracle.build_environment(target, episode_id=episode_id)
+                    content = {"changed_paths": prediction["changed_paths"]}
+                    sealed = oracle.recover_sealed_prediction(
                         environment,
-                        target_position=all_history.index(target),
-                        learner_identity=learner_identity,
-                        prediction_content={"changed_paths": list(predicted_paths)},
+                        target_position=target_position,
+                        learner_identity=prediction["learner_identity"],
+                        prediction_content=content,
                     )
+                    if sealed is None:
+                        sealed = oracle.seal_prediction(
+                            environment,
+                            target_position=target_position,
+                            learner_identity=prediction["learner_identity"],
+                            prediction_content=content,
+                        )
                     reveal = oracle.reveal(environment, sealed)
                     grade = oracle.grade(environment, sealed, reveal)
                     record = {
-                        "episode_id": environment.episode_id,
+                        "episode_id": episode_id,
                         "target_sha": target,
                         "prediction_digest": sealed.digest,
                         "score": grade.score,
@@ -1138,7 +1236,7 @@ class AutonomousBrain:
                     }
                     self._connection.execute(
                         "INSERT INTO pit_grades(episode_id, run_id, target_sha, payload_json) VALUES(?, ?, ?, ?)",
-                        (environment.episode_id, run_id, target, _canonical(record)),
+                        (episode_id, run_id, target, _canonical(record)),
                     )
                     self._connection.execute("COMMIT")
                 except BaseException:

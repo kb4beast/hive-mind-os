@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -420,28 +421,83 @@ class PointInTimeOracle:
             line for line in content.decode("ascii", "strict").splitlines() if line
         )
 
+    def _environment_record_path(self, episode_id: str) -> Path:
+        return self.state_dir / "environment-records" / f"{episode_id}.json"
+
+    def _resume_environment(self, target: str, episode_id: str) -> PITEnvironment | None:
+        record_path = self._environment_record_path(episode_id)
+        if not record_path.is_file():
+            return None
+        try:
+            document = json.loads(record_path.read_text(encoding="utf-8"))
+            if (
+                not isinstance(document, Mapping)
+                or document.get("schema_version") != 1
+                or document.get("episode_id") != episode_id
+                or document.get("target_sha") != target
+            ):
+                raise ValueError
+            values = {
+                name: document[name]
+                for name in (
+                    "target_tree_sha",
+                    "environment_digest",
+                    "environment_built_at",
+                )
+            }
+            collections = {
+                name: document[name]
+                for name in ("parent_shas", "ancestor_shas", "hidden_shas", "contamination_caveats")
+            }
+            if not all(isinstance(value, str) and value for value in values.values()) or not all(
+                isinstance(value, list) and all(isinstance(item, str) for item in value)
+                for value in collections.values()
+            ):
+                raise ValueError
+        except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise LeakageError("stored PIT environment record is invalid") from error
+        return PITEnvironment(
+            episode_id=episode_id,
+            root=self.state_dir / "environments" / episode_id,
+            target_sha=target,
+            target_tree_sha=str(values["target_tree_sha"]),
+            parent_shas=tuple(collections["parent_shas"]),
+            ancestor_shas=tuple(collections["ancestor_shas"]),
+            hidden_shas=tuple(collections["hidden_shas"]),
+            environment_digest=str(values["environment_digest"]),
+            environment_built_at=str(values["environment_built_at"]),
+            contamination_caveats=tuple(collections["contamination_caveats"]),
+        )
+
     def build_environment(
         self,
         target_sha: str,
         *,
         self_history: bool = False,
+        episode_id: str | None = None,
     ) -> PITEnvironment:
         target = target_sha.lower()
         if len(target) != _FULL_SHA_LENGTH or any(
             character not in "0123456789abcdef" for character in target
         ):
             raise ValueError("target must be a full 40-hex commit SHA")
-        episode_id = f"PIT-{uuid4()}"
+        identifier = f"PIT-{uuid4()}" if episode_id is None else episode_id
+        if not isinstance(identifier, str) or re.fullmatch(r"PIT-[A-Za-z0-9-]{8,128}", identifier) is None:
+            raise ValueError("PIT episode identifier is invalid")
+        resumed = self._resume_environment(target, identifier)
+        if resumed is not None:
+            self.verify_environment(resumed)
+            return resumed
         records: list[dict[str, Any]] = []
-        stable_root = self.state_dir / "environments" / episode_id
+        stable_root = self.state_dir / "environments" / identifier
         if stable_root.exists():
             raise LeakageError("episode environment path already exists")
 
-        with self._source_session(episode_id, records) as (build_root, runner):
+        with self._source_session(identifier, records) as (build_root, runner):
             _, target_line, _ = self._command(
                 runner,
                 ["git", "--git-dir", "source.git", "rev-list", "--parents", "-n", "1", target],
-                episode_id,
+                identifier,
                 "resolve target and parent commits",
                 records,
             )
@@ -452,7 +508,7 @@ class PointInTimeOracle:
             _, tree_output, _ = self._command(
                 runner,
                 ["git", "--git-dir", "source.git", "rev-parse", f"{target}^{{tree}}"],
-                episode_id,
+                identifier,
                 "resolve target tree",
                 records,
             )
@@ -468,7 +524,7 @@ class PointInTimeOracle:
                     "--reverse",
                     "--all",
                 ],
-                episode_id,
+                identifier,
                 "enumerate trusted source commits",
                 records,
             )
@@ -488,7 +544,7 @@ class PointInTimeOracle:
                         "--reverse",
                         *parents,
                     ],
-                    episode_id,
+                    identifier,
                     "enumerate exact target-parent ancestor closure",
                     records,
                 )
@@ -503,7 +559,7 @@ class PointInTimeOracle:
                     self._command(
                         runner,
                         ["git", "--git-dir", "source.git", "update-ref", ref, parent],
-                        episode_id,
+                        identifier,
                         "pin one target parent for ancestor bundle export",
                         records,
                     )
@@ -518,14 +574,14 @@ class PointInTimeOracle:
                         "ancestor.bundle",
                         *refs,
                     ],
-                    episode_id,
+                    identifier,
                     "export exact ancestor closure bundle",
                     records,
                 )
                 self._command(
                     runner,
                     ["git", "init", "--initial-branch=pit-base", "environment"],
-                    episode_id,
+                    identifier,
                     "initialize empty learner repository",
                     records,
                 )
@@ -543,7 +599,7 @@ class PointInTimeOracle:
                         "ancestor.bundle",
                         *fetch_specs,
                     ],
-                    episode_id,
+                    identifier,
                     "import ancestor closure into learner repository",
                     records,
                 )
@@ -551,7 +607,7 @@ class PointInTimeOracle:
                 self._command(
                     runner,
                     ["git", "-C", "environment", "checkout", "--detach", parents[0]],
-                    episode_id,
+                    identifier,
                     "materialize observable parent state",
                     records,
                 )
@@ -559,7 +615,7 @@ class PointInTimeOracle:
                 self._command(
                     runner,
                     ["git", "init", "--initial-branch=pit-base", "environment"],
-                    episode_id,
+                    identifier,
                     "initialize root-target learner repository",
                     records,
                 )
@@ -574,7 +630,7 @@ class PointInTimeOracle:
             "ancestor_shas": ancestors,
         }
         environment = PITEnvironment(
-            episode_id=episode_id,
+            episode_id=identifier,
             root=stable_root,
             target_sha=target,
             target_tree_sha=target_tree,
@@ -586,9 +642,24 @@ class PointInTimeOracle:
             contamination_caveats=caveats,
             receipt_records=records,
         )
+        _atomic_json(
+            self._environment_record_path(identifier),
+            {
+                "schema_version": 1,
+                "episode_id": identifier,
+                "target_sha": target,
+                "target_tree_sha": target_tree,
+                "parent_shas": parents,
+                "ancestor_shas": ancestors,
+                "hidden_shas": hidden,
+                "environment_digest": environment.environment_digest,
+                "environment_built_at": environment.environment_built_at,
+                "contamination_caveats": caveats,
+            },
+        )
         self.verify_environment(environment)
         self.ledger.append_event(
-            episode_id,
+            identifier,
             "pit.environment.verified",
             Role.OPTIMIZER.value,
             {
@@ -682,6 +753,54 @@ class PointInTimeOracle:
             prediction_content,
             digest,
             sequence,
+        )
+        self._seals[environment.episode_id] = sealed
+        return sealed
+
+    def recover_sealed_prediction(
+        self,
+        environment: PITEnvironment,
+        *,
+        target_position: int,
+        learner_identity: str,
+        prediction_content: Mapping[str, Any],
+    ) -> SealedPrediction | None:
+        """Rehydrate the one durable seal for an interrupted deterministic episode."""
+
+        document = {
+            "episode_id": environment.episode_id,
+            "target_position": target_position,
+            "target_sha": environment.target_sha,
+            "environment_digest": environment.environment_digest,
+            "learner_identity": learner_identity,
+            "prediction_content": prediction_content,
+        }
+        digest = _prediction_digest(document)
+        seals = [
+            event
+            for event in self.ledger.events(environment.episode_id)
+            if event["event_type"] == "pit.prediction.sealed"
+        ]
+        if not seals:
+            return None
+        if len(seals) != 1:
+            raise SealViolation("PIT episode has more than one durable prediction seal")
+        payload = seals[0]["payload"]
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("prediction_digest") != digest
+            or payload.get("target_sha") != environment.target_sha
+        ):
+            raise SealViolation("stored PIT prediction seal does not match the durable episode claim")
+        sealed = SealedPrediction(
+            environment.episode_id,
+            target_position,
+            environment.target_sha,
+            environment.environment_digest,
+            learner_identity,
+            prediction_content,
+            digest,
+            int(seals[0]["sequence"]),
         )
         self._seals[environment.episode_id] = sealed
         return sealed
@@ -794,6 +913,24 @@ class PointInTimeOracle:
                 {"kind": "canonical_reveal_changed"},
             )
             raise SealViolation("canonical target reveal changed after it was recorded")
+        durable_reveals = [
+            event
+            for event in self.ledger.events(environment.episode_id)
+            if event["event_type"] == "pit.target.revealed"
+        ]
+        if len(durable_reveals) > 1:
+            raise SealViolation("PIT episode has more than one durable target reveal")
+        if durable_reveals:
+            payload = durable_reveals[0]["payload"]
+            if (
+                not isinstance(payload, Mapping)
+                or payload.get("target_sha") != environment.target_sha
+                or payload.get("seal_digest") != intact.digest
+                or payload.get("reveal_digest") != reveal_digest
+            ):
+                raise SealViolation("stored PIT target reveal does not match the durable prediction seal")
+            self._reveal_digests[environment.episode_id] = reveal_digest
+            return reveal
         self._reveal_digests[environment.episode_id] = reveal_digest
         self.ledger.append_event(
             environment.episode_id,
@@ -846,6 +983,23 @@ class PointInTimeOracle:
         overlap = tuple(sorted(set(predicted) & set(actual)))
         union = set(predicted) | set(actual)
         score = round(len(overlap) / len(union), 6) if union else 1.0
+        durable_grades = [
+            event
+            for event in self.ledger.events(environment.episode_id)
+            if event["event_type"] == "pit.episode.graded"
+        ]
+        if len(durable_grades) > 1:
+            raise SealViolation("PIT episode has more than one durable grade")
+        if durable_grades:
+            payload = durable_grades[0]["payload"]
+            if (
+                not isinstance(payload, Mapping)
+                or payload.get("prediction_digest") != intact.digest
+                or payload.get("score") != score
+                or payload.get("overlap_paths") != list(overlap)
+            ):
+                raise SealViolation("stored PIT grade does not match the durable prediction and reveal")
+            return EpisodeGrade(predicted, actual, overlap, score, int(durable_grades[0]["sequence"]))
         sequence = self.ledger.append_event(
             environment.episode_id,
             "pit.episode.graded",

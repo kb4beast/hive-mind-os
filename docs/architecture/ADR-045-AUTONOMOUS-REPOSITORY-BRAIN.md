@@ -97,12 +97,15 @@ start and enumerates every commit in `start..final`. For each of the N commits i
 3. reveals the target only after the seal;
 4. grades overlap and appends the result.
 
-The bounded supervisor supplies that final commit from a changed local HEAD. PIT grade
-records have a unique run-and-target constraint. Before any PIT work, one supervisor
-takes a transactional per-target gate; a competing supervisor waits, rechecks, and
-skips an already stored grade. A failed predictor rolls that gate back, so the same
-human commit can be retried. Thus N later local commits produce N separate sealed
-grades, even when they are discovered across multiple polling leases.
+The bounded supervisor supplies that final commit from a changed local HEAD. Each
+run/target pair first receives one deterministic, append-only episode reservation.
+The predicted paths and learner identity are then stored in a separate durable record
+before the oracle can seal. A transactional gate serializes sealing and grading; a
+competing supervisor waits, rechecks, and skips an already stored grade. If interrupted
+after sealing, a retry rebuilds the same recorded ancestor environment, rehydrates the
+same durable seal, and finishes that episode rather than making another one. Thus N
+later local commits produce N separate sealed grades, even when they are discovered
+across multiple polling leases or a retry follows interruption.
 
 The selected Codex or Claude host can serve as the read-only predictor only from a
 fresh remote-free clone of the oracle's verified ancestor environment. A malformed
@@ -123,7 +126,7 @@ or host profile.
 | Human correction lost | Every later commit receives a distinct sealed PIT episode and measured grade |
 | Host sees a future PIT target | The host receives a disposable remote-free clone made only from the oracle's verified ancestor environment |
 | Feedback replay/duplicate reply | Remote comment IDs are append-only deduplication keys |
-| Concurrent PIT supervision | A transactional run-and-target gate plus a unique grade record prevents duplicates and allows failed work to retry |
+| Concurrent or interrupted PIT supervision | Stable run/target episode reservations, durable pre-seal predictions, seal recovery, a transactional grade gate, and a unique grade record prevent duplicate episodes while allowing retry |
 | Autonomous policy mutation | Authority is immutable per run; learning does not change policy or prompts |
 
 Acceptance is a focused test proving the charter contract, protected branch refusal,

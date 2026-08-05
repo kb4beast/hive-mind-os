@@ -18,6 +18,7 @@ from hive_mind_os.autonomous_os import (
 )
 from hive_mind_os.cli import build_autonomous_parser, main
 from hive_mind_os.contracts import validate_contract
+from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.pit_oracle import PointInTimeOracle
 
 
@@ -330,6 +331,44 @@ class AutonomousBrainTests(unittest.TestCase):
                     )
             finally:
                 connection.close()
+
+    def test_interrupted_pit_episode_recovers_without_duplicate_oracle_events(self) -> None:
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository, "Improve app behavior.", "codex", run_id="AR-pit-seal-recovery"
+            )
+            target = _commit(self.repository, "app.py", "VALUE = 2\n", "human correction")
+            original_grade = PointInTimeOracle.grade
+
+            def grade_then_interrupt(oracle, *arguments):
+                original_grade(oracle, *arguments)
+                raise AutonomousRunError("simulated interruption after oracle grading")
+
+            with patch.object(
+                PointInTimeOracle,
+                "grade",
+                new=grade_then_interrupt,
+            ), self.assertRaisesRegex(AutonomousRunError, "simulated interruption"):
+                brain.learn_from_human_outcome(run["run_id"], target, lambda _environment: ["app.py"])
+            records = brain.learn_from_human_outcome(
+                run["run_id"], target, lambda _environment: ["app.py"]
+            )
+            self.assertEqual(len(records), 1)
+            ledger = EvidenceLedger(self.state / "pit" / run["run_id"] / "evidence-ledger.sqlite3")
+            try:
+                seals = [
+                    event for event in ledger.events()
+                    if event["event_type"] == "pit.prediction.sealed"
+                ]
+                oracle_grades = [
+                    event for event in ledger.events()
+                    if event["event_type"] == "pit.episode.graded"
+                ]
+            finally:
+                ledger.close()
+            self.assertEqual(len(seals), 1)
+            self.assertEqual(len(oracle_grades), 1)
+            self.assertEqual(records[0]["episode_id"], seals[0]["run_id"])
 
     def test_bounded_supervision_handles_pr_feedback_and_local_human_commits(self) -> None:
         gateway = FakeCommentGateway(
