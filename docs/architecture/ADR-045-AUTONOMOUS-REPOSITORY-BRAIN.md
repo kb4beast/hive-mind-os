@@ -75,6 +75,13 @@ system a merge capability. The adapter polls both ordinary PR conversation comme
 and inline review comments, then replies in the ordinary PR conversation. It does not
 silently mark review threads resolved.
 
+`hive-mind autonomous supervise` is the bounded autonomous operating mode for that
+feedback loop. Its caller supplies a finite polling lease; each poll handles any new
+bound-PR feedback and observes the local repository HEAD. It resumes from the durable
+ledger after interruption, rather than needing the original prompt or raw model output
+again. It does not assume a webhook, a background service, or permission to fetch a
+remote repository: those deployment adapters remain optional and separately governed.
+
 ## PIT learning and promotion boundary
 
 When a human final commit is supplied, the Brain verifies it descends from the run
@@ -84,6 +91,11 @@ start and enumerates every commit in `start..final`. For each of the N commits i
 2. seals its predicted changed paths;
 3. reveals the target only after the seal;
 4. grades overlap and appends the result.
+
+The bounded supervisor supplies that final commit from a changed local HEAD. PIT grade
+records are keyed by run and target SHA, so re-running supervision resumes safely and
+does not grade the same human commit twice. Thus N later local commits produce N
+separate sealed grades, even when they are discovered across multiple polling leases.
 
 The selected Codex or Claude host can serve as the read-only predictor only from a
 fresh remote-free clone of the oracle's verified ancestor environment. A malformed
@@ -107,9 +119,9 @@ or host profile.
 | Autonomous policy mutation | Authority is immutable per run; learning does not change policy or prompts |
 
 Acceptance is a focused test proving the charter contract, protected branch refusal,
-both host command selections, safe feedback/reply behavior, append-only records, and
-N PIT records for N later commits. The full CI gate and independent Curator are later
-delivery requirements.
+both host command selections, safe feedback/reply behavior, bounded supervision,
+append-only records, and exactly N PIT records for N later commits. The full CI gate
+and independent Curator are later delivery requirements.
 
 ## Rollback and limits
 

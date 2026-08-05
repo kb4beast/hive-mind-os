@@ -500,6 +500,17 @@ def build_autonomous_parser() -> argparse.ArgumentParser:
     learn.add_argument("--run-id", required=True)
     learn.add_argument("--human-final-commit", required=True)
     learn.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    supervise = commands.add_parser(
+        "supervise",
+        help="Boundedly process new PR feedback and local human commits without restating context",
+    )
+    supervise.add_argument("--run-id", required=True)
+    supervise.add_argument("--polls", required=True, type=int)
+    supervise.add_argument("--interval-seconds", default=60.0, type=float)
+    supervise.add_argument("--owner")
+    supervise.add_argument("--repository")
+    supervise.add_argument("--token-env", default="GITHUB_TOKEN")
+    supervise.add_argument("--state-dir", default=".hive-mind-state/autonomous")
     events = commands.add_parser("events", help="Print the run's safe append-only event ledger")
     events.add_argument("--run-id", required=True)
     events.add_argument("--state-dir", default=".hive-mind-state/autonomous")
@@ -1186,6 +1197,24 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                         sort_keys=True,
                     )
                 )
+                return 0
+            if args.action == "supervise":
+                feedback_requested = args.owner is not None or args.repository is not None
+                if feedback_requested and (args.owner is None or args.repository is None):
+                    raise AutonomousRunError("supervision owner and repository must be supplied together")
+                result = brain.supervise(
+                    args.run_id,
+                    max_polls=args.polls,
+                    poll_interval_seconds=args.interval_seconds,
+                    owner=args.owner,
+                    repository=args.repository,
+                    gateway=(
+                        GitHubRestCommentGateway(args.token_env)
+                        if feedback_requested
+                        else None
+                    ),
+                )
+                print(json.dumps({"status": "supervised", **result}, indent=2, sort_keys=True))
                 return 0
             print(json.dumps({"status": "unknown-action"}, indent=2), file=sys.stderr)
             return 1

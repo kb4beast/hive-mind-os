@@ -15,6 +15,7 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from contextlib import contextmanager
@@ -732,6 +733,82 @@ class AutonomousBrain:
             results.append(result)
         return tuple(results)
 
+    def supervise(
+        self,
+        run_id: str,
+        *,
+        max_polls: int,
+        poll_interval_seconds: float,
+        owner: str | None = None,
+        repository: str | None = None,
+        gateway: PullRequestCommentGateway | None = None,
+        executor: Callable[[tuple[str, ...], Path, Mapping[str, str]], HostExecution] | None = None,
+        predictor: Callable[[Path], Sequence[str]] | None = None,
+        sleeper: Callable[[float], None] = time.sleep,
+    ) -> dict[str, Any]:
+        """Run a bounded autonomous feedback and local-outcome supervision cycle.
+
+        The caller chooses a finite polling lease.  While the lease is active, new
+        bound-PR comments are handled through the normal untrusted-feedback path and
+        a changed local repository HEAD is PIT-graded exactly once per target commit.
+        This deliberately does not fetch remote history or create an unbounded daemon.
+        """
+
+        contract = self.get_run(run_id)
+        if type(max_polls) is not int or not 1 <= max_polls <= 10_000:
+            raise AutonomousRunError("supervision polls must be a bounded positive integer")
+        if (
+            isinstance(poll_interval_seconds, bool)
+            or not isinstance(poll_interval_seconds, (int, float))
+            or not 0 <= poll_interval_seconds <= 3_600
+        ):
+            raise AutonomousRunError("supervision poll interval must be between zero and 3600 seconds")
+        feedback_requested = gateway is not None or owner is not None or repository is not None
+        if feedback_requested and (
+            gateway is None
+            or not isinstance(owner, str)
+            or not isinstance(repository, str)
+            or not _SIMPLE_NAME.fullmatch(owner)
+            or not _SIMPLE_NAME.fullmatch(repository)
+        ):
+            raise AutonomousRunError("supervision feedback requires a safe owner, repository, and gateway")
+        root = Path(str(contract["repository"]))
+        observed_heads = {str(contract["start_commit"])}
+        feedback_count = 0
+        pit_iterations = 0
+        last_head = str(contract["start_commit"])
+        active_predictor = predictor
+        for poll_index in range(max_polls):
+            if gateway is not None:
+                assert owner is not None
+                assert repository is not None
+                results = self.handle_pull_request_feedback(
+                    run_id,
+                    owner=owner,
+                    repository=repository,
+                    gateway=gateway,
+                    executor=executor,
+                )
+                feedback_count += len(results)
+            last_head = self._git(root, "rev-parse", "HEAD")
+            if last_head not in observed_heads:
+                if active_predictor is None:
+                    active_predictor = self._host_pit_predictor(run_id)
+                records = self.learn_from_human_outcome(run_id, last_head, active_predictor)
+                pit_iterations += len(records)
+                observed_heads.add(last_head)
+            if poll_index + 1 < max_polls:
+                sleeper(float(poll_interval_seconds))
+        result = {
+            "run_id": run_id,
+            "poll_count": max_polls,
+            "feedback_count": feedback_count,
+            "pit_iterations": pit_iterations,
+            "last_observed_head": last_head,
+        }
+        self._append(run_id, "supervision_completed", result)
+        return result
+
     def push_own_branch(self, run_id: str, *, remote: str = "origin") -> str:
         """Push only the isolated branch, never force and never a protected ref."""
 
@@ -893,7 +970,16 @@ class AutonomousBrain:
         if ancestor.returncode:
             raise AutonomousRunError("human final commit does not descend from the run start")
         targets = tuple(
-            item for item in self._git(root, "rev-list", "--reverse", f"{candidate}..{human_final_commit}").splitlines() if item
+            item
+            for item in self._git(
+                root, "rev-list", "--reverse", f"{candidate}..{human_final_commit}"
+            ).splitlines()
+            if item
+            and self._connection.execute(
+                "SELECT 1 FROM pit_grades WHERE run_id = ? AND target_sha = ?",
+                (run_id, item),
+            ).fetchone()
+            is None
         )
         oracle = PointInTimeOracle(root, self.state_dir / "pit" / run_id)
         records: list[dict[str, Any]] = []

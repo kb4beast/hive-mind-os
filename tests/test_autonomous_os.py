@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 import sqlite3
 import subprocess
 import tempfile
@@ -15,7 +16,7 @@ from hive_mind_os.autonomous_os import (
     AutonomousRunError,
     HostExecution,
 )
-from hive_mind_os.cli import main
+from hive_mind_os.cli import build_autonomous_parser, main
 from hive_mind_os.contracts import validate_contract
 from hive_mind_os.pit_oracle import PointInTimeOracle
 
@@ -154,7 +155,11 @@ class AutonomousBrainTests(unittest.TestCase):
                     b"raw output is intentionally not saved",
                 )
 
-            with patch("hive_mind_os.autonomous_os.shutil.which", return_value="codex"):
+            original_which = shutil.which
+            with patch(
+                "hive_mind_os.autonomous_os.shutil.which",
+                side_effect=lambda name: "codex" if name == "codex" else original_which(name),
+            ):
                 handled = brain.handle_pull_request_feedback(
                     run["run_id"],
                     owner="example",
@@ -254,11 +259,68 @@ class AutonomousBrainTests(unittest.TestCase):
             self.assertEqual([record["target_sha"] for record in records], [first, final])
             self.assertEqual(len({record["episode_id"] for record in records}), 2)
             self.assertEqual(len(observed_roots), 2)
+            self.assertEqual(
+                brain.learn_from_human_outcome(run["run_id"], final, predictor), ()
+            )
+            self.assertEqual(len(observed_roots), 2)
             self.assertEqual(_git(self.repository, "rev-parse", "main"), final)
             events = brain.events(run["run_id"])
             self.assertEqual(
                 len([event for event in events if event["kind"] == "human_outcome_pit_graded"]), 2
             )
+
+    def test_bounded_supervision_handles_pr_feedback_and_local_human_commits(self) -> None:
+        gateway = FakeCommentGateway(
+            [{"id": 42, "user": {"login": "reviewer"}, "body": "Please explain the test."}]
+        )
+        with AutonomousBrain(self.state) as brain:
+            run = brain.start_run(
+                self.repository,
+                "Make a small safe change.",
+                "codex",
+                run_id="AR-supervision",
+                allow_pr_comments=True,
+            )
+            brain.register_pull_request(run["run_id"], 7, "https://github.com/example/repo/pull/7")
+            first = _commit(self.repository, "app.py", "VALUE = 2\n", "human first correction")
+            final = _commit(
+                self.repository, "docs/note.txt", "accepted learning\n", "human second correction"
+            )
+            pauses: list[float] = []
+
+            def executor(_command, _worktree, _environment):
+                return HostExecution(
+                    0,
+                    b"HIVE_MIND_ACTION: answer\nHIVE_MIND_REPLY: The test checks the accepted behavior.\n",
+                    b"not retained",
+                )
+
+            original_which = shutil.which
+            with patch(
+                "hive_mind_os.autonomous_os.shutil.which",
+                side_effect=lambda name: "codex" if name == "codex" else original_which(name),
+            ):
+                result = brain.supervise(
+                    run["run_id"],
+                    max_polls=2,
+                    poll_interval_seconds=0.25,
+                    owner="example",
+                    repository="repo",
+                    gateway=gateway,
+                    executor=executor,
+                    predictor=lambda _environment: ["app.py"],
+                    sleeper=pauses.append,
+                )
+            self.assertEqual(result["feedback_count"], 1)
+            self.assertEqual(result["pit_iterations"], 2)
+            self.assertEqual(result["last_observed_head"], final)
+            self.assertEqual(pauses, [0.25])
+            self.assertEqual(gateway.posted, ["The test checks the accepted behavior."])
+            records = [
+                event for event in brain.events(run["run_id"])
+                if event["kind"] == "human_outcome_pit_graded"
+            ]
+            self.assertEqual([event["payload"]["target_sha"] for event in records], [first, final])
 
     def test_pit_host_workspace_has_no_remote_or_target_object(self) -> None:
         with AutonomousBrain(self.state) as brain:
@@ -342,6 +404,11 @@ class AutonomousBrainTests(unittest.TestCase):
             )
         self.assertEqual(success.exception.code, 0)
         self.assertEqual(json.loads(output.getvalue())["status"], "prepared")
+        supervision = build_autonomous_parser().parse_args(
+            ["supervise", "--run-id", "AR-cli-run", "--polls", "2", "--owner", "example", "--repository", "repo"]
+        )
+        self.assertEqual(supervision.action, "supervise")
+        self.assertEqual(supervision.polls, 2)
         with AutonomousBrain(self.state) as brain:
             with self.assertRaises(AutonomousRunError):
                 brain.start_run(
