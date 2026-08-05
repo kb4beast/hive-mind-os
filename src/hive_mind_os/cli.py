@@ -15,21 +15,21 @@ from .acceptance import (
     AcceptanceSpecificationError,
     normalize_acceptance_specifications,
 )
-from .autonomy import AutonomyBudget
 from .autonomous_os import (
     AutonomousBrain,
     AutonomousRunError,
     GitHubRestCommentGateway,
     HostKind,
 )
+from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
-from .courtroom import CaseParticipants
 from .continuation import (
     ContinuationPacketError,
     export_packet,
     validate_packet,
     write_packet,
 )
+from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
     create_audit_artifact,
@@ -56,11 +56,10 @@ from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .projection import build_projection, projection_json, write_projection_html
-from .prompt_registry import PromptRegistry
-from .verify import VerificationError, verify_repository
 from .runtime import HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
+from .verify import VerificationError, verify_repository
 from .workers import serve
 
 

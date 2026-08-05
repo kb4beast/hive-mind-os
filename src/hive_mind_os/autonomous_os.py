@@ -20,7 +20,6 @@ import urllib.request
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
-from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable, Iterator, Mapping, Protocol, Sequence
 from uuid import uuid4
@@ -28,7 +27,6 @@ from uuid import uuid4
 from .contracts import validate_contract
 from .pit_oracle import PointInTimeOracle
 from .receipts import sha256_digest
-
 
 PROTECTED_BRANCHES = ("main", "master", "staging")
 _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")

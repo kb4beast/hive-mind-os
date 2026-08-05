@@ -11,7 +11,6 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-
 COMMIT_ONE_SHA = "842376f736beea0350d18dc2b983d0414e827885"
 COMMIT_TWO_SHA = "f1c725ed6033f6e484f779fb01cd7939f2ae1863"
 GOOD_FIX = b"def increment(value: int) -> int:\n    return value + 1\n"

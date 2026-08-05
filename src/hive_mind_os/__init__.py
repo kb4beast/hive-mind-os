@@ -1,18 +1,18 @@
 """Hive Mind OS agent kernel."""
 
-from .autonomy import (
-    AgentVariant,
-    AutonomousMissionLoop,
-    AutonomyBudget,
-    EvolutionArena,
-    MissionCharter,
-)
 from .autonomous_os import (
     AutonomousBrain,
     AutonomousRunError,
     HostKind,
     HostRunResult,
     PullRequestCommentGateway,
+)
+from .autonomy import (
+    AgentVariant,
+    AutonomousMissionLoop,
+    AutonomyBudget,
+    EvolutionArena,
+    MissionCharter,
 )
 from .contracts import (
     ContractValidation,

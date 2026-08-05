@@ -15,7 +15,11 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .contracts import validate_contract
-from .receipts import path_traverses_link_or_reparse_point, portable_path_parts, sha256_digest
+from .receipts import (
+    path_traverses_link_or_reparse_point,
+    portable_path_parts,
+    sha256_digest,
+)
 
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _SAFE_TEXT = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .,:;()/_-]*\Z")

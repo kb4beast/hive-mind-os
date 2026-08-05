@@ -2,7 +2,6 @@ import unittest
 from dataclasses import replace
 
 from hive_mind_os.models import Role
-from hive_mind_os.source_docket import load_default_source_docket
 from hive_mind_os.reference.vision import (
     REQUIRED_CAPABILITIES,
     REQUIRED_ROLES,
@@ -11,6 +10,7 @@ from hive_mind_os.reference.vision import (
     VisionComplianceGate,
     VisionRunEvidence,
 )
+from hive_mind_os.source_docket import load_default_source_docket
 
 
 class HardenedVisionTests(unittest.TestCase):

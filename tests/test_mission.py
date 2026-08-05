@@ -187,7 +187,7 @@ class _CorrectingBuilderProvider(_RepositoryProvider):
 
     def complete_once(self, request: ModelRequest) -> ModelResponse:
         self.requests.append(request)
-        role = DEFAULT_LIFECYCLE[self.index]
+        role = IMPLEMENTED_REPOSITORY_ROLES[self.index]
         response = super().complete_once(request)
         if role is Role.BUILDER and not self.invalid_builder_turn_sent:
             self.invalid_builder_turn_sent = True

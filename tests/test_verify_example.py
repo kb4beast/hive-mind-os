@@ -7,7 +7,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_RUNNER = REPOSITORY_ROOT / "examples" / "verify-an-agent-change" / "run_example.py"
 

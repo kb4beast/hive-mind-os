@@ -2084,6 +2084,9 @@ class RepositoryMission:
         record: Mapping[str, Any],
         artifact_id: str,
     ) -> bytes:
+        evidence_root = self._evidence_root
+        if evidence_root is None:
+            raise MissionFailed("capability evidence root is unavailable")
         receipt = self._receipt_document(record)
         artifacts = receipt.get("artifacts")
         if not isinstance(artifacts, list):
@@ -2091,7 +2094,7 @@ class RepositoryMission:
         for artifact in artifacts:
             if not isinstance(artifact, Mapping) or artifact.get("artifact_id") != artifact_id:
                 continue
-            path = self._evidence_root / Path(
+            path = evidence_root / Path(
                 *portable_path_parts(_required_string(artifact, "path"))
             )
             return path.read_bytes()

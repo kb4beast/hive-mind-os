@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, TypedDict
 from uuid import uuid4
 
 from .acceptance import AcceptanceSpecification
@@ -44,6 +44,12 @@ _INTERPRETER_INLINE_FLAGS = frozenset({"-c", "-m", "-e", "--eval", "--print"})
 
 class VerificationError(RuntimeError):
     """The requested verification could not be assembled safely."""
+
+
+class _TestAnalysis(TypedDict):
+    files: list[dict[str, object]]
+    weakened: list[str]
+    not_evaluated: list[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -641,7 +647,7 @@ def _analyze_tests(
     base: str,
     candidate: str,
     changes: Sequence[_GitChange],
-) -> dict[str, object]:
+) -> _TestAnalysis:
     weakened: list[str] = []
     not_evaluated: list[str] = []
     files: list[dict[str, object]] = []
@@ -921,7 +927,12 @@ def _rmtree(path: Path) -> None:
 
     for attempt in range(3):
         try:
-            shutil.rmtree(path, onexc=make_writable)
+            # ``onexc`` was added in Python 3.12.  The public package supports
+            # Python 3.11 too, where the equivalent callback is ``onerror``.
+            if sys.version_info >= (3, 12):
+                shutil.rmtree(path, onexc=make_writable)
+            else:
+                shutil.rmtree(path, onerror=make_writable)
             return
         except PermissionError:
             if attempt == 2:
