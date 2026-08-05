@@ -306,6 +306,21 @@ class AutonomousBrainTests(unittest.TestCase):
             self.assertEqual(environment["GIT_CONFIG_NOSYSTEM"], "1")
             self.assertTrue(environment["GIT_CONFIG_GLOBAL"].endswith("AR-scrubbed-environment.gitconfig"))
 
+    def test_clone_remote_removal_fails_closed_for_missing_or_extra_remotes(self) -> None:
+        clone = self.root / "clone"
+        _git(self.repository.parent, "clone", "--no-local", "--no-hardlinks", str(self.repository), str(clone))
+        with AutonomousBrain(self.state) as brain:
+            brain._remove_clone_remote(clone)
+            self.assertEqual(_git(clone, "remote"), "")
+            with self.assertRaises(AutonomousRunError):
+                brain._remove_clone_remote(clone)
+        extra = self.root / "clone-extra"
+        _git(self.repository.parent, "clone", "--no-local", "--no-hardlinks", str(self.repository), str(extra))
+        _git(extra, "remote", "add", "secondary", "https://example.invalid/secondary.git")
+        with AutonomousBrain(self.root / "extra-state") as brain:
+            with self.assertRaises(AutonomousRunError):
+                brain._remove_clone_remote(extra)
+
     def test_cli_kickoff_is_a_prompt_entrypoint_and_rejects_secret_like_prompts(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output), self.assertRaises(SystemExit) as success:

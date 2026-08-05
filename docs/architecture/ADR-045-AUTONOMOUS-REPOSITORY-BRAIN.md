@@ -57,6 +57,8 @@ the host in that clone, removes all inherited Git, GitHub, and SSH configuration
 variables plus normal GitHub/Git credential configuration, and checks
 local `main`, `master`, and `staging` refs before and after the turn. The host receives
 an explicit no-merge/no-rebase/no-push instruction. A mismatch blocks the run.
+The clone must begin with exactly one `origin` remote, remove it successfully, and
+prove that its remote list is empty; any other condition blocks before host launch.
 
 There is intentionally no merge API, CLI command, or gateway. The only optional Git
 write to a remote is a non-force push of the run's own `hive-mind/` branch, and that

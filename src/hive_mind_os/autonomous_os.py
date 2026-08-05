@@ -323,6 +323,19 @@ class AutonomousBrain:
             values[branch] = value if _FULL_SHA.fullmatch(value) else None
         return values
 
+    @classmethod
+    def _remove_clone_remote(cls, repository: Path) -> None:
+        """A host clone must lose its only source remote or the run fails closed."""
+
+        remotes = tuple(
+            item for item in cls._git(repository, "remote").splitlines() if item
+        )
+        if remotes != ("origin",):
+            raise AutonomousRunError("isolated clone did not contain exactly one origin remote")
+        cls._git(repository, "remote", "remove", "origin")
+        if cls._git(repository, "remote"):
+            raise AutonomousRunError("isolated clone still has a configured remote")
+
     def _append(self, run_id: str, kind: str, payload: Mapping[str, Any]) -> None:
         if not _SIMPLE_NAME.fullmatch(kind):
             raise AutonomousRunError("event kind must be a safe identifier")
@@ -450,7 +463,7 @@ class AutonomousBrain:
             if completed.returncode:
                 raise AutonomousRunError("isolated repository clone could not be created")
             self._git(worktree, "checkout", "-b", branch, start_commit)
-            self._git(worktree, "remote", "remove", "origin", allow_failure=True)
+            self._remove_clone_remote(worktree)
             with self._connection:
                 self._connection.execute(
                     "INSERT INTO runs(run_id, contract_json) VALUES(?, ?)",
@@ -852,7 +865,7 @@ class AutonomousBrain:
             if completed.returncode:
                 raise AutonomousRunError("isolated PIT host workspace could not be created")
             self._git(host_root, "checkout", "--detach", "HEAD")
-            self._git(host_root, "remote", "remove", "origin", allow_failure=True)
+            self._remove_clone_remote(host_root)
             yield host_root
 
     def learn_from_human_outcome(
