@@ -9,13 +9,12 @@
 
 ### Source intake
 
-The Explorer inspected `https://github.com/Fayth-Investments/mission-control.git`
-at commit `557fa957a69bf62415b5fcf84c0ff0df2ccf04e0` on 2026-08-05. The local checkout did
-not contain an observed `LICENSE*` file. Its license is therefore **unknown** and no
-Mission Control code, data, or wording was copied. The source is used only for these
-abstract, independently implemented patterns: an append-only decision ledger, a
-feedback loop, and delayed outcome assessment. The missing license remains an
-explicit source obligation if any future change proposes code reuse.
+The Explorer inspected `Public repos` where the local checkout did
+not contain an observed `LICENSE*` file. Its license is therefore **unknown** .
+The source is used only for these abstract, independently implemented patterns:
+an append-only decision ledger, a feedback loop, and delayed outcome assessment.
+The missing license remains an explicit source obligation if any future change
+proposes code reuse.
 
 - **Advocate:** prompt-driven repository work needs a durable brain that survives a
   session change, records decisions, and learns from later human corrections instead
