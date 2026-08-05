@@ -1,0 +1,4 @@
+{
+  "decision": "blocked",
+  "safe_reason": "Termination must revalidate each descendant identity through the opened process handle before acting."
+}

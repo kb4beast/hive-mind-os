@@ -7,12 +7,13 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from hive_mind_os.autonomy import EpisodeAllowance
 from hive_mind_os.contracts import (
@@ -365,6 +366,67 @@ class SandboxTests(unittest.TestCase):
         ):
             descendants = SandboxRunner._windows_descendants(100, 1000)
         self.assertEqual(descendants, {200})
+
+    def test_windows_descendants_reject_unknown_descendant_identity(self) -> None:
+        creation_times = {100: 1000, 200: None}
+        with (
+            patch.object(
+                SandboxRunner,
+                "_windows_process_table",
+                return_value={100: 4, 200: 100},
+            ),
+            patch.object(
+                SandboxRunner,
+                "_windows_pid_creation_time",
+                side_effect=creation_times.get,
+            ),
+        ):
+            descendants = SandboxRunner._windows_descendants(100, 1000)
+        self.assertEqual(descendants, set())
+
+    def test_windows_termination_revalidates_handle_identity(self) -> None:
+        kernel32 = Mock()
+        kernel32.OpenProcess.return_value = 42
+        fake_ctypes = types.SimpleNamespace(
+            c_ulong=object,
+            c_int=object,
+            c_void_p=object,
+            windll=types.SimpleNamespace(kernel32=kernel32),
+        )
+        with (
+            patch("hive_mind_os.sandbox.os.name", "nt"),
+            patch.dict(sys.modules, {"ctypes": fake_ctypes}),
+            patch.object(
+                SandboxRunner,
+                "_windows_process_creation_time_from_handle",
+                return_value=2000,
+            ),
+        ):
+            SandboxRunner._terminate_windows_pid_if_identity_matches(200, 1001)
+        kernel32.TerminateProcess.assert_not_called()
+        kernel32.CloseHandle.assert_called_once_with(42)
+
+    def test_windows_termination_allows_matching_handle_identity(self) -> None:
+        kernel32 = Mock()
+        kernel32.OpenProcess.return_value = 42
+        fake_ctypes = types.SimpleNamespace(
+            c_ulong=object,
+            c_int=object,
+            c_void_p=object,
+            windll=types.SimpleNamespace(kernel32=kernel32),
+        )
+        with (
+            patch("hive_mind_os.sandbox.os.name", "nt"),
+            patch.dict(sys.modules, {"ctypes": fake_ctypes}),
+            patch.object(
+                SandboxRunner,
+                "_windows_process_creation_time_from_handle",
+                return_value=1001,
+            ),
+        ):
+            SandboxRunner._terminate_windows_pid_if_identity_matches(200, 1001)
+        kernel32.TerminateProcess.assert_called_once_with(42, 1)
+        kernel32.CloseHandle.assert_called_once_with(42)
 
     def test_windows_timeout_kill_never_uses_unfiltered_taskkill_tree(self) -> None:
         class FinishedProcess:

@@ -536,11 +536,7 @@ class SandboxRunner:
     ) -> set[int]:
         def eligible(pid: int) -> bool:
             created = creation_times.get(pid)
-            return (
-                root_creation_time is None
-                or created is None
-                or created >= root_creation_time
-            )
+            return created is not None and created >= root_creation_time
 
         descendants: set[int] = set()
         frontier = {root_pid}
@@ -562,8 +558,10 @@ class SandboxRunner:
         root_pid: int,
         root_creation_time: int | None,
     ) -> set[int]:
+        if root_creation_time is None:
+            return set()
         table = cls._windows_process_table()
-        if root_creation_time is not None and root_pid in table:
+        if root_pid in table:
             current_root_creation_time = cls._windows_pid_creation_time(root_pid)
             if current_root_creation_time != root_creation_time:
                 return set()
@@ -598,6 +596,33 @@ class SandboxRunner:
         return cls._windows_process_creation_time(process)
 
     @classmethod
+    def _terminate_windows_pid_if_identity_matches(
+        cls,
+        pid: int,
+        expected_creation_time: int | None,
+    ) -> None:
+        if os.name != "nt" or expected_creation_time is None:
+            return
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        open_process = kernel32.OpenProcess
+        open_process.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        open_process.restype = ctypes.c_void_p
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [ctypes.c_void_p]
+        close_handle.restype = ctypes.c_int
+        handle = open_process(0x0001 | 0x1000, False, pid)
+        if not handle:
+            return
+        try:
+            if cls._windows_process_creation_time_from_handle(int(handle)) != expected_creation_time:
+                return
+            kernel32.TerminateProcess(handle, 1)
+        finally:
+            close_handle(handle)
+
+    @classmethod
     def _tree_alive(cls, process: subprocess.Popen[bytes]) -> bool:
         if process.poll() is None:
             return True
@@ -630,17 +655,14 @@ class SandboxRunner:
                 process.pid,
                 cls._root_creation_time(process),
             )
-            if descendants:
-                import ctypes
-
-                kernel32 = ctypes.windll.kernel32
-            for pid in descendants:
-                handle = kernel32.OpenProcess(0x0001, False, pid)
-                if handle:
-                    try:
-                        kernel32.TerminateProcess(handle, 1)
-                    finally:
-                        kernel32.CloseHandle(handle)
+            creation_times = {
+                pid: cls._windows_pid_creation_time(pid) for pid in descendants
+            }
+            for pid in sorted(descendants):
+                cls._terminate_windows_pid_if_identity_matches(
+                    pid,
+                    creation_times[pid],
+                )
             if process.poll() is None:
                 process.kill()
 
