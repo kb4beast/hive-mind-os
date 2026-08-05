@@ -93,10 +93,11 @@ start and enumerates every commit in `start..final`. For each of the N commits i
 4. grades overlap and appends the result.
 
 The bounded supervisor supplies that final commit from a changed local HEAD. PIT grade
-records have a unique run-and-target constraint plus an append-only claim made before
-PIT work begins. Concurrent or restarted supervision therefore resumes safely and
-cannot grade the same human commit twice. Thus N later local commits produce N separate
-sealed grades, even when they are discovered across multiple polling leases.
+records have a unique run-and-target constraint. Before any PIT work, one supervisor
+takes a transactional per-target gate; a competing supervisor waits, rechecks, and
+skips an already stored grade. A failed predictor rolls that gate back, so the same
+human commit can be retried. Thus N later local commits produce N separate sealed
+grades, even when they are discovered across multiple polling leases.
 
 The selected Codex or Claude host can serve as the read-only predictor only from a
 fresh remote-free clone of the oracle's verified ancestor environment. A malformed
@@ -117,7 +118,7 @@ or host profile.
 | Human correction lost | Every later commit receives a distinct sealed PIT episode and measured grade |
 | Host sees a future PIT target | The host receives a disposable remote-free clone made only from the oracle's verified ancestor environment |
 | Feedback replay/duplicate reply | Remote comment IDs are append-only deduplication keys |
-| Concurrent PIT supervision | An append-only run-and-target claim gates PIT work; grade records also enforce that unique pair |
+| Concurrent PIT supervision | A transactional run-and-target gate plus a unique grade record prevents duplicates and allows failed work to retry |
 | Autonomous policy mutation | Authority is immutable per run; learning does not change policy or prompts |
 
 Acceptance is a focused test proving the charter contract, protected branch refusal,

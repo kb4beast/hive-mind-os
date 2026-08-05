@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "e63c43657e00083f87555d54f53deb79dafa2ee4",
+  "reviewer_role": "curator",
+  "decision": "not-approved",
+  "reason": "A failed or interrupted PIT prediction left a permanent claim that stopped the human commit from later receiving its sealed grade.",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or test-suite instruction",
+  "focused_validation": {
+    "result": "not-run-by-curator"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T10:29:00Z"
+}

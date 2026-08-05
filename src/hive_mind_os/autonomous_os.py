@@ -26,7 +26,6 @@ from typing import Any, Callable, Iterator, Mapping, Protocol, Sequence
 from uuid import uuid4
 
 from .contracts import validate_contract
-from .models import utc_now
 from .pit_oracle import PointInTimeOracle
 from .receipts import sha256_digest
 
@@ -236,7 +235,10 @@ class AutonomousBrain:
     def __init__(self, state_dir: str | Path) -> None:
         self.state_dir = Path(state_dir).resolve()
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(self.state_dir / "autonomous-brain.sqlite3")
+        self._connection = sqlite3.connect(
+            self.state_dir / "autonomous-brain.sqlite3", timeout=1_210
+        )
+        self._connection.execute("PRAGMA busy_timeout = 1210000")
         self._connection.row_factory = sqlite3.Row
         self._initialize()
 
@@ -278,12 +280,6 @@ class AutonomousBrain:
                     target_sha TEXT NOT NULL,
                     payload_json TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS pit_claims (
-                    run_id TEXT NOT NULL,
-                    target_sha TEXT NOT NULL,
-                    claimed_at TEXT NOT NULL,
-                    PRIMARY KEY(run_id, target_sha)
-                );
                 """
             )
             duplicates = self._connection.execute(
@@ -294,7 +290,7 @@ class AutonomousBrain:
             self._connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS pit_grades_run_target ON pit_grades(run_id, target_sha)"
             )
-            for table in ("runs", "events", "feedback", "pit_grades", "pit_claims"):
+            for table in ("runs", "events", "feedback", "pit_grades"):
                 self._connection.executescript(
                     f"""
                     CREATE TRIGGER IF NOT EXISTS {table}_no_update
@@ -984,58 +980,60 @@ class AutonomousBrain:
         )
         if ancestor.returncode:
             raise AutonomousRunError("human final commit does not descend from the run start")
-        candidate_targets = tuple(
+        targets = tuple(
             item
             for item in self._git(
                 root, "rev-list", "--reverse", f"{candidate}..{human_final_commit}"
             ).splitlines()
             if item
-            and self._connection.execute(
-                "SELECT 1 FROM pit_grades WHERE run_id = ? AND target_sha = ?",
-                (run_id, item),
-            ).fetchone()
-            is None
         )
-        targets: list[str] = []
-        for target in candidate_targets:
-            with self._connection:
-                claimed = self._connection.execute(
-                    "INSERT OR IGNORE INTO pit_claims(run_id, target_sha, claimed_at) VALUES(?, ?, ?)",
-                    (run_id, target, utc_now()),
-                )
-            if claimed.rowcount:
-                targets.append(target)
         oracle = PointInTimeOracle(root, self.state_dir / "pit" / run_id)
         records: list[dict[str, Any]] = []
         try:
             all_history = tuple(self._git(root, "rev-list", "--topo-order", "--reverse", "--all").splitlines())
             for target in targets:
-                environment = oracle.build_environment(target)
-                predicted_paths = tuple(predictor(environment.root))
-                if not all(isinstance(path, str) and path and "\\" not in path for path in predicted_paths):
-                    raise AutonomousRunError("PIT predictor must return safe portable changed paths")
-                sealed = oracle.seal_prediction(
-                    environment,
-                    target_position=all_history.index(target),
-                    learner_identity=learner_identity,
-                    prediction_content={"changed_paths": list(predicted_paths)},
-                )
-                reveal = oracle.reveal(environment, sealed)
-                grade = oracle.grade(environment, sealed, reveal)
-                record = {
-                    "episode_id": environment.episode_id,
-                    "target_sha": target,
-                    "prediction_digest": sealed.digest,
-                    "score": grade.score,
-                    "predicted_paths": list(grade.predicted_paths),
-                    "actual_paths": list(grade.actual_paths),
-                    "overlap_paths": list(grade.overlap_paths),
-                }
-                with self._connection:
+                self._connection.execute("BEGIN IMMEDIATE")
+                try:
+                    existing = self._connection.execute(
+                        "SELECT 1 FROM pit_grades WHERE run_id = ? AND target_sha = ?",
+                        (run_id, target),
+                    ).fetchone()
+                    if existing is not None:
+                        self._connection.execute("COMMIT")
+                        continue
+                    environment = oracle.build_environment(target)
+                    predicted_paths = tuple(predictor(environment.root))
+                    if not all(
+                        isinstance(path, str) and path and "\\" not in path
+                        for path in predicted_paths
+                    ):
+                        raise AutonomousRunError("PIT predictor must return safe portable changed paths")
+                    sealed = oracle.seal_prediction(
+                        environment,
+                        target_position=all_history.index(target),
+                        learner_identity=learner_identity,
+                        prediction_content={"changed_paths": list(predicted_paths)},
+                    )
+                    reveal = oracle.reveal(environment, sealed)
+                    grade = oracle.grade(environment, sealed, reveal)
+                    record = {
+                        "episode_id": environment.episode_id,
+                        "target_sha": target,
+                        "prediction_digest": sealed.digest,
+                        "score": grade.score,
+                        "predicted_paths": list(grade.predicted_paths),
+                        "actual_paths": list(grade.actual_paths),
+                        "overlap_paths": list(grade.overlap_paths),
+                    }
                     self._connection.execute(
                         "INSERT INTO pit_grades(episode_id, run_id, target_sha, payload_json) VALUES(?, ?, ?, ?)",
                         (environment.episode_id, run_id, target, _canonical(record)),
                     )
+                    self._connection.execute("COMMIT")
+                except BaseException:
+                    if self._connection.in_transaction:
+                        self._connection.execute("ROLLBACK")
+                    raise
                 self._append(run_id, "human_outcome_pit_graded", record)
                 records.append(record)
         finally:
