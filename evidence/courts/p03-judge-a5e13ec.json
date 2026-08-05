@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The candidate replaces PID traversal with a pre-resume, kill-on-close Job Object, uses its active-process accounting with query failures treated as live until timeout, and the focused plus recorded full audit tests pass."
+}
