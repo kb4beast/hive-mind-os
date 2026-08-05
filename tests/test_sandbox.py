@@ -33,6 +33,7 @@ from hive_mind_os.sandbox import (
     SandboxRunner,
     SandboxSpec,
     SandboxTimeout,
+    _interpreter_flags,
 )
 
 
@@ -144,6 +145,10 @@ class SandboxTests(unittest.TestCase):
         with self.assertRaisesRegex(SandboxDenied, "inline interpreter"):
             runner.run(self.intent([sys.executable, "-c", "print('no spawn')"]))
         self.assertEqual(runner.spawn_count, 0)
+
+    def test_versioned_python_names_reject_inline_execution(self) -> None:
+        self.assertEqual(_interpreter_flags("python3.11"), frozenset({"-c", "-m"}))
+        self.assertEqual(_interpreter_flags("pypy3.10"), frozenset({"-c", "-m"}))
 
     def test_undeclared_path_like_argument_is_confined(self) -> None:
         runner = self.runner()

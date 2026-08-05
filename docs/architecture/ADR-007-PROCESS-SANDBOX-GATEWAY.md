@@ -85,12 +85,13 @@ The runner:
 3. checks the fixed episode allowance before process creation;
 4. resolves an allowlisted executable and every caller-declared path argument;
 5. rejects traversal, absolute/nonportable paths, and resolved symlink escapes;
-6. executes an argv list with `shell=False`, a fixed working root, closed stdin, and an
+6. denies inline interpreter flags by default for canonical and versioned Python/PyPy names;
+7. executes an argv list with `shell=False`, a fixed working root, closed stdin, and an
    explicitly allowlisted environment;
-7. bounds wall time and captured bytes, killing the process tree on timeout;
-8. writes stdout, stderr, and the receipt atomically under a trusted root outside the
+8. bounds wall time and captured bytes, killing the process tree on timeout;
+9. writes stdout, stderr, and the receipt atomically under a trusted root outside the
    executable workspace;
-9. validates the receipt against the catalog schema and exposes a content-addressed
+10. validates the receipt against the catalog schema and exposes a content-addressed
    `ReceiptReference` accepted by `FileReceiptValidator`.
 
 Extend the version-1 schemas without weakening legacy validation:
@@ -138,6 +139,7 @@ audit subprocesses.
 | Threat | Control | Residual |
 |---|---|---|
 | Shell injection | argv list and `shell=False` | Allowed executable semantics remain trusted |
+| Inline interpreter bypass through a versioned Python name | Normalize Python/PyPy version aliases before checking `-c` and `-m` | An explicitly opted-in interpreter remains trusted |
 | PATH substitution | Resolve executable to a real path; compare normalized basename to allowlist | Allowlist does not pin executable bytes |
 | Path traversal or symlink escape | Portable path grammar plus resolved-root containment | Undeclared paths synthesized by a program are not intercepted |
 | Ambient credentials | Empty-by-default environment allowlist | Explicitly allowlisted values can appear in child output |
@@ -166,6 +168,7 @@ non-bypassable. P04 may depend on the runner only after P03 merges.
 - a successful command with schema-valid output accepted by `FileReceiptValidator`;
 - canonical intent mutation rejection;
 - executable, traversal, symlink, policy, and allowance denials before spawn;
+- inline Python denial for canonical and versioned executable names;
 - empty-by-default and explicit environment propagation;
 - process-tree timeout with a failed receipt;
 - early-parent-exit background-child timeout;
