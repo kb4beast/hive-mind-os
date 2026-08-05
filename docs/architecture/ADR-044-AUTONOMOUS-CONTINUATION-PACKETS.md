@@ -32,7 +32,7 @@ deterministic for identical clean inputs.
 | Path escape, symlink, or artifact drift | Portable-path, regular-file, link, and digest checks |
 | Stale or dirty repository | Exact HEAD and porcelain-status verification on export and resume |
 | Accidental authority expansion | Fixed forbidden authority set; grants are local-only enum values |
-| Raw output or secret retention | Only bounded plain-English summaries are accepted; secret-like markers and multiline/free-form structures are rejected |
+| Raw output or secret retention | Only bounded plain-English summaries and single-line safe identifiers are accepted; secret-like markers and multiline/free-form structures are rejected |
 | Historic evidence mistaken for delivery | Decision is recorded exactly, does not create approval, and must be independently verified again |
 
 Acceptance is a successful focused export/validate round trip and deterministic rejection

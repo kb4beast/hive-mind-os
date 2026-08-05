@@ -145,6 +145,35 @@ class ContinuationPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(ContinuationPacketError, "packet is unsafe"):
             export_packet(self.source(granted_authority=["read_repository", "remote_git"]), self.repository)
 
+    def test_subdirectory_cannot_bypass_output_guard_or_store_unsafe_identifiers(self) -> None:
+        subdirectory = self.repository / "component"
+        subdirectory.mkdir()
+        packet = export_packet(self.source(), subdirectory)
+        self.assertEqual(packet["repository"]["path"], self.repository.resolve().as_posix())
+        with self.assertRaisesRegex(ContinuationPacketError, "outside"):
+            write_packet(packet, self.repository / "packet.json", subdirectory)
+        with self.assertRaisesRegex(ContinuationPacketError, "safe identifier"):
+            export_packet(self.source(packet_id="CP-id\napi_key=retained"), self.repository)
+        with self.assertRaisesRegex(ContinuationPacketError, "safe identifier"):
+            export_packet(
+                self.source(independent_verification=[
+                    {"verifier_id": "curator-001\napi_key=retained", "decision": "approved"}
+                ]),
+                self.repository,
+            )
+
+    def test_nonfinite_packet_is_rejected_without_cli_crash(self) -> None:
+        packet = self.packet()
+        packet["objective"] = float("nan")
+        self.assertFalse(validate_packet(packet, self.repository).valid)
+        packet_path = self.root / "nonfinite.json"
+        packet_path.write_text(json.dumps(packet), encoding="utf-8")
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as raised:
+            cli.main(("continuation", "validate", "--repository", str(self.repository), "--packet", str(packet_path)))
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(json.loads(stdout.getvalue())["status"], "rejected")
+
     def test_output_cannot_dirty_the_bound_repository(self) -> None:
         with self.assertRaisesRegex(ContinuationPacketError, "outside"):
             write_packet(self.packet(), self.repository / "packet.json", self.repository)

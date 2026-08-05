@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "receipt_id": "CURATOR-CONTINUATION-837BD17-ATTEMPT-2",
+  "candidate_commit": "837bd17f8f0fff32302515c1676c75f99282afc2",
+  "reviewer": "codex-headless-curator",
+  "review_worktree": "detached-local-worktree",
+  "decision": "not-approved",
+  "reason": "CLI export accepts a path inside the actual Git worktree via a subdirectory and accepts multiline secret-like identifiers, so packets can dirty the repo and retain unsafe data.",
+  "external_state_changed": false
+}

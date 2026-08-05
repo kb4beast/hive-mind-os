@@ -74,16 +74,22 @@ def _git(repository: Path, *arguments: str) -> str:
 
 
 def _repository_root(repository: str | Path) -> Path:
-    root = Path(repository).resolve()
-    if not root.is_dir():
+    supplied = Path(repository).resolve()
+    if not supplied.is_dir():
         raise ContinuationPacketError("repository must be an existing directory")
-    _git(root, "rev-parse", "--show-toplevel")
-    return root
+    return Path(_git(supplied, "rev-parse", "--show-toplevel")).resolve()
 
 
 def _safe_text(value: object, label: str, issues: list[str]) -> None:
     if not isinstance(value, str) or not _SAFE_TEXT.fullmatch(value):
         issues.append(f"{label} must be a short plain-English summary")
+    elif _FORBIDDEN_TEXT.search(value):
+        issues.append(f"{label} contains a prohibited secret-like marker")
+
+
+def _safe_identifier(value: object, label: str, issues: list[str]) -> None:
+    if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+        issues.append(f"{label} must be a single-line safe identifier")
     elif _FORBIDDEN_TEXT.search(value):
         issues.append(f"{label} contains a prohibited secret-like marker")
 
@@ -126,8 +132,13 @@ def validate_packet(
         return PacketValidation(False, tuple(issues + [str(error)]))
 
     integrity = document.get("integrity")
-    if not isinstance(integrity, Mapping) or integrity.get("canonical_digest") != canonical_digest(document):
-        issues.append("packet canonical digest mismatch")
+    try:
+        observed_digest = canonical_digest(document)
+    except (TypeError, ValueError, UnicodeError):
+        issues.append("packet cannot be canonically digested")
+    else:
+        if not isinstance(integrity, Mapping) or integrity.get("canonical_digest") != observed_digest:
+            issues.append("packet canonical digest mismatch")
 
     repository_record = document.get("repository")
     if isinstance(repository_record, Mapping):
@@ -155,6 +166,7 @@ def validate_packet(
 
     decision = document.get("decision")
     reason = document.get("reason")
+    _safe_identifier(document.get("packet_id"), "packet identifier", issues)
     if decision in {"approved", "no-decision"} and reason is not None:
         issues.append("approval or no-decision packet must not include a reason")
     if reason is not None:
@@ -166,8 +178,10 @@ def validate_packet(
         if decision != "no-decision" and not verification:
             issues.append("a decided packet requires independent verification")
         for index, record in enumerate(verification):
-            if isinstance(record, Mapping) and record.get("decision") != decision:
-                issues.append(f"independent verification {index} does not preserve the packet decision")
+            if isinstance(record, Mapping):
+                _safe_identifier(record.get("verifier_id"), f"verifier {index}", issues)
+                if record.get("decision") != decision:
+                    issues.append(f"independent verification {index} does not preserve the packet decision")
     _safe_text(document.get("objective"), "objective", issues)
     _safe_text(document.get("scope"), "scope", issues)
     _safe_text(document.get("resume_instruction"), "resume instruction", issues)
