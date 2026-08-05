@@ -620,25 +620,17 @@ class SandboxRunner:
             except ProcessLookupError:
                 pass
         else:
-            taskkill = shutil.which("taskkill")
-            if taskkill is not None:
-                completed = subprocess.run(
-                    [taskkill, "/PID", str(process.pid), "/T", "/F"],
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    shell=False,
-                    check=False,
-                )
-                if completed.returncode == 0:
-                    return
-            import ctypes
-
-            kernel32 = ctypes.windll.kernel32
-            for pid in cls._windows_descendants(
+            # taskkill /T follows a parent PID without validating its creation time.
+            # That can kill an unrelated process after Windows reuses the root PID.
+            descendants = cls._windows_descendants(
                 process.pid,
                 cls._root_creation_time(process),
-            ):
+            )
+            if descendants:
+                import ctypes
+
+                kernel32 = ctypes.windll.kernel32
+            for pid in descendants:
                 handle = kernel32.OpenProcess(0x0001, False, pid)
                 if handle:
                     try:
