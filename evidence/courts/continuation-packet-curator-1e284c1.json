@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "receipt_id": "CURATOR-CONTINUATION-1E284C1",
+  "created_at": "2026-08-05T07:54:58Z",
+  "candidate_commit": "1e284c1b3c115d0f0db689432326e6ee94a88825",
+  "reviewer": "codex-headless-curator",
+  "review_worktree": "detached-local-worktree",
+  "decision": "approved",
+  "focused_tests": "tests/test_continuation.py: 8 passed",
+  "external_state_changed": false
+}
