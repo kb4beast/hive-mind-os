@@ -283,6 +283,26 @@ class PointInTimeOracle:
     ) -> Iterator[tuple[Path, SandboxRunner]]:
         with tempfile.TemporaryDirectory(prefix="hive-pit-source-") as directory:
             root = Path(directory)
+            source_bundle = root / "source.bundle"
+            completed = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(self.repository),
+                    "bundle",
+                    "create",
+                    str(source_bundle),
+                    "--all",
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                check=False,
+                shell=False,
+                timeout=120,
+            )
+            if completed.returncode or not source_bundle.is_file():
+                raise LeakageError("trusted source bundle could not be staged")
             runner = self._runner(root, tool_calls=400)
             self._command(
                 runner,
@@ -291,7 +311,7 @@ class PointInTimeOracle:
                     "clone",
                     "--mirror",
                     "--no-hardlinks",
-                    str(self.repository),
+                    "source.bundle",
                     "source.git",
                 ],
                 episode_id,
@@ -520,13 +540,14 @@ class PointInTimeOracle:
                         "-C",
                         "environment",
                         "fetch",
-                        "../ancestor.bundle",
+                        "ancestor.bundle",
                         *fetch_specs,
                     ],
                     episode_id,
                     "import ancestor closure into learner repository",
                     records,
                 )
+                (build_root / "ancestor.bundle").unlink()
                 self._command(
                     runner,
                     ["git", "-C", "environment", "checkout", "--detach", parents[0]],
@@ -611,37 +632,21 @@ class PointInTimeOracle:
             *((sha_value, "hidden commit") for sha_value in environment.hidden_shas),
         )
         unique_probes = tuple(dict.fromkeys(object_id for object_id, _ in probes))
-        git_executable = str(Path(shutil.which("git") or "git").resolve())
-        for offset in range(0, len(unique_probes), 100):
-            batch = unique_probes[offset : offset + 100]
-            runner = self._runner(environment.root)
-            _, found_output, _ = self._command(
-                runner,
-                [
-                    sys.executable,
-                    "-B",
-                    "-c",
-                    (
-                        "import subprocess,sys; git=sys.argv[1]; "
-                        "found=[v for v in sys.argv[2:] if subprocess.run("
-                        "[git,'cat-file','-e',v],stdin=subprocess.DEVNULL,"
-                        "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,"
-                        "shell=False,check=False).returncode==0]; "
-                        "print(*found,sep='\\n')"
-                    ),
-                    git_executable,
-                    *batch,
-                ],
-                environment.episode_id,
-                "prove physical absence of target, tree, and hidden commit objects",
-                environment.receipt_records,
+        found: list[str] = []
+        for object_id in unique_probes:
+            receipt, _, _ = self._environment_command(
+                environment,
+                ["cat-file", "-e", object_id],
+                "prove physical absence of one target or hidden object",
+                allow_failure=True,
             )
-            found = self._lines(found_output)
-            if found:
-                raise LeakageError(
-                    "learner repository contains forbidden object(s): "
-                    + ", ".join(found)
-                )
+            if receipt["result"] == "succeeded":
+                found.append(object_id)
+        if found:
+            raise LeakageError(
+                "learner repository contains forbidden object(s): "
+                + ", ".join(found)
+            )
 
     def seal_prediction(
         self,
@@ -890,22 +895,10 @@ class PointInTimeOracle:
         )
         log_output = git_probe("all-refs-log", ["log", "--all", "--format=%H"])
         reflog_output = git_probe("reflog", ["reflog", "show", "--all"])
-        runner = self._runner(environment.root)
-        receipt, packed_output, _ = self._command(
-            runner,
-            [
-                sys.executable,
-                "-B",
-                "-c",
-                (
-                    "from pathlib import Path; "
-                    "p=Path('.git/packed-refs'); "
-                    "print(p.read_text(encoding='utf-8') if p.exists() else '', end='')"
-                ),
-            ],
-            environment.episode_id,
-            "adversarial learner probe: packed-refs",
-            environment.receipt_records,
+        receipt, packed_output, _ = self._environment_command(
+            environment,
+            ["show-ref", "--head"],
+            "adversarial learner probe: all ref table",
         )
         probes.append(
             {

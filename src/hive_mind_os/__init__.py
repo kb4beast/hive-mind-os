@@ -7,6 +7,13 @@ from .autonomy import (
     EvolutionArena,
     MissionCharter,
 )
+from .autonomous_os import (
+    AutonomousBrain,
+    AutonomousRunError,
+    HostKind,
+    HostRunResult,
+    PullRequestCommentGateway,
+)
 from .contracts import (
     ContractValidation,
     load_schema,
@@ -172,7 +179,9 @@ from .workers import Worker, serve
 __all__ = [
     "ActionKind",
     "AgentManifest",
+    "AutonomousBrain",
     "AgentVariant",
+    "AutonomousRunError",
     "AutonomyBudget",
     "AutonomyLevel",
     "ArchitectDesign",
@@ -215,6 +224,8 @@ __all__ = [
     "HiveKernel",
     "HostCapability",
     "HostCapabilityProfile",
+    "HostKind",
+    "HostRunResult",
     "Job",
     "GovernedSourceAudit",
     "GitHubClient",
@@ -255,6 +266,7 @@ __all__ = [
     "PackagePin",
     "PackageValidationError",
     "PullRequestResult",
+    "PullRequestCommentGateway",
     "PromptRegistry",
     "ProviderAction",
     "PushResult",

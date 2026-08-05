@@ -16,6 +16,12 @@ from .acceptance import (
     normalize_acceptance_specifications,
 )
 from .autonomy import AutonomyBudget
+from .autonomous_os import (
+    AutonomousBrain,
+    AutonomousRunError,
+    GitHubRestCommentGateway,
+    HostKind,
+)
 from .benchmark_harness import BenchmarkHarness
 from .courtroom import CaseParticipants
 from .continuation import (
@@ -447,6 +453,57 @@ def build_continuation_parser() -> argparse.ArgumentParser:
     validate = commands.add_parser("validate")
     validate.add_argument("--repository", required=True, help="Bound local Git worktree")
     validate.add_argument("--packet", required=True, help="Existing continuation packet JSON")
+    return parser
+
+
+def build_autonomous_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind autonomous",
+        description="Run a governed, host-neutral autonomous repository worktree",
+    )
+    commands = parser.add_subparsers(dest="action", required=True)
+    kickoff = commands.add_parser("kickoff", help="Create an isolated branch from one user prompt")
+    kickoff.add_argument("--repository", required=True, help="Clean local Git repository")
+    kickoff.add_argument("--prompt", required=True, help="Kickoff objective; safe text only")
+    kickoff.add_argument("--host", choices=tuple(item.value for item in HostKind), required=True)
+    kickoff.add_argument("--run-id", help="Optional stable run identifier")
+    kickoff.add_argument("--allow-remote-push", action="store_true")
+    kickoff.add_argument("--allow-pr-comments", action="store_true")
+    kickoff.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    turn = commands.add_parser("turn", help="Run the selected signed-in coding host locally")
+    turn.add_argument("--run-id", required=True)
+    turn.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    register = commands.add_parser("register-pr", help="Bind this run to its own draft PR")
+    register.add_argument("--run-id", required=True)
+    register.add_argument("--number", required=True, type=int)
+    register.add_argument("--url", required=True)
+    register.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    open_pr = commands.add_parser("open-draft-pr", help="Push the run branch and open a draft PR")
+    open_pr.add_argument("--run-id", required=True)
+    open_pr.add_argument("--owner", required=True)
+    open_pr.add_argument("--repository", required=True)
+    open_pr.add_argument("--base", required=True)
+    open_pr.add_argument("--title", required=True)
+    open_pr.add_argument("--body", required=True)
+    open_pr.add_argument("--token-env", default="GITHUB_TOKEN")
+    open_pr.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    poll = commands.add_parser("poll-pr", help="Handle new conversation comments on the bound PR")
+    poll.add_argument("--run-id", required=True)
+    poll.add_argument("--owner", required=True)
+    poll.add_argument("--repository", required=True)
+    poll.add_argument("--token-env", default="GITHUB_TOKEN")
+    poll.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    push = commands.add_parser("push", help="Push only the run's own non-protected branch")
+    push.add_argument("--run-id", required=True)
+    push.add_argument("--remote", default="origin")
+    push.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    learn = commands.add_parser("learn", help="PIT-grade every human commit after the run start")
+    learn.add_argument("--run-id", required=True)
+    learn.add_argument("--human-final-commit", required=True)
+    learn.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    events = commands.add_parser("events", help="Print the run's safe append-only event ledger")
+    events.add_argument("--run-id", required=True)
+    events.add_argument("--state-dir", default=".hive-mind-state/autonomous")
     return parser
 
 
@@ -1049,6 +1106,98 @@ def _run_continuation(args: argparse.Namespace) -> int:
         return 1
 
 
+def _run_autonomous(args: argparse.Namespace) -> int:
+    try:
+        with AutonomousBrain(args.state_dir) as brain:
+            if args.action == "kickoff":
+                contract = brain.start_run(
+                    args.repository,
+                    args.prompt,
+                    args.host,
+                    run_id=args.run_id,
+                    allow_remote_push=args.allow_remote_push,
+                    allow_pr_comments=args.allow_pr_comments,
+                )
+                print(json.dumps({"status": "prepared", "run": contract}, indent=2, sort_keys=True))
+                return 0
+            if args.action == "turn":
+                result = brain.run_host_turn(args.run_id)
+                print(
+                    json.dumps(
+                        {
+                            "status": "completed" if result.returncode == 0 else "blocked",
+                            "run_id": result.run_id,
+                            "action": result.action,
+                            "reply": result.reply,
+                            "changed_paths": result.changed_paths,
+                            "output_digest": result.output_digest,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0 if result.returncode == 0 else 1
+            if args.action == "register-pr":
+                brain.register_pull_request(args.run_id, args.number, args.url)
+                print(json.dumps({"status": "registered", "run_id": args.run_id, "number": args.number}, indent=2))
+                return 0
+            if args.action == "open-draft-pr":
+                result = brain.open_draft_pull_request(
+                    args.run_id,
+                    owner=args.owner,
+                    repository=args.repository,
+                    base=args.base,
+                    title=args.title,
+                    body=args.body,
+                    gateway=GitHubRestCommentGateway(args.token_env),
+                )
+                print(json.dumps({"status": "opened", "run_id": args.run_id, "pull_request": result}, indent=2))
+                return 0
+            if args.action == "poll-pr":
+                results = brain.handle_pull_request_feedback(
+                    args.run_id,
+                    owner=args.owner,
+                    repository=args.repository,
+                    gateway=GitHubRestCommentGateway(args.token_env),
+                )
+                print(
+                    json.dumps(
+                        {
+                            "status": "processed",
+                            "run_id": args.run_id,
+                            "comment_count": len(results),
+                            "actions": [result.action for result in results],
+                        },
+                        indent=2,
+                    )
+                )
+                return 0
+            if args.action == "push":
+                head = brain.push_own_branch(args.run_id, remote=args.remote)
+                print(json.dumps({"status": "pushed", "run_id": args.run_id, "head": head}, indent=2))
+                return 0
+            if args.action == "learn":
+                records = brain.learn_from_human_outcome_with_host(
+                    args.run_id, args.human_final_commit
+                )
+                print(
+                    json.dumps(
+                        {"status": "graded", "run_id": args.run_id, "iterations": list(records)},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0
+            print(json.dumps({"status": "unknown-action"}, indent=2), file=sys.stderr)
+            return 1
+    except (AutonomousRunError, OSError, RuntimeError, ValueError) as error:
+        print(
+            json.dumps({"status": "blocked", "error": f"{type(error).__name__}: {error}"}, indent=2),
+            file=sys.stderr,
+        )
+        return 1
+
+
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     if bool(args.signing_key_file) != bool(args.signing_key_id):
         raise SystemExit("--signing-key-file and --signing-key-id must be supplied together")
@@ -1209,6 +1358,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "continuation":
         args = build_continuation_parser().parse_args(arguments[1:])
         raise SystemExit(_run_continuation(args))
+    if arguments and arguments[0] == "autonomous":
+        args = build_autonomous_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_autonomous(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 

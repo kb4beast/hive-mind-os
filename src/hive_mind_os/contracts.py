@@ -29,6 +29,7 @@ LEGACY_SCHEMA_NAMES = (
     "tool-receipt",
 )
 EXTENSION_SCHEMA_NAMES = (
+    "autonomous-run",
     "continuation-packet",
     "package-manifest",
     "agent-component",
