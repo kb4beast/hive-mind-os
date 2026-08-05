@@ -562,14 +562,11 @@ class SandboxRunner:
         root_pid: int,
         root_creation_time: int | None,
     ) -> set[int]:
-        if root_creation_time is not None:
-            current_root_creation_time = cls._windows_pid_creation_time(root_pid)
-            if (
-                current_root_creation_time is not None
-                and current_root_creation_time != root_creation_time
-            ):
-                return set()
         table = cls._windows_process_table()
+        if root_creation_time is not None and root_pid in table:
+            current_root_creation_time = cls._windows_pid_creation_time(root_pid)
+            if current_root_creation_time != root_creation_time:
+                return set()
         candidates: set[int] = set()
         frontier = {root_pid}
         while frontier:

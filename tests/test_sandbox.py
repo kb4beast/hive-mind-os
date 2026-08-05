@@ -322,7 +322,7 @@ class SandboxTests(unittest.TestCase):
             patch.object(
                 SandboxRunner,
                 "_windows_process_table",
-                return_value={200: 100, 201: 200},
+                return_value={100: 4, 200: 100, 201: 200},
             ),
             patch.object(
                 SandboxRunner,
@@ -332,6 +332,39 @@ class SandboxTests(unittest.TestCase):
         ):
             descendants = SandboxRunner._windows_descendants(100, 1000)
         self.assertEqual(descendants, set())
+
+    def test_windows_descendants_reject_present_root_without_identity(self) -> None:
+        creation_times = {100: None, 200: 1001}
+        with (
+            patch.object(
+                SandboxRunner,
+                "_windows_process_table",
+                return_value={100: 4, 200: 100},
+            ),
+            patch.object(
+                SandboxRunner,
+                "_windows_pid_creation_time",
+                side_effect=creation_times.get,
+            ),
+        ):
+            descendants = SandboxRunner._windows_descendants(100, 1000)
+        self.assertEqual(descendants, set())
+
+    def test_windows_descendants_preserve_children_after_root_exit(self) -> None:
+        with (
+            patch.object(
+                SandboxRunner,
+                "_windows_process_table",
+                return_value={200: 100},
+            ),
+            patch.object(
+                SandboxRunner,
+                "_windows_pid_creation_time",
+                return_value=1001,
+            ),
+        ):
+            descendants = SandboxRunner._windows_descendants(100, 1000)
+        self.assertEqual(descendants, {200})
 
     def test_windows_timeout_kill_never_uses_unfiltered_taskkill_tree(self) -> None:
         class FinishedProcess:

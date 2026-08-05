@@ -1,0 +1,4 @@
+{
+  "decision": "blocked",
+  "safe_reason": "A present root PID without a verifiable identity can still lead traversal into an unrelated process tree."
+}
