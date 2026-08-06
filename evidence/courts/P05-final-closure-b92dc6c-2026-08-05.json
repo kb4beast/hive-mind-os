@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "receipt_id": "P05-FINAL-CLOSURE-B92DC6C-2026-08-05",
+  "phase": "P05",
+  "candidate_commit": "b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9",
+  "decision": "approved_for_merge",
+  "closure_effect": "P05 is closed only when this final receipt is merged to main through its narrow pull request.",
+  "pre_merge_conditions": {
+    "candidate_represented_in_origin_main": true,
+    "origin_main_observed": "3c07be4051752c47d7f7516376d5145218bfbca5",
+    "clean_exact_candidate_audit": {
+      "path": "evidence/audits/P05-b92dc6c-post-commit-closeout-2026-08-05.json",
+      "digest": "sha256:0955120f24bdb3bcf40ee625a5a3383298a11077463db377caa8cf4b9d4fefdf",
+      "completed_cleanly": true
+    },
+    "matching_exact_candidate_ci": {
+      "run_id": "30989265377",
+      "workflow": "Constitutional CI",
+      "head_sha": "b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9",
+      "conclusion": "success",
+      "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/30989265377"
+    },
+    "court_receipts": {
+      "curator": "evidence/courts/p05-curator-b92dc6c-2026-08-05.json",
+      "judge": "evidence/courts/p05-judge-b92dc6c-2026-08-05.json",
+      "orchestrator": "evidence/courts/p05-orchestrator-b92dc6c-2026-08-05.json"
+    },
+    "b_gov_06_reenable_verification": "evidence/governance/B-GOV-06-reenable-verification-2026-08-05.json"
+  },
+  "scope_limits": {
+    "closure_scope": "deterministic/local P05 vertical-slice evidence only",
+    "b_ops_03_resolved": false,
+    "real_provider_or_production_claim": false,
+    "provider_credentials_or_live_calls_used": false
+  },
+  "historical_evidence_preserved": true
+}
