@@ -372,7 +372,10 @@ class ModelBackend:
             "request": {
                 "temperature": provider.config.temperature,
                 "max_output_tokens": provider.config.max_output_tokens,
-                "api_key_env": provider.config.api_key_env,
+                "credential_reference": getattr(
+                    provider, "credential_reference", "test-double"
+                ),
+                "api_key_env": provider.config.api_key_env or None,
             },
             "request_digest": _digest(request_body),
             "prompt_artifact_digest": prompt_artifact_digest,

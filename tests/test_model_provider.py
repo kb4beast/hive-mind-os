@@ -3,14 +3,19 @@ from __future__ import annotations
 import io
 import json
 import os
+import subprocess
 import unittest
 import urllib.error
 from collections.abc import Mapping
+from pathlib import Path
 from unittest.mock import patch
 
 from hive_mind_os.model_provider import (
     MAX_HTTP_RESPONSE_BYTES,
+    SUBSCRIPTION_BASE_URL,
+    SUBSCRIPTION_DEFAULT_MODEL,
     AnthropicProvider,
+    CodexSubscriptionProvider,
     HttpTransport,
     MissingModelCredential,
     ModelRequest,
@@ -18,6 +23,7 @@ from hive_mind_os.model_provider import (
     OpenAICompatibleProvider,
     ProviderConfig,
     ProviderKind,
+    provider_from_env,
 )
 
 
@@ -157,6 +163,110 @@ class ModelProviderTests(unittest.TestCase):
             with self.assertRaisesRegex(ModelTransportError, "after 3 attempts"):
                 provider.complete(ModelRequest("system", "user"))
         self.assertEqual(len(transport.calls), 3)
+
+    def test_subscription_provider_uses_a_scrubbed_read_only_ephemeral_codex_command(self) -> None:
+        observed: dict[str, object] = {}
+
+        def runner(command, workspace, environment, timeout_s):
+            observed["command"] = command
+            observed["workspace"] = workspace
+            observed["environment"] = environment
+            observed["timeout_s"] = timeout_s
+            response = command[command.index("--output-last-message") + 1]
+            Path(response).write_text(
+                '{"model_turn_json":"{\\"success\\":true}"}', encoding="utf-8"
+            )
+            return subprocess.CompletedProcess(command, 0, b"unretained", b"unretained")
+
+        config = ProviderConfig(
+            ProviderKind.CODEX_SUBSCRIPTION,
+            SUBSCRIPTION_BASE_URL,
+            SUBSCRIPTION_DEFAULT_MODEL,
+            "",
+            timeout_s=12.5,
+        )
+        provider = CodexSubscriptionProvider(config, command_runner=runner)
+        with patch("hive_mind_os.model_provider.shutil.which", return_value="codex"):
+            with patch.dict(
+                os.environ,
+                {
+                    "OPENAI_API_KEY": "must-not-reach-subprocess",
+                    "OPENAI_ACCESS_KEY": "must-not-reach-subprocess",
+                    "ANTHROPIC_API_KEY": "must-not-reach-subprocess",
+                    "CODEX_API_KEY": "must-not-reach-subprocess",
+                    "GITHUB_TOKEN": "must-not-reach-subprocess",
+                    "MODEL_SECRET": "must-not-reach-subprocess",
+                    "SAFE_VALUE": "preserved",
+                },
+                clear=True,
+            ):
+                response = provider.complete_once(
+                    ModelRequest(
+                        "outputs must contain exactly these keys: result. Quality gates: pass",
+                        "user",
+                    )
+                )
+        command = observed["command"]
+        environment = observed["environment"]
+        self.assertEqual(response.content, '{"success":true}')
+        self.assertEqual(
+            response.raw_body, b'{"model_turn_json":"{\\"success\\":true}"}'
+        )
+        self.assertEqual(provider.credential_reference, "chatgpt-subscription-session")
+        self.assertIn("--sandbox", command)
+        self.assertEqual(command[command.index("--sandbox") + 1], "read-only")
+        self.assertIn("--ephemeral", command)
+        self.assertIn("--ignore-user-config", command)
+        self.assertIn("--skip-git-repo-check", command)
+        self.assertIn("INPUT_JSON.system is the trusted role contract", command[-1])
+        self.assertIn('["result"]', command[-1])
+        self.assertNotIn("--model", command)
+        self.assertEqual(environment["SAFE_VALUE"], "preserved")
+        for name in (
+            "OPENAI_API_KEY",
+            "OPENAI_ACCESS_KEY",
+            "ANTHROPIC_API_KEY",
+            "CODEX_API_KEY",
+            "GITHUB_TOKEN",
+            "MODEL_SECRET",
+        ):
+            self.assertNotIn(name, environment)
+
+    def test_subscription_provider_fails_closed_for_missing_output_or_api_key_configuration(self) -> None:
+        with self.assertRaisesRegex(ValueError, "without an API-key environment"):
+            ProviderConfig(
+                ProviderKind.CODEX_SUBSCRIPTION,
+                SUBSCRIPTION_BASE_URL,
+                SUBSCRIPTION_DEFAULT_MODEL,
+                "OPENAI_API_KEY",
+            )
+
+        def runner(command, _workspace, _environment, _timeout_s):
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+
+        provider = CodexSubscriptionProvider(
+            ProviderConfig(
+                ProviderKind.CODEX_SUBSCRIPTION,
+                SUBSCRIPTION_BASE_URL,
+                SUBSCRIPTION_DEFAULT_MODEL,
+                "",
+            ),
+            command_runner=runner,
+        )
+        with patch("hive_mind_os.model_provider.shutil.which", return_value="codex"):
+            with self.assertRaisesRegex(ModelTransportError, "did not produce a response"):
+                provider.complete_once(ModelRequest("system", "user"))
+
+    def test_subscription_provider_factory_needs_no_api_key_or_model_id(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"HIVE_MIND_MODEL_PROVIDER": "codex_subscription"},
+            clear=True,
+        ):
+            provider = provider_from_env()
+        self.assertIsInstance(provider, CodexSubscriptionProvider)
+        self.assertEqual(provider.config.base_url, SUBSCRIPTION_BASE_URL)
+        self.assertEqual(provider.config.model, SUBSCRIPTION_DEFAULT_MODEL)
 
 
 if __name__ == "__main__":

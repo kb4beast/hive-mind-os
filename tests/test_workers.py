@@ -80,7 +80,17 @@ class WorkerTests(unittest.TestCase):
                         connection.close()
                     return str(job.payload["mission_id"])
 
-                Worker(queue, f"recovery-{index}", executor=execute).run_once()
+                recovery_deadline = time.monotonic() + 5
+                while (
+                    queue.get(marker.read_text(encoding="utf-8")).state != "done"
+                    and time.monotonic() < recovery_deadline
+                ):
+                    Worker(queue, f"recovery-{index}", executor=execute).run_once()
+                    time.sleep(0.01)
+                self.assertEqual(
+                    queue.get(marker.read_text(encoding="utf-8")).state,
+                    "done",
+                )
             self.assertTrue(all(job.state == "done" for job in queue.jobs()))
             connection = sqlite3.connect(effects)
             try:

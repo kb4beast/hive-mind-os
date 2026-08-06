@@ -78,3 +78,12 @@ in this record permits a superiority statement.
 Revert this record and the linked authority annotations to restore the prior undecided
 posture. The captured license exhibits, branch history, and unresolved source obligations
 remain preserved and must not be rewritten.
+
+## Owner decision amendment — 2026-08-06
+
+The owner supersedes only the G2 row's no-real-model decision. Local Codex execution may use
+the owner's existing ChatGPT subscription through the constrained `codex_subscription`
+transport recorded in ADR-044. No API key, API billing, third-party credential, remote
+delivery, or production operation is authorized. This amendment allows implementation and
+bounded local evidence collection; it does not schedule the withdrawn P14–P20 program or
+resolve `B-OPS-03`.
