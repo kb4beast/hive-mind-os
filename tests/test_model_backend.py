@@ -4,10 +4,12 @@ import asyncio
 import io
 import json
 import os
+import subprocess
 import unittest
 import urllib.error
 from dataclasses import dataclass
 from hashlib import sha256
+from pathlib import Path
 from unittest.mock import patch
 
 from hive_mind_os.autonomy import AutonomyBudget, BudgetExceeded
@@ -15,6 +17,9 @@ from hive_mind_os.cli import build_parser
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.model_backend import ModelBackend, ModelTurnError, RepositoryContext
 from hive_mind_os.model_provider import (
+    SUBSCRIPTION_BASE_URL,
+    SUBSCRIPTION_DEFAULT_MODEL,
+    CodexSubscriptionProvider,
     ModelRequest,
     ModelResponse,
     ModelResponseError,
@@ -160,6 +165,37 @@ class ModelBackendTests(unittest.TestCase):
             (payload["prompt_tokens"], payload["completion_tokens"]),
             (10, 5),
         )
+
+    def test_subscription_receipt_identifies_session_auth_without_an_api_key(self) -> None:
+        def runner(command, _workspace, _environment, _timeout_s):
+            response_path = Path(command[command.index("--output-last-message") + 1])
+            response_path.write_text(
+                json.dumps({"model_turn_json": valid_turn(Role.ARCHITECT)}),
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+
+        provider = CodexSubscriptionProvider(
+            ProviderConfig(
+                ProviderKind.CODEX_SUBSCRIPTION,
+                SUBSCRIPTION_BASE_URL,
+                SUBSCRIPTION_DEFAULT_MODEL,
+                "",
+                max_retries=0,
+            ),
+            command_runner=runner,
+        )
+        ledger = EvidenceLedger()
+        with patch("hive_mind_os.model_provider.shutil.which", return_value="codex"):
+            result = execute_once(ModelBackend(provider, ledger=ledger))
+        self.assertTrue(result.success)
+        payload = ledger.events()[0]["payload"]
+        self.assertEqual(payload["provider_kind"], "codex_subscription")
+        self.assertEqual(
+            payload["request"]["credential_reference"],
+            "chatgpt-subscription-session",
+        )
+        self.assertIsNone(payload["request"]["api_key_env"])
 
     def test_failed_provider_response_body_is_digested(self) -> None:
         raw = b"{not-json"

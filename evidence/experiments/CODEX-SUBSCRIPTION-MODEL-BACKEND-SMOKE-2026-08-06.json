@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-06T01:00:30Z",
+  "authority": {
+    "gate": "G2",
+    "decision_ref": "docs/architecture/HUMAN_AUTHORITY_GATES.md#owner-decision-amendment--2026-08-06",
+    "billing_boundary": "locally signed-in Codex ChatGPT subscription only; no API key or API spend authorized"
+  },
+  "scope": "one local, read-only Architect ModelBackend turn through the unmerged codex_subscription transport",
+  "configuration": {
+    "provider_kind": "codex_subscription",
+    "model_label": "subscription-default",
+    "max_retries": 0,
+    "max_output_tokens": 1000,
+    "workspace": "temporary empty directory created by the transport",
+    "codex_flags": [
+      "exec",
+      "--sandbox read-only",
+      "--ephemeral",
+      "--ignore-user-config",
+      "--skip-git-repo-check",
+      "--output-schema",
+      "--output-last-message"
+    ]
+  },
+  "result": {
+    "transport_completed": true,
+    "model_backend_outcome": "succeeded",
+    "result_success": false,
+    "output_names": [
+      "architecture",
+      "interfaces",
+      "migration plan",
+      "threat model"
+    ],
+    "credential_reference": "chatgpt-subscription-session",
+    "api_key_env": null,
+    "response_digest": "sha256:d02471ee85822faa7483878b586d4a7b1e4fe9e188843757e19f8133d87c8cc7"
+  },
+  "preserved_adverse_observations": [
+    {
+      "stage": "initial output-schema attempt",
+      "result": "Codex rejected the original open-ended model-turn outputs schema before producing a model response.",
+      "repair": "Use a strict one-string Codex response wrapper and validate its decoded payload with Hive Mind's existing model-turn contract."
+    },
+    {
+      "stage": "initial backend integration",
+      "result": "Codex returned an empty outputs object; ModelBackend rejected it after its bounded retries.",
+      "repair": "Extract exact output names from the trusted role contract and state them explicitly in the Codex instruction."
+    },
+    {
+      "stage": "final backend integration",
+      "result": "The transport and ModelBackend receipt path succeeded with all required Architect outputs, but the model set result_success=false.",
+      "disposition": "Retained as an adverse result; no delivery, capability-maturity, or B-OPS-03 completion claim is made."
+    }
+  ],
+  "limits": [
+    "No public-repository delivery, remote Git operation, pull request, merge, deployment, provider API call, or external credential was used.",
+    "This local smoke test is not an independently reproduced end-to-end mission and does not resolve B-OPS-03.",
+    "The Codex subprocess is not a hard isolation or authenticated-provider receipt boundary; B-OPS-06 and B-GOV-03 remain open."
+  ]
+}

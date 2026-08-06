@@ -202,7 +202,7 @@ def build_deliver_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--provider",
-        choices=("openai_compatible", "anthropic"),
+        choices=("openai_compatible", "anthropic", "codex_subscription"),
         help="Model provider; overrides HIVE_MIND_MODEL_PROVIDER",
     )
     parser.add_argument(
