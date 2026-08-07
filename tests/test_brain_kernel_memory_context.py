@@ -203,6 +203,15 @@ class KernelMemoryContextTests(unittest.TestCase):
         self.assertEqual("MEMORY-restricted", allowed[0].entry.record.record_id)
         self.assertEqual(0.0, allowed[0].terms.sensitivity_penalty)
 
+    def test_freshness_score_declines_deterministically_within_validity_window(self) -> None:
+        fresh = self.record("MEMORY-fresh", "alpha")
+        aging = self.record("MEMORY-aging", "alpha", valid_to="2026-08-09T12:00:00Z")
+        self.catalog.register(fresh, self.access())
+        self.catalog.register(aging, self.access())
+        ranked = {item.entry.record.record_id: item for item in self.catalog.rank(self.request(query="alpha"))}
+        self.assertEqual(1.0, ranked["MEMORY-fresh"].terms.freshness_score)
+        self.assertEqual(0.5, ranked["MEMORY-aging"].terms.freshness_score)
+
     def test_context_is_bounded_valid_and_cold_retrieval_creates_a_new_manifest(self) -> None:
         alpha = self.record("MEMORY-alpha", "alpha alpha alpha")
         beta = self.record("MEMORY-beta", "beta")

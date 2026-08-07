@@ -585,7 +585,7 @@ class MemoryCatalog:
                         _authority_score(record.authority_level),
                         min(1.0, len(record.source_refs) / 3.0),
                         _bounded_lookup(request.graph_proximity, record.record_id),
-                        1.0,
+                        _freshness_score(record, _instant(request.now)),
                         1.0,
                         _bounded_lookup(request.prior_usefulness, record.record_id),
                         1.0 if record.record_id in request.explicit_pins else 0.0,
@@ -666,3 +666,14 @@ def _bounded_lookup(values: Mapping[str, float] | None, key: str) -> float:
 
 def _sensitivity_penalty(sensitivity: str) -> float:
     return {"public": 0.0, "internal": 0.33, "restricted": 0.66}[sensitivity]
+
+
+def _freshness_score(record: MemoryRecord, now: datetime) -> float:
+    if record.valid_to is None:
+        return 1.0
+    start = _instant(record.valid_from)
+    end = _instant(record.valid_to)
+    duration = (end - start).total_seconds()
+    if duration <= 0:
+        return 1.0
+    return max(0.0, min(1.0, (end - now).total_seconds() / duration))

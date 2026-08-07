@@ -22,9 +22,10 @@ Working memory must be scoped to one work item and carry an explicit expiry.
 `ContextCompiler` is a deterministic hot/warm/cold selector. It filters memory by
 record scope, explicitly granted role and data scopes, availability, validity, and
 lifecycle state. Explicit sensitivity scopes also filter the view; the fixed retrieval
-score penalizes material whose sensitivity was not required. It selects whole records
-under a declared hard token budget and leaves the rest as cold references. Explicit
-cold retrieval creates a new immutable manifest revision; existing manifests remain
+score penalizes material whose sensitivity was not required and derives freshness from
+the record validity window plus caller-supplied time. It selects whole records under a
+declared hard token budget and leaves the rest as cold references. Explicit cold
+retrieval creates a new immutable manifest revision; existing manifests remain
 addressable. Evaluator mode excludes scratchpad and self-assessment material marked
 unavailable to evaluators.
 
