@@ -77,3 +77,21 @@ required for a governed Phase 0 completion remains an explicit open obligation.
 The only new runtime capability is the additive, read-only `hive-mind kernel doctor`
 surface. It does not create a kernel database or move any existing state. The new
 `brain_kernel` package must not import repository-cortex code.
+
+## Phase 1: canonical contract boundary
+
+Phase 1 adds additive, immutable kernel contracts and JSON schemas only. The kernel
+does not persist a mission, execute an effect, access a provider, or alter legacy
+paths. `docs/architecture/ADR-045-VERIFIABLE-HIVE-KERNEL-CANONICAL-CONTRACTS.md`
+records the boundary, rollback, and remaining courtroom obligations.
+
+The contract fixture inventory is
+`docs/plan/verifiable-hive-kernel/PHASE_1_FIXTURE_INVENTORY.md`. It covers all ten
+`brain-kernel-*.schema.json` files. The contract surface uses canonical UTF-8 JSON,
+sorted keys, compact separators, and fail-closed values. Windows separators normalize
+to portable POSIX paths; absolute and traversal paths are rejected.
+
+The complete local unittest gate passed from the isolated Phase 1 source tree on
+2026-08-07: 469 tests passed in 739.840 seconds, with 5 expected Windows symlink
+permission skips. This is technical verification evidence only; it does not close the
+independent courtroom disposition obligation recorded by ADR-045.
