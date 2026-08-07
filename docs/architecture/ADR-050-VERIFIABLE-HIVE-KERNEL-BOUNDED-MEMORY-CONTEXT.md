@@ -15,6 +15,10 @@ content types are rejected before persistence. `MemoryCatalog` retains immutable
 record supersedes old records through lifecycle facts; neither source content nor
 prior metadata is rewritten.
 
+Memory classes are closed to evidence, facts, episodes, opinions, lessons, working
+context, scratchpad, and self-assessment. Policy remains outside the memory plane.
+Working memory must be scoped to one work item and carry an explicit expiry.
+
 `ContextCompiler` is a deterministic hot/warm/cold selector. It filters memory by
 record scope, explicitly granted role and data scopes, availability, validity, and
 lifecycle state. Explicit sensitivity scopes also filter the view; the fixed retrieval

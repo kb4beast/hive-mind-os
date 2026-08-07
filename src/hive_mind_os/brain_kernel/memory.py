@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
 from threading import RLock
@@ -34,6 +35,17 @@ _TERMINAL_STATES = frozenset(
         MemoryState.QUARANTINED,
     }
 )
+
+
+class MemoryClass(StrEnum):
+    EVIDENCE = "evidence"
+    FACT = "fact"
+    EPISODE = "episode"
+    OPINION = "opinion"
+    LESSON = "lesson"
+    WORKING = "working"
+    SCRATCHPAD = "scratchpad"
+    SELF_ASSESSMENT = "self_assessment"
 
 
 class MemoryDenied(ValueError):
@@ -338,6 +350,7 @@ class MemoryCatalog:
     def register(self, record: MemoryRecord, access: MemoryAccess) -> None:
         """Register immutable metadata only after its immutable body is verified."""
 
+        self._validate_class(record)
         if record.content_ref != self._verified_artifact(record.content_ref):
             raise MemoryDenied("memory record content_ref must name its stored artifact")
         with self._lock:
@@ -598,6 +611,19 @@ class MemoryCatalog:
     def _verified_artifact(self, digest: str) -> str:
         self.artifacts.get(digest)
         return digest
+
+    @staticmethod
+    def _validate_class(record: MemoryRecord) -> None:
+        try:
+            memory_class = MemoryClass(record.memory_class)
+        except ValueError as error:
+            raise MemoryDenied("memory class is not registered") from error
+        if memory_class is MemoryClass.WORKING and (
+            record.scope != "work_item" or record.valid_to is None
+        ):
+            raise MemoryDenied("working memory must be work-scoped and expire")
+        if memory_class is MemoryClass.EVIDENCE and not record.source_refs:
+            raise MemoryDenied("evidence memory requires source references")
 
     def _eligible(self, entry: MemoryEntry, request: RetrievalRequest, now: datetime) -> bool:
         record = entry.record

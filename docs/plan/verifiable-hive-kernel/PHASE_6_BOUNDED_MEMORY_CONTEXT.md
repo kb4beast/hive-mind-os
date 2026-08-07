@@ -6,6 +6,9 @@ correction or retraction does not erase source evidence. Context assembly has no
 provider dependency and is reproducible from its explicit request, catalog, and
 artifact state.
 
+Memory classes are closed and policy is not admitted to this plane. Working memory is
+bounded to one work item with an explicit expiry.
+
 The compiler accepts an explicit token budget, keeps required hot references whole,
 selects warm records by the pinned Phase 6 score, and reports unselected records as
 cold references. An explicit cold request produces another canonical manifest rather

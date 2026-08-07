@@ -93,6 +93,22 @@ class KernelMemoryContextTests(unittest.TestCase):
         with self.assertRaises(MemoryDenied):
             self.artifacts.get(artifact.digest)
 
+    def test_memory_classes_are_closed_and_working_memory_has_a_bounded_lifetime(self) -> None:
+        policy = self.record("MEMORY-policy", "do this", memory_class="policy")
+        with self.assertRaisesRegex(MemoryDenied, "not registered"):
+            self.catalog.register(policy, self.access())
+        unbounded_working = self.record(
+            "MEMORY-working", "temporary", memory_class="working", scope="work_item",
+            subject_keys=("WORK-one",),
+        )
+        with self.assertRaisesRegex(MemoryDenied, "work-scoped and expire"):
+            self.catalog.register(unbounded_working, self.access())
+        bounded_working = self.record(
+            "MEMORY-working-bounded", "temporary", memory_class="working", scope="work_item",
+            subject_keys=("WORK-one",), valid_to=LATER,
+        )
+        self.catalog.register(bounded_working, self.access())
+
     def test_lifecycle_supersession_conflict_retraction_and_expiry_preserve_records(self) -> None:
         first = self.record("MEMORY-one", "old validated fact")
         successor = self.record(
