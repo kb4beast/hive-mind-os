@@ -17,11 +17,12 @@ prior metadata is rewritten.
 
 `ContextCompiler` is a deterministic hot/warm/cold selector. It filters memory by
 record scope, explicitly granted role and data scopes, availability, validity, and
-lifecycle state. It scores eligible records with the Phase 6 fixed weights, selects
-whole records under a declared hard token budget, and leaves the rest as cold
-references. Explicit cold retrieval creates a new immutable manifest revision;
-existing manifests remain addressable. Evaluator mode excludes scratchpad and
-self-assessment material marked unavailable to evaluators.
+lifecycle state. Explicit sensitivity scopes also filter the view; the fixed retrieval
+score penalizes material whose sensitivity was not required. It selects whole records
+under a declared hard token budget and leaves the rest as cold references. Explicit
+cold retrieval creates a new immutable manifest revision; existing manifests remain
+addressable. Evaluator mode excludes scratchpad and self-assessment material marked
+unavailable to evaluators.
 
 `ContextManifestStore` may persist canonical manifests below a caller-selected local
 root. Restore verifies the contract and digest and refuses corrupted files. Lesson

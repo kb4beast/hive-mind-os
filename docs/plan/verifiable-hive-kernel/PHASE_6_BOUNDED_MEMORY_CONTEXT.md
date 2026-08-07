@@ -9,7 +9,8 @@ artifact state.
 The compiler accepts an explicit token budget, keeps required hot references whole,
 selects warm records by the pinned Phase 6 score, and reports unselected records as
 cold references. An explicit cold request produces another canonical manifest rather
-than editing the prior selection. No full memory projection, CLI, worker integration,
+than editing the prior selection. Explicit sensitivity scope filters records and
+penalizes non-required sensitivity. No full memory projection, CLI, worker integration,
 or scheduled consolidation is part of this implementation. A deterministic local
 snapshot can rebuild the active-memory view without becoming an authority.
 

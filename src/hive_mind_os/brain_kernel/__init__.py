@@ -32,6 +32,7 @@ from .contracts import (
     normalize_portable_path,
 )
 from .memory import (
+    SENSITIVITY_LEVELS,
     ConsolidationPolicy,
     MemoryAccess,
     MemoryArtifact,
@@ -90,6 +91,7 @@ __all__ = (
     "RankedMemory",
     "RetrievalRequest",
     "ScoreTerms",
+    "SENSITIVITY_LEVELS",
     "MissionCharter",
     "MissionState",
     "RoleResult",

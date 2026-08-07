@@ -24,6 +24,7 @@ _SECRET = re.compile(
     r"(?i)(?:\b(?:api[_-]?key|password|secret|access[_-]?token)\s*[:=]\s*\S+|\b(?:sk|ghp|github_pat)_[a-z0-9_-]{8,})"
 )
 _TRANSCRIPT_KINDS = frozenset({"model_transcript", "raw_transcript", "tool_transcript"})
+SENSITIVITY_LEVELS = frozenset({"public", "internal", "restricted"})
 _TERMINAL_STATES = frozenset(
     {
         MemoryState.SUPERSEDED,
@@ -257,6 +258,8 @@ class RetrievalRequest:
     explicit_pins: tuple[str, ...] = ()
     graph_proximity: Mapping[str, float] | None = None
     prior_usefulness: Mapping[str, float] | None = None
+    sensitivity_scopes: tuple[str, ...] = ("public", "internal")
+    required_sensitivities: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.role not in ROLE_NAMES:
@@ -266,6 +269,11 @@ class RetrievalRequest:
         _instant(self.now)
         if len(set(self.data_scopes)) != len(self.data_scopes):
             raise ValueError("retrieval data scopes must be unique")
+        if (
+            not set(self.sensitivity_scopes).issubset(SENSITIVITY_LEVELS)
+            or not set(self.required_sensitivities).issubset(self.sensitivity_scopes)
+        ):
+            raise ValueError("retrieval sensitivity scopes are invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -569,7 +577,9 @@ class MemoryCatalog:
                         _bounded_lookup(request.prior_usefulness, record.record_id),
                         1.0 if record.record_id in request.explicit_pins else 0.0,
                         1.0 if record.record_id in conflicts else 0.0,
-                        0.0,
+                        0.0
+                        if record.sensitivity in request.required_sensitivities
+                        else _sensitivity_penalty(record.sensitivity),
                         min(1.0, estimate_tokens(text) / 4096.0),
                     ),
                 )
@@ -601,6 +611,8 @@ class MemoryCatalog:
             return False
         if not set(entry.access.data_scopes).issubset(request.data_scopes):
             return False
+        if record.sensitivity not in request.sensitivity_scopes:
+            return False
         if record.scope == "mission" and request.mission_id not in record.subject_keys:
             return False
         if record.scope == "work_item" and request.work_id not in record.subject_keys:
@@ -624,3 +636,7 @@ def _bounded_lookup(values: Mapping[str, float] | None, key: str) -> float:
     if not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0:
         raise ValueError("retrieval component values must be in [0, 1]")
     return float(value)
+
+
+def _sensitivity_penalty(sensitivity: str) -> float:
+    return {"public": 0.0, "internal": 0.33, "restricted": 0.66}[sensitivity]

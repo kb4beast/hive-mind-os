@@ -47,6 +47,7 @@ class KernelMemoryContextTests(unittest.TestCase):
         supersedes: tuple[str, ...] = (),
         outcome_refs: tuple[str, ...] = (),
         evaluator_id: str | None = None,
+        sensitivity: str = "internal",
     ) -> MemoryRecord:
         artifact = self.artifacts.put(body)
         return MemoryRecord(
@@ -57,7 +58,7 @@ class KernelMemoryContextTests(unittest.TestCase):
             artifact.digest,
             ("SRC-one",),
             "verified",
-            "internal",
+            sensitivity,
             TIME,
             valid_to,
             TIME,
@@ -168,6 +169,23 @@ class KernelMemoryContextTests(unittest.TestCase):
             ("MEMORY-curator",),
             tuple(item.entry.record.record_id for item in self.catalog.rank(self.request(role="curator", query="alpha"))),
         )
+
+    def test_sensitivity_scope_filters_and_penalizes_nonrequired_memory(self) -> None:
+        internal = self.record("MEMORY-internal", "alpha")
+        restricted = self.record("MEMORY-restricted", "alpha", sensitivity="restricted")
+        self.catalog.register(internal, self.access())
+        self.catalog.register(restricted, self.access())
+        default = self.catalog.rank(self.request(query="alpha"))
+        self.assertEqual(("MEMORY-internal",), tuple(item.entry.record.record_id for item in default))
+        allowed = self.catalog.rank(
+            RetrievalRequest(
+                "MISSION-one", "WORK-one", "builder", "alpha", LATER, ("internal",),
+                sensitivity_scopes=("public", "internal", "restricted"),
+                required_sensitivities=("restricted",),
+            )
+        )
+        self.assertEqual("MEMORY-restricted", allowed[0].entry.record.record_id)
+        self.assertEqual(0.0, allowed[0].terms.sensitivity_penalty)
 
     def test_context_is_bounded_valid_and_cold_retrieval_creates_a_new_manifest(self) -> None:
         alpha = self.record("MEMORY-alpha", "alpha alpha alpha")

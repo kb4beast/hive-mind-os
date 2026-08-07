@@ -40,6 +40,8 @@ class ContextRequest:
     repository_key: str | None = None
     evaluator_mode: bool = False
     explicit_pins: tuple[str, ...] = ()
+    sensitivity_scopes: tuple[str, ...] = ("public", "internal")
+    required_sensitivities: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.attempt_id or type(self.token_budget) is not int or self.token_budget < 0:
@@ -190,6 +192,8 @@ class ContextCompiler:
             data_scopes=request.data_scopes,
             repository_key=request.repository_key,
             explicit_pins=request.explicit_pins,
+            sensitivity_scopes=request.sensitivity_scopes,
+            required_sensitivities=request.required_sensitivities,
         )
         ranked = self.catalog.rank(retrieval)
         if request.evaluator_mode:
@@ -236,6 +240,8 @@ class ContextCompiler:
                 repository_key=request.repository_key,
                 evaluator_mode=request.evaluator_mode,
                 explicit_pins=tuple(sorted((*request.explicit_pins, record_id))),
+                sensitivity_scopes=request.sensitivity_scopes,
+                required_sensitivities=request.required_sensitivities,
             )
         )
 
