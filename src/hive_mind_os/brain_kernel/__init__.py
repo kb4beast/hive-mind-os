@@ -1,6 +1,14 @@
 """Additive, repository-neutral primitives for the Verifiable Hive Kernel."""
 
 from .canonical import canonical_bytes, canonical_digest
+from .context import (
+    CompiledContext,
+    ContextCompiler,
+    ContextManifestStore,
+    ContextRequest,
+    HotContextItem,
+    manifest_digest,
+)
 from .contracts import (
     Budget,
     Candidate,
@@ -23,6 +31,21 @@ from .contracts import (
     WorkState,
     normalize_portable_path,
 )
+from .memory import (
+    MemoryAccess,
+    MemoryArtifact,
+    MemoryArtifactStore,
+    MemoryCatalog,
+    MemoryConflict,
+    MemoryDenied,
+    MemoryEntry,
+    MemoryLifecycleEvent,
+    RankedMemory,
+    RetrievalRequest,
+    ScoreTerms,
+    estimate_tokens,
+    normalize_terms,
+)
 from .objectives import ObjectiveGraph, PlanLimits, paths_overlap
 from .planner import (
     DeterministicFixturePlanner,
@@ -35,8 +58,12 @@ __all__ = (
     "Budget",
     "Candidate",
     "CandidateState",
+    "CompiledContext",
     "ConstraintEnvelope",
+    "ContextCompiler",
     "ContextManifest",
+    "ContextManifestStore",
+    "ContextRequest",
     "EffectIntent",
     "EffectReceipt",
     "EvaluationPlan",
@@ -45,9 +72,20 @@ __all__ = (
     "ExecutionLease",
     "LeaseState",
     "MemoryRecord",
+    "MemoryAccess",
+    "MemoryArtifact",
+    "MemoryArtifactStore",
+    "MemoryCatalog",
+    "MemoryConflict",
+    "MemoryDenied",
+    "MemoryEntry",
+    "MemoryLifecycleEvent",
     "MemoryState",
     "ObjectiveGraph",
     "PlanLimits",
+    "RankedMemory",
+    "RetrievalRequest",
+    "ScoreTerms",
     "MissionCharter",
     "MissionState",
     "RoleResult",
@@ -57,7 +95,11 @@ __all__ = (
     "canonical_digest",
     "DeterministicFixturePlanner",
     "FixturePlan",
+    "HotContextItem",
     "graph_from_events",
+    "estimate_tokens",
+    "manifest_digest",
+    "normalize_terms",
     "normalize_portable_path",
     "paths_overlap",
     "persist_plan",
