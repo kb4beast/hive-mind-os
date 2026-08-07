@@ -24,9 +24,10 @@ existing manifests remain addressable. Evaluator mode excludes scratchpad and
 self-assessment material marked unavailable to evaluators.
 
 The current implementation intentionally does not add a database projection,
-background consolidation/expiration job, CLI command, model invocation adapter, or
-legacy-command rewiring. Callers pass `now` explicitly; no selection depends on wall
-clock state or provider tokenization.
+background consolidation job, CLI command, model invocation adapter, or legacy-command
+rewiring. The catalog can reproduce its active-memory view from a deterministic local
+snapshot of immutable records, lifecycle facts, and conflicts. Callers pass `now`
+explicitly; no selection depends on wall clock state or provider tokenization.
 
 ## Consequences and rollback
 

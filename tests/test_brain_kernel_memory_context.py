@@ -109,6 +109,20 @@ class KernelMemoryContextTests(unittest.TestCase):
         self.assertEqual(3, len(self.catalog.lifecycle_events()))
         self.assertEqual("old validated fact", self.artifacts.get(first.content_ref))
 
+    def test_snapshot_rebuild_reproduces_the_active_memory_projection(self) -> None:
+        first = self.record("MEMORY-one", "old fact")
+        successor = self.record("MEMORY-two", "corrected fact", supersedes=("MEMORY-one",))
+        self.catalog.register(first, self.access())
+        self.catalog.supersede(successor, self.access(), now=LATER, reason="correction")
+        self.catalog.record_conflict(("MEMORY-one", "MEMORY-two"), reason="review", recorded_at=LATER)
+        snapshot = self.catalog.snapshot()
+        rebuilt = MemoryCatalog.rebuild(self.artifacts, snapshot)
+        self.assertEqual(snapshot.digest(), rebuilt.snapshot().digest())
+        self.assertEqual(
+            self.catalog.active_records(self.request()),
+            rebuilt.active_records(self.request()),
+        )
+
     def test_ranking_is_deterministic_and_unauthorized_records_are_omitted(self) -> None:
         builder = self.record("MEMORY-builder", "alpha alpha")
         curator = self.record("MEMORY-curator", "alpha secret assessment")

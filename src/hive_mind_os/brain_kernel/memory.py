@@ -181,6 +181,54 @@ class MemoryConflict:
 
 
 @dataclass(frozen=True, slots=True)
+class MemorySnapshot:
+    """A deterministic, non-authoritative reconstruction input for local memory."""
+
+    entries: tuple[MemoryEntry, ...]
+    lifecycle_events: tuple[MemoryLifecycleEvent, ...]
+    conflicts: tuple[MemoryConflict, ...]
+
+    def digest(self) -> str:
+        return canonical_digest(
+            {
+                "entries": [
+                    {
+                        "record": entry.record.to_document(),
+                        "access": {
+                            "roles": entry.access.roles,
+                            "data_scopes": entry.access.data_scopes,
+                            "evaluator_visible": entry.access.evaluator_visible,
+                        },
+                    }
+                    for entry in self.entries
+                ],
+                "lifecycle_events": [
+                    {
+                        "sequence": event.sequence,
+                        "event_id": event.event_id,
+                        "record_id": event.record_id,
+                        "previous_state": event.previous_state.value,
+                        "state": event.state.value,
+                        "occurred_at": event.occurred_at,
+                        "reason": event.reason,
+                        "successor_id": event.successor_id,
+                    }
+                    for event in self.lifecycle_events
+                ],
+                "conflicts": [
+                    {
+                        "conflict_id": conflict.conflict_id,
+                        "record_ids": conflict.record_ids,
+                        "reason": conflict.reason,
+                        "recorded_at": conflict.recorded_at,
+                    }
+                    for conflict in self.conflicts
+                ],
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RetrievalRequest:
     mission_id: str
     work_id: str
@@ -391,6 +439,44 @@ class MemoryCatalog:
     def lifecycle_events(self) -> tuple[MemoryLifecycleEvent, ...]:
         with self._lock:
             return tuple(self._events)
+
+    def snapshot(self) -> MemorySnapshot:
+        """Return a stable rebuild input; it is never a replacement for artifacts."""
+
+        with self._lock:
+            return MemorySnapshot(
+                tuple(self._entries[record_id] for record_id in sorted(self._entries)),
+                tuple(self._events),
+                tuple(self._conflicts[conflict_id] for conflict_id in sorted(self._conflicts)),
+            )
+
+    @classmethod
+    def rebuild(cls, artifacts: MemoryArtifactStore, snapshot: MemorySnapshot) -> MemoryCatalog:
+        """Fail closed while replaying immutable local lifecycle and conflict facts."""
+
+        catalog = cls(artifacts)
+        for entry in snapshot.entries:
+            catalog.register(entry.record, entry.access)
+        for event in snapshot.lifecycle_events:
+            rebuilt = catalog.transition(
+                event.record_id,
+                event.state,
+                event_id=event.event_id,
+                occurred_at=event.occurred_at,
+                reason=event.reason,
+                successor_id=event.successor_id,
+            )
+            if rebuilt != event:
+                raise MemoryDenied("memory lifecycle reconstruction diverged")
+        for conflict in snapshot.conflicts:
+            rebuilt = catalog.record_conflict(
+                conflict.record_ids,
+                reason=conflict.reason,
+                recorded_at=conflict.recorded_at,
+            )
+            if rebuilt != conflict:
+                raise MemoryDenied("memory conflict reconstruction diverged")
+        return catalog
 
     def active_records(self, request: RetrievalRequest) -> tuple[MemoryEntry, ...]:
         """Return active authorized records only, in stable record-id order."""
