@@ -35,11 +35,17 @@ consolidation is explicit and deterministic: it requires separately evidenced ac
 episodes from distinct caller-declared contexts plus an evaluator and outcome reference;
 it creates a successor and append-only supersession facts.
 
+`MemoryCatalogStore` persists content-addressed catalog snapshots and reconstructs the
+active view only by replaying their immutable records, lifecycle facts, and conflicts.
+The local CLI exposes `kernel memory search`, `kernel memory inspect`, `kernel memory
+expire`, and `kernel context`. Search and inspection return metadata and scores, never
+durable body text; expiration writes a successor snapshot and leaves prior snapshots
+untouched.
+
 The current implementation intentionally does not add a database projection,
-background job, CLI command, model invocation adapter, or legacy-command rewiring. The
-catalog can reproduce its active-memory view from a deterministic local snapshot of
-immutable records, lifecycle facts, and conflicts. Callers pass `now` explicitly; no
-selection depends on wall clock state or provider tokenization.
+background scheduler, model invocation adapter, or legacy-command rewiring. Callers
+pass `now` explicitly; no selection depends on wall clock state or provider
+tokenization.
 
 ## Consequences and rollback
 

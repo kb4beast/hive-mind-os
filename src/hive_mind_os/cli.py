@@ -7,6 +7,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
 from typing import Sequence, cast
@@ -18,8 +19,10 @@ from .acceptance import (
 )
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
+from .brain_kernel.context import ContextManifestStore
 from .brain_kernel.contracts import MissionCharter
 from .brain_kernel.doctor import inspect_kernel_environment
+from .brain_kernel.memory import MemoryCatalogStore, MemoryDenied, RetrievalRequest
 from .brain_kernel.planner import (
     DeterministicFixturePlanner,
     graph_from_events,
@@ -149,6 +152,35 @@ def build_kernel_parser() -> argparse.ArgumentParser:
     graph.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
     graph.add_argument("--state-dir", default=".hive-mind-kernel-state")
     graph.add_argument("--json", action="store_true", dest="json_output")
+    memory = commands.add_parser("memory", help="Inspect bounded local kernel memory.")
+    memory_commands = memory.add_subparsers(dest="memory_command", required=True)
+    search = memory_commands.add_parser("search", help="Rank scoped memory from a durable snapshot.")
+    search.add_argument("--snapshot", required=True, help="Memory snapshot digest")
+    search.add_argument("--mission", required=True)
+    search.add_argument("--work", required=True)
+    search.add_argument("--role", required=True)
+    search.add_argument("--query", required=True)
+    search.add_argument("--now", required=True, help="RFC 3339 retrieval time")
+    search.add_argument("--data-scope", action="append", default=[])
+    search.add_argument("--sensitivity-scope", action="append", default=["public", "internal"])
+    search.add_argument("--require-sensitivity", action="append", default=[])
+    search.add_argument("--repository-key")
+    search.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    search.add_argument("--json", action="store_true", dest="json_output")
+    inspect = memory_commands.add_parser("inspect", help="Inspect memory metadata without reading its body.")
+    inspect.add_argument("record_id")
+    inspect.add_argument("--snapshot", required=True, help="Memory snapshot digest")
+    inspect.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    inspect.add_argument("--json", action="store_true", dest="json_output")
+    expire = memory_commands.add_parser("expire", help="Append expiration facts and save a successor snapshot.")
+    expire.add_argument("--snapshot", required=True, help="Memory snapshot digest")
+    expire.add_argument("--now", required=True, help="RFC 3339 maintenance time")
+    expire.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    expire.add_argument("--json", action="store_true", dest="json_output")
+    context = commands.add_parser("context", help="Inspect one persisted kernel context manifest.")
+    context.add_argument("--manifest", required=True, help="Context manifest digest")
+    context.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    context.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1166,6 +1198,75 @@ def _run_kernel_graph(args: argparse.Namespace) -> int:
     return 0
 
 
+def _memory_catalog(args: argparse.Namespace):
+    return MemoryCatalogStore(args.state_dir).restore(args.snapshot)
+
+
+def _run_kernel_memory_search(args: argparse.Namespace) -> int:
+    try:
+        catalog = _memory_catalog(args)
+        request = RetrievalRequest(
+            args.mission, args.work, args.role, args.query, args.now,
+            tuple(args.data_scope), repository_key=args.repository_key,
+            sensitivity_scopes=tuple(args.sensitivity_scope),
+            required_sensitivities=tuple(args.require_sensitivity),
+        )
+        ranked = catalog.rank(request)
+    except (KeyError, MemoryDenied, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {
+        "snapshot": args.snapshot,
+        "records": [
+            {"record": item.entry.record.to_document(), "score": item.score, "terms": asdict(item.terms)}
+            for item in ranked
+        ],
+    }
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else "\n".join(item.entry.record.record_id for item in ranked))
+    return 0
+
+
+def _run_kernel_memory_inspect(args: argparse.Namespace) -> int:
+    try:
+        entry, state = _memory_catalog(args).inspect(args.record_id)
+    except (KeyError, MemoryDenied, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {
+        "record": entry.record.to_document(),
+        "access": {"roles": entry.access.roles, "data_scopes": entry.access.data_scopes, "evaluator_visible": entry.access.evaluator_visible},
+        "derived_state": state.value,
+    }
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else f"{entry.record.record_id}: {state.value}")
+    return 0
+
+
+def _run_kernel_memory_expire(args: argparse.Namespace) -> int:
+    try:
+        store = MemoryCatalogStore(args.state_dir)
+        catalog = store.restore(args.snapshot)
+        events = catalog.expire(now=args.now)
+        successor = store.persist(catalog)
+    except (KeyError, MemoryDenied, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {"snapshot": successor, "expired_record_ids": [event.record_id for event in events]}
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else successor)
+    return 0
+
+
+def _run_kernel_context(args: argparse.Namespace) -> int:
+    try:
+        manifests = ContextManifestStore(args.state_dir)
+        manifests.restore()
+        manifest = manifests.get(args.manifest)
+    except (KeyError, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    print(json.dumps(manifest.to_document(), indent=2, sort_keys=True) if args.json_output else manifest.manifest_digest)
+    return 0
+
+
 def _run_ingest(args: argparse.Namespace) -> int:
     supplied_file = Path(args.file)
     try:
@@ -1257,6 +1358,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             raise SystemExit(_run_kernel_plan(args))
         if args.kernel_command == "graph":
             raise SystemExit(_run_kernel_graph(args))
+        if args.kernel_command == "memory":
+            if args.memory_command == "search":
+                raise SystemExit(_run_kernel_memory_search(args))
+            if args.memory_command == "inspect":
+                raise SystemExit(_run_kernel_memory_inspect(args))
+            raise SystemExit(_run_kernel_memory_expire(args))
+        if args.kernel_command == "context":
+            raise SystemExit(_run_kernel_context(args))
     if arguments and arguments[0] == "audit":
         args = build_audit_parser().parse_args(arguments[1:])
         raise SystemExit(_run_audit(args, ("hive-mind", *arguments)))

@@ -13,9 +13,10 @@ The compiler accepts an explicit token budget, keeps required hot references who
 selects warm records by the pinned Phase 6 score, and reports unselected records as
 cold references. An explicit cold request produces another canonical manifest rather
 than editing the prior selection. Explicit sensitivity scope filters records and
-penalizes non-required sensitivity. No full memory projection, CLI, worker integration,
-or scheduled consolidation is part of this implementation. A deterministic local
-snapshot can rebuild the active-memory view without becoming an authority.
+penalizes non-required sensitivity. A deterministic local snapshot can rebuild the
+active-memory view without becoming an authority. The local CLI exposes memory search,
+metadata-only inspection, deterministic expiration, and persisted-context inspection;
+it does not invoke a model or alter legacy commands.
 
 Canonical manifests can optionally persist beneath a caller-selected local root and
 are restored only after contract/digest verification. Consolidation remains an explicit

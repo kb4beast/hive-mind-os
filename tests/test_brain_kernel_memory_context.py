@@ -17,6 +17,7 @@ from hive_mind_os.brain_kernel.memory import (
     MemoryAccess,
     MemoryArtifactStore,
     MemoryCatalog,
+    MemoryCatalogStore,
     MemoryDenied,
     RetrievalRequest,
 )
@@ -143,6 +144,18 @@ class KernelMemoryContextTests(unittest.TestCase):
             self.catalog.active_records(self.request()),
             rebuilt.active_records(self.request()),
         )
+
+    def test_catalog_store_restores_only_immutable_verified_snapshots(self) -> None:
+        record = self.record("MEMORY-one", "durable evidence")
+        self.catalog.register(record, self.access())
+        store = MemoryCatalogStore(self.temporary.name)
+        digest = store.persist(self.catalog)
+        restored = store.restore(digest)
+        self.assertEqual(self.catalog.snapshot().digest(), restored.snapshot().digest())
+        path = store._path(digest)
+        path.write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex((KeyError, MemoryDenied), "snapshot"):
+            store.restore(digest)
 
     def test_consolidation_requires_independent_evidenced_episodes(self) -> None:
         first = self.record(

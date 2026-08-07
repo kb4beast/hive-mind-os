@@ -7,6 +7,7 @@ a content-addressed artifact store and are never rewritten in place.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -17,7 +18,7 @@ from threading import RLock
 from typing import Iterable, Mapping
 
 from ..contracts import ROLE_NAMES
-from .canonical import canonical_digest
+from .canonical import canonical_bytes, canonical_digest
 from .contracts import MemoryRecord, MemoryState
 
 _TOKEN = re.compile(r"[a-z0-9][a-z0-9._/-]*")
@@ -201,44 +202,168 @@ class MemorySnapshot:
     lifecycle_events: tuple[MemoryLifecycleEvent, ...]
     conflicts: tuple[MemoryConflict, ...]
 
+    def to_document(self) -> dict[str, object]:
+        return {
+            "entries": [
+                {
+                    "record": entry.record.to_document(),
+                    "access": {
+                        "roles": entry.access.roles,
+                        "data_scopes": entry.access.data_scopes,
+                        "evaluator_visible": entry.access.evaluator_visible,
+                    },
+                }
+                for entry in self.entries
+            ],
+            "lifecycle_events": [
+                {
+                    "sequence": event.sequence,
+                    "event_id": event.event_id,
+                    "record_id": event.record_id,
+                    "previous_state": event.previous_state.value,
+                    "state": event.state.value,
+                    "occurred_at": event.occurred_at,
+                    "reason": event.reason,
+                    "successor_id": event.successor_id,
+                }
+                for event in self.lifecycle_events
+            ],
+            "conflicts": [
+                {
+                    "conflict_id": conflict.conflict_id,
+                    "record_ids": conflict.record_ids,
+                    "reason": conflict.reason,
+                    "recorded_at": conflict.recorded_at,
+                }
+                for conflict in self.conflicts
+            ],
+        }
+
     def digest(self) -> str:
-        return canonical_digest(
-            {
-                "entries": [
-                    {
-                        "record": entry.record.to_document(),
-                        "access": {
-                            "roles": entry.access.roles,
-                            "data_scopes": entry.access.data_scopes,
-                            "evaluator_visible": entry.access.evaluator_visible,
-                        },
-                    }
-                    for entry in self.entries
-                ],
-                "lifecycle_events": [
-                    {
-                        "sequence": event.sequence,
-                        "event_id": event.event_id,
-                        "record_id": event.record_id,
-                        "previous_state": event.previous_state.value,
-                        "state": event.state.value,
-                        "occurred_at": event.occurred_at,
-                        "reason": event.reason,
-                        "successor_id": event.successor_id,
-                    }
-                    for event in self.lifecycle_events
-                ],
-                "conflicts": [
-                    {
-                        "conflict_id": conflict.conflict_id,
-                        "record_ids": conflict.record_ids,
-                        "reason": conflict.reason,
-                        "recorded_at": conflict.recorded_at,
-                    }
-                    for conflict in self.conflicts
-                ],
-            }
-        )
+        return canonical_digest(self.to_document())
+
+    @classmethod
+    def from_document(cls, document: Mapping[str, object]) -> MemorySnapshot:
+        if set(document) != {"entries", "lifecycle_events", "conflicts"}:
+            raise ValueError("memory snapshot has unsupported fields")
+        entries_value = document["entries"]
+        events_value = document["lifecycle_events"]
+        conflicts_value = document["conflicts"]
+        if (
+            not isinstance(entries_value, list)
+            or not isinstance(events_value, list)
+            or not isinstance(conflicts_value, list)
+        ):
+            raise ValueError("memory snapshot lists are malformed")
+        entries: list[MemoryEntry] = []
+        for item in entries_value:
+            if not isinstance(item, dict) or set(item) != {"record", "access"}:
+                raise ValueError("memory snapshot entry is malformed")
+            record_value, access_value = item["record"], item["access"]
+            if not isinstance(record_value, dict) or not isinstance(access_value, dict):
+                raise ValueError("memory snapshot entry is malformed")
+            restored = MemoryRecord.from_document(record_value)
+            if not isinstance(restored, MemoryRecord):
+                raise ValueError("memory snapshot record has the wrong type")
+            record = MemoryRecord(
+                restored.record_id, restored.memory_class, restored.scope,
+                tuple(restored.subject_keys), restored.content_ref, tuple(restored.source_refs),
+                restored.authority_level, restored.sensitivity, restored.valid_from,
+                restored.valid_to, restored.recorded_at, restored.available_at, restored.state,
+                tuple(restored.supersedes), tuple(restored.superseded_by), restored.evaluator_id,
+                tuple(restored.outcome_refs), restored.retention_policy, restored.digest_value,
+            )
+            if set(access_value) != {"roles", "data_scopes", "evaluator_visible"}:
+                raise ValueError("memory snapshot access is malformed")
+            if (
+                not isinstance(access_value["roles"], list)
+                or not isinstance(access_value["data_scopes"], list)
+                or type(access_value["evaluator_visible"]) is not bool
+            ):
+                raise ValueError("memory snapshot access is malformed")
+            access = MemoryAccess(
+                tuple(access_value["roles"]),
+                tuple(access_value["data_scopes"]),
+                access_value["evaluator_visible"],
+            )
+            entries.append(MemoryEntry(record, access))
+        events: list[MemoryLifecycleEvent] = []
+        for item in events_value:
+            if not isinstance(item, dict) or set(item) != {
+                "sequence", "event_id", "record_id", "previous_state", "state",
+                "occurred_at", "reason", "successor_id",
+            }:
+                raise ValueError("memory snapshot lifecycle event is malformed")
+            events.append(
+                MemoryLifecycleEvent(
+                    item["sequence"], item["event_id"], item["record_id"],
+                    MemoryState(item["previous_state"]), MemoryState(item["state"]),
+                    item["occurred_at"], item["reason"], item["successor_id"],
+                )
+            )
+        conflicts: list[MemoryConflict] = []
+        for item in conflicts_value:
+            if not isinstance(item, dict) or set(item) != {"conflict_id", "record_ids", "reason", "recorded_at"}:
+                raise ValueError("memory snapshot conflict is malformed")
+            if not isinstance(item["record_ids"], list):
+                raise ValueError("memory snapshot conflict is malformed")
+            conflicts.append(
+                MemoryConflict(
+                    item["conflict_id"], tuple(item["record_ids"]), item["reason"], item["recorded_at"]
+                )
+            )
+        snapshot = cls(tuple(entries), tuple(events), tuple(conflicts))
+        if tuple(entry.record.record_id for entry in snapshot.entries) != tuple(sorted(entry.record.record_id for entry in snapshot.entries)):
+            raise ValueError("memory snapshot entries are not sorted")
+        return snapshot
+
+
+class MemoryCatalogStore:
+    """Content-addressed durable snapshots for local, caller-owned memory state."""
+
+    def __init__(self, root: str | Path) -> None:
+        self.root = Path(root)
+
+    def persist(self, catalog: MemoryCatalog) -> str:
+        snapshot = catalog.snapshot()
+        digest = snapshot.digest()
+        path = self._path(digest)
+        encoded = canonical_bytes(snapshot.to_document())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with path.open("xb") as output:
+                output.write(encoded)
+        except FileExistsError:
+            if path.read_bytes() != encoded:
+                raise MemoryDenied("memory snapshot cannot be rewritten")
+        return digest
+
+    def restore(self, digest: str) -> MemoryCatalog:
+        path = self._path(digest)
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise KeyError(f"unknown or corrupt memory snapshot: {digest}") from error
+        if not isinstance(document, dict):
+            raise MemoryDenied("memory snapshot is not an object")
+        try:
+            snapshot = MemorySnapshot.from_document(document)
+        except ValueError as error:
+            raise MemoryDenied("memory snapshot is corrupt") from error
+        if snapshot.digest() != digest:
+            raise MemoryDenied("memory snapshot digest mismatch")
+        return MemoryCatalog.rebuild(MemoryArtifactStore(self.root), snapshot)
+
+    def snapshots(self) -> tuple[str, ...]:
+        directory = self.root / "memory" / "snapshots"
+        if not directory.exists():
+            return ()
+        return tuple(f"sha256:{path.stem}" for path in sorted(directory.glob("*.json")))
+
+    def _path(self, digest: str) -> Path:
+        if not isinstance(digest, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None:
+            raise ValueError("memory snapshot reference must be a sha256 digest")
+        return self.root / "memory" / "snapshots" / f"{digest.removeprefix('sha256:')}.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -564,6 +689,15 @@ class MemoryCatalog:
                 for record_id, entry in sorted(self._entries.items())
                 if self._eligible(entry, request, now)
             )
+
+    def inspect(self, record_id: str) -> tuple[MemoryEntry, MemoryState]:
+        """Return immutable metadata and its derived lifecycle state, never the body."""
+
+        with self._lock:
+            try:
+                return self._entries[record_id], self._states[record_id]
+            except KeyError as error:
+                raise KeyError(f"unknown memory record: {record_id}") from error
 
     def rank(self, request: RetrievalRequest) -> tuple[RankedMemory, ...]:
         """Score eligible memory with the handoff's deterministic bounded formula."""
