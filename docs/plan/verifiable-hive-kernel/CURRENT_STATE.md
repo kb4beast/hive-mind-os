@@ -95,3 +95,26 @@ The complete local unittest gate passed from the isolated Phase 1 source tree on
 2026-08-07: 469 tests passed in 739.840 seconds, with 5 expected Windows symlink
 permission skips. This is technical verification evidence only; it does not close the
 independent courtroom disposition obligation recorded by ADR-045.
+
+## Phase 2: append-only event spine boundary
+
+Phase 2 adds a new, additive SQLite event store for *new kernel missions* only. The
+authoritative event chain has database-enforced no-update/no-delete triggers,
+predecessor-bound canonical digests, optimistic sequencing, idempotency bindings, and
+transactional derived projections. Mission/work state is always reducer-derived and
+rebuildable from sequence one. Snapshots are non-authoritative and are verified against
+event replay before use; a corrupted snapshot is discarded and rebuilt.
+
+The only Phase 2 CLI addition is `hive-mind kernel status MISSION_ID --state-dir
+STATE_DIR [--json]`. It requires an existing `brain-kernel.sqlite3`, reports an
+event-derived status, and does not create state when it is unavailable. No legacy
+mission store, ledger, receipt, role, provider, policy, or effect path is changed.
+`ADR-046-VERIFIABLE-HIVE-KERNEL-EVENT-SPINE.md` and
+`PHASE_2_EVENT_SPINE.md` hold the data, migration, rollback, and handoff record.
+
+The final Phase 2 deterministic local gate passed from the isolated source tree on
+2026-08-07: `python -m unittest discover -s tests -v` ran 478 tests in 754.853
+seconds, with 5 expected Windows symlink-permission skips. Focused kernel/contract/
+doctor coverage (22 tests), `compileall`, Ruff, and Pyright also passed. These are
+technical verification facts only; the independent courtroom disposition obligation
+remains open.

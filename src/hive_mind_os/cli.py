@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 from hashlib import sha256
@@ -18,6 +19,7 @@ from .acceptance import (
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
 from .brain_kernel.doctor import inspect_kernel_environment
+from .brain_kernel.store import KernelIntegrityError, KernelStore
 from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
@@ -113,6 +115,17 @@ def build_kernel_parser() -> argparse.ArgumentParser:
         help="State directory to validate without creating it",
     )
     doctor.add_argument("--json", action="store_true", dest="json_output")
+    status = commands.add_parser(
+        "status",
+        help="Show a read-only event-derived status for one kernel mission.",
+    )
+    status.add_argument("mission_id", help="Kernel mission identifier")
+    status.add_argument(
+        "--state-dir",
+        default=".hive-mind-kernel-state",
+        help="Directory containing brain-kernel.sqlite3",
+    )
+    status.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1036,6 +1049,45 @@ def _run_kernel_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_kernel_status(args: argparse.Namespace) -> int:
+    database = KernelStore.database_path(args.state_dir)
+    if not database.is_file():
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": f"kernel state database does not exist: {database}",
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        store = KernelStore(database, read_only=True)
+        try:
+            report = store.status(args.mission_id)
+        finally:
+            store.close()
+    except (KernelIntegrityError, OSError, sqlite3.Error, KeyError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    if args.json_output:
+        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        print(
+            f"{report['mission_id']}: {report['status']} "
+            f"(sequence {report['last_sequence']}, {len(report['work'])} work items)"
+        )
+    return 0
+
+
 def _run_ingest(args: argparse.Namespace) -> int:
     supplied_file = Path(args.file)
     try:
@@ -1121,6 +1173,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         args = build_kernel_parser().parse_args(arguments[1:])
         if args.kernel_command == "doctor":
             raise SystemExit(_run_kernel_doctor(args))
+        if args.kernel_command == "status":
+            raise SystemExit(_run_kernel_status(args))
     if arguments and arguments[0] == "audit":
         args = build_audit_parser().parse_args(arguments[1:])
         raise SystemExit(_run_audit(args, ("hive-mind", *arguments)))

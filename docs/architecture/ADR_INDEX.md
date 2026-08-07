@@ -18,9 +18,10 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-018` | [Runtime surface disposition](ADR-018-RUNTIME-SURFACE-DISPOSITION.md) | P2.2 | adopted |
 | `ADR-044` | [Verifiable Hive Kernel Phase 0 baseline](ADR-044-VERIFIABLE-HIVE-KERNEL-PHASE-0.md) | Verifiable Hive Kernel P0 | proposed; independent courtroom disposition remains required |
 | `ADR-045` | [Verifiable Hive Kernel canonical contracts](ADR-045-VERIFIABLE-HIVE-KERNEL-CANONICAL-CONTRACTS.md) | Verifiable Hive Kernel P1 | proposed; independent courtroom disposition remains required |
+| `ADR-046` | [Verifiable Hive Kernel append-only event spine](ADR-046-VERIFIABLE-HIVE-KERNEL-EVENT-SPINE.md) | Verifiable Hive Kernel P2 | proposed; independent courtroom disposition remains required |
 | `ADR-041` | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md) | P3.4 | adapted |
 | `ADR-042` | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md) | P4.05 | adopted |
 | `ADR-043` | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md) | P5.3 follow-up | adopted; G6 read-only comparator intake authorized |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-046; it must be unique at creation time.
+is ADR-047; it must be unique at creation time.
