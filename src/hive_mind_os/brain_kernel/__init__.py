@@ -58,6 +58,18 @@ from .planner import (
     graph_from_events,
     persist_plan,
 )
+from .roles import (
+    KERNEL_IMPLEMENTED_ROLES,
+    RoleCapabilities,
+    RoleHandler,
+    RoleInvocation,
+    RoleProtocolError,
+    append_role_result,
+    next_role,
+    result_digest,
+    role_capabilities,
+    role_prompt,
+)
 
 __all__ = (
     "Budget",
@@ -113,4 +125,14 @@ __all__ = (
     "normalize_portable_path",
     "paths_overlap",
     "persist_plan",
+    "KERNEL_IMPLEMENTED_ROLES",
+    "RoleCapabilities",
+    "RoleHandler",
+    "RoleInvocation",
+    "RoleProtocolError",
+    "append_role_result",
+    "result_digest",
+    "role_capabilities",
+    "role_prompt",
+    "next_role",
 )

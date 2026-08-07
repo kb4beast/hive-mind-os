@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any, Mapping
 
 from .canonical import canonical_digest
-from .contracts import MissionState, WorkState
+from .contracts import MissionState, RoleResult, WorkState
 
 _MISSION_NEXT = {
     MissionState.CREATED: {
@@ -108,6 +109,42 @@ def reduce_event(state: Mapping[str, Any], event: Mapping[str, Any]) -> dict[str
             raise ValueError(f"illegal work transition: {old} -> {new}")
         work["status"] = new.value
         result["work"][work_id] = work
+    elif event_type == "role.result":
+        work_id = event["work_id"]
+        if not work_id or work_id not in result["work"]:
+            raise ValueError("role result belongs to an unknown work item")
+        work = result["work"][work_id]
+        if work["mission_id"] != mission_id or work["status"] != WorkState.RUNNING.value:
+            raise ValueError("role result belongs to work that is not running")
+        document = payload.get("result")
+        if not isinstance(document, Mapping):
+            raise ValueError("role result payload is malformed")
+        values = dict(document)
+        for name in (
+            "base_artifact_refs",
+            "candidate_artifact_refs",
+            "output_artifact_refs",
+            "claims",
+            "effect_receipt_refs",
+            "unresolved_risks",
+        ):
+            if name in values:
+                values[name] = tuple(values[name])
+        try:
+            role_result = RoleResult(**values)
+        except (TypeError, ValueError) as error:
+            raise ValueError("role result contract is invalid") from error
+        bound = asdict(role_result)
+        claimed_digest = bound.pop("result_digest")
+        if (
+            claimed_digest != canonical_digest(bound)
+            or role_result.mission_id != mission_id
+            or role_result.work_id != work_id
+            or role_result.attempt_id != event["attempt_id"]
+            or role_result.executor_id != event["actor_id"]
+            or role_result.role != event["actor_role"]
+        ):
+            raise ValueError("role result event binding is invalid")
     else:
         raise ValueError(f"unknown kernel event type: {event_type}")
     return result
