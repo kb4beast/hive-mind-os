@@ -70,6 +70,19 @@ from .roles import (
     role_capabilities,
     role_prompt,
 )
+from .verification import (
+    ExactCandidateVerificationError,
+    TreeSnapshot,
+    VerificationOutcome,
+    accept_verified_work,
+    create_evaluation_plan,
+    evaluation_plan_digest,
+    evaluation_result_digest,
+    seal_evaluation_plan,
+    snapshot_tree,
+    verify_bundle,
+    verify_exact_candidate,
+)
 
 __all__ = (
     "Budget",
@@ -135,4 +148,15 @@ __all__ = (
     "role_capabilities",
     "role_prompt",
     "next_role",
+    "ExactCandidateVerificationError",
+    "TreeSnapshot",
+    "VerificationOutcome",
+    "accept_verified_work",
+    "create_evaluation_plan",
+    "evaluation_plan_digest",
+    "evaluation_result_digest",
+    "seal_evaluation_plan",
+    "snapshot_tree",
+    "verify_bundle",
+    "verify_exact_candidate",
 )
