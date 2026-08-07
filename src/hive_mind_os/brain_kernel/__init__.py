@@ -23,6 +23,13 @@ from .contracts import (
     WorkState,
     normalize_portable_path,
 )
+from .objectives import ObjectiveGraph, PlanLimits, paths_overlap
+from .planner import (
+    DeterministicFixturePlanner,
+    FixturePlan,
+    graph_from_events,
+    persist_plan,
+)
 
 __all__ = (
     "Budget",
@@ -39,6 +46,8 @@ __all__ = (
     "LeaseState",
     "MemoryRecord",
     "MemoryState",
+    "ObjectiveGraph",
+    "PlanLimits",
     "MissionCharter",
     "MissionState",
     "RoleResult",
@@ -46,5 +55,10 @@ __all__ = (
     "WorkState",
     "canonical_bytes",
     "canonical_digest",
+    "DeterministicFixturePlanner",
+    "FixturePlan",
+    "graph_from_events",
     "normalize_portable_path",
+    "paths_overlap",
+    "persist_plan",
 )

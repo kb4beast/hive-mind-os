@@ -9,7 +9,7 @@ import sys
 import tempfile
 from hashlib import sha256
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, cast
 
 from .acceptance import (
     AcceptanceSpecification,
@@ -18,7 +18,13 @@ from .acceptance import (
 )
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
+from .brain_kernel.contracts import MissionCharter
 from .brain_kernel.doctor import inspect_kernel_environment
+from .brain_kernel.planner import (
+    DeterministicFixturePlanner,
+    graph_from_events,
+    persist_plan,
+)
 from .brain_kernel.store import KernelIntegrityError, KernelStore
 from .courtroom import CaseParticipants
 from .current_state_audit import (
@@ -126,6 +132,23 @@ def build_kernel_parser() -> argparse.ArgumentParser:
         help="Directory containing brain-kernel.sqlite3",
     )
     status.add_argument("--json", action="store_true", dest="json_output")
+    plan = commands.add_parser(
+        "plan", help="Persist a deterministic fixture plan for an existing kernel mission."
+    )
+    plan.add_argument("mission_id", help="Kernel mission identifier")
+    plan.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
+    plan.add_argument(
+        "--fixture", choices=("bugfix", "feature", "refactor", "docs", "integration"), required=True
+    )
+    plan.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    plan.add_argument("--json", action="store_true", dest="json_output")
+    graph = commands.add_parser(
+        "graph", help="Render a read-only, event-derived kernel work graph."
+    )
+    graph.add_argument("mission_id", help="Kernel mission identifier")
+    graph.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
+    graph.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    graph.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1088,6 +1111,61 @@ def _run_kernel_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_kernel_charter(path: str, mission_id: str) -> MissionCharter:
+    document = json.loads(Path(path).read_text(encoding="utf-8"))
+    charter = cast(MissionCharter, MissionCharter.from_document(document))
+    if charter.mission_id != mission_id:
+        raise ValueError("charter mission_id does not match command mission_id")
+    return charter
+
+
+def _kernel_database_or_error(state_dir: str) -> Path:
+    database = KernelStore.database_path(state_dir)
+    if not database.is_file():
+        raise FileNotFoundError(f"kernel state database does not exist: {database}")
+    return database
+
+
+def _run_kernel_plan(args: argparse.Namespace) -> int:
+    try:
+        charter = _load_kernel_charter(args.charter, args.mission_id)
+        store = KernelStore(_kernel_database_or_error(args.state_dir))
+        try:
+            if args.mission_id not in store.projection()["missions"]:
+                raise KeyError(f"unknown kernel mission: {args.mission_id}")
+            plan = DeterministicFixturePlanner().plan(charter, args.fixture)
+            sequences = persist_plan(store, plan)
+        finally:
+            store.close()
+    except (FileNotFoundError, KernelIntegrityError, OSError, ValueError, KeyError, sqlite3.Error) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {"mission_id": args.mission_id, "plan_digest": plan.digest, "sequences": sequences}
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else plan.digest)
+    return 0
+
+
+def _run_kernel_graph(args: argparse.Namespace) -> int:
+    try:
+        charter = _load_kernel_charter(args.charter, args.mission_id)
+        store = KernelStore(_kernel_database_or_error(args.state_dir), read_only=True)
+        try:
+            graph = graph_from_events(charter, store.events())
+        finally:
+            store.close()
+    except (FileNotFoundError, KernelIntegrityError, OSError, ValueError, KeyError, sqlite3.Error) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {
+        "mission_id": args.mission_id,
+        "graph_digest": graph.digest,
+        "ready_work_ids": [item.work_id for item in graph.ready_items()],
+        "work_items": [item.to_document() for item in graph.ordered_items()],
+    }
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else graph.digest)
+    return 0
+
+
 def _run_ingest(args: argparse.Namespace) -> int:
     supplied_file = Path(args.file)
     try:
@@ -1175,6 +1253,10 @@ def main(argv: Sequence[str] | None = None) -> None:
             raise SystemExit(_run_kernel_doctor(args))
         if args.kernel_command == "status":
             raise SystemExit(_run_kernel_status(args))
+        if args.kernel_command == "plan":
+            raise SystemExit(_run_kernel_plan(args))
+        if args.kernel_command == "graph":
+            raise SystemExit(_run_kernel_graph(args))
     if arguments and arguments[0] == "audit":
         args = build_audit_parser().parse_args(arguments[1:])
         raise SystemExit(_run_audit(args, ("hive-mind", *arguments)))
