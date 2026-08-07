@@ -1466,6 +1466,7 @@ class RepositoryMission:
                 # additions undercounts real tool calls.
                 used = len(workspace.receipt_records)
             self._consume(allowance, used)
+        assert workspace is not None
         self._record_workspace_receipts(workspace)
         self.ledger.append_event(
             self.run_id,
@@ -2092,6 +2093,7 @@ class RepositoryMission:
         record: Mapping[str, Any],
         artifact_id: str,
     ) -> bytes:
+        assert self._evidence_root is not None
         receipt = self._receipt_document(record)
         artifacts = receipt.get("artifacts")
         if not isinstance(artifacts, list):

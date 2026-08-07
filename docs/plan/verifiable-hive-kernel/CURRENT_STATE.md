@@ -39,6 +39,24 @@ The full-suite result predates the additive doctor files. The doctor-specific fo
 suite is maintained separately so the pre-existing baseline failure count is not
 misrepresented as a Phase 0 regression.
 
+## Local baseline repair provenance
+
+The local repository contained user-authored repair commit
+`b9ac2373e964dfe840fb63643b1b29b336eb1274` on
+`codex/green-trunk-repair`. Phase 0 inspected and applied that local commit as
+`880ca992d9f036cd82eec93a14a222d4af85dc44`. Its repairs verify historical benchmark
+and experiment receipts through the existing immutable local archive tag instead of
+restoring or modifying receipt files. It also closes local capability, sandbox-path,
+and recovery accounting mismatches exposed by the baseline gate.
+
+Two follow-up local repairs complete the same deterministic gate reconciliation:
+
+- synchronize the Builder facade with its already committed package manifest;
+- normalize copied example source and patch bytes before applying them on Windows.
+
+These changes do not access a provider, remote Git, remote CI, a draft pull request,
+or an existing receipt artifact. The final full-suite receipt is pending.
+
 ## Phase 0 implementation boundary
 
 The only new runtime capability is the additive, read-only `hive-mind kernel doctor`

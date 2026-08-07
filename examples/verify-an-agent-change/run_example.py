@@ -34,12 +34,17 @@ def _run_git(repository: Path, *arguments: str) -> None:
 def _prepare_repository(output: Path) -> Path:
     repository = output / "nonprofit-checkout"
     shutil.copytree(BASE_REPOSITORY, repository)
+    for relative in ("discounts.py", "check_discount.py"):
+        path = repository / relative
+        path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
     _run_git(repository, "init", "--quiet")
     _run_git(repository, "config", "user.name", "Example Maintainer")
     _run_git(repository, "config", "user.email", "maintainer@example.invalid")
     _run_git(repository, "add", "discounts.py", "check_discount.py")
     _run_git(repository, "commit", "--quiet", "-m", "baseline checkout rule")
-    _run_git(repository, "apply", "--whitespace=error", str(AGENT_PATCH))
+    normalized_patch = output / "agent-change.normalized.patch"
+    normalized_patch.write_bytes(AGENT_PATCH.read_bytes().replace(b"\r\n", b"\n"))
+    _run_git(repository, "apply", "--whitespace=error", str(normalized_patch))
     _run_git(repository, "add", "discounts.py")
     _run_git(
         repository,
