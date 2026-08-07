@@ -13,4 +13,9 @@ than editing the prior selection. No full memory projection, CLI, worker integra
 or scheduled consolidation is part of this implementation. A deterministic local
 snapshot can rebuild the active-memory view without becoming an authority.
 
+Canonical manifests can optionally persist beneath a caller-selected local root and
+are restored only after contract/digest verification. Consolidation remains an explicit
+bounded operation: independently evidenced episodes and an evaluator-approved outcome
+are required before it may emit supersession facts for a validated lesson.
+
 The complete regression gate remains `python -m unittest discover -s tests -v`.

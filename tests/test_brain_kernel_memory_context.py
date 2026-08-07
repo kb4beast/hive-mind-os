@@ -7,11 +7,13 @@ from pathlib import Path
 
 from hive_mind_os.brain_kernel.context import (
     ContextCompiler,
+    ContextManifestStore,
     ContextRequest,
     HotContextItem,
 )
 from hive_mind_os.brain_kernel.contracts import MemoryRecord, MemoryState
 from hive_mind_os.brain_kernel.memory import (
+    ConsolidationPolicy,
     MemoryAccess,
     MemoryArtifactStore,
     MemoryCatalog,
@@ -43,6 +45,8 @@ class KernelMemoryContextTests(unittest.TestCase):
         subject_keys: tuple[str, ...] = ("MISSION-one",),
         valid_to: str | None = None,
         supersedes: tuple[str, ...] = (),
+        outcome_refs: tuple[str, ...] = (),
+        evaluator_id: str | None = None,
     ) -> MemoryRecord:
         artifact = self.artifacts.put(body)
         return MemoryRecord(
@@ -61,8 +65,8 @@ class KernelMemoryContextTests(unittest.TestCase):
             MemoryState.ACTIVE,
             supersedes,
             (),
-            None,
-            (),
+            evaluator_id,
+            outcome_refs,
             "retain",
             DIGEST,
         )
@@ -123,6 +127,34 @@ class KernelMemoryContextTests(unittest.TestCase):
             rebuilt.active_records(self.request()),
         )
 
+    def test_consolidation_requires_independent_evidenced_episodes(self) -> None:
+        first = self.record(
+            "MEMORY-episode-one", "first episode", memory_class="episode", outcome_refs=("OUT-one",)
+        )
+        second = self.record(
+            "MEMORY-episode-two", "second episode", memory_class="episode", outcome_refs=("OUT-two",)
+        )
+        lesson = self.record(
+            "MEMORY-lesson", "validated lesson", memory_class="lesson",
+            supersedes=("MEMORY-episode-one", "MEMORY-episode-two"),
+            outcome_refs=("EVAL-one",), evaluator_id="curator-1",
+        )
+        self.catalog.register(first, self.access())
+        self.catalog.register(second, self.access())
+        with self.assertRaisesRegex(MemoryDenied, "independent contexts"):
+            self.catalog.consolidate(
+                lesson, self.access(), supporting_record_ids=lesson.supersedes,
+                independence_keys={"MEMORY-episode-one": "same", "MEMORY-episode-two": "same"},
+                now=LATER, reason="promotion",
+            )
+        events = self.catalog.consolidate(
+            lesson, self.access(), supporting_record_ids=lesson.supersedes,
+            independence_keys={"MEMORY-episode-one": "run-a", "MEMORY-episode-two": "run-b"},
+            now=LATER, reason="promotion", policy=ConsolidationPolicy(),
+        )
+        self.assertEqual(2, len(events))
+        self.assertEqual(("MEMORY-lesson",), tuple(item.record.record_id for item in self.catalog.active_records(self.request())))
+
     def test_ranking_is_deterministic_and_unauthorized_records_are_omitted(self) -> None:
         builder = self.record("MEMORY-builder", "alpha alpha")
         curator = self.record("MEMORY-curator", "alpha secret assessment")
@@ -171,6 +203,22 @@ class KernelMemoryContextTests(unittest.TestCase):
         self.assertEqual(("MEMORY-evidence",), compiled.manifest.warm_items)
         self.assertIn("evaluator_isolation", compiled.manifest.excluded_categories)
         self.assertTrue(compiled.manifest.generator_evaluator_separated)
+
+    def test_manifest_store_is_append_only_and_restores_canonical_manifests(self) -> None:
+        record = self.record("MEMORY-one", "reproducible evidence")
+        self.catalog.register(record, self.access())
+        store = ContextManifestStore(self.temporary.name)
+        compiled = ContextCompiler(self.catalog, store).compile(
+            ContextRequest(
+                "MISSION-one", "WORK-one", "ATTEMPT-one", "builder", DIGEST, DIGEST,
+                40, "evidence", LATER, ("internal",), (),
+            )
+        )
+        restored = ContextManifestStore(self.temporary.name)
+        self.assertEqual((compiled.manifest,), restored.restore())
+        store._path(compiled.manifest).write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "corrupt"):
+            ContextManifestStore(self.temporary.name).restore()
 
     def test_hot_context_never_slices_required_items_to_fit(self) -> None:
         request = ContextRequest(

@@ -32,6 +32,7 @@ from .contracts import (
     normalize_portable_path,
 )
 from .memory import (
+    ConsolidationPolicy,
     MemoryAccess,
     MemoryArtifact,
     MemoryArtifactStore,
@@ -59,6 +60,7 @@ __all__ = (
     "Budget",
     "Candidate",
     "CandidateState",
+    "ConsolidationPolicy",
     "CompiledContext",
     "ConstraintEnvelope",
     "ContextCompiler",

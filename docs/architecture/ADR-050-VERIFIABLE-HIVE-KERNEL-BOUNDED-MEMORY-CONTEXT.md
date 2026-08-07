@@ -23,11 +23,17 @@ references. Explicit cold retrieval creates a new immutable manifest revision;
 existing manifests remain addressable. Evaluator mode excludes scratchpad and
 self-assessment material marked unavailable to evaluators.
 
+`ContextManifestStore` may persist canonical manifests below a caller-selected local
+root. Restore verifies the contract and digest and refuses corrupted files. Lesson
+consolidation is explicit and deterministic: it requires separately evidenced active
+episodes from distinct caller-declared contexts plus an evaluator and outcome reference;
+it creates a successor and append-only supersession facts.
+
 The current implementation intentionally does not add a database projection,
-background consolidation job, CLI command, model invocation adapter, or legacy-command
-rewiring. The catalog can reproduce its active-memory view from a deterministic local
-snapshot of immutable records, lifecycle facts, and conflicts. Callers pass `now`
-explicitly; no selection depends on wall clock state or provider tokenization.
+background job, CLI command, model invocation adapter, or legacy-command rewiring. The
+catalog can reproduce its active-memory view from a deterministic local snapshot of
+immutable records, lifecycle facts, and conflicts. Callers pass `now` explicitly; no
+selection depends on wall clock state or provider tokenization.
 
 ## Consequences and rollback
 

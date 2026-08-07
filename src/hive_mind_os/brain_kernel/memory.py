@@ -229,6 +229,23 @@ class MemorySnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class ConsolidationPolicy:
+    """The minimum evidence burden for a deterministic lesson promotion."""
+
+    minimum_independent_episodes: int = 2
+    minimum_distinct_contexts: int = 2
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.minimum_independent_episodes) is not int
+            or type(self.minimum_distinct_contexts) is not int
+            or self.minimum_independent_episodes < 2
+            or self.minimum_distinct_contexts < 2
+        ):
+            raise ValueError("consolidation minimums must be integers of at least two")
+
+
+@dataclass(frozen=True, slots=True)
 class RetrievalRequest:
     mission_id: str
     work_id: str
@@ -393,6 +410,44 @@ class MemoryCatalog:
                     )
                 )
             return tuple(events)
+
+    def consolidate(
+        self,
+        lesson: MemoryRecord,
+        access: MemoryAccess,
+        *,
+        supporting_record_ids: Iterable[str],
+        independence_keys: Mapping[str, str],
+        now: str,
+        reason: str,
+        policy: ConsolidationPolicy = ConsolidationPolicy(),
+    ) -> tuple[MemoryLifecycleEvent, ...]:
+        """Promote a lesson only from independently evidenced active episodes."""
+
+        support = tuple(sorted(set(supporting_record_ids)))
+        if (
+            lesson.memory_class != "lesson"
+            or lesson.evaluator_id is None
+            or not lesson.outcome_refs
+            or lesson.supersedes != support
+        ):
+            raise MemoryDenied("lesson consolidation lacks a complete independent approval")
+        if len(support) < policy.minimum_independent_episodes:
+            raise MemoryDenied("lesson consolidation has too few episodes")
+        with self._lock:
+            if any(
+                record_id not in self._entries
+                or self._states[record_id] is not MemoryState.ACTIVE
+                or self._entries[record_id].record.memory_class != "episode"
+                or not self._entries[record_id].record.source_refs
+                or not self._entries[record_id].record.outcome_refs
+                for record_id in support
+            ):
+                raise MemoryDenied("lesson consolidation requires active evidenced episodes")
+            contexts = {independence_keys.get(record_id, "") for record_id in support}
+            if "" in contexts or len(contexts) < policy.minimum_distinct_contexts:
+                raise MemoryDenied("lesson consolidation lacks independent contexts")
+            return self.supersede(lesson, access, now=now, reason=reason)
 
     def record_conflict(
         self, record_ids: Iterable[str], *, reason: str, recorded_at: str

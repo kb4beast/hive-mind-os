@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from threading import RLock
 
-from .canonical import canonical_digest
+from .canonical import canonical_bytes, canonical_digest
 from .contracts import ContextManifest
 from .memory import MemoryCatalog, RankedMemory, RetrievalRequest
 
@@ -65,8 +67,9 @@ class CompiledContext:
 class ContextManifestStore:
     """Append-only manifest registry keyed by digest, not a mutable attempt slot."""
 
-    def __init__(self) -> None:
+    def __init__(self, root: str | Path | None = None) -> None:
         self._manifests: dict[str, ContextManifest] = {}
+        self.root = None if root is None else Path(root)
         self._lock = RLock()
 
     def store(self, manifest: ContextManifest) -> None:
@@ -92,6 +95,7 @@ class ContextManifestStore:
             existing = self._manifests.get(manifest.manifest_digest)
             if existing is not None and existing != manifest:
                 raise ValueError("context manifest digest is already bound")
+            self._persist(manifest)
             self._manifests[manifest.manifest_digest] = manifest
 
     def get(self, digest: str) -> ContextManifest:
@@ -102,6 +106,68 @@ class ContextManifestStore:
 
     def manifests(self) -> tuple[ContextManifest, ...]:
         return tuple(self._manifests[digest] for digest in sorted(self._manifests))
+
+    def restore(self) -> tuple[ContextManifest, ...]:
+        """Load every on-disk manifest only if its canonical contract verifies."""
+
+        if self.root is None:
+            return self.manifests()
+        directory = self.root / "context"
+        if not directory.exists():
+            return ()
+        for path in sorted(directory.rglob("*.json")):
+            try:
+                document = json.loads(path.read_text(encoding="utf-8"))
+                restored = ContextManifest.from_document(document)
+                if not isinstance(restored, ContextManifest):
+                    raise ValueError("context manifest has the wrong contract type")
+                manifest = ContextManifest(
+                    restored.mission_id,
+                    restored.work_id,
+                    restored.attempt_id,
+                    restored.role,
+                    restored.charter_digest,
+                    restored.authority_digest,
+                    restored.token_budget,
+                    restored.estimated_tokens,
+                    tuple(restored.hot_items),
+                    tuple(restored.warm_items),
+                    tuple(restored.cold_references),
+                    tuple(restored.excluded_categories),
+                    dict(restored.excluded_counts),
+                    tuple(restored.conflict_records),
+                    restored.generator_evaluator_separated,
+                    restored.manifest_digest,
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+                raise ValueError(f"context manifest is corrupt: {path}") from error
+            self.store(manifest)
+        return self.manifests()
+
+    def _persist(self, manifest: ContextManifest) -> None:
+        if self.root is None:
+            return
+        path = self._path(manifest)
+        encoded = canonical_bytes(manifest.to_document())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with path.open("xb") as output:
+                output.write(encoded)
+        except FileExistsError:
+            if path.read_bytes() != encoded:
+                raise ValueError("context manifest cannot be rewritten")
+
+    def _path(self, manifest: ContextManifest) -> Path:
+        if self.root is None:
+            raise ValueError("an in-memory manifest store has no persistence path")
+        return (
+            self.root
+            / "context"
+            / manifest.mission_id
+            / manifest.work_id
+            / manifest.attempt_id
+            / f"{manifest.manifest_digest.removeprefix('sha256:')}.json"
+        )
 
 
 class ContextCompiler:
