@@ -20,9 +20,10 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-045` | [Verifiable Hive Kernel canonical contracts](ADR-045-VERIFIABLE-HIVE-KERNEL-CANONICAL-CONTRACTS.md) | Verifiable Hive Kernel P1 | proposed; independent courtroom disposition remains required |
 | `ADR-046` | [Verifiable Hive Kernel append-only event spine](ADR-046-VERIFIABLE-HIVE-KERNEL-EVENT-SPINE.md) | Verifiable Hive Kernel P2 | proposed; independent courtroom disposition remains required |
 | `ADR-047` | [Verifiable Hive Kernel bounded objective DAG](ADR-047-VERIFIABLE-HIVE-KERNEL-OBJECTIVE-DAG.md) | Verifiable Hive Kernel P3 | proposed; independent courtroom disposition remains required |
+| `ADR-048` | [Verifiable Hive Kernel bounded local workers](ADR-048-VERIFIABLE-HIVE-KERNEL-LOCAL-WORKERS.md) | Verifiable Hive Kernel P4 | proposed; independent courtroom disposition remains required |
 | `ADR-041` | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md) | P3.4 | adapted |
 | `ADR-042` | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md) | P4.05 | adopted |
 | `ADR-043` | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md) | P5.3 follow-up | adopted; G6 read-only comparator intake authorized |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-048; it must be unique at creation time.
+is ADR-049; it must be unique at creation time.

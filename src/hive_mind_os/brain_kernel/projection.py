@@ -41,11 +41,12 @@ _WORK_NEXT = {
         WorkState.SUPERSEDED,
     },
     WorkState.READY: {WorkState.LEASED, WorkState.CANCELLED},
-    WorkState.LEASED: {WorkState.RUNNING, WorkState.RETRYABLE_FAILED},
+    WorkState.LEASED: {WorkState.RUNNING, WorkState.RETRYABLE_FAILED, WorkState.CANCELLED},
     WorkState.RUNNING: {
         WorkState.AWAITING_VERIFICATION,
         WorkState.RETRYABLE_FAILED,
         WorkState.TERMINAL_FAILED,
+        WorkState.CANCELLED,
     },
     WorkState.AWAITING_VERIFICATION: {
         WorkState.ACCEPTED,
