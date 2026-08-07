@@ -15,9 +15,9 @@ from .acceptance import (
     AcceptanceSpecificationError,
     normalize_acceptance_specifications,
 )
-from .brain_kernel.doctor import inspect_kernel_environment
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
+from .brain_kernel.doctor import inspect_kernel_environment
 from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
@@ -45,11 +45,10 @@ from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .projection import build_projection, projection_json, write_projection_html
-from .prompt_registry import PromptRegistry
-from .verify import VerificationError, verify_repository
 from .runtime import HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
+from .verify import VerificationError, verify_repository
 from .workers import serve
 
 

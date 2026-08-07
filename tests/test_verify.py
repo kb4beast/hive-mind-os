@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import io
+import json
 import subprocess
 import sys
 import tempfile
@@ -9,8 +9,8 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from hive_mind_os.verify import verify_repository
 from hive_mind_os import cli
+from hive_mind_os.verify import verify_repository
 
 
 class StandaloneVerificationTests(unittest.TestCase):

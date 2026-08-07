@@ -12,7 +12,10 @@ from hive_mind_os.reference.package_system import (
     ComponentKind,
     WorkflowManifest,
 )
-from hive_mind_os.reference.package_system.builtins import hive_core_catalog, hive_core_root
+from hive_mind_os.reference.package_system.builtins import (
+    hive_core_catalog,
+    hive_core_root,
+)
 from hive_mind_os.roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 
 EXPECTED_ROLE_DATA = {

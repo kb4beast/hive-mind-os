@@ -7,14 +7,6 @@ from .autonomy import (
     EvolutionArena,
     MissionCharter,
 )
-from .reference.classic_gpt import (
-    ActionKind,
-    ClassicGptSimulationGate,
-    ClassicGptSourcePack,
-    ClassicGptTurn,
-    SimulatedAction,
-    SimulationPhase,
-)
 from .contracts import (
     ContractValidation,
     load_schema,
@@ -74,6 +66,43 @@ from .mission_store import (
     resume_mission,
 )
 from .models import AutonomyLevel, Objective, RiskTier, Role
+from .projection import (
+    DEFAULT_PROJECTION_SCHEMA_VERSION,
+    WAR_ROOM_PROJECTION_SCHEMA_VERSION,
+    build_projection,
+    build_war_room_projection,
+    projection_html,
+    projection_json,
+)
+from .prompt_registry import PromptRegistry, generation_zero_prompt, prompt_digest
+from .receipts import (
+    FileReceiptValidator,
+    ReceiptReference,
+    ReceiptResult,
+    ReceiptValidation,
+    ReceiptValidator,
+    sha256_digest,
+)
+from .recursive_improvement import (
+    ExperimentCandidate,
+    ExperimentDecision,
+    ExperimentEvidence,
+    ExperimentVerdict,
+    MetricDirection,
+    MetricObservation,
+    MetricSpec,
+    RecursiveImprovementContract,
+    RecursiveImprovementController,
+    RecursiveImprovementGate,
+)
+from .reference.classic_gpt import (
+    ActionKind,
+    ClassicGptSimulationGate,
+    ClassicGptSourcePack,
+    ClassicGptTurn,
+    SimulatedAction,
+    SimulationPhase,
+)
 from .reference.package_system import (
     AgentManifest,
     CatalogSnapshot,
@@ -105,35 +134,7 @@ from .reference.package_system import (
     load_builtin_host_profiles,
     validate_ooda_contract,
 )
-from .projection import (
-    DEFAULT_PROJECTION_SCHEMA_VERSION,
-    WAR_ROOM_PROJECTION_SCHEMA_VERSION,
-    build_projection,
-    build_war_room_projection,
-    projection_html,
-    projection_json,
-)
-from .prompt_registry import PromptRegistry, generation_zero_prompt, prompt_digest
-from .receipts import (
-    FileReceiptValidator,
-    ReceiptReference,
-    ReceiptResult,
-    ReceiptValidation,
-    ReceiptValidator,
-    sha256_digest,
-)
-from .recursive_improvement import (
-    ExperimentCandidate,
-    ExperimentDecision,
-    ExperimentEvidence,
-    ExperimentVerdict,
-    MetricDirection,
-    MetricObservation,
-    MetricSpec,
-    RecursiveImprovementContract,
-    RecursiveImprovementController,
-    RecursiveImprovementGate,
-)
+from .reference.vision import HardenedVisionContract, VisionComplianceGate
 from .repository_learning import RepositoryLearningCurriculum, RepositoryScout
 from .runtime import HiveKernel
 from .scheduler import Job, ManualClock, Scheduler, StaleLeaseError, SystemClock
@@ -142,7 +143,6 @@ from .source_docket import (
     load_default_source_docket,
     load_source_docket,
 )
-from .reference.vision import HardenedVisionContract, VisionComplianceGate
 from .workers import Worker, serve
 
 __all__ = [

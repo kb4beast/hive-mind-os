@@ -57,6 +57,21 @@ Two follow-up local repairs complete the same deterministic gate reconciliation:
 These changes do not access a provider, remote Git, remote CI, a draft pull request,
 or an existing receipt artifact. The final full-suite receipt is pending.
 
+## Final local gate receipt
+
+The repaired isolated worktree passed the deterministic suite on 2026-08-07:
+
+- `python -m unittest discover -s tests -v`: 464 tests passed in 666.429 seconds;
+  5 skips are expected where Windows does not grant symlink privilege.
+- `python -m compileall -q src tests`: passed.
+- `python -m ruff check src tests`: passed after mechanical import normalization.
+- `pyright`: 0 errors, 0 warnings, 0 informations.
+- `python -m hive_mind_os.cli kernel doctor --repository . --json`: reports a clean,
+  locally ready worktree without creating state or revealing configuration values.
+
+This is technical gate evidence only. The independent Curator/Judge disposition
+required for a governed Phase 0 completion remains an explicit open obligation.
+
 ## Phase 0 implementation boundary
 
 The only new runtime capability is the additive, read-only `hive-mind kernel doctor`
