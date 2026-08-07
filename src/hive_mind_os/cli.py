@@ -15,6 +15,7 @@ from .acceptance import (
     AcceptanceSpecificationError,
     normalize_acceptance_specifications,
 )
+from .brain_kernel.doctor import inspect_kernel_environment
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
 from .courtroom import CaseParticipants
@@ -93,6 +94,26 @@ def build_audit_parser() -> argparse.ArgumentParser:
         "--signing-key-id",
         help="Required stable identifier when --signing-key-file is used",
     )
+    return parser
+
+
+def build_kernel_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind kernel",
+        description="Inspect additive Verifiable Hive Kernel capabilities.",
+    )
+    commands = parser.add_subparsers(dest="kernel_command", required=True)
+    doctor = commands.add_parser(
+        "doctor",
+        help="Report local kernel prerequisites without performing remote effects.",
+    )
+    doctor.add_argument("--repository", default=".", help="Git worktree to inspect")
+    doctor.add_argument(
+        "--state-dir",
+        default=".hive-mind-kernel-state",
+        help="State directory to validate without creating it",
+    )
+    doctor.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1007,6 +1028,15 @@ def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     return 0 if audit["complete"] else 1
 
 
+def _run_kernel_doctor(args: argparse.Namespace) -> int:
+    report = inspect_kernel_environment(
+        args.repository,
+        state_dir=args.state_dir,
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
 def _run_ingest(args: argparse.Namespace) -> int:
     supplied_file = Path(args.file)
     try:
@@ -1088,6 +1118,10 @@ def _run_defer(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "kernel":
+        args = build_kernel_parser().parse_args(arguments[1:])
+        if args.kernel_command == "doctor":
+            raise SystemExit(_run_kernel_doctor(args))
     if arguments and arguments[0] == "audit":
         args = build_audit_parser().parse_args(arguments[1:])
         raise SystemExit(_run_audit(args, ("hive-mind", *arguments)))
