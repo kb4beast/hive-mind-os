@@ -34,3 +34,11 @@ G2 (real-model access), G3 (signing), G4 (external retention), G5 (production pi
 (comparator execution), G7 (source licensing), and G8 (authenticated independent-human
 promotion) remain open. Those gates, plus the named release/production blockers in
 `docs/plan/BLOCKERS.md`, are not defeatable by local tests or this packet.
+
+## Local packet receipt
+
+[`phase12-54020b7.json`](../../../evidence/local_assurance/phase12-54020b7.json) binds
+commit `54020b72d2fff602b355c99924b01b5cfb5d8ec5`, tree
+`a54dcc7b58055be8850f4461191746fc94bd453d`, the retained two-task/two-repetition offline
+benchmark, and named Phase 11, security, and recovery transcripts. Its report digest is
+`sha256:af3f4600d0d64a250cfb78a2a016e2ba4e2cecf28a766785c393185f7ec59ab8`.

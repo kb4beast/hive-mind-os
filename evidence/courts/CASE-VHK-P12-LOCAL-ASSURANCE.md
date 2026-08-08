@@ -19,3 +19,18 @@ The final local packet must bind an exact committed candidate, Phase 11 route ma
 parity/rollback digests, an offline `measurement-recorded` benchmark report, and named
 passing security and recovery receipts. Missing or contradictory values are a failure, not a
 reason to relax the packet.
+
+## Local measurement receipt
+
+`evidence/local_assurance/phase12-54020b7.json` has report digest
+`sha256:af3f4600d0d64a250cfb78a2a016e2ba4e2cecf28a766785c393185f7ec59ab8`. It records
+the existing offline benchmark run `p13-19f89e32e6980c82`, whose verdict is
+`measurement-recorded`; it does not make a comparative quality or superiority claim.
+
+### Procedural Curator reproduction
+
+A separately prompted procedural Curator verified that the packet candidate commit/tree
+match Git and that its scope is `local-deterministic` with every release, production,
+provider, signing, and comparative-promotion flag false. It also reproduced the focused
+enqueue and assurance tests: 6 passed in 1.512 seconds. The result remains local technical
+evidence and does not close G2-G8 or create an authenticated independent review claim.
