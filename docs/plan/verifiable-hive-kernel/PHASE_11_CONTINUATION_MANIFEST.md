@@ -6,9 +6,9 @@
   Phase 10 `adapt` disposition and local Phase 11 execution on 2026-08-08. See
   `CASE-VHK-P10-LOCAL-COMPATIBILITY-FIREWALL.md` and
   `CASE-P10G-WINDOWS-SANDBOX-LIVENESS.md`.
-- **Base and candidate:** `becd317a8105da7c711315bbee8c0e32e60d1046`; commit tree
-  `211521a44bea52da1f1ab3d85a157f9d8666f759`; worktree was clean before this
-  manifest.
+- **Base and candidate:** `f9cbdda9b620e77f70bf36fc1e8f9d70c1e64ee4`; commit tree
+  `c44cf055c70f90b931c3e7fb1168307eb25bf7b3`; worktree was clean before this
+  continuation update.
 
 ## Governing sources and boundaries
 
@@ -24,6 +24,11 @@ its parity/migration/rollback tests, the Phase 11 migration map and evidence rec
 and additive CLI/documentation wiring. Legacy state must remain readable; no old database
 is mutated in place, no provider/network/Git effect is introduced, and no historical
 receipt is changed.
+
+The next work item is compatibility routing for `serve` and `resume`. It may add only
+an outer adapter/reconciler, parser switches required for rollback, focused parity and
+recovery tests, and corresponding migration/evidence records. It must not rewrite legacy
+worker execution, checkpoint adoption, receipt formats, or the read-only `status` route.
 
 ## Roles and authority
 
