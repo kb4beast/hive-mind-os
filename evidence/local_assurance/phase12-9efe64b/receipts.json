@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "candidate_commit": "9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7",
+  "candidate_tree": "25839e21173160052189044ba4b6be16214ff8e7",
+  "report_digest": "sha256:1f48147213ba98d0bd1c00f6b4da4df0679a2880a7394c1f9d8e41b670ebb064",
+  "receipts": [
+    {
+      "name": "phase11-parity",
+      "status": "passed",
+      "digest": "sha256:2c90558b9491b67eecfa8c56200eef6a7c649c7e2037be86bc84de5eefcdb48d",
+      "command": [
+        ".venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work",
+        "-v"
+      ],
+      "interpreter": "Python 3.14 virtual environment",
+      "transcript_path": "logs/phase11-parity.log"
+    },
+    {
+      "name": "phase11-rollback",
+      "status": "passed",
+      "digest": "sha256:972c9ace79b2b43feb010c6465f4a8d9f421f6ea78f26f01b4b00803d08fdbc4",
+      "command": [
+        ".venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes",
+        "-v"
+      ],
+      "interpreter": "Python 3.14 virtual environment",
+      "transcript_path": "logs/phase11-rollback.log"
+    },
+    {
+      "name": "security-regression",
+      "status": "passed",
+      "digest": "sha256:963c5e8295a612e8424b9772cfeb49d4f3adb1d3b6ed5f56314c51c0443ff3eb",
+      "command": [
+        ".venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "tests.test_brain_kernel_authority",
+        "tests.test_brain_kernel_local_execution",
+        "tests.test_sandbox",
+        "-v"
+      ],
+      "interpreter": "Python 3.14 virtual environment",
+      "transcript_path": "logs/security-regression.log"
+    },
+    {
+      "name": "recovery-regression",
+      "status": "passed",
+      "digest": "sha256:b38df7af49fcdc66a5ef80a34f6b0e7e55536b010f3bf7c71f9232e273661868",
+      "command": [
+        ".venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_workers.py",
+        "-v"
+      ],
+      "interpreter": "Python 3.14 virtual environment",
+      "transcript_path": "logs/recovery-regression.log"
+    }
+  ],
+  "benchmark_summary": {
+    "path": "benchmark-success/p13-62b18c75e8cc99fc/summary.json",
+    "digest": "sha256:6f99246839f2866bae89d81f8035370559c75c10da4f40edc70971d56f82c21d"
+  }
+}

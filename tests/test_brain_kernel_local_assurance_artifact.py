@@ -59,6 +59,11 @@ class LocalAssuranceArtifactTests(unittest.TestCase):
                 "disposition": "measurement-recorded",
                 "judge_id": "judge",
                 "lane_identities": ["lane"],
+                "code_digest": self.commit,
+                "corpus_digest": digest(b"corpus"),
+                "harness_digest": digest(b"harness"),
+                "lane_digests": {"baseline": digest(b"baseline")},
+                "results_digest": digest(b"results"),
             },
         }
         summary_path, summary_digest = self.write(

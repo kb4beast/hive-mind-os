@@ -42,3 +42,19 @@ commit `54020b72d2fff602b355c99924b01b5cfb5d8ec5`, tree
 `a54dcc7b58055be8850f4461191746fc94bd453d`, the retained two-task/two-repetition offline
 benchmark, and named Phase 11, security, and recovery transcripts. Its report digest is
 `sha256:af3f4600d0d64a250cfb78a2a016e2ba4e2cecf28a766785c393185f7ec59ab8`.
+
+## Retained, content-addressed packet
+
+[`phase12-9efe64b`](../../../evidence/local_assurance/phase12-9efe64b/) retains the raw
+Phase 11 parity and rollback, security, and recovery transcripts beside its receipt
+manifest. The validator verifies every transcript digest and the copied benchmark summary
+before accepting the report. It binds commit `9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7`,
+tree `25839e21173160052189044ba4b6be16214ff8e7`, and report digest
+`sha256:1f48147213ba98d0bd1c00f6b4da4df0679a2880a7394c1f9d8e41b670ebb064`.
+
+The first attempt to materialize its benchmark beneath this repository hit Windows
+`WinError 145` during failed-evidence cleanup. That failed attempt is retained under
+`benchmark/` with its error receipt. A fresh external output root then completed the same
+deterministic two-task/two-repetition run; its complete output is copied under
+`benchmark-success/`. This remains local measurement only, not a completion or promotion
+of Phase 12.

@@ -34,3 +34,13 @@ match Git and that its scope is `local-deterministic` with every release, produc
 provider, signing, and comparative-promotion flag false. It also reproduced the focused
 enqueue and assurance tests: 6 passed in 1.512 seconds. The result remains local technical
 evidence and does not close G2-G8 or create an authenticated independent review claim.
+
+## Retained evidence repair
+
+The earlier packet retained only receipt hashes. The later
+`evidence/local_assurance/phase12-9efe64b/` packet retains the receipt bytes and an
+explicit manifest. `verify_local_assurance_artifact` fails closed if any transcript or
+the benchmark summary is unavailable, path-escaping, or digest-mismatched. Its report
+digest is `sha256:1f48147213ba98d0bd1c00f6b4da4df0679a2880a7394c1f9d8e41b670ebb064`.
+The retained failed Windows benchmark materialization and successful fresh-root rerun are
+both preserved; neither supports a release, superiority, or independent-review claim.

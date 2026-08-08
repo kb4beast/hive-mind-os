@@ -251,7 +251,10 @@ def verify_local_assurance_artifact(
     if _file_digest(summary_path) != _digest(benchmark_manifest.get("digest"), "benchmark summary digest"):
         raise LocalAssuranceError("benchmark summary digest does not match its content")
     summary = _load_object(summary_path, "benchmark summary")
-    benchmark_keys = ("run_id", "code_digest", "corpus_digest", "harness_digest", "results_digest", "lane_digests", "verdict")
-    if {key: summary.get(key) for key in benchmark_keys} != benchmark:
+    # BenchmarkHarness retains additional provenance fields in its verdict.  The
+    # assurance packet deliberately projects just the non-promoting judgment
+    # fields, so rebuild that same canonical projection rather than demanding
+    # byte-for-byte equality with the richer source record.
+    if _measurement_record(summary, _sha(report.get("candidate_commit"), "candidate commit")) != benchmark:
         raise LocalAssuranceError("benchmark summary does not match assurance measurement")
     return {**report, "report_digest": claimed_digest}
