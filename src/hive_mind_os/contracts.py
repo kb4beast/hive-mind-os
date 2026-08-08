@@ -49,6 +49,8 @@ KERNEL_SCHEMA_NAMES = (
     "brain-kernel-memory-record",
     "brain-kernel-evaluation",
     "brain-kernel-candidate",
+    "brain-kernel-historical-evidence-reference",
+    "brain-kernel-technical-closeout-report",
 )
 SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES, *KERNEL_SCHEMA_NAMES)
 ROLE_NAMES = frozenset(

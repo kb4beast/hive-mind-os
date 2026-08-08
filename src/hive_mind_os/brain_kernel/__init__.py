@@ -21,12 +21,15 @@ from .contracts import (
     EvaluationResult,
     EvaluationState,
     ExecutionLease,
+    HistoricalEvidenceReference,
     LeaseState,
     MemoryRecord,
     MemoryState,
     MissionCharter,
     MissionState,
     RoleResult,
+    TechnicalCloseoutReport,
+    TechnicalCloseoutState,
     WorkItem,
     WorkState,
     normalize_portable_path,
@@ -84,8 +87,29 @@ from .verification import (
     verify_exact_candidate,
 )
 
+_CLOSEOUT_EXPORTS = frozenset(
+    {
+        "TechnicalCloseoutError",
+        "declare_closeout_obligations",
+        "derive_technical_closeout",
+        "integrate_verified_work",
+        "record_evaluation_bundle",
+        "technical_closeout_digest",
+    }
+)
+
+
+def __getattr__(name: str):
+    if name in _CLOSEOUT_EXPORTS:
+        from . import closeout
+
+        return getattr(closeout, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = (
     "Budget",
+    "TechnicalCloseoutError",
     "Candidate",
     "CandidateState",
     "ConsolidationPolicy",
@@ -123,15 +147,21 @@ __all__ = (
     "SENSITIVITY_LEVELS",
     "MissionCharter",
     "MissionState",
+    "HistoricalEvidenceReference",
     "RoleResult",
+    "TechnicalCloseoutReport",
+    "TechnicalCloseoutState",
     "WorkItem",
     "WorkState",
     "canonical_bytes",
     "canonical_digest",
+    "declare_closeout_obligations",
+    "derive_technical_closeout",
     "DeterministicFixturePlanner",
     "FixturePlan",
     "HotContextItem",
     "graph_from_events",
+    "integrate_verified_work",
     "estimate_tokens",
     "manifest_digest",
     "normalize_terms",
@@ -147,6 +177,8 @@ __all__ = (
     "result_digest",
     "role_capabilities",
     "role_prompt",
+    "record_evaluation_bundle",
+    "technical_closeout_digest",
     "next_role",
     "ExactCandidateVerificationError",
     "TreeSnapshot",

@@ -152,6 +152,19 @@ def build_kernel_parser() -> argparse.ArgumentParser:
     graph.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
     graph.add_argument("--state-dir", default=".hive-mind-kernel-state")
     graph.add_argument("--json", action="store_true", dest="json_output")
+    closeout = commands.add_parser(
+        "closeout", help="Read a local, event-derived technical closeout report."
+    )
+    closeout.add_argument("mission_id", help="Kernel mission identifier")
+    closeout.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    closeout.add_argument(
+        "--bundle-ref",
+        action="append",
+        default=[],
+        metavar="REFERENCE=PATH",
+        help="Local verification bundle directory for one recorded opaque reference.",
+    )
+    closeout.add_argument("--json", action="store_true", dest="json_output")
     memory = commands.add_parser("memory", help="Inspect bounded local kernel memory.")
     memory_commands = memory.add_subparsers(dest="memory_command", required=True)
     search = memory_commands.add_parser("search", help="Rank scoped memory from a durable snapshot.")
@@ -1198,6 +1211,31 @@ def _run_kernel_graph(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_kernel_closeout(args: argparse.Namespace) -> int:
+    from .brain_kernel.closeout import TechnicalCloseoutError, derive_technical_closeout
+
+    try:
+        directories: dict[str, str] = {}
+        for value in args.bundle_ref:
+            reference, separator, directory = value.partition("=")
+            if not separator or not reference or not directory or reference in directories:
+                raise ValueError("bundle references must use unique REFERENCE=PATH values")
+            directories[reference] = directory
+        store = KernelStore(_kernel_database_or_error(args.state_dir), read_only=True)
+        try:
+            report = derive_technical_closeout(
+                store, args.mission_id, bundle_directories=directories
+            )
+        finally:
+            store.close()
+    except (FileNotFoundError, KernelIntegrityError, TechnicalCloseoutError, OSError, ValueError, KeyError, sqlite3.Error) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    document = report.to_document()
+    print(json.dumps(document, indent=2, sort_keys=True) if args.json_output else f"{report.mission_id}: {report.state}")
+    return 0
+
+
 def _memory_catalog(args: argparse.Namespace):
     return MemoryCatalogStore(args.state_dir).restore(args.snapshot)
 
@@ -1358,6 +1396,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             raise SystemExit(_run_kernel_plan(args))
         if args.kernel_command == "graph":
             raise SystemExit(_run_kernel_graph(args))
+        if args.kernel_command == "closeout":
+            raise SystemExit(_run_kernel_closeout(args))
         if args.kernel_command == "memory":
             if args.memory_command == "search":
                 raise SystemExit(_run_kernel_memory_search(args))

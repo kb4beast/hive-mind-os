@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.local/schemas/brain-kernel-historical-evidence-reference.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["receipt_ref", "receipt_digest", "provenance_label", "retention_note"],
+  "properties": {
+    "receipt_ref": {"type": "string", "minLength": 1},
+    "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "provenance_label": {"type": "string", "minLength": 1},
+    "retention_note": {"type": "string", "minLength": 1}
+  }
+}

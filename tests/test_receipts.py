@@ -58,7 +58,9 @@ class FileReceiptValidatorTests(unittest.TestCase):
         document.update(overrides)
         return document
 
-    def reference(self, document: object, name: str = "receipt.json") -> ReceiptReference:
+    def reference(
+        self, document: object, name: str = "receipt.json"
+    ) -> ReceiptReference:
         path = self.root / name
         path.write_text(json.dumps(document, sort_keys=True), encoding="utf-8")
         return ReceiptReference(path.name, sha256_digest(path.read_bytes()))
@@ -89,7 +91,7 @@ class FileReceiptValidatorTests(unittest.TestCase):
         self.assertFalse(self.validate(missing).valid)
 
     def test_long_windows_path_receipt_validates(self) -> None:
-        long_root = self.root / ("a" * 80) / ("b" * 80) / ("c" * 80)
+        long_root = self.root / ("a" * 80) / ("b" * 80) / ("c" * 96)
         self.assertGreater(len(str(long_root)), 260)
         access_root = filesystem_path(long_root)
         access_root.mkdir(parents=True)

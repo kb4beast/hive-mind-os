@@ -15,10 +15,13 @@ from hive_mind_os.brain_kernel.contracts import (
     EffectReceipt,
     EvaluationPlan,
     EvaluationState,
+    HistoricalEvidenceReference,
     MemoryRecord,
     MemoryState,
     MissionCharter,
     MissionState,
+    TechnicalCloseoutReport,
+    TechnicalCloseoutState,
     WorkItem,
     WorkState,
     normalize_portable_path,
@@ -51,6 +54,8 @@ class KernelContractTests(unittest.TestCase):
             MemoryRecord("MEMORY-one", "fact", "mission", (), "artifact", (), "verified", "internal", TIME, None, TIME, TIME, MemoryState.ACTIVE, (), (), None, (), "retain", DIGEST),
             EvaluationPlan("PLAN-one", SHA, DIGEST, ("python -m unittest",), (), ("tests\\test_one.py",), (DIGEST,), (), (), (), "json", (), BUDGET, EvaluationState.SEALED, DIGEST),
             Candidate("CANDIDATE-one", "MISSION-phase-1", SHA, (), CandidateState.PROPOSED, DIGEST, DIGEST),
+            HistoricalEvidenceReference("receipt:legacy", DIGEST, "legacy", "retain"),
+            TechnicalCloseoutReport("MISSION-phase-1", DIGEST, DIGEST, ("builder",), ("builder",), (), ("WORK-one",), (DIGEST,), (DIGEST,), TechnicalCloseoutState.TECHNICALLY_VERIFIED, DIGEST),
         )
         self.assertEqual(len(contracts), len(KERNEL_SCHEMA_NAMES) - 1)
         for contract in contracts:

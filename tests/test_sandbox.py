@@ -304,6 +304,56 @@ class SandboxTests(unittest.TestCase):
                 )
                 self.assertEqual(receipt["execution"]["outcome"], "succeeded")
 
+    @unittest.skipUnless(os.name == "nt", "Windows-specific Job Object regression")
+    def test_windows_job_assignment_failure_denies_before_suspended_root_runs(self) -> None:
+        class FailingJob:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def assign(self, process: subprocess.Popen[bytes]) -> bool:
+                return False
+
+            def resume(self, process: subprocess.Popen[bytes]) -> bool:
+                raise AssertionError("a process must not resume before Job Object assignment")
+
+            def close(self) -> None:
+                self.closed = True
+
+        marker = self.root / "assignment-escape.txt"
+        job = FailingJob()
+        runner = self.runner()
+        with patch("hive_mind_os.sandbox._WindowsJob.create", return_value=job):
+            with self.assertRaisesRegex(SandboxDenied, "process creation failed: SubprocessError"):
+                runner.run(
+                    self.intent(
+                        [
+                            sys.executable,
+                            "-c",
+                            "import pathlib; pathlib.Path('assignment-escape.txt').write_text('escaped')",
+                        ]
+                    )
+                )
+        self.assertTrue(job.closed)
+        self.assertFalse(marker.exists())
+
+    @unittest.skipUnless(os.name == "nt", "Windows-specific Job Object regression")
+    def test_windows_job_unavailable_denies_before_root_spawns(self) -> None:
+        marker = self.root / "unavailable-escape.txt"
+        runner = self.runner(spec=self.spec(timeout_s=0.2))
+        with patch("hive_mind_os.sandbox._WindowsJob.create", return_value=None):
+            with self.assertRaisesRegex(SandboxDenied, "process creation failed: SubprocessError"):
+                runner.run(
+                    self.intent(
+                        [
+                            sys.executable,
+                            "-c",
+                            "import pathlib; pathlib.Path('unavailable-escape.txt').write_text('escaped')",
+                        ]
+                    )
+                )
+        self.assertEqual(runner.spawn_count, 0)
+        self.assertFalse(marker.exists())
+
     def test_output_cap_is_explicit_and_digest_bound(self) -> None:
         runner = self.runner(spec=self.spec(max_output_bytes=100))
         receipt = runner.run(

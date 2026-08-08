@@ -88,6 +88,12 @@ class CandidateState(StrEnum):
     QUARANTINED = "QUARANTINED"
 
 
+class TechnicalCloseoutState(StrEnum):
+    TECHNICALLY_VERIFIED = "TECHNICALLY_VERIFIED"
+    PARTIAL = "PARTIAL"
+    BLOCKED = "BLOCKED"
+
+
 def _require(value: str, label: str) -> None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{label} is required")
@@ -199,6 +205,7 @@ class _Contract:
             MemoryRecord: ("state", MemoryState),
             EvaluationPlan: ("state", EvaluationState),
             Candidate: ("state", CandidateState),
+            TechnicalCloseoutReport: ("state", TechnicalCloseoutState),
         }
         field = enum_fields.get(cls)
         if field is not None:
@@ -609,6 +616,60 @@ class EvaluationResult:
         for label in ("plan_digest", "candidate_digest", "result_digest"):
             _digest(getattr(self, label), label)
         _require(self.evaluator_id, "evaluator_id")
+
+
+@dataclass(frozen=True, slots=True)
+class HistoricalEvidenceReference(_Contract):
+    """Opaque, immutable metadata for evidence produced before the kernel."""
+
+    schema_name: ClassVar[str] = "brain-kernel-historical-evidence-reference"
+    receipt_ref: str
+    receipt_digest: str
+    provenance_label: str
+    retention_note: str
+
+    def __post_init__(self) -> None:
+        _require(self.receipt_ref, "receipt_ref")
+        _digest(self.receipt_digest, "receipt_digest")
+        _require(self.provenance_label, "provenance_label")
+        _require(self.retention_note, "retention_note")
+
+
+@dataclass(frozen=True, slots=True)
+class TechnicalCloseoutReport(_Contract):
+    """A replayable local technical finding, never a customer-success claim."""
+
+    schema_name: ClassVar[str] = "brain-kernel-technical-closeout-report"
+    mission_id: str
+    event_head_digest: str
+    projection_digest: str
+    required_roles: tuple[str, ...]
+    fulfilled_roles: tuple[str, ...]
+    missing_obligations: tuple[str, ...]
+    integrated_work_ids: tuple[str, ...]
+    evaluation_result_digests: tuple[str, ...]
+    evidence_bundle_digests: tuple[str, ...]
+    state: TechnicalCloseoutState
+    report_digest: str
+
+    def __post_init__(self) -> None:
+        _identifier(self.mission_id, "mission")
+        for value in (self.event_head_digest, self.projection_digest, self.report_digest):
+            _digest(value)
+        if not self.required_roles or len(set(self.required_roles)) != len(self.required_roles):
+            raise ValueError("required_roles must be non-empty and unique")
+        if len(set(self.fulfilled_roles)) != len(self.fulfilled_roles):
+            raise ValueError("fulfilled_roles must be unique")
+        for role in (*self.required_roles, *self.fulfilled_roles):
+            _role(role)
+        if not set(self.fulfilled_roles).issubset(self.required_roles):
+            raise ValueError("fulfilled_roles must be required roles")
+        for work_id in self.integrated_work_ids:
+            _identifier(work_id, "work")
+        for digest in (*self.evaluation_result_digests, *self.evidence_bundle_digests):
+            _digest(digest)
+        if not isinstance(self.state, TechnicalCloseoutState):
+            raise ValueError("invalid technical closeout state")
 
 
 @dataclass(frozen=True, slots=True)

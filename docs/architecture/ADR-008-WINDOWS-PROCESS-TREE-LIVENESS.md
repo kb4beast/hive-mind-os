@@ -1,6 +1,6 @@
 # ADR-008: Bind Windows Process-Tree Liveness to Process Creation Time
 
-- **Status:** Proposed for independent P03 appeal review
+- **Status:** Implemented locally; independent P03 appeal review remains pending
 - **Date:** 2026-07-27
 - **Case:** `CASE-P03-WINDOWS-PROCESS-TREE-LIVENESS-APPEAL`
 - **Originating decision:** `docs/architecture/ADR-007-PROCESS-SANDBOX-GATEWAY.md`
@@ -45,17 +45,29 @@ Use the filtered set for both post-parent liveness and timeout termination. Pres
 existing parent-PID traversal so genuine descendants of an early-exiting parent remain
 bounded.
 
+The P10.G local repair creates a Windows Job Object with `KILL_ON_JOB_CLOSE` before
+spawning the root. It starts that root suspended, assigns it to the job, then resumes it.
+Creation, assignment, or resume failure denies the command before the root can execute.
+After the parent exits, an active-process query failure remains liveness-unknown until the
+deadline closes the job; it does not fall back to a racy Toolhelp success decision.
+
 ## Threats and residual limits
 
 | Threat | Control | Residual |
 |---|---|---|
 | Stale parent PID | Root/descendant creation-time comparison | Snapshot and query are not atomic |
 | Metadata access denied | Treat unknown-time candidates as descendants | May retain a false positive rather than fail open |
-| Early parent exit | Root process handle retains its creation time; snapshot follows genuine descendants | Windows remains best-effort without a Job Object |
+| Early parent exit | Suspended root is assigned before execution; job close tears down descendants | Command is denied when the Job Object is unavailable |
 | PID reuse during traversal | Creation-time lower bound rejects pre-root processes | A later unrelated process plus matching live ancestry remains a process-tier race |
+| Job creation/assignment/resume unavailable | Deny before root execution | Availability reduces capability but not liveness soundness |
+| Job active-process query unavailable | Treat tree liveness as unknown until timeout closes the job | May time out conservatively |
 
 This does not add Windows CPU or memory enforcement, network isolation, filesystem ACLs,
-Job Objects, containers, or externally authenticated evidence. `B-OPS-06` remains open.
+containers, or externally authenticated evidence. `B-OPS-06` remains open.
+
+The Job Object is only descendant-liveness and teardown plumbing. It does not impose the
+filesystem, network, executable-identity, secret, or resource controls required for hard
+isolation; `B-OPS-06` remains open.
 
 ## Acceptance evidence
 
@@ -66,6 +78,23 @@ Job Objects, containers, or externally authenticated evidence. `B-OPS-06` remain
 - The original P04 materialization regression completes against the repaired sandbox.
 - Full tests, Ruff, Pyright, audit, exact-head GitHub checks, and independent court review
   are required before delivery.
+
+## P10.G local implementation evidence
+
+On 2026-08-08, the Windows early-parent-exit/background-child regression passed after the
+Job Object repair, and `python -m unittest tests.test_sandbox -v` passed 23 tests with one
+expected POSIX-only skip. The required full local gate was also run with `TEMP` and `TMP`
+set to `C:\t`: 524 tests ran in 926.435 seconds with five expected skips and one failure.
+The former sandbox failure passed; the remaining failure was
+`test_long_windows_path_receipt_validates`, whose generated root length was 259 rather than
+the test's required greater-than-260 length under the short temporary root. This is local
+Builder evidence only and does not establish a clean full gate or independent disposition.
+
+After cross-examination exposed the Toolhelp fallback race, the suspended-root, fail-closed
+adaptation ran 25 sandbox tests with one expected POSIX-only skip. The final
+short-root full gate passed 526 tests in 1043.431 seconds with five expected skips. The Judge
+deferred Phase 10 pending separate Windows and Curator reproduction; this ADR does not
+authorize Phase 11 or alter `B-OPS-06`.
 
 ## Rollback
 

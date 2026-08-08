@@ -10,6 +10,7 @@ from .contracts import (
     EvaluationPlan,
     EvaluationResult,
     EvaluationState,
+    HistoricalEvidenceReference,
     MissionState,
     RoleResult,
     WorkState,
@@ -188,6 +189,49 @@ def reduce_event(state: Mapping[str, Any], event: Mapping[str, Any]) -> dict[str
         if evaluation.state is EvaluationState.PASSED:
             work["passed_evaluation_digest"] = evaluation.result_digest
         result["work"][work_id] = work
+    elif event_type == "evaluation.bundle.recorded":
+        work_id = event["work_id"]
+        if not work_id or work_id not in result["work"]:
+            raise ValueError("evaluation bundle belongs to an unknown work item")
+        work = dict(result["work"][work_id])
+        payload = event["payload"]
+        if (
+            work["mission_id"] != mission_id
+            or work["status"] != WorkState.AWAITING_VERIFICATION.value
+            or event["actor_role"] != "curator"
+            or work.get("passed_evaluation_digest") != payload.get("result_digest")
+            or "evaluation_bundle_digest" in work
+            or not isinstance(payload.get("bundle_ref"), str)
+        ):
+            raise ValueError("evaluation bundle binding is invalid")
+        digest = payload.get("bundle_digest")
+        if not isinstance(digest, str):
+            raise ValueError("evaluation bundle digest is invalid")
+        try:
+            HistoricalEvidenceReference("bundle:" + payload["bundle_ref"], digest, "phase-8-local", "retain")
+        except ValueError as error:
+            raise ValueError("evaluation bundle payload is invalid") from error
+        work["evaluation_bundle_digest"] = digest
+        result["work"][work_id] = work
+    elif event_type == "closeout.obligations.declared":
+        if mission_id not in result["missions"] or event["actor_role"] != "orchestrator":
+            raise ValueError("closeout obligation authority is invalid")
+        roles = payload.get("required_roles")
+        historical = payload.get("historical_evidence")
+        if not isinstance(roles, list) or not roles or len(set(roles)) != len(roles) or not isinstance(historical, list):
+            raise ValueError("closeout obligation payload is invalid")
+        try:
+            for role in roles:
+                if role not in {"orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer"}:
+                    raise ValueError("invalid closeout role")
+            references = [
+                cast(HistoricalEvidenceReference, HistoricalEvidenceReference.from_document(item))
+                for item in historical
+            ]
+            if len({item.receipt_ref for item in references}) != len(references):
+                raise ValueError("duplicate historical evidence reference")
+        except (TypeError, ValueError) as error:
+            raise ValueError("closeout historical evidence is invalid") from error
     elif event_type == "role.result":
         work_id = event["work_id"]
         if not work_id or work_id not in result["work"]:
