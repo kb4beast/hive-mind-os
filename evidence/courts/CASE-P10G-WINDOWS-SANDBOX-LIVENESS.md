@@ -92,3 +92,14 @@ The receipt does not attest a separately controlled Windows environment or an au
 witness identity. Its earlier runner version also did not retain the full test-count and
 expected-skip summary in `C:\Phase10Full\logs\full-tests.log`. It is therefore a retained
 witness exhibit, not completion of the Expert Witness obligation or a Judge disposition.
+
+### Owner/Judge continuation authorization
+
+On 2026-08-08, the repository owner, acting as the designated Judge for this local
+continuation, explicitly authorized the accompanying Phase 10 `adapt` disposition and
+local Phase 11 execution. This does not turn any PowerShell receipt into independent
+evidence and does not alter this case's Windows hard-isolation boundary.
+
+The adaptation permits reversible local migration work only. Separately controlled
+Windows witness evidence, authenticated identity, and release/promotion obligations
+remain open and must not be reclassified by Phase 11 or Phase 12 work.

@@ -121,3 +121,16 @@ Rollback removes the additive compatibility route and tests while retaining appe
 kernel events, local bundles, fixtures, legacy state, and all historical receipt bytes.
 No court participant may treat local tests as an independent promotion or customer
 outcome claim.
+
+### Owner/Judge continuation authorization
+
+On 2026-08-08, the repository owner, acting as the designated Judge for this local
+continuation, explicitly authorized an `adapt` disposition for Phase 10 and local
+Phase 11 execution. This is an interactive owner directive, not a claim that the
+PowerShell runner itself establishes independent authority.
+
+The adaptation permits only incremental, reversible local compatibility migration with
+parity, rollback, and evidence requirements preserved. The separately controlled
+Windows-witness obligation, authenticated identity limits, and all G2-G8 release and
+promotion gates remain open. Phase 11 may begin; no production or independent-human
+promotion claim is authorized by this disposition.

@@ -22,3 +22,11 @@ No existing path may be routed through the kernel until the relevant phase suppl
 
 The current Phase 0 doctor intentionally introduces no persistent state, so it has no
 database migration or data rollback step.
+
+## Phase 11: versioned enqueue convergence
+
+| Legacy surface | Phase 11 action | Compatibility | Rollback |
+| --- | --- | --- | --- |
+| `hive-mind enqueue` | Record an idempotent `legacy-enqueue-v1` kernel mission binding after the existing scheduler job is created. | Existing parser, job payload, mission ID, deduplication, stdout JSON, and legacy scheduler remain authoritative. | `--compatibility-mode legacy` skips the additive kernel record and reuses the existing legacy job. |
+| `.hive-mind-state` | Preserve `scheduler.sqlite3`, missions, receipts, and ledger in place. | Existing `serve`, `resume`, `missions`, and `status` retain their legacy reads and execution behavior. | No data restoration is needed because this route never migrates or mutates legacy state. |
+| `.hive-mind-kernel-state` | Create a separate `brain-kernel.sqlite3` migration record. | The record binds legacy mission ID, scheduler job ID, payload digest, and repository pin. | Reverting the additive record leaves the legacy route executable; the separate kernel record is retained as evidence. |

@@ -56,6 +56,7 @@ from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .projection import build_projection, projection_json, write_projection_html
+from .repository_compatibility import record_legacy_enqueue
 from .runtime import HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
@@ -496,6 +497,16 @@ def build_enqueue_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pin")
     parser.add_argument("--max-attempts", type=int, default=3)
     parser.add_argument("--state-dir", default=".hive-mind-state")
+    parser.add_argument(
+        "--kernel-state-dir",
+        help="Separate kernel migration-record directory (default: sibling .hive-mind-kernel-state)",
+    )
+    parser.add_argument(
+        "--compatibility-mode",
+        choices=("kernel-v1", "legacy"),
+        default="kernel-v1",
+        help="Use the versioned kernel ingress record or retain legacy-only dispatch for rollback.",
+    )
     return parser
 
 
@@ -1031,6 +1042,12 @@ def _run_enqueue(args: argparse.Namespace) -> int:
         )
     finally:
         scheduler.close()
+    if getattr(args, "compatibility_mode", "kernel-v1") == "kernel-v1":
+        record_legacy_enqueue(
+            job,
+            legacy_state_dir=args.state_dir,
+            kernel_state_dir=getattr(args, "kernel_state_dir", None),
+        )
     print(
         json.dumps(
             {
