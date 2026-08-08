@@ -42,5 +42,5 @@ The earlier packet retained only receipt hashes. The later
 explicit manifest. `verify_local_assurance_artifact` fails closed if any transcript or
 the benchmark summary is unavailable, path-escaping, or digest-mismatched. Its report
 digest is `sha256:1f48147213ba98d0bd1c00f6b4da4df0679a2880a7394c1f9d8e41b670ebb064`.
-The retained failed Windows benchmark materialization and successful fresh-root rerun are
+The retained failed Windows benchmark materialization (`e/p12f/`) and successful fresh-root rerun are
 both preserved; neither supports a release, superiority, or independent-review claim.

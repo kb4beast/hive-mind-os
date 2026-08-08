@@ -54,7 +54,8 @@ tree `25839e21173160052189044ba4b6be16214ff8e7`, and report digest
 
 The first attempt to materialize its benchmark beneath this repository hit Windows
 `WinError 145` during failed-evidence cleanup. That failed attempt is retained under
-`benchmark/` with its error receipt. A fresh external output root then completed the same
+`e/p12f/` with its error receipt. The deliberately short path keeps the retained bytes
+copyable by Windows point-in-time verification. A fresh external output root then completed the same
 deterministic two-task/two-repetition run; its complete output is copied under
 `benchmark-success/`. This remains local measurement only, not a completion or promotion
 of Phase 12.
