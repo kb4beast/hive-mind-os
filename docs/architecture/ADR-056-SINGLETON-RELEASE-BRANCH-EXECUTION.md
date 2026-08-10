@@ -9,7 +9,7 @@ Date: 2026-08-10
 All Autopilot nodes execute, validate, reconcile, claim, publish receipts, and open
 node PRs against one configured singleton release branch:
 
-`release/hive-mind-os-singleton-20260810`
+`release/hive-mind-os-singleton-20260810-r2`
 
 The protected `main` branch is not an execution target and must not receive node
 merges. It is reserved for one final integration after L0–L15 completion has been
