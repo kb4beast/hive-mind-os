@@ -11,48 +11,53 @@ permissions:
   contents: read
 
 jobs:
-  diagnose:
+  reproduce:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR branch with full history
-        uses: actions/checkout@v4
+      - name: Checkout branch with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-      - name: Inspect retained evidence and repair targets
+          persist-credentials: false
+      - name: Configure Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.14'
+      - name: Reproduce historical Phase-12 receipts
         shell: bash
         run: |
           set -euo pipefail
-          echo "=== zero-arg super calls in brain kernel ==="
-          grep -R -n -F 'super().' src/hive_mind_os/brain_kernel || true
-          echo "=== phase12 evidence history ==="
-          git log --all --oneline --name-status -- evidence/local_assurance/phase12-9efe64b || true
-          echo "=== historical phase12 log objects ==="
-          git rev-list --objects --all | grep -E 'phase12-9efe64b/.+\.log$' || true
-          echo "=== any current file with required receipt digests ==="
-          python - <<'PY'
-          from hashlib import sha256
-          from pathlib import Path
+          candidate=9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7
+          git worktree add --detach /tmp/pr117-candidate "$candidate"
+          cd /tmp/pr117-candidate
+          python -m pip install --disable-pip-version-check --no-deps -e . >/tmp/pr117-install.log 2>&1
+          mkdir -p /tmp/reproduced-logs
 
-          expected = {
-              "2c90558b9491b67eecfa8c56200eef6a7c649c7e2037be86bc84de5eefcdb48d",
-              "972c9ace79b2b43feb010c6465f4a8d9f421f6ea78f26f01b4b00803d08fdbc4",
-              "963c5e8295a612e8424b9772cfeb49d4f3adb1d3b6ed5f56314c51c0443ff3eb",
-              "b38df7af49fcdc66a5ef80a34f6b0e7e55536b010f3bf7c71f9232e273661868",
-          }
-          for path in Path('.').rglob('*'):
-              if not path.is_file() or '.git' in path.parts:
-                  continue
-              try:
-                  digest = sha256(path.read_bytes()).hexdigest()
-              except OSError:
-                  continue
-              if digest in expected:
-                  print(digest, path.as_posix())
-          PY
-          echo "=== database path implementation ==="
-          grep -n -A8 -B3 'def database_path' src/hive_mind_os/brain_kernel/store.py
-          echo "=== Ruff-reported example imports ==="
-          sed -n '1,45p' examples/verify-an-agent-change/repository/check_discount.py
-          sed -n '1,45p' examples/verify-an-agent-change/run_example.py
-          echo "=== Ruff evidence file ==="
-          sed -n '1,20p' e/p12f/attempts/a-53cc11ad795130c2/evaluation/tiny_pkg/__init__.py
+          python -m unittest \
+            tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work \
+            -v > /tmp/reproduced-logs/phase11-parity.log 2>&1
+          python -m unittest \
+            tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes \
+            -v > /tmp/reproduced-logs/phase11-rollback.log 2>&1
+          python -m unittest \
+            tests.test_brain_kernel_authority \
+            tests.test_brain_kernel_local_execution \
+            tests.test_sandbox \
+            -v > /tmp/reproduced-logs/security-regression.log 2>&1
+          python -m unittest discover -s tests -p test_workers.py -v \
+            > /tmp/reproduced-logs/recovery-regression.log 2>&1
+
+          echo "=== reproduced transcript digests ==="
+          sha256sum /tmp/reproduced-logs/*.log
+          echo "=== transcript tails ==="
+          for path in /tmp/reproduced-logs/*.log; do
+            echo "--- $(basename "$path") ---"
+            tail -n 8 "$path"
+          done
+
+      - name: Show Ruff fixes without modifying branch
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
+        continue-on-error: true
+        with:
+          version: '0.16.0'
+          args: 'check --fix --diff examples/verify-an-agent-change/repository/check_discount.py examples/verify-an-agent-change/run_example.py'
