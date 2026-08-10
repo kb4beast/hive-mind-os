@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from controller import (
+from durable_controller import (
     AutopilotError,
     ClaimError,
     ConfigurationError,
