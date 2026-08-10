@@ -17,4 +17,12 @@ baseline/candidate observations, repeated measurements, noise and regression gua
 proposer/builder/evaluator/judge separation, and an append-only court decision. Only a
 KEEP verdict may atomically move the champion pointer. Preserve every losing result.
 Never promote because a worker, Optimizer, or same-run evaluator recommends itself.
-Stop at the node's defined draft PR or genuine authority gate.
+
+Before opening the draft PR, finalize the promotion/evidence commit, create a receipt
+with exact base/final commit and tree identities, and run `autopilot complete`. Commit
+the generated node-owned `evidence/**/autopilot-completion-receipt.json` as a follow-up
+evidence commit. Completion retained only under `.autopilot/state/` is not durable. The
+eventual node PR must use an ancestry-preserving merge commit; do not squash or rebase it,
+because the receipt's `final_commit` must remain in target ancestry.
+
+Stop at the node's defined draft PR or genuine authority gate. Do not merge.
