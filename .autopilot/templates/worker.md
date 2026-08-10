@@ -14,6 +14,12 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
+## Dispatcher release barrier
+
+`{{NODE_STATE}}`, DAG membership, level membership, and dependency readiness are eligibility signals only. They do **not** authorize execution. This worker may claim or implement `{{NODE_ID}}` only when the latest dispatcher release is current and the rendered prompt begins with `DISPATCH VERDICT FOR {{NODE_ID}}: START NOW`. Otherwise the verdict is `WAIT` or `STOP` and this worker must not begin.
+
+For a parallel wave, all workers may be opened together only when the same current dispatcher release says `START TOGETHER NOW` and names the wave. Any target-branch advance/merge, conflicting claim, GitHub snapshot change, or reconciliation event makes the prior release stale. Re-run the dispatcher instead of reusing an old prompt. The `claim` command independently enforces this gate and fails closed on stale or absent release authority.
+
 Use a fresh, clean checkout with authenticated GitHub access. Read every applicable
 `AGENTS.md` and `CLAUDE.md`, then read `.autopilot/README.md` and the full contract for
 `{{NODE_ID}}` in `.autopilot/plan.json`.
@@ -22,12 +28,13 @@ Run:
 
 ```bash
 python .autopilot/bin/autopilot.py --repo-root . doctor --skip-controller-tests
+python .autopilot/bin/autopilot.py --repo-root . status
+python .autopilot/bin/autopilot.py --repo-root . ready
 python .autopilot/bin/autopilot.py --repo-root . claim {{NODE_ID}} \
   --owner <provider>:<unique-session> --publish-remote
 ```
 
-The remote claim must succeed before product work begins. Create/switch to `{{BRANCH}}`
-from the claim commit. Do not reuse another branch.
+`ready` returns only nodes with a current explicit dispatcher release, not merely static DAG eligibility. The remote claim must succeed before product work begins. Create/switch to `{{BRANCH}}` from the claim commit. Do not reuse another branch.
 
 ## Objective
 
@@ -90,7 +97,7 @@ python .autopilot/bin/autopilot.py --repo-root . complete {{NODE_ID}} \
 ```
 
 The command validates that declared changed paths equal the exact Git diff and remain
-inside this node's write scope, validates the retained remote claim including its branch,
+inside this node's effective write scope, validates the retained remote claim including its branch,
 and appends a **zero-path durable receipt commit** whose tree equals `final_tree`. It
 advances the local node branch to that receipt commit and prints its SHA. Push that branch
 and open/update the draft PR. Do not put completion truth only under ignored

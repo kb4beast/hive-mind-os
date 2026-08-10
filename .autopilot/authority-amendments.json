@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "amendments": [
+    {
+      "amendment_id": "recon-010-pr120-dispatcher-release-barrier-v1",
+      "node_id": "RECON-010",
+      "decision": "ADAPT",
+      "source_pr": 120,
+      "source_integrated_commit": "0f2aea66cf00c4d302d235b73aaeaea7248e044e",
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "authority_evidence": "evidence/autopilot/recon-010/dispatcher-release-barrier-authority-reconciliation.json",
+      "reason": "Merged PR #120 explicitly assigns the dispatcher release barrier to RECON-010, while the generated plan entry retained a narrower write scope. This exact-path amendment reconciles that contradiction without rewriting the sealed plan fingerprint or BOOT-000 attestation.",
+      "additional_write_scope": [
+        ".autopilot/authority-amendments.json",
+        ".autopilot/bin/autopilot.py",
+        ".autopilot/bin/release_barrier.py",
+        ".autopilot/workflow-policy.json",
+        ".autopilot/README.md",
+        ".autopilot/templates/reconciliation.md",
+        ".autopilot/templates/worker.md",
+        ".autopilot/tests/test_release_barrier.py",
+        "USER_GUIDE/02_ONE_PROMPT_FOREVER.md",
+        "USER_GUIDE/04_WHEN_TO_START_STOP.md"
+      ],
+      "additional_file_locks": [
+        ".autopilot/authority-amendments.json",
+        ".autopilot/bin/autopilot.py",
+        ".autopilot/bin/release_barrier.py",
+        ".autopilot/workflow-policy.json",
+        ".autopilot/README.md",
+        ".autopilot/templates/reconciliation.md",
+        ".autopilot/templates/worker.md",
+        ".autopilot/tests/test_release_barrier.py",
+        "USER_GUIDE/02_ONE_PROMPT_FOREVER.md",
+        "USER_GUIDE/04_WHEN_TO_START_STOP.md"
+      ],
+      "additional_required_tests": [
+        "dispatcher-release-barrier-tests"
+      ],
+      "additional_acceptance_criteria": [
+        "Unreleased workers remain WAIT while dispatcher reconciliation/release is incomplete.",
+        "A worker is claimable only after a current explicit START NOW release for that exact node.",
+        "A parallel wave is executable only after an explicit START TOGETHER NOW release naming that wave.",
+        "Every dispatcher candidate receives exactly one verdict: START NOW, WAIT, or STOP.",
+        "Dispatcher output plainly states how many worker sessions to open.",
+        "Static DAG or level membership alone never authorizes execution.",
+        "Target advance, merge, conflicting claim, snapshot change, or reconciliation event invalidates prior release instructions."
+      ],
+      "constraints": [
+        "No product runtime paths.",
+        "No DAG dependency weakening.",
+        "No completion requirement weakening.",
+        "No authority expansion for any node other than RECON-010.",
+        "No write authority beyond the exact enumerated additional paths."
+      ]
+    }
+  ]
+}
