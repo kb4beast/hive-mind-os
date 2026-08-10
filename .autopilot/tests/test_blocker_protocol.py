@@ -54,3 +54,11 @@ class BlockerProtocolTests(unittest.TestCase):
         )
         self.assertEqual(action["action"], "SPAWN_SUBTASK")
         self.assertEqual(action["role"], "orchestrator")
+        self.assertEqual(
+            action["required_sequence"],
+            list(controller.SUBTASK_EXECUTION_SEQUENCE),
+        )
+        self.assertLess(
+            action["required_sequence"].index("dispatch_explicit_start_now"),
+            action["required_sequence"].index("claim_remote_node_branch"),
+        )

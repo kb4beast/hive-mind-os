@@ -29,6 +29,17 @@ target, emits a new explicit release, and retries the blocked claim. It must
 stop again if the target changes or if the only workaround weakens a security
 or provenance control.
 
+Every child task follows this exact order:
+
+1. fetch the current singleton release;
+2. install the current GitHub snapshot;
+3. reconcile the target;
+4. run doctor and status;
+5. dispatch an explicit `START NOW` release;
+6. claim the remote node branch.
+
+A child must never attempt step 6 before step 5 has produced a valid release.
+
 Runtime packets are append-only under `.autopilot/state/blockers/`.  The
 protocol, tests, and failed-attempt evidence are repository artifacts, so a
 fresh session learns the recovery rule rather than repeating an opaque failure.

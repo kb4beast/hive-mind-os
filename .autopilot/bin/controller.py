@@ -43,6 +43,14 @@ UNSAFE_REMEDIATION_MARKERS = (
     "verify=false",
     "ignore certificate",
 )
+SUBTASK_EXECUTION_SEQUENCE = (
+    "fetch_current_singleton_release",
+    "install_current_github_snapshot",
+    "reconcile_target",
+    "run_doctor_and_status",
+    "dispatch_explicit_start_now",
+    "claim_remote_node_branch",
+)
 LEGAL_STATES = (
     "BOOTSTRAP_REQUIRED",
     "BOOTSTRAP_INVALID",
@@ -950,6 +958,7 @@ class ControlPlane:
                 "action": "SPAWN_SUBTASK",
                 "role": "orchestrator",
                 "objective": "refresh the singleton release snapshot, reconcile the current target, dispatch the exact eligible node, and retry its claim",
+                "required_sequence": list(SUBTASK_EXECUTION_SEQUENCE),
                 "stop_if": "target or snapshot changes again, or a protected/security control would need weakening",
             }
         return {
