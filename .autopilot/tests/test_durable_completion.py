@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -40,6 +41,16 @@ class DurableCompletionTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def git(self, *args: str) -> str:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=self.root,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        return completed.stdout.strip()
+
     @staticmethod
     def concrete_path(scope: str) -> str:
         path = scope.removesuffix("/**").replace("*", "artifact")
@@ -47,23 +58,36 @@ class DurableCompletionTests(unittest.TestCase):
             path += "/artifact.txt"
         return path
 
-    def receipt(self, node_id: str) -> dict:
+    def receipt(
+        self,
+        node_id: str,
+        *,
+        base_commit: str = BASELINE,
+        base_tree: str = BASE_TREE,
+        final_commit: str = SECOND,
+        final_tree: str = FINAL_TREE,
+        changed_paths: list[str] | None = None,
+    ) -> dict:
         node = self.plane.node(node_id)
-        changed = [self.concrete_path(node["write_scope"][0])]
+        changed = changed_paths or [self.concrete_path(node["write_scope"][0])]
         return {
             "schema_version": 1,
             "plan_fingerprint": self.plane.expected_plan_fingerprint,
             "node_id": node_id,
             "contract_version": node["contract_version"],
-            "base_commit": BASELINE,
-            "base_tree": BASE_TREE,
-            "final_commit": SECOND,
-            "final_tree": FINAL_TREE,
+            "base_commit": base_commit,
+            "base_tree": base_tree,
+            "final_commit": final_commit,
+            "final_tree": final_tree,
             "branch": node["branch"],
             "pr": 321,
             "changed_paths": changed,
             "tests": [
-                {"name": name, "status": "passed", "command": ["python", "-m", "unittest"]}
+                {
+                    "name": name,
+                    "status": "passed",
+                    "command": ["python", "-m", "unittest"],
+                }
                 for name in node["required_tests"]
             ],
             "evidence_refs": ["evidence:test"],
@@ -87,11 +111,21 @@ class DurableCompletionTests(unittest.TestCase):
             "rollback_ref": "revert:fixture",
         }
 
+    @staticmethod
+    def record(receipt: dict) -> dict:
+        return {
+            "commit": "a" * 40,
+            "parents": (receipt["final_commit"],),
+            "tree": receipt["final_tree"],
+            "receipt": receipt,
+        }
+
     def test_01_fresh_checkout_reconstructs_bootstrap_completion(self) -> None:
-        self.assertEqual(self.plane.node_view("BOOT-000").state, "COMPLETE")
+        view = self.plane.node_view("BOOT-000")
+        self.assertEqual(view.state, "COMPLETE")
         self.assertTrue(self.plane.completed("BOOT-000"))
-        self.assertEqual(self.plane.node_view("BOOT-000").branch, "agent/bootstrap-autopilot-control-plane")
-        self.assertEqual(self.plane.node_view("BOOT-000").pr_number, 120)
+        self.assertEqual(view.branch, "agent/bootstrap-autopilot-control-plane")
+        self.assertEqual(view.pr_number, 120)
 
     def test_02_ready_releases_exact_first_wave_after_bootstrap(self) -> None:
         self.assertEqual(set(self.plane.ready_nodes()), {"RECON-010", "BASE-020"})
@@ -124,7 +158,15 @@ class DurableCompletionTests(unittest.TestCase):
         self.assertEqual(view.state, "BOOTSTRAP_INVALID")
         self.assertIn("candidate_tree", view.reasons[0])
 
-    def test_07_pr_or_status_prose_alone_never_proves_bootstrap_complete(self) -> None:
+    def test_07_bootstrap_outside_sealed_historical_scope_fails_closed(self) -> None:
+        value = json.loads(self.plane.bootstrap_attestation_path.read_text(encoding="utf-8"))
+        value["changed_paths"].append("src/unauthorized.py")
+        self.plane.bootstrap_attestation_path.write_text(json.dumps(value), encoding="utf-8")
+        view = self.plane.node_view("BOOT-000")
+        self.assertEqual(view.state, "BOOTSTRAP_INVALID")
+        self.assertIn("outside sealed historical scope", view.reasons[0])
+
+    def test_08_pr_title_branch_or_status_alone_never_proves_bootstrap_complete(self) -> None:
         self.plane.bootstrap_attestation_path.unlink()
         durable.atomic_write_json(
             self.plane.state_dir / "github-state.json",
@@ -140,70 +182,136 @@ class DurableCompletionTests(unittest.TestCase):
                         "title": "BOOT-000 COMPLETE everything passed",
                     }
                 ],
-                "branches": [
-                    {"name": "autopilot/boot-000", "stale": False}
-                ],
+                "branches": [{"name": "autopilot/boot-000", "stale": False}],
             },
         )
         self.assertEqual(self.plane.node_view("BOOT-000").state, "BOOTSTRAP_REQUIRED")
 
-    def test_08_future_durable_receipt_survives_deleted_local_state(self) -> None:
-        receipt = self.receipt("BASE-020")
-        durable_path = self.plane.durable_receipt_path("BASE-020")
-        durable.atomic_write_json(durable_path, receipt)
-        self.assertEqual(self.plane.node_view("BASE-020").state, "COMPLETE")
+    def test_09_future_receipt_commit_survives_deleted_local_state(self) -> None:
+        self.git("init", "-b", "main")
+        self.git("config", "user.name", "Autopilot Test")
+        self.git("config", "user.email", "autopilot-test@example.invalid")
+        self.git("add", ".autopilot")
+        self.git("commit", "-m", "synthetic baseline")
+        base = self.git("rev-parse", "HEAD")
+        base_tree = self.git("rev-parse", "HEAD^{tree}")
+
+        branch = "autopilot/base-020"
+        self.git("checkout", "-b", branch)
+        claim_message = json.dumps(
+            {
+                "branch": branch,
+                "expires_at": "2099-01-01T00:00:00Z",
+                "kind": durable.REMOTE_CLAIM_KIND,
+                "node_id": "BASE-020",
+                "owner": "fixture:session",
+                "plan_fingerprint": self.plane.expected_plan_fingerprint,
+                "target_sha": base,
+            },
+            sort_keys=True,
+        )
+        self.git("commit", "--allow-empty", "-m", claim_message)
+
+        evidence = self.root / "docs" / "execution" / "AUTONOMY_BASELINE.md"
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        evidence.write_text("synthetic baseline evidence\n", encoding="utf-8")
+        self.git("add", evidence.relative_to(self.root).as_posix())
+        self.git("commit", "-m", "capture synthetic autonomy baseline")
+        final = self.git("rev-parse", "HEAD")
+        final_tree = self.git("rev-parse", "HEAD^{tree}")
+
+        receipt = self.receipt(
+            "BASE-020",
+            base_commit=base,
+            base_tree=base_tree,
+            final_commit=final,
+            final_tree=final_tree,
+            changed_paths=["docs/execution/AUTONOMY_BASELINE.md"],
+        )
+        durable.atomic_write_json(
+            self.plane.claim_path("BASE-020"),
+            {
+                "node_id": "BASE-020",
+                "owner": "fixture:session",
+                "expires_at": "2099-01-01T00:00:00Z",
+            },
+        )
+        receipt_commit = self.plane.complete("BASE-020", "fixture:session", receipt)
+        self.assertEqual(self.git("rev-parse", "HEAD"), receipt_commit)
+        self.assertEqual(self.git("rev-parse", f"{receipt_commit}^{{tree}}"), final_tree)
+        self.assertEqual(self.git("diff", "--name-only", f"{final}..{receipt_commit}"), "")
+
+        self.git("checkout", "main")
+        self.git("merge", "--no-ff", branch, "-m", "merge synthetic BASE-020")
         shutil.rmtree(self.plane.state_dir, ignore_errors=True)
+
         fresh = durable.ControlPlane(self.root)
-        self.assertEqual(fresh.node_view("BOOT-000").state, "COMPLETE")
         self.assertEqual(fresh.node_view("BASE-020").state, "COMPLETE")
 
-    def test_09_wrong_plan_future_receipt_fails_closed(self) -> None:
+    def test_10_wrong_plan_durable_receipt_fails_closed(self) -> None:
         receipt = self.receipt("BASE-020")
         receipt["plan_fingerprint"] = "sha256:" + "0" * 64
-        durable.atomic_write_json(self.plane.durable_receipt_path("BASE-020"), receipt)
-        self.assertEqual(self.plane.node_view("BASE-020").state, "REPAIR_REQUIRED")
+        with mock.patch.object(
+            self.plane,
+            "_durable_receipt_records",
+            return_value={"BASE-020": [self.record(receipt)]},
+        ):
+            self.assertEqual(self.plane.node_view("BASE-020").state, "REPAIR_REQUIRED")
 
-    def test_10_wrong_branch_future_receipt_fails_closed(self) -> None:
+    def test_11_wrong_branch_durable_receipt_fails_closed(self) -> None:
         receipt = self.receipt("BASE-020")
         receipt["branch"] = "not/the/node/branch"
-        durable.atomic_write_json(self.plane.durable_receipt_path("BASE-020"), receipt)
-        view = self.plane.node_view("BASE-020")
+        with mock.patch.object(
+            self.plane,
+            "_durable_receipt_records",
+            return_value={"BASE-020": [self.record(receipt)]},
+        ):
+            view = self.plane.node_view("BASE-020")
         self.assertEqual(view.state, "REPAIR_REQUIRED")
         self.assertIn("branch", view.reasons[0])
 
-    def test_11_out_of_scope_future_receipt_fails_closed(self) -> None:
+    def test_12_out_of_scope_durable_receipt_fails_closed(self) -> None:
         receipt = self.receipt("BASE-020")
         receipt["changed_paths"] = ["src/unauthorized.py"]
-        durable.atomic_write_json(self.plane.durable_receipt_path("BASE-020"), receipt)
-        view = self.plane.node_view("BASE-020")
+        with mock.patch.object(
+            self.plane,
+            "_durable_receipt_records",
+            return_value={"BASE-020": [self.record(receipt)]},
+        ):
+            view = self.plane.node_view("BASE-020")
         self.assertEqual(view.state, "REPAIR_REQUIRED")
         self.assertIn("outside node write scope", view.reasons[0])
 
-    def test_12_missing_tree_binding_fails_closed(self) -> None:
+    def test_13_missing_tree_binding_fails_closed(self) -> None:
         receipt = self.receipt("BASE-020")
         del receipt["final_tree"]
-        durable.atomic_write_json(self.plane.durable_receipt_path("BASE-020"), receipt)
-        view = self.plane.node_view("BASE-020")
+        record = self.record({**receipt, "final_tree": FINAL_TREE})
+        record["receipt"] = receipt
+        with mock.patch.object(
+            self.plane,
+            "_durable_receipt_records",
+            return_value={"BASE-020": [record]},
+        ):
+            view = self.plane.node_view("BASE-020")
         self.assertEqual(view.state, "REPAIR_REQUIRED")
         self.assertIn("final_tree", view.reasons[0])
 
-    def test_13_wrong_commit_tree_binding_is_rejected(self) -> None:
+    def test_14_receipt_commit_parent_or_tree_mismatch_fails_closed(self) -> None:
         receipt = self.receipt("BASE-020")
-        self.plane.control["verify_git_objects"] = True
-        with (
-            mock.patch.object(self.plane, "git_object_exists", return_value=True),
-            mock.patch.object(
-                self.plane,
-                "_commit_tree",
-                side_effect=lambda commit: BASE_TREE if commit == BASELINE else "9" * 40,
-            ),
-            mock.patch.object(self.plane, "is_ancestor", return_value=True),
-            mock.patch.object(self.plane, "current_target_sha", return_value=THIRD),
+        bad_record = self.record(receipt)
+        bad_record["parents"] = (THIRD,)
+        bad_record["tree"] = "9" * 40
+        with mock.patch.object(
+            self.plane,
+            "_durable_receipt_records",
+            return_value={"BASE-020": [bad_record]},
         ):
-            issues = self.plane.validate_receipt("BASE-020", receipt, require_integrated=True)
-        self.assertIn("receipt final_tree does not match final_commit", issues)
+            view = self.plane.node_view("BASE-020")
+        self.assertEqual(view.state, "REPAIR_REQUIRED")
+        self.assertIn("exactly the final candidate as parent", view.reasons[0])
+        self.assertIn("tree differs", view.reasons[0])
 
-    def test_14_non_integrated_future_receipt_is_rejected(self) -> None:
+    def test_15_non_integrated_future_receipt_is_rejected(self) -> None:
         receipt = self.receipt("BASE-020")
         self.plane.control["verify_git_objects"] = True
 
@@ -215,37 +323,44 @@ class DurableCompletionTests(unittest.TestCase):
             return True
 
         with (
+            mock.patch.object(self.plane, "_has_git_repository", return_value=True),
             mock.patch.object(self.plane, "git_object_exists", return_value=True),
             mock.patch.object(
                 self.plane,
                 "_commit_tree",
                 side_effect=lambda commit: BASE_TREE if commit == BASELINE else FINAL_TREE,
             ),
+            mock.patch.object(self.plane, "_diff_paths", return_value=tuple(receipt["changed_paths"])),
             mock.patch.object(self.plane, "is_ancestor", side_effect=ancestor),
             mock.patch.object(self.plane, "current_target_sha", return_value=THIRD),
         ):
             issues = self.plane.validate_receipt("BASE-020", receipt, require_integrated=True)
         self.assertIn("receipt final commit is not integrated into target history", issues)
 
-    def test_15_tampered_local_receipt_cannot_hide_behind_durable_copy(self) -> None:
+    def test_16_tampered_local_receipt_cannot_hide_behind_durable_commit(self) -> None:
         receipt = self.receipt("BASE-020")
-        durable.atomic_write_json(self.plane.durable_receipt_path("BASE-020"), receipt)
         tampered = copy.deepcopy(receipt)
         tampered["branch"] = "tampered/local"
         durable.atomic_write_json(self.plane.receipt_path("BASE-020"), tampered)
-        view = self.plane.node_view("BASE-020")
+        with mock.patch.object(
+            self.plane,
+            "_durable_receipt_records",
+            return_value={"BASE-020": [self.record(receipt)]},
+        ):
+            view = self.plane.node_view("BASE-020")
         self.assertEqual(view.state, "REPAIR_REQUIRED")
         self.assertIn("invalid local completion receipt", view.reasons[0])
 
-    def test_16_every_future_node_has_node_owned_durable_receipt_scope(self) -> None:
-        for node in self.plane.nodes():
-            node_id = str(node["id"])
-            if node_id == "BOOT-000":
-                continue
-            path = self.plane.durable_receipt_path(node_id)
-            relative = path.relative_to(self.root).as_posix()
-            self.assertTrue(relative.startswith("evidence/"), node_id)
-            self.assertTrue(relative.endswith("/autopilot-completion-receipt.json"), node_id)
+    def test_17_multiple_durable_receipts_fail_closed(self) -> None:
+        receipt = self.receipt("BASE-020")
+        with mock.patch.object(
+            self.plane,
+            "_durable_receipt_records",
+            return_value={"BASE-020": [self.record(receipt), self.record(receipt)]},
+        ):
+            view = self.plane.node_view("BASE-020")
+        self.assertEqual(view.state, "REPAIR_REQUIRED")
+        self.assertIn("multiple durable completion", view.reasons[0])
 
 
 if __name__ == "__main__":
