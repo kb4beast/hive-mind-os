@@ -11,10 +11,7 @@ BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
-from autopilot import (  # noqa: E402
-    RECON_PREMATURE_RECEIPT,
-    ControlPlane as CliControlPlane,
-)
+from autopilot import RECON_PREMATURE_RECEIPT, ControlPlane as CliControlPlane  # noqa: E402
 from durable_controller import ClaimError  # noqa: E402
 from release_barrier import ControlPlane  # noqa: E402
 
