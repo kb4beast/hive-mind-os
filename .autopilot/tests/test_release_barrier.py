@@ -11,6 +11,10 @@ BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
+from autopilot import (  # noqa: E402
+    RECON_PREMATURE_RECEIPT,
+    ControlPlane as CliControlPlane,
+)
 from durable_controller import ClaimError  # noqa: E402
 from release_barrier import ControlPlane  # noqa: E402
 
@@ -86,6 +90,34 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
             "nodes": nodes,
             "complete": False,
             "generated_at": "2030-01-01T00:00:00Z",
+        }
+
+    def _receipt_record(
+        self,
+        commit: str,
+        *,
+        supersedes: str | None = None,
+    ) -> dict[str, object]:
+        authority: dict[str, object] = {
+            "autonomy_level": "A3",
+            "node_id": "RECON-010",
+        }
+        if supersedes is not None:
+            authority["supersedes_receipt_commit"] = supersedes
+        return {
+            "commit": commit,
+            "receipt": {
+                "schema_version": 1,
+                "plan_fingerprint": PLAN_FINGERPRINT,
+                "node_id": "RECON-010",
+                "contract_version": 1,
+                "base_commit": BASELINE,
+                "base_tree": "a" * 40,
+                "branch": "autopilot/recon-010",
+                "pr": 122,
+                "final_commit": "c" * 40,
+                "authority": authority,
+            },
         }
 
     def test_01_real_static_graph_reports_first_wave_but_release_layer_keeps_wait(self) -> None:
@@ -264,6 +296,25 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
             any("product runtime" in issue for issue in plane.authority_issues())
         )
         self.assertNotIn("src/forbidden.py", plane.node("RECON-010")["write_scope"])
+
+    def test_12_exact_premature_receipt_can_be_superseded_without_history_rewrite(self) -> None:
+        plane = CliControlPlane(self.root)
+        historical = self._receipt_record(RECON_PREMATURE_RECEIPT)
+        replacement = self._receipt_record(
+            "d" * 40,
+            supersedes=RECON_PREMATURE_RECEIPT,
+        )
+        records = [historical, replacement]
+        resolved = plane._resolve_recon_receipt_records(records)
+        self.assertEqual(resolved, [replacement])
+        self.assertEqual(records, [historical, replacement])
+
+    def test_13_unbound_duplicate_receipts_remain_fail_closed(self) -> None:
+        plane = CliControlPlane(self.root)
+        historical = self._receipt_record(RECON_PREMATURE_RECEIPT)
+        duplicate = self._receipt_record("d" * 40)
+        records = [historical, duplicate]
+        self.assertIs(plane._resolve_recon_receipt_records(records), records)
 
 
 if __name__ == "__main__":
