@@ -6,8 +6,8 @@ checkout without granting a worker new file authority.
 
 Normal nodes therefore retain completion as an empty Git commit whose tree is exactly
 the validated final candidate tree and whose message contains the canonical receipt.
-That commit is created on the claimed node branch and must later remain in ``main``
-ancestry through an ancestry-preserving merge. The historical BOOT-000 squash merge
+That commit is created on the claimed node branch and must later remain in the configured
+singleton release branch through an ancestry-preserving merge. The historical BOOT-000 squash merge
 predates this mechanism and is recovered through one sealed bootstrap attestation.
 """
 
