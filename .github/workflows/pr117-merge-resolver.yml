@@ -123,6 +123,17 @@ jobs:
               raise RuntimeError("Ruff per-file-ignore section already exists; refuse to overwrite it")
           pyproject.write_text(text.rstrip() + section, encoding="utf-8")
 
+          attrs = Path(".gitattributes")
+          attrs_text = attrs.read_text(encoding="utf-8")
+          rule = "evidence/local_assurance/**/logs/** -text -diff"
+          if rule not in attrs_text:
+              attrs_text = attrs_text.rstrip() + (
+                  "\n\n# Local-assurance transcripts are content-addressed evidentiary bytes.\n"
+                  + rule
+                  + "\n"
+              )
+              attrs.write_text(attrs_text, encoding="utf-8")
+
           evidence_root = Path("evidence/local_assurance/phase12-9efe64b")
           logs_root = evidence_root / "logs"
           logs_root.mkdir(parents=True, exist_ok=True)
