@@ -37,6 +37,7 @@ class BlockerProtocolTests(unittest.TestCase):
             self.assertTrue(packet["blocker_id"])
             self.assertEqual(packet["status"], "OPEN")
             self.assertTrue(plane.safe_retry_allowed(packet))
+            self.assertEqual(packet["recovery_action"]["action"], "REPORT_BLOCKER")
             stored = root / ".autopilot" / "state" / "blockers" / "ARCH-100.jsonl"
             self.assertIn("retry_when", stored.read_text(encoding="utf-8"))
 
@@ -46,3 +47,10 @@ class BlockerProtocolTests(unittest.TestCase):
                 {"fix": "disable TLS certificate revocation", "retry_when": "retry"}
             )
         )
+
+    def test_stale_dispatcher_release_requests_orchestrator_subtask(self) -> None:
+        action = controller.ControlPlane.recovery_action(
+            {"category": "dispatcher", "cause": "dispatcher release is stale", "fix": "rerun dispatch"}
+        )
+        self.assertEqual(action["action"], "SPAWN_SUBTASK")
+        self.assertEqual(action["role"], "orchestrator")

@@ -22,6 +22,13 @@ is an unsafe remediation and remains ineligible for automatic retry. The
 controller may pursue safe alternatives, but must stop and report the exact
 repair when no safe alternative is available.
 
+Known orchestration blockers are actionable: a missing or stale dispatcher
+release produces a `SPAWN_SUBTASK` recovery action for an orchestrator child
+task. That child refreshes the current singleton snapshot, reconciles the
+target, emits a new explicit release, and retries the blocked claim. It must
+stop again if the target changes or if the only workaround weakens a security
+or provenance control.
+
 Runtime packets are append-only under `.autopilot/state/blockers/`.  The
 protocol, tests, and failed-attempt evidence are repository artifacts, so a
 fresh session learns the recovery rule rather than repeating an opaque failure.

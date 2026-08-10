@@ -927,12 +927,37 @@ class ControlPlane:
             "timestamp": format_time(self.clock()),
             "status": "OPEN",
         }
+        packet_without_id["recovery_action"] = self.recovery_action(packet_without_id)
         packet = {
             **packet_without_id,
             "blocker_id": digest_json(packet_without_id),
         }
         append_jsonl(self.blockers_dir / f"{node_id}.jsonl", packet)
         return packet
+
+    @staticmethod
+    def recovery_action(packet: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Turn known orchestration blockers into bounded child-task work."""
+
+        text = " ".join(
+            str(packet.get(key, "")) for key in ("category", "cause", "fix")
+        ).lower()
+        if any(
+            marker in text
+            for marker in ("dispatcher release", "release record", "dispatch release")
+        ):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "orchestrator",
+                "objective": "refresh the singleton release snapshot, reconcile the current target, dispatch the exact eligible node, and retry its claim",
+                "stop_if": "target or snapshot changes again, or a protected/security control would need weakening",
+            }
+        return {
+            "action": "REPORT_BLOCKER",
+            "role": "orchestrator",
+            "objective": "report the exact fix and retry condition to the controlling task",
+            "stop_if": "the blocker remains unresolved",
+        }
 
     @staticmethod
     def safe_retry_allowed(packet: Mapping[str, Any]) -> bool:
