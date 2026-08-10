@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "node_id": "RECON-010",
+  "decision": "ADOPT",
+  "target": {
+    "branch": "main",
+    "commit": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+    "tree": "87a92782680a967afd29bceab218c61fc562a5e4"
+  },
+  "validated_candidate": {
+    "commit": "5888b5fe285d47c0a20aa55ca53cfa72dd2669e8",
+    "tree": "bb71f1019d456989091351150f7e769f5083c8a2"
+  },
+  "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+  "contract_version": 1,
+  "authority": {
+    "source_pr": 120,
+    "source_integrated_commit": "0f2aea66cf00c4d302d235b73aaeaea7248e044e",
+    "amendment_id": "recon-010-pr120-dispatcher-release-barrier-v1",
+    "authority_record": ".autopilot/authority-amendments.json",
+    "reconciliation_evidence": "evidence/autopilot/recon-010/dispatcher-release-barrier-authority-reconciliation.json",
+    "rule": "Only the exact PR #120 dispatcher-release-barrier surfaces are added to RECON-010 authority; product runtime, DAG weakening, and unrelated control-plane expansion remain forbidden."
+  },
+  "release_barrier_acceptance": {
+    "unreleased_workers_wait": "PASS",
+    "exact_start_now_required": "PASS",
+    "parallel_start_together_now_required": "PASS",
+    "every_candidate_exactly_one_verdict": "PASS",
+    "plain_worker_session_count": "PASS",
+    "static_dag_is_not_execution_authority": "PASS",
+    "target_advance_invalidates_release": "PASS",
+    "new_reconciliation_invalidates_release": "PASS",
+    "github_snapshot_change_invalidates_release": "PASS",
+    "conflicting_claim_invalidates_release": "PASS"
+  },
+  "tests": [
+    {
+      "name": "live-state-reconciliation-test",
+      "outcome": "passed",
+      "evidence": "evidence/autopilot/recon-010/live-state-reconciliation.json"
+    },
+    {
+      "name": "dispatcher-release-barrier-tests",
+      "outcome": "passed",
+      "workflow": "Autopilot Control Room",
+      "run_id": 31398703411,
+      "head": "5888b5fe285d47c0a20aa55ca53cfa72dd2669e8",
+      "details": "control-plane tests and bootstrap doctor both completed successfully"
+    },
+    {
+      "name": "deterministic-repository-suite",
+      "outcome": "passed",
+      "workflow": "Constitutional CI",
+      "run_id": 31398703068,
+      "head": "5888b5fe285d47c0a20aa55ca53cfa72dd2669e8",
+      "details": "Windows/Linux unit-test matrices and applicable static/type, CodeQL, dependency/license, secret-scan, and provenance/build checks completed successfully"
+    }
+  ],
+  "adverse_history": [
+    {
+      "candidate": "c1c50d4696510154e9717aff4a1038b7adf9fcc4",
+      "run_id": 31397970840,
+      "outcome": "failed",
+      "reason": "release_barrier.py imported format_time from durable_controller instead of controller",
+      "disposition": "preserved and repaired; not normalized into success"
+    }
+  ],
+  "parallel_state": {
+    "base_020_remote_claim_observed": "34c8e3296348e9be265c128f45c0665c7461a42a",
+    "disposition": "parallel non-overlapping claim; not modified or executed by RECON-010"
+  },
+  "publication": {
+    "pr": 122,
+    "branch": "autopilot/recon-010",
+    "draft_required": true,
+    "auto_merge_forbidden": true,
+    "eventual_merge_method": "merge",
+    "squash_forbidden": true,
+    "rebase_forbidden": true
+  },
+  "roles": [
+    "orchestrator",
+    "explorer",
+    "curator"
+  ],
+  "timestamp": "2026-08-10T15:42:00Z"
+}
