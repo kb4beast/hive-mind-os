@@ -293,6 +293,7 @@ class ControlPlane:
         self.claims_dir = self.state_dir / "claims"
         self.receipts_dir = self.state_dir / "receipts"
         self.failures_dir = self.state_dir / "failures"
+        self.blockers_dir = self.state_dir / "blockers"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -872,6 +873,55 @@ class ControlPlane:
             if isinstance(value, Mapping):
                 records.append(value)
         return tuple(records)
+
+    def record_blocker(
+        self,
+        node_id: str,
+        *,
+        cause: str,
+        fix: str,
+        retry_when: str,
+        attempted_command: Sequence[str] = (),
+        category: str = "unknown",
+        evidence_refs: Sequence[str] = (),
+    ) -> Mapping[str, Any]:
+        """Preserve an actionable blocker instead of emitting an opaque failure.
+
+        A blocker is an operating-system learning record: it names the exact
+        cause, the safe fix, and the condition that makes retry valid.  The
+        append-only JSONL ledger is runtime state, while the protocol and its
+        tests are repository code so future sessions cannot silently repeat the
+        same failed attempt.
+        """
+
+        for value, label in (
+            (cause, "cause"),
+            (fix, "fix"),
+            (retry_when, "retry_when"),
+            (category, "category"),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise AutopilotError(f"blocker {label} is required")
+        command = [str(item) for item in attempted_command]
+        packet_without_id = {
+            "schema_version": SCHEMA_VERSION,
+            "node_id": node_id,
+            "category": category,
+            "cause": cause,
+            "fix": fix,
+            "retry_when": retry_when,
+            "attempted_command": command,
+            "evidence_refs": [str(item) for item in evidence_refs],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "OPEN",
+        }
+        packet = {
+            **packet_without_id,
+            "blocker_id": digest_json(packet_without_id),
+        }
+        append_jsonl(self.blockers_dir / f"{node_id}.jsonl", packet)
+        return packet
 
     def is_quarantined(self, node_id: str) -> bool:
         return (self.quarantine_dir / f"{node_id}.json").is_file()
@@ -1480,6 +1530,11 @@ class ControlPlane:
         error: str,
         kind: str = "failure",
         evidence_refs: Sequence[str] = (),
+        blocker_cause: str | None = None,
+        blocker_fix: str | None = None,
+        retry_when: str | None = None,
+        attempted_command: Sequence[str] = (),
+        blocker_category: str = "execution",
     ) -> Mapping[str, Any]:
         if not error.strip():
             raise AutopilotError("failure requires an error description")
@@ -1499,6 +1554,15 @@ class ControlPlane:
             "plan_fingerprint": self.expected_plan_fingerprint,
         }
         append_jsonl(self.failures_dir / f"{node_id}.jsonl", record)
+        blocker = self.record_blocker(
+            node_id,
+            cause=blocker_cause or error,
+            fix=blocker_fix or "Inspect the retained evidence and correct the reported cause.",
+            retry_when=retry_when or "Retry only after the cause is corrected and the same checks pass.",
+            attempted_command=attempted_command,
+            category=blocker_category,
+            evidence_refs=evidence_refs,
+        )
         if path.is_file():
             path.unlink()
         if kind == "escalation":
@@ -1512,7 +1576,7 @@ class ControlPlane:
                     "reason": "configured retry budget exhausted",
                 },
             )
-        return record
+        return {**record, "blocker": blocker}
 
     def complete(
         self,

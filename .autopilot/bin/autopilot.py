@@ -148,6 +148,11 @@ def parser() -> argparse.ArgumentParser:
     fail.add_argument("--error", required=True)
     fail.add_argument("--kind", choices=("failure", "escalation"), default="failure")
     fail.add_argument("--evidence-ref", action="append", default=[])
+    fail.add_argument("--blocker-cause")
+    fail.add_argument("--blocker-fix")
+    fail.add_argument("--retry-when")
+    fail.add_argument("--attempted-command", action="append", default=[])
+    fail.add_argument("--blocker-category", default="execution")
 
     reconcile = commands.add_parser("reconcile")
     reconcile.add_argument("--target-sha", required=True)
@@ -322,6 +327,11 @@ def main(argv: list[str] | None = None) -> int:
                         error=args.error,
                         kind=args.kind,
                         evidence_refs=args.evidence_ref,
+                        blocker_cause=args.blocker_cause,
+                        blocker_fix=args.blocker_fix,
+                        retry_when=args.retry_when,
+                        attempted_command=args.attempted_command,
+                        blocker_category=args.blocker_category,
                     ),
                     indent=2,
                     sort_keys=True,
