@@ -1,0 +1,38 @@
+name: PR 117 Merge Diagnostic
+
+on:
+  push:
+    branches:
+      - codex/phase8-exact-candidate-verification
+    paths:
+      - .github/workflows/pr117-merge-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Diagnose merge against main
+        shell: bash
+        run: |
+          set -uo pipefail
+          git fetch origin main
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_rc=$?
+          set -e
+          echo "merge_exit_code=${merge_rc}"
+          echo "=== unresolved paths ==="
+          git diff --name-only --diff-filter=U || true
+          echo "=== unresolved stage records ==="
+          git ls-files -u || true
+          if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+            git merge --abort
+          fi
+          exit 0
