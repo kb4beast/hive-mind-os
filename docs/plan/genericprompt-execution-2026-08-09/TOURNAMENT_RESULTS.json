@@ -1,0 +1,1557 @@
+{
+  "assessment_type": "Architecture suitability tournament based on current repository evidence and documented component capabilities; not an empirical product superiority benchmark.",
+  "championship": {
+    "best_hybrid": "Verifiable Hive Cortex",
+    "best_hybrid_score": 9.423,
+    "best_original": "Current Verifiable Hive Kernel",
+    "best_original_score": 7.74,
+    "reason": "It preserves the repository’s strongest verification/evidence assets while adding the missing canonical role runtime, role-first consultation, durable effect reconciliation, self-healing, and independently gated learning without imposing a new external workflow framework as the source of authority.",
+    "verdict": "ADAPT",
+    "winner": "Verifiable Hive Cortex"
+  },
+  "component_winners": {
+    "adversarial_judgment": "Courtroom / Adversarial Review",
+    "agent_handoffs": "OpenAI Agents SDK",
+    "append_only_truth": "Event Sourcing + CQRS",
+    "current_repository_foundation": "Current Verifiable Hive Kernel",
+    "desired_state_self_healing": "Kubernetes Controller Pattern",
+    "durable_execution": "Temporal",
+    "episodic_learning": "Reflexion",
+    "iterative_reasoning": "ReAct + Tree of Thoughts",
+    "least_authority": "Capability-Based Security",
+    "local_durable_transactions": "DBOS",
+    "multi-agent_replanning": "Magentic-One",
+    "policy_separation": "Open Policy Agent",
+    "provenance": "in-toto + SLSA + Sigstore/Rekor",
+    "repository_coding_interface": "SWE-agent ACI / OpenHands",
+    "state_machine_verification": "TLA+/TLC"
+  },
+  "criteria_weights": {
+    "cost_simplicity": 0.05,
+    "durability_recovery": 0.15,
+    "humanless_resolution": 0.1,
+    "learning_adaptation": 0.1,
+    "observability_operability": 0.07,
+    "repository_fit_migration": 0.12,
+    "role_lifecycle_wiring": 0.14,
+    "security_isolation": 0.09,
+    "truth_evidence_authority": 0.18
+  },
+  "entrants": [
+    {
+      "category": "durable",
+      "fatal_gap_for_full_solution": "heavy external service; no role truth, anti-cheating, or repository verification",
+      "name": "Temporal",
+      "round1_rank": 30,
+      "round2_rank": 12,
+      "round2_scenario_score": 7.0,
+      "round3_migration_score": 4.4,
+      "round3_rank": 15,
+      "scores": {
+        "cost_simplicity": 3,
+        "durability_recovery": 10,
+        "humanless_resolution": 3,
+        "learning_adaptation": 3,
+        "observability_operability": 9,
+        "repository_fit_migration": 4,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 8,
+        "truth_evidence_authority": 7
+      },
+      "strengths": "mature event history, deterministic workflows, retry and recovery",
+      "weighted_score": 5.76
+    },
+    {
+      "category": "local_durable",
+      "fatal_gap_for_full_solution": "requires Postgres and does not supply role, authority, or independent verification",
+      "name": "DBOS",
+      "round1_rank": 22,
+      "round2_rank": 5,
+      "round2_scenario_score": 7.15,
+      "round3_migration_score": 6.8,
+      "round3_rank": 10,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 9,
+        "humanless_resolution": 3,
+        "learning_adaptation": 3,
+        "observability_operability": 8,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 7,
+        "truth_evidence_authority": 7
+      },
+      "strengths": "Python/Postgres durable workflows and exactly-once transactions",
+      "weighted_score": 6.13
+    },
+    {
+      "category": "durable",
+      "fatal_gap_for_full_solution": "external runtime and no role/evidence constitution",
+      "name": "Restate",
+      "round1_rank": 31,
+      "round2_rank": 13,
+      "round2_scenario_score": 7.0,
+      "round3_migration_score": 4.4,
+      "round3_rank": 16,
+      "scores": {
+        "cost_simplicity": 3,
+        "durability_recovery": 10,
+        "humanless_resolution": 3,
+        "learning_adaptation": 3,
+        "observability_operability": 9,
+        "repository_fit_migration": 4,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 8,
+        "truth_evidence_authority": 7
+      },
+      "strengths": "durable execution, state, communication, exactly-once effects",
+      "weighted_score": 5.76
+    },
+    {
+      "category": "durable",
+      "fatal_gap_for_full_solution": "cloud/runtime lock-in and no role/authority model",
+      "name": "Azure Durable Functions",
+      "round1_rank": 32,
+      "round2_rank": 14,
+      "round2_scenario_score": 6.65,
+      "round3_migration_score": 4.4,
+      "round3_rank": 17,
+      "scores": {
+        "cost_simplicity": 3,
+        "durability_recovery": 10,
+        "humanless_resolution": 3,
+        "learning_adaptation": 3,
+        "observability_operability": 9,
+        "repository_fit_migration": 4,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 8,
+        "truth_evidence_authority": 7
+      },
+      "strengths": "checkpointed deterministic orchestration and retries",
+      "weighted_score": 5.76
+    },
+    {
+      "category": "durable",
+      "fatal_gap_for_full_solution": "cloud lock-in, coarse local repository fit, weak agent semantics",
+      "name": "AWS Step Functions",
+      "round1_rank": 41,
+      "scores": {
+        "cost_simplicity": 2,
+        "durability_recovery": 10,
+        "humanless_resolution": 3,
+        "learning_adaptation": 3,
+        "observability_operability": 9,
+        "repository_fit_migration": 3,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 8,
+        "truth_evidence_authority": 7
+      },
+      "strengths": "managed state machines and service integrations",
+      "weighted_score": 5.59
+    },
+    {
+      "category": "durable",
+      "fatal_gap_for_full_solution": "service burden; no verification/role authority",
+      "name": "Netflix Conductor",
+      "round1_rank": 33,
+      "round2_rank": 15,
+      "round2_scenario_score": 6.65,
+      "round3_migration_score": 4.4,
+      "round3_rank": 18,
+      "scores": {
+        "cost_simplicity": 3,
+        "durability_recovery": 10,
+        "humanless_resolution": 3,
+        "learning_adaptation": 3,
+        "observability_operability": 9,
+        "repository_fit_migration": 4,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 8,
+        "truth_evidence_authority": 7
+      },
+      "strengths": "durable workflow orchestration and visibility",
+      "weighted_score": 5.76
+    },
+    {
+      "category": "scheduler",
+      "fatal_gap_for_full_solution": "cluster dependency, batch orientation",
+      "name": "Argo Workflows",
+      "round1_rank": 54,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 7,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "Kubernetes DAG execution and artifacts",
+      "weighted_score": 4.76
+    },
+    {
+      "category": "scheduler",
+      "fatal_gap_for_full_solution": "data-pipeline semantics and poor interactive role fit",
+      "name": "Apache Airflow",
+      "round1_rank": 55,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 7,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "DAG scheduling, retries, observability",
+      "weighted_score": 4.76
+    },
+    {
+      "category": "scheduler",
+      "fatal_gap_for_full_solution": "data orchestration, no authority/verification",
+      "name": "Dagster",
+      "round1_rank": 56,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 7,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "asset-aware orchestration and typed metadata",
+      "weighted_score": 4.76
+    },
+    {
+      "category": "scheduler",
+      "fatal_gap_for_full_solution": "not an evidence or role kernel",
+      "name": "Prefect",
+      "round1_rank": 57,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 7,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "Python-native workflows and retries",
+      "weighted_score": 4.76
+    },
+    {
+      "category": "scheduler",
+      "fatal_gap_for_full_solution": "cluster complexity and weak local fit",
+      "name": "Flyte",
+      "round1_rank": 58,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 7,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "typed distributed workflows and reproducibility",
+      "weighted_score": 4.76
+    },
+    {
+      "category": "desired_state",
+      "fatal_gap_for_full_solution": "does not supply semantic cognition or exact candidate verification",
+      "name": "Kubernetes Controller Pattern",
+      "round1_rank": 17,
+      "round2_rank": 3,
+      "round2_scenario_score": 7.45,
+      "round3_migration_score": 6.0,
+      "round3_rank": 14,
+      "scores": {
+        "cost_simplicity": 5,
+        "durability_recovery": 9,
+        "humanless_resolution": 5,
+        "learning_adaptation": 3,
+        "observability_operability": 9,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 8,
+        "truth_evidence_authority": 7
+      },
+      "strengths": "continuous desired/current reconciliation and self-healing",
+      "weighted_score": 6.27
+    },
+    {
+      "category": "actor",
+      "fatal_gap_for_full_solution": "external sidecar/runtime and no court/verification",
+      "name": "Dapr Workflows and Actors",
+      "round1_rank": 45,
+      "scores": {
+        "cost_simplicity": 5,
+        "durability_recovery": 8,
+        "humanless_resolution": 5,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 5,
+        "role_lifecycle_wiring": 4,
+        "security_isolation": 6,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "durable actors, workflows, state stores",
+      "weighted_score": 5.51
+    },
+    {
+      "category": "actor",
+      "fatal_gap_for_full_solution": "language/runtime mismatch and no repository evidence model",
+      "name": "Microsoft Orleans",
+      "round1_rank": 46,
+      "scores": {
+        "cost_simplicity": 5,
+        "durability_recovery": 8,
+        "humanless_resolution": 5,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 5,
+        "role_lifecycle_wiring": 4,
+        "security_isolation": 6,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "virtual actors, persistence, supervision patterns",
+      "weighted_score": 5.51
+    },
+    {
+      "category": "actor",
+      "fatal_gap_for_full_solution": "JVM-centric and not a complete authority/verification system",
+      "name": "Akka/Pekko Supervision",
+      "round1_rank": 47,
+      "scores": {
+        "cost_simplicity": 5,
+        "durability_recovery": 8,
+        "humanless_resolution": 5,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 5,
+        "role_lifecycle_wiring": 4,
+        "security_isolation": 6,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "actor isolation, supervision, restart strategies",
+      "weighted_score": 5.51
+    },
+    {
+      "category": "actor",
+      "fatal_gap_for_full_solution": "weak durable authority/evidence by default",
+      "name": "Ray Actors",
+      "round1_rank": 48,
+      "scores": {
+        "cost_simplicity": 5,
+        "durability_recovery": 8,
+        "humanless_resolution": 5,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 5,
+        "role_lifecycle_wiring": 4,
+        "security_isolation": 6,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "parallel distributed stateful workers",
+      "weighted_score": 5.51
+    },
+    {
+      "category": "scheduler",
+      "fatal_gap_for_full_solution": "at-least-once complexity and weak event-sourced truth",
+      "name": "Celery",
+      "round1_rank": 59,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 7,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "simple Python task queue, retries, workers",
+      "weighted_score": 4.76
+    },
+    {
+      "category": "event",
+      "fatal_gap_for_full_solution": "messaging component, not mission kernel",
+      "name": "NATS JetStream",
+      "round1_rank": 8,
+      "round2_rank": 8,
+      "round2_scenario_score": 7.05,
+      "round3_migration_score": 7.05,
+      "round3_rank": 6,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 9,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 7,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "durable messaging, consumers, replay",
+      "weighted_score": 6.41
+    },
+    {
+      "category": "event",
+      "fatal_gap_for_full_solution": "operationally heavy and poor local-first fit",
+      "name": "Kafka Streams",
+      "round1_rank": 9,
+      "round2_rank": 9,
+      "round2_scenario_score": 7.05,
+      "round3_migration_score": 7.05,
+      "round3_rank": 7,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 9,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 7,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "event log, replay, stateful processing",
+      "weighted_score": 6.41
+    },
+    {
+      "category": "event",
+      "fatal_gap_for_full_solution": "pattern only; needs scheduler, roles, effects, verification",
+      "name": "Event Sourcing + CQRS",
+      "round1_rank": 3,
+      "round2_rank": 2,
+      "round2_scenario_score": 7.45,
+      "round3_migration_score": 7.7,
+      "round3_rank": 2,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 9,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 9,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 7,
+        "truth_evidence_authority": 9
+      },
+      "strengths": "append-only truth, deterministic projections, replay",
+      "weighted_score": 6.71
+    },
+    {
+      "category": "event",
+      "fatal_gap_for_full_solution": "component only",
+      "name": "Transactional Outbox",
+      "round1_rank": 10,
+      "round2_rank": 10,
+      "round2_scenario_score": 7.05,
+      "round3_migration_score": 7.05,
+      "round3_rank": 8,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 9,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 7,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "crash-safe intent publication and idempotent delivery",
+      "weighted_score": 6.41
+    },
+    {
+      "category": "event",
+      "fatal_gap_for_full_solution": "component only and compensation cannot prove correctness",
+      "name": "Saga Pattern",
+      "round1_rank": 11,
+      "round2_rank": 11,
+      "round2_scenario_score": 7.05,
+      "round3_migration_score": 7.05,
+      "round3_rank": 9,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 9,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 8,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 7,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "compensating transactions and long-running effects",
+      "weighted_score": 6.41
+    },
+    {
+      "category": "authority",
+      "fatal_gap_for_full_solution": "needs concrete persistence, identity, and adapter enforcement",
+      "name": "Capability-Based Security",
+      "round1_rank": 12,
+      "round2_rank": 6,
+      "round2_scenario_score": 7.1,
+      "round3_migration_score": 7.15,
+      "round3_rank": 4,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 6,
+        "humanless_resolution": 4,
+        "learning_adaptation": 3,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 10,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "least authority and unforgeable scoped grants",
+      "weighted_score": 6.4
+    },
+    {
+      "category": "authority",
+      "fatal_gap_for_full_solution": "external policy engine; no mission/role runtime",
+      "name": "Open Policy Agent",
+      "round1_rank": 13,
+      "round2_rank": 7,
+      "round2_scenario_score": 7.1,
+      "round3_migration_score": 7.15,
+      "round3_rank": 5,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 6,
+        "humanless_resolution": 4,
+        "learning_adaptation": 3,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 10,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "policy decision separated from enforcement",
+      "weighted_score": 6.4
+    },
+    {
+      "category": "provenance",
+      "fatal_gap_for_full_solution": "provenance component, no autonomy runtime",
+      "name": "in-toto",
+      "round1_rank": 42,
+      "scores": {
+        "cost_simplicity": 6,
+        "durability_recovery": 5,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 9,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "planned steps, functionaries, link metadata, supply-chain evidence",
+      "weighted_score": 5.55
+    },
+    {
+      "category": "provenance",
+      "fatal_gap_for_full_solution": "supply-chain scope only",
+      "name": "SLSA Provenance",
+      "round1_rank": 43,
+      "scores": {
+        "cost_simplicity": 6,
+        "durability_recovery": 5,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 9,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "build provenance maturity and tamper resistance",
+      "weighted_score": 5.55
+    },
+    {
+      "category": "provenance",
+      "fatal_gap_for_full_solution": "external identity/log component only",
+      "name": "Sigstore/Rekor",
+      "round1_rank": 44,
+      "scores": {
+        "cost_simplicity": 6,
+        "durability_recovery": 5,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 9,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "signed identities and transparency log",
+      "weighted_score": 5.55
+    },
+    {
+      "category": "provenance",
+      "fatal_gap_for_full_solution": "observability only",
+      "name": "OpenTelemetry",
+      "round1_rank": 36,
+      "scores": {
+        "cost_simplicity": 6,
+        "durability_recovery": 5,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 9,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 9,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "traces, metrics, logs, baggage correlation",
+      "weighted_score": 5.69
+    },
+    {
+      "category": "testing",
+      "fatal_gap_for_full_solution": "verification technique, not runtime",
+      "name": "TLA+/TLC",
+      "round1_rank": 37,
+      "scores": {
+        "cost_simplicity": 6,
+        "durability_recovery": 5,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 6,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 9,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "state-machine specification and model checking",
+      "weighted_score": 5.68
+    },
+    {
+      "category": "testing",
+      "fatal_gap_for_full_solution": "testing method, not architecture",
+      "name": "Jepsen-Style Fault Testing",
+      "round1_rank": 38,
+      "scores": {
+        "cost_simplicity": 6,
+        "durability_recovery": 5,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 6,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 9,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "adversarial distributed safety validation",
+      "weighted_score": 5.68
+    },
+    {
+      "category": "testing",
+      "fatal_gap_for_full_solution": "testing method only",
+      "name": "Hypothesis Property Testing",
+      "round1_rank": 34,
+      "round2_rank": 17,
+      "round2_scenario_score": 6.0,
+      "round3_migration_score": 6.65,
+      "round3_rank": 11,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 6,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 9,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "generative invariant exploration",
+      "weighted_score": 5.73
+    },
+    {
+      "category": "testing",
+      "fatal_gap_for_full_solution": "execution component, no full authority/court",
+      "name": "Container Sandbox / OpenHands Runtime",
+      "round1_rank": 29,
+      "round2_rank": 16,
+      "round2_scenario_score": 6.15,
+      "round3_migration_score": 6.45,
+      "round3_rank": 12,
+      "scores": {
+        "cost_simplicity": 6,
+        "durability_recovery": 5,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 6,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 10,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "stronger isolation and reproducible execution",
+      "weighted_score": 5.77
+    },
+    {
+      "category": "testing",
+      "fatal_gap_for_full_solution": "operational cost and component scope",
+      "name": "MicroVM Sandbox",
+      "round1_rank": 39,
+      "scores": {
+        "cost_simplicity": 4,
+        "durability_recovery": 5,
+        "humanless_resolution": 3,
+        "learning_adaptation": 4,
+        "observability_operability": 6,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 3,
+        "security_isolation": 10,
+        "truth_evidence_authority": 8
+      },
+      "strengths": "strong isolation and disposable workspaces",
+      "weighted_score": 5.67
+    },
+    {
+      "category": "provenance",
+      "fatal_gap_for_full_solution": "storage component only",
+      "name": "Content-Addressed Artifact Store",
+      "round1_rank": 35,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 2,
+        "learning_adaptation": 2,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 2,
+        "security_isolation": 9,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "immutable identities, dedupe, verifiable artifacts",
+      "weighted_score": 5.72
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "interrupt side effects require care; no evidence authority by default",
+      "name": "LangGraph",
+      "round1_rank": 4,
+      "round2_rank": 18,
+      "round2_scenario_score": 5.9,
+      "round3_migration_score": 6.25,
+      "round3_rank": 13,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 6,
+        "humanless_resolution": 8,
+        "learning_adaptation": 7,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 8,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "typed graphs, checkpoints, interrupts, stores",
+      "weighted_score": 6.43
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "provider/framework layer, not durable repository authority",
+      "name": "OpenAI Agents SDK",
+      "round1_rank": 5,
+      "round2_rank": 20,
+      "round2_scenario_score": 5.75,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 9,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 9,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "handoffs, tools, guardrails, tracing",
+      "weighted_score": 6.42
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "conversation-first and no canonical evidence/effect authority",
+      "name": "Microsoft AutoGen",
+      "round1_rank": 6,
+      "round2_rank": 25,
+      "round2_scenario_score": 5.4,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 9,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 9,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "team patterns, selector, swarm, MagenticOne",
+      "weighted_score": 6.42
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "framework layer; experimental orchestration and no proof kernel",
+      "name": "Semantic Kernel Orchestration",
+      "round1_rank": 18,
+      "round2_rank": 27,
+      "round2_scenario_score": 5.25,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 8,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 8,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "sequential, concurrent, handoff, group-chat patterns",
+      "weighted_score": 6.18
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "role labels and workflow convenience do not prove independence",
+      "name": "CrewAI",
+      "round1_rank": 19,
+      "round2_rank": 28,
+      "round2_scenario_score": 5.25,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 8,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 8,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "role/task orchestration and flows",
+      "weighted_score": 6.18
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "agent component without durable multi-role authority",
+      "name": "PydanticAI",
+      "round1_rank": 15,
+      "round2_rank": 26,
+      "round2_scenario_score": 5.4,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 5,
+        "humanless_resolution": 8,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 8,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "typed model outputs, dependencies, instrumentation",
+      "weighted_score": 6.35
+    },
+    {
+      "category": "code_agent",
+      "fatal_gap_for_full_solution": "single coding-agent orientation; no eight-role court or promotion",
+      "name": "OpenHands",
+      "round1_rank": 25,
+      "round2_rank": 19,
+      "round2_scenario_score": 5.9,
+      "scores": {
+        "cost_simplicity": 5,
+        "durability_recovery": 5,
+        "humanless_resolution": 7,
+        "learning_adaptation": 5,
+        "observability_operability": 6,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 7,
+        "security_isolation": 7,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "repository coding agent with sandbox/runtime",
+      "weighted_score": 5.97
+    },
+    {
+      "category": "code_agent",
+      "fatal_gap_for_full_solution": "agent interface only; no durable role lifecycle",
+      "name": "SWE-agent ACI",
+      "round1_rank": 23,
+      "round2_rank": 22,
+      "round2_scenario_score": 5.7,
+      "scores": {
+        "cost_simplicity": 5,
+        "durability_recovery": 5,
+        "humanless_resolution": 7,
+        "learning_adaptation": 5,
+        "observability_operability": 6,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 7,
+        "security_isolation": 7,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "repository navigation/edit/test interface tuned for software tasks",
+      "weighted_score": 6.09
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "research orchestration, not authority/evidence runtime",
+      "name": "Magentic-One",
+      "round1_rank": 7,
+      "round2_rank": 21,
+      "round2_scenario_score": 5.75,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 9,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 9,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "orchestrator-led planning/replanning with specialists",
+      "weighted_score": 6.42
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "role simulation and weak production durability/authority",
+      "name": "MetaGPT",
+      "round1_rank": 20,
+      "round2_rank": 29,
+      "round2_scenario_score": 5.25,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 8,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 8,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "software-role decomposition and artifact flow",
+      "weighted_score": 6.18
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "conversation theater risk and weak repository truth",
+      "name": "ChatDev",
+      "round1_rank": 21,
+      "round2_rank": 30,
+      "round2_scenario_score": 5.25,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 8,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 6,
+        "role_lifecycle_wiring": 8,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "communicative software agents and phases",
+      "weighted_score": 6.18
+    },
+    {
+      "category": "agent",
+      "fatal_gap_for_full_solution": "needs strict provenance, access, and durable control",
+      "name": "Blackboard Architecture",
+      "round1_rank": 14,
+      "round2_rank": 24,
+      "round2_scenario_score": 5.55,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 9,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 8,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "shared evidence workspace and opportunistic specialists",
+      "weighted_score": 6.4
+    },
+    {
+      "category": "reasoning",
+      "fatal_gap_for_full_solution": "planner component; brittle if methods stale",
+      "name": "Hierarchical Task Network Planning",
+      "round1_rank": 49,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 3,
+        "humanless_resolution": 7,
+        "learning_adaptation": 7,
+        "observability_operability": 4,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 6,
+        "security_isolation": 4,
+        "truth_evidence_authority": 4
+      },
+      "strengths": "structured decomposition and reusable methods",
+      "weighted_score": 5.41
+    },
+    {
+      "category": "reasoning",
+      "fatal_gap_for_full_solution": "conceptual agent model, weak exact evidence/effects",
+      "name": "BDI Agent Architecture",
+      "round1_rank": 50,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 3,
+        "humanless_resolution": 7,
+        "learning_adaptation": 7,
+        "observability_operability": 4,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 6,
+        "security_isolation": 4,
+        "truth_evidence_authority": 4
+      },
+      "strengths": "belief/desire/intention separation",
+      "weighted_score": 5.41
+    },
+    {
+      "category": "reasoning",
+      "fatal_gap_for_full_solution": "single-agent pattern; no independent verification",
+      "name": "ReAct",
+      "round1_rank": 51,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 3,
+        "humanless_resolution": 7,
+        "learning_adaptation": 7,
+        "observability_operability": 4,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 6,
+        "security_isolation": 4,
+        "truth_evidence_authority": 4
+      },
+      "strengths": "interleaved reasoning and action with tool feedback",
+      "weighted_score": 5.41
+    },
+    {
+      "category": "learning",
+      "fatal_gap_for_full_solution": "self-feedback can reinforce errors without independent gates",
+      "name": "Reflexion",
+      "round1_rank": 26,
+      "round2_rank": 32,
+      "round2_scenario_score": 4.8,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 4,
+        "humanless_resolution": 6,
+        "learning_adaptation": 10,
+        "observability_operability": 5,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 5,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "feedback-driven episodic learning",
+      "weighted_score": 5.79
+    },
+    {
+      "category": "reasoning",
+      "fatal_gap_for_full_solution": "expensive and evaluator quality limits correctness",
+      "name": "Tree of Thoughts",
+      "round1_rank": 52,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 3,
+        "humanless_resolution": 7,
+        "learning_adaptation": 7,
+        "observability_operability": 4,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 6,
+        "security_isolation": 4,
+        "truth_evidence_authority": 4
+      },
+      "strengths": "branching search, evaluation, backtracking",
+      "weighted_score": 5.41
+    },
+    {
+      "category": "learning",
+      "fatal_gap_for_full_solution": "same-model self-evaluation is not independent proof",
+      "name": "Self-Refine",
+      "round1_rank": 27,
+      "round2_rank": 33,
+      "round2_scenario_score": 4.8,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 4,
+        "humanless_resolution": 6,
+        "learning_adaptation": 10,
+        "observability_operability": 5,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 5,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "iterative feedback and revision",
+      "weighted_score": 5.79
+    },
+    {
+      "category": "reasoning",
+      "fatal_gap_for_full_solution": "consensus is not evidence and can collude",
+      "name": "Multi-Agent Debate",
+      "round1_rank": 40,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 3,
+        "humanless_resolution": 8,
+        "learning_adaptation": 7,
+        "observability_operability": 4,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 7,
+        "security_isolation": 4,
+        "truth_evidence_authority": 4
+      },
+      "strengths": "independent challenge can improve reasoning",
+      "weighted_score": 5.65
+    },
+    {
+      "category": "authority",
+      "fatal_gap_for_full_solution": "needs authenticated identities and deterministic evidence",
+      "name": "Courtroom / Adversarial Review",
+      "round1_rank": 2,
+      "round2_rank": 4,
+      "round2_scenario_score": 7.25,
+      "round3_migration_score": 7.45,
+      "round3_rank": 3,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 6,
+        "humanless_resolution": 5,
+        "learning_adaptation": 3,
+        "observability_operability": 7,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 5,
+        "security_isolation": 10,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "advocate, cross-examiner, judge, dissent, burdens",
+      "weighted_score": 6.78
+    },
+    {
+      "category": "reasoning",
+      "fatal_gap_for_full_solution": "high-level loop without durable effects/authority",
+      "name": "OODA Loop",
+      "round1_rank": 53,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 3,
+        "humanless_resolution": 7,
+        "learning_adaptation": 7,
+        "observability_operability": 4,
+        "repository_fit_migration": 8,
+        "role_lifecycle_wiring": 6,
+        "security_isolation": 4,
+        "truth_evidence_authority": 4
+      },
+      "strengths": "continuous observe-orient-decide-act adaptation",
+      "weighted_score": 5.41
+    },
+    {
+      "category": "memory",
+      "fatal_gap_for_full_solution": "poisoning, staleness, and leakage risks",
+      "name": "Layered RAG Memory",
+      "round1_rank": 16,
+      "round2_rank": 23,
+      "round2_scenario_score": 5.65,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 5,
+        "humanless_resolution": 7,
+        "learning_adaptation": 8,
+        "observability_operability": 6,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 6,
+        "security_isolation": 6,
+        "truth_evidence_authority": 6
+      },
+      "strengths": "episodic, semantic, procedural retrieval",
+      "weighted_score": 6.32
+    },
+    {
+      "category": "learning",
+      "fatal_gap_for_full_solution": "needs independent evaluation and outcome data",
+      "name": "Champion/Challenger Optimization",
+      "round1_rank": 28,
+      "round2_rank": 34,
+      "round2_scenario_score": 4.8,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 4,
+        "humanless_resolution": 6,
+        "learning_adaptation": 10,
+        "observability_operability": 5,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 5,
+        "security_isolation": 5,
+        "truth_evidence_authority": 5
+      },
+      "strengths": "reversible experiments and gated promotion",
+      "weighted_score": 5.79
+    },
+    {
+      "category": "learning",
+      "fatal_gap_for_full_solution": "learning component; no mission runtime",
+      "name": "Point-in-Time Replay Learning",
+      "round1_rank": 24,
+      "round2_rank": 31,
+      "round2_scenario_score": 5.2,
+      "scores": {
+        "cost_simplicity": 7,
+        "durability_recovery": 4,
+        "humanless_resolution": 6,
+        "learning_adaptation": 10,
+        "observability_operability": 5,
+        "repository_fit_migration": 7,
+        "role_lifecycle_wiring": 5,
+        "security_isolation": 6,
+        "truth_evidence_authority": 6
+      },
+      "strengths": "future-leakage-resistant historical evaluation",
+      "weighted_score": 6.06
+    },
+    {
+      "category": "current_hive",
+      "fatal_gap_for_full_solution": "provider/effect-free role fixtures; no single all-role mission, consultation, self-healing, or challenger generation",
+      "name": "Current Verifiable Hive Kernel",
+      "round1_rank": 1,
+      "round2_rank": 1,
+      "round2_scenario_score": 8.35,
+      "round3_migration_score": 9.0,
+      "round3_rank": 1,
+      "scores": {
+        "cost_simplicity": 8,
+        "durability_recovery": 8,
+        "humanless_resolution": 4,
+        "learning_adaptation": 6,
+        "observability_operability": 7,
+        "repository_fit_migration": 10,
+        "role_lifecycle_wiring": 6,
+        "security_isolation": 9,
+        "truth_evidence_authority": 10
+      },
+      "strengths": "canonical contracts, event spine, authority, memory, role fixtures, exact verification, repository fit",
+      "weighted_score": 7.74
+    }
+  ],
+  "entrants_considered": 59,
+  "hybrid_ranking": [
+    "Verifiable Hive Cortex",
+    "DBOS-Hive Local Spine",
+    "Desired-State Agent Microkernel",
+    "Durable Agent Graph",
+    "Courtroom Blackboard"
+  ],
+  "hybrids": [
+    {
+      "components": [
+        "Temporal/DBOS semantics",
+        "LangGraph-style typed graph",
+        "OpenAI Agents SDK handoffs",
+        "Hive exact verification"
+      ],
+      "critical_gap": "External durable runtime burden and weaker repository-native migration.",
+      "name": "Durable Agent Graph",
+      "scores": {
+        "cost_simplicity": 4.5,
+        "durability_recovery": 9.5,
+        "humanless_resolution": 8.0,
+        "learning_adaptation": 7.5,
+        "observability_operability": 9.0,
+        "repository_fit_migration": 6.5,
+        "role_lifecycle_wiring": 8.5,
+        "security_isolation": 8.0,
+        "truth_evidence_authority": 8.5
+      },
+      "weighted_score": 8.05
+    },
+    {
+      "components": [
+        "Kubernetes controller reconciliation",
+        "capability security",
+        "transactional outbox",
+        "typed role runtime"
+      ],
+      "critical_gap": "Needs exact-candidate verification and learning court to be complete.",
+      "name": "Desired-State Agent Microkernel",
+      "scores": {
+        "cost_simplicity": 6.0,
+        "durability_recovery": 9.0,
+        "humanless_resolution": 8.5,
+        "learning_adaptation": 7.0,
+        "observability_operability": 8.5,
+        "repository_fit_migration": 7.5,
+        "role_lifecycle_wiring": 8.0,
+        "security_isolation": 9.0,
+        "truth_evidence_authority": 9.0
+      },
+      "weighted_score": 8.245
+    },
+    {
+      "components": [
+        "blackboard architecture",
+        "multi-agent debate",
+        "OPA-style policy",
+        "in-toto provenance",
+        "Curator verification"
+      ],
+      "critical_gap": "Weaker crash recovery and durable effect semantics.",
+      "name": "Courtroom Blackboard",
+      "scores": {
+        "cost_simplicity": 6.0,
+        "durability_recovery": 6.5,
+        "humanless_resolution": 9.0,
+        "learning_adaptation": 7.5,
+        "observability_operability": 7.0,
+        "repository_fit_migration": 7.5,
+        "role_lifecycle_wiring": 9.0,
+        "security_isolation": 8.5,
+        "truth_evidence_authority": 9.5
+      },
+      "weighted_score": 8.05
+    },
+    {
+      "components": [
+        "DBOS durable transactions",
+        "Hive role contracts",
+        "outbox effects",
+        "PIT learning",
+        "Curator verification"
+      ],
+      "critical_gap": "Introduces Postgres/DBOS into a stdlib-only local-first repository before need is proven.",
+      "name": "DBOS-Hive Local Spine",
+      "scores": {
+        "cost_simplicity": 6.0,
+        "durability_recovery": 9.5,
+        "humanless_resolution": 8.5,
+        "learning_adaptation": 8.5,
+        "observability_operability": 8.5,
+        "repository_fit_migration": 7.5,
+        "role_lifecycle_wiring": 8.5,
+        "security_isolation": 8.5,
+        "truth_evidence_authority": 9.0
+      },
+      "weighted_score": 8.495
+    },
+    {
+      "components": [
+        "current brain_kernel event spine",
+        "desired-state reconciliation",
+        "provider-backed eight-role runtime",
+        "role-first anti-cheating consultation",
+        "durable outbox effects",
+        "exact-candidate Curator",
+        "PIT champion/challenger learning",
+        "legacy-runtime adapters"
+      ],
+      "critical_gap": "Requires disciplined convergence migration and later external authority/pilot evidence.",
+      "name": "Verifiable Hive Cortex",
+      "scores": {
+        "cost_simplicity": 8.2,
+        "durability_recovery": 9.2,
+        "humanless_resolution": 9.7,
+        "learning_adaptation": 9.2,
+        "observability_operability": 9.0,
+        "repository_fit_migration": 9.7,
+        "role_lifecycle_wiring": 9.5,
+        "security_isolation": 9.5,
+        "truth_evidence_authority": 9.8
+      },
+      "weighted_score": 9.423
+    }
+  ],
+  "schema_version": 1,
+  "subject": "Self-operating Hive Mind OS with eight wired roles, role-first humanless resolution, anti-cheating consultation, learning, durable effects, and self-healing.",
+  "triple_elimination": {
+    "round_1": {
+      "eliminated": [
+        "Content-Addressed Artifact Store",
+        "OpenTelemetry",
+        "TLA+/TLC",
+        "Jepsen-Style Fault Testing",
+        "MicroVM Sandbox",
+        "Multi-Agent Debate",
+        "AWS Step Functions",
+        "in-toto",
+        "SLSA Provenance",
+        "Sigstore/Rekor",
+        "Dapr Workflows and Actors",
+        "Microsoft Orleans",
+        "Akka/Pekko Supervision",
+        "Ray Actors",
+        "Hierarchical Task Network Planning",
+        "BDI Agent Architecture",
+        "ReAct",
+        "Tree of Thoughts",
+        "OODA Loop",
+        "Argo Workflows",
+        "Apache Airflow",
+        "Dagster",
+        "Prefect",
+        "Flyte",
+        "Celery"
+      ],
+      "rule": "weighted architecture fit; top 34 survive",
+      "survivors": [
+        "Current Verifiable Hive Kernel",
+        "Courtroom / Adversarial Review",
+        "Event Sourcing + CQRS",
+        "LangGraph",
+        "OpenAI Agents SDK",
+        "Microsoft AutoGen",
+        "Magentic-One",
+        "NATS JetStream",
+        "Kafka Streams",
+        "Transactional Outbox",
+        "Saga Pattern",
+        "Capability-Based Security",
+        "Open Policy Agent",
+        "Blackboard Architecture",
+        "PydanticAI",
+        "Layered RAG Memory",
+        "Kubernetes Controller Pattern",
+        "Semantic Kernel Orchestration",
+        "CrewAI",
+        "MetaGPT",
+        "ChatDev",
+        "DBOS",
+        "SWE-agent ACI",
+        "Point-in-Time Replay Learning",
+        "OpenHands",
+        "Reflexion",
+        "Self-Refine",
+        "Champion/Challenger Optimization",
+        "Container Sandbox / OpenHands Runtime",
+        "Temporal",
+        "Restate",
+        "Azure Durable Functions",
+        "Netflix Conductor",
+        "Hypothesis Property Testing"
+      ]
+    },
+    "round_2": {
+      "eliminated": [
+        "OpenHands",
+        "OpenAI Agents SDK",
+        "Magentic-One",
+        "SWE-agent ACI",
+        "Layered RAG Memory",
+        "Blackboard Architecture",
+        "Microsoft AutoGen",
+        "PydanticAI",
+        "Semantic Kernel Orchestration",
+        "CrewAI",
+        "MetaGPT",
+        "ChatDev",
+        "Point-in-Time Replay Learning",
+        "Reflexion",
+        "Self-Refine",
+        "Champion/Challenger Optimization"
+      ],
+      "rule": "crash, authority, humanless, anti-cheating, security, and migration stress; top 18 survive",
+      "survivors": [
+        "Current Verifiable Hive Kernel",
+        "Event Sourcing + CQRS",
+        "Kubernetes Controller Pattern",
+        "Courtroom / Adversarial Review",
+        "DBOS",
+        "Capability-Based Security",
+        "Open Policy Agent",
+        "NATS JetStream",
+        "Kafka Streams",
+        "Transactional Outbox",
+        "Saga Pattern",
+        "Temporal",
+        "Restate",
+        "Azure Durable Functions",
+        "Netflix Conductor",
+        "Container Sandbox / OpenHands Runtime",
+        "Hypothesis Property Testing",
+        "LangGraph"
+      ]
+    },
+    "round_3": {
+      "finalists": [
+        {
+          "migration_score": 9.0,
+          "name": "Current Verifiable Hive Kernel",
+          "scenario_score": 8.35,
+          "weighted_score": 7.74
+        },
+        {
+          "migration_score": 7.7,
+          "name": "Event Sourcing + CQRS",
+          "scenario_score": 7.45,
+          "weighted_score": 6.71
+        },
+        {
+          "migration_score": 7.45,
+          "name": "Courtroom / Adversarial Review",
+          "scenario_score": 7.25,
+          "weighted_score": 6.78
+        },
+        {
+          "migration_score": 7.15,
+          "name": "Capability-Based Security",
+          "scenario_score": 7.1,
+          "weighted_score": 6.4
+        },
+        {
+          "migration_score": 7.15,
+          "name": "Open Policy Agent",
+          "scenario_score": 7.1,
+          "weighted_score": 6.4
+        },
+        {
+          "migration_score": 7.05,
+          "name": "NATS JetStream",
+          "scenario_score": 7.05,
+          "weighted_score": 6.41
+        },
+        {
+          "migration_score": 7.05,
+          "name": "Kafka Streams",
+          "scenario_score": 7.05,
+          "weighted_score": 6.41
+        },
+        {
+          "migration_score": 7.05,
+          "name": "Transactional Outbox",
+          "scenario_score": 7.05,
+          "weighted_score": 6.41
+        }
+      ],
+      "rule": "repository-native migration, evidence authority, simplicity, and role composability; top 8 finalists"
+    }
+  }
+}

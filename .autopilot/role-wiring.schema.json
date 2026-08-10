@@ -1,0 +1,41 @@
+{
+  "$id": "hive-mind-role-wiring-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "baseline_commit": {
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "roles": {
+      "items": {
+        "required": [
+          "role",
+          "contract_registered",
+          "generic_model_turn_reachable",
+          "current_runtime_truth",
+          "current_effect_truth",
+          "role_first_consultation",
+          "learning_cell",
+          "canonical_target",
+          "acceptance_node"
+        ],
+        "type": "object"
+      },
+      "maxItems": 8,
+      "minItems": 8,
+      "type": "array"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "truth_label": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "baseline_commit",
+    "truth_label",
+    "roles"
+  ],
+  "type": "object"
+}

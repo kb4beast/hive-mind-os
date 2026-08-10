@@ -1,0 +1,95 @@
+{
+  "baseline_commit": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
+  "roles": [
+    {
+      "acceptance_node": "ORCH-300",
+      "canonical_target": "Provider-backed orchestrator RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "no canonical repository effects",
+      "current_runtime_truth": "generic serial model/deterministic pass; kernel deterministic fixture",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "not wired",
+      "role": "orchestrator",
+      "role_first_consultation": "not implemented"
+    },
+    {
+      "acceptance_node": "EXPLORER-310",
+      "canonical_target": "Provider-backed explorer RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "real local repository reads/tests in legacy path",
+      "current_runtime_truth": "generic model pass; real RepositoryMission read/test role; kernel fixture",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "not wired",
+      "role": "explorer",
+      "role_first_consultation": "not implemented"
+    },
+    {
+      "acceptance_node": "ARCHITECT-320",
+      "canonical_target": "Provider-backed architect RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "no canonical tool/effect path",
+      "current_runtime_truth": "generic model pass; partial MissionLoop design input; kernel fixture",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "not wired",
+      "role": "architect",
+      "role_first_consultation": "not implemented"
+    },
+    {
+      "acceptance_node": "BUILDER-330",
+      "canonical_target": "Provider-backed builder RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "real local repository effects in legacy path",
+      "current_runtime_truth": "generic model pass; real RepositoryMission branch/write/test/commit; kernel fixture",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "not wired",
+      "role": "builder",
+      "role_first_consultation": "not implemented"
+    },
+    {
+      "acceptance_node": "CURATOR-340",
+      "canonical_target": "Provider-backed curator RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "exact-candidate verification exists but is not wired through all roles",
+      "current_runtime_truth": "generic model pass; real independent legacy verification; kernel fixture",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "not wired",
+      "role": "curator",
+      "role_first_consultation": "not implemented"
+    },
+    {
+      "acceptance_node": "INTEGRATOR-350",
+      "canonical_target": "Provider-backed integrator RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "no canonical integration effect path",
+      "current_runtime_truth": "generic model pass; kernel fixture only",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "not wired",
+      "role": "integrator",
+      "role_first_consultation": "not implemented"
+    },
+    {
+      "acceptance_node": "STEWARD-360",
+      "canonical_target": "Provider-backed steward RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "no canonical operations controller",
+      "current_runtime_truth": "generic model pass; high-risk MissionLoop label; kernel fixture",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "not wired",
+      "role": "steward",
+      "role_first_consultation": "not implemented"
+    },
+    {
+      "acceptance_node": "OPTIMIZER-370",
+      "canonical_target": "Provider-backed optimizer RoleRuntime with typed context/result, consultation, receipts, and no direct self-approval.",
+      "contract_registered": true,
+      "current_effect_truth": "no canonical challenger-generation/promotion runtime",
+      "current_runtime_truth": "generic model pass; experiment components exist; kernel fixture",
+      "generic_model_turn_reachable": true,
+      "learning_cell": "partial components only",
+      "role": "optimizer",
+      "role_first_consultation": "not implemented"
+    }
+  ],
+  "schema_version": 1,
+  "truth_label": "The roles exist in contracts and several partial paths, but no single current product runtime gives all eight meaningful cognition, tools/effects, consultation, recovery, and learning."
+}

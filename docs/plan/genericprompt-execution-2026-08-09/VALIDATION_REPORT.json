@@ -1,0 +1,38 @@
+{
+  "artifact_validation": {
+    "compileall": {
+      "command": "python -m compileall -q REPO_ROOT/.autopilot/bin REPO_ROOT/.autopilot/tests",
+      "passed": true
+    },
+    "controller_tests": {
+      "command": "python -m unittest discover -s REPO_ROOT/.autopilot/tests -v",
+      "errors": 0,
+      "failures": 0,
+      "passed": true,
+      "tests": 45
+    },
+    "doctor_no_git_mode": {
+      "passed": true,
+      "purpose": "configuration, receipt, consultation, and controller contract validation without claiming repository-object verification"
+    },
+    "json_parse": {
+      "passed": true,
+      "scope": "all REPO_ROOT JSON files"
+    }
+  },
+  "live_repository_validation": {
+    "github_connector_main_commit": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
+    "github_connector_main_tree": "ac76686aa004cf8188f0281b1ec9ac1f5c666929",
+    "local_clone_attempt": {
+      "passed": false,
+      "reason": "artifact container could not resolve github.com; no local product suite or actual-repository bootstrap doctor was claimed"
+    }
+  },
+  "schema_version": 1,
+  "truth_limits": [
+    "No Hive Mind OS product implementation node was executed.",
+    "No PR was opened, reviewed, merged, or auto-merged.",
+    "No live subscription-model call was made.",
+    "Architecture scores are suitability judgments, not empirical product superiority claims."
+  ]
+}

@@ -1,0 +1,350 @@
+{
+  "baseline_commit": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
+  "baseline_tree": "ac76686aa004cf8188f0281b1ec9ac1f5c666929",
+  "bundle": "HIVE_MIND_OS_GENERICPROMPT_EXECUTION_2026-08-09",
+  "file_count": 68,
+  "files": [
+    {
+      "bytes": 5632,
+      "path": "ARCHITECTURE_DECISION.md",
+      "sha256": "ccc4b3c3021072295b6a0a79ce9196b17ace226e83d46bff78cf7e4fa2f5fe5a"
+    },
+    {
+      "bytes": 2189,
+      "path": "BOOTSTRAP_PROMPT.md",
+      "sha256": "305180a461c5b7d5db03050f10dd841d20591d7ac552aef992ef5b0459e201de"
+    },
+    {
+      "bytes": 1191,
+      "path": "CONTROL_ROOM.txt",
+      "sha256": "86b65d4a8e08c94c061f62d2e1915d29056f7d887667be27eb0c9a0285e9bdbb"
+    },
+    {
+      "bytes": 2126,
+      "path": "DISPATCHER_PROMPT.md",
+      "sha256": "8dd0be8ade48abbe560fb81c2cb4a4fac8807f54a7f4dcaddbbfb7454fb186d6"
+    },
+    {
+      "bytes": 7256,
+      "path": "FIRST_PARALLEL_PROMPTS.md",
+      "sha256": "f1acd88f844fb426cbd61c3d03db7473cd6335a17f604efec1d156a925adcc5f"
+    },
+    {
+      "bytes": 26318,
+      "path": "FOUNDATION_PARALLEL_PROMPTS.md",
+      "sha256": "8da4e9019df26993e067780b75a6431effc78b2a598b0a79e5c56e66d70fc300"
+    },
+    {
+      "bytes": 19025,
+      "path": "FULL_REPORT.md",
+      "sha256": "193f6970b2889f9e17c5d3d011a4b39aa55d249f10f3c1ebad463dd598dde807"
+    },
+    {
+      "bytes": 9428,
+      "path": "IMPLEMENTATION_PROGRAM.md",
+      "sha256": "d792f1083f311d8dd74299de715ab8653c1268b95ecb8541f4cd7e5d92130593"
+    },
+    {
+      "bytes": 371,
+      "path": "README.md",
+      "sha256": "83f27850184b992f1467cf5b18cfe3cbe6c70eeeef676821bc65cdf50440012c"
+    },
+    {
+      "bytes": 60,
+      "path": "REPO_ROOT/.autopilot/.gitignore",
+      "sha256": "a28609388dabc1d5ce751b18c9e089e0e36697133f4ff729ecfb5fad67770bdb"
+    },
+    {
+      "bytes": 4617,
+      "path": "REPO_ROOT/.autopilot/README.md",
+      "sha256": "0887142e46efd390d6d70fee598e6e3a06d15128d918edb6f2f34be20169cc73"
+    },
+    {
+      "bytes": 2474,
+      "path": "REPO_ROOT/.autopilot/acceptance-matrix.json",
+      "sha256": "1984e384140c7bc5c42571cc497b294666acc2eebd078b36a407f6c70b45ca7a"
+    },
+    {
+      "bytes": 8094,
+      "path": "REPO_ROOT/.autopilot/bin/autopilot.py",
+      "sha256": "6701a355f619f1c688627cb7549c3bce7899060eb8762c6b97981194c04c2990"
+    },
+    {
+      "bytes": 68252,
+      "path": "REPO_ROOT/.autopilot/bin/controller.py",
+      "sha256": "ae41820eef376106194d58396342ba0495ff60774e1a87557b47c61c8bb47bc6"
+    },
+    {
+      "bytes": 148,
+      "path": "REPO_ROOT/.autopilot/bin/doctor.py",
+      "sha256": "8d8d1d2e626adc035b323b65fb9c857a516fd2018c63d65ddeca500a48656dd1"
+    },
+    {
+      "bytes": 156,
+      "path": "REPO_ROOT/.autopilot/bin/verify_receipt.py",
+      "sha256": "4cb41ff518a53cddb3d3e575cde2f519deeeee2263ebeb2c2448ebefcee2c093"
+    },
+    {
+      "bytes": 2380,
+      "path": "REPO_ROOT/.autopilot/consultation.schema.json",
+      "sha256": "952789ef06039acf059eb5a51c1bba3037dd6e9fcf2db74d683c7a71f95e91b6"
+    },
+    {
+      "bytes": 1305,
+      "path": "REPO_ROOT/.autopilot/control-plane.json",
+      "sha256": "6910c54887fbc07170a6b6f6f631a3f8860527910e31e10e55c63be1470b9797"
+    },
+    {
+      "bytes": 14,
+      "path": "REPO_ROOT/.autopilot/generated/.gitignore",
+      "sha256": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d"
+    },
+    {
+      "bytes": 1358,
+      "path": "REPO_ROOT/.autopilot/model-routing.json",
+      "sha256": "081e91c629da68a20338c6e6a849a97b88c553257bad07aebd222583a4a025a5"
+    },
+    {
+      "bytes": 169053,
+      "path": "REPO_ROOT/.autopilot/plan.json",
+      "sha256": "85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef"
+    },
+    {
+      "bytes": 2282,
+      "path": "REPO_ROOT/.autopilot/provider-catalog.json",
+      "sha256": "49247eaf3da14d50f53a32c58ceae5433bd68f7512c673d643e126a18c7749dc"
+    },
+    {
+      "bytes": 3253,
+      "path": "REPO_ROOT/.autopilot/receipt.schema.json",
+      "sha256": "90893612ddb24057c6474745444e67805e61004d3d3d8e03ddba6ba054513310"
+    },
+    {
+      "bytes": 4896,
+      "path": "REPO_ROOT/.autopilot/role-wiring.json",
+      "sha256": "9a5201b2d712984e5800417d8729f4c06ee2ab2ad9b0f08493e13bd8d414c2fb"
+    },
+    {
+      "bytes": 859,
+      "path": "REPO_ROOT/.autopilot/role-wiring.schema.json",
+      "sha256": "65d8af01f322867a69dd9937b9d163baee0645c64fd9c8b1702c69e1a91481a5"
+    },
+    {
+      "bytes": 454,
+      "path": "REPO_ROOT/.autopilot/templates/consultation.md",
+      "sha256": "170c56430bbbeb7678a82a20f10d19b4dc25722f95f07471f4ea3dce87285523"
+    },
+    {
+      "bytes": 438,
+      "path": "REPO_ROOT/.autopilot/templates/human-escalation.md",
+      "sha256": "2d433b9ee1dd2ec7567835eee56bca75651eafc5bd4a452f744f83d430b56de1"
+    },
+    {
+      "bytes": 524,
+      "path": "REPO_ROOT/.autopilot/templates/integration.md",
+      "sha256": "d9eb1841977f81e1ae884677a77074eb29707d66155137a94aa7f2a5cad4308b"
+    },
+    {
+      "bytes": 589,
+      "path": "REPO_ROOT/.autopilot/templates/promotion.md",
+      "sha256": "7478b2c40f1c7a511a61eeb8a73db329e6ef989f189055a5eaa7010ea7a764e1"
+    },
+    {
+      "bytes": 552,
+      "path": "REPO_ROOT/.autopilot/templates/reconciliation.md",
+      "sha256": "a1ece8247199aec42725ff840b21366ab84e9a84b9e8651fd0982dff83206ab2"
+    },
+    {
+      "bytes": 405,
+      "path": "REPO_ROOT/.autopilot/templates/repair.md",
+      "sha256": "559730cddd1d7652213ef161b8bcef278521980660b86406bab501e59b681583"
+    },
+    {
+      "bytes": 340,
+      "path": "REPO_ROOT/.autopilot/templates/replan.md",
+      "sha256": "f52bf0ec285d1a4a2406d3e7871b04920e63165964680493bd251a63aa19a7e1"
+    },
+    {
+      "bytes": 2062,
+      "path": "REPO_ROOT/.autopilot/templates/worker.md",
+      "sha256": "733b5d8c509347484c985a2d58860455e39771c667ecb6f6b5afec37b767c1cd"
+    },
+    {
+      "bytes": 1060,
+      "path": "REPO_ROOT/.autopilot/tests/fixtures/consultations/valid-cheating-disproved.json",
+      "sha256": "159e0222bfce8e9d600d220c7394d3fb5ccf1b30ecade43d1a807428e16d78ee"
+    },
+    {
+      "bytes": 934,
+      "path": "REPO_ROOT/.autopilot/tests/fixtures/consultations/valid-human-authority.json",
+      "sha256": "f1585a9d8f7a7d6d4c30b917eb99423b94d6d81d8def2da50731c276daa6596f"
+    },
+    {
+      "bytes": 836,
+      "path": "REPO_ROOT/.autopilot/tests/fixtures/consultations/valid-resolved.json",
+      "sha256": "7b3be4a10e69a38c591f6b87f64cb38b1b8e11bc4bec8727d85dda387aa2eaa6"
+    },
+    {
+      "bytes": 17600,
+      "path": "REPO_ROOT/.autopilot/tests/test_controller.py",
+      "sha256": "f3631809d306661583580463fbb49bc26249060fe6a59a95470dcf71e6f54229"
+    },
+    {
+      "bytes": 1274,
+      "path": "REPO_ROOT/.github/workflows/autopilot-control-room.yml",
+      "sha256": "7bd9d5b1db22c37108cbbb7ae713c3d9a18e37206bd6162a137d6cf2189ae6a6"
+    },
+    {
+      "bytes": 48832,
+      "path": "REPO_ROOT/ORIGINAL_PLAN.md",
+      "sha256": "9535faf5031411829ea3b940e059c6c7f22d38aec638c917ca8b6d7766ab250a"
+    },
+    {
+      "bytes": 725,
+      "path": "REPO_ROOT/USER_GUIDE/00_START_HERE.md",
+      "sha256": "7012dd105051832bf480716be6d65f739bbc168404977ba06d913421d67f8289"
+    },
+    {
+      "bytes": 749,
+      "path": "REPO_ROOT/USER_GUIDE/01_BOOTSTRAP_ONCE.md",
+      "sha256": "cbc128233ef0c0be02c1a89958b0b9674f52cb1c530204162ad15dc6d054b293"
+    },
+    {
+      "bytes": 2126,
+      "path": "REPO_ROOT/USER_GUIDE/02_ONE_PROMPT_FOREVER.md",
+      "sha256": "8dd0be8ade48abbe560fb81c2cb4a4fac8807f54a7f4dcaddbbfb7454fb186d6"
+    },
+    {
+      "bytes": 1973,
+      "path": "REPO_ROOT/USER_GUIDE/03_PARALLEL_EXECUTION.md",
+      "sha256": "aa4bed281acd6e7c9b5fef75625f2a6844245fd5891a2a392bfa7f59d8ea15d2"
+    },
+    {
+      "bytes": 1058,
+      "path": "REPO_ROOT/USER_GUIDE/04_WHEN_TO_START_STOP.md",
+      "sha256": "f62382a1c4bfc21a4b854ccaeca0e430171b09a9df74a75e9db7a1be2c5ddba9"
+    },
+    {
+      "bytes": 1050,
+      "path": "REPO_ROOT/USER_GUIDE/05_RECEIPTS_REPAIRS_RECONCILIATION.md",
+      "sha256": "b2af236dd8596277799765008f2cfd0f1cdeb5e8ad7db1803555e77258655579"
+    },
+    {
+      "bytes": 826,
+      "path": "REPO_ROOT/USER_GUIDE/06_HUMAN_ESCALATION.md",
+      "sha256": "12d0988b4181f84134ce936b362a324b7425ea2e778e5df1e609ec0c231db74b"
+    },
+    {
+      "bytes": 865,
+      "path": "REPO_ROOT/USER_GUIDE/07_MODEL_ROUTING.md",
+      "sha256": "4e12f8f8d54480abb519edd1cbd8df800efe5502e7feff2d6891c7db533aff6a"
+    },
+    {
+      "bytes": 2185,
+      "path": "REPO_ROOT/docs/execution/AUTONOMY_ACCEPTANCE.md",
+      "sha256": "3d7e1e6da6a82a324798b67090787e3799d9d6f0c8c163ccde36055302041baa"
+    },
+    {
+      "bytes": 2794,
+      "path": "REPO_ROOT/docs/execution/ROLE_FIRST_CONSULTATION.md",
+      "sha256": "bea09ccbecefcc2d35a9810632fad1b38f5718d205d79f48a6a752d724fd9998"
+    },
+    {
+      "bytes": 3704,
+      "path": "REPO_ROOT/docs/execution/ROLE_WIRING_AUDIT.md",
+      "sha256": "03118d5f2b5f51763a32abab05bb6c89232449a50dbe6f717b4afb6231fa07de"
+    },
+    {
+      "bytes": 5632,
+      "path": "REPO_ROOT/docs/execution/VERIFIABLE_HIVE_CORTEX_DECISION.md",
+      "sha256": "ccc4b3c3021072295b6a0a79ce9196b17ace226e83d46bff78cf7e4fa2f5fe5a"
+    },
+    {
+      "bytes": 1322,
+      "path": "RUN_CHECKPOINT.json",
+      "sha256": "3f7b66f3f207312d33f2af6a8dedabb88a810f9384d6476f5a43265b43765e68"
+    },
+    {
+      "bytes": 48832,
+      "path": "SOURCE_GENERICPROMPT.txt",
+      "sha256": "9535faf5031411829ea3b940e059c6c7f22d38aec638c917ca8b6d7766ab250a"
+    },
+    {
+      "bytes": 6628,
+      "path": "SOURCE_HIVE_CLASSIC_INSTRUCTIONS.txt",
+      "sha256": "07390fd058878d7705a449850166d4812e793d154da1493dbc5e9887d238a623"
+    },
+    {
+      "bytes": 2646,
+      "path": "SOURCE_REGISTER.md",
+      "sha256": "61d1a4436f2b3fb460113a6a71147f0ab6068fcab239fcd844b8dbec73d80c56"
+    },
+    {
+      "bytes": 51459,
+      "path": "TOURNAMENT_RESULTS.json",
+      "sha256": "4358ebb64771096bce760861f979d111c386f99714a17bf5e3964d554078c01d"
+    },
+    {
+      "bytes": 1371,
+      "path": "VALIDATION_REPORT.json",
+      "sha256": "b6328a75d7314105bd058c30379c706cded590e151678579cfc966b30c7faa66"
+    },
+    {
+      "bytes": 6261,
+      "path": "VALIDATION_TEST_LOG.txt",
+      "sha256": "8b7da2520faa557fc129520bc229af5351cec9d67a76d76b6c75c5e5d0071175"
+    },
+    {
+      "bytes": 3570,
+      "path": "prompts/ACCEPT-240.md",
+      "sha256": "3939e45fd0a684e5f18991accb431ad6c8f03e83380ed7b045794a56fe9579e4"
+    },
+    {
+      "bytes": 3552,
+      "path": "prompts/BASE-020.md",
+      "sha256": "28158efb0b1abf5694240f456e36eaa214405921719829b972b440f906945ffe"
+    },
+    {
+      "bytes": 2189,
+      "path": "prompts/BOOT-000.md",
+      "sha256": "305180a461c5b7d5db03050f10dd841d20591d7ac552aef992ef5b0459e201de"
+    },
+    {
+      "bytes": 3860,
+      "path": "prompts/CONSULT-210.md",
+      "sha256": "1d556ceff7681e33ae3e5db4bf374779337c704beda3dff92949c2b084aa9620"
+    },
+    {
+      "bytes": 3722,
+      "path": "prompts/CONTEXT-230.md",
+      "sha256": "f615d12ab1ba0d74292f474be51d6d9a2c50cb28908e3e1608c8a97a202644a9"
+    },
+    {
+      "bytes": 3828,
+      "path": "prompts/EFFECT-220.md",
+      "sha256": "919e8c0f22273553c554832da4f9ce2cff83de332b1291d9db274d74e720e425"
+    },
+    {
+      "bytes": 3625,
+      "path": "prompts/MIGRATE-260.md",
+      "sha256": "b4743a1c5c41a21a616123da8164ad7f298819282cd30897c9fee6357c581435"
+    },
+    {
+      "bytes": 3252,
+      "path": "prompts/RECON-010.md",
+      "sha256": "faa611589130249453767977dd9663884756b97a013df462a490539b98b55bdb"
+    },
+    {
+      "bytes": 3694,
+      "path": "prompts/RECONCILE-250.md",
+      "sha256": "04245a5bca5d4fcfe36aa615e948822da593a8c8edd62d40df4b0326a59cebcd"
+    },
+    {
+      "bytes": 3742,
+      "path": "prompts/ROLE-200.md",
+      "sha256": "060fc036b1705da293c0f209b7be4647a855c15569f0532897023a45c05fdd1f"
+    }
+  ],
+  "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+  "schema_version": 1
+}

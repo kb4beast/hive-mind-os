@@ -1,0 +1,43 @@
+{
+  "execution_surface_policy": {
+    "fallback": "codex_bounded_subtask_only",
+    "fallback_rule": "Codex requires a specific evidenced capability gap after Classic tools and role-first consultation are exhausted.",
+    "human_after": "Only genuine authority/access after self-resolution and any necessary bounded Codex subtask.",
+    "preferred": "chatgpt_classic",
+    "return_to_classic": true
+  },
+  "mandatory_escalation_signals": [
+    "node assumptions contradicted by current main",
+    "write scope must broaden",
+    "acceptance criteria are not executable",
+    "authority or credential is absent",
+    "same actor would generate and independently approve its own result",
+    "suspected cheating cannot be disproved with retained evidence",
+    "semantic conflict with another active node",
+    "third unsuccessful semantic attempt",
+    "required migration affects an undeclared runtime path",
+    "protected branch, production, spending, or legal authority is required"
+  ],
+  "risk_dimensions": [
+    "ambiguity",
+    "novelty",
+    "code breadth",
+    "architecture",
+    "concurrency",
+    "security",
+    "authority",
+    "migration",
+    "reversibility",
+    "testing difficulty",
+    "blast radius",
+    "failure cost"
+  ],
+  "schema_version": 1,
+  "tier_rules": {
+    "T0": "No semantic design choice; deterministic transformation or inspection only.",
+    "T1": "One bounded component, stable interface, low blast radius, direct tests.",
+    "T2": "Several files or one moderate design decision; reversible and locally testable.",
+    "T3": "Cross-cutting runtime behavior, concurrency, security, or compatibility migration.",
+    "T4": "Canonical kernel, authority, anti-cheating, promotion, or irreversible/broad architecture."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "before_codex": [
+    "Inspect current repository/evidence and use available ChatGPT Classic reasoning and connectors/tools.",
+    "Attempt bounded self-resolution and alternate supported tool paths.",
+    "Use role-first consultation for ambiguity, missing evidence, software/design questions, or suspected cheating.",
+    "Prove the remaining blocker is an execution capability unavailable in ChatGPT Classic."
+  ],
+  "codex_allowed_only_for": [
+    "local checkout or shell execution unavailable in ChatGPT Classic",
+    "repository tests/builds/benchmarks that must run in an unavailable local environment",
+    "interactive authenticated developer tooling not exposed to ChatGPT Classic",
+    "a code mutation that cannot be performed safely with available Classic/GitHub tooling after bounded attempts"
+  ],
+  "codex_mode": "last_resort_bounded_subtask_only",
+  "codex_prompt": "Delegate only the smallest blocked subtask. Keep the prompt token-aware and include repository, node, exact base SHA when relevant, exact scope, exact task/commands, evidence to return, and stop condition. Do not restate the whole plan. Return evidence to ChatGPT Classic, which remains node owner.",
+  "human_instructions": "Never assume the user knows how to perform a manual action. Give exact click-by-click UI steps or copy-paste commands, what should appear, exactly what to send back, and safety/rollback guidance when relevant.",
+  "human_rule": "Ask the user only for genuine human authority/access after Classic tools, self-resolution, role consultation, and any truly necessary bounded Codex subtask are exhausted.",
+  "policy_id": "chatgpt-classic-first-codex-last-resort-v1",
+  "preferred_surface": "chatgpt_classic",
+  "response_contract": {
+    "blocks_rule": "List a blocker only after self-resolution paths are exhausted. State what was tried, why it remains blocked, and whether a bounded Codex subtask or genuine human action is required. Use None. when clear.",
+    "required_sections": [
+      "WHAT I DID",
+      "NEXT STEPS",
+      "BLOCKS"
+    ]
+  },
+  "schema_version": 1,
+  "scope": "all nodes and all dispatcher/repair/reconciliation/integration/promotion/replan work in this plan"
+}

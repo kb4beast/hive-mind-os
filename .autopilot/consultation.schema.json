@@ -1,0 +1,130 @@
+{
+  "$id": "hive-cortex-consultation-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "answer": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authority_class": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cheating_disposition": {
+      "enum": [
+        "NOT_APPLICABLE",
+        "CONFIRMED",
+        "DISPROVED",
+        "UNRESOLVED"
+      ]
+    },
+    "consulted_roles": {
+      "items": {
+        "enum": [
+          "orchestrator",
+          "explorer",
+          "architect",
+          "builder",
+          "curator",
+          "integrator",
+          "steward",
+          "optimizer"
+        ]
+      },
+      "minItems": 2,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "decision": {
+      "enum": [
+        "RESOLVED",
+        "REMAND",
+        "REPLAN",
+        "BLOCKED_EVIDENCE",
+        "TRUE_AUTHORITY_REQUIRED",
+        "QUARANTINE"
+      ]
+    },
+    "dissent": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "evidence_refs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "human_escalation": {
+      "type": "boolean"
+    },
+    "identity_records": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "mission_id": {
+      "type": "string"
+    },
+    "question": {
+      "type": "string"
+    },
+    "reason_code": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "requesting_role": {
+      "enum": [
+        "orchestrator",
+        "explorer",
+        "architect",
+        "builder",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ]
+    },
+    "role_first_exhausted": {
+      "type": "boolean"
+    },
+    "round": {
+      "maximum": 3,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "suspected_cheating": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "request_id",
+    "mission_id",
+    "question",
+    "reason_code",
+    "requesting_role",
+    "consulted_roles",
+    "round",
+    "suspected_cheating",
+    "evidence_refs",
+    "decision",
+    "answer",
+    "dissent",
+    "human_escalation",
+    "authority_class",
+    "role_first_exhausted",
+    "cheating_disposition",
+    "identity_records"
+  ],
+  "type": "object"
+}

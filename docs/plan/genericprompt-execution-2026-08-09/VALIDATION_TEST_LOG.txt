@@ -1,0 +1,50 @@
+test_01_fresh_bootstrap_is_required (test_controller.AutopilotControllerTests.test_01_fresh_bootstrap_is_required) ... ok
+test_02_invalid_bootstrap_missing_template (test_controller.AutopilotControllerTests.test_02_invalid_bootstrap_missing_template) ... ok
+test_03_first_nodes_ready_after_bootstrap (test_controller.AutopilotControllerTests.test_03_first_nodes_ready_after_bootstrap) ... ok
+test_04_parallel_foundation_wave_ready (test_controller.AutopilotControllerTests.test_04_parallel_foundation_wave_ready) ... ok
+test_05_valid_receipt_marks_node_complete (test_controller.AutopilotControllerTests.test_05_valid_receipt_marks_node_complete) ... ok
+test_06_deleted_branch_after_merge_does_not_erase_completion (test_controller.AutopilotControllerTests.test_06_deleted_branch_after_merge_does_not_erase_completion) ... ok
+test_07_open_node_pr_is_reported (test_controller.AutopilotControllerTests.test_07_open_node_pr_is_reported) ... ok
+test_08_closed_unmerged_pr_requires_repair (test_controller.AutopilotControllerTests.test_08_closed_unmerged_pr_requires_repair) ... ok
+test_09_failed_ci_is_reported (test_controller.AutopilotControllerTests.test_09_failed_ci_is_reported) ... ok
+test_10_stale_receipt_is_not_completion (test_controller.AutopilotControllerTests.test_10_stale_receipt_is_not_completion) ... ok
+test_11_stale_branch_requires_repair (test_controller.AutopilotControllerTests.test_11_stale_branch_requires_repair) ... ok
+test_12_duplicate_claim_is_rejected (test_controller.AutopilotControllerTests.test_12_duplicate_claim_is_rejected) ... ok
+test_13_file_lock_conflict_blocks_parallel_claim (test_controller.AutopilotControllerTests.test_13_file_lock_conflict_blocks_parallel_claim) ... ok
+test_14_semantic_lock_conflict_blocks_parallel_claim (test_controller.AutopilotControllerTests.test_14_semantic_lock_conflict_blocks_parallel_claim) ... ok
+test_15_merged_pr_without_receipt_waits_for_receipt (test_controller.AutopilotControllerTests.test_15_merged_pr_without_receipt_waits_for_receipt) ... ok
+test_16_target_advance_requires_reconciliation (test_controller.AutopilotControllerTests.test_16_target_advance_requires_reconciliation) ... ok
+test_17_reconciliation_accepts_current_target (test_controller.AutopilotControllerTests.test_17_reconciliation_accepts_current_target) ... ok
+test_18_integration_node_becomes_integration_ready (test_controller.AutopilotControllerTests.test_18_integration_node_becomes_integration_ready) ... ok
+test_19_integration_pr_failure_is_ci_failed (test_controller.AutopilotControllerTests.test_19_integration_pr_failure_is_ci_failed) ... ok
+test_20_promotion_node_becomes_promotion_ready (test_controller.AutopilotControllerTests.test_20_promotion_node_becomes_promotion_ready) ... ok
+test_21_worker_can_preserve_model_escalation (test_controller.AutopilotControllerTests.test_21_worker_can_preserve_model_escalation) ... ok
+test_22_consultation_resolves_question (test_controller.AutopilotControllerTests.test_22_consultation_resolves_question) ... ok
+test_23_consultation_preserves_dissent (test_controller.AutopilotControllerTests.test_23_consultation_preserves_dissent) ... ok
+test_24_consultation_loop_is_bounded (test_controller.AutopilotControllerTests.test_24_consultation_loop_is_bounded) ... ok
+test_25_genuine_human_authority_is_allowed (test_controller.AutopilotControllerTests.test_25_genuine_human_authority_is_allowed) ... ok
+test_26_fake_human_escalation_is_rejected (test_controller.AutopilotControllerTests.test_26_fake_human_escalation_is_rejected) ... ok
+test_27_confirmed_cheating_cannot_resolve_normally (test_controller.AutopilotControllerTests.test_27_confirmed_cheating_cannot_resolve_normally) ... ok
+test_28_cheating_can_be_disproved_with_evidence (test_controller.AutopilotControllerTests.test_28_cheating_can_be_disproved_with_evidence) ... ok
+test_29_self_healing_retry_returns_node_to_ready (test_controller.AutopilotControllerTests.test_29_self_healing_retry_returns_node_to_ready) ... ok
+test_30_repeated_failure_quarantines_node (test_controller.AutopilotControllerTests.test_30_repeated_failure_quarantines_node) ... ok
+test_31_cycle_requires_replanning (test_controller.AutopilotControllerTests.test_31_cycle_requires_replanning) ... ok
+test_32_project_complete_when_all_nodes_have_receipts (test_controller.AutopilotControllerTests.test_32_project_complete_when_all_nodes_have_receipts) ... ok
+test_33_unknown_dependency_is_invalid (test_controller.AutopilotControllerTests.test_33_unknown_dependency_is_invalid) ... ok
+test_34_duplicate_node_ids_are_invalid (test_controller.AutopilotControllerTests.test_34_duplicate_node_ids_are_invalid) ... ok
+test_35_missing_provider_route_is_invalid (test_controller.AutopilotControllerTests.test_35_missing_provider_route_is_invalid) ... ok
+test_36_missing_role_row_is_invalid (test_controller.AutopilotControllerTests.test_36_missing_role_row_is_invalid) ... ok
+test_37_archive_only_installation_is_detected (test_controller.AutopilotControllerTests.test_37_archive_only_installation_is_detected) ... ok
+test_38_receipt_outside_write_scope_is_rejected (test_controller.AutopilotControllerTests.test_38_receipt_outside_write_scope_is_rejected) ... ok
+test_39_nonpassing_test_is_rejected (test_controller.AutopilotControllerTests.test_39_nonpassing_test_is_rejected) ... ok
+test_40_stale_claim_is_reaped (test_controller.AutopilotControllerTests.test_40_stale_claim_is_reaped) ... ok
+test_41_receipt_with_valid_consultation_passes (test_controller.AutopilotControllerTests.test_41_receipt_with_valid_consultation_passes) ... ok
+test_42_doctor_passes_configuration_without_git (test_controller.AutopilotControllerTests.test_42_doctor_passes_configuration_without_git) ... ok
+test_43_rendered_prompt_contains_node_and_routes (test_controller.AutopilotControllerTests.test_43_rendered_prompt_contains_node_and_routes) ... ok
+test_44_filename_glob_scope_accepts_matching_receipt (test_controller.AutopilotControllerTests.test_44_filename_glob_scope_accepts_matching_receipt) ... ok
+test_45_sibling_glob_scopes_do_not_false_conflict (test_controller.AutopilotControllerTests.test_45_sibling_glob_scopes_do_not_false_conflict) ... ok
+
+----------------------------------------------------------------------
+Ran 45 tests in 1.807s
+
+OK
