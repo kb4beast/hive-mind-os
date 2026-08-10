@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   reproduce:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout branch with full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -23,39 +23,49 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.14'
-      - name: Reproduce historical Phase-12 receipts
-        shell: bash
+      - name: Reproduce historical Phase-12 receipts on Windows
+        shell: pwsh
         run: |
-          set -euo pipefail
-          candidate=9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7
-          git worktree add --detach /tmp/pr117-candidate "$candidate"
-          cd /tmp/pr117-candidate
-          python -m pip install --disable-pip-version-check --no-deps -e . >/tmp/pr117-install.log 2>&1
-          mkdir -p /tmp/reproduced-logs
+          $ErrorActionPreference = 'Stop'
+          $candidate = '9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7'
+          $candidateRoot = Join-Path $env:RUNNER_TEMP 'pr117-candidate'
+          $logRoot = Join-Path $env:RUNNER_TEMP 'reproduced-logs'
+          git worktree add --detach $candidateRoot $candidate
+          Set-Location $candidateRoot
+          python -m pip install --disable-pip-version-check --no-deps -e . | Out-Null
+          New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 
-          python -m unittest \
-            tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work \
-            -v > /tmp/reproduced-logs/phase11-parity.log 2>&1
-          python -m unittest \
-            tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes \
-            -v > /tmp/reproduced-logs/phase11-rollback.log 2>&1
-          python -m unittest \
-            tests.test_brain_kernel_authority \
-            tests.test_brain_kernel_local_execution \
-            tests.test_sandbox \
-            -v > /tmp/reproduced-logs/security-regression.log 2>&1
-          python -m unittest discover -s tests -p test_workers.py -v \
-            > /tmp/reproduced-logs/recovery-regression.log 2>&1
+          $results = @{}
+          $parity = Join-Path $logRoot 'phase11-parity.log'
+          & python -m unittest tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work -v *> $parity
+          $results['phase11-parity'] = $LASTEXITCODE
 
-          echo "=== reproduced transcript digests ==="
-          sha256sum /tmp/reproduced-logs/*.log
-          echo "=== transcript tails ==="
-          for path in /tmp/reproduced-logs/*.log; do
-            echo "--- $(basename "$path") ---"
-            tail -n 8 "$path"
-          done
+          $rollback = Join-Path $logRoot 'phase11-rollback.log'
+          & python -m unittest tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes -v *> $rollback
+          $results['phase11-rollback'] = $LASTEXITCODE
 
+          $security = Join-Path $logRoot 'security-regression.log'
+          & python -m unittest tests.test_brain_kernel_authority tests.test_brain_kernel_local_execution tests.test_sandbox -v *> $security
+          $results['security-regression'] = $LASTEXITCODE
+
+          $recovery = Join-Path $logRoot 'recovery-regression.log'
+          & python -m unittest discover -s tests -p test_workers.py -v *> $recovery
+          $results['recovery-regression'] = $LASTEXITCODE
+
+          Write-Host '=== reproduced transcript status and digests ==='
+          foreach ($path in Get-ChildItem $logRoot -Filter '*.log' | Sort-Object Name) {
+            $name = [System.IO.Path]::GetFileNameWithoutExtension($path.Name)
+            $digest = (Get-FileHash -Algorithm SHA256 $path.FullName).Hash.ToLowerInvariant()
+            Write-Host "$name exit=$($results[$name]) sha256:$digest"
+            Write-Host "--- $($path.Name) tail ---"
+            Get-Content $path.FullName | Select-Object -Last 8
+          }
+
+          if ($results.Values | Where-Object { $_ -ne 0 }) {
+            throw 'one or more historical receipt commands failed'
+          }
       - name: Show Ruff fixes without modifying branch
+        if: always()
         uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
         continue-on-error: true
         with:
