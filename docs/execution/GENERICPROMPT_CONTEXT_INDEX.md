@@ -13,7 +13,9 @@ Canonical operating artifacts:
 - `docs/execution/NEXT_SESSION_PROMPTS.md` — exact Level 1 session prompts.
 - `USER_GUIDE/02_ONE_PROMPT_FOREVER.md` — permanent dispatcher prompt.
 
-Plan fingerprint: `sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39`.
+Canonical amended plan fingerprint: `sha256:5a7cb3177a11dec9d73fd531c1549388b1f82d65f8ff71e72866a61c11fdf913`.
+
+Execution workflow policy: `.autopilot/workflow-policy.json` and `docs/execution/CHATGPT_CODEX_EXECUTION_POLICY.md`. The original GenericPrompt run remains preserved unchanged in the archive directory.
 Original baseline: `7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23`.
 
 The user objective, exact source prompt, reports, tournament evidence, validation logs,

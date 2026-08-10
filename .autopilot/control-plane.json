@@ -8,7 +8,9 @@
     "The implementation control plane is not the product runtime.",
     "No role, worker, or dispatcher may expand authority.",
     "No same-model role label may be presented as an independent human.",
-    "No human escalation may substitute for a software repair or role-resolvable question."
+    "No human escalation may substitute for a software repair or role-resolvable question.",
+    "ChatGPT Classic is the default node owner; Codex may be used only for the smallest proven unavailable execution capability after Classic/tool/role paths are exhausted.",
+    "Never ask the user for a manual action without novice-safe exact instructions and proof that genuine human authority or access is required."
   ],
   "schema_version": 1,
   "source_of_truth": [
@@ -27,5 +29,6 @@
     "branch": "main",
     "repository": "kb4beast/hive-mind-os"
   },
-  "verify_git_objects": true
+  "verify_git_objects": true,
+  "workflow_policy_file": ".autopilot/workflow-policy.json"
 }

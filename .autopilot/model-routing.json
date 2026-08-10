@@ -1,4 +1,11 @@
 {
+  "execution_surface_policy": {
+    "fallback": "codex_bounded_subtask_only",
+    "fallback_rule": "Codex requires a specific evidenced capability gap after Classic tools and role-first consultation are exhausted.",
+    "human_after": "Only genuine authority/access after self-resolution and any necessary bounded Codex subtask.",
+    "preferred": "chatgpt_classic",
+    "return_to_classic": true
+  },
   "mandatory_escalation_signals": [
     "node assumptions contradicted by current main",
     "write scope must broaden",

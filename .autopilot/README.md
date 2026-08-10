@@ -56,6 +56,12 @@ A dispatcher session does not implement product work. It:
 6. reconciles target advancement before issuing worker prompts;
 7. returns only dependency-ready, conflict-free nodes with copy-ready prompts.
 
+## ChatGPT Classic-first execution workflow
+
+`.autopilot/workflow-policy.json` is a mandatory plan-wide policy for every node and every dispatcher/repair/reconciliation/integration/promotion/replan session. ChatGPT Classic is the normal node owner and must exhaust its available reasoning, connectors/tools, bounded repair paths, and role-first consultation before Codex is considered. Codex is a last-resort executor for only the smallest concrete subtask requiring a capability unavailable in Classic; ownership returns to Classic afterward. Difficulty or convenience alone is never a Codex reason.
+
+If human action is genuinely required, never assume the user knows the UI, command, or terminology. Give exact novice-safe steps, expected results, what to return, and safety/rollback guidance. Every session response ends with `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`.
+
 ## Role-first consultation rule
 
 A worker may not ask the owner a question merely because the task is ambiguous, hard,

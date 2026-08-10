@@ -12,3 +12,7 @@ model availability before every wave because model catalogs change.
 Escalate model tier only after preserving the lower-tier failure and identifying the specific
 capability gap. A higher model does not grant broader file, effect, credential, or acceptance
 authority.
+
+## Execution surface
+
+Model tier and execution surface are separate. **ChatGPT Classic is always attempted first**, even for code work. Use its available GitHub/connectors, files, web, and deterministic tools to complete as much of the node as possible. Codex is permitted only for the smallest remaining action that requires a capability Classic actually lacks (for example local shell/test/build/benchmark execution). Keep the Codex prompt short, return its evidence to Classic, and resume the node in Classic.
