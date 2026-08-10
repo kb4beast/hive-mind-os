@@ -4,11 +4,13 @@ import argparse
 import asyncio
 import json
 import os
+import sqlite3
 import sys
 import tempfile
+from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, cast
 
 from .acceptance import (
     AcceptanceSpecification,
@@ -23,6 +25,16 @@ from .autonomous_os import (
 )
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
+from .brain_kernel.context import ContextManifestStore
+from .brain_kernel.contracts import MissionCharter
+from .brain_kernel.doctor import inspect_kernel_environment
+from .brain_kernel.memory import MemoryCatalogStore, MemoryDenied, RetrievalRequest
+from .brain_kernel.planner import (
+    DeterministicFixturePlanner,
+    graph_from_events,
+    persist_plan,
+)
+from .brain_kernel.store import KernelIntegrityError, KernelStore
 from .continuation import (
     ContinuationPacketError,
     export_packet,
@@ -56,6 +68,7 @@ from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .projection import build_projection, projection_json, write_projection_html
+from .repository_compatibility import record_legacy_enqueue
 from .runtime import HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
@@ -104,6 +117,96 @@ def build_audit_parser() -> argparse.ArgumentParser:
         "--signing-key-id",
         help="Required stable identifier when --signing-key-file is used",
     )
+    return parser
+
+
+def build_kernel_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind kernel",
+        description="Inspect additive Verifiable Hive Kernel capabilities.",
+    )
+    commands = parser.add_subparsers(dest="kernel_command", required=True)
+    doctor = commands.add_parser(
+        "doctor",
+        help="Report local kernel prerequisites without performing remote effects.",
+    )
+    doctor.add_argument("--repository", default=".", help="Git worktree to inspect")
+    doctor.add_argument(
+        "--state-dir",
+        default=".hive-mind-kernel-state",
+        help="State directory to validate without creating it",
+    )
+    doctor.add_argument("--json", action="store_true", dest="json_output")
+    status = commands.add_parser(
+        "status",
+        help="Show a read-only event-derived status for one kernel mission.",
+    )
+    status.add_argument("mission_id", help="Kernel mission identifier")
+    status.add_argument(
+        "--state-dir",
+        default=".hive-mind-kernel-state",
+        help="Directory containing brain-kernel.sqlite3",
+    )
+    status.add_argument("--json", action="store_true", dest="json_output")
+    plan = commands.add_parser(
+        "plan", help="Persist a deterministic fixture plan for an existing kernel mission."
+    )
+    plan.add_argument("mission_id", help="Kernel mission identifier")
+    plan.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
+    plan.add_argument(
+        "--fixture", choices=("bugfix", "feature", "refactor", "docs", "integration"), required=True
+    )
+    plan.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    plan.add_argument("--json", action="store_true", dest="json_output")
+    graph = commands.add_parser(
+        "graph", help="Render a read-only, event-derived kernel work graph."
+    )
+    graph.add_argument("mission_id", help="Kernel mission identifier")
+    graph.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
+    graph.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    graph.add_argument("--json", action="store_true", dest="json_output")
+    closeout = commands.add_parser(
+        "closeout", help="Read a local, event-derived technical closeout report."
+    )
+    closeout.add_argument("mission_id", help="Kernel mission identifier")
+    closeout.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    closeout.add_argument(
+        "--bundle-ref",
+        action="append",
+        default=[],
+        metavar="REFERENCE=PATH",
+        help="Local verification bundle directory for one recorded opaque reference.",
+    )
+    closeout.add_argument("--json", action="store_true", dest="json_output")
+    memory = commands.add_parser("memory", help="Inspect bounded local kernel memory.")
+    memory_commands = memory.add_subparsers(dest="memory_command", required=True)
+    search = memory_commands.add_parser("search", help="Rank scoped memory from a durable snapshot.")
+    search.add_argument("--snapshot", required=True, help="Memory snapshot digest")
+    search.add_argument("--mission", required=True)
+    search.add_argument("--work", required=True)
+    search.add_argument("--role", required=True)
+    search.add_argument("--query", required=True)
+    search.add_argument("--now", required=True, help="RFC 3339 retrieval time")
+    search.add_argument("--data-scope", action="append", default=[])
+    search.add_argument("--sensitivity-scope", action="append", default=["public", "internal"])
+    search.add_argument("--require-sensitivity", action="append", default=[])
+    search.add_argument("--repository-key")
+    search.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    search.add_argument("--json", action="store_true", dest="json_output")
+    inspect = memory_commands.add_parser("inspect", help="Inspect memory metadata without reading its body.")
+    inspect.add_argument("record_id")
+    inspect.add_argument("--snapshot", required=True, help="Memory snapshot digest")
+    inspect.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    inspect.add_argument("--json", action="store_true", dest="json_output")
+    expire = memory_commands.add_parser("expire", help="Append expiration facts and save a successor snapshot.")
+    expire.add_argument("--snapshot", required=True, help="Memory snapshot digest")
+    expire.add_argument("--now", required=True, help="RFC 3339 maintenance time")
+    expire.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    expire.add_argument("--json", action="store_true", dest="json_output")
+    context = commands.add_parser("context", help="Inspect one persisted kernel context manifest.")
+    context.add_argument("--manifest", required=True, help="Context manifest digest")
+    context.add_argument("--state-dir", default=".hive-mind-kernel-state")
+    context.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -411,6 +514,16 @@ def build_enqueue_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pin")
     parser.add_argument("--max-attempts", type=int, default=3)
     parser.add_argument("--state-dir", default=".hive-mind-state")
+    parser.add_argument(
+        "--kernel-state-dir",
+        help="Separate kernel migration-record directory (default: sibling .hive-mind-kernel-state)",
+    )
+    parser.add_argument(
+        "--compatibility-mode",
+        choices=("kernel-v1", "legacy"),
+        default="kernel-v1",
+        help="Use the versioned kernel ingress record or retain legacy-only dispatch for rollback.",
+    )
     return parser
 
 
@@ -1035,6 +1148,12 @@ def _run_enqueue(args: argparse.Namespace) -> int:
         )
     finally:
         scheduler.close()
+    if getattr(args, "compatibility_mode", "kernel-v1") == "kernel-v1":
+        record_legacy_enqueue(
+            job,
+            legacy_state_dir=args.state_dir,
+            kernel_state_dir=getattr(args, "kernel_state_dir", None),
+        )
     print(
         json.dumps(
             {
@@ -1279,6 +1398,203 @@ def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     return 0 if audit["complete"] else 1
 
 
+def _run_kernel_doctor(args: argparse.Namespace) -> int:
+    report = inspect_kernel_environment(
+        args.repository,
+        state_dir=args.state_dir,
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _run_kernel_status(args: argparse.Namespace) -> int:
+    database = KernelStore.database_path(args.state_dir)
+    if not database.is_file():
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": f"kernel state database does not exist: {database}",
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        store = KernelStore(database, read_only=True)
+        try:
+            report = store.status(args.mission_id)
+        finally:
+            store.close()
+    except (KernelIntegrityError, OSError, sqlite3.Error, KeyError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    if args.json_output:
+        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        print(
+            f"{report['mission_id']}: {report['status']} "
+            f"(sequence {report['last_sequence']}, {len(report['work'])} work items)"
+        )
+    return 0
+
+
+def _load_kernel_charter(path: str, mission_id: str) -> MissionCharter:
+    document = json.loads(Path(path).read_text(encoding="utf-8"))
+    charter = cast(MissionCharter, MissionCharter.from_document(document))
+    if charter.mission_id != mission_id:
+        raise ValueError("charter mission_id does not match command mission_id")
+    return charter
+
+
+def _kernel_database_or_error(state_dir: str) -> Path:
+    database = KernelStore.database_path(state_dir)
+    if not database.is_file():
+        raise FileNotFoundError(f"kernel state database does not exist: {database}")
+    return database
+
+
+def _run_kernel_plan(args: argparse.Namespace) -> int:
+    try:
+        charter = _load_kernel_charter(args.charter, args.mission_id)
+        store = KernelStore(_kernel_database_or_error(args.state_dir))
+        try:
+            if args.mission_id not in store.projection()["missions"]:
+                raise KeyError(f"unknown kernel mission: {args.mission_id}")
+            plan = DeterministicFixturePlanner().plan(charter, args.fixture)
+            sequences = persist_plan(store, plan)
+        finally:
+            store.close()
+    except (FileNotFoundError, KernelIntegrityError, OSError, ValueError, KeyError, sqlite3.Error) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {"mission_id": args.mission_id, "plan_digest": plan.digest, "sequences": sequences}
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else plan.digest)
+    return 0
+
+
+def _run_kernel_graph(args: argparse.Namespace) -> int:
+    try:
+        charter = _load_kernel_charter(args.charter, args.mission_id)
+        store = KernelStore(_kernel_database_or_error(args.state_dir), read_only=True)
+        try:
+            graph = graph_from_events(charter, store.events())
+        finally:
+            store.close()
+    except (FileNotFoundError, KernelIntegrityError, OSError, ValueError, KeyError, sqlite3.Error) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {
+        "mission_id": args.mission_id,
+        "graph_digest": graph.digest,
+        "ready_work_ids": [item.work_id for item in graph.ready_items()],
+        "work_items": [item.to_document() for item in graph.ordered_items()],
+    }
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else graph.digest)
+    return 0
+
+
+def _run_kernel_closeout(args: argparse.Namespace) -> int:
+    from .brain_kernel.closeout import TechnicalCloseoutError, derive_technical_closeout
+
+    try:
+        directories: dict[str, str] = {}
+        for value in args.bundle_ref:
+            reference, separator, directory = value.partition("=")
+            if not separator or not reference or not directory or reference in directories:
+                raise ValueError("bundle references must use unique REFERENCE=PATH values")
+            directories[reference] = directory
+        store = KernelStore(_kernel_database_or_error(args.state_dir), read_only=True)
+        try:
+            report = derive_technical_closeout(
+                store, args.mission_id, bundle_directories=directories
+            )
+        finally:
+            store.close()
+    except (FileNotFoundError, KernelIntegrityError, TechnicalCloseoutError, OSError, ValueError, KeyError, sqlite3.Error) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    document = report.to_document()
+    print(json.dumps(document, indent=2, sort_keys=True) if args.json_output else f"{report.mission_id}: {report.state}")
+    return 0
+
+
+def _memory_catalog(args: argparse.Namespace):
+    return MemoryCatalogStore(args.state_dir).restore(args.snapshot)
+
+
+def _run_kernel_memory_search(args: argparse.Namespace) -> int:
+    try:
+        catalog = _memory_catalog(args)
+        request = RetrievalRequest(
+            args.mission, args.work, args.role, args.query, args.now,
+            tuple(args.data_scope), repository_key=args.repository_key,
+            sensitivity_scopes=tuple(args.sensitivity_scope),
+            required_sensitivities=tuple(args.require_sensitivity),
+        )
+        ranked = catalog.rank(request)
+    except (KeyError, MemoryDenied, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {
+        "snapshot": args.snapshot,
+        "records": [
+            {"record": item.entry.record.to_document(), "score": item.score, "terms": asdict(item.terms)}
+            for item in ranked
+        ],
+    }
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else "\n".join(item.entry.record.record_id for item in ranked))
+    return 0
+
+
+def _run_kernel_memory_inspect(args: argparse.Namespace) -> int:
+    try:
+        entry, state = _memory_catalog(args).inspect(args.record_id)
+    except (KeyError, MemoryDenied, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {
+        "record": entry.record.to_document(),
+        "access": {"roles": entry.access.roles, "data_scopes": entry.access.data_scopes, "evaluator_visible": entry.access.evaluator_visible},
+        "derived_state": state.value,
+    }
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else f"{entry.record.record_id}: {state.value}")
+    return 0
+
+
+def _run_kernel_memory_expire(args: argparse.Namespace) -> int:
+    try:
+        store = MemoryCatalogStore(args.state_dir)
+        catalog = store.restore(args.snapshot)
+        events = catalog.expire(now=args.now)
+        successor = store.persist(catalog)
+    except (KeyError, MemoryDenied, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    report = {"snapshot": successor, "expired_record_ids": [event.record_id for event in events]}
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else successor)
+    return 0
+
+
+def _run_kernel_context(args: argparse.Namespace) -> int:
+    try:
+        manifests = ContextManifestStore(args.state_dir)
+        manifests.restore()
+        manifest = manifests.get(args.manifest)
+    except (KeyError, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 1
+    print(json.dumps(manifest.to_document(), indent=2, sort_keys=True) if args.json_output else manifest.manifest_digest)
+    return 0
+
+
 def _run_ingest(args: argparse.Namespace) -> int:
     supplied_file = Path(args.file)
     try:
@@ -1360,6 +1676,26 @@ def _run_defer(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "kernel":
+        args = build_kernel_parser().parse_args(arguments[1:])
+        if args.kernel_command == "doctor":
+            raise SystemExit(_run_kernel_doctor(args))
+        if args.kernel_command == "status":
+            raise SystemExit(_run_kernel_status(args))
+        if args.kernel_command == "plan":
+            raise SystemExit(_run_kernel_plan(args))
+        if args.kernel_command == "graph":
+            raise SystemExit(_run_kernel_graph(args))
+        if args.kernel_command == "closeout":
+            raise SystemExit(_run_kernel_closeout(args))
+        if args.kernel_command == "memory":
+            if args.memory_command == "search":
+                raise SystemExit(_run_kernel_memory_search(args))
+            if args.memory_command == "inspect":
+                raise SystemExit(_run_kernel_memory_inspect(args))
+            raise SystemExit(_run_kernel_memory_expire(args))
+        if args.kernel_command == "context":
+            raise SystemExit(_run_kernel_context(args))
     if arguments and arguments[0] == "audit":
         args = build_audit_parser().parse_args(arguments[1:])
         raise SystemExit(_run_audit(args, ("hive-mind", *arguments)))

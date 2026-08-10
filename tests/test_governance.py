@@ -133,7 +133,10 @@ class RepositoryGovernanceTests(unittest.TestCase):
         self.assertEqual(allowlist["regexTarget"], "line")
         self.assertEqual(
             allowlist["regexes"],
-            ["IDEMPOTENCY" + "-P06-test"],
+            [
+                "IDEMPOTENCY" + "-P06-test",
+                r'ConstraintEnvelope\("AUTH-(?:one|parent|child)", "MISSION-phase-1"',
+            ],
         )
         self.assertNotIn("commits", allowlist)
         self.assertNotIn("paths", allowlist)

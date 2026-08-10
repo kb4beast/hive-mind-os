@@ -1,0 +1,9 @@
+test_graceful_shutdown_finishes_inflight_job (test_workers.WorkerTests.test_graceful_shutdown_finishes_inflight_job) ... ok
+test_seeded_process_kill_sweep_reclaims_without_duplicate_effects (test_workers.WorkerTests.test_seeded_process_kill_sweep_reclaims_without_duplicate_effects) ... ok
+test_worker_dead_letters_an_unpinned_repository_mission (test_workers.WorkerTests.test_worker_dead_letters_an_unpinned_repository_mission) ... ok
+test_worker_executes_real_durable_mission_with_unique_effect_adoption (test_workers.WorkerTests.test_worker_executes_real_durable_mission_with_unique_effect_adoption) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 11.431s
+
+OK

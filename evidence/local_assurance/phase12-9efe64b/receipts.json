@@ -1,0 +1,84 @@
+{
+  "benchmark_summary": {
+    "digest": "sha256:6f99246839f2866bae89d81f8035370559c75c10da4f40edc70971d56f82c21d",
+    "path": "benchmark-success/p13-62b18c75e8cc99fc/summary.json"
+  },
+  "candidate_commit": "9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7",
+  "candidate_tree": "25839e21173160052189044ba4b6be16214ff8e7",
+  "receipt_reproduction": {
+    "candidate_commit": "9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7",
+    "platform": "GitHub Actions Windows Server 2025",
+    "python": "3.14.6",
+    "reason": "original content-addressed transcript bytes were referenced but never committed"
+  },
+  "receipts": [
+    {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work",
+        "-v"
+      ],
+      "digest": "sha256:5c6fae2477662f6df6c5317fcc8d0ce94a2405f9f907b09aa4b27d8c39207c87",
+      "interpreter": "GitHub Actions Windows Server 2025 / CPython 3.14.6 reproduction",
+      "name": "phase11-parity",
+      "provenance": "reproduced 2026-08-10 against exact candidate commit 9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7 because the original transcript bytes were not retained",
+      "status": "passed",
+      "transcript_path": "logs/phase11-parity.log"
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes",
+        "-v"
+      ],
+      "digest": "sha256:95b354ea71933d8087f2dd965532992e9e4e6f1bf270a743e37312209e3e1aa5",
+      "interpreter": "GitHub Actions Windows Server 2025 / CPython 3.14.6 reproduction",
+      "name": "phase11-rollback",
+      "provenance": "reproduced 2026-08-10 against exact candidate commit 9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7 because the original transcript bytes were not retained",
+      "status": "passed",
+      "transcript_path": "logs/phase11-rollback.log"
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_brain_kernel_authority",
+        "tests.test_brain_kernel_local_execution",
+        "tests.test_sandbox",
+        "-v"
+      ],
+      "digest": "sha256:fcbe58c086826af61a15184d9ac82b1e02e9a13af6f02abe632ff592ebeb4d1b",
+      "interpreter": "GitHub Actions Windows Server 2025 / CPython 3.14.6 reproduction",
+      "name": "security-regression",
+      "provenance": "reproduced 2026-08-10 against exact candidate commit 9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7 because the original transcript bytes were not retained",
+      "status": "passed",
+      "transcript_path": "logs/security-regression.log"
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_workers.py",
+        "-v"
+      ],
+      "digest": "sha256:6a66aa970ad42d36d01d718b7101e207c734854b87d7f996e94945f65dda0dc4",
+      "interpreter": "GitHub Actions Windows Server 2025 / CPython 3.14.6 reproduction",
+      "name": "recovery-regression",
+      "provenance": "reproduced 2026-08-10 against exact candidate commit 9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7 because the original transcript bytes were not retained",
+      "status": "passed",
+      "transcript_path": "logs/recovery-regression.log"
+    }
+  ],
+  "report_digest": "sha256:9e29c18eb906ec52ffcbe2fe8f7f49877958126f6358136f9e54757fd355073d",
+  "schema_version": 1
+}

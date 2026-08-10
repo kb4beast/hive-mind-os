@@ -1,0 +1,6 @@
+test_enqueue_pins_and_deduplicates_semantic_work (tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 1.027s
+
+OK

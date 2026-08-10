@@ -1,0 +1,5 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema", "$id":"https://hive-mind-os.local/schemas/brain-kernel-event.schema.json", "type":"object", "additionalProperties":false,
+  "required":["event_id","mission_id","work_id","attempt_id","event_type","event_version","actor_id","actor_role","occurred_at","recorded_at","payload","previous_digest","digest"],
+  "properties":{"event_id":{"type":"string","minLength":1},"mission_id":{"type":"string","pattern":"^MISSION-"},"work_id":{"type":["string","null"]},"attempt_id":{"type":["string","null"]},"event_type":{"type":"string","minLength":1},"event_version":{"type":"integer","minimum":1},"actor_id":{"type":"string","minLength":1},"actor_role":{"type":["string","null"]},"occurred_at":{"type":"string","format":"date-time"},"recorded_at":{"type":"string","format":"date-time"},"payload":{"type":"object"},"previous_digest":{"type":["string","null"]},"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}}
+}

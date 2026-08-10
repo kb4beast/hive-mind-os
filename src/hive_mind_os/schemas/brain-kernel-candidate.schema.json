@@ -1,0 +1,5 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema", "$id":"https://hive-mind-os.local/schemas/brain-kernel-candidate.schema.json", "type":"object", "additionalProperties":false,
+  "required":["candidate_id","mission_id","base_commit","artifact_refs","state","evaluation_plan_digest","digest"],
+  "properties":{"candidate_id":{"type":"string","pattern":"^CANDIDATE-"},"mission_id":{"type":"string","pattern":"^MISSION-"},"base_commit":{"type":"string","pattern":"^[0-9a-f]{40}$"},"artifact_refs":{"type":"array","items":{"type":"string"}},"state":{"enum":["PROPOSED","EVALUATING","ACCEPTED","REJECTED","QUARANTINED"]},"evaluation_plan_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}}
+}

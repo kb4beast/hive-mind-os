@@ -1,0 +1,61 @@
+{
+  "benchmark": {
+    "code_digest": "54020b72d2fff602b355c99924b01b5cfb5d8ec5",
+    "corpus_digest": "sha256:f95b727e349662bfe5b8e59000a80070f08a30316498b6f477fbe312de6718f2",
+    "harness_digest": "sha256:d2b3b61ab6c548e85a2b0478094c2e411900097686bc35014955f931b00f71d2",
+    "lane_digests": {
+      "baseline": "sha256:c538af3ed0770adb53bc38cb906ddd0dfb8685a54b527e2bc91f34a9553e6349",
+      "hive-mind": "sha256:47de391b63c88ce47cd1738617370c322c98f8b6fb2ed1c106e85d05e4f8e8fc"
+    },
+    "results_digest": "sha256:509b1874ec204208e10210d94d5f11c686526831f63e29dcb1a564cae23709c2",
+    "run_id": "p13-19f89e32e6980c82",
+    "verdict": {
+      "disposition": "measurement-recorded",
+      "judge_id": "p13-independent-benchmark-judge",
+      "lane_identities": [
+        "p05-hive-mind-scripted-lane",
+        "p13-pinned-naive-baseline-v1"
+      ]
+    }
+  },
+  "candidate_commit": "54020b72d2fff602b355c99924b01b5cfb5d8ec5",
+  "candidate_tree": "a54dcc7b58055be8850f4461191746fc94bd453d",
+  "comparative_claim_authorized": false,
+  "phase11_routes": [
+    {
+      "manifest_digest": "sha256:6c9e228bb50f7156e5f4e7a88460f80f2efd3261803fce98ebcaea785b8323b5",
+      "parity_receipt_digest": "sha256:068057b04c794559f5e39d271c2aaabc180de976eb95222e0d355cec8a2ad8f5",
+      "rollback_receipt_digest": "sha256:e588fa1018767001507c0c3d8adfe927e735e003f458cc62c831a4d9c6e67037",
+      "route": "legacy-enqueue-v1"
+    }
+  ],
+  "production_ready": false,
+  "real_provider_used": false,
+  "release_ready": false,
+  "report_digest": "sha256:af3f4600d0d64a250cfb78a2a016e2ba4e2cecf28a766785c393185f7ec59ab8",
+  "schema_version": 1,
+  "scope": "local-deterministic",
+  "signed_attestation_present": false,
+  "test_receipts": [
+    {
+      "digest": "sha256:068057b04c794559f5e39d271c2aaabc180de976eb95222e0d355cec8a2ad8f5",
+      "name": "phase11-parity",
+      "status": "passed"
+    },
+    {
+      "digest": "sha256:e588fa1018767001507c0c3d8adfe927e735e003f458cc62c831a4d9c6e67037",
+      "name": "phase11-rollback",
+      "status": "passed"
+    },
+    {
+      "digest": "sha256:2d311efe88f37763d454886c46ae1c915140492df8d97ee865cee7dabba37bec",
+      "name": "recovery-regression",
+      "status": "passed"
+    },
+    {
+      "digest": "sha256:629f745341f12f18e7664a2317842cf3ebd0d1a5f4caa7fe883bc2861ca7c4de",
+      "name": "security-regression",
+      "status": "passed"
+    }
+  ]
+}

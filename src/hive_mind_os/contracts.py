@@ -40,7 +40,21 @@ EXTENSION_SCHEMA_NAMES = (
     "ooda-state",
     "war-room-event",
 )
-SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES)
+KERNEL_SCHEMA_NAMES = (
+    "brain-kernel-event",
+    "brain-kernel-charter",
+    "brain-kernel-work-item",
+    "brain-kernel-authority",
+    "brain-kernel-context-manifest",
+    "brain-kernel-effect-intent",
+    "brain-kernel-effect-receipt",
+    "brain-kernel-memory-record",
+    "brain-kernel-evaluation",
+    "brain-kernel-candidate",
+    "brain-kernel-historical-evidence-reference",
+    "brain-kernel-technical-closeout-report",
+)
+SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES, *KERNEL_SCHEMA_NAMES)
 ROLE_NAMES = frozenset(
     {
         "orchestrator",

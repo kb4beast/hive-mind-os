@@ -1,0 +1,5 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema", "$id":"https://hive-mind-os.local/schemas/brain-kernel-effect-receipt.schema.json", "type":"object", "additionalProperties":false,
+  "required":["intent_digest","started_at","ended_at","adapter_identity","adapter_version","observed_precondition_digest","status","stdout_digest","stderr_digest","produced_identifiers","postcondition_digest","retry_of","rollback_receipt"],
+  "properties":{"intent_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"started_at":{"type":"string","format":"date-time"},"ended_at":{"type":"string","format":"date-time"},"adapter_identity":{"type":"string","minLength":1},"adapter_version":{"type":"string","minLength":1},"observed_precondition_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"status":{"enum":["SUCCEEDED","FAILED","ABSTAINED"]},"stdout_digest":{"type":["string","null"]},"stderr_digest":{"type":["string","null"]},"produced_identifiers":{"type":"array","items":{"type":"string"}},"postcondition_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"retry_of":{"type":["string","null"]},"rollback_receipt":{"type":["string","null"]}}
+}

@@ -46,6 +46,160 @@ class SandboxTimeout(SandboxError):
         self.receipt = receipt
 
 
+class _WindowsJob:
+    """Track one sandbox process tree when Windows Job Objects are available."""
+
+    _KILL_ON_JOB_CLOSE = 0x00002000
+    _EXTENDED_LIMIT_INFORMATION = 9
+    _BASIC_ACCOUNTING_INFORMATION = 1
+
+    def __init__(self, handle: int) -> None:
+        self._handle: int | None = handle
+
+    @classmethod
+    def create(cls) -> _WindowsJob | None:
+        if os.name != "nt":
+            return None
+        import ctypes
+
+        class LargeInteger(ctypes.Structure):
+            _fields_ = [("value", ctypes.c_longlong)]
+
+        class BasicLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("per_process_user_time_limit", LargeInteger),
+                ("per_job_user_time_limit", LargeInteger),
+                ("limit_flags", ctypes.c_ulong),
+                ("minimum_working_set_size", ctypes.c_size_t),
+                ("maximum_working_set_size", ctypes.c_size_t),
+                ("active_process_limit", ctypes.c_ulong),
+                ("affinity", ctypes.c_size_t),
+                ("priority_class", ctypes.c_ulong),
+                ("scheduling_class", ctypes.c_ulong),
+            ]
+
+        class IoCounters(ctypes.Structure):
+            _fields_ = [
+                ("read_operation_count", ctypes.c_ulonglong),
+                ("write_operation_count", ctypes.c_ulonglong),
+                ("other_operation_count", ctypes.c_ulonglong),
+                ("read_transfer_count", ctypes.c_ulonglong),
+                ("write_transfer_count", ctypes.c_ulonglong),
+                ("other_transfer_count", ctypes.c_ulonglong),
+            ]
+
+        class ExtendedLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("basic_limit_information", BasicLimitInformation),
+                ("io_info", IoCounters),
+                ("process_memory_limit", ctypes.c_size_t),
+                ("job_memory_limit", ctypes.c_size_t),
+                ("peak_process_memory_used", ctypes.c_size_t),
+                ("peak_job_memory_used", ctypes.c_size_t),
+            ]
+
+        kernel32 = ctypes.windll.kernel32
+        create_job = kernel32.CreateJobObjectW
+        create_job.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+        create_job.restype = ctypes.c_void_p
+        set_information = kernel32.SetInformationJobObject
+        set_information.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong]
+        set_information.restype = ctypes.c_int
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [ctypes.c_void_p]
+        close_handle.restype = ctypes.c_int
+        handle = create_job(None, None)
+        if not handle:
+            return None
+        limits = ExtendedLimitInformation()
+        limits.basic_limit_information.limit_flags = cls._KILL_ON_JOB_CLOSE
+        if not set_information(
+            handle,
+            cls._EXTENDED_LIMIT_INFORMATION,
+            ctypes.byref(limits),
+            ctypes.sizeof(limits),
+        ):
+            close_handle(handle)
+            return None
+        return cls(int(handle))
+
+    def assign(self, process: subprocess.Popen[bytes]) -> bool:
+        if os.name != "nt" or self._handle is None:
+            return False
+        import ctypes
+
+        process_handle = getattr(process, "_handle", None)
+        if process_handle is None:
+            return False
+        assign_process = ctypes.windll.kernel32.AssignProcessToJobObject
+        assign_process.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        assign_process.restype = ctypes.c_int
+        return bool(assign_process(self._handle, int(process_handle)))
+
+    @staticmethod
+    def resume(process: subprocess.Popen[bytes]) -> bool:
+        if os.name != "nt":
+            return False
+        import ctypes
+
+        process_handle = getattr(process, "_handle", None)
+        if process_handle is None:
+            return False
+        resume_process = ctypes.windll.ntdll.NtResumeProcess
+        resume_process.argtypes = [ctypes.c_void_p]
+        resume_process.restype = ctypes.c_long
+        return resume_process(int(process_handle)) == 0
+
+    def active_processes(self) -> int | None:
+        if os.name != "nt" or self._handle is None:
+            return None
+        import ctypes
+
+        class LargeInteger(ctypes.Structure):
+            _fields_ = [("value", ctypes.c_longlong)]
+
+        class BasicAccountingInformation(ctypes.Structure):
+            _fields_ = [
+                ("total_user_time", LargeInteger),
+                ("total_kernel_time", LargeInteger),
+                ("this_period_total_user_time", LargeInteger),
+                ("this_period_total_kernel_time", LargeInteger),
+                ("total_page_fault_count", ctypes.c_ulong),
+                ("total_processes", ctypes.c_ulong),
+                ("active_processes", ctypes.c_ulong),
+                ("total_terminated_processes", ctypes.c_ulong),
+            ]
+
+        information = BasicAccountingInformation()
+        query_information = ctypes.windll.kernel32.QueryInformationJobObject
+        query_information.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+            ctypes.c_void_p,
+        ]
+        query_information.restype = ctypes.c_int
+        if not query_information(
+            self._handle,
+            self._BASIC_ACCOUNTING_INFORMATION,
+            ctypes.byref(information),
+            ctypes.sizeof(information),
+            None,
+        ):
+            return None
+        return int(information.active_processes)
+
+    def close(self) -> None:
+        if os.name != "nt" or self._handle is None:
+            return
+        import ctypes
+
+        handle = self._handle
+        self._handle = None
+        ctypes.windll.kernel32.CloseHandle(handle)
+
+
 def _normalized_executable(value: str) -> str:
     name = Path(value).name.casefold()
     return name.removesuffix(".exe").removesuffix(".cmd").removesuffix(".bat")
@@ -265,6 +419,9 @@ class SandboxRunner:
             process.stdout.close()
         if process.stderr is not None:
             process.stderr.close()
+        job = self._windows_job(process)
+        if job is not None:
+            job.close()
         out = b"".join(stdout)
         err = b"".join(stderr)
         outcome = "timeout" if timed_out else ("succeeded" if process.returncode == 0 else "failed")
@@ -374,17 +531,39 @@ class SandboxRunner:
                         resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
 
                 kwargs["preexec_fn"] = set_limits
-        else:
-            kwargs["creationflags"] = getattr(
-                subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        job = _WindowsJob.create() if os.name == "nt" else None
+        if os.name == "nt":
+            if job is None:
+                raise subprocess.SubprocessError("Windows Job Object is unavailable")
+            kwargs["creationflags"] = (
+                getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | 0x00000004  # CREATE_SUSPENDED
             )
-        process = cast(subprocess.Popen[bytes], subprocess.Popen(argv, **kwargs))
+        try:
+            process = cast(subprocess.Popen[bytes], subprocess.Popen(argv, **kwargs))
+        except Exception:
+            if job is not None:
+                job.close()
+            raise
         if os.name == "nt":
             setattr(
                 process,
                 "_hive_mind_creation_time",
                 self._windows_process_creation_time(process),
             )
+            if job is not None:
+                if job.assign(process) and job.resume(process):
+                    setattr(process, "_hive_mind_job", job)
+                else:
+                    job.close()
+                    try:
+                        process.kill()
+                        process.wait()
+                    finally:
+                        if process.stdout is not None:
+                            process.stdout.close()
+                        if process.stderr is not None:
+                            process.stderr.close()
+                    raise subprocess.SubprocessError("Windows Job Object assignment or resume failed")
         return process
 
     def _read_capped(
@@ -655,6 +834,11 @@ class SandboxRunner:
             return creation_time
         return cls._windows_process_creation_time(process)
 
+    @staticmethod
+    def _windows_job(process: subprocess.Popen[bytes]) -> _WindowsJob | None:
+        job = getattr(process, "_hive_mind_job", None)
+        return job if isinstance(job, _WindowsJob) else None
+
     @classmethod
     def _tree_alive(cls, process: subprocess.Popen[bytes]) -> bool:
         if process.poll() is None:
@@ -666,6 +850,12 @@ class SandboxRunner:
                 return False
             except PermissionError:
                 return True
+            return True
+        job = cls._windows_job(process)
+        if job is not None:
+            active_processes = job.active_processes()
+            if active_processes is not None:
+                return active_processes > 0
             return True
         return bool(
             cls._windows_descendants(
@@ -682,6 +872,11 @@ class SandboxRunner:
             except ProcessLookupError:
                 pass
         else:
+            job = cls._windows_job(process)
+            if job is not None:
+                job.close()
+                setattr(process, "_hive_mind_job", None)
+                return
             # Do not use taskkill /T here: it follows a recycled PID solely by parent
             # PID and bypasses the creation-time filter required by ADR-008.
             root_creation_time = cls._root_creation_time(process)
