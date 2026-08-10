@@ -39,6 +39,8 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
             reason="initial live reconciliation",
         )
         self._install_snapshot(BASELINE)
+        self.real_base_status = self.plane._base_status
+        self.plane._base_status = self._bounded_base_status  # type: ignore[method-assign]
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -60,8 +62,34 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         )
         self.plane.install_github_snapshot(source)
 
-    def test_01_static_ready_is_wait_until_explicit_release(self) -> None:
-        base = self.plane._base_status()
+    def _bounded_base_status(self) -> dict[str, object]:
+        nodes: list[dict[str, object]] = []
+        for node_id in sorted(self.plane._nodes):
+            if node_id == "BOOT-000":
+                state = "COMPLETE"
+            elif node_id in {"RECON-010", "BASE-020"}:
+                state = "READY"
+            else:
+                state = "BLOCKED"
+            nodes.append({"node_id": node_id, "state": state})
+        return {
+            "schema_version": 1,
+            "plan_id": self.plane.plan.get("plan_id"),
+            "plan_fingerprint": self.plane.expected_plan_fingerprint,
+            "target_branch": "main",
+            "target_sha": self.plane.current_target_sha(),
+            "last_reconciled_sha": self.plane.reconciled_target_sha(),
+            "reconciliation_required": self.plane.target_requires_reconciliation(),
+            "changed_paths_since_reconciliation": [],
+            "counts": {"COMPLETE": 1, "READY": 2, "BLOCKED": len(nodes) - 3},
+            "ready": ["RECON-010", "BASE-020"],
+            "nodes": nodes,
+            "complete": False,
+            "generated_at": "2030-01-01T00:00:00Z",
+        }
+
+    def test_01_real_static_graph_reports_first_wave_but_release_layer_keeps_wait(self) -> None:
+        base = self.real_base_status()
         self.assertEqual(set(base["ready"]), {"RECON-010", "BASE-020"})
         status = self.plane.status()
         self.assertEqual(status["ready"], [])
@@ -105,7 +133,9 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         release = self.plane.dispatch(actor="test:dispatcher")
         verdicts = release["verdicts"]
         self.assertEqual(set(verdicts), set(self.plane._nodes))
-        self.assertTrue(set(verdicts.values()).issubset({"START NOW", "WAIT", "STOP"}))
+        self.assertTrue(
+            set(verdicts.values()).issubset({"START NOW", "WAIT", "STOP"})
+        )
         self.assertEqual(verdicts["BOOT-000"], "STOP")
 
     def test_05_target_advance_invalidates_release(self) -> None:
@@ -133,7 +163,10 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         status = self.plane.status()
         self.assertFalse(status["dispatch_release"]["valid"])
         self.assertTrue(
-            any("reconciliation" in issue for issue in status["dispatch_release"]["issues"])
+            any(
+                "reconciliation" in issue
+                for issue in status["dispatch_release"]["issues"]
+            )
         )
 
     def test_07_snapshot_change_invalidates_release(self) -> None:
@@ -159,7 +192,10 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         status = self.plane.status()
         self.assertFalse(status["dispatch_release"]["valid"])
         self.assertTrue(
-            any("snapshot" in issue.lower() for issue in status["dispatch_release"]["issues"])
+            any(
+                "snapshot" in issue.lower()
+                for issue in status["dispatch_release"]["issues"]
+            )
         )
 
     def test_08_new_conflicting_claim_invalidates_release(self) -> None:
@@ -183,7 +219,10 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         status = self.plane.status()
         self.assertFalse(status["dispatch_release"]["valid"])
         self.assertTrue(
-            any("conflicting claim" in issue for issue in status["dispatch_release"]["issues"])
+            any(
+                "conflicting claim" in issue
+                for issue in status["dispatch_release"]["issues"]
+            )
         )
 
     def test_09_nonconflicting_released_wave_claim_does_not_stale_sibling(self) -> None:
@@ -193,7 +232,10 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         )
         claim = self.plane.claim("RECON-010", "openai:recon")
         self.assertEqual(claim["node_id"], "RECON-010")
-        self.assertEqual(self.plane.assert_start_now("BASE-020")["directive"], "START TOGETHER NOW")
+        self.assertEqual(
+            self.plane.assert_start_now("BASE-020")["directive"],
+            "START TOGETHER NOW",
+        )
 
     def test_10_authority_amendment_is_exact_and_plan_fingerprint_is_preserved(self) -> None:
         recon = self.plane.node("RECON-010")
@@ -207,9 +249,16 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
     def test_11_authority_amendment_rejects_product_runtime_expansion(self) -> None:
         path = self.root / ".autopilot" / "authority-amendments.json"
         value = json.loads(path.read_text(encoding="utf-8"))
-        value["amendments"][0]["additional_write_scope"].append("src/forbidden.py")
-        value["amendments"][0]["additional_file_locks"].append("src/forbidden.py")
-        path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        value["amendments"][0]["additional_write_scope"].append(
+            "src/forbidden.py"
+        )
+        value["amendments"][0]["additional_file_locks"].append(
+            "src/forbidden.py"
+        )
+        path.write_text(
+            json.dumps(value, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         plane = ControlPlane(self.root)
         self.assertTrue(
             any("product runtime" in issue for issue in plane.authority_issues())
