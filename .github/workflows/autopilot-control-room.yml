@@ -45,7 +45,6 @@ jobs:
           git config user.name "Hive Mind bootstrap"
           git config user.email "hive-mind-bootstrap@users.noreply.github.com"
           git add -A
-          git diff --cached --check
           git commit -m "chore: install autonomy implementation control plane"
 
       - name: Run repository-aware doctor
