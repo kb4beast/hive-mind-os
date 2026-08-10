@@ -6,16 +6,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 from durable_controller import (
     AutopilotError,
     ClaimError,
     ConfigurationError,
-    ControlPlane,
     ReceiptError,
     read_json,
 )
+from release_barrier import ControlPlane
 
 
 def parser() -> argparse.ArgumentParser:
@@ -32,6 +33,11 @@ def parser() -> argparse.ArgumentParser:
 
     ready = commands.add_parser("ready")
     ready.add_argument("--json", action="store_true", dest="json_output")
+
+    dispatch = commands.add_parser("dispatch")
+    dispatch.add_argument("--actor", required=True)
+    dispatch.add_argument("--node", action="append", default=[])
+    dispatch.add_argument("--json", action="store_true", dest="json_output")
 
     claim = commands.add_parser("claim")
     claim.add_argument("node_id")
@@ -88,7 +94,7 @@ def print_status(document: dict[str, object]) -> None:
     print(
         "STATE: RECONCILIATION_REQUIRED"
         if document["reconciliation_required"]
-        else "STATE: READY_TO_DISPATCH"
+        else "STATE: RECONCILED"
     )
     counts = document["counts"]
     assert isinstance(counts, dict)
@@ -110,7 +116,29 @@ def print_status(document: dict[str, object]) -> None:
     ):
         if key in counts:
             print(f"{key}: {counts[key]}")
-    print("START NOW: " + (", ".join(document["ready"]) or "none"))
+    eligible = document.get("eligible", [])
+    if isinstance(eligible, list):
+        print("ELIGIBLE ONLY: " + (", ".join(str(item) for item in eligible) or "none"))
+    release = document.get("dispatch_release")
+    if isinstance(release, Mapping):
+        verdicts = release.get("verdicts", {})
+        if isinstance(verdicts, Mapping):
+            for node_id in sorted(str(item) for item in verdicts):
+                print(f"VERDICT {node_id}: {verdicts[node_id]}")
+        print(f"DISPATCH DIRECTIVE: {release.get('directive', 'WAIT')}")
+        print(str(release.get("action", "Do not open any worker sessions yet")))
+    ready = document.get("ready", [])
+    if isinstance(ready, list):
+        print("START NOW: " + (", ".join(str(item) for item in ready) or "none"))
+
+
+def print_dispatch(result: Mapping[str, object]) -> None:
+    verdicts = result.get("verdicts", {})
+    if isinstance(verdicts, Mapping):
+        for node_id in sorted(str(item) for item in verdicts):
+            print(f"{node_id}: {verdicts[node_id]}")
+    print(str(result.get("directive", "WAIT")))
+    print(str(result.get("action", "Do not open any worker sessions yet")))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -138,11 +166,34 @@ def main(argv: list[str] | None = None) -> int:
                 print_status(result)
             return 0
         if args.command == "ready":
-            ready = plane.ready_nodes()
+            result = plane.status()
+            ready = result.get("ready", [])
+            ready_list = [str(item) for item in ready] if isinstance(ready, list) else []
             if args.json_output:
-                print(json.dumps({"ready": list(ready)}, indent=2))
+                print(
+                    json.dumps(
+                        {
+                            "ready": ready_list,
+                            "eligible": result.get("eligible", []),
+                            "dispatch_release": result.get("dispatch_release", {}),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            elif ready_list:
+                print("\n".join(ready_list))
             else:
-                print("\n".join(ready))
+                release = result.get("dispatch_release", {})
+                action = release.get("action") if isinstance(release, Mapping) else None
+                print(str(action or "Do not open any worker sessions yet"))
+            return 0
+        if args.command == "dispatch":
+            result = plane.dispatch(actor=args.actor, requested_nodes=args.node)
+            if args.json_output:
+                print(json.dumps(result, indent=2, sort_keys=True))
+            else:
+                print_dispatch(result)
             return 0
         if args.command == "claim":
             print(
