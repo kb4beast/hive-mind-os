@@ -20,8 +20,9 @@ Build one self-operating Hive Mind OS runtime that:
 
 The controller reconstructs execution state from target-branch ancestry, **durable
 validated completion evidence**, PR/CI snapshots, remote branches, bounded claims, and
-append-only reconciliation records. A branch name, PR title, plan document, or edited
-status file never proves completion.
+append-only reconciliation records. A branch name, PR title, plan document, edited
+status file, static DAG level, or dependency-ready classification never proves completion
+or authorizes execution.
 
 `BOOT-000` is the one historical bootstrap that predates durable receipt commits. Its
 exact PR, actual branch, candidate commit/tree, squash-integrated commit/tree, tests,
@@ -30,12 +31,21 @@ changed paths, authority, and one-time historical installation scope are sealed 
 controller verifies the integrated history and exact tree/diff; it does not fabricate
 the planned bootstrap branch or treat the PR title as a receipt.
 
+Merged PR #120 also assigned one exact dispatcher-release-barrier amendment to
+`RECON-010`. The generated RECON plan entry retained a narrower write scope, so that
+contradiction is represented separately in `.autopilot/authority-amendments.json` and
+validated fail-closed. The sealed plan fingerprint and historical BOOT-000 attestation
+are not rewritten. The amendment expands effective RECON authority only to the exact
+listed control-plane/documentation/test paths.
+
 ## Commands
 
 ```bash
 python .autopilot/bin/autopilot.py --repo-root . doctor
 python .autopilot/bin/autopilot.py --repo-root . status
 python .autopilot/bin/autopilot.py --repo-root . ready
+python .autopilot/bin/autopilot.py --repo-root . dispatch \
+  --actor DISPATCHER_ID [--node NODE_ID ...]
 python .autopilot/bin/autopilot.py --repo-root . render-prompt NODE_ID
 python .autopilot/bin/autopilot.py --repo-root . claim NODE_ID \
   --owner PROVIDER:SESSION --publish-remote
@@ -45,24 +55,45 @@ python .autopilot/bin/autopilot.py --repo-root . complete NODE_ID \
   --owner PROVIDER:SESSION --receipt PATH
 ```
 
+`status` distinguishes static **eligibility** from current execution **release**.
+`ready` returns only nodes whose latest valid dispatcher release assigns `START NOW`.
+A worker claim fails closed if there is no current explicit release for that exact node.
+
 `--publish-remote` creates a unique empty claim commit on the node's fixed remote branch.
-That claim now retains the exact node branch, target SHA, owner, lease, and plan
-fingerprint. Git ref creation is the cross-session mutex: a competing worker loses the
-push race and must stop. Local claim files add lease/heartbeat state but are not the
-cross-session or durable completion source.
+That claim retains the exact node branch, target SHA, owner, lease, and plan fingerprint.
+Git ref creation is the cross-session mutex: a competing worker loses the push race and
+must stop. Local claim files add lease/heartbeat state but are not the cross-session or
+durable completion source.
 
 ## Dispatcher protocol
 
-A dispatcher session does not implement product work. It:
+A dispatcher session does not implement product work. Until it completes the steps below,
+all not-yet-released workers are `WAIT`.
 
-1. reads this file and `plan.json`;
-2. fetches current `main` and records its exact SHA;
-3. inspects open/merged/closed PRs, CI, remote node branches, and stale claims;
-4. writes a current `.autopilot/state/github-state.json` snapshot through
-   `install-github-snapshot`;
-5. runs `status`;
-6. reconciles target advancement before issuing worker prompts;
-7. returns only dependency-ready, conflict-free nodes with copy-ready prompts.
+1. Read this file, `workflow-policy.json`, `control-plane.json`,
+   `authority-amendments.json`, and `plan.json`.
+2. Fetch current `main` and record its exact commit and tree.
+3. Inspect open/merged/closed PRs, CI, remote node branches, claims, durable receipts, and
+   plan-impacting changes.
+4. Install a current `.autopilot/state/github-state.json` snapshot through
+   `install-github-snapshot`.
+5. Run `doctor`, `status`, and `ready` as applicable.
+6. Reconcile current target state before release. Any graph/scope inconsistency must use
+   append-only reconciliation/replan authority; never silently broaden a node.
+7. Compute the smallest dependency-eligible, conflict-free candidate wave. Eligibility
+   alone still means `WAIT`.
+8. Run `dispatch --actor ... [--node ...]`. This is the explicit release boundary.
+9. Require every candidate node to have exactly one verdict: `START NOW`, `WAIT`, or
+   `STOP`.
+10. A released multi-node wave must say `START TOGETHER NOW`. The dispatcher must also
+    emit a plain action sentence such as `Open these 2 sessions now: RECON-010, BASE-020`
+    or `Do not open any worker sessions yet`.
+11. Render/copy worker prompts only for current `START NOW` nodes.
+
+Static DAG/level membership never authorizes a worker. A target-branch advance or merge,
+new conflicting claim, GitHub snapshot change, or new reconciliation event makes prior
+release instructions stale. Run the dispatcher again rather than reusing an old prompt.
+The claim command independently revalidates the release before creating a claim.
 
 Target reconciliation remains intentionally live and session-local: a fresh dispatcher
 must inspect whatever `main` is now before releasing work. Completion evidence is the
@@ -117,17 +148,19 @@ quarantines the work. Unresolved cheating cannot be converted into ordinary succ
 ## State and durable receipt commits
 
 Runtime state under `.autopilot/state/` is generated and ignored by Git. It may contain a
-working receipt copy, but it is never the durable completion source.
+working receipt copy, dispatcher reconciliation state, GitHub snapshots, and dispatcher
+release records, but it is never the durable completion source.
 
 For every non-bootstrap node, `complete` validates the receipt and creates an **empty
 receipt commit** on the already-claimed node branch. The receipt commit:
 
 - has the exact `final_commit` as its only parent;
 - has the exact `final_tree`, so it changes **zero repository paths** and therefore does
-  not expand the node's declared file write scope;
+  not expand the node's effective file write authority;
 - contains the canonical machine-readable completion receipt in its commit message;
 - is accepted only when the receipt's declared `changed_paths` exactly match the actual
-  `base_commit..final_commit` Git diff and every path is allowed by the node contract;
+  `base_commit..final_commit` Git diff and every path is allowed by the node contract plus
+  any validated exact-path authority amendment;
 - is cross-checked against the retained remote-claim commit, including node ID, plan
   fingerprint, target/base SHA, and claimed branch.
 
@@ -137,22 +170,23 @@ authority, consultations, acceptance decision, and rollback reference.
 
 Worker publication order is mandatory:
 
-1. Claim the fixed node branch remotely and work only on that branch.
-2. Finish and commit the node implementation/evidence. Record that exact commit and tree
+1. Receive a current explicit dispatcher `START NOW` for the exact node.
+2. Claim the fixed node branch remotely and work only on that branch.
+3. Finish and commit the node implementation/evidence. Record that exact commit and tree
    as `final_commit` and `final_tree` in the receipt.
-3. Run `autopilot complete ...`. It validates the candidate and claim provenance, appends
+4. Run `autopilot complete ...`. It validates the candidate and claim provenance, appends
    the zero-path durable receipt commit, advances the local node branch to that commit,
    writes only a working copy/index under `.autopilot/state/`, and prints the receipt
    commit SHA.
-4. Push the node branch and open/update its draft PR. The receipt commit itself is the
+5. Push the node branch and open/update its draft PR. The receipt commit itself is the
    durable repository evidence; no extra file path is required.
-5. **Integrate node PRs with an ancestry-preserving merge commit. Do not squash or
+6. **Integrate node PRs with an ancestry-preserving merge commit. Do not squash or
    rebase.** The claim, exact candidate, and receipt commits must remain ancestors of
    `main`. The historical PR #120 squash is handled only by its sealed bootstrap
    attestation and is not precedent for future nodes.
-6. After merge, rerun the dispatcher. A fresh controller scans current target history,
-   reconstructs the canonical receipt commit, revalidates its exact commit/tree/diff and
-   claim provenance, and only then releases dependent work.
+7. After merge, rerun the dispatcher. The merge advances `main`, so every earlier worker
+   release is stale by definition. A fresh controller reconstructs completion and only a
+   new dispatch release may start further work.
 
 If a local receipt is stale or tampered it cannot be hidden behind a valid durable
 commit. If multiple durable receipt commits exist for one node, or a retained receipt is
@@ -161,5 +195,6 @@ provenance, or otherwise inconsistent, the node fails closed as `REPAIR_REQUIRED
 
 ## Permanent dispatcher prompt
 
-Use the exact prompt in `USER_GUIDE/02_ONE_PROMPT_FOREVER.md` after the bootstrap PR is
-merged. The human should never need to remember the prior dispatcher response.
+Use the exact prompt in `USER_GUIDE/02_ONE_PROMPT_FOREVER.md`. The human should never need
+to remember the prior dispatcher response, and prior releases must never be carried into
+a new dispatcher session.
