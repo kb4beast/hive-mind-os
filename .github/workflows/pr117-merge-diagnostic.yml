@@ -18,31 +18,41 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Diagnose merge against main
+      - name: Inspect retained evidence and repair targets
         shell: bash
         run: |
-          set -uo pipefail
-          git config user.name "PR 117 merge diagnostic"
-          git config user.email "pr117-merge-diagnostic@users.noreply.github.com"
-          git fetch origin main
-          set +e
-          git merge --no-commit --no-ff origin/main
-          merge_rc=$?
-          set -e
-          echo "merge_exit_code=${merge_rc}"
-          echo "=== unresolved paths ==="
-          git diff --name-only --diff-filter=U || true
-          echo "=== conflict hunks ==="
-          git diff --cc -- \
-            src/hive_mind_os/builtin_packages/hive-core/agents/builder.json \
-            src/hive_mind_os/builtin_packages/hive-core/package.json \
-            src/hive_mind_os/cli.py \
-            src/hive_mind_os/mission.py \
-            src/hive_mind_os/pit_oracle.py \
-            src/hive_mind_os/sandbox.py \
-            tests/test_receipts.py \
-            tests/test_verify.py || true
-          if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
-            git merge --abort
-          fi
-          exit 0
+          set -euo pipefail
+          echo "=== zero-arg super calls in brain kernel ==="
+          grep -R -n -F 'super().' src/hive_mind_os/brain_kernel || true
+          echo "=== phase12 evidence history ==="
+          git log --all --oneline --name-status -- evidence/local_assurance/phase12-9efe64b || true
+          echo "=== historical phase12 log objects ==="
+          git rev-list --objects --all | grep -E 'phase12-9efe64b/.+\.log$' || true
+          echo "=== any current file with required receipt digests ==="
+          python - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+
+          expected = {
+              "2c90558b9491b67eecfa8c56200eef6a7c649c7e2037be86bc84de5eefcdb48d",
+              "972c9ace79b2b43feb010c6465f4a8d9f421f6ea78f26f01b4b00803d08fdbc4",
+              "963c5e8295a612e8424b9772cfeb49d4f3adb1d3b6ed5f56314c51c0443ff3eb",
+              "b38df7af49fcdc66a5ef80a34f6b0e7e55536b010f3bf7c71f9232e273661868",
+          }
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts:
+                  continue
+              try:
+                  digest = sha256(path.read_bytes()).hexdigest()
+              except OSError:
+                  continue
+              if digest in expected:
+                  print(digest, path.as_posix())
+          PY
+          echo "=== database path implementation ==="
+          grep -n -A8 -B3 'def database_path' src/hive_mind_os/brain_kernel/store.py
+          echo "=== Ruff-reported example imports ==="
+          sed -n '1,45p' examples/verify-an-agent-change/repository/check_discount.py
+          sed -n '1,45p' examples/verify-an-agent-change/run_example.py
+          echo "=== Ruff evidence file ==="
+          sed -n '1,20p' e/p12f/attempts/a-53cc11ad795130c2/evaluation/tiny_pkg/__init__.py
