@@ -36,5 +36,13 @@ class BlockerProtocolTests(unittest.TestCase):
             )
             self.assertTrue(packet["blocker_id"])
             self.assertEqual(packet["status"], "OPEN")
+            self.assertTrue(plane.safe_retry_allowed(packet))
             stored = root / ".autopilot" / "state" / "blockers" / "ARCH-100.jsonl"
             self.assertIn("retry_when", stored.read_text(encoding="utf-8"))
+
+    def test_permission_does_not_authorize_security_bypass(self) -> None:
+        self.assertFalse(
+            controller.ControlPlane.safe_retry_allowed(
+                {"fix": "disable TLS certificate revocation", "retry_when": "retry"}
+            )
+        )

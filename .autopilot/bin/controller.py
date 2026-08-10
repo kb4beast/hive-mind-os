@@ -32,6 +32,17 @@ ROLE_NAMES = (
     "steward",
     "optimizer",
 )
+UNSAFE_REMEDIATION_MARKERS = (
+    "disable tls",
+    "skip tls",
+    "disable certificate",
+    "skip certificate",
+    "disable revocation",
+    "skip revocation",
+    "sslverify=false",
+    "verify=false",
+    "ignore certificate",
+)
 LEGAL_STATES = (
     "BOOTSTRAP_REQUIRED",
     "BOOTSTRAP_INVALID",
@@ -922,6 +933,15 @@ class ControlPlane:
         }
         append_jsonl(self.blockers_dir / f"{node_id}.jsonl", packet)
         return packet
+
+    @staticmethod
+    def safe_retry_allowed(packet: Mapping[str, Any]) -> bool:
+        """Reject remediation that weakens TLS, certificate, or verification controls."""
+
+        remediation = " ".join(
+            str(packet.get(key, "")) for key in ("fix", "retry_when")
+        ).lower()
+        return not any(marker in remediation for marker in UNSAFE_REMEDIATION_MARKERS)
 
     def is_quarantined(self, node_id: str) -> bool:
         return (self.quarantine_dir / f"{node_id}.json").is_file()
