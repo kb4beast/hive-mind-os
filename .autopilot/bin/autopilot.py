@@ -8,6 +8,7 @@ import json
 import sys
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from durable_controller import (
     AutopilotError,
@@ -16,7 +17,87 @@ from durable_controller import (
     ReceiptError,
     read_json,
 )
-from release_barrier import ControlPlane
+from release_barrier import ControlPlane as ReleaseBarrierControlPlane
+
+RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
+
+
+class ControlPlane(ReleaseBarrierControlPlane):
+    """CLI plane with one fail-closed RECON receipt supersession repair.
+
+    RECON-010 published a durable receipt before the merged PR #120 release-barrier
+    amendment was fully implemented. The historical receipt must remain in Git history,
+    but the replacement receipt required by the amended contract must become the only
+    active RECON completion record. This repair recognizes only that exact historical
+    receipt and only when the replacement explicitly binds it in receipt authority.
+    Every other duplicate-receipt situation remains fail-closed.
+    """
+
+    def _resolve_recon_receipt_records(
+        self, records: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        if len(records) != 2:
+            return records
+        historical = next(
+            (
+                record
+                for record in records
+                if record.get("commit") == RECON_PREMATURE_RECEIPT
+            ),
+            None,
+        )
+        replacement = next(
+            (
+                record
+                for record in records
+                if record.get("commit") != RECON_PREMATURE_RECEIPT
+            ),
+            None,
+        )
+        if historical is None or replacement is None:
+            return records
+        old_receipt = historical.get("receipt")
+        new_receipt = replacement.get("receipt")
+        if not isinstance(old_receipt, Mapping) or not isinstance(new_receipt, Mapping):
+            return records
+        authority = new_receipt.get("authority")
+        if not isinstance(authority, Mapping):
+            return records
+        if authority.get("supersedes_receipt_commit") != RECON_PREMATURE_RECEIPT:
+            return records
+        for key in (
+            "schema_version",
+            "plan_fingerprint",
+            "node_id",
+            "contract_version",
+            "base_commit",
+            "base_tree",
+            "branch",
+            "pr",
+        ):
+            if new_receipt.get(key) != old_receipt.get(key):
+                return records
+        if new_receipt.get("node_id") != "RECON-010":
+            return records
+        final = new_receipt.get("final_commit")
+        if self._has_git_repository():
+            if not isinstance(final, str) or not self.is_ancestor(
+                RECON_PREMATURE_RECEIPT, final
+            ):
+                return records
+        return [replacement]
+
+    def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
+        records = super()._durable_receipt_records()
+        recon = records.get("RECON-010")
+        if not isinstance(recon, list):
+            return records
+        resolved = self._resolve_recon_receipt_records(recon)
+        if resolved is recon:
+            return records
+        updated = dict(records)
+        updated["RECON-010"] = resolved
+        return updated
 
 
 def parser() -> argparse.ArgumentParser:
