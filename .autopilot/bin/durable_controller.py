@@ -1,10 +1,8 @@
 """Durable completion layer for the repository-resident Autopilot controller.
 
-The base controller intentionally keeps leases, GitHub snapshots, retries, and other
-runtime state under ignored ``.autopilot/state``. Completion evidence is different:
-it must survive a fresh checkout. This module preserves the base controller's receipt
-validation and adds repository-resident durable receipt discovery/publication plus a
-strict historical bootstrap attestation for PR #120.
+Leases, GitHub snapshots, retries, and other live coordination state remain under the
+ignored ``.autopilot/state`` directory. Completion evidence is different: it must be
+repository-resident, exact, fail-closed, and reconstructable by a fresh checkout.
 """
 
 from __future__ import annotations
@@ -14,7 +12,6 @@ from typing import Any, Mapping
 
 from controller import (
     FULL_SHA,
-    AutopilotError,
     ClaimError,
     ConfigurationError,
     ControlPlane as BaseControlPlane,
@@ -38,12 +35,7 @@ class ControlPlane(BaseControlPlane):
     """Base controller with durable, fail-closed completion reconstruction."""
 
     def durable_receipt_path(self, node_id: str) -> Path:
-        """Return the repository-resident receipt path authorized by the node.
-
-        Product nodes already own a node-specific evidence directory. Durable receipts
-        live inside that declared write scope rather than expanding authority into a
-        global control-plane directory.
-        """
+        """Derive a receipt path from the node's already-authorized evidence scope."""
 
         if node_id == "BOOT-000":
             raise ConfigurationError(
@@ -54,11 +46,10 @@ class ControlPlane(BaseControlPlane):
             if not isinstance(raw_scope, str):
                 continue
             scope = raw_scope.replace("\\", "/").strip().rstrip("/")
-            if not scope.startswith("evidence/") or not scope.endswith("/**"):
-                continue
-            root = scope[:-3].rstrip("/")
-            if root:
-                return self.repo_root / root / DURABLE_RECEIPT_FILENAME
+            if scope.startswith("evidence/") and scope.endswith("/**"):
+                root = scope[:-3].rstrip("/")
+                if root:
+                    return self.repo_root / root / DURABLE_RECEIPT_FILENAME
         raise ConfigurationError(
             f"{node_id}: no node-owned evidence/** write scope is available for a durable receipt"
         )
@@ -105,8 +96,10 @@ class ControlPlane(BaseControlPlane):
             except ConfigurationError as error:
                 issues.append(str(error))
         if self.bootstrap_attestation_path.is_file():
-            attestation = read_json(self.bootstrap_attestation_path)
-            issues.extend(self.validate_bootstrap_attestation(attestation, require_integrated=True))
+            value = read_json(self.bootstrap_attestation_path)
+            issues.extend(
+                self.validate_bootstrap_attestation(value, require_integrated=True)
+            )
         return tuple(dict.fromkeys(issues))
 
     def validate_receipt(
@@ -116,7 +109,7 @@ class ControlPlane(BaseControlPlane):
         *,
         require_integrated: bool = False,
     ) -> tuple[str, ...]:
-        """Preserve base validation and additionally bind declared commit trees."""
+        """Preserve base validation and additionally bind commit trees exactly."""
 
         issues = list(
             super().validate_receipt(
@@ -158,13 +151,7 @@ class ControlPlane(BaseControlPlane):
         *,
         require_integrated: bool = True,
     ) -> tuple[str, ...]:
-        """Validate the one historical bootstrap that predates durable receipts.
-
-        PR #120 was squash-merged. The candidate commit therefore is not an ancestor of
-        main, but its candidate tree is byte-identical to the integrated merge tree. We
-        retain both identities and require tree equality instead of fabricating the
-        planned node branch or pretending a PR title is a receipt.
-        """
+        """Validate truthful recovery evidence for the squash-merged PR #120 bootstrap."""
 
         issues: list[str] = []
         if not isinstance(value, Mapping):
@@ -202,13 +189,14 @@ class ControlPlane(BaseControlPlane):
             issues.append("bootstrap attestation plan fingerprint is stale")
         if value.get("node_id") != "BOOT-000":
             issues.append("bootstrap attestation node ID does not match")
+
         node = self.node("BOOT-000")
         if value.get("contract_version") != node.get("contract_version"):
             issues.append("bootstrap attestation contract version does not match")
         if value.get("planned_branch") != node.get("branch"):
             issues.append("bootstrap attestation planned branch does not match node contract")
 
-        control = self._bootstrap_control()
+        sealed = self._bootstrap_control()
         for key in (
             "actual_branch",
             "source_pr",
@@ -216,11 +204,12 @@ class ControlPlane(BaseControlPlane):
             "candidate_tree",
             "integrated_commit",
             "integrated_tree",
+            "merge_method",
         ):
-            if value.get(key) != control.get(key):
-                issues.append(f"bootstrap attestation {key} does not match sealed provenance")
-        if value.get("merge_method") != control.get("merge_method"):
-            issues.append("bootstrap attestation merge method does not match sealed provenance")
+            if value.get(key) != sealed.get(key):
+                issues.append(
+                    f"bootstrap attestation {key} does not match sealed provenance"
+                )
 
         target = self.control.get("target")
         target = target if isinstance(target, Mapping) else {}
@@ -242,11 +231,15 @@ class ControlPlane(BaseControlPlane):
                 issues.append(f"bootstrap attestation {key} is invalid")
 
         if value.get("actual_branch") == value.get("planned_branch"):
-            issues.append("bootstrap provenance unexpectedly collapses actual and planned branches")
+            issues.append(
+                "bootstrap provenance unexpectedly collapses actual and planned branches"
+            )
         if not isinstance(value.get("source_pr"), int):
             issues.append("bootstrap attestation source_pr must be an integer")
         if value.get("merge_method") != "squash":
-            issues.append("bootstrap attestation must retain the historical squash merge method")
+            issues.append(
+                "bootstrap attestation must retain the historical squash merge method"
+            )
 
         changed = value.get("changed_paths")
         normalized_changed: list[str] = []
@@ -260,9 +253,17 @@ class ControlPlane(BaseControlPlane):
                     issues.append(f"bootstrap changed path is unsafe: {error}")
                     continue
                 normalized_changed.append(path)
-                if not any(path_matches_scope(path, scope) for scope in node.get("write_scope", [])):
-                    issues.append(f"bootstrap changed path outside node write scope: {path}")
-                if any(path_matches_scope(path, scope) for scope in node.get("forbidden_scope", [])):
+                if not any(
+                    path_matches_scope(path, scope)
+                    for scope in node.get("write_scope", [])
+                ):
+                    issues.append(
+                        f"bootstrap changed path outside node write scope: {path}"
+                    )
+                if any(
+                    path_matches_scope(path, scope)
+                    for scope in node.get("forbidden_scope", [])
+                ):
                     issues.append(f"bootstrap changed path enters forbidden scope: {path}")
 
         tests = value.get("tests")
@@ -276,7 +277,9 @@ class ControlPlane(BaseControlPlane):
             }
             for required_test in node.get("required_tests", []):
                 if required_test not in passed:
-                    issues.append(f"bootstrap required test did not pass: {required_test}")
+                    issues.append(
+                        f"bootstrap required test did not pass: {required_test}"
+                    )
             if any(
                 isinstance(item, Mapping) and item.get("status") != "passed"
                 for item in tests
@@ -287,8 +290,8 @@ class ControlPlane(BaseControlPlane):
         if not isinstance(evidence, list) or not evidence:
             issues.append("bootstrap attestation requires retained evidence references")
 
-        observed_roles: set[str] = set()
         roles = value.get("role_identities")
+        observed_roles: set[str] = set()
         if not isinstance(roles, list):
             issues.append("bootstrap attestation role_identities must be a list")
         else:
@@ -316,40 +319,59 @@ class ControlPlane(BaseControlPlane):
 
         candidate_tree = value.get("candidate_tree")
         integrated_tree = value.get("integrated_tree")
-        if isinstance(candidate_tree, str) and isinstance(integrated_tree, str):
-            if candidate_tree != integrated_tree:
-                issues.append("bootstrap candidate tree differs from integrated tree")
+        if (
+            isinstance(candidate_tree, str)
+            and isinstance(integrated_tree, str)
+            and candidate_tree != integrated_tree
+        ):
+            issues.append("bootstrap candidate tree differs from integrated tree")
 
         if self.verify_git_objects:
             base = value.get("base_commit")
             candidate = value.get("candidate_commit")
             integrated = value.get("integrated_commit")
-            if all(isinstance(item, str) and FULL_SHA.fullmatch(item) for item in (base, candidate, integrated)):
-                for label, commit in (
-                    ("base", str(base)),
-                    ("candidate", str(candidate)),
-                    ("integrated", str(integrated)),
-                ):
-                    if not self.git_object_exists(commit):
-                        issues.append(f"bootstrap {label} commit is unavailable")
-                if self.git_object_exists(str(base)) and self._commit_tree(str(base)) != value.get("base_tree"):
+            if all(
+                isinstance(item, str) and FULL_SHA.fullmatch(item)
+                for item in (base, candidate, integrated)
+            ):
+                base = str(base)
+                candidate = str(candidate)
+                integrated = str(integrated)
+                # Base and integrated commits are target-history facts and must be
+                # locally available. The historical source branch was deleted, so the
+                # squash candidate may be absent from a fresh object database; its
+                # exact identity/tree remain sealed in control-plane provenance and PR
+                # evidence. If the object is locally available, verify it too.
+                if not self.git_object_exists(base):
+                    issues.append("bootstrap base commit is unavailable")
+                if not self.git_object_exists(integrated):
+                    issues.append("bootstrap integrated commit is unavailable")
+                if self.git_object_exists(base) and self._commit_tree(base) != value.get("base_tree"):
                     issues.append("bootstrap base tree does not match base commit")
-                if self.git_object_exists(str(candidate)) and self._commit_tree(str(candidate)) != candidate_tree:
+                if self.git_object_exists(candidate) and self._commit_tree(candidate) != candidate_tree:
                     issues.append("bootstrap candidate tree does not match candidate commit")
-                if self.git_object_exists(str(integrated)) and self._commit_tree(str(integrated)) != integrated_tree:
+                if self.git_object_exists(integrated) and self._commit_tree(integrated) != integrated_tree:
                     issues.append("bootstrap integrated tree does not match integrated commit")
-                if self.git_object_exists(str(base)) and self.git_object_exists(str(integrated)):
-                    if not self.is_ancestor(str(base), str(integrated)):
-                        issues.append("bootstrap integrated commit does not descend from sealed baseline")
-                    if require_integrated and not self.is_ancestor(str(integrated), self.current_target_sha()):
+                if self.git_object_exists(base) and self.git_object_exists(integrated):
+                    if not self.is_ancestor(base, integrated):
+                        issues.append(
+                            "bootstrap integrated commit does not descend from sealed baseline"
+                        )
+                    if require_integrated and not self.is_ancestor(
+                        integrated, self.current_target_sha()
+                    ):
                         issues.append("bootstrap integrated commit is not in target history")
-                    observed_paths = self._diff_paths(str(base), str(integrated))
+                    observed_paths = self._diff_paths(base, integrated)
                     if tuple(sorted(set(normalized_changed))) != observed_paths:
-                        issues.append("bootstrap changed_paths do not match integrated diff")
+                        issues.append(
+                            "bootstrap changed_paths do not match integrated diff"
+                        )
 
         return tuple(dict.fromkeys(issues))
 
-    def _receipt_with_source(self, node_id: str) -> tuple[str, Mapping[str, Any]] | None:
+    def _receipt_with_source(
+        self, node_id: str
+    ) -> tuple[str, Mapping[str, Any]] | None:
         local = BaseControlPlane.stored_receipt(self, node_id)
         if local is not None:
             return ("local", local)
@@ -374,7 +396,9 @@ class ControlPlane(BaseControlPlane):
         found = self._receipt_with_source(node_id)
         if found is not None:
             source, receipt = found
-            issues = self.validate_receipt(node_id, receipt, require_integrated=True)
+            issues = self.validate_receipt(
+                node_id, receipt, require_integrated=True
+            )
             if not issues:
                 return NodeView(
                     node_id,
@@ -383,7 +407,9 @@ class ControlPlane(BaseControlPlane):
                     tuple(self.node(node_id).get("dependencies", [])),
                     branch=str(self.node(node_id).get("branch")),
                     pr_number=(
-                        int(receipt.get("pr")) if isinstance(receipt.get("pr"), int) else None
+                        int(receipt.get("pr"))
+                        if isinstance(receipt.get("pr"), int)
+                        else None
                     ),
                 )
             return NodeView(
@@ -393,13 +419,17 @@ class ControlPlane(BaseControlPlane):
                 tuple(self.node(node_id).get("dependencies", [])),
                 branch=str(self.node(node_id).get("branch")),
                 pr_number=(
-                    int(receipt.get("pr")) if isinstance(receipt.get("pr"), int) else None
+                    int(receipt.get("pr"))
+                    if isinstance(receipt.get("pr"), int)
+                    else None
                 ),
             )
 
         if node_id == "BOOT-000" and self.bootstrap_attestation_path.is_file():
             attestation = read_json(self.bootstrap_attestation_path)
-            issues = self.validate_bootstrap_attestation(attestation, require_integrated=True)
+            issues = self.validate_bootstrap_attestation(
+                attestation, require_integrated=True
+            )
             if not issues:
                 return NodeView(
                     node_id,
@@ -437,7 +467,9 @@ class ControlPlane(BaseControlPlane):
         """Publish both ephemeral runtime state and a node-owned durable receipt."""
 
         if node_id == "BOOT-000":
-            raise ReceiptError("historical BOOT-000 completion is sealed by bootstrap attestation")
+            raise ReceiptError(
+                "historical BOOT-000 completion is sealed by bootstrap attestation"
+            )
         claim_path = self.claim_path(node_id)
         if not claim_path.is_file():
             raise ClaimError("node completion requires an active claim")
@@ -456,7 +488,9 @@ class ControlPlane(BaseControlPlane):
             if path.exists():
                 existing = read_json(path)
                 if digest_json(existing) != digest_json(receipt):
-                    raise ReceiptError(f"node already has a different {label} completion receipt")
+                    raise ReceiptError(
+                        f"node already has a different {label} completion receipt"
+                    )
 
         if not local_path.exists():
             atomic_write_json(local_path, receipt)
@@ -468,7 +502,9 @@ class ControlPlane(BaseControlPlane):
                 "node_id": node_id,
                 "receipt_digest": digest_json(receipt),
                 "final_commit": receipt.get("final_commit"),
-                "durable_path": str(durable_path.relative_to(self.repo_root)).replace("\\", "/"),
+                "durable_path": str(durable_path.relative_to(self.repo_root)).replace(
+                    "\\", "/"
+                ),
                 "timestamp": receipt.get("timestamp"),
             },
         )
