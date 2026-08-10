@@ -13,16 +13,16 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
 Do not implement product work. Reconstruct current branch ancestry, open/merged/closed
-PRs, CI, remote branches, durable validated receipts, and changed planned surfaces.
-Determine whether the node was completed elsewhere, partially absorbed, invalidated,
-duplicated, or remains eligible. Append a reconciliation record with exact evidence and
-graph-change reason. Never mark completion from prose or names alone.
+PRs, CI, remote branches, durable validated receipt commits, and changed planned
+surfaces. Determine whether the node was completed elsewhere, partially absorbed,
+invalidated, duplicated, or remains eligible. Append a reconciliation record with exact
+evidence and graph-change reason. Never mark completion from prose or names alone.
 
 If this reconciliation node itself reaches its completion gate, finalize its evidence
 commit, create a receipt with exact base/final commit and tree identities, and run
-`autopilot complete`. Commit the generated node-owned
-`evidence/**/autopilot-completion-receipt.json` as a follow-up evidence commit. The
-eventual node PR must use an ancestry-preserving merge commit; do not squash or rebase it.
+`autopilot complete`. The command appends a zero-path durable receipt commit retaining
+the exact final tree and remote-claim provenance. Push that branch. The eventual node PR
+must use an ancestry-preserving merge commit; do not squash or rebase it.
 
-Stop after the dispatcher can safely recompute readiness, with any node completion
-receipt durably committed rather than retained only under `.autopilot/state/`.
+Stop after the dispatcher can safely recompute readiness, with completion durably
+retained in target Git history rather than only under `.autopilot/state/`.
