@@ -20,9 +20,11 @@ a winner; remand or replan.
 
 Before opening the draft PR, finalize the implementation/evidence commit, create a
 receipt with exact base/final commit and tree identities, and run `autopilot complete`.
-Commit the generated node-owned `evidence/**/autopilot-completion-receipt.json` as a
-follow-up evidence commit. Completion retained only under `.autopilot/state/` is not
-durable. The eventual node PR must use an ancestry-preserving merge commit; do not squash
-or rebase it, because the receipt's `final_commit` must remain in target ancestry.
+The command appends a zero-path durable receipt commit with the exact final tree and
+retained claim provenance; push that node branch. Completion retained only under
+`.autopilot/state/` is not durable. The eventual node PR must use an ancestry-preserving
+merge commit; do not squash or rebase it, because the claim, exact candidate, and receipt
+commits must remain in target ancestry.
 
-Stop at a green draft integration PR with the durable receipt committed. Do not merge.
+Stop at a green draft integration PR with the durable receipt commit pushed. Do not
+merge.
