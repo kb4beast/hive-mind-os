@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from controller import scopes_overlap
+from controller import format_time, scopes_overlap
 from durable_controller import (
     AutopilotError,
     ClaimError,
@@ -20,7 +20,6 @@ from durable_controller import (
     atomic_write_json,
     append_jsonl,
     digest_json,
-    format_time,
     normalize_path,
     path_matches_scope,
     read_json,
@@ -49,7 +48,9 @@ STOP_STATES = {
 
 
 def _string_list(value: object) -> list[str] | None:
-    if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item for item in value
+    ):
         return None
     return list(value)
 
@@ -92,16 +93,23 @@ class ControlPlane(DurableControlPlane):
         if not isinstance(sealed_bootstrap, Mapping):
             issues.append("control-plane bootstrap completion is unavailable")
             sealed_bootstrap = {}
-        if record.get("source_integrated_commit") != sealed_bootstrap.get("integrated_commit"):
-            issues.append("authority amendment source commit is not the sealed PR #120 integration")
+        if record.get("source_integrated_commit") != sealed_bootstrap.get(
+            "integrated_commit"
+        ):
+            issues.append(
+                "authority amendment source commit is not the sealed PR #120 integration"
+            )
         if record.get("plan_fingerprint") != self.expected_plan_fingerprint:
             issues.append("authority amendment plan fingerprint is stale")
         evidence_ref = record.get("authority_evidence")
         raw_node = super().node("RECON-010")
         if not isinstance(evidence_ref, str) or not any(
-            path_matches_scope(evidence_ref, scope) for scope in raw_node.get("write_scope", [])
+            path_matches_scope(evidence_ref, scope)
+            for scope in raw_node.get("write_scope", [])
         ):
-            issues.append("authority amendment evidence is not retained in original RECON scope")
+            issues.append(
+                "authority amendment evidence is not retained in original RECON scope"
+            )
 
         additional_write = _string_list(record.get("additional_write_scope"))
         additional_locks = _string_list(record.get("additional_file_locks"))
@@ -115,9 +123,13 @@ class ControlPlane(DurableControlPlane):
             issues.append("authority amendment requires exact additional_file_locks")
             additional_locks = []
         if set(additional_write) != set(additional_locks):
-            issues.append("authority amendment file locks must exactly match added write scope")
+            issues.append(
+                "authority amendment file locks must exactly match added write scope"
+            )
         if required_tests != ["dispatcher-release-barrier-tests"]:
-            issues.append("authority amendment must require dispatcher-release-barrier-tests")
+            issues.append(
+                "authority amendment must require dispatcher-release-barrier-tests"
+            )
         if not acceptance:
             issues.append("authority amendment requires explicit acceptance criteria")
         if not constraints:
@@ -126,23 +138,37 @@ class ControlPlane(DurableControlPlane):
             try:
                 normalize_path(scope)
             except ValueError as error:
-                issues.append(f"authority amendment has unsafe scope {scope!r}: {error}")
+                issues.append(
+                    f"authority amendment has unsafe scope {scope!r}: {error}"
+                )
                 continue
-            if any(scopes_overlap(scope, forbidden) for forbidden in raw_node.get("forbidden_scope", [])):
-                issues.append(f"authority amendment overlaps forbidden RECON scope: {scope}")
-        if any(scope.startswith("src/") or scope.startswith("tests/") for scope in additional_write):
+            if any(
+                scopes_overlap(scope, forbidden)
+                for forbidden in raw_node.get("forbidden_scope", [])
+            ):
+                issues.append(
+                    f"authority amendment overlaps forbidden RECON scope: {scope}"
+                )
+        if any(
+            scope.startswith("src/") or scope.startswith("tests/")
+            for scope in additional_write
+        ):
             issues.append("authority amendment may not enter product runtime/test paths")
         return tuple(dict.fromkeys(issues))
 
     def authority_issues(self) -> tuple[str, ...]:
         document = self._authority_document()
         if document is None:
-            return (f"required authority amendment file is missing: {AUTHORITY_AMENDMENTS}",)
+            return (
+                f"required authority amendment file is missing: {AUTHORITY_AMENDMENTS}",
+            )
         if document.get("schema_version") != 1:
             return ("authority amendments schema_version is unsupported",)
         amendments = document.get("amendments")
         if not isinstance(amendments, list) or len(amendments) != 1:
-            return ("authority amendments must contain exactly the sealed RECON-010 amendment",)
+            return (
+                "authority amendments must contain exactly the sealed RECON-010 amendment",
+            )
         return self._authority_record_issues(amendments[0])
 
     def _amendment_for_node(self, node_id: str) -> Mapping[str, Any] | None:
@@ -223,7 +249,10 @@ class ControlPlane(DurableControlPlane):
             for second_scope in second.get("file_locks", [])
         ):
             return True
-        return bool(set(first.get("semantic_locks", [])) & set(second.get("semantic_locks", [])))
+        return bool(
+            set(first.get("semantic_locks", []))
+            & set(second.get("semantic_locks", []))
+        )
 
     def _candidate_verdicts(
         self,
@@ -236,7 +265,9 @@ class ControlPlane(DurableControlPlane):
         if not isinstance(nodes, list):
             raise AutopilotError("status node inventory is unavailable")
         for item in nodes:
-            if not isinstance(item, Mapping) or not isinstance(item.get("node_id"), str):
+            if not isinstance(item, Mapping) or not isinstance(
+                item.get("node_id"), str
+            ):
                 continue
             node_id = str(item["node_id"])
             state = str(item.get("state"))
@@ -248,7 +279,9 @@ class ControlPlane(DurableControlPlane):
                 verdict = "WAIT"
             verdicts[node_id] = verdict
         if set(verdicts) != set(self._nodes):
-            raise AutopilotError("dispatcher could not assign exactly one verdict to every candidate")
+            raise AutopilotError(
+                "dispatcher could not assign exactly one verdict to every candidate"
+            )
         return verdicts
 
     @staticmethod
@@ -271,32 +304,47 @@ class ControlPlane(DurableControlPlane):
         if not actor.strip():
             raise AutopilotError("dispatcher actor is required")
         if self.target_requires_reconciliation():
-            raise AutopilotError("dispatcher release is forbidden until live target reconciliation completes")
+            raise AutopilotError(
+                "dispatcher release is forbidden until live target reconciliation completes"
+            )
         reconciliation_digest = self._reconciliation_digest()
         if reconciliation_digest is None:
-            raise AutopilotError("dispatcher release requires a current reconciliation event")
+            raise AutopilotError(
+                "dispatcher release requires a current reconciliation event"
+            )
         snapshot_digest = self._snapshot_digest()
         if snapshot_digest is None:
-            raise AutopilotError("dispatcher release requires a current GitHub snapshot")
+            raise AutopilotError(
+                "dispatcher release requires a current GitHub snapshot"
+            )
 
         base_status = self._base_status()
         eligible_raw = base_status.get("ready", [])
-        eligible = [str(item) for item in eligible_raw] if isinstance(eligible_raw, list) else []
+        eligible = (
+            [str(item) for item in eligible_raw]
+            if isinstance(eligible_raw, list)
+            else []
+        )
         if requested_nodes:
             wave = list(dict.fromkeys(str(item) for item in requested_nodes))
             unavailable = [node_id for node_id in wave if node_id not in eligible]
             if unavailable:
                 raise AutopilotError(
-                    "dispatcher cannot release non-eligible nodes: " + ", ".join(unavailable)
+                    "dispatcher cannot release non-eligible nodes: "
+                    + ", ".join(unavailable)
                 )
             for index, first in enumerate(wave):
                 for second in wave[index + 1 :]:
                     if self._nodes_conflict(first, second):
-                        raise AutopilotError(f"requested parallel release conflicts: {first} vs {second}")
+                        raise AutopilotError(
+                            f"requested parallel release conflicts: {first} vs {second}"
+                        )
         else:
             wave = []
             for node_id in sorted(eligible):
-                if all(not self._nodes_conflict(node_id, chosen) for chosen in wave):
+                if all(
+                    not self._nodes_conflict(node_id, chosen) for chosen in wave
+                ):
                     wave.append(node_id)
 
         verdicts = self._candidate_verdicts(base_status, wave)
@@ -338,7 +386,9 @@ class ControlPlane(DurableControlPlane):
         if record.get("reconciliation_digest") != self._reconciliation_digest():
             issues.append("dispatcher release was invalidated by reconciliation")
         if record.get("github_snapshot_digest") != self._snapshot_digest():
-            issues.append("dispatcher release was invalidated by GitHub snapshot change")
+            issues.append(
+                "dispatcher release was invalidated by GitHub snapshot change"
+            )
         wave = _string_list(record.get("released_wave"))
         verdicts = record.get("verdicts")
         if wave is None:
@@ -354,7 +404,9 @@ class ControlPlane(DurableControlPlane):
                 issues.append(f"released node lacks START NOW verdict: {node_id}")
         directive, action = self._action_sentence(wave)
         if record.get("directive") != directive or record.get("action") != action:
-            issues.append("dispatcher release directive/action is inconsistent with released wave")
+            issues.append(
+                "dispatcher release directive/action is inconsistent with released wave"
+            )
 
         claims = self.active_claims()
         for node_id in wave:
@@ -374,9 +426,17 @@ class ControlPlane(DurableControlPlane):
 
     def status(self) -> dict[str, object]:
         base = self._base_status()
-        original_eligible = list(base.get("ready", [])) if isinstance(base.get("ready"), list) else []
+        original_eligible = (
+            list(base.get("ready", []))
+            if isinstance(base.get("ready"), list)
+            else []
+        )
         record = self.current_release()
-        issues = self._release_issues(record) if record is not None else ("no current dispatcher release",)
+        issues = (
+            self._release_issues(record)
+            if record is not None
+            else ("no current dispatcher release",)
+        )
         if record is not None and not issues:
             verdicts = dict(record.get("verdicts", {}))
             wave = list(record.get("released_wave", []))
@@ -396,7 +456,8 @@ class ControlPlane(DurableControlPlane):
         released_ready = [
             node_id
             for node_id in wave
-            if verdicts.get(node_id) == "START NOW" and state_by_node.get(node_id) in READY_STATES
+            if verdicts.get(node_id) == "START NOW"
+            and state_by_node.get(node_id) in READY_STATES
         ]
         base["eligible"] = original_eligible
         base["ready"] = released_ready
@@ -414,20 +475,30 @@ class ControlPlane(DurableControlPlane):
     def ready_nodes(self) -> tuple[str, ...]:
         status = self.status()
         ready = status.get("ready", [])
-        return tuple(str(item) for item in ready) if isinstance(ready, list) else ()
+        return (
+            tuple(str(item) for item in ready)
+            if isinstance(ready, list)
+            else ()
+        )
 
     def assert_start_now(self, node_id: str) -> Mapping[str, Any]:
         record = self.current_release()
         issues = self._release_issues(record)
         if issues:
-            raise ClaimError("worker release is stale or unavailable: " + "; ".join(issues))
+            raise ClaimError(
+                "worker release is stale or unavailable: " + "; ".join(issues)
+            )
         assert record is not None
         verdicts = record.get("verdicts")
         if not isinstance(verdicts, Mapping) or verdicts.get(node_id) != "START NOW":
-            raise ClaimError(f"node {node_id} is WAIT; explicit START NOW was not released")
+            raise ClaimError(
+                f"node {node_id} is WAIT; explicit START NOW was not released"
+            )
         view = self.node_view(node_id)
         if view.state not in READY_STATES:
-            raise ClaimError(f"node {node_id} cannot start from current state {view.state}")
+            raise ClaimError(
+                f"node {node_id} cannot start from current state {view.state}"
+            )
         return record
 
     def claim(
@@ -452,8 +523,16 @@ class ControlPlane(DurableControlPlane):
         rendered = super().render_worker_prompt(node_id)
         release = self.status().get("dispatch_release", {})
         verdicts = release.get("verdicts", {}) if isinstance(release, Mapping) else {}
-        verdict = verdicts.get(node_id, "WAIT") if isinstance(verdicts, Mapping) else "WAIT"
-        directive = release.get("directive", "WAIT") if isinstance(release, Mapping) else "WAIT"
+        verdict = (
+            verdicts.get(node_id, "WAIT")
+            if isinstance(verdicts, Mapping)
+            else "WAIT"
+        )
+        directive = (
+            release.get("directive", "WAIT")
+            if isinstance(release, Mapping)
+            else "WAIT"
+        )
         return (
             f"DISPATCH VERDICT FOR {node_id}: {verdict}\n"
             f"DISPATCH DIRECTIVE: {directive}\n"
