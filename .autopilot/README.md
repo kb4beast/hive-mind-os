@@ -72,7 +72,7 @@ all not-yet-released workers are `WAIT`.
 
 1. Read this file, `workflow-policy.json`, `control-plane.json`,
    `authority-amendments.json`, and `plan.json`.
-2. Fetch current `main` and record its exact commit and tree.
+2. Fetch the configured singleton release branch and record its exact commit and tree.
 3. Inspect open/merged/closed PRs, CI, remote node branches, claims, durable receipts, and
    plan-impacting changes.
 4. Install a current `.autopilot/state/github-state.json` snapshot through
@@ -96,7 +96,7 @@ release instructions stale. Run the dispatcher again rather than reusing an old 
 The claim command independently revalidates the release before creating a claim.
 
 Target reconciliation remains intentionally live and session-local: a fresh dispatcher
-must inspect whatever `main` is now before releasing work. Completion evidence is the
+must inspect the configured singleton release branch before releasing work. Completion evidence is the
 opposite: once integrated and validated, it survives deletion of local
 `.autopilot/state/` and a completely fresh checkout.
 
@@ -182,9 +182,9 @@ Worker publication order is mandatory:
    durable repository evidence; no extra file path is required.
 6. **Integrate node PRs with an ancestry-preserving merge commit. Do not squash or
    rebase.** The claim, exact candidate, and receipt commits must remain ancestors of
-   `main`. The historical PR #120 squash is handled only by its sealed bootstrap
+   the singleton release branch. The historical PR #120 squash is handled only by its sealed bootstrap
    attestation and is not precedent for future nodes.
-7. After merge, rerun the dispatcher. The merge advances `main`, so every earlier worker
+7. After merge, rerun the dispatcher. The merge advances the singleton release branch, so every earlier worker
    release is stale by definition. A fresh controller reconstructs completion and only a
    new dispatch release may start further work.
 

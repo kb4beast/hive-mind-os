@@ -2,8 +2,8 @@
 
 ## Start a node only when
 
-- its dependencies have validated receipts integrated into current `main`;
-- current `main` equals the reconciled target;
+- its dependencies have validated receipts integrated into the singleton release branch;
+- the singleton release branch equals the reconciled target;
 - the dispatcher has installed a current GitHub-state snapshot;
 - no active file or semantic lock conflicts;
 - the latest current dispatcher release gives this exact node `START NOW`;
@@ -26,7 +26,7 @@ For a released multi-node wave, open the sessions together only when the dispatc
 
 Never reuse an old START instruction after any of these events:
 
-- target `main` advances, including a merge;
+- the singleton release target advances, including a merge;
 - a new conflicting claim appears;
 - the live GitHub snapshot changes; or
 - a new reconciliation event is recorded.

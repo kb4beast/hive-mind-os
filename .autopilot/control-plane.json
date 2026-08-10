@@ -44,8 +44,12 @@
     "baseline_rule": "The baseline must remain an ancestor. Any target advancement must be reconciled before new claims.",
     "baseline_sha": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
     "baseline_tree": "ac76686aa004cf8188f0281b1ec9ac1f5c666929",
-    "branch": "main",
-    "repository": "kb4beast/hive-mind-os"
+    "branch": "release/hive-mind-os-singleton-20260810",
+    "repository": "kb4beast/hive-mind-os",
+    "execution_mode": "singleton-release-branch",
+    "final_integration_branch": "main",
+    "protected_until_final_integration": ["main"],
+    "release_branch_base": "c2a26549e89387f82949d098e723cc3b52323440"
   },
   "verify_git_objects": true,
   "workflow_policy_file": ".autopilot/workflow-policy.json"

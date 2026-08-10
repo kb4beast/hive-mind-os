@@ -78,7 +78,7 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
             "schema_version": 1,
             "plan_id": self.plane.plan.get("plan_id"),
             "plan_fingerprint": self.plane.expected_plan_fingerprint,
-            "target_branch": "main",
+            "target_branch": "release/hive-mind-os-singleton-20260810",
             "target_sha": self.plane.current_target_sha(),
             "last_reconciled_sha": self.plane.reconciled_target_sha(),
             "reconciliation_required": self.plane.target_requires_reconciliation(),

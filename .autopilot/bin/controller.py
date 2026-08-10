@@ -334,6 +334,24 @@ class ControlPlane:
         return _require_nonempty_text(target.get("branch"), "target.branch")
 
     @property
+    def final_integration_branch(self) -> str:
+        target = _require_mapping(self.control.get("target"), "control-plane.target")
+        return _require_nonempty_text(
+            target.get("final_integration_branch"),
+            "target.final_integration_branch",
+        )
+
+    @property
+    def execution_mode(self) -> str:
+        target = _require_mapping(self.control.get("target"), "control-plane.target")
+        mode = _require_nonempty_text(target.get("execution_mode"), "target.execution_mode")
+        if mode != "singleton-release-branch":
+            raise ConfigurationError("target.execution_mode must be singleton-release-branch")
+        if self.target_branch == self.final_integration_branch:
+            raise ConfigurationError("singleton release target must not equal final integration branch")
+        return mode
+
+    @property
     def baseline_sha(self) -> str:
         target = _require_mapping(self.control.get("target"), "control-plane.target")
         sha = _require_nonempty_text(target.get("baseline_sha"), "target.baseline_sha")
@@ -359,6 +377,17 @@ class ControlPlane:
 
     def validate_configuration(self) -> tuple[str, ...]:
         issues: list[str] = []
+        try:
+            self.execution_mode
+            target = _require_mapping(self.control.get("target"), "control-plane.target")
+            protected = target.get("protected_until_final_integration")
+            if protected != [self.final_integration_branch]:
+                issues.append("target.protected_until_final_integration must protect final integration branch")
+            release_base = target.get("release_branch_base")
+            if not isinstance(release_base, str) or FULL_SHA.fullmatch(release_base) is None:
+                issues.append("target.release_branch_base must be a full lowercase Git SHA")
+        except ConfigurationError as error:
+            issues.append(str(error))
         if self.plan.get("schema_version") != SCHEMA_VERSION:
             issues.append("plan schema_version is unsupported")
         if self.control.get("schema_version") != SCHEMA_VERSION:
@@ -1575,7 +1604,7 @@ class ControlPlane:
             "NODE_STATE": view.state,
             "OBJECTIVE": str(node.get("objective")),
             "BRANCH": str(node.get("branch")),
-            "PR_TARGET": str(node.get("pr_target")),
+            "PR_TARGET": self.target_branch,
             "ROLES": ", ".join(node.get("roles", [])),
             "DEPENDENCIES": ", ".join(node.get("dependencies", [])) or "none",
             "READ_SCOPE": "\n".join(f"- {item}" for item in node.get("read_scope", [])),
