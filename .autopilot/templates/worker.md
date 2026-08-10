@@ -79,27 +79,32 @@ continue with broader scope or weaker acceptance.
 
 ## Durable completion publication
 
-Completion must survive a fresh checkout. After the implementation/evidence commit is
-final, record its exact commit and tree in a receipt matching
-`.autopilot/receipt.schema.json`, including `base_tree` and `final_tree`, then run:
+Completion must survive a fresh checkout without expanding file authority. After the
+implementation/evidence commit is final, record its exact base/final commits and trees
+in a receipt matching `.autopilot/receipt.schema.json`, including `base_tree` and
+`final_tree`, then run:
 
 ```bash
 python .autopilot/bin/autopilot.py --repo-root . complete {{NODE_ID}} \
   --owner <provider>:<unique-session> --receipt <receipt.json>
 ```
 
-The command prints the node-owned durable receipt path under the node's existing
-`evidence/**` write scope. Commit that generated
-`autopilot-completion-receipt.json` as a follow-up evidence commit and push it with the
-node branch. Do not put completion truth only under ignored `.autopilot/state/`.
+The command validates that declared changed paths equal the exact Git diff and remain
+inside this node's write scope, validates the retained remote claim including its branch,
+and appends a **zero-path durable receipt commit** whose tree equals `final_tree`. It
+advances the local node branch to that receipt commit and prints its SHA. Push that branch
+and open/update the draft PR. Do not put completion truth only under ignored
+`.autopilot/state/`.
 
 The node PR must later be integrated with an **ancestry-preserving merge commit**. Do not
-squash or rebase the node PR: the receipt's exact `final_commit` must remain an ancestor
-of `main` so a completely fresh dispatcher can validate it. A PR title, branch name,
-prose status, or merge alone never proves completion.
+squash or rebase: the retained claim, exact `final_commit`, and durable receipt commit
+must remain ancestors of `main` so a completely fresh dispatcher can independently
+reconstruct and validate completion. A PR title, branch name, prose status, or merge
+alone never proves completion.
 
 ## Stop
 
 {{STOPPING_CONDITION}}
 
-Do not merge or auto-merge. Publish and commit the durable validated completion receipt.
+Do not merge or auto-merge. Publish the durable validated receipt commit and push the
+claimed node branch.
