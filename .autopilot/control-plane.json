@@ -4,6 +4,14 @@
     "attestation": ".autopilot/bootstrap-completion.json",
     "candidate_commit": "4170b307a6ede35389372c81288b7e3cd24ebe45",
     "candidate_tree": "12f6b8a3260a37b3d85c4ae011de4d6aeb85529d",
+    "historical_write_scope": [
+      ".autopilot/**",
+      ".github/workflows/autopilot-control-room.yml",
+      "docs/execution/**",
+      "docs/plan/genericprompt-execution-2026-08-09/**",
+      "USER_GUIDE/**",
+      "ORIGINAL_PLAN.md"
+    ],
     "integrated_commit": "0f2aea66cf00c4d302d235b73aaeaea7248e044e",
     "integrated_tree": "12f6b8a3260a37b3d85c4ae011de4d6aeb85529d",
     "merge_method": "squash",
@@ -25,7 +33,7 @@
   "schema_version": 1,
   "source_of_truth": [
     "target branch ancestry",
-    "durable validated node receipts and sealed bootstrap attestation",
+    "durable validated node receipt commits and sealed bootstrap attestation",
     "open/merged/closed-unmerged PR state",
     "CI state",
     "active bounded claims",
