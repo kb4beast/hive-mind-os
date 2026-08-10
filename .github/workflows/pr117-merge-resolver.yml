@@ -11,15 +11,70 @@ permissions:
   contents: write
 
 jobs:
-  resolve:
+  reproduce-historical-receipts:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout branch with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Configure Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.14'
+      - name: Reproduce the four missing Phase-12 transcripts on the exact candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidate = '9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7'
+          $candidateRoot = Join-Path $env:RUNNER_TEMP 'pr117-candidate'
+          $logRoot = Join-Path $env:RUNNER_TEMP 'reproduced-logs'
+          git worktree add --detach $candidateRoot $candidate
+          Set-Location $candidateRoot
+          python -m pip install --disable-pip-version-check --no-deps -e . | Out-Null
+          New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+
+          & python -m unittest tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work -v *> (Join-Path $logRoot 'phase11-parity.log')
+          if ($LASTEXITCODE -ne 0) { throw 'phase11 parity reproduction failed' }
+          & python -m unittest tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes -v *> (Join-Path $logRoot 'phase11-rollback.log')
+          if ($LASTEXITCODE -ne 0) { throw 'phase11 rollback reproduction failed' }
+          & python -m unittest tests.test_brain_kernel_authority tests.test_brain_kernel_local_execution tests.test_sandbox -v *> (Join-Path $logRoot 'security-regression.log')
+          if ($LASTEXITCODE -ne 0) { throw 'security regression reproduction failed' }
+          & python -m unittest discover -s tests -p test_workers.py -v *> (Join-Path $logRoot 'recovery-regression.log')
+          if ($LASTEXITCODE -ne 0) { throw 'recovery regression reproduction failed' }
+
+          Get-ChildItem $logRoot -Filter '*.log' | Sort-Object Name | ForEach-Object {
+            $digest = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
+            Write-Host "$($_.Name) sha256:$digest"
+          }
+      - name: Upload reproduced receipt bytes
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pr117-reproduced-phase12-receipts
+          path: ${{ runner.temp }}/reproduced-logs/*.log
+          if-no-files-found: error
+          retention-days: 7
+
+  reconcile:
+    needs: reproduce-historical-receipts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: true
-      - name: Merge current main and preserve both lines of work
+      - name: Configure Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.14'
+      - name: Download reproduced receipt bytes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: pr117-reproduced-phase12-receipts
+          path: /tmp/pr117-reproduced-logs
+      - name: Repair latent branch defects and reconcile current main
         shell: bash
         env:
           EXPECTED_MAIN: 56cdf8b7a25294a0e1fbe73d8f732575e8c6b9a2
@@ -33,6 +88,145 @@ jobs:
             echo "main moved: expected $EXPECTED_MAIN, got $actual_main" >&2
             exit 1
           fi
+
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import shutil
+          import sys
+          from pathlib import Path
+
+          contracts = Path("src/hive_mind_os/brain_kernel/contracts.py")
+          text = contracts.read_text(encoding="utf-8")
+          old = "document = super().to_document()"
+          if text.count(old) != 3:
+              raise RuntimeError(f"expected exactly three slotted dataclass super calls, got {text.count(old)}")
+          contracts.write_text(text.replace(old, "document = _Contract.to_document(self)"), encoding="utf-8")
+
+          store = Path("src/hive_mind_os/brain_kernel/store.py")
+          text = store.read_text(encoding="utf-8")
+          old = "        return Path(state_dir) / DATABASE_FILENAME\n"
+          new = '        return Path(str(state_dir).replace("\\\\", "/")) / DATABASE_FILENAME\n'
+          if text.count(old) != 1:
+              raise RuntimeError("portable database path target changed unexpectedly")
+          store.write_text(text.replace(old, new), encoding="utf-8")
+
+          pyproject = Path("pyproject.toml")
+          text = pyproject.read_text(encoding="utf-8")
+          section = (
+              '\n[tool.ruff.lint.per-file-ignores]\n'
+              '"e/p12f/attempts/a-53cc11ad795130c2/evaluation/tiny_pkg/__init__.py" = ["F401"]\n'
+          )
+          if "[tool.ruff.lint.per-file-ignores]" in text:
+              raise RuntimeError("Ruff per-file-ignore section already exists; refuse to overwrite it")
+          pyproject.write_text(text.rstrip() + section, encoding="utf-8")
+
+          evidence_root = Path("evidence/local_assurance/phase12-9efe64b")
+          logs_root = evidence_root / "logs"
+          logs_root.mkdir(parents=True, exist_ok=True)
+          source_root = Path("/tmp/pr117-reproduced-logs")
+          names = (
+              "phase11-parity",
+              "phase11-rollback",
+              "security-regression",
+              "recovery-regression",
+          )
+          digests: dict[str, str] = {}
+          for name in names:
+              source = source_root / f"{name}.log"
+              target = logs_root / f"{name}.log"
+              if not source.is_file():
+                  raise RuntimeError(f"reproduced transcript missing: {source}")
+              shutil.copyfile(source, target)
+              digests[name] = "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
+
+          manifest_path = evidence_root / "receipts.json"
+          report_path = evidence_root / "assurance.json"
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+
+          commands = {
+              "phase11-parity": [
+                  "python", "-m", "unittest",
+                  "tests.test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work",
+                  "-v",
+              ],
+              "phase11-rollback": [
+                  "python", "-m", "unittest",
+                  "tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes",
+                  "-v",
+              ],
+              "security-regression": [
+                  "python", "-m", "unittest",
+                  "tests.test_brain_kernel_authority",
+                  "tests.test_brain_kernel_local_execution",
+                  "tests.test_sandbox",
+                  "-v",
+              ],
+              "recovery-regression": [
+                  "python", "-m", "unittest", "discover",
+                  "-s", "tests", "-p", "test_workers.py", "-v",
+              ],
+          }
+          manifest_receipts = manifest.get("receipts")
+          if not isinstance(manifest_receipts, list):
+              raise RuntimeError("receipt manifest structure changed unexpectedly")
+          for receipt in manifest_receipts:
+              name = receipt.get("name")
+              if name not in digests:
+                  raise RuntimeError(f"unexpected retained receipt name: {name!r}")
+              receipt["digest"] = digests[name]
+              receipt["command"] = commands[name]
+              receipt["interpreter"] = "GitHub Actions Windows Server 2025 / CPython 3.14.6 reproduction"
+              receipt["transcript_path"] = f"logs/{name}.log"
+              receipt["provenance"] = (
+                  "reproduced 2026-08-10 against exact candidate commit "
+                  "9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7 because the original transcript bytes were not retained"
+              )
+
+          report_receipts = report.get("test_receipts")
+          routes = report.get("phase11_routes")
+          if not isinstance(report_receipts, list) or not isinstance(routes, list):
+              raise RuntimeError("assurance report structure changed unexpectedly")
+          for receipt in report_receipts:
+              name = receipt.get("name")
+              if name not in digests:
+                  raise RuntimeError(f"unexpected report receipt name: {name!r}")
+              receipt["digest"] = digests[name]
+          for route in routes:
+              if route.get("route") == "legacy-enqueue-v1":
+                  route["parity_receipt_digest"] = digests["phase11-parity"]
+                  route["rollback_receipt_digest"] = digests["phase11-rollback"]
+
+          sys.path.insert(0, str(Path("src").resolve()))
+          from hive_mind_os.brain_kernel.local_assurance import (  # noqa: E402
+              build_local_assurance_report,
+              verify_local_assurance_artifact,
+          )
+
+          rebuilt = build_local_assurance_report(
+              candidate_commit=report["candidate_commit"],
+              candidate_tree=report["candidate_tree"],
+              phase11_routes=tuple(routes),
+              benchmark_report=report["benchmark"],
+              test_receipts=tuple(report_receipts),
+          )
+          report_path.write_text(json.dumps(rebuilt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          manifest["report_digest"] = rebuilt["report_digest"]
+          manifest["receipt_reproduction"] = {
+              "candidate_commit": "9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7",
+              "platform": "GitHub Actions Windows Server 2025",
+              "python": "3.14.6",
+              "reason": "original content-addressed transcript bytes were referenced but never committed",
+          }
+          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          verified = verify_local_assurance_artifact(report_path, manifest_path)
+          if verified["candidate_commit"] != "9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7":
+              raise RuntimeError("retained assurance candidate changed")
+          print("reproduced receipt digests:", json.dumps(digests, sort_keys=True))
+          PY
 
           set +e
           git merge --no-commit --no-ff origin/main
@@ -49,9 +243,10 @@ jobs:
           import hashlib
           import json
           import re
+          import subprocess
           from pathlib import Path
 
-          conflicts = {
+          expected = {
               "src/hive_mind_os/builtin_packages/hive-core/agents/builder.json",
               "src/hive_mind_os/builtin_packages/hive-core/package.json",
               "src/hive_mind_os/cli.py",
@@ -61,6 +256,13 @@ jobs:
               "tests/test_receipts.py",
               "tests/test_verify.py",
           }
+          actual = set(
+              subprocess.check_output(
+                  ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+              ).splitlines()
+          )
+          if actual != expected:
+              raise RuntimeError(f"conflict set changed; expected {sorted(expected)}, got {sorted(actual)}")
 
           marker = re.compile(
               r"<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n",
@@ -75,12 +277,9 @@ jobs:
                   nonlocal blocks
                   blocks += 1
                   ours, theirs = match.group(1), match.group(2)
-
                   if path.endswith("agents/builder.json"):
-                      # main adds comment_pull_request; it strictly contains the PR's prior capability set.
                       return theirs
                   if path.endswith("hive-core/package.json"):
-                      # Digest is recalculated after builder.json is resolved.
                       return theirs
                   if path.endswith("cli.py"):
                       if "brain_kernel" in ours and "continuation" in theirs:
@@ -89,23 +288,17 @@ jobs:
                           return ours
                       raise RuntimeError(f"unrecognized cli conflict block: {ours!r} / {theirs!r}")
                   if path.endswith("mission.py"):
-                      # Preserve main's fail-closed runtime checks rather than optimization-removable asserts.
                       return theirs
                   if path.endswith("pit_oracle.py"):
-                      # Preserve main's bundle staging and cleanup, which maintain the PR's isolated-source goal
-                      # while avoiding a whole-worktree copy and retaining the hardened sandbox boundary.
                       return theirs
                   if path.endswith("sandbox.py"):
                       if "taskkill" not in ours or "root_creation_time" not in theirs:
                           raise RuntimeError("unrecognized sandbox conflict block")
-                      # Keep PR #117's Windows Job Object fast path, then use main's PID-reuse-safe fallback.
                       prefix = ours.split('            taskkill = shutil.which("taskkill")', 1)[0]
                       return prefix + theirs
                   if path.endswith("test_receipts.py"):
-                      # Retain PR #117's deliberately shortened >260-character Windows path fixture.
                       return ours
                   if path.endswith("test_verify.py"):
-                      # main's imports are a strict superset of the PR-side imports in both conflict blocks.
                       return theirs
                   raise RuntimeError(path)
 
@@ -116,7 +309,7 @@ jobs:
                   raise RuntimeError(f"unresolved marker remains in {path}")
               Path(path).write_text(resolved, encoding="utf-8")
 
-          for path in sorted(conflicts):
+          for path in sorted(expected):
               resolve_file(path)
 
           builder = Path("src/hive_mind_os/builtin_packages/hive-core/agents/builder.json")
@@ -131,22 +324,13 @@ jobs:
           if replacements != 1:
               raise RuntimeError(f"expected one builder digest replacement, got {replacements}")
           package.write_text(package_text, encoding="utf-8")
-
           json.loads(builder.read_text(encoding="utf-8"))
           json.loads(package.read_text(encoding="utf-8"))
-          print(f"resolved {len(conflicts)} conflict files; builder digest sha256:{builder_digest}")
+          print(f"resolved {len(expected)} exact conflict files; builder digest sha256:{builder_digest}")
           PY
 
-          git add \
-            src/hive_mind_os/builtin_packages/hive-core/agents/builder.json \
-            src/hive_mind_os/builtin_packages/hive-core/package.json \
-            src/hive_mind_os/cli.py \
-            src/hive_mind_os/mission.py \
-            src/hive_mind_os/pit_oracle.py \
-            src/hive_mind_os/sandbox.py \
-            tests/test_receipts.py \
-            tests/test_verify.py
-
+          git add -A
+          git add -f evidence/local_assurance/phase12-9efe64b/logs/*.log
           if git ls-files -u | grep -q .; then
             echo "unresolved index entries remain" >&2
             git ls-files -u >&2
@@ -154,8 +338,44 @@ jobs:
           fi
           git diff --check --cached
           python -m pip install --disable-pip-version-check --no-deps -e .
+
+      - name: Apply deterministic Ruff-safe formatting repairs
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
+        with:
+          version: '0.16.0'
+          args: 'check --fix examples/verify-an-agent-change/repository/check_discount.py examples/verify-an-agent-change/run_example.py'
+      - name: Ruff static checks
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
+        with:
+          version: '0.16.0'
+          args: 'check src tests'
+      - name: Pyright type checks
+        uses: jakebailey/pyright-action@8ec14b5cfe41f26e5f41686a31eb6012758217ef
+        with:
+          version: '1.1.411'
+      - name: Run complete validation and push one merge reconciliation commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git add -f evidence/local_assurance/phase12-9efe64b/logs/*.log
+          if git ls-files -u | grep -q .; then
+            git ls-files -u >&2
+            exit 1
+          fi
+          git diff --check --cached
           python -m compileall -q src tests
           python -m unittest discover -s tests -v
-
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, str(Path('src').resolve()))
+          from hive_mind_os.brain_kernel.local_assurance import verify_local_assurance_artifact
+          root = Path('evidence/local_assurance/phase12-9efe64b')
+          report = verify_local_assurance_artifact(root / 'assurance.json', root / 'receipts.json')
+          assert report['candidate_commit'] == '9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7'
+          assert report['release_ready'] is False
+          PY
+          git status --short
           git commit -m "merge: reconcile main into PR 117 without dropping changes"
           git push origin HEAD:codex/phase8-exact-candidate-verification
