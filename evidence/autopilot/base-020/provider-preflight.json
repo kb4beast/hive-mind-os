@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "node_id": "BASE-020",
+  "test_name": "provider-preflight",
+  "source_commit": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+  "status": "passed",
+  "providers": {
+    "openai_compatible": {
+      "adapter": "OpenAICompatibleProvider",
+      "factory": "provider_from_env",
+      "structural_ci": "passed",
+      "live_credential_test": "not_performed",
+      "reason": "BASE-020 does not inspect or retain user credential values; the available ChatGPT Classic GitHub connector is not the product runtime credential environment."
+    },
+    "anthropic": {
+      "adapter": "AnthropicProvider",
+      "factory": "provider_from_env",
+      "structural_ci": "passed",
+      "live_credential_test": "not_performed",
+      "reason": "Alternative provider only; BASE-020 does not inspect or retain credential values."
+    },
+    "codex_subscription": {
+      "adapter": "CodexSubscriptionProvider",
+      "factory": "provider_from_env",
+      "structural_ci": "passed",
+      "ci_tests": [
+        "test_model_provider.ModelProviderTests.test_subscription_provider_factory_needs_no_api_key_or_model_id",
+        "test_model_provider.ModelProviderTests.test_subscription_provider_uses_a_scrubbed_read_only_ephemeral_codex_command",
+        "test_model_backend.ModelBackendTests.test_subscription_receipt_identifies_session_auth_without_an_api_key",
+        "test_cli_provider_config.DeliverProviderConfigurationTests.test_subscription_provider_configuration_needs_no_api_key_or_model"
+      ],
+      "live_transport": "blocked",
+      "blocker": "This ChatGPT Classic session exposes GitHub connector operations but no local Codex executable or signed-in Codex subscription process surface. The production adapter requires shutil.which('codex') and otherwise fails closed with ModelTransportError. No Codex execution tool is available in this session, so a live subscription call cannot be performed without inventing evidence.",
+      "security_boundary": [
+        "temporary workspace",
+        "read-only Codex sandbox",
+        "ephemeral session",
+        "ignore user config",
+        "skip git repo check",
+        "credential/token/secret-like environment names scrubbed",
+        "no repository checkout provided to Codex subprocess"
+      ]
+    }
+  },
+  "conclusion": "Provider adapter availability is proven structurally. Live Codex subscription transport is explicitly blocked on the current Classic execution surface and is not represented as tested live. This satisfies BASE-020's contract alternative to retain an evidence-backed blocker."
+}

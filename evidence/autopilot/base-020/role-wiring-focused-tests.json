@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "node_id": "BASE-020",
+  "test_name": "role-wiring-focused-tests",
+  "source_commit": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+  "workflow_run": 31371653163,
+  "job_id": 93401746487,
+  "status": "passed",
+  "observed_passing_tests": [
+    "test_brain_kernel_roles.KernelRoleHandlerTests.test_all_eight_roles_are_executable_and_evidence_bound",
+    "test_brain_kernel_roles.KernelRoleHandlerTests.test_fixture_mission_runs_all_roles_and_persists_separate_results",
+    "test_brain_kernel_roles.KernelRoleHandlerTests.test_integrator_requests_builder_work_instead_of_patching",
+    "test_brain_kernel_roles.KernelRoleHandlerTests.test_optimizer_cannot_promote_or_change_a_champion",
+    "test_brain_kernel_roles.KernelRoleHandlerTests.test_orchestrator_cannot_write_or_accept",
+    "test_brain_kernel_roles.KernelRoleHandlerTests.test_role_and_context_mismatch_fails_closed",
+    "test_roles.RoleLifecycleTests.test_repository_lifecycle_lists_only_implemented_roles",
+    "test_roles.RoleLifecycleTests.test_role_capabilities_resolve_to_policy_actions",
+    "test_model_backend.ModelBackendTests.test_offline_backend_completes_all_roles",
+    "test_model_backend.ModelBackendTests.test_subscription_receipt_identifies_session_auth_without_an_api_key",
+    "test_model_provider.ModelProviderTests.test_subscription_provider_factory_needs_no_api_key_or_model_id",
+    "test_model_provider.ModelProviderTests.test_subscription_provider_uses_a_scrubbed_read_only_ephemeral_codex_command",
+    "test_cli_provider_config.DeliverProviderConfigurationTests.test_subscription_provider_configuration_needs_no_api_key_or_model",
+    "test_mission.RepositoryMissionTests.test_model_backend_uses_the_same_capability_path"
+  ],
+  "classification_evidence": {
+    "generic_all_eight_model_or_deterministic_path": "src/hive_mind_os/runtime.py + src/hive_mind_os/model_backend.py",
+    "real_repository_roles": ["explorer", "builder", "curator"],
+    "real_repository_roles_source": "src/hive_mind_os/roles.py::IMPLEMENTED_REPOSITORY_ROLES",
+    "kernel_all_eight_provider_free_handlers": "src/hive_mind_os/brain_kernel/roles.py"
+  }
+}

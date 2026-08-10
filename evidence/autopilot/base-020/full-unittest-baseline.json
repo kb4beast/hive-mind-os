@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "node_id": "BASE-020",
+  "test_name": "full-unittest-baseline",
+  "source_commit": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+  "source_tree": "87a92782680a967afd29bceab218c61fc562a5e4",
+  "workflow_run": 31371653163,
+  "primary_job": {
+    "job_id": 93401746487,
+    "name": "unit-tests (Python 3.11)",
+    "command": ["python", "-m", "unittest", "discover", "-s", "tests", "-v"],
+    "result": "passed",
+    "tests_run": 611,
+    "skipped": 5,
+    "summary": "OK (skipped=5)"
+  },
+  "matrix": [
+    {"name": "unit-tests (Python 3.11)", "result": "success"},
+    {"name": "unit-tests (Python 3.12)", "result": "success"},
+    {"name": "unit-tests (Python 3.14)", "result": "success"},
+    {"name": "unit-tests (Windows, Python 3.12) (3.12)", "result": "success"},
+    {"name": "static-and-type-checks", "result": "success"},
+    {"name": "codeql-security", "result": "success"},
+    {"name": "secret-scan", "result": "success"},
+    {"name": "sbom-and-build-provenance", "result": "success"},
+    {"name": "dependency-and-license-review", "result": "skipped"}
+  ],
+  "normalization_policy": "No skip or non-success result was rewritten as success. The dependency/license job remains recorded as skipped, and the Linux suite's five platform-specific skips remain recorded as skips.",
+  "status": "passed"
+}
