@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "record_kind": "autopilot-authority-reconciliation-v1",
+  "node_id": "RECON-010",
+  "observed_main": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+  "observed_main_tree": "87a92782680a967afd29bceab218c61fc562a5e4",
+  "prior_receipt_commit": "37055e0b8c6dac451e899401802061fe258594f7",
+  "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+  "conflict": {
+    "live_plan_write_scope": [
+      "docs/execution/LIVE_REPOSITORY_RECONCILIATION.md",
+      "evidence/autopilot/recon-010/**"
+    ],
+    "merged_authority_source": "github:pull/120#dispatcher-release-barrier-required-RECON-010-amendment",
+    "merged_source_commit": "0f2aea66cf00c4d302d235b73aaeaea7248e044e",
+    "description": "Merged PR #120 explicitly assigns dispatcher release-barrier policy, dispatcher documentation/templates, and deterministic tests to RECON-010, but the generated RECON-010 plan entry retained a narrower documentation/evidence-only write scope. Implementing the amendment without first reconciling this conflict would be an unauthorized scope expansion."
+  },
+  "decision": "ADAPT",
+  "authority_resolution": {
+    "mechanism": "repository replan/control-plane amendment with append-only authority evidence and fail-closed effective-scope validation",
+    "plan_fingerprint_policy": "Preserve the installed plan fingerprint and historical BOOT-000 attestation. Do not rewrite sealed bootstrap evidence. Represent the one-time merged amendment as a separately validated control-plane authority amendment bound to RECON-010 and PR #120.",
+    "additional_write_scope": [
+      ".autopilot/authority-amendments.json",
+      ".autopilot/bin/autopilot.py",
+      ".autopilot/bin/release_barrier.py",
+      ".autopilot/workflow-policy.json",
+      ".autopilot/README.md",
+      ".autopilot/templates/reconciliation.md",
+      ".autopilot/templates/worker.md",
+      ".autopilot/tests/test_release_barrier.py",
+      "USER_GUIDE/02_ONE_PROMPT_FOREVER.md",
+      "USER_GUIDE/04_WHEN_TO_START_STOP.md"
+    ],
+    "additional_file_locks": [
+      ".autopilot/authority-amendments.json",
+      ".autopilot/bin/autopilot.py",
+      ".autopilot/bin/release_barrier.py",
+      ".autopilot/workflow-policy.json",
+      ".autopilot/README.md",
+      ".autopilot/templates/reconciliation.md",
+      ".autopilot/templates/worker.md",
+      ".autopilot/tests/test_release_barrier.py",
+      "USER_GUIDE/02_ONE_PROMPT_FOREVER.md",
+      "USER_GUIDE/04_WHEN_TO_START_STOP.md"
+    ],
+    "additional_required_test": "dispatcher-release-barrier-tests",
+    "constraints": [
+      "No product-runtime behavior may change.",
+      "The static DAG and existing completion requirements remain unchanged.",
+      "The amendment may only expand effective authority for RECON-010 and only to the enumerated files.",
+      "The existing RECON reconciliation evidence and prior receipt commit remain immutable history.",
+      "A new candidate and new zero-path durable receipt must cover the complete amended diff."
+    ]
+  },
+  "parallel_state": {
+    "BASE-020": {
+      "observed_branch": "autopilot/base-020",
+      "observed_head": "34c8e3296348e9be265c128f45c0665c7461a42a",
+      "claim_target": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+      "disposition": "parallel-nonconflicting-do-not-touch"
+    }
+  },
+  "roles": [
+    {
+      "role": "orchestrator",
+      "decision": "ADAPT",
+      "reason": "The merged amendment is binding repository history, but the generated node scope must be reconciled before implementation."
+    },
+    {
+      "role": "explorer",
+      "decision": "ADAPT",
+      "reason": "Repository inspection confirms the release-barrier text exists in merged PR #120 but not in the current Autopilot policy/controller surface."
+    },
+    {
+      "role": "curator",
+      "decision": "ADAPT",
+      "reason": "A separately validated, exact-path authority amendment preserves fail-closed scope enforcement without rewriting BOOT-000 or weakening receipt validation."
+    }
+  ],
+  "rollback": "Revert the amended RECON candidate/PR commits while retaining this adverse authority-reconciliation record and the prior receipt commit in branch history.",
+  "timestamp": "2026-08-10T14:18:00Z"
+}

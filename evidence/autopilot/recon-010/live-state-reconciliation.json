@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "node_id": "RECON-010",
+  "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+  "observed_at": "2026-08-10T09:19:45Z",
+  "authority": {
+    "autonomy_level": "A3",
+    "grants": ["repository-reconciliation", "documentation", "evidence-publication"],
+    "forbidden_product_work": true
+  },
+  "target": {
+    "repository": "kb4beast/hive-mind-os",
+    "branch": "main",
+    "commit": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+    "tree": "87a92782680a967afd29bceab218c61fc562a5e4",
+    "original_plan_baseline": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
+    "baseline_relation": "ancestor",
+    "commits_ahead_of_original_baseline": 2,
+    "commits_behind_original_baseline": 0
+  },
+  "bootstrap": {
+    "node_id": "BOOT-000",
+    "state": "COMPLETE",
+    "source_pr": 120,
+    "integrated_commit": "0f2aea66cf00c4d302d235b73aaeaea7248e044e",
+    "integrated_tree": "12f6b8a3260a37b3d85c4ae011de4d6aeb85529d",
+    "attestation": ".autopilot/bootstrap-completion.json",
+    "reconstruction_test": "test_01_fresh_checkout_reconstructs_bootstrap_completion"
+  },
+  "readiness": {
+    "controller_state": "READY",
+    "ready_nodes_after_bootstrap": ["BASE-020", "RECON-010"],
+    "recon_claim_branch_preexisting": false,
+    "base_claim_branch_preexisting": false,
+    "recon_claim_commit": "648c314276205dce5498125d0d7fcd3378832f96",
+    "recon_claim_owner": "openai:chatgpt-classic-recon-010-20260810T091945Z"
+  },
+  "ci": {
+    "exact_target_has_failure": false,
+    "exact_target_has_pending_or_queued_checks_observed": false,
+    "autopilot_control_room": {
+      "run_id": 31371653124,
+      "conclusion": "success",
+      "tests": 66,
+      "doctor_passed": true,
+      "doctor_state": "READY"
+    },
+    "constitutional_ci": {
+      "run_id": 31371653163,
+      "conclusion": "success",
+      "successful_jobs": [
+        "static-and-type-checks",
+        "unit-tests (Python 3.11)",
+        "unit-tests (Python 3.12)",
+        "unit-tests (Python 3.14)",
+        "unit-tests (Windows, Python 3.12) (3.12)",
+        "codeql-security",
+        "sbom-and-build-provenance",
+        "secret-scan"
+      ],
+      "skipped_jobs": ["dependency-and-license-review"]
+    }
+  },
+  "open_pull_requests": [
+    {
+      "number": 114,
+      "title": "docs: record P05 Actions re-enable blocker",
+      "head": "codex/p05-closeout-blocked-gov06",
+      "head_sha": "d09288517ebd6fd8723ec418218ac900f85f1b85",
+      "disposition": "SUPERSEDED_STALE_DO_NOT_MERGE_AS_CURRENT_STATE",
+      "reason": "The branch diverges from live main, is six commits behind the RECON claim base, and its only unique file is the older blocked B-GOV-06 evidence. Merged PR #115 subsequently published B-GOV-06 re-enable verification and P05 closeout evidence. Preserve PR #114 as historical evidence; grant no Autopilot node completion credit."
+    },
+    {
+      "number": 118,
+      "title": "build(deps): bump github/codeql-action/init from 4.37.4 to 4.37.6",
+      "disposition": "DEFER_EXTERNAL_MAINTENANCE",
+      "reason": "Open Dependabot security-tool maintenance is outside RECON-010 write scope and proves no plan node complete."
+    },
+    {
+      "number": 119,
+      "title": "build(deps): bump github/codeql-action/analyze from 4.37.4 to 4.37.6",
+      "disposition": "DEFER_EXTERNAL_MAINTENANCE",
+      "reason": "Open Dependabot security-tool maintenance is outside RECON-010 write scope and proves no plan node complete."
+    }
+  ],
+  "recent_integrated_history": [
+    {
+      "commit": "ffaaed5531ad4535a1fce59ffcf81b8442836c58",
+      "pr": 121,
+      "disposition": "ABSORBED_CONTROL_PLANE_REPAIR",
+      "impact": "Durable Autopilot completion reconstruction and immutable receipt plumbing. This repairs control-plane evidence semantics; it does not complete a product node."
+    },
+    {
+      "commit": "0f2aea66cf00c4d302d235b73aaeaea7248e044e",
+      "pr": 120,
+      "disposition": "BOOTSTRAP_INTEGRATED",
+      "impact": "Installs the Autopilot control plane. BOOT-000 is the only node reconstructed COMPLETE."
+    },
+    {
+      "commit": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
+      "pr": 117,
+      "disposition": "PRE_PLAN_CAPABILITY_BASELINE",
+      "impact": "Contains substantial preexisting kernel, contract, context, role, verification, anti-cheating and bounded mission capabilities that later nodes must reuse instead of reimplementing. It carries no post-bootstrap Autopilot node receipt."
+    },
+    {
+      "commit": "56cdf8b7a25294a0e1fbe73d8f732575e8c6b9a2",
+      "pr": 116,
+      "disposition": "PRE_PLAN_CAPABILITY_BASELINE",
+      "impact": "Codex subscription transport is preexisting provider/runtime capability relevant to ROLE-200 and later role nodes, but is not node completion evidence."
+    },
+    {
+      "commit": "dfee1c24125034c750e3d6e93c5af6c9ffd06e6d",
+      "pr": 109,
+      "disposition": "PRE_PLAN_CAPABILITY_BASELINE",
+      "impact": "Autonomous repository brain, continuation, recovery, learning and governed patch foundations overlap later mission/durability/delivery/self-healing/learning nodes without satisfying their current contracts."
+    },
+    {
+      "commit": "08232c6ba5d8091cd2fac3974f12a68dcbbf0c56",
+      "pr": 108,
+      "disposition": "PRE_PLAN_CAPABILITY_BASELINE",
+      "impact": "Standalone verification isolation, bounded mission loop and provider receipts overlap acceptance/durability/effect work without durable node completion."
+    }
+  ],
+  "plan_reconciliation": {
+    "complete": ["BOOT-000"],
+    "active": ["RECON-010"],
+    "start_ready_but_not_executed_here": ["BASE-020"],
+    "invalidated": [],
+    "superseded_external_work": ["PR-114"],
+    "partially_absorbed_not_complete": {
+      "ARCH-100": "Existing architecture and implementation-plan material must be reconciled rather than recreated.",
+      "CONTRACT-110": "PR #117 already added canonical contract schemas and kernel invariants.",
+      "ACCEPT-240": "PRs #108/#117 contain verification and assurance foundations.",
+      "CONSULT-210": "Current Autopilot includes role-first consultation contracts; product/runtime consultation remains a separate node.",
+      "CONTEXT-230": "PR #117 contains bounded memory/context primitives and manifests.",
+      "EFFECT-220": "Existing governed patch/provider receipt behavior provides effect-governance foundations.",
+      "MIGRATE-260": "Existing migration/compatibility work is present in the baseline and must be reused where compatible.",
+      "RECONCILE-250": "Autonomous recovery/reconciliation foundations predate the node.",
+      "ROLE-200": "Executable role fixtures plus Codex subscription transport already exist and must be wired/reconciled, not replaced wholesale.",
+      "ORCH-300": "Existing orchestrator/runtime code and historical phase branches are implementation inputs, not completion evidence.",
+      "EXPLORER-310": "Existing explorer/runtime code and historical phase-4 branches are implementation inputs, not completion evidence.",
+      "ARCHITECT-320": "Existing architect/runtime code and historical role work are implementation inputs, not completion evidence.",
+      "BUILDER-330": "Existing builder/runtime code and governed patch restrictions are implementation inputs, not completion evidence.",
+      "CURATOR-340": "Existing curator verification code/evidence is an implementation input, not completion evidence.",
+      "INTEGRATOR-350": "Existing integration and migration machinery is an implementation input, not completion evidence.",
+      "STEWARD-360": "Existing recovery/governance machinery is an implementation input, not completion evidence.",
+      "OPTIMIZER-370": "Existing learning/benchmark components are implementation inputs, not completion evidence.",
+      "COURT-380": "Existing courtroom/source-docket components are implementation inputs, not completion evidence.",
+      "MISSION-400": "PRs #108/#109/#117 already contain bounded mission/autonomous repository-brain paths.",
+      "DURABLE-410": "Continuation and restart/recovery foundations exist.",
+      "DELIVERY-420": "Governed patch and protected-ref restrictions exist.",
+      "HUMANLESS-430": "Autonomous repository-brain behavior is a partial foundation only.",
+      "CHEAT-440": "PR #117 records anti-cheating foundations; current node proof is still required.",
+      "SELFHEAL-450": "Recovery determinism and autonomous recovery foundations exist.",
+      "MIGRATION-460": "Legacy/public migration foundations exist but current qualification remains required.",
+      "LEARN-500": "PR #109 includes supervised feedback/PIT learning foundations.",
+      "CHALLENGER-510": "Learning/challenger-related primitives may be reusable; no current node receipt exists.",
+      "EVAL-520": "Benchmark/evaluation primitives exist; no current node receipt exists.",
+      "PROMOTE-530": "Existing courtroom/governance components are reusable; no promotion proof exists.",
+      "POISON-540": "Existing source/evidence controls are reusable; poisoning-defense proof remains required.",
+      "BENCH-600": "A benchmark harness exists in current code, but the autonomy benchmark court is not complete.",
+      "QUALIFY-610": "Historical assurance evidence is input only; governed autonomy qualification remains required.",
+      "LEGACY-620": "Historical release/legacy branches exist; retirement is not proven.",
+      "A3-700": "No durable A3 qualification receipt exists.",
+      "A4-800": "No bounded delivery-pilot receipt exists.",
+      "A5-900": "No governed-full qualification receipt exists."
+    },
+    "still_required_after_recon_merge": [
+      "BASE-020", "ARCH-100", "CONTRACT-110", "ACCEPT-240", "CONSULT-210", "CONTEXT-230", "EFFECT-220", "MIGRATE-260", "RECONCILE-250", "ROLE-200", "ARCHITECT-320", "BUILDER-330", "COURT-380", "CURATOR-340", "EXPLORER-310", "INTEGRATOR-350", "OPTIMIZER-370", "ORCH-300", "STEWARD-360", "MISSION-400", "CHEAT-440", "DELIVERY-420", "DURABLE-410", "HUMANLESS-430", "LEARN-500", "CHALLENGER-510", "MIGRATION-460", "POISON-540", "SELFHEAL-450", "EVAL-520", "BENCH-600", "PROMOTE-530", "QUALIFY-610", "LEGACY-620", "A3-700", "A4-800", "A5-900"
+    ]
+  },
+  "codex_branch_policy": {
+    "common_disposition": "HISTORICAL_REF_NO_COMPLETION_CREDIT",
+    "rule": "Retain the remote reference for provenance unless separately governed for deletion. A branch name or head is not completion evidence; downstream workers must compare current main and reuse only still-relevant changes.",
+    "exception": "codex/p05-closeout-blocked-gov06 is also the head of open PR #114 and is explicitly superseded/stale for current-state purposes.",
+    "branches": [
+      "codex/autonomous-closeout-handoff@f4b7b9fc44e9437500e0ee838bce978ca8f6d036",
+      "codex/governance-admin-enforcement@0d647d58388fa400d818e68afa4e9c0ee919e6d2",
+      "codex/harden-extensible-architecture@5689cd616d2a99d0f4ab1c05f7aa4a63f8b946f2",
+      "codex/master-implementation-bootstrap@f17e95c00b90434d0610f8d4de2c261a74201b8f",
+      "codex/p03-curator-closeout-repair@6eb469c2df5dc24810e0e63068794e9640ad7292",
+      "codex/p03-root-identity-ci@a5e13ec5a41eeb8e49c12ebaaa3710af6a1622df",
+      "codex/p03-timeout-pid-reuse-ci@38eaf7b892a59e813b4e6bd80c91e5d7eaebffc4",
+      "codex/p03-timeout-pid-reuse-final-ci@e80ab129559c1fbe1c6ea5cbe625e4f4a1d532ef",
+      "codex/p03-timeout-pid-reuse-repair@4a6f2a9352bfb276344605f31bc2923b35563782",
+      "codex/p03-windows-tree-liveness@fc29ea568866e5bd9b2660e1b7b486fa3662e293",
+      "codex/p04-audit-compatibility-handoff@cce9dd1d5a03b7cfdd284b7352558f2080da5fa5",
+      "codex/p04-audit-loader-ci@f2caeb08b776c90ad3639aa8db14b8afe18c7d96",
+      "codex/p04-evidence-confinement-ci@76ec259a69912a0e9a4f6324aa62353eba05feaf",
+      "codex/p04-evidence-confinement-closeout@3d2ff1a75628caf2f6af6551290f504d51e00903",
+      "codex/p05-closeout-blocked-gov06@d09288517ebd6fd8723ec418218ac900f85f1b85",
+      "codex/p05-historical-ci@b92dc6ca7a3dcbb71c85bbe91d4f11cbacf741e9",
+      "codex/p1-correctness-hardening@1ed6e44ab36f64a9414b1ef7a00634d17cf88346",
+      "codex/phase1-redesign-characterization@3298078c41ce69103eb2bdce61960a69dc6aab93",
+      "codex/phase2-additive-memory-telemetry-foundation@94e67cde15fa8a75d92561384241f0419c9f589b",
+      "codex/phase2-memory-usage-foundation@39e07c9e3c3ce439911481be2d38d901d05d4824",
+      "codex/phase3-federation-recursion-guards@2cbfe1d0e4dccd6f1758e5ddba10f799834bf857",
+      "codex/phase3-obsidian-bases-canvas@ff2bbb14729cf8b3d1475a1d3ef0281f6e713e50",
+      "codex/phase3-obsidian-vault-refresh@376a4a6082f6bdf154ba6252ccb70062a17a549b",
+      "codex/phase3-open-brain-obsidian-projection@7f7013c99d86bbd34f966b902bb873cf5c10d740",
+      "codex/phase3-public-private-memory-separation@40a508b6b1bfb4a8624cf1ef8169384d32a39d44",
+      "codex/phase3-stable-id-cognitive-notes@7e26a56eab5fe79f075cccc57a6ff0a01fb9ef9a",
+      "codex/phase4-explorer-behavior-fixtures@59df5f5f2d0af45f403f74dac9781d2664f227cd",
+      "codex/phase4-explorer-equal-comparison@0cbf581b77b77c1cdc15879a05164674fd5ae3ec",
+      "codex/phase4-explorer-idea-lifecycle@11e4a7b16b00e11caf59c231b5b718f14ed65195",
+      "codex/phase4-explorer-shadow@316ee55da4ea7449bcdb934ab442ef0d95f54ba5",
+      "codex/phase4-explorer-v2-candidate@55ec59828dcd999723627219210e5b224c65a36f",
+      "codex/phase5-debt-reconciliation@a842827ed86d47046f968855419131cd92679b05",
+      "codex/phase5-evidence-inventory-chain@992d82fa2665840817a6ad8381c957479a638568",
+      "codex/phase5-full-role-outputs@3caddcbc105709e531d682191955048d7ab57495",
+      "codex/phase5-governance-records@69a77c281a98bbe62cd196c95947db940aa93c24",
+      "codex/phase5-role-ancestry@4a26f595822d7606c3b8fd064e10ad30291d40b1",
+      "codex/phase5-worker-recovery-determinism@8ede2414f45210b3b6139850d7d0578e080a08d9",
+      "codex/post-merge-integration-receipt-repair@920429f23c1dcf769bc01888fa95507d4990467a",
+      "codex/release-1.1-stabilization@af9ac00a5959b96260fb3bcdfb0958ce0640ae04",
+      "codex/repair-ci-test-contract@0948f7ec385238f5825ce7c39dd25de2e9a1035d",
+      "codex/restore-b-ops-03-blocker@feb493b487b869198c5d62b9210097d269c3c57e"
+    ]
+  },
+  "durable_completion": {
+    "completion_marker_commits_observed_on_main": 0,
+    "sealed_bootstrap_attestation_observed": true,
+    "conclusion": "Only BOOT-000 may be reconstructed COMPLETE before RECON-010 is integrated."
+  },
+  "role_passes": [
+    {
+      "role": "orchestrator",
+      "identity": "role:orchestrator:openai-chatgpt-classic-recon-010",
+      "identity_kind": "model_role",
+      "finding": "Live repository evidence takes precedence; only BOOT-000 is complete and RECON-010/BASE-020 are the first-wave nodes."
+    },
+    {
+      "role": "explorer",
+      "identity": "role:explorer:openai-chatgpt-classic-recon-010",
+      "identity_kind": "model_role",
+      "finding": "Current code contains substantial pre-plan foundations; later node workers must inspect/reuse them instead of repeating historical implementations."
+    },
+    {
+      "role": "curator",
+      "identity": "role:curator:openai-chatgpt-classic-recon-010",
+      "identity_kind": "model_role",
+      "finding": "No branch name, PR title, historical phase label, or prose was accepted as node completion without a durable validated receipt or sealed bootstrap attestation."
+    }
+  ],
+  "test": {
+    "name": "live-state-reconciliation-test",
+    "status": "passed",
+    "assertions": [
+      "main equals ffaaed5531ad4535a1fce59ffcf81b8442836c58 and tree equals 87a92782680a967afd29bceab218c61fc562a5e4",
+      "original baseline 7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23 is an ancestor and current main is exactly two commits ahead",
+      "BOOT-000 reconstructs COMPLETE from sealed evidence",
+      "Autopilot ready set after bootstrap is exactly RECON-010 and BASE-020",
+      "exact-target Autopilot Control Room and Constitutional CI are successful with no observed failing/pending checks",
+      "RECON-010 had no preexisting remote claim branch before claim",
+      "open PRs 114, 118 and 119 receive explicit non-completion dispositions",
+      "all observed codex branches receive explicit historical/no-completion disposition",
+      "all non-BOOT planned nodes remain required unless and until their own durable receipts validate",
+      "RECON changed paths are confined to its declared write scope"
+    ]
+  },
+  "rollback": "Delete/revert RECON-010 documentation/evidence commits before integration, or revert the eventual ancestry-preserving merge commit after integration. No product/runtime state was mutated."
+}
