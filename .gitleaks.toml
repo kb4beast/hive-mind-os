@@ -4,6 +4,9 @@ title = "Hive Mind OS secret-scanning policy"
 useDefault = true
 
 [allowlist]
-description = "Removed P06 synthetic idempotency fixture retained in PR history"
+description = "Synthetic test identifiers retained in PR history; exact line-level false positives only"
 regexTarget = "line"
-regexes = ['''IDEMPOTENCY-P06-test''']
+regexes = [
+  '''IDEMPOTENCY-P06-test''',
+  '''ConstraintEnvelope\("AUTH-(?:one|parent|child)", "MISSION-phase-1"''',
+]
