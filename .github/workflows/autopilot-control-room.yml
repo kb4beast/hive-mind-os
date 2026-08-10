@@ -23,7 +23,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .autopilot/bootstrap-payload/part* > /tmp/bootstrap.tar.xz
+          cat .autopilot/bootstrap-payload/part{00..12} > /tmp/bootstrap-prefix
+          cat .autopilot/bootstrap-payload/part13hex{0..5} | xxd -r -p > /tmp/bootstrap-part13
+          cat /tmp/bootstrap-prefix /tmp/bootstrap-part13 > /tmp/bootstrap.tar.xz
           echo "56488f869fa76895088ffbc5da2effc2f5ee2f8a2b4b90d2b35876375b9937bd  /tmp/bootstrap.tar.xz" | sha256sum -c -
           tar -xJf /tmp/bootstrap.tar.xz -C .
           rm -rf .autopilot/bootstrap-payload
