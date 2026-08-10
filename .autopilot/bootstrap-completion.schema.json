@@ -1,0 +1,63 @@
+{
+  "$id": "hive-mind-autopilot-bootstrap-completion-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acceptance_decision": {"enum": ["ADOPT", "ADAPT"]},
+    "actual_branch": {"minLength": 1, "type": "string"},
+    "authority": {"type": "object"},
+    "base_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "base_tree": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "candidate_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "candidate_tree": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "changed_paths": {
+      "items": {"type": "string"},
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "contract_version": {"const": 1},
+    "evidence_refs": {
+      "items": {"type": "string"},
+      "minItems": 1,
+      "type": "array"
+    },
+    "integrated_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "integrated_tree": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "merge_method": {"const": "squash"},
+    "node_id": {"const": "BOOT-000"},
+    "plan_fingerprint": {"pattern": "^sha256:[0-9a-f]{64}$", "type": "string"},
+    "planned_branch": {"minLength": 1, "type": "string"},
+    "role_identities": {"type": "array"},
+    "rollback_ref": {"minLength": 1, "type": "string"},
+    "schema_version": {"const": 1},
+    "source_pr": {"minimum": 1, "type": "integer"},
+    "tests": {"type": "array"},
+    "timestamp": {"format": "date-time", "type": "string"}
+  },
+  "required": [
+    "schema_version",
+    "plan_fingerprint",
+    "node_id",
+    "contract_version",
+    "planned_branch",
+    "actual_branch",
+    "source_pr",
+    "merge_method",
+    "base_commit",
+    "base_tree",
+    "candidate_commit",
+    "candidate_tree",
+    "integrated_commit",
+    "integrated_tree",
+    "changed_paths",
+    "tests",
+    "evidence_refs",
+    "role_identities",
+    "authority",
+    "acceptance_decision",
+    "timestamp",
+    "rollback_ref"
+  ],
+  "type": "object"
+}

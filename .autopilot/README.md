@@ -18,10 +18,17 @@ Build one self-operating Hive Mind OS runtime that:
 
 ## Source of truth
 
-The controller reconstructs execution state from target-branch ancestry, validated
-receipts, PR/CI snapshots, remote branches, bounded claims, and append-only
-reconciliation records. A branch name, PR title, plan document, or edited status file
-never proves completion.
+The controller reconstructs execution state from target-branch ancestry, **durable
+validated completion evidence**, PR/CI snapshots, remote branches, bounded claims, and
+append-only reconciliation records. A branch name, PR title, plan document, or edited
+status file never proves completion.
+
+`BOOT-000` is the one historical bootstrap that predates durable receipt commits. Its
+exact PR, actual branch, candidate commit/tree, squash-integrated commit/tree, tests,
+changed paths, authority, and one-time historical installation scope are sealed in
+`.autopilot/bootstrap-completion.json` and `.autopilot/control-plane.json`. The
+controller verifies the integrated history and exact tree/diff; it does not fabricate
+the planned bootstrap branch or treat the PR title as a receipt.
 
 ## Commands
 
@@ -39,9 +46,10 @@ python .autopilot/bin/autopilot.py --repo-root . complete NODE_ID \
 ```
 
 `--publish-remote` creates a unique empty claim commit on the node's fixed remote branch.
-Git ref creation is the cross-session mutex: a competing worker loses the push race and
-must stop. Local claim files add lease/heartbeat state but are not treated as the only
-cross-session lock.
+That claim now retains the exact node branch, target SHA, owner, lease, and plan
+fingerprint. Git ref creation is the cross-session mutex: a competing worker loses the
+push race and must stop. Local claim files add lease/heartbeat state but are not the
+cross-session or durable completion source.
 
 ## Dispatcher protocol
 
@@ -55,6 +63,11 @@ A dispatcher session does not implement product work. It:
 5. runs `status`;
 6. reconciles target advancement before issuing worker prompts;
 7. returns only dependency-ready, conflict-free nodes with copy-ready prompts.
+
+Target reconciliation remains intentionally live and session-local: a fresh dispatcher
+must inspect whatever `main` is now before releasing work. Completion evidence is the
+opposite: once integrated and validated, it survives deletion of local
+`.autopilot/state/` and a completely fresh checkout.
 
 ## ChatGPT Classic-first execution workflow
 
@@ -101,12 +114,50 @@ following:
 A role council may disprove the concern only with retained evidence. Confirmed cheating
 quarantines the work. Unresolved cheating cannot be converted into ordinary success.
 
-## State and receipts
+## State and durable receipt commits
 
-Runtime state under `.autopilot/state/` is generated and ignored by Git. Completion
-receipts are accepted only when they bind the plan fingerprint, node contract, base and
-final commits, changed paths, passing tests, evidence, role identities, authority,
-consultations, acceptance decision, and rollback.
+Runtime state under `.autopilot/state/` is generated and ignored by Git. It may contain a
+working receipt copy, but it is never the durable completion source.
+
+For every non-bootstrap node, `complete` validates the receipt and creates an **empty
+receipt commit** on the already-claimed node branch. The receipt commit:
+
+- has the exact `final_commit` as its only parent;
+- has the exact `final_tree`, so it changes **zero repository paths** and therefore does
+  not expand the node's declared file write scope;
+- contains the canonical machine-readable completion receipt in its commit message;
+- is accepted only when the receipt's declared `changed_paths` exactly match the actual
+  `base_commit..final_commit` Git diff and every path is allowed by the node contract;
+- is cross-checked against the retained remote-claim commit, including node ID, plan
+  fingerprint, target/base SHA, and claimed branch.
+
+The receipt still contains exact base/final commit **and tree** identities, plan and
+contract binding, changed paths, passing required tests, evidence, role identities,
+authority, consultations, acceptance decision, and rollback reference.
+
+Worker publication order is mandatory:
+
+1. Claim the fixed node branch remotely and work only on that branch.
+2. Finish and commit the node implementation/evidence. Record that exact commit and tree
+   as `final_commit` and `final_tree` in the receipt.
+3. Run `autopilot complete ...`. It validates the candidate and claim provenance, appends
+   the zero-path durable receipt commit, advances the local node branch to that commit,
+   writes only a working copy/index under `.autopilot/state/`, and prints the receipt
+   commit SHA.
+4. Push the node branch and open/update its draft PR. The receipt commit itself is the
+   durable repository evidence; no extra file path is required.
+5. **Integrate node PRs with an ancestry-preserving merge commit. Do not squash or
+   rebase.** The claim, exact candidate, and receipt commits must remain ancestors of
+   `main`. The historical PR #120 squash is handled only by its sealed bootstrap
+   attestation and is not precedent for future nodes.
+6. After merge, rerun the dispatcher. A fresh controller scans current target history,
+   reconstructs the canonical receipt commit, revalidates its exact commit/tree/diff and
+   claim provenance, and only then releases dependent work.
+
+If a local receipt is stale or tampered it cannot be hidden behind a valid durable
+commit. If multiple durable receipt commits exist for one node, or a retained receipt is
+wrong-plan, wrong-branch, wrong-tree, non-integrated, out-of-scope, missing claim
+provenance, or otherwise inconsistent, the node fails closed as `REPAIR_REQUIRED`.
 
 ## Permanent dispatcher prompt
 
