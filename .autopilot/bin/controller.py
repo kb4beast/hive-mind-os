@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from urllib.parse import urlparse
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -50,6 +51,14 @@ SUBTASK_EXECUTION_SEQUENCE = (
     "run_doctor_and_status",
     "dispatch_explicit_start_now",
     "claim_remote_node_branch",
+)
+SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
 )
 LEGAL_STATES = (
     "BOOTSTRAP_REQUIRED",
@@ -617,6 +626,18 @@ class ControlPlane:
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_TERMINAL_PROMPT": "0",
         }
+        # Keep the controller deterministic while allowing a trusted local
+        # proxy/network path to reach GitHub. These values exist only in the
+        # child process environment; they are never persisted or printed.
+        for key in SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS:
+            value = os.environ.get(key)
+            if not value or any(character in value for character in "\r\n"):
+                continue
+            if key.lower() in {"http_proxy", "https_proxy"}:
+                parsed = urlparse(value)
+                if parsed.scheme not in {"http", "https", "socks5", "socks5h"} or not parsed.hostname:
+                    continue
+            base_environment[key] = value
         if environment is not None:
             base_environment.update(environment)
         completed = subprocess.run(

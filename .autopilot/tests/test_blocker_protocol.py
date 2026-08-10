@@ -62,3 +62,38 @@ class BlockerProtocolTests(unittest.TestCase):
             action["required_sequence"].index("dispatch_explicit_start_now"),
             action["required_sequence"].index("claim_remote_node_branch"),
         )
+
+    def test_git_transport_allowlist_accepts_proxy_only_in_child_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = Path(__file__).resolve().parents[1]
+            shutil.copytree(source, root / ".autopilot")
+            control = controller.read_json(root / ".autopilot" / "control-plane.json")
+            control["verify_git_objects"] = False
+            controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
+            plane = controller.ControlPlane(root)
+            original = controller.os.environ.get("HTTPS_PROXY")
+            controller.os.environ["HTTPS_PROXY"] = "https://proxy.example.test:8443"
+            try:
+                environment = {
+                    "PATH": controller.os.environ.get("PATH", ""),
+                    "GIT_CONFIG_GLOBAL": controller.os.devnull,
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_TERMINAL_PROMPT": "0",
+                }
+                for key in controller.SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS:
+                    value = controller.os.environ.get(key)
+                    if value and not any(character in value for character in "\r\n"):
+                        if key.lower() in {"http_proxy", "https_proxy"}:
+                            parsed = controller.urlparse(value)
+                            if parsed.scheme in {"http", "https", "socks5", "socks5h"} and parsed.hostname:
+                                environment[key] = value
+                        else:
+                            environment[key] = value
+                self.assertEqual(environment["HTTPS_PROXY"], "https://proxy.example.test:8443")
+                self.assertNotIn("GITHUB_TOKEN", environment)
+            finally:
+                if original is None:
+                    controller.os.environ.pop("HTTPS_PROXY", None)
+                else:
+                    controller.os.environ["HTTPS_PROXY"] = original
