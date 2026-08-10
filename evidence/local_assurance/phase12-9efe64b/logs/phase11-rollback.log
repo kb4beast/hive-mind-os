@@ -1,0 +1,6 @@
+test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes (tests.test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 1.013s
+
+OK

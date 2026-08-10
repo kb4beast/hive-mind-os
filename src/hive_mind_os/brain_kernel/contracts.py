@@ -342,7 +342,7 @@ class ConstraintEnvelope(_Contract):
         _digest(self.digest_value, "digest")
 
     def to_document(self) -> dict[str, Any]:
-        document = super().to_document()
+        document = _Contract.to_document(self)
         document["digest"] = document.pop("digest_value")
         return document
 
@@ -499,7 +499,7 @@ class MemoryRecord(_Contract):
         _digest(self.digest_value, "digest")
 
     def to_document(self) -> dict[str, Any]:
-        document = super().to_document()
+        document = _Contract.to_document(self)
         document["digest"] = document.pop("digest_value")
         return document
 
@@ -691,6 +691,6 @@ class Candidate(_Contract):
         _digest(self.digest_value, "digest")
 
     def to_document(self) -> dict[str, Any]:
-        document = super().to_document()
+        document = _Contract.to_document(self)
         document["digest"] = document.pop("digest_value")
         return document

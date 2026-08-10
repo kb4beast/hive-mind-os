@@ -55,7 +55,7 @@ class KernelStore:
     def database_path(state_dir: str | Path) -> Path:
         """Return the portable local database path below a kernel state directory."""
 
-        return Path(state_dir) / DATABASE_FILENAME
+        return Path(str(state_dir).replace("\\", "/")) / DATABASE_FILENAME
 
     def _bootstrap_locked(self) -> None:
         self.connection.execute("PRAGMA foreign_keys=ON")

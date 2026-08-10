@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "47b2472fc93c9c9c29c4e3628005874d24ada3c1",
+  "reviewer_role": "curator",
+  "decision": "not-approved",
+  "reason": "An interruption can leave a sealed PIT episode before its durable grade is recorded, so retry can create duplicate episodes.",
+  "review_mode": "detached full-access process with no edit, network, push, PR, merge, or test-suite instruction",
+  "focused_validation": {
+    "result": "not-run-by-curator"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T10:50:00Z"
+}

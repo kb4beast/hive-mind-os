@@ -1466,7 +1466,8 @@ class RepositoryMission:
                 # additions undercounts real tool calls.
                 used = len(workspace.receipt_records)
             self._consume(allowance, used)
-        assert workspace is not None
+        if workspace is None:
+            raise MissionFailed("workspace materialization did not return a workspace")
         self._record_workspace_receipts(workspace)
         self.ledger.append_event(
             self.run_id,
@@ -2093,7 +2094,9 @@ class RepositoryMission:
         record: Mapping[str, Any],
         artifact_id: str,
     ) -> bytes:
-        assert self._evidence_root is not None
+        evidence_root = self._evidence_root
+        if evidence_root is None:
+            raise MissionFailed("capability evidence root is unavailable")
         receipt = self._receipt_document(record)
         artifacts = receipt.get("artifacts")
         if not isinstance(artifacts, list):
@@ -2101,7 +2104,7 @@ class RepositoryMission:
         for artifact in artifacts:
             if not isinstance(artifact, Mapping) or artifact.get("artifact_id") != artifact_id:
                 continue
-            path = self._evidence_root / Path(
+            path = evidence_root / Path(
                 *portable_path_parts(_required_string(artifact, "path"))
             )
             return path.read_bytes()

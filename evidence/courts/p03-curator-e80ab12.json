@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The immutable candidate matches its sealed 528-test audit, passes focused Windows timeout-identity regressions, confines the change to creation-time-bound descendant termination, and preserves ADR-documented process-tier residual limits."
+}

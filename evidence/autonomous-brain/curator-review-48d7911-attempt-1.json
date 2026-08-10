@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "48d7911e9eb0ed3f3a319a350e3d1f9cc9e9cfe1",
+  "reviewer_role": "curator",
+  "decision": "blocked",
+  "reason": "The compatibility change lacked a targeted test that simulated the Windows path alias.",
+  "review_mode": "detached full-access headless Codex process with no edit, network, push, PR, merge, or test-suite instruction",
+  "focused_validation": {
+    "result": "not-run-by-curator"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T12:23:37Z"
+}

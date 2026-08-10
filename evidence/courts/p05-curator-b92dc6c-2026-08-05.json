@@ -1,0 +1,1 @@
+{"decision":"approved","safe_reason":"Exact candidate, digest-valid clean local audit, deterministic P05 coverage, and matching successful Constitutional CI were independently verified; scope remains local only."}

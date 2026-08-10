@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The immutable candidate is clean and on origin/main, and its exact passing CI plus independently verified compatible-auditor artifact (186 tests, matching digest and head) support closure of the evidence-confinement scope."
+}

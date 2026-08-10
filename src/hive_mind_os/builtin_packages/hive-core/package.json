@@ -48,7 +48,7 @@
   ],
   "files": [
     {"path": "agents/architect.json", "digest": "sha256:de8d92ed357193fcaab05c74200964960db3d89eb12796210f84ea1c058c0cac", "media_type": "application/json"},
-    {"path": "agents/builder.json", "digest": "sha256:6823154a0d27c9cec2678c118dc3af95336b4e7426a80bf5c73ec40aede158e4", "media_type": "application/json"},
+    {"path": "agents/builder.json", "digest": "sha256:52d272dede937c4ca789edea1ad72816033cf375d28cde3a5a23a65888093801", "media_type": "application/json"},
     {"path": "agents/curator.json", "digest": "sha256:b9f575fc62016c93a91835cf2124d24f2fed024db39d2259e129f866d6d4138d", "media_type": "application/json"},
     {"path": "agents/explorer.json", "digest": "sha256:598306e1ba06081ff71fe07309d8ab489fe741ffd756954af74b5fe0a7eb748e", "media_type": "application/json"},
     {"path": "agents/integrator.json", "digest": "sha256:de64896e73f9cb8be2138bd07f7af8587f0f274e90c3d970828fcda733fad064", "media_type": "application/json"},

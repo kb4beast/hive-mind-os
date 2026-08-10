@@ -17,6 +17,12 @@ from .acceptance import (
     AcceptanceSpecificationError,
     normalize_acceptance_specifications,
 )
+from .autonomous_os import (
+    AutonomousBrain,
+    AutonomousRunError,
+    GitHubRestCommentGateway,
+    HostKind,
+)
 from .autonomy import AutonomyBudget
 from .benchmark_harness import BenchmarkHarness
 from .brain_kernel.context import ContextManifestStore
@@ -29,6 +35,12 @@ from .brain_kernel.planner import (
     persist_plan,
 )
 from .brain_kernel.store import KernelIntegrityError, KernelStore
+from .continuation import (
+    ContinuationPacketError,
+    export_packet,
+    validate_packet,
+    write_packet,
+)
 from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
@@ -293,7 +305,7 @@ def build_deliver_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--provider",
-        choices=("openai_compatible", "anthropic"),
+        choices=("openai_compatible", "anthropic", "codex_subscription"),
         help="Model provider; overrides HIVE_MIND_MODEL_PROVIDER",
     )
     parser.add_argument(
@@ -474,6 +486,11 @@ def build_verify_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repository", required=True)
     parser.add_argument("--spec", required=True, help="Acceptance specification JSON")
+    parser.add_argument(
+        "--candidate",
+        required=True,
+        help="Full 40-hex immutable candidate commit SHA",
+    )
     parser.add_argument("--output", required=True, help="New receipt bundle directory")
     return parser
 
@@ -532,6 +549,90 @@ def build_status_parser() -> argparse.ArgumentParser:
     output.add_argument("--json", action="store_true", dest="json_output")
     output.add_argument("--html", help="Write a self-contained static status page")
     parser.add_argument("--state-dir", default=".hive-mind-state")
+    return parser
+
+
+def build_continuation_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind continuation",
+        description="Export or validate a local-only autonomous continuation packet",
+    )
+    commands = parser.add_subparsers(dest="action", required=True)
+    export = commands.add_parser("export")
+    export.add_argument("--repository", required=True, help="Clean local Git worktree")
+    export.add_argument("--input", required=True, help="Short structured packet source JSON")
+    export.add_argument("--output", required=True, help="New packet path outside the repository")
+    validate = commands.add_parser("validate")
+    validate.add_argument("--repository", required=True, help="Bound local Git worktree")
+    validate.add_argument("--packet", required=True, help="Existing continuation packet JSON")
+    return parser
+
+
+def build_autonomous_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind autonomous",
+        description="Run a governed, host-neutral autonomous repository worktree",
+    )
+    commands = parser.add_subparsers(dest="action", required=True)
+    kickoff = commands.add_parser("kickoff", help="Create an isolated branch from one user prompt")
+    kickoff.add_argument("--repository", required=True, help="Clean local Git repository")
+    kickoff.add_argument("--prompt", required=True, help="Kickoff objective; safe text only")
+    kickoff.add_argument("--host", choices=tuple(item.value for item in HostKind), required=True)
+    kickoff.add_argument("--run-id", help="Optional stable run identifier")
+    kickoff.add_argument("--allow-remote-push", action="store_true")
+    kickoff.add_argument("--allow-pr-comments", action="store_true")
+    kickoff.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    turn = commands.add_parser("turn", help="Run the selected signed-in coding host locally")
+    turn.add_argument("--run-id", required=True)
+    turn.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    register = commands.add_parser("register-pr", help="Bind this run to its own draft PR")
+    register.add_argument("--run-id", required=True)
+    register.add_argument("--number", required=True, type=int)
+    register.add_argument("--url", required=True)
+    register.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    open_pr = commands.add_parser("open-draft-pr", help="Push the run branch and open a draft PR")
+    open_pr.add_argument("--run-id", required=True)
+    open_pr.add_argument("--owner", required=True)
+    open_pr.add_argument("--repository", required=True)
+    open_pr.add_argument("--base", required=True)
+    open_pr.add_argument("--title", required=True)
+    open_pr.add_argument("--body", required=True)
+    open_pr.add_argument("--token-env", default="GITHUB_TOKEN")
+    open_pr.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    poll = commands.add_parser("poll-pr", help="Handle new conversation comments on the bound PR")
+    poll.add_argument("--run-id", required=True)
+    poll.add_argument("--owner", required=True)
+    poll.add_argument("--repository", required=True)
+    poll.add_argument("--token-env", default="GITHUB_TOKEN")
+    poll.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    push = commands.add_parser("push", help="Push only the run's own non-protected branch")
+    push.add_argument("--run-id", required=True)
+    push.add_argument("--remote", default="origin")
+    push.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    learn = commands.add_parser("learn", help="PIT-grade every human commit after the run start")
+    learn.add_argument("--run-id", required=True)
+    learn.add_argument("--human-final-commit", required=True)
+    learn.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    supervise = commands.add_parser(
+        "supervise",
+        help="Boundedly process new PR feedback and local human commits without restating context",
+    )
+    supervise.add_argument("--run-id", required=True)
+    supervise.add_argument("--polls", required=True, type=int)
+    supervise.add_argument("--interval-seconds", default=60.0, type=float)
+    supervise.add_argument("--owner")
+    supervise.add_argument("--repository")
+    supervise.add_argument("--token-env", default="GITHUB_TOKEN")
+    supervise.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    events = commands.add_parser("events", help="Print the run's safe append-only event ledger")
+    events.add_argument("--run-id", required=True)
+    events.add_argument("--state-dir", default=".hive-mind-state/autonomous")
+    requirements = commands.add_parser(
+        "requirements",
+        help="Print the sealed carry-forward requirements for an autonomous run",
+    )
+    requirements.add_argument("--run-id", required=True)
+    requirements.add_argument("--state-dir", default=".hive-mind-state/autonomous")
     return parser
 
 
@@ -957,7 +1058,12 @@ def _run_experiment(args: argparse.Namespace) -> int:
 
 def _run_verify(args: argparse.Namespace) -> int:
     try:
-        report = verify_repository(args.repository, args.spec, args.output)
+        report = verify_repository(
+            args.repository,
+            args.spec,
+            args.output,
+            args.candidate,
+        )
     except (OSError, ValueError, VerificationError) as error:
         print(
             json.dumps({"status": "failed", "error": str(error)}, indent=2),
@@ -1089,6 +1195,173 @@ def _run_status(args: argparse.Namespace) -> int:
     else:
         print(projection_json(model), end="")
     return 0
+
+
+def _read_packet_json(path: str) -> dict[str, object]:
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ContinuationPacketError(
+            f"packet JSON could not be read: {type(error).__name__}"
+        ) from None
+    if not isinstance(document, dict):
+        raise ContinuationPacketError("packet JSON must be an object")
+    return document
+
+
+def _run_continuation(args: argparse.Namespace) -> int:
+    try:
+        if args.action == "export":
+            packet = export_packet(_read_packet_json(args.input), args.repository)
+            output = write_packet(packet, args.output, args.repository)
+            print(
+                json.dumps(
+                    {
+                        "status": "exported",
+                        "packet": str(output),
+                        "canonical_digest": packet["integrity"]["canonical_digest"],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        packet = _read_packet_json(args.packet)
+        validation = validate_packet(packet, args.repository)
+        print(
+            json.dumps(
+                {"status": "valid" if validation.valid else "rejected", "issues": list(validation.issues)},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0 if validation.valid else 1
+    except ContinuationPacketError as error:
+        print(json.dumps({"status": "rejected", "error": str(error)}, indent=2), file=sys.stderr)
+        return 1
+
+
+def _run_autonomous(args: argparse.Namespace) -> int:
+    try:
+        with AutonomousBrain(args.state_dir) as brain:
+            if args.action == "kickoff":
+                contract = brain.start_run(
+                    args.repository,
+                    args.prompt,
+                    args.host,
+                    run_id=args.run_id,
+                    allow_remote_push=args.allow_remote_push,
+                    allow_pr_comments=args.allow_pr_comments,
+                )
+                print(json.dumps({"status": "prepared", "run": contract}, indent=2, sort_keys=True))
+                return 0
+            if args.action == "turn":
+                result = brain.run_host_turn(args.run_id)
+                print(
+                    json.dumps(
+                        {
+                            "status": "completed" if result.returncode == 0 else "blocked",
+                            "run_id": result.run_id,
+                            "action": result.action,
+                            "reply": result.reply,
+                            "changed_paths": result.changed_paths,
+                            "output_digest": result.output_digest,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0 if result.returncode == 0 else 1
+            if args.action == "register-pr":
+                brain.register_pull_request(args.run_id, args.number, args.url)
+                print(json.dumps({"status": "registered", "run_id": args.run_id, "number": args.number}, indent=2))
+                return 0
+            if args.action == "open-draft-pr":
+                result = brain.open_draft_pull_request(
+                    args.run_id,
+                    owner=args.owner,
+                    repository=args.repository,
+                    base=args.base,
+                    title=args.title,
+                    body=args.body,
+                    gateway=GitHubRestCommentGateway(args.token_env),
+                )
+                print(json.dumps({"status": "opened", "run_id": args.run_id, "pull_request": result}, indent=2))
+                return 0
+            if args.action == "poll-pr":
+                results = brain.handle_pull_request_feedback(
+                    args.run_id,
+                    owner=args.owner,
+                    repository=args.repository,
+                    gateway=GitHubRestCommentGateway(args.token_env),
+                )
+                print(
+                    json.dumps(
+                        {
+                            "status": "processed",
+                            "run_id": args.run_id,
+                            "comment_count": len(results),
+                            "actions": [result.action for result in results],
+                        },
+                        indent=2,
+                    )
+                )
+                return 0
+            if args.action == "push":
+                head = brain.push_own_branch(args.run_id, remote=args.remote)
+                print(json.dumps({"status": "pushed", "run_id": args.run_id, "head": head}, indent=2))
+                return 0
+            if args.action == "learn":
+                records = brain.learn_from_human_outcome_with_host(
+                    args.run_id, args.human_final_commit
+                )
+                print(
+                    json.dumps(
+                        {"status": "graded", "run_id": args.run_id, "iterations": list(records)},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0
+            if args.action == "supervise":
+                feedback_requested = args.owner is not None or args.repository is not None
+                if feedback_requested and (args.owner is None or args.repository is None):
+                    raise AutonomousRunError("supervision owner and repository must be supplied together")
+                result = brain.supervise(
+                    args.run_id,
+                    max_polls=args.polls,
+                    poll_interval_seconds=args.interval_seconds,
+                    owner=args.owner,
+                    repository=args.repository,
+                    gateway=(
+                        GitHubRestCommentGateway(args.token_env)
+                        if feedback_requested
+                        else None
+                    ),
+                )
+                print(json.dumps({"status": "supervised", **result}, indent=2, sort_keys=True))
+                return 0
+            if args.action == "requirements":
+                print(
+                    json.dumps(
+                        {
+                            "status": "sealed",
+                            "run_id": args.run_id,
+                            "requirements": brain.requirements(args.run_id),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0
+            print(json.dumps({"status": "unknown-action"}, indent=2), file=sys.stderr)
+            return 1
+    except (AutonomousRunError, OSError, RuntimeError, ValueError) as error:
+        print(
+            json.dumps({"status": "blocked", "error": f"{type(error).__name__}: {error}"}, indent=2),
+            file=sys.stderr,
+        )
+        return 1
 
 
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
@@ -1465,6 +1738,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "status":
         args = build_status_parser().parse_args(arguments[1:])
         raise SystemExit(_run_status(args))
+    if arguments and arguments[0] == "continuation":
+        args = build_continuation_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_continuation(args))
+    if arguments and arguments[0] == "autonomous":
+        args = build_autonomous_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_autonomous(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 

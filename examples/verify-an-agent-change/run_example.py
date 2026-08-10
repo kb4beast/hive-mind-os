@@ -9,7 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 EXAMPLE_ROOT = Path(__file__).resolve().parent
 BASE_REPOSITORY = EXAMPLE_ROOT / "repository"
 AGENT_PATCH = EXAMPLE_ROOT / "agent-change.patch"
@@ -75,6 +74,16 @@ def main() -> int:
     output.mkdir(parents=True)
     try:
         repository = _prepare_repository(output)
+        candidate = subprocess.run(
+            ("git", "-C", str(repository), "rev-parse", "HEAD"),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=True,
+        )
+        if candidate.returncode != 0:
+            raise RuntimeError("could not resolve the example candidate commit")
         bundle = output / "receipt-bundle"
         completed = subprocess.run(
             (
@@ -86,6 +95,8 @@ def main() -> int:
                 str(repository),
                 "--spec",
                 str(ACCEPTANCE_SPECIFICATION),
+                "--candidate",
+                candidate.stdout.strip(),
                 "--output",
                 str(bundle),
             ),

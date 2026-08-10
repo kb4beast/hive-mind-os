@@ -202,7 +202,7 @@ class _WindowsJob:
 
 def _normalized_executable(value: str) -> str:
     name = Path(value).name.casefold()
-    return name.removesuffix(".exe")
+    return name.removesuffix(".exe").removesuffix(".cmd").removesuffix(".bat")
 
 
 _INTERPRETER_FLAGS = {
@@ -219,6 +219,16 @@ _INTERPRETER_FLAGS = {
 _SIMPLE_PATH_TOKEN = re.compile(r"[^/\\\s]+\.[A-Za-z0-9]{1,10}\Z")
 
 
+def _interpreter_flags(executable: str) -> frozenset[str]:
+    normalized = _normalized_executable(executable)
+    direct = _INTERPRETER_FLAGS.get(normalized)
+    if direct is not None:
+        return direct
+    if re.fullmatch(r"(?:python|pypy)\d+(?:\.\d+)*", normalized):
+        return frozenset({"-c", "-m"})
+    return frozenset()
+
+
 @dataclass(frozen=True, slots=True)
 class SandboxSpec:
     root: Path
@@ -226,6 +236,7 @@ class SandboxSpec:
     argv_allowlist: tuple[str, ...] = ("python",)
     allow_interpreter_flags: bool = False
     env_allowlist: tuple[str, ...] = ()
+    fixed_environment: tuple[tuple[str, str], ...] = ()
     timeout_s: float = 30.0
     max_output_bytes: int = 1_000_000
     cpu_seconds: int | None = None
@@ -240,6 +251,19 @@ class SandboxSpec:
             raise ValueError("sandbox allowlist and limits must be positive")
         if type(self.allow_interpreter_flags) is not bool:
             raise ValueError("allow_interpreter_flags must be boolean")
+        fixed_names: set[str] = set()
+        for name, value in self.fixed_environment:
+            if (
+                not isinstance(name, str)
+                or not name
+                or "=" in name
+                or "\x00" in name
+                or not isinstance(value, str)
+                or "\x00" in value
+                or name in fixed_names
+            ):
+                raise ValueError("fixed environment entries must have unique safe names and values")
+            fixed_names.add(name)
         if self.cpu_seconds is not None and self.cpu_seconds < 1:
             raise ValueError("CPU limit must be positive")
         if self.memory_bytes is not None and self.memory_bytes < 1:
@@ -253,7 +277,7 @@ class SandboxSpec:
                 raise ValueError("writable path escapes sandbox root") from None
 
     def spec_digest(self) -> str:
-        payload = {
+        payload: dict[str, object] = {
             "root": self.root.as_posix(),
             "writable": list(self.writable),
             "argv_allowlist": sorted(_normalized_executable(v) for v in self.argv_allowlist),
@@ -264,6 +288,8 @@ class SandboxSpec:
             "cpu_seconds": self.cpu_seconds,
             "memory_bytes": self.memory_bytes,
         }
+        if self.fixed_environment:
+            payload["fixed_environment"] = sorted(self.fixed_environment)
         raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return sha256_digest(raw)
 
@@ -326,7 +352,7 @@ class SandboxRunner:
         }:
             self._deny(intent, "executable is not allowlisted")
         argv[0] = str(Path(resolved).resolve())
-        forbidden_flags = _INTERPRETER_FLAGS.get(_normalized_executable(argv[0]), frozenset())
+        forbidden_flags = _interpreter_flags(argv[0])
         if not self.spec.allow_interpreter_flags and any(
             argument in forbidden_flags for argument in argv[1:]
         ):
@@ -476,9 +502,15 @@ class SandboxRunner:
         return not argument.startswith("-") and bool(_SIMPLE_PATH_TOKEN.fullmatch(argument))
 
     def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
+        environment = {
+            name: os.environ[name]
+            for name in self.spec.env_allowlist
+            if name in os.environ
+        }
+        environment.update(dict(self.spec.fixed_environment))
         kwargs: dict[str, Any] = {
             "cwd": self.spec.root,
-            "env": {name: os.environ[name] for name in self.spec.env_allowlist if name in os.environ},
+            "env": environment,
             "stdin": subprocess.DEVNULL,
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
@@ -709,6 +741,16 @@ class SandboxRunner:
         root_pid: int,
         root_creation_time: int | None,
     ) -> set[int]:
+        return set(
+            cls._windows_descendant_identities(root_pid, root_creation_time)
+        )
+
+    @classmethod
+    def _windows_descendant_identities(
+        cls,
+        root_pid: int,
+        root_creation_time: int | None,
+    ) -> dict[int, int | None]:
         table = cls._windows_process_table()
         candidates: set[int] = set()
         frontier = {root_pid}
@@ -723,12 +765,64 @@ class SandboxRunner:
         creation_times = {
             pid: cls._windows_pid_creation_time(pid) for pid in candidates
         }
-        return cls._descendants_from_table(
+        descendants = cls._descendants_from_table(
             root_pid,
             root_creation_time,
             table,
             creation_times,
         )
+        return {pid: creation_times[pid] for pid in descendants}
+
+    @classmethod
+    def _terminate_windows_descendant_identities(
+        cls,
+        identities: Mapping[int, int | None],
+        root_creation_time: int | None,
+        *,
+        kernel32: Any | None = None,
+    ) -> None:
+        if not identities:
+            return
+        import ctypes
+        from ctypes import wintypes
+
+        if kernel32 is None:
+            win_dll: Any = getattr(ctypes, "windll")
+            kernel32 = win_dll.kernel32
+        active_kernel32: Any = kernel32
+        open_process = active_kernel32.OpenProcess
+        open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        open_process.restype = wintypes.HANDLE
+        terminate_process = active_kernel32.TerminateProcess
+        terminate_process.argtypes = [wintypes.HANDLE, wintypes.UINT]
+        terminate_process.restype = wintypes.BOOL
+        close_handle = active_kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+        access = 0x0001 | 0x1000  # PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION
+        for pid, expected_creation_time in identities.items():
+            handle = open_process(access, False, pid)
+            if not handle:
+                continue
+            try:
+                observed_creation_time = cls._windows_process_creation_time_from_handle(
+                    int(handle)
+                )
+                if (
+                    expected_creation_time is not None
+                    and observed_creation_time != expected_creation_time
+                ):
+                    continue
+                if (
+                    expected_creation_time is None
+                    and root_creation_time is not None
+                    and observed_creation_time is not None
+                    and observed_creation_time < root_creation_time
+                ):
+                    continue
+                terminate_process(handle, 1)
+            finally:
+                close_handle(handle)
 
     @classmethod
     def _root_creation_time(
@@ -783,33 +877,25 @@ class SandboxRunner:
                 job.close()
                 setattr(process, "_hive_mind_job", None)
                 return
-            taskkill = shutil.which("taskkill")
-            if taskkill is not None:
-                completed = subprocess.run(
-                    [taskkill, "/PID", str(process.pid), "/T", "/F"],
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    shell=False,
-                    check=False,
-                )
-                if completed.returncode == 0:
-                    return
-            import ctypes
-
-            kernel32 = ctypes.windll.kernel32
-            for pid in cls._windows_descendants(
-                process.pid,
-                cls._root_creation_time(process),
-            ):
-                handle = kernel32.OpenProcess(0x0001, False, pid)
-                if handle:
-                    try:
-                        kernel32.TerminateProcess(handle, 1)
-                    finally:
-                        kernel32.CloseHandle(handle)
+            # Do not use taskkill /T here: it follows a recycled PID solely by parent
+            # PID and bypasses the creation-time filter required by ADR-008.
+            root_creation_time = cls._root_creation_time(process)
             if process.poll() is None:
                 process.kill()
+            # A child can appear between a snapshot and root termination.  Re-enumerate
+            # after the root is stopped, but keep the bounded process-tier behavior
+            # documented in ADR-007 rather than claiming an atomic Windows boundary.
+            for _ in range(2):
+                identities = cls._windows_descendant_identities(
+                    process.pid,
+                    root_creation_time,
+                )
+                if not identities:
+                    break
+                cls._terminate_windows_descendant_identities(
+                    identities,
+                    root_creation_time,
+                )
 
     def _persist(
         self,

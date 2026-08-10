@@ -1,0 +1,4 @@
+{
+  "decision": "approved",
+  "safe_reason": "The inspected-signature dispatch selects repository or zero-argument loaders, rejects unsupported or uninspectable signatures, and lets loader-body TypeErrors propagate without retry."
+}

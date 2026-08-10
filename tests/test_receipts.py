@@ -118,7 +118,7 @@ class FileReceiptValidatorTests(unittest.TestCase):
             )
             self.assertTrue(validation.valid, validation.issues)
         finally:
-            shutil.rmtree(access_root)
+            shutil.rmtree(filesystem_path(self.root))
 
     def test_symlink_escape_fails_closed_when_supported(self) -> None:
         outside_directory = tempfile.TemporaryDirectory()

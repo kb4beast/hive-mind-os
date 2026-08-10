@@ -85,12 +85,13 @@ The runner:
 3. checks the fixed episode allowance before process creation;
 4. resolves an allowlisted executable and every caller-declared path argument;
 5. rejects traversal, absolute/nonportable paths, and resolved symlink escapes;
-6. executes an argv list with `shell=False`, a fixed working root, closed stdin, and an
+6. denies inline interpreter flags by default for canonical and versioned Python/PyPy names;
+7. executes an argv list with `shell=False`, a fixed working root, closed stdin, and an
    explicitly allowlisted environment;
-7. bounds wall time and captured bytes, killing the process tree on timeout;
-8. writes stdout, stderr, and the receipt atomically under a trusted root outside the
+8. bounds wall time and captured bytes, killing the process tree on timeout;
+9. writes stdout, stderr, and the receipt atomically under a trusted root outside the
    executable workspace;
-9. validates the receipt against the catalog schema and exposes a content-addressed
+10. validates the receipt against the catalog schema and exposes a content-addressed
    `ReceiptReference` accepted by `FileReceiptValidator`.
 
 Extend the version-1 schemas without weakening legacy validation:
@@ -112,9 +113,14 @@ against a hostile allowed executable.
 
 - POSIX starts a new session, kills the process group on timeout, and applies configured
   `RLIMIT_CPU`/`RLIMIT_AS`.
-- Windows starts a new process group and uses `taskkill /T /F`, with a Toolhelp
-  parent-process snapshot and direct termination as fallback. It does not use a Job Object
-  or implement CPU/memory limits.
+- Windows starts a new process group and uses a Toolhelp parent-process snapshot filtered
+  by process creation time, as specified by ADR-008. On timeout it stops the root, takes
+  up to two post-root snapshots, and directly terminates only eligible descendants whose
+  opened-handle creation time still matches the snapshot. `taskkill /T` is prohibited
+  because its parent-PID traversal bypasses that filter. Unknown creation-time metadata
+  remains conservatively eligible; PID reuse or process creation between snapshot and
+  handle inspection is therefore a documented best-effort race, not an isolation claim.
+  It does not use a Job Object or implement CPU/memory limits.
 - The environment is scrubbed, but the process tier does **not** block network syscalls.
 - Declared path arguments are confined and replaced with their checked resolved targets.
   An allowed program can still synthesize an undeclared absolute path internally.
@@ -138,6 +144,7 @@ audit subprocesses.
 | Threat | Control | Residual |
 |---|---|---|
 | Shell injection | argv list and `shell=False` | Allowed executable semantics remain trusted |
+| Inline interpreter bypass through a versioned Python name | Normalize Python/PyPy version aliases before checking `-c` and `-m` | An explicitly opted-in interpreter remains trusted |
 | PATH substitution | Resolve executable to a real path; compare normalized basename to allowlist | Allowlist does not pin executable bytes |
 | Path traversal or symlink escape | Portable path grammar plus resolved-root containment | Undeclared paths synthesized by a program are not intercepted |
 | Ambient credentials | Empty-by-default environment allowlist | Explicitly allowlisted values can appear in child output |
@@ -166,6 +173,7 @@ non-bypassable. P04 may depend on the runner only after P03 merges.
 - a successful command with schema-valid output accepted by `FileReceiptValidator`;
 - canonical intent mutation rejection;
 - executable, traversal, symlink, policy, and allowance denials before spawn;
+- inline Python denial for canonical and versioned executable names;
 - empty-by-default and explicit environment propagation;
 - process-tree timeout with a failed receipt;
 - early-parent-exit background-child timeout;

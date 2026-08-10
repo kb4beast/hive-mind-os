@@ -57,6 +57,7 @@ ROLE_CONTRACTS: dict[Role, RoleContract] = {
             "run_commands",
             "create_branch",
             "open_pull_request",
+            "comment_pull_request",
         ),
         ("tests pass", "change is traceable to the objective"),
     ),

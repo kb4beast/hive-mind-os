@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-AUTONOMOUS-REPOSITORY-BRAIN",
+  "candidate_commit": "f146c537f1cb85961d316427d2c3ad3fa549a568",
+  "reviewer_role": "curator",
+  "decision": "approved",
+  "review_mode": "detached full-access headless Codex process with no edit, network, push, PR, merge, or test-suite instruction",
+  "review_scope": [
+    "continuation packet output preserves the caller-requested path",
+    "Windows path aliases do not change the returned output path",
+    "the regression test would fail under the former resolved-path return behavior"
+  ],
+  "focused_validation": {
+    "command": "PYTHONPATH=src py -3.12 -m unittest tests.test_continuation -v",
+    "result": "9 tests passed"
+  },
+  "raw_model_output_retained": false,
+  "created_at": "2026-08-05T12:27:34Z"
+}

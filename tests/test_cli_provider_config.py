@@ -19,6 +19,7 @@ class DeliverProviderConfigurationTests(unittest.TestCase):
             with self.subTest(flag=flag):
                 self.assertIn(flag, help_text)
         self.assertNotIn("--api-key", help_text)
+        self.assertIn("codex_subscription", help_text)
 
     def test_flags_override_environment_for_primary_and_curator(self) -> None:
         arguments = argparse.Namespace(
@@ -56,6 +57,20 @@ class DeliverProviderConfigurationTests(unittest.TestCase):
         rendered = error.getvalue()
         self.assertIn("HIVE_MIND_MODEL_MODEL", rendered)
         self.assertIn("OPENAI_API_KEY", rendered)
+
+    def test_subscription_provider_configuration_needs_no_api_key_or_model(self) -> None:
+        arguments = argparse.Namespace(
+            state_dir=None,
+            backend="model",
+            provider="codex_subscription",
+            base_url=None,
+            model=None,
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(cli._missing_model_configuration(arguments), ())
+            provider = cli._provider_from_arguments(arguments)
+        self.assertEqual(provider.kind.value, "codex_subscription")
+        self.assertEqual(provider.config.model, "subscription-default")
 
     def test_experiment_run_fails_until_a_real_evaluation_surface_exists(self) -> None:
         error = io.StringIO()

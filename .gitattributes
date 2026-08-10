@@ -20,3 +20,6 @@ evidence/benchmarks/** -text -diff
 # streams generated on Windows. Git must preserve their pre-commit bytes exactly.
 evidence/experiments/_artifacts/** -text -diff
 evidence/experiments/_failed/** -text -diff
+
+# Local-assurance transcripts are content-addressed evidentiary bytes.
+evidence/local_assurance/**/logs/** -text -diff

@@ -53,6 +53,7 @@ EXPECTED_ROLE_DATA = {
             "run_commands",
             "create_branch",
             "open_pull_request",
+            "comment_pull_request",
         ),
         ("tests pass", "change is traceable to the objective"),
     ),

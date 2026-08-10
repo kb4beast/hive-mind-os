@@ -4,7 +4,7 @@
   "role_binding": "builder",
   "mission": "Implement the smallest complete change and ship it with executable verification.",
   "required_outputs": ["implementation", "tests", "change summary"],
-  "requested_capabilities": ["read_repository", "model_system", "write_workspace", "run_commands", "create_branch", "open_pull_request"],
+  "requested_capabilities": ["read_repository", "model_system", "write_workspace", "run_commands", "create_branch", "open_pull_request", "comment_pull_request"],
   "quality_gates": ["tests pass", "change is traceable to the objective"],
   "prompt_path": "prompts/builder.json",
   "skill_ids": ["skill.builder"],

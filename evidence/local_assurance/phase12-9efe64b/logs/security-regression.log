@@ -1,0 +1,46 @@
+test_gateway_requires_matching_token_and_deduplicates (tests.test_brain_kernel_authority.AuthorityTests.test_gateway_requires_matching_token_and_deduplicates) ... ok
+test_scope_expiry_revocation_and_action_denials_fail_closed (tests.test_brain_kernel_authority.AuthorityTests.test_scope_expiry_revocation_and_action_denials_fail_closed) ... ok
+test_builder_uses_an_isolated_gateway_write_and_curator_verifies_after_seal (tests.test_brain_kernel_local_execution.LocalKernelExecutionTests.test_builder_uses_an_isolated_gateway_write_and_curator_verifies_after_seal) ... ok
+test_workspace_adapter_refuses_path_escape_before_writing (tests.test_brain_kernel_local_execution.LocalKernelExecutionTests.test_workspace_adapter_refuses_path_escape_before_writing) ... ok
+test_all_pre_spawn_denials_append_ledger_evidence (tests.test_sandbox.SandboxTests.test_all_pre_spawn_denials_append_ledger_evidence) ... ok
+test_concurrent_calls_cannot_overbook_one_call_allowance (tests.test_sandbox.SandboxTests.test_concurrent_calls_cannot_overbook_one_call_allowance) ... C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\ctypes\__init__.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000001E9F5CEE110>
+  class c_char(_SimpleCData):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\ctypes\__init__.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000001E9F5CEFF10>
+  class c_char(_SimpleCData):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\ctypes\__init__.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000001E9F5E04040>
+  class c_char(_SimpleCData):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_default_rejects_inline_python_execution (tests.test_sandbox.SandboxTests.test_default_rejects_inline_python_execution) ... ok
+test_environment_is_scrubbed_unless_allowlisted (tests.test_sandbox.SandboxTests.test_environment_is_scrubbed_unless_allowlisted) ... ok
+test_exhausted_allowance_occurs_before_spawn (tests.test_sandbox.SandboxTests.test_exhausted_allowance_occurs_before_spawn) ... ok
+test_golden_intent_and_receipt_conform_to_extended_contracts (tests.test_sandbox.SandboxTests.test_golden_intent_and_receipt_conform_to_extended_contracts) ... ok
+test_happy_path_receipt_round_trips_through_validator (tests.test_sandbox.SandboxTests.test_happy_path_receipt_round_trips_through_validator) ... ok
+test_intent_digest_binds_every_declared_field (tests.test_sandbox.SandboxTests.test_intent_digest_binds_every_declared_field) ... ok
+test_interrupted_publish_leaves_no_receipt_claim (tests.test_sandbox.SandboxTests.test_interrupted_publish_leaves_no_receipt_claim) ... ok
+test_non_allowlisted_executable_is_denied_before_spawn (tests.test_sandbox.SandboxTests.test_non_allowlisted_executable_is_denied_before_spawn) ... ok
+test_non_object_intent_is_a_receipted_schema_denial (tests.test_sandbox.SandboxTests.test_non_object_intent_is_a_receipted_schema_denial) ... ok
+test_output_cap_is_explicit_and_digest_bound (tests.test_sandbox.SandboxTests.test_output_cap_is_explicit_and_digest_bound) ... ok
+test_parent_path_escape_is_rejected (tests.test_sandbox.SandboxTests.test_parent_path_escape_is_rejected) ... ok
+test_policy_denial_occurs_before_spawn (tests.test_sandbox.SandboxTests.test_policy_denial_occurs_before_spawn) ... ok
+test_repeat_execution_differs_only_in_volatile_receipt_fields (tests.test_sandbox.SandboxTests.test_repeat_execution_differs_only_in_volatile_receipt_fields) ... ok
+test_short_lived_windows_commands_do_not_false_timeout (tests.test_sandbox.SandboxTests.test_short_lived_windows_commands_do_not_false_timeout) ... C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\contextlib.py:479: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000001E9F5E055D0>
+  @staticmethod
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_subprocess_creation_error_is_a_receipted_denial (tests.test_sandbox.SandboxTests.test_subprocess_creation_error_is_a_receipted_denial) ... ok
+test_symlink_escape_is_rejected (tests.test_sandbox.SandboxTests.test_symlink_escape_is_rejected) ... skipped 'POSIX-only symlink confinement case'
+test_timeout_covers_early_parent_exit_and_background_child (tests.test_sandbox.SandboxTests.test_timeout_covers_early_parent_exit_and_background_child) ... ok
+test_timeout_kills_process_tree_and_leaves_failed_receipt (tests.test_sandbox.SandboxTests.test_timeout_kills_process_tree_and_leaves_failed_receipt) ... ok
+test_trusted_receipt_store_cannot_be_inside_workspace (tests.test_sandbox.SandboxTests.test_trusted_receipt_store_cannot_be_inside_workspace) ... ok
+test_undeclared_path_like_argument_is_confined (tests.test_sandbox.SandboxTests.test_undeclared_path_like_argument_is_confined) ... ok
+test_windows_descendants_exclude_stale_parent_pid_records (tests.test_sandbox.SandboxTests.test_windows_descendants_exclude_stale_parent_pid_records) ... ok
+test_windows_job_assignment_failure_denies_before_suspended_root_runs (tests.test_sandbox.SandboxTests.test_windows_job_assignment_failure_denies_before_suspended_root_runs) ... ok
+test_windows_job_unavailable_denies_before_root_spawns (tests.test_sandbox.SandboxTests.test_windows_job_unavailable_denies_before_root_spawns) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 3.561s
+
+OK (skipped=1)

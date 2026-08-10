@@ -79,6 +79,11 @@ class PointInTimeOracleTests(unittest.TestCase):
         self.assertEqual(set(environment.ancestor_shas), set(expected))
         self.assertEqual(set(observed), set(expected))
 
+    def test_parent_environment_removes_the_temporary_bundle_before_handoff(self) -> None:
+        environment = self.environment(6)
+        self.assertFalse((environment.root / "ancestor.bundle").exists())
+        self.assertTrue(environment.root.is_dir())
+
     def test_target_tree_future_objects_absent_and_ancestor_blob_present(self) -> None:
         environment = self.environment(6)
         forbidden = (
