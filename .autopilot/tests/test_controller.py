@@ -39,6 +39,11 @@ class AutopilotControllerTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         source = Path(__file__).resolve().parents[1]
         shutil.copytree(source, self.root / ".autopilot")
+        # The real checkout may contain ignored runtime snapshots from a
+        # previous dispatcher run.  They are not fixture inputs and must not
+        # contaminate deterministic controller tests.
+        shutil.rmtree(self.root / ".autopilot" / "state", ignore_errors=True)
+        (self.root / ".autopilot" / "state").mkdir()
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False

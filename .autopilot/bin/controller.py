@@ -1319,7 +1319,24 @@ class ControlPlane:
         self.clean_stale_claims()
         target = self.current_target_sha()
         changed = self.changed_paths_since_reconciliation()
-        views = [self.node_view(node_id) for node_id in sorted(self._nodes)]
+        # The plan is a DAG with substantial fan-in.  Re-evaluating every
+        # dependency recursively for every node turns status into exponential
+        # work and can make the dispatcher appear hung on a full plan.  Keep
+        # this cache scoped to one status snapshot so all consumers observe a
+        # consistent view without retaining stale receipt or claim state.
+        uncached_node_view = self.node_view
+        view_cache: dict[str, NodeView] = {}
+
+        def cached_node_view(node_id: str) -> NodeView:
+            if node_id not in view_cache:
+                view_cache[node_id] = uncached_node_view(node_id)
+            return view_cache[node_id]
+
+        self.node_view = cached_node_view  # type: ignore[method-assign]
+        try:
+            views = [cached_node_view(node_id) for node_id in sorted(self._nodes)]
+        finally:
+            self.node_view = uncached_node_view  # type: ignore[method-assign]
         counts: dict[str, int] = {state: 0 for state in LEGAL_STATES}
         for view in views:
             counts[view.state] = counts.get(view.state, 0) + 1
