@@ -32,8 +32,16 @@ jobs:
           echo "merge_exit_code=${merge_rc}"
           echo "=== unresolved paths ==="
           git diff --name-only --diff-filter=U || true
-          echo "=== unresolved stage records ==="
-          git ls-files -u || true
+          echo "=== conflict hunks ==="
+          git diff --cc -- \
+            src/hive_mind_os/builtin_packages/hive-core/agents/builder.json \
+            src/hive_mind_os/builtin_packages/hive-core/package.json \
+            src/hive_mind_os/cli.py \
+            src/hive_mind_os/mission.py \
+            src/hive_mind_os/pit_oracle.py \
+            src/hive_mind_os/sandbox.py \
+            tests/test_receipts.py \
+            tests/test_verify.py || true
           if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
             git merge --abort
           fi
