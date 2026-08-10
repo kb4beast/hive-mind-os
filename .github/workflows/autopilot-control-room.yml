@@ -1,62 +1,43 @@
-name: Bootstrap Autopilot Control Plane
+name: Autopilot Control Room
 
 on:
+  pull_request:
+    paths:
+      - ".autopilot/**"
+      - ".github/workflows/autopilot-control-room.yml"
+      - "docs/execution/**"
+      - "USER_GUIDE/**"
+      - "ORIGINAL_PLAN.md"
   push:
-    branches:
-      - agent/bootstrap-autopilot-control-plane
+    branches: [main]
+    paths:
+      - ".autopilot/**"
+      - ".github/workflows/autopilot-control-room.yml"
+      - "docs/execution/**"
+      - "USER_GUIDE/**"
+      - "ORIGINAL_PLAN.md"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  expand:
-    name: expand-validated-autopilot-package
+  controller-contract:
+    name: autopilot-controller-contract
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout bootstrap branch
+      - name: Checkout immutable workflow input
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: true
-
-      - name: Reconstruct and verify package
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show HEAD:.github/workflows/autopilot-control-room.yml > /tmp/bootstrap-workflow.yml
-          cat .autopilot/bootstrap-payload/part{00..12} > /tmp/bootstrap-prefix
-          cat .autopilot/bootstrap-payload/part13hex{0..5} | xxd -r -p > /tmp/bootstrap-part13
-          cat /tmp/bootstrap-prefix /tmp/bootstrap-part13 > /tmp/bootstrap.tar.xz
-          echo "56488f869fa76895088ffbc5da2effc2f5ee2f8a2b4b90d2b35876375b9937bd  /tmp/bootstrap.tar.xz" | sha256sum -c -
-          tar -xJf /tmp/bootstrap.tar.xz -C .
-          install -m 0644 /tmp/bootstrap-workflow.yml .github/workflows/autopilot-control-room.yml
-          rm -rf .autopilot/bootstrap-payload
-          test ! -e REPO_ROOT
-
-      - name: Validate expanded control plane
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m compileall -q .autopilot/bin .autopilot/tests
-          python -m unittest discover -s .autopilot/tests -v
-
-      - name: Commit expanded source
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "Hive Mind bootstrap"
-          git config user.email "hive-mind-bootstrap@users.noreply.github.com"
-          git add -A
-          git commit -m "chore: install autonomy implementation control plane"
-
-      - name: Run repository-aware doctor
-        shell: bash
-        run: |
-          set -euo pipefail
-          python .autopilot/bin/autopilot.py --repo-root . doctor --json
-
-      - name: Push expanded source
-        shell: bash
-        run: |
-          set -euo pipefail
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          persist-credentials: false
+      - name: Configure Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Compile deterministic controller
+        run: python -m compileall -q .autopilot/bin .autopilot/tests
+      - name: Run control-plane tests
+        run: python -m unittest discover -s .autopilot/tests -v
+      - name: Run bootstrap doctor
+        run: python .autopilot/bin/autopilot.py --repo-root . doctor --json
