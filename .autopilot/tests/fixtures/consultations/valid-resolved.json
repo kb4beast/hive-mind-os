@@ -1,0 +1,22 @@
+{
+  "answer": "Use the exact current code and retain the narrower reversible option.",
+  "authority_class": null,
+  "cheating_disposition": "NOT_APPLICABLE",
+  "consulted_roles": ["architect", "curator"],
+  "decision": "RESOLVED",
+  "dissent": [],
+  "evidence_refs": ["evidence:architecture-options"],
+  "human_escalation": false,
+  "identity_records": [
+    {"identity": "role:architect:1", "identity_kind": "model_role", "role": "architect"},
+    {"identity": "role:curator:1", "identity_kind": "model_role", "role": "curator"}
+  ],
+  "mission_id": "MISSION-fixture",
+  "question": "Which reversible option satisfies the sealed constraints?",
+  "reason_code": "AMBIGUOUS_DESIGN",
+  "request_id": "CONSULT-fixture-resolved",
+  "requesting_role": "builder",
+  "role_first_exhausted": true,
+  "round": 1,
+  "suspected_cheating": false
+}

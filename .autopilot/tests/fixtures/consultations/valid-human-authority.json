@@ -1,0 +1,23 @@
+{
+  "answer": null,
+  "authority_class": "credential_or_secret",
+  "cheating_disposition": "NOT_APPLICABLE",
+  "consulted_roles": ["orchestrator", "curator", "integrator"],
+  "decision": "TRUE_AUTHORITY_REQUIRED",
+  "dissent": [],
+  "evidence_refs": ["evidence:no-credential-in-authority-envelope"],
+  "human_escalation": true,
+  "identity_records": [
+    {"identity": "role:orchestrator:3", "identity_kind": "model_role", "role": "orchestrator"},
+    {"identity": "role:curator:3", "identity_kind": "model_role", "role": "curator"},
+    {"identity": "role:integrator:3", "identity_kind": "model_role", "role": "integrator"}
+  ],
+  "mission_id": "MISSION-fixture",
+  "question": "May this run authenticate to the remote Git host?",
+  "reason_code": "MISSING_EXTERNAL_AUTHORITY",
+  "request_id": "CONSULT-fixture-authority",
+  "requesting_role": "builder",
+  "role_first_exhausted": true,
+  "round": 1,
+  "suspected_cheating": false
+}

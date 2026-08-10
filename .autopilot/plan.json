@@ -1,0 +1,4443 @@
+{
+  "baseline": {
+    "branch": "main",
+    "commit": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
+    "tree": "ac76686aa004cf8188f0281b1ec9ac1f5c666929"
+  },
+  "created_at": "2026-08-09T00:00:00Z",
+  "nodes": [
+    {
+      "acceptance_criteria": [
+        "REPO_ROOT contents are installed into actual repository-root paths, not committed as an archive.",
+        "autopilot doctor passes and controller tests pass.",
+        "The bootstrap PR changes no Hive Mind product runtime behavior.",
+        "A completion receipt binds the installed plan fingerprint and exact commit."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/boot-000",
+      "category": "bootstrap",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [],
+      "downstream_unlock_value": 100,
+      "effort": "medium",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        ".autopilot/**",
+        ".github/workflows/autopilot-control-room.yml",
+        "docs/execution/**",
+        "USER_GUIDE/**",
+        "ORIGINAL_PLAN.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "BOOT-000",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Install the repository-resident implementation control plane at its real root paths and prove it deterministically.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "No product implementation should begin until the operator no longer has to manually remember branches, dependencies, locks, receipts, or model routes.",
+      "read_scope": [
+        "AGENTS.md",
+        "pyproject.toml",
+        ".github/workflows/ci.yml"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "autopilot-doctor",
+        "autopilot-controller-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "moderate",
+      "roles": [
+        "orchestrator",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Sonnet 5",
+          "reasoning_effort": "medium"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Terra",
+          "reasoning_effort": "medium"
+        },
+        "rationale": "Installation is mechanical but spans Git, CI, schemas, and repository-root placement.",
+        "tier": "T2"
+      },
+      "semantic_locks": [
+        "implementation-control-plane"
+      ],
+      "stopping_condition": "Open a draft bootstrap PR containing the installed control plane and passing deterministic tests; do not merge it automatically.",
+      "write_scope": [
+        ".autopilot/**",
+        ".github/workflows/autopilot-control-room.yml",
+        "docs/execution/**",
+        "USER_GUIDE/**",
+        "ORIGINAL_PLAN.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Exact target SHA and ancestry are recorded.",
+        "Open PR #114 and stale codex branches receive explicit dispositions.",
+        "No node is marked complete from names or prose alone.",
+        "Changed planned surfaces and absorbed work are mapped to nodes."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/recon-010",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 95,
+      "dependencies": [
+        "BOOT-000"
+      ],
+      "downstream_unlock_value": 90,
+      "effort": "medium",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "docs/execution/LIVE_REPOSITORY_RECONCILIATION.md",
+        "evidence/autopilot/recon-010/**"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "RECON-010",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Reconstruct and reconcile current main, open/closed PRs, remote branches, CI, and plan-impacting unplanned work.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The dispatcher must not launch stale work from documents or branch names.",
+      "read_scope": [
+        "**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "live-state-reconciliation-test"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "moderate",
+      "roles": [
+        "orchestrator",
+        "explorer",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Sonnet 5",
+          "reasoning_effort": "medium"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Terra",
+          "reasoning_effort": "medium"
+        },
+        "rationale": "Requires repository/GitHub synthesis but no product design.",
+        "tier": "T2"
+      },
+      "semantic_locks": [
+        "live-repository-reconciliation"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "docs/execution/LIVE_REPOSITORY_RECONCILIATION.md",
+        "evidence/autopilot/recon-010/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every public CLI route is traced to its actual runtime and side-effect path.",
+        "All eight roles are classified as contract-only, model-backed, tool-backed, effect-backed, and/or fixture-only.",
+        "Full deterministic baseline and focused role tests are retained without normalizing failures away.",
+        "Codex subscription transport is tested or explicitly blocked with evidence."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/base-020",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 95,
+      "dependencies": [
+        "BOOT-000"
+      ],
+      "downstream_unlock_value": 95,
+      "effort": "medium",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "docs/execution/AUTONOMY_BASELINE.md",
+        "docs/execution/ROLE_WIRING_AUDIT.md",
+        "evidence/autopilot/base-020/**"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "BASE-020",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Capture an exact clean baseline of tests, call paths, role wiring, provider availability, and current runtime claims.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The architecture migration must distinguish existing capability from names, fixtures, and stale plans.",
+      "read_scope": [
+        "src/**",
+        "tests/**",
+        "docs/**",
+        "README.md",
+        "AGENTS.md",
+        "pyproject.toml"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "full-unittest-baseline",
+        "role-wiring-focused-tests",
+        "provider-preflight"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "moderate",
+      "roles": [
+        "explorer",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Sonnet 5",
+          "reasoning_effort": "medium"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Terra",
+          "reasoning_effort": "medium"
+        },
+        "rationale": "Broad inspection and baseline characterization need moderate reasoning and careful evidence capture.",
+        "tier": "T2"
+      },
+      "semantic_locks": [
+        "autonomy-baseline"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "docs/execution/AUTONOMY_BASELINE.md",
+        "docs/execution/ROLE_WIRING_AUDIT.md",
+        "evidence/autopilot/base-020/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "brain_kernel is designated the sole authority-bearing event spine for new missions.",
+        "Model cognition, deterministic control, effects, verification, learning, and delivery boundaries are explicit.",
+        "RepositoryMission, MissionLoop, AutonomousBrain, and legacy workers have retain/adapt/migrate/retire dispositions.",
+        "The role-first consultation and anti-cheating rule from the owner subject is normative.",
+        "Migration has compatibility, rollback, and no-dual-write invariants."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/arch-100",
+      "category": "implementation",
+      "consultation_routes": [
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [
+        "RECON-010",
+        "BASE-020"
+      ],
+      "downstream_unlock_value": 100,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "docs/architecture/ADR-055-VERIFIABLE-HIVE-CORTEX.md",
+        "docs/execution/CANONICAL_RUNTIME_MIGRATION_MAP.md",
+        "evidence/autopilot/arch-100/**"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "ARCH-100",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Adopt one canonical Verifiable Hive Cortex architecture and a reversible migration from competing runtime brains.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "Current main has overlapping HiveKernel, RepositoryMission, MissionLoop, AutonomousBrain, scheduler, and brain_kernel paths; adding another brain would deepen the defect.",
+      "read_scope": [
+        "src/hive_mind_os/**",
+        "docs/architecture/**",
+        "docs/plan/**",
+        "README.md"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "architecture-contract-test",
+        "migration-map-consistency-test"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "architect",
+        "curator",
+        "integrator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "This is the canonical kernel and authority decision with the highest migration blast radius.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "canonical-runtime",
+        "authority-model",
+        "migration-strategy"
+      ],
+      "stopping_condition": "Open a draft architecture PR with independent Curator dissent/approval recorded; do not implement runtime code in this node.",
+      "write_scope": [
+        "docs/architecture/ADR-055-VERIFIABLE-HIVE-CORTEX.md",
+        "docs/execution/CANONICAL_RUNTIME_MIGRATION_MAP.md",
+        "evidence/autopilot/arch-100/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every contract is immutable, canonical, versioned, and fail-closed.",
+        "Consultation distinguishes role-resolvable questions from genuine human authority.",
+        "Effect intent and receipt bind authority, idempotency, target, parameters, result, and rollback.",
+        "Role result cannot itself cause an effect or approve itself.",
+        "Schema evolution and compatibility rules are executable."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/contract-110",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [
+        "ARCH-100"
+      ],
+      "downstream_unlock_value": 100,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/contracts.py",
+        "src/hive_mind_os/schemas/hive-cortex-*.schema.json",
+        "docs/execution/HIVE_CORTEX_CONTRACTS.md",
+        "tests/test_hive_cortex_contracts.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "CONTRACT-110",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Freeze the canonical mission, role invocation/result, consultation, effect intent/receipt, outcome, and promotion contracts.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "Stable typed interfaces unlock parallel implementation without silent semantic drift.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/contracts.py",
+        "src/hive_mind_os/schemas/**",
+        "docs/architecture/ADR-055-VERIFIABLE-HIVE-CORTEX.md"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "hive-cortex-contract-tests",
+        "schema-roundtrip-tests",
+        "compatibility-fixture-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "architect",
+        "curator",
+        "integrator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Shared canonical schemas are security- and concurrency-critical and unlock all parallel runtime work.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "canonical-contracts",
+        "event-schema"
+      ],
+      "stopping_condition": "Open a draft contract PR with all schemas and compatibility tests green; no downstream implementation node starts before this PR is merged.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/contracts.py",
+        "src/hive_mind_os/schemas/hive-cortex-*.schema.json",
+        "docs/execution/HIVE_CORTEX_CONTRACTS.md",
+        "tests/test_hive_cortex_contracts.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every role is reachable in a real mission and invokes its configured provider when cognition is required.",
+        "Role-specific prompts, required outputs, context, tool permissions, and identity are bound to each invocation.",
+        "No role directly writes, pushes, merges, deploys, promotes, or approves itself.",
+        "Same-model role passes are labeled procedural separation, not independent humans."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/role-200",
+      "category": "implementation",
+      "consultation_routes": [
+        "architect",
+        "curator",
+        "integrator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 95,
+      "dependencies": [
+        "CONTRACT-110"
+      ],
+      "downstream_unlock_value": 95,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/role_runtime.py",
+        "src/hive_mind_os/brain_kernel/roles.py",
+        "tests/test_hive_cortex_role_runtime.py",
+        "docs/execution/ROLE_RUNTIME.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "ROLE-200",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Implement a provider-backed RoleRuntime that executes all eight real roles through bounded prompts, tools, and typed results without direct side effects.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "All eight role names exist, but no canonical product runtime currently gives every role meaningful cognition and a reachable lifecycle position.",
+      "read_scope": [
+        "src/hive_mind_os/model_backend.py",
+        "src/hive_mind_os/model_provider.py",
+        "src/hive_mind_os/brain_kernel/**",
+        "src/hive_mind_os/roles.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "all-eight-role-runtime-tests",
+        "role-provider-routing-tests",
+        "role-capability-denial-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "orchestrator",
+        "architect",
+        "builder",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Cross-cutting model/runtime integration is difficult but bounded by the frozen contracts.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "role-runtime"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/role_runtime.py",
+        "src/hive_mind_os/brain_kernel/roles.py",
+        "tests/test_hive_cortex_role_runtime.py",
+        "docs/execution/ROLE_RUNTIME.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Typed consultation requests classify ambiguity, missing evidence, authority, unsafe effect, independence, cheating, and no-progress.",
+        "At least two applicable roles evaluate a question before human escalation.",
+        "Consultation can resolve, remand, replan, block for evidence, quarantine, or prove genuine authority need.",
+        "Consultation loops are bounded and preserved with dissent.",
+        "Roles cannot fabricate credentials, consent, owner preferences, legal approval, production authority, or external facts."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/consult-210",
+      "category": "implementation",
+      "consultation_routes": [
+        "curator",
+        "architect",
+        "steward",
+        "optimizer"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 98,
+      "dependencies": [
+        "CONTRACT-110"
+      ],
+      "downstream_unlock_value": 90,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/consultation.py",
+        "src/hive_mind_os/schemas/hive-cortex-consultation.schema.json",
+        "tests/test_hive_cortex_consultation.py",
+        "docs/execution/ROLE_CONSULTATION.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "CONSULT-210",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Implement role-first consultation and anti-cheating adjudication before any human escalation.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The owner requires roles to solve one another’s ambiguity and cheating concerns instead of reflexively asking a human.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/contracts.py",
+        "src/hive_mind_os/courtroom.py",
+        "src/hive_mind_os/roles.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "role-first-resolution-tests",
+        "anti-cheating-tests",
+        "fake-human-escalation-tests",
+        "consultation-loop-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "curator",
+        "architect",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "This is a core authority and anti-cheating boundary; mistakes could create fake autonomy or unsafe escalation.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "consultation-protocol",
+        "anti-cheating"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/consultation.py",
+        "src/hive_mind_os/schemas/hive-cortex-consultation.schema.json",
+        "tests/test_hive_cortex_consultation.py",
+        "docs/execution/ROLE_CONSULTATION.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Intent is committed before execution and result receipt is append-only.",
+        "Duplicate delivery returns the prior logical receipt or safely reconciles external state.",
+        "Crash between external effect and receipt is detectable and repairable.",
+        "Adapters cannot exceed the authority envelope or target scope.",
+        "No hidden network, credential, merge, deploy, or spending authority is introduced."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/effect-220",
+      "category": "implementation",
+      "consultation_routes": [
+        "curator",
+        "steward",
+        "integrator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 96,
+      "dependencies": [
+        "CONTRACT-110"
+      ],
+      "downstream_unlock_value": 92,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/effect_outbox.py",
+        "src/hive_mind_os/brain_kernel/effects.py",
+        "src/hive_mind_os/brain_kernel/store.py",
+        "tests/test_hive_cortex_effects.py",
+        "docs/execution/DURABLE_EFFECTS.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EFFECT-220",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Make effects durable through an outbox, capability authorization, idempotent adapters, receipts, and reconciliation.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The current in-memory authority/effect gateway cannot prove crash-safe exactly-once logical effects.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/effects.py",
+        "src/hive_mind_os/brain_kernel/authority.py",
+        "src/hive_mind_os/brain_kernel/store.py",
+        "src/hive_mind_os/git_adapter.py",
+        "src/hive_mind_os/github_adapter.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "effect-outbox-tests",
+        "idempotency-tests",
+        "crash-window-reconciliation-tests",
+        "authority-denial-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "architect",
+        "builder",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Durable effects and authority are canonical safety-critical kernel behavior.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "durable-effects",
+        "authority-gateway"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/effect_outbox.py",
+        "src/hive_mind_os/brain_kernel/effects.py",
+        "src/hive_mind_os/brain_kernel/store.py",
+        "tests/test_hive_cortex_effects.py",
+        "docs/execution/DURABLE_EFFECTS.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Context manifests bind source records, provenance, sensitivity, freshness, role, mission, work, and authority.",
+        "Curator receives evaluator-isolated context and no Builder scratchpad.",
+        "Future commits and protected holdouts remain unavailable until the appropriate seal.",
+        "Untrusted repository text remains data rather than instruction.",
+        "Memory expiry, correction, contradiction, and quarantine are append-only."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/context-230",
+      "category": "implementation",
+      "consultation_routes": [
+        "curator",
+        "steward",
+        "optimizer"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 88,
+      "dependencies": [
+        "CONTRACT-110"
+      ],
+      "downstream_unlock_value": 85,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/context.py",
+        "src/hive_mind_os/brain_kernel/memory.py",
+        "tests/test_hive_cortex_context.py",
+        "docs/execution/MEMORY_CONTEXT.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "CONTEXT-230",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Compile bounded, role-specific, provenance-aware memory contexts from immutable mission evidence.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Roles need durable shared knowledge without raw transcript leakage, future contamination, or unrestricted cross-role scratchpads.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/memory.py",
+        "src/hive_mind_os/brain_kernel/context.py",
+        "src/hive_mind_os/repository_learning.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "context-manifest-tests",
+        "future-leakage-tests",
+        "sensitivity-scope-tests",
+        "memory-poisoning-fixtures"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "explorer",
+        "architect",
+        "curator",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Memory/context is broad and security-sensitive but isolated behind existing kernel stores.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "memory-context"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/context.py",
+        "src/hive_mind_os/brain_kernel/memory.py",
+        "tests/test_hive_cortex_context.py",
+        "docs/execution/MEMORY_CONTEXT.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Harness contains hidden-defect, misleading-README, no-test, monorepo, Python, Node, and C# fixtures.",
+        "Tests fail against missing role wiring, fake consultation, self-approval, and future leakage.",
+        "Humanless scenarios distinguish genuine authority blockers from software defects.",
+        "Receipts prove exact candidate and role/effect sequence."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/accept-240",
+      "category": "implementation",
+      "consultation_routes": [
+        "curator",
+        "steward",
+        "optimizer"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [
+        "CONTRACT-110"
+      ],
+      "downstream_unlock_value": 90,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "tests/hive_cortex/**",
+        "tests/fixtures/hive_cortex/**",
+        "docs/execution/AUTONOMY_ACCEPTANCE.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "ACCEPT-240",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Create the adversarial acceptance harness for all-role, humanless, no-cheating, learning, self-healing, and repository-safety proof.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Implementation must be driven by executable evidence rather than claims or role labels.",
+      "read_scope": [
+        "tests/**",
+        "src/hive_mind_os/schemas/**",
+        "docs/execution/AUTONOMY_ACCEPTANCE.md"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "acceptance-harness-self-tests",
+        "negative-control-tests",
+        "cross-language-fixture-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "curator",
+        "steward",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "A broad adversarial harness requires substantial test design but can remain independent of runtime implementation.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "autonomy-acceptance-harness"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "tests/hive_cortex/**",
+        "tests/fixtures/hive_cortex/**",
+        "docs/execution/AUTONOMY_ACCEPTANCE.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Mission desired state and observed state are deterministic projections.",
+        "Stale leases, orphaned intents, missing workspaces, provider failure, and interrupted verification have bounded repairs.",
+        "Repeated no-progress reaches quarantine rather than infinite looping.",
+        "Recovery never rewrites history or widens authority."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/reconcile-250",
+      "category": "implementation",
+      "consultation_routes": [
+        "curator",
+        "steward",
+        "architect"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 94,
+      "dependencies": [
+        "CONTRACT-110"
+      ],
+      "downstream_unlock_value": 88,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/reconciler.py",
+        "src/hive_mind_os/brain_kernel/workers.py",
+        "tests/test_hive_cortex_reconciler.py",
+        "docs/execution/DESIRED_STATE_RECONCILIATION.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "RECONCILE-250",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Implement a deterministic desired-state reconciler for mission recovery, retries, remands, rollback, and quarantine.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "A self-operating OS must notice divergence and restore safe progress without a human restating context.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/projection.py",
+        "src/hive_mind_os/brain_kernel/workers.py",
+        "src/hive_mind_os/scheduler.py",
+        "src/hive_mind_os/mission_store.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "reconciler-transition-tests",
+        "stale-lease-tests",
+        "crash-recovery-tests",
+        "no-progress-quarantine-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "orchestrator",
+        "steward",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Recovery spans scheduling and event projections, but contracts isolate the work.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "desired-state-reconciler"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/reconciler.py",
+        "src/hive_mind_os/brain_kernel/workers.py",
+        "tests/test_hive_cortex_reconciler.py",
+        "docs/execution/DESIRED_STATE_RECONCILIATION.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Each legacy entry point has a typed adapter or explicit retirement blocker.",
+        "Parity probes compare behavior and evidence without dual authoritative writes.",
+        "Rollback can route back to the prior path until canonical qualification.",
+        "No old path is declared retired before accepted parity evidence."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/migrate-260",
+      "category": "implementation",
+      "consultation_routes": [
+        "integrator",
+        "curator",
+        "steward"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 85,
+      "dependencies": [
+        "CONTRACT-110"
+      ],
+      "downstream_unlock_value": 82,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/cortex/compatibility/**",
+        "tests/test_hive_cortex_compatibility.py",
+        "docs/execution/RUNTIME_COMPATIBILITY.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "MIGRATE-260",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Build additive compatibility adapters and parity probes for RepositoryMission, MissionLoop, AutonomousBrain, and legacy workers.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The winning architecture requires convergence, not a flag-day rewrite or permanent duplicate brains.",
+      "read_scope": [
+        "src/hive_mind_os/mission.py",
+        "src/hive_mind_os/mission_loop.py",
+        "src/hive_mind_os/autonomous_os.py",
+        "src/hive_mind_os/workers.py",
+        "src/hive_mind_os/brain_kernel/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "compatibility-adapter-tests",
+        "no-dual-write-tests",
+        "rollback-routing-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "architect",
+        "integrator",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Multi-runtime compatibility is broad and conflict-prone but separable from canonical implementation.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "legacy-runtime-adapters"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/cortex/compatibility/**",
+        "tests/test_hive_cortex_compatibility.py",
+        "docs/execution/RUNTIME_COMPATIBILITY.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Planner emits acyclic work with explicit dependencies, scopes, budgets, and stop conditions.",
+        "Replanning is append-only and reasoned.",
+        "Consultations and human gates are scheduled rather than improvised."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/orch-300",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 88,
+      "dependencies": [
+        "ROLE-200",
+        "CONSULT-210",
+        "RECONCILE-250"
+      ],
+      "downstream_unlock_value": 80,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/planner.py",
+        "tests/test_hive_cortex_orchestrator.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "ORCH-300",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Make Orchestrator build and continuously revise a dependency DAG with budgets, risk lanes, stop conditions, and consultation scheduling.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The current fixed serial lifecycle cannot exploit safe parallelism or replan from evidence.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/objectives.py",
+        "src/hive_mind_os/brain_kernel/planner.py",
+        "src/hive_mind_os/brain_kernel/reconciler.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "orchestrator-dag-tests",
+        "replan-tests",
+        "budget-stop-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "orchestrator",
+        "architect",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Dynamic planning and recovery are difficult but isolated behind canonical contracts.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "orchestrator-planner"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/planner.py",
+        "tests/test_hive_cortex_orchestrator.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Explorer can inspect repository/history and run approved read-only commands through receipts.",
+        "External source intake retains provenance/license/completeness.",
+        "Prompt injection in repository text is treated as data.",
+        "Explorer cannot write or approve."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/explorer-310",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 75,
+      "dependencies": [
+        "ROLE-200",
+        "CONTEXT-230",
+        "EFFECT-220"
+      ],
+      "downstream_unlock_value": 65,
+      "effort": "medium",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/explorer.py",
+        "tests/test_hive_cortex_explorer.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXPLORER-310",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Give Explorer real read-only repository, history, test-discovery, and governed source-intake capabilities.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Explorer must replace guesses with evidence while remaining unable to mutate candidates.",
+      "read_scope": [
+        "src/hive_mind_os/mission_loop.py",
+        "src/hive_mind_os/ingestion.py",
+        "src/hive_mind_os/governed_sources.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "explorer-readonly-tests",
+        "source-provenance-tests",
+        "prompt-injection-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "moderate",
+      "roles": [
+        "explorer",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Sonnet 5",
+          "reasoning_effort": "medium"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Terra",
+          "reasoning_effort": "medium"
+        },
+        "rationale": "Capabilities are well bounded and mostly adapt existing code.",
+        "tier": "T2"
+      },
+      "semantic_locks": [
+        "explorer-role"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/explorer.py",
+        "tests/test_hive_cortex_explorer.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "At least two options and explicit tradeoffs are required.",
+        "Every sealed criterion maps to design and verification.",
+        "Threats, data classification, compatibility, migration, and rollback are mandatory."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/architect-320",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 72,
+      "dependencies": [
+        "ROLE-200",
+        "CONTEXT-230"
+      ],
+      "downstream_unlock_value": 62,
+      "effort": "medium",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/architect.py",
+        "tests/test_hive_cortex_architect.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "ARCHITECT-320",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Make Architect compare alternatives and produce threat, interface, migration, rollback, and acceptance mappings.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Architecture output must be operational evidence rather than a generic role summary.",
+      "read_scope": [
+        "src/hive_mind_os/mission_loop.py",
+        "src/hive_mind_os/roles.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "architect-output-tests",
+        "acceptance-mapping-tests",
+        "threat-model-negative-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "moderate",
+      "roles": [
+        "architect",
+        "curator",
+        "integrator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Sonnet 5",
+          "reasoning_effort": "medium"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Terra",
+          "reasoning_effort": "medium"
+        },
+        "rationale": "Structured design behavior is moderate and bounded by frozen schemas.",
+        "tier": "T2"
+      },
+      "semantic_locks": [
+        "architect-role"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/architect.py",
+        "tests/test_hive_cortex_architect.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Builder actions are typed, scoped, idempotent, and receipt-backed.",
+        "Builder can iterate after failed tests within budgets.",
+        "Sealed tests, undeclared paths, protected branches, direct push/merge/deploy, and dependency changes without grants are denied."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/builder-330",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 92,
+      "dependencies": [
+        "ROLE-200",
+        "EFFECT-220",
+        "CONTEXT-230"
+      ],
+      "downstream_unlock_value": 78,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/builder.py",
+        "src/hive_mind_os/cortex/repository/builder_adapter.py",
+        "tests/test_hive_cortex_builder.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "BUILDER-330",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Make Builder iteratively request isolated writes, commands, branches, and commits through the durable effect path.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Builder must solve defects end-to-end without receiving direct authority or editing sealed acceptance.",
+      "read_scope": [
+        "src/hive_mind_os/mission.py",
+        "src/hive_mind_os/mission_loop.py",
+        "src/hive_mind_os/git_adapter.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "builder-action-tests",
+        "sealed-acceptance-denial-tests",
+        "iterative-repair-tests",
+        "isolation-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "builder",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Repository mutation and iterative repair have high blast radius and adversarial requirements.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "builder-role"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/builder.py",
+        "src/hive_mind_os/cortex/repository/builder_adapter.py",
+        "tests/test_hive_cortex_builder.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Acceptance seals before candidate access.",
+        "Fresh isolated verification binds commit and tree.",
+        "Curator cannot write candidate or reuse Builder scratchpad.",
+        "Verdicts support adopt, reject, remand, quarantine, and blocked evidence."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/curator-340",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 98,
+      "dependencies": [
+        "ROLE-200",
+        "ACCEPT-240",
+        "CONTEXT-230"
+      ],
+      "downstream_unlock_value": 85,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/curator_runtime.py",
+        "tests/test_hive_cortex_curator.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "CURATOR-340",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Make Curator independently reconstruct and verify exact immutable candidates, remanding defects without Builder context leakage.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The system cannot claim autonomy or learning without a real independent verification boundary.",
+      "read_scope": [
+        "src/hive_mind_os/curator.py",
+        "src/hive_mind_os/verify.py",
+        "src/hive_mind_os/brain_kernel/verification.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "exact-candidate-curator-tests",
+        "blind-context-tests",
+        "test-weakening-tests",
+        "remand-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Independent verification is a critical trust and anti-cheating boundary.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "curator-role",
+        "verification-boundary"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/curator_runtime.py",
+        "tests/test_hive_cortex_curator.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Integrator runs contract and compatibility tests.",
+        "Breaking changes and lineage gaps are explicit.",
+        "Integrator cannot write or conceal incompatibility.",
+        "Repairs become new Builder work items."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/integrator-350",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 82,
+      "dependencies": [
+        "ROLE-200",
+        "EFFECT-220",
+        "MIGRATE-260"
+      ],
+      "downstream_unlock_value": 72,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/integrator.py",
+        "tests/test_hive_cortex_integrator.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "INTEGRATOR-350",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Make Integrator validate versioned contracts, data lineage, adapters, and cross-runtime compatibility, requesting Builder repairs rather than patching.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Integration is currently a role label or fixture, not a real lifecycle gate.",
+      "read_scope": [
+        "src/hive_mind_os/github_adapter.py",
+        "src/hive_mind_os/cortex/**",
+        "src/hive_mind_os/schemas/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "integration-contract-tests",
+        "lineage-tests",
+        "breaking-change-remand-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "integrator",
+        "curator",
+        "builder"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Cross-runtime compatibility and lineage need difficult reasoning.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "integrator-role"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/integrator.py",
+        "tests/test_hive_cortex_integrator.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Health checks cover queues, leases, event chains, snapshots, workspaces, receipts, and provider availability.",
+        "Repair proposals are bounded and reversible.",
+        "Evidence corruption or recovery gaps fail closed."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/steward-360",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 86,
+      "dependencies": [
+        "ROLE-200",
+        "RECONCILE-250",
+        "EFFECT-220"
+      ],
+      "downstream_unlock_value": 70,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/steward.py",
+        "tests/test_hive_cortex_steward.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "STEWARD-360",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Make Steward continuously assess operational health, recovery, dependencies, observability, and evidence integrity.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Self-healing requires an operational role that can detect and propose repairs without trading away recoverability.",
+      "read_scope": [
+        "src/hive_mind_os/scheduler.py",
+        "src/hive_mind_os/mission_store.py",
+        "src/hive_mind_os/brain_kernel/store.py",
+        "src/hive_mind_os/current_state_audit.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "steward-health-tests",
+        "recovery-proof-tests",
+        "evidence-integrity-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "steward",
+        "curator",
+        "orchestrator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Operational correctness spans durable state and failure handling.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "steward-role"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/steward.py",
+        "tests/test_hive_cortex_steward.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Lessons bind evidence, context, outcome, error class, applicability, confidence, expiry, and provenance.",
+        "Challengers never mutate champions in place.",
+        "Optimizer cannot evaluate or promote its own candidate."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/optimizer-370",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 84,
+      "dependencies": [
+        "ROLE-200",
+        "CONTEXT-230",
+        "ACCEPT-240"
+      ],
+      "downstream_unlock_value": 70,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/optimizer.py",
+        "tests/test_hive_cortex_optimizer.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "OPTIMIZER-370",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Make Optimizer attribute outcomes, generate scoped lessons and challengers, and recommend—but never perform—promotion.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Current learning gates exist, but automatic challenger generation and outcome-linked role learning are incomplete.",
+      "read_scope": [
+        "src/hive_mind_os/learning.py",
+        "src/hive_mind_os/recursive_improvement.py",
+        "src/hive_mind_os/prompt_registry.py",
+        "src/hive_mind_os/experiment_runner.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "optimizer-lesson-tests",
+        "challenger-proposal-tests",
+        "self-promotion-denial-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "optimizer",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Outcome attribution and safe learning are difficult but can reuse existing gates.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "optimizer-role"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/optimizer.py",
+        "tests/test_hive_cortex_optimizer.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Advocate and cross-examiner receive distinct tasks and identities.",
+        "Judge cannot be the affected generator/builder/evaluator.",
+        "Dissent and rejected claims remain append-only.",
+        "Consensus without evidence cannot approve cheating or superiority claims."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/court-380",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [
+        "ROLE-200",
+        "CONSULT-210",
+        "ACCEPT-240"
+      ],
+      "downstream_unlock_value": 72,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/court_runtime.py",
+        "tests/test_hive_cortex_court.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "COURT-380",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Operationalize temporary Advocate, Cross-Examiner, Expert, Judge, and Appeals identities over role results and consultations.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Cheating concerns and material claims need structured challenge, not friendly consensus theater.",
+      "read_scope": [
+        "src/hive_mind_os/courtroom.py",
+        "src/hive_mind_os/brain_kernel/consultation.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "court-identity-separation-tests",
+        "dissent-retention-tests",
+        "friendly-reviewer-attack-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "curator",
+        "architect",
+        "orchestrator",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "This is an independence, anti-cheating, and promotion authority boundary.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "courtroom-runtime",
+        "anti-cheating"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/court_runtime.py",
+        "tests/test_hive_cortex_court.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "A single objective executes all applicable roles with real typed outputs and receipts.",
+        "Role-first consultation resolves role-resolvable ambiguity before human escalation.",
+        "Effects, verification, remand, integration, operations, and optimization are event-derived.",
+        "Routine reversible repository work completes without discretionary human answers.",
+        "No role or model self-approves, fabricates authority, or bypasses exact-candidate verification."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/mission-400",
+      "category": "integration",
+      "consultation_routes": [
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [
+        "ORCH-300",
+        "EXPLORER-310",
+        "ARCHITECT-320",
+        "BUILDER-330",
+        "CURATOR-340",
+        "INTEGRATOR-350",
+        "STEWARD-360",
+        "OPTIMIZER-370",
+        "COURT-380",
+        "EFFECT-220",
+        "CONTEXT-230",
+        "RECONCILE-250"
+      ],
+      "downstream_unlock_value": 100,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/mission_runtime.py",
+        "src/hive_mind_os/cortex/repository/mission_adapter.py",
+        "tests/test_hive_cortex_mission_runtime.py",
+        "docs/execution/CANONICAL_MISSION_RUNTIME.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "MISSION-400",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Wire one canonical end-to-end mission runner through all eight roles, consultation, durable effects, exact verification, and acceptance.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "The product becomes a self-operating OS only when one real call path owns the complete lifecycle.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/**",
+        "src/hive_mind_os/cortex/**",
+        "src/hive_mind_os/model_backend.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "canonical-eight-role-e2e-tests",
+        "humanless-repair-tests",
+        "mission-replay-tests",
+        "authority-boundary-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "explorer",
+        "architect",
+        "builder",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "This integrates every canonical runtime boundary and is the core product critical path.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "canonical-mission-runtime",
+        "event-schema",
+        "authority-model"
+      ],
+      "stopping_condition": "Open a draft integration PR with the complete eight-role local mission suite green; do not route public CLI traffic yet.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/mission_runtime.py",
+        "src/hive_mind_os/cortex/repository/mission_adapter.py",
+        "tests/test_hive_cortex_mission_runtime.py",
+        "docs/execution/CANONICAL_MISSION_RUNTIME.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every injected crash resumes from append-only state.",
+        "No accepted effect or role result is duplicated.",
+        "Stale leases and corrupt snapshots are recovered or quarantined."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/durable-410",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 92,
+      "dependencies": [
+        "MISSION-400"
+      ],
+      "downstream_unlock_value": 80,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "tests/test_hive_cortex_durability.py",
+        "docs/execution/DURABILITY_QUALIFICATION.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "DURABLE-410",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Prove restart, resume, lease, crash consistency, and event replay for the canonical mission runtime.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Autonomy must survive process loss without a human restating context or duplicating effects.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/**",
+        "src/hive_mind_os/scheduler.py",
+        "src/hive_mind_os/mission_store.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "crash-matrix-tests",
+        "lease-recovery-tests",
+        "snapshot-corruption-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "steward",
+        "curator",
+        "orchestrator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Failure injection across durable state is difficult and safety-critical.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "durability-qualification"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "tests/test_hive_cortex_durability.py",
+        "docs/execution/DURABILITY_QUALIFICATION.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Remote actions require immutable explicit grants.",
+        "Only the run branch can be pushed, never force.",
+        "Draft PR/comments are idempotent and receipt-backed.",
+        "No merge API is reachable from routine missions."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/delivery-420",
+      "category": "integration",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 80,
+      "dependencies": [
+        "MISSION-400",
+        "EFFECT-220"
+      ],
+      "downstream_unlock_value": 65,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/cortex/github/**",
+        "tests/test_hive_cortex_delivery.py",
+        "docs/execution/CONTROLLED_DELIVERY.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "DELIVERY-420",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Connect controlled non-protected push, draft PR, and comment adapters to the canonical effect path without adding merge authority.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The existing AutonomousBrain delivery boundary must become an adapter rather than a separate brain.",
+      "read_scope": [
+        "src/hive_mind_os/autonomous_os.py",
+        "src/hive_mind_os/github_adapter.py",
+        "src/hive_mind_os/brain_kernel/effects.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "delivery-adapter-tests",
+        "protected-branch-denial-tests",
+        "duplicate-pr-comment-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "integrator",
+        "builder",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Authenticated remote side effects and branch safety have high blast radius.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "github-delivery-adapter"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/cortex/github/**",
+        "tests/test_hive_cortex_delivery.py",
+        "docs/execution/CONTROLLED_DELIVERY.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "All role-resolvable questions are answered by role consultation or deterministic evidence.",
+        "Software defects create repair work, not human questions.",
+        "Only genuine authority classes produce human escalation packets.",
+        "The mission resumes after interruption without restating context."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/humanless-430",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 95,
+      "dependencies": [
+        "MISSION-400",
+        "CONSULT-210",
+        "ACCEPT-240"
+      ],
+      "downstream_unlock_value": 85,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "tests/hive_cortex/test_humanless_operation.py",
+        "evidence/autonomy/humanless/**",
+        "docs/execution/HUMANLESS_OPERATION_RESULTS.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "HUMANLESS-430",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Prove role-first end-to-end resolution across ambiguity, missing tests, design tradeoffs, CI repair, and recoverable failures.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The first owner prompt requires no avoidable human interaction.",
+      "read_scope": [
+        "tests/hive_cortex/**",
+        "src/hive_mind_os/brain_kernel/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "humanless-operation-suite",
+        "genuine-authority-classification-suite",
+        "software-defect-not-human-suite"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "explorer",
+        "architect",
+        "builder",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "This is the owner’s primary product acceptance and spans the full runtime.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "humanless-qualification"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "tests/hive_cortex/test_humanless_operation.py",
+        "evidence/autonomy/humanless/**",
+        "docs/execution/HUMANLESS_OPERATION_RESULTS.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every defined cheating class has a negative fixture.",
+        "Suspected cheating triggers a role council before continuation.",
+        "Confirmed cheating quarantines; disproved cheating cites retained evidence.",
+        "Same-model role labels are never presented as independent humans."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/cheat-440",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 95,
+      "dependencies": [
+        "MISSION-400",
+        "CONSULT-210",
+        "ACCEPT-240",
+        "CURATOR-340",
+        "COURT-380"
+      ],
+      "downstream_unlock_value": 82,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "tests/hive_cortex/test_no_cheating.py",
+        "evidence/autonomy/no-cheating/**",
+        "docs/execution/NO_CHEATING_RESULTS.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "CHEAT-440",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Prove cheating detection and independent challenge against test weakening, evaluator leakage, future access, stale evidence, fake receipts, authority expansion, and friendly consultation.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The owner explicitly requires cross-role confirmation whenever the system suspects it is cheating.",
+      "read_scope": [
+        "tests/hive_cortex/**",
+        "src/hive_mind_os/brain_kernel/**",
+        "src/hive_mind_os/verify.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "no-cheating-suite",
+        "evaluator-leakage-suite",
+        "authority-expansion-suite",
+        "friendly-consultation-suite"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "curator",
+        "architect",
+        "steward",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Anti-cheating and independence are critical trust boundaries.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "no-cheating-qualification"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "tests/hive_cortex/test_no_cheating.py",
+        "evidence/autonomy/no-cheating/**",
+        "docs/execution/NO_CHEATING_RESULTS.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every recoverable failure maps to a deterministic repair or bounded role remand.",
+        "Provider failover preserves contract and receipt identity.",
+        "Rollback is automatic only inside existing authority.",
+        "Repeated semantic no-progress quarantines."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/selfheal-450",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [
+        "DURABLE-410",
+        "STEWARD-360",
+        "RECONCILE-250",
+        "EFFECT-220"
+      ],
+      "downstream_unlock_value": 78,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/self_healing.py",
+        "tests/test_hive_cortex_self_healing.py",
+        "docs/execution/SELF_HEALING.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "SELFHEAL-450",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Integrate provider failover, bounded retry, remand, rollback, workspace rebuild, stale lease repair, and quarantine into mission reconciliation.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "A self-operating OS must solve its own recoverable operational problems end-to-end.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/**",
+        "src/hive_mind_os/model_provider.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "self-healing-fault-matrix",
+        "provider-failover-tests",
+        "rollback-tests",
+        "quarantine-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "steward",
+        "orchestrator",
+        "curator",
+        "builder"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Failure recovery across cognition, effects, and verification is broad and safety-critical.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "self-healing-runtime"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/self_healing.py",
+        "tests/test_hive_cortex_self_healing.py",
+        "docs/execution/SELF_HEALING.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "New missions default to canonical runtime.",
+        "Legacy routes remain explicit rollback modes during qualification.",
+        "No request is executed by two authoritative stores.",
+        "Status and receipts identify the actual runtime."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/migration-460",
+      "category": "integration",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 94,
+      "dependencies": [
+        "MISSION-400",
+        "MIGRATE-260",
+        "DURABLE-410"
+      ],
+      "downstream_unlock_value": 85,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/cli.py",
+        "src/hive_mind_os/workers.py",
+        "src/hive_mind_os/repository_compatibility.py",
+        "tests/test_hive_cortex_cli_migration.py",
+        "docs/execution/CLI_MIGRATION.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "MIGRATION-460",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Route public CLI and scheduler ingress to the canonical mission runtime behind compatibility switches.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "The architecture is not real until user-facing paths stop selecting independent brains.",
+      "read_scope": [
+        "src/hive_mind_os/cli.py",
+        "src/hive_mind_os/workers.py",
+        "src/hive_mind_os/repository_compatibility.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "cli-routing-tests",
+        "no-dual-authority-tests",
+        "legacy-rollback-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "integrator",
+        "architect",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Changing public ingress and runtime ownership is a high-risk migration.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "public-cli-routing",
+        "canonical-runtime"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/cli.py",
+        "src/hive_mind_os/workers.py",
+        "src/hive_mind_os/repository_compatibility.py",
+        "tests/test_hive_cortex_cli_migration.py",
+        "docs/execution/CLI_MIGRATION.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Lessons bind source episode, outcome, error class, applicability, confidence, provenance, and expiry.",
+        "Counterexamples and dissent are retained.",
+        "No lesson mutates policy, prompt, or champion directly."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/learn-500",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 82,
+      "dependencies": [
+        "MISSION-400",
+        "OPTIMIZER-370",
+        "CONTEXT-230"
+      ],
+      "downstream_unlock_value": 78,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/learning_runtime.py",
+        "tests/test_hive_cortex_learning.py",
+        "docs/execution/LEARNING_RUNTIME.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "LEARN-500",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Generate scoped, evidence-bound lessons from outcomes, incidents, remands, repairs, and human corrections.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Learning must improve future behavior without turning anecdotes or raw transcripts into policy.",
+      "read_scope": [
+        "src/hive_mind_os/learning.py",
+        "src/hive_mind_os/repository_learning.py",
+        "src/hive_mind_os/pit_oracle.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "lesson-generation-tests",
+        "outcome-attribution-tests",
+        "counterexample-retention-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "optimizer",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Learning attribution is difficult but bounded by existing PIT and memory contracts.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "learning-runtime"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/learning_runtime.py",
+        "tests/test_hive_cortex_learning.py",
+        "docs/execution/LEARNING_RUNTIME.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every challenger has a champion parent, hypothesis, changed scope, rollback, and provenance.",
+        "Live champions are immutable.",
+        "Forbidden self-modification classes are rejected."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/challenger-510",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 76,
+      "dependencies": [
+        "LEARN-500"
+      ],
+      "downstream_unlock_value": 72,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/challengers.py",
+        "tests/test_hive_cortex_challengers.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "CHALLENGER-510",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Generate immutable prompt, planner, policy-rule, retrieval, or tool-selection challengers from accepted lessons.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Current main can evaluate supplied prompt challengers but does not autonomously generate them.",
+      "read_scope": [
+        "src/hive_mind_os/prompt_registry.py",
+        "src/hive_mind_os/recursive_improvement.py",
+        "src/hive_mind_os/experiment_runner.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "challenger-generation-tests",
+        "champion-immutability-tests",
+        "scope-denial-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "optimizer",
+        "architect",
+        "curator"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Challenger generation is novel and requires safe scoping.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "challenger-generation"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/challengers.py",
+        "tests/test_hive_cortex_challengers.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Evaluator is distinct from proposer and builder.",
+        "Holdout remains hidden until prediction/plan seal.",
+        "Repeated measurements, noise floor, hard guardrails, and losing evidence are retained.",
+        "Missing artifacts quarantine rather than retest optimistically."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/eval-520",
+      "category": "implementation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 88,
+      "dependencies": [
+        "CHALLENGER-510",
+        "CURATOR-340",
+        "ACCEPT-240"
+      ],
+      "downstream_unlock_value": 78,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/evaluation_runtime.py",
+        "tests/test_hive_cortex_evaluation.py",
+        "evidence/experiments/hive-cortex/**"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EVAL-520",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Evaluate challengers on held-out, PIT, adversarial, and comparator surfaces with independent evaluators.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "A self-learning OS needs measured generalization rather than same-run self-congratulation.",
+      "read_scope": [
+        "src/hive_mind_os/experiment_runner.py",
+        "src/hive_mind_os/pit_oracle.py",
+        "src/hive_mind_os/benchmark_harness.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "held-out-evaluation-tests",
+        "pit-leakage-tests",
+        "noise-floor-tests",
+        "missing-artifact-quarantine-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "curator",
+        "optimizer",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Independent evaluation and holdout integrity are promotion-critical.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "challenger-evaluation",
+        "holdout-boundary"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/evaluation_runtime.py",
+        "tests/test_hive_cortex_evaluation.py",
+        "evidence/experiments/hive-cortex/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "KEEP/RETEST/DISCARD/QUARANTINE/STOP decisions are append-only and candidate-bound.",
+        "Proposer, builder, evaluator, and judge separation is enforced.",
+        "Only KEEP can move an atomic pointer.",
+        "Rollback restores retained prior champion and records a receipt."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/promote-530",
+      "category": "promotion",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [
+        "EVAL-520",
+        "COURT-380",
+        "EFFECT-220"
+      ],
+      "downstream_unlock_value": 75,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/brain_kernel/promotion.py",
+        "tests/test_hive_cortex_promotion.py",
+        "docs/execution/PROMOTION_AUTHORITY.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "PROMOTE-530",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Authorize atomic champion promotion or rollback only through an independent append-only court decision.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "Current promotion components intentionally remain blocked against unauthenticated or self-issued decisions.",
+      "read_scope": [
+        "src/hive_mind_os/prompt_registry.py",
+        "src/hive_mind_os/recursive_improvement.py",
+        "src/hive_mind_os/courtroom.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "promotion-authority-tests",
+        "self-promotion-attack-tests",
+        "atomic-pointer-failure-tests",
+        "rollback-promotion-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "curator",
+        "optimizer",
+        "orchestrator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Promotion changes future system behavior and is a critical authority boundary.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "promotion-authority",
+        "champion-pointer"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/promotion.py",
+        "tests/test_hive_cortex_promotion.py",
+        "docs/execution/PROMOTION_AUTHORITY.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Poisoned/stale/unproven lessons are rejected or quarantined.",
+        "Contradictions reduce confidence rather than silently overwrite history.",
+        "Expiry and scope prevent broad reuse."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/poison-540",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 75,
+      "dependencies": [
+        "LEARN-500",
+        "CHEAT-440"
+      ],
+      "downstream_unlock_value": 60,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "tests/hive_cortex/test_learning_poisoning.py",
+        "docs/execution/LEARNING_POISONING_RESULTS.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "POISON-540",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "low",
+      "objective": "Test and harden memory, lesson, and challenger paths against poisoning, stale evidence, provenance gaps, and overgeneralization.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Self-learning systems can amplify false lessons unless forgetting and quarantine are explicit.",
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/memory.py",
+        "src/hive_mind_os/brain_kernel/learning_runtime.py",
+        "tests/hive_cortex/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "memory-poisoning-suite",
+        "stale-evidence-suite",
+        "overgeneralization-suite"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "curator",
+        "optimizer",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Adversarial learning tests are difficult but isolated.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "learning-poisoning-qualification"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "tests/hive_cortex/test_learning_poisoning.py",
+        "docs/execution/LEARNING_POISONING_RESULTS.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Benchmark covers correctness, human interventions, role coverage, recovery, evidence completeness, cost, and latency.",
+        "Comparators are pinned and licensed or marked unavailable.",
+        "No superiority claim is made without reproducible receipts."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/bench-600",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 70,
+      "dependencies": [
+        "HUMANLESS-430",
+        "CHEAT-440",
+        "SELFHEAL-450",
+        "EVAL-520"
+      ],
+      "downstream_unlock_value": 65,
+      "effort": "large",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "benchmarks/hive-cortex/**",
+        "docs/benchmarks/HIVE_CORTEX_RESULTS.md",
+        "tests/test_hive_cortex_benchmark.py"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "BENCH-600",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "medium",
+      "objective": "Create a reproducible multi-scenario autonomy benchmark and comparator court without unsupported superiority claims.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The architecture must be measured against strong baselines while retaining all losing evidence.",
+      "read_scope": [
+        "benchmarks/**",
+        "src/hive_mind_os/benchmark_harness.py",
+        "tests/fixtures/hive_cortex/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "benchmark-harness-tests",
+        "comparator-provenance-tests",
+        "superiority-claim-guard-tests"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "high",
+      "roles": [
+        "optimizer",
+        "curator",
+        "explorer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "high"
+        },
+        "openai": {
+          "availability": "verified-current",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "high"
+        },
+        "rationale": "Benchmark design is broad and evidence-heavy but does not change runtime authority.",
+        "tier": "T3"
+      },
+      "semantic_locks": [
+        "autonomy-benchmark"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "benchmarks/hive-cortex/**",
+        "docs/benchmarks/HIVE_CORTEX_RESULTS.md",
+        "tests/test_hive_cortex_benchmark.py"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "All required CI and adversarial suites pass on exact candidate.",
+        "All eight roles have meaningful end-to-end receipts.",
+        "Humanless, no-cheating, learning, self-healing, durability, and repository-safety gates pass.",
+        "Residual blockers and maturity labels are explicit."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/qualify-610",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [
+        "MIGRATION-460",
+        "PROMOTE-530",
+        "POISON-540",
+        "BENCH-600",
+        "DELIVERY-420"
+      ],
+      "downstream_unlock_value": 100,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "docs/execution/HIVE_CORTEX_QUALIFICATION.md",
+        "evidence/qualification/hive-cortex/**"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "QUALIFY-610",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Run the complete local governed-autonomy qualification and issue an honest maturity verdict.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "No legacy brain should be retired and no remote pilot should start before full local evidence converges.",
+      "read_scope": [
+        "src/**",
+        "tests/**",
+        "docs/**",
+        "benchmarks/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "full-constitutional-ci",
+        "complete-autonomy-acceptance",
+        "clean-replay-verification",
+        "cross-platform-qualification"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "explorer",
+        "architect",
+        "builder",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "This is the final local trust court across the complete system.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "local-autonomy-qualification"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "docs/execution/HIVE_CORTEX_QUALIFICATION.md",
+        "evidence/qualification/hive-cortex/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Legacy entry points delegate to canonical runtime or are removed with compatibility notice.",
+        "No retained public behavior or evidence path is lost.",
+        "Rollback tag and migration receipts exist."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/legacy-620",
+      "category": "integration",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 78,
+      "dependencies": [
+        "QUALIFY-610"
+      ],
+      "downstream_unlock_value": 65,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "src/hive_mind_os/mission.py",
+        "src/hive_mind_os/mission_loop.py",
+        "src/hive_mind_os/autonomous_os.py",
+        "src/hive_mind_os/workers.py",
+        "docs/execution/LEGACY_RUNTIME_RETIREMENT.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "LEGACY-620",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Retire independent legacy brain ownership only after accepted parity and rollback evidence.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "Competing authoritative runtimes are the root architecture defect, but premature deletion would lose proven behavior.",
+      "read_scope": [
+        "src/hive_mind_os/mission.py",
+        "src/hive_mind_os/mission_loop.py",
+        "src/hive_mind_os/autonomous_os.py",
+        "src/hive_mind_os/workers.py"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "legacy-parity-tests",
+        "public-api-compatibility-tests",
+        "rollback-tag-test"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "architect",
+        "integrator",
+        "curator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Retiring broad legacy paths is a critical migration with high regression risk.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "legacy-retirement",
+        "public-cli-routing"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "src/hive_mind_os/mission.py",
+        "src/hive_mind_os/mission_loop.py",
+        "src/hive_mind_os/autonomous_os.py",
+        "src/hive_mind_os/workers.py",
+        "docs/execution/LEGACY_RUNTIME_RETIREMENT.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Multiple real disposable repository missions complete end-to-end.",
+        "No discretionary human answers are needed for routine reversible work.",
+        "Cheating, recovery, and rollback evidence remains valid."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/a3-700",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 85,
+      "dependencies": [
+        "QUALIFY-610",
+        "LEGACY-620"
+      ],
+      "downstream_unlock_value": 80,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Current code contradicts a node assumption.",
+        "Required changes exceed declared write scope.",
+        "A genuine credential, consent, protected-branch, spending, legal, or production authority is required.",
+        "Independent verification cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "evidence/pilots/a3/**",
+        "docs/execution/A3_REPOSITORY_AUTONOMY.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "A3-700",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Qualify A3 repository autonomy on real disposable repositories without remote delivery authority.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "This is the first maturity level matching routine self-operating repository work.",
+      "read_scope": [
+        "src/**",
+        "tests/**",
+        "examples/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "a3-pilot-suite",
+        "real-repository-compatibility-suite"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "explorer",
+        "architect",
+        "builder",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Real repository qualification has broad failure cost even without remote effects.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "a3-qualification"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "evidence/pilots/a3/**",
+        "docs/execution/A3_REPOSITORY_AUTONOMY.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Owner explicitly supplies scoped credentials and pilot repository authority.",
+        "Only non-protected branch and draft PR operations occur.",
+        "No merge or production deployment is performed.",
+        "Pilot can be stopped and rolled back."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/a4-800",
+      "category": "qualification",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 70,
+      "dependencies": [
+        "A3-700",
+        "DELIVERY-420"
+      ],
+      "downstream_unlock_value": 65,
+      "effort": "critical",
+      "escalation_conditions": [
+        "Missing credential_or_secret authority.",
+        "Missing owner_value_choice for pilot repository.",
+        "Protected branch or merge authority would be required.",
+        "Remote host state contradicts the sealed pilot plan."
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "evidence/pilots/a4/**",
+        "docs/execution/A4_DELIVERY_PILOT.md"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "A4-800",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Run a bounded governed remote-delivery pilot with explicit owner credentials and grants.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "Remote push, PR, and comments require genuine external authority; this cannot be fabricated by roles.",
+      "read_scope": [
+        "src/hive_mind_os/cortex/github/**",
+        "docs/architecture/HUMAN_AUTHORITY_GATES.md"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "a4-delivery-pilot",
+        "remote-idempotency-pilot"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "builder",
+        "curator",
+        "integrator",
+        "steward"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "Real remote effects require frontier reasoning and genuine human authority.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "a4-remote-pilot"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "evidence/pilots/a4/**",
+        "docs/execution/A4_DELIVERY_PILOT.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Independent security and operational reviews pass.",
+        "Owner/legal/production authority gates are explicit and authenticated.",
+        "Rollback, incident response, evidence retention, and stop mechanisms are proven.",
+        "No autonomous expansion of authority is possible."
+      ],
+      "assumptions": [
+        "Current main remains the source of product truth.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "autopilot/a5-900",
+      "category": "promotion",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 60,
+      "dependencies": [
+        "A4-800"
+      ],
+      "downstream_unlock_value": 50,
+      "effort": "critical",
+      "escalation_conditions": [
+        "legal_or_regulatory_signoff required",
+        "production_access required",
+        "financial_spend required",
+        "protected_branch_merge required",
+        "external_contractual_commitment required"
+      ],
+      "evidence_requirements": [
+        "Exact base and final commit/tree identities",
+        "Changed-path inventory bound to declared write scope",
+        "Command/test receipts with outcomes",
+        "Role and authority identities",
+        "Consultation and dissent records where invoked",
+        "Rollback reference"
+      ],
+      "expected_outputs": [
+        "Bounded implementation or decision artifact",
+        "Tests and adversarial evidence",
+        "Node completion receipt"
+      ],
+      "file_locks": [
+        "docs/execution/A5_GOVERNED_FULL_READINESS.md",
+        "evidence/pilots/a5/**"
+      ],
+      "forbidden_scope": [
+        ".github/CODEOWNERS",
+        ".github/governance/**",
+        "evidence/courts/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "A5-900",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "high",
+      "objective": "Qualify governed-full production autonomy only after external security, legal, operational, and owner gates.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "Production authority, spending, legal commitments, and protected changes are genuine human/governance decisions, not role-resolvable questions.",
+      "read_scope": [
+        "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+        "docs/plan/BLOCKERS.md",
+        "evidence/pilots/a4/**"
+      ],
+      "required_inputs": [
+        "Current target SHA and ancestry",
+        "Applicable AGENTS.md and architecture contracts",
+        "Validated dependency receipts"
+      ],
+      "required_tests": [
+        "a5-readiness-court",
+        "production-recovery-exercise",
+        "authority-boundary-audit"
+      ],
+      "reversibility": "Revert the node commit or close the unmerged PR; do not rewrite retained evidence.",
+      "risk": "critical",
+      "roles": [
+        "orchestrator",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer"
+      ],
+      "rollback": "Revert the exact candidate commit and restore the last accepted contract; preserve adverse receipts.",
+      "routes": {
+        "anthropic": {
+          "availability": "verified-current",
+          "model": "Claude Fable 5",
+          "reasoning_effort": "highest available"
+        },
+        "openai": {
+          "availability": "verified-current; ultra is optional escalation where the account exposes it",
+          "model": "GPT-5.6 Sol",
+          "reasoning_effort": "max"
+        },
+        "rationale": "This is the maximum blast-radius governed production decision.",
+        "tier": "T4"
+      },
+      "semantic_locks": [
+        "a5-governed-full"
+      ],
+      "stopping_condition": "Open a draft PR with a validated node receipt; do not merge or start downstream nodes.",
+      "write_scope": [
+        "docs/execution/A5_GOVERNED_FULL_READINESS.md",
+        "evidence/pilots/a5/**"
+      ]
+    }
+  ],
+  "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+  "plan_id": "hive-mind-os-verifiable-hive-cortex-v1",
+  "schema_version": 1,
+  "state_machine": [
+    "BOOTSTRAP_REQUIRED",
+    "BOOTSTRAP_INVALID",
+    "READY",
+    "CLAIMED",
+    "RUNNING",
+    "WAITING_FOR_RECEIPT",
+    "PR_OPEN",
+    "CI_FAILED",
+    "REPAIR_REQUIRED",
+    "RECONCILIATION_REQUIRED",
+    "INTEGRATION_READY",
+    "INTEGRATING",
+    "PROMOTION_READY",
+    "BLOCKED",
+    "ESCALATION_REQUIRED",
+    "QUARANTINED",
+    "COMPLETE",
+    "SUPERSEDED",
+    "CANCELLED",
+    "REPLAN_REQUIRED"
+  ],
+  "subject": "The Hive Mind OS codebase is intended to be a self-operating operating system that learns and solves problems end-to-end without avoidable human interaction. When it suspects cheating or believes it needs a human answer, it must first consult applicable roles because those roles may resolve the question. The current roles are not yet fully wired into one real runtime.",
+  "title": "Verifiable Hive Cortex — Self-Operating, Role-Consulting, Self-Learning Hive Mind OS"
+}

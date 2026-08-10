@@ -1,0 +1,30 @@
+HIVE MIND OS GENERICPROMPT EXECUTION — CONTROL ROOM
+
+Repository: kb4beast/hive-mind-os
+Observed main: 7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23
+Observed tree: ac76686aa004cf8188f0281b1ec9ac1f5c666929
+Plan: hive-mind-os-verifiable-hive-cortex-v1
+Plan fingerprint: sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39
+Nodes: 39
+Dependency levels: 16
+
+CURRENT STATE
+- GenericPrompt architecture/tournament: COMPLETE AS AN ANALYSIS ARTIFACT
+- Repository product implementation: NOT STARTED BY THIS RUN
+- Bootstrap control-plane installation: REQUIRED
+- Full eight-role autonomy: BLOCKED UNTIL PROGRAM NODES PASS
+
+START NOW
+1 chat only: BOOT-000 using BOOTSTRAP_PROMPT.md
+
+AFTER BOOT-000 IS MERGED
+2 parallel chats: RECON-010 and BASE-020
+OpenAI minimum for each: GPT-5.6 Terra, medium reasoning
+Anthropic minimum for each: Claude Sonnet 5, medium reasoning
+
+DO NOT START YET
+ARCH-100, CONTRACT-110, any role implementation node, MISSION-400, learning, delivery, or autonomy qualification.
+
+STOP RULE
+Every worker stops at its draft PR + validated receipt. It does not merge or launch downstream work.
+A dispatcher is rerun after each merge or any unplanned main advancement.

@@ -1,0 +1,5 @@
+state/
+generated/*
+!generated/.gitignore
+__pycache__/
+*.pyc

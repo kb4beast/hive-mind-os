@@ -1,0 +1,167 @@
+{
+  "$id": "hive-mind-autopilot-receipt-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acceptance_decision": {
+      "enum": [
+        "ADOPT",
+        "ADAPT"
+      ]
+    },
+    "authority": {
+      "type": "object"
+    },
+    "base_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "base_tree": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "changed_paths": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "consultations": {
+      "type": "array"
+    },
+    "contract_version": {
+      "const": 1
+    },
+    "evidence_refs": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "final_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "final_tree": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "model_runtime": {
+      "type": "object"
+    },
+    "node_id": {
+      "type": "string"
+    },
+    "plan_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "pr": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "role_identities": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "identity": {
+            "type": "string"
+          },
+          "identity_kind": {
+            "enum": [
+              "model_role",
+              "service",
+              "human"
+            ]
+          },
+          "role": {
+            "enum": [
+              "orchestrator",
+              "explorer",
+              "architect",
+              "builder",
+              "curator",
+              "integrator",
+              "steward",
+              "optimizer"
+            ]
+          }
+        },
+        "required": [
+          "role",
+          "identity",
+          "identity_kind"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "rollback_ref": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "tests": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "command": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "receipt_ref": {
+            "type": "string"
+          },
+          "status": {
+            "const": "passed"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "plan_fingerprint",
+    "node_id",
+    "contract_version",
+    "base_commit",
+    "final_commit",
+    "branch",
+    "pr",
+    "changed_paths",
+    "tests",
+    "evidence_refs",
+    "model_runtime",
+    "role_identities",
+    "authority",
+    "consultations",
+    "acceptance_decision",
+    "timestamp",
+    "rollback_ref"
+  ],
+  "type": "object"
+}

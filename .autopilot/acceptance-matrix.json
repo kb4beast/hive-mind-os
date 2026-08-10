@@ -1,0 +1,110 @@
+{
+  "baseline_commit": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
+  "schema_version": 1,
+  "suites": {
+    "all_role": {
+      "proof": [
+        "all eight roles invoked where applicable",
+        "typed outputs and receipts",
+        "no fixture-only role counted as operational"
+      ],
+      "required_nodes": [
+        "ROLE-200",
+        "ORCH-300",
+        "EXPLORER-310",
+        "ARCHITECT-320",
+        "BUILDER-330",
+        "CURATOR-340",
+        "INTEGRATOR-350",
+        "STEWARD-360",
+        "OPTIMIZER-370",
+        "MISSION-400"
+      ]
+    },
+    "humanless_operation": {
+      "proof": [
+        "role-first resolution",
+        "software defects become repair work",
+        "only genuine authority escalates"
+      ],
+      "required_nodes": [
+        "CONSULT-210",
+        "MISSION-400",
+        "HUMANLESS-430"
+      ]
+    },
+    "learning": {
+      "proof": [
+        "outcome-bound lessons",
+        "immutable challengers",
+        "held-out independent evaluation",
+        "atomic promotion/rollback"
+      ],
+      "required_nodes": [
+        "OPTIMIZER-370",
+        "LEARN-500",
+        "CHALLENGER-510",
+        "EVAL-520",
+        "PROMOTE-530",
+        "POISON-540"
+      ]
+    },
+    "no_cheating": {
+      "proof": [
+        "test weakening",
+        "future leakage",
+        "self-grading",
+        "fake evidence",
+        "authority expansion",
+        "friendly consultation"
+      ],
+      "required_nodes": [
+        "CONSULT-210",
+        "CURATOR-340",
+        "COURT-380",
+        "CHEAT-440"
+      ]
+    },
+    "repository_safety": {
+      "proof": [
+        "isolated workspaces",
+        "declared paths",
+        "protected branch denial",
+        "idempotent remote effects"
+      ],
+      "required_nodes": [
+        "EFFECT-220",
+        "BUILDER-330",
+        "CURATOR-340",
+        "DELIVERY-420"
+      ]
+    },
+    "self_healing": {
+      "proof": [
+        "crash resume",
+        "stale lease repair",
+        "provider failover",
+        "rollback",
+        "no-progress quarantine"
+      ],
+      "required_nodes": [
+        "RECONCILE-250",
+        "DURABLE-410",
+        "STEWARD-360",
+        "SELFHEAL-450"
+      ]
+    },
+    "staged_autonomy": {
+      "proof": [
+        "A3 no avoidable human answer",
+        "A4 explicit remote grant",
+        "A5 external governance and production authority"
+      ],
+      "required_nodes": [
+        "A3-700",
+        "A4-800",
+        "A5-900"
+      ]
+    }
+  }
+}

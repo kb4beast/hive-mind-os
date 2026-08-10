@@ -1,0 +1,23 @@
+{
+  "answer": "Continue because the candidate never accessed the holdout and the seal precedes candidate access.",
+  "authority_class": null,
+  "cheating_disposition": "DISPROVED",
+  "consulted_roles": ["curator", "steward", "architect"],
+  "decision": "RESOLVED",
+  "dissent": ["Steward requests the sequence proof remain in the final bundle."],
+  "evidence_refs": ["receipt:seal-sequence", "receipt:candidate-access-sequence"],
+  "human_escalation": false,
+  "identity_records": [
+    {"identity": "role:curator:2", "identity_kind": "model_role", "role": "curator"},
+    {"identity": "role:steward:2", "identity_kind": "model_role", "role": "steward"},
+    {"identity": "role:architect:2", "identity_kind": "model_role", "role": "architect"}
+  ],
+  "mission_id": "MISSION-fixture",
+  "question": "Did the evaluator see the candidate before sealing?",
+  "reason_code": "SUSPECTED_CHEATING",
+  "request_id": "CONSULT-fixture-cheating-disproved",
+  "requesting_role": "orchestrator",
+  "role_first_exhausted": true,
+  "round": 1,
+  "suspected_cheating": true
+}

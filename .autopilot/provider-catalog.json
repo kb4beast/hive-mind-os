@@ -1,0 +1,72 @@
+{
+  "routing_rule": "Use the lowest safe independent first-attempt route. A worker must stop and escalate when a node trigger fires.",
+  "schema_version": 1,
+  "tiers": {
+    "T0": {
+      "anthropic": {
+        "availability": "exact version must be discovered at runtime; do not invent it",
+        "model": "Current Claude Haiku",
+        "reasoning_effort": "standard"
+      },
+      "description": "Mechanical, deterministic, narrow, easily reversible.",
+      "openai": {
+        "availability": "verified-current",
+        "model": "GPT-5.6 Luna",
+        "reasoning_effort": "low"
+      }
+    },
+    "T1": {
+      "anthropic": {
+        "availability": "verified-current",
+        "model": "Claude Sonnet 5",
+        "reasoning_effort": "low"
+      },
+      "description": "Bounded implementation or review with clear contracts.",
+      "openai": {
+        "availability": "verified-current",
+        "model": "GPT-5.6 Luna",
+        "reasoning_effort": "medium"
+      }
+    },
+    "T2": {
+      "anthropic": {
+        "availability": "verified-current",
+        "model": "Claude Sonnet 5",
+        "reasoning_effort": "medium"
+      },
+      "description": "Moderate multi-file reasoning, testing, or reconciliation.",
+      "openai": {
+        "availability": "verified-current",
+        "model": "GPT-5.6 Terra",
+        "reasoning_effort": "medium"
+      }
+    },
+    "T3": {
+      "anthropic": {
+        "availability": "verified-current",
+        "model": "Claude Opus 4.8",
+        "reasoning_effort": "high"
+      },
+      "description": "Difficult cross-cutting implementation, security, concurrency, or migration.",
+      "openai": {
+        "availability": "verified-current",
+        "model": "GPT-5.6 Sol",
+        "reasoning_effort": "high"
+      }
+    },
+    "T4": {
+      "anthropic": {
+        "availability": "verified-current",
+        "model": "Claude Fable 5",
+        "reasoning_effort": "highest available"
+      },
+      "description": "Critical architecture, authority, kernel, promotion, or broad migration.",
+      "openai": {
+        "availability": "verified-current; ultra is optional escalation where the account exposes it",
+        "model": "GPT-5.6 Sol",
+        "reasoning_effort": "max"
+      }
+    }
+  },
+  "verified_on": "2026-08-09"
+}
