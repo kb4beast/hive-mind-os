@@ -1,0 +1,161 @@
+name: PR 117 Merge Resolver
+
+on:
+  push:
+    branches:
+      - codex/phase8-exact-candidate-verification
+    paths:
+      - .github/workflows/pr117-merge-resolver.yml
+
+permissions:
+  contents: write
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge current main and preserve both lines of work
+        shell: bash
+        env:
+          EXPECTED_MAIN: 56cdf8b7a25294a0e1fbe73d8f732575e8c6b9a2
+        run: |
+          set -euo pipefail
+          git config user.name "PR 117 merge reconciler"
+          git config user.email "pr117-merge-reconciler@users.noreply.github.com"
+          git fetch origin main
+          actual_main="$(git rev-parse origin/main)"
+          if [ "$actual_main" != "$EXPECTED_MAIN" ]; then
+            echo "main moved: expected $EXPECTED_MAIN, got $actual_main" >&2
+            exit 1
+          fi
+
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_rc=$?
+          set -e
+          if [ "$merge_rc" -ne 0 ] && [ "$merge_rc" -ne 1 ]; then
+            echo "unexpected merge exit code: $merge_rc" >&2
+            exit "$merge_rc"
+          fi
+
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import re
+          from pathlib import Path
+
+          conflicts = {
+              "src/hive_mind_os/builtin_packages/hive-core/agents/builder.json",
+              "src/hive_mind_os/builtin_packages/hive-core/package.json",
+              "src/hive_mind_os/cli.py",
+              "src/hive_mind_os/mission.py",
+              "src/hive_mind_os/pit_oracle.py",
+              "src/hive_mind_os/sandbox.py",
+              "tests/test_receipts.py",
+              "tests/test_verify.py",
+          }
+
+          marker = re.compile(
+              r"<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n",
+              re.DOTALL,
+          )
+
+          def resolve_file(path: str) -> None:
+              text = Path(path).read_text(encoding="utf-8")
+              blocks = 0
+
+              def choose(match: re.Match[str]) -> str:
+                  nonlocal blocks
+                  blocks += 1
+                  ours, theirs = match.group(1), match.group(2)
+
+                  if path.endswith("agents/builder.json"):
+                      # main adds comment_pull_request; it strictly contains the PR's prior capability set.
+                      return theirs
+                  if path.endswith("hive-core/package.json"):
+                      # Digest is recalculated after builder.json is resolved.
+                      return theirs
+                  if path.endswith("cli.py"):
+                      if "brain_kernel" in ours and "continuation" in theirs:
+                          return ours + theirs
+                      if "repository_compatibility" in ours and not theirs.strip():
+                          return ours
+                      raise RuntimeError(f"unrecognized cli conflict block: {ours!r} / {theirs!r}")
+                  if path.endswith("mission.py"):
+                      # Preserve main's fail-closed runtime checks rather than optimization-removable asserts.
+                      return theirs
+                  if path.endswith("pit_oracle.py"):
+                      # Preserve main's bundle staging and cleanup, which maintain the PR's isolated-source goal
+                      # while avoiding a whole-worktree copy and retaining the hardened sandbox boundary.
+                      return theirs
+                  if path.endswith("sandbox.py"):
+                      if "taskkill" not in ours or "root_creation_time" not in theirs:
+                          raise RuntimeError("unrecognized sandbox conflict block")
+                      # Keep PR #117's Windows Job Object fast path, then use main's PID-reuse-safe fallback.
+                      prefix = ours.split('            taskkill = shutil.which("taskkill")', 1)[0]
+                      return prefix + theirs
+                  if path.endswith("test_receipts.py"):
+                      # Retain PR #117's deliberately shortened >260-character Windows path fixture.
+                      return ours
+                  if path.endswith("test_verify.py"):
+                      # main's imports are a strict superset of the PR-side imports in both conflict blocks.
+                      return theirs
+                  raise RuntimeError(path)
+
+              resolved = marker.sub(choose, text)
+              if blocks == 0:
+                  raise RuntimeError(f"expected conflict markers in {path}")
+              if "<<<<<<<" in resolved or "=======" in resolved or ">>>>>>>" in resolved:
+                  raise RuntimeError(f"unresolved marker remains in {path}")
+              Path(path).write_text(resolved, encoding="utf-8")
+
+          for path in sorted(conflicts):
+              resolve_file(path)
+
+          builder = Path("src/hive_mind_os/builtin_packages/hive-core/agents/builder.json")
+          package = Path("src/hive_mind_os/builtin_packages/hive-core/package.json")
+          builder_digest = hashlib.sha256(builder.read_bytes()).hexdigest()
+          package_text = package.read_text(encoding="utf-8")
+          package_text, replacements = re.subn(
+              r'("path": "agents/builder\.json", "digest": "sha256:)[0-9a-f]{64}',
+              rf'\g<1>{builder_digest}',
+              package_text,
+          )
+          if replacements != 1:
+              raise RuntimeError(f"expected one builder digest replacement, got {replacements}")
+          package.write_text(package_text, encoding="utf-8")
+
+          json.loads(builder.read_text(encoding="utf-8"))
+          json.loads(package.read_text(encoding="utf-8"))
+          print(f"resolved {len(conflicts)} conflict files; builder digest sha256:{builder_digest}")
+          PY
+
+          git add \
+            src/hive_mind_os/builtin_packages/hive-core/agents/builder.json \
+            src/hive_mind_os/builtin_packages/hive-core/package.json \
+            src/hive_mind_os/cli.py \
+            src/hive_mind_os/mission.py \
+            src/hive_mind_os/pit_oracle.py \
+            src/hive_mind_os/sandbox.py \
+            tests/test_receipts.py \
+            tests/test_verify.py
+
+          if git ls-files -u | grep -q .; then
+            echo "unresolved index entries remain" >&2
+            git ls-files -u >&2
+            exit 1
+          fi
+          git diff --check --cached
+          python -m pip install --disable-pip-version-check --no-deps -e .
+          python -m compileall -q src tests
+          python -m unittest discover -s tests -v
+
+          git commit -m "merge: reconcile main into PR 117 without dropping changes"
+          git push origin HEAD:codex/phase8-exact-candidate-verification
