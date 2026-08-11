@@ -22,18 +22,6 @@ _SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
 _RFC3339 = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\Z")
 _BLOCKED_GIT_TOKENS = frozenset({"--output", "--ext-diff", "--textconv", "--refresh", "-c", "--git-dir", "--work-tree", "-C"})
-_BLOCKED_GIT_ENV_PREFIXES = ("GIT_CONFIG",)
-_BLOCKED_GIT_ENV_NAMES = frozenset(
-    {
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_EXTERNAL_DIFF",
-        "GIT_DIFF_OPTS",
-    }
-)
 _TRUSTED_GIT_DIRECTORIES = (
     Path("C:/Program Files/Git/cmd"),
     Path("C:/Program Files/Git/bin"),
@@ -230,17 +218,24 @@ class RepositoryExplorer:
             raise ExplorerDenied(f"{label} must be exactly a lowercase 40-character Git commit SHA")
         return value
 
-    @staticmethod
-    def _git_environment() -> dict[str, str]:
-        environment = dict(os.environ)
-        for key in tuple(environment):
-            if key in _BLOCKED_GIT_ENV_NAMES or key.startswith(_BLOCKED_GIT_ENV_PREFIXES):
-                raise ExplorerDenied("Git configuration or repository environment injection is not allowed")
+    def _git_environment(self) -> dict[str, str]:
+        """Create the entire Git environment; inherited ``GIT_*`` is rejected."""
+
+        if any(key.upper().startswith("GIT_") for key in os.environ):
+            raise ExplorerDenied("inherited Git environment injection is not allowed")
+        environment: dict[str, str] = {}
+        for key in ("COMSPEC", "SYSTEMROOT", "TEMP", "TMP", "WINDIR"):
+            value = os.environ.get(key)
+            if value:
+                environment[key] = value
         environment.update(
             {
                 "GIT_OPTIONAL_LOCKS": "0",
                 "GIT_PAGER": "cat",
                 "GIT_TERMINAL_PROMPT": "0",
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "PATH": str(self.git_executable.parent),
             }
         )
         return environment

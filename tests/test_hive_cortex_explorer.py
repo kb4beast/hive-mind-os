@@ -117,6 +117,22 @@ class HiveCortexExplorerTests(unittest.TestCase):
         self.assertFalse(sentinel.exists())
         self.assertEqual(before, _tree_digest(self.root))
 
+    def test_trace_environment_is_rejected_without_writing_a_trace_file(self) -> None:
+        sentinel = self.root / "escaped-trace.log"
+        before = _tree_digest(self.root)
+        old_trace = os.environ.get("GIT_TRACE")
+        os.environ["GIT_TRACE"] = str(sentinel)
+        try:
+            with self.assertRaises(ExplorerDenied):
+                self.explorer.status()
+        finally:
+            if old_trace is None:
+                os.environ.pop("GIT_TRACE", None)
+            else:
+                os.environ["GIT_TRACE"] = old_trace
+        self.assertFalse(sentinel.exists())
+        self.assertEqual(before, _tree_digest(self.root))
+
     def test_explorer_rejects_path_escape_and_has_no_generic_command_runner(self) -> None:
         with self.assertRaises(ExplorerDenied):
             self.explorer.read_text("../outside.txt")
