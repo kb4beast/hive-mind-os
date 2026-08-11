@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
 
 from hive_mind_os.brain_kernel.canonical import canonical_digest
@@ -49,6 +49,31 @@ class OptimizerLessonTests(unittest.TestCase):
                 _attribution(),
                 expires_at=(datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
             )
+
+    def test_optimizer_lesson_tests_reject_mutable_sequence_bindings(self) -> None:
+        values = _attribution()
+        with self.assertRaisesRegex(OptimizerError, "immutable tuples"):
+            replace(values, evidence_refs=["evidence:mutable"])  # type: ignore[arg-type]
+        with self.assertRaisesRegex(OptimizerError, "immutable tuples"):
+            replace(values, applicability=["scope:mutable"])  # type: ignore[arg-type]
+
+    def test_optimizer_lesson_tests_do_not_retain_original_mutable_containers(self) -> None:
+        evidence = ["evidence:run-1", "evidence:run-2"]
+        applicability = ["python", "unit-tests"]
+        attribution = replace(
+            _attribution(),
+            evidence_refs=tuple(evidence),
+            applicability=tuple(applicability),
+        )
+        lesson = Optimizer().attribute_outcome(attribution)
+
+        evidence.append("evidence:mutated")
+        applicability.append("scope:mutated")
+
+        self.assertEqual(
+            lesson.lesson_digest,
+            canonical_digest(asdict(lesson.attribution)),
+        )
 
 
 class ChallengerProposalTests(unittest.TestCase):

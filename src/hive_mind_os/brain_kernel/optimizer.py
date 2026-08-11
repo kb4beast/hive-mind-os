@@ -41,7 +41,14 @@ class OutcomeAttribution:
     provenance_ref: str
 
     def __post_init__(self) -> None:
-        if not self.evidence_refs or any(not value.strip() for value in self.evidence_refs):
+        if not isinstance(self.evidence_refs, tuple) or not isinstance(
+            self.applicability, tuple
+        ):
+            raise OptimizerError("lesson sequence bindings must be immutable tuples")
+        if not self.evidence_refs or any(
+            not isinstance(value, str) or not value.strip()
+            for value in self.evidence_refs
+        ):
             raise OptimizerError("lesson attribution requires retained evidence")
         if len(set(self.evidence_refs)) != len(self.evidence_refs):
             raise OptimizerError("lesson evidence references must be unique")
@@ -51,9 +58,12 @@ class OutcomeAttribution:
             self.error_class,
             self.provenance_ref,
         ):
-            if not value.strip():
+            if not isinstance(value, str) or not value.strip():
                 raise OptimizerError("lesson attribution bindings must be nonempty")
-        if not self.applicability or any(not value.strip() for value in self.applicability):
+        if not self.applicability or any(
+            not isinstance(value, str) or not value.strip()
+            for value in self.applicability
+        ):
             raise OptimizerError("lesson applicability is required")
         if len(set(self.applicability)) != len(self.applicability):
             raise OptimizerError("lesson applicability must be unique")
@@ -147,6 +157,8 @@ class Optimizer:
         change_ref: str,
         author_id: str,
     ) -> ChallengerProposal:
+        if lesson.lesson_digest != canonical_digest(asdict(lesson.attribution)):
+            raise OptimizerError("lesson digest does not match its attribution")
         if not challenger_id.strip() or not champion_id.strip() or not change_ref.strip() or not author_id.strip():
             raise OptimizerError("challenger proposal bindings must be nonempty")
         if author_id != author_id.strip():
