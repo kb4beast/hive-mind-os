@@ -131,6 +131,22 @@ class HiveCortexStewardTests(unittest.TestCase):
             object.__setattr__(sealed, "evidence_digest", canonical_digest(forged))
         self.assertFalse(hasattr(__import__("hive_mind_os.brain_kernel.steward", fromlist=["*"],), "_OBSERVATION_SEALS"))
 
+    def test_assessment_rejects_tuple_constructor_bypass(self) -> None:
+        evidence = {"surface": "queues", "verified": True}
+        bypassed = tuple.__new__(
+            HealthObservation,
+            (
+                HealthSurface.QUEUES,
+                HealthStatus.HEALTHY,
+                "",
+                evidence,
+                canonical_digest(evidence),
+                None,
+            ),
+        )
+        with self.assertRaisesRegex(StewardIntegrityError, "assessment revalidation"):
+            Steward().assess((bypassed, *complete_observations()[1:]))
+
 
 if __name__ == "__main__":
     unittest.main()

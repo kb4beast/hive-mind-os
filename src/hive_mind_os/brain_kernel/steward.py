@@ -267,9 +267,23 @@ class Steward:
     """Assess all required operational surfaces without executing a repair."""
 
     def assess(self, observations: Iterable[HealthObservation]) -> StewardReport:
-        records = tuple(observations)
-        if not records or any(not isinstance(item, HealthObservation) for item in records):
+        supplied = tuple(observations)
+        if not supplied or any(type(item) is not HealthObservation for item in supplied):
             raise StewardIntegrityError("Steward requires HealthObservation values")
+        try:
+            records = tuple(
+                HealthObservation(
+                    item.surface,
+                    item.status,
+                    item.subject_id,
+                    item.evidence,
+                    item.evidence_digest,
+                    item.recovery_ref,
+                )
+                for item in supplied
+            )
+        except (AttributeError, TypeError, ValueError, StewardIntegrityError) as error:
+            raise StewardIntegrityError("health observation failed assessment revalidation") from error
         by_surface = {item.surface: item for item in records}
         if len(by_surface) != len(records):
             raise StewardIntegrityError("health surfaces must not be observed more than once")
