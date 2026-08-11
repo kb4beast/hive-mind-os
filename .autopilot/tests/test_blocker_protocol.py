@@ -31,7 +31,9 @@ class BlockerProtocolTests(unittest.TestCase):
                 return real_replace(source, destination)
 
             with (
-                mock.patch.object(controller.os, "name", "nt"),
+                mock.patch.object(
+                    controller, "windows_replace_retry_enabled", return_value=True
+                ),
                 mock.patch.object(controller.os, "replace", side_effect=transient_replace),
                 mock.patch.object(controller.time, "sleep") as pause,
             ):

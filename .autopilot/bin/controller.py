@@ -280,6 +280,12 @@ def read_json(path: Path) -> Any:
         raise ConfigurationError(f"cannot parse JSON file {path}: {error}") from error
 
 
+def windows_replace_retry_enabled() -> bool:
+    """Return whether atomic replacement needs the bounded Windows retry."""
+
+    return os.name == "nt"
+
+
 def atomic_write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
@@ -301,7 +307,7 @@ def atomic_write_json(path: Path, value: object) -> None:
             os.replace(temporary_path, path)
             break
         except PermissionError:
-            if os.name != "nt" or attempt == 4:
+            if not windows_replace_retry_enabled() or attempt == 4:
                 raise
             time.sleep(0.01 * (2**attempt))
 
