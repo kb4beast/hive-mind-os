@@ -5,8 +5,11 @@ import os
 import subprocess
 import tempfile
 import unittest
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
+from hmac import new as hmac_new
 from pathlib import Path
+from unittest.mock import patch
 
 from hive_mind_os.autopilot_workflow import (
     GENERIC_PROMPT_SOURCE,
@@ -22,6 +25,15 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
+        self.host_state = self.root.parent / f"{self.root.name}-host-state"
+        self.environment = patch.dict(
+            os.environ,
+            {"XDG_STATE_HOME": str(self.host_state)},
+            clear=False,
+        )
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.host_state, ignore_errors=True))
         subprocess.run(["git", "init", "-b", "main"], cwd=self.root, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Fixture"], cwd=self.root, check=True)
         subprocess.run(["git", "config", "user.email", "fixture@example.invalid"], cwd=self.root, check=True)
@@ -36,6 +48,77 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    @staticmethod
+    def _canonical_bytes(value: object) -> bytes:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+
+    def _issue_controller_authorization(
+        self,
+        contract: dict[str, object],
+        *,
+        actor: str = "host:trust-pinner",
+        issuer: str = "host:authority",
+        reviewer: str = "curator:independent-fixture",
+        evidence_inside_repository: bool = False,
+    ) -> tuple[Path, Path, Path]:
+        authority_root = self.host_state / "hive-mind-os" / "controller-trust-authority"
+        trust_root = self.root.parent / f"{self.root.name}-trust"
+        authority_root.mkdir(parents=True, exist_ok=True)
+        if os.name != "nt":
+            authority_root.chmod(0o700)
+        self.addCleanup(lambda: __import__("shutil").rmtree(trust_root, ignore_errors=True))
+        key = b"fixture-host-owned-controller-trust-key-0123456789"
+        key_path = authority_root / "controller-trust-authority.key"
+        key_path.write_bytes(key)
+        if os.name != "nt":
+            key_path.chmod(0o600)
+        if evidence_inside_repository:
+            evidence = self.root / "review-evidence.json"
+            evidence_uri = str(evidence)
+        else:
+            evidence = authority_root / "review-evidence.json"
+            evidence_uri = evidence.name
+        evidence.write_text('{"verdict":"safe","executed":false}\n', encoding="utf-8")
+        now = datetime.now(UTC)
+        authorization = {
+            "grant": "PIN_CONTROLLER_TRUST",
+            "repository_id": contract["repository_id"],
+            "controller_source_commit": contract["controller_source_commit"],
+            "controller_bundle_digest": contract["controller_bundle_digest"],
+            "authorized_actor": actor,
+            "issuer": issuer,
+            "independent_reviewer": reviewer,
+            "evidence": {
+                "uri": evidence_uri,
+                "sha256": "sha256:" + sha256(evidence.read_bytes()).hexdigest(),
+            },
+            "issued_at": (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z"),
+            "expires_at": (now + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
+        }
+        signed_material = {
+            "schema_version": 1,
+            "kind": "hive-mind-controller-trust-authorization-v1",
+            "key_id": "sha256:" + sha256(key).hexdigest(),
+            "authorization": authorization,
+        }
+        capability: dict[str, object] = {
+            **signed_material,
+            "signature": "sha256:"
+            + hmac_new(key, self._canonical_bytes(signed_material), "sha256").hexdigest(),
+        }
+        capability["capability_id"] = "sha256:" + sha256(
+            self._canonical_bytes(capability)
+        ).hexdigest()
+        capability_path = authority_root / "controller-trust-capability.json"
+        capability_path.write_text(json.dumps(capability), encoding="utf-8")
+        return authority_root, trust_root, capability_path
 
     def test_initialize_and_inspect_uninstalled_repository(self) -> None:
         result = initialize_repository(
@@ -224,12 +307,14 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         controller.write_text("print('{}')\n", encoding="utf-8")
         subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
         subprocess.run(["git", "commit", "-m", "controller"], cwd=self.root, check=True, capture_output=True)
-        trust_root = self.root.parent / f"{self.root.name}-trust"
-        self.addCleanup(lambda: __import__("shutil").rmtree(trust_root, ignore_errors=True))
+        review = inspect_repository(self.root, request="continue")
+        _authority_root, trust_root, capability_path = self._issue_controller_authorization(
+            dict(review)
+        )
         trust_controller(
             self.root,
-            actor="curator:independent-fixture",
-            evidence_ref="fixture-review:controller-bundle",
+            actor="host:trust-pinner",
+            authorization_capability=capability_path,
             trust_state_root=trust_root,
         )
         contract = inspect_repository(self.root, request="check")
@@ -241,6 +326,125 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         )
         self.assertTrue(contract["invocation"]["deny_outside_repository_filesystem"])
         self.assertIn("git", contract["invocation"]["allow_descendant_processes"])
+
+    def test_controller_trust_rejects_self_review_and_arbitrary_actor(self) -> None:
+        controller = self.root / ".autopilot" / "bin" / "autopilot.py"
+        controller.parent.mkdir(parents=True)
+        controller.write_text("print('{}')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
+        subprocess.run(["git", "commit", "-m", "controller"], cwd=self.root, check=True, capture_output=True)
+        review = inspect_repository(self.root, request="continue")
+        _authority_root, trust_root, capability_path = self._issue_controller_authorization(
+            dict(review),
+            reviewer="host:trust-pinner",
+        )
+        with self.assertRaisesRegex(PortableAutopilotError, "distinct authorized actor"):
+            trust_controller(
+                self.root,
+                actor="host:trust-pinner",
+                authorization_capability=capability_path,
+                trust_state_root=trust_root,
+            )
+        _authority_root, trust_root, capability_path = self._issue_controller_authorization(
+            dict(review),
+            actor="host:authorized-pinner",
+        )
+        with self.assertRaisesRegex(PortableAutopilotError, "does not authorize this actor"):
+            trust_controller(
+                self.root,
+                actor="attacker:self-appointed",
+                authorization_capability=capability_path,
+                trust_state_root=trust_root,
+            )
+
+    def test_controller_trust_revalidates_resolvable_digest_bound_evidence(self) -> None:
+        controller = self.root / ".autopilot" / "bin" / "autopilot.py"
+        controller.parent.mkdir(parents=True)
+        controller.write_text("print('{}')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
+        subprocess.run(["git", "commit", "-m", "controller"], cwd=self.root, check=True, capture_output=True)
+        review = inspect_repository(self.root, request="continue")
+        authority_root, trust_root, capability_path = self._issue_controller_authorization(
+            dict(review)
+        )
+        trust_controller(
+            self.root,
+            actor="host:trust-pinner",
+            authorization_capability=capability_path,
+            trust_state_root=trust_root,
+        )
+        (authority_root / "review-evidence.json").write_text("tampered\n", encoding="utf-8")
+        contract = inspect_repository(
+            self.root,
+            request="continue",
+            trust_state_root=trust_root,
+        )
+        self.assertEqual(contract["outcome"], "CONTROLLER_REVIEW_REQUIRED")
+        self.assertIn("evidence digest", contract["blocker"])
+
+    def test_controller_trust_rejects_forgery_and_stale_bundle(self) -> None:
+        controller = self.root / ".autopilot" / "bin" / "autopilot.py"
+        controller.parent.mkdir(parents=True)
+        controller.write_text("print('{}')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
+        subprocess.run(["git", "commit", "-m", "controller"], cwd=self.root, check=True, capture_output=True)
+        review = inspect_repository(self.root, request="continue")
+        _authority_root, trust_root, capability_path = self._issue_controller_authorization(
+            dict(review)
+        )
+        forged = json.loads(capability_path.read_text(encoding="utf-8"))
+        forged["authorization"]["independent_reviewer"] = "curator:forged"
+        material = dict(forged)
+        material.pop("capability_id")
+        forged["capability_id"] = "sha256:" + sha256(
+            self._canonical_bytes(material)
+        ).hexdigest()
+        capability_path.write_text(json.dumps(forged), encoding="utf-8")
+        with self.assertRaisesRegex(PortableAutopilotError, "signature is invalid"):
+            trust_controller(
+                self.root,
+                actor="host:trust-pinner",
+                authorization_capability=capability_path,
+                trust_state_root=trust_root,
+            )
+        _authority_root, trust_root, capability_path = self._issue_controller_authorization(
+            dict(review)
+        )
+        trust_controller(
+            self.root,
+            actor="host:trust-pinner",
+            authorization_capability=capability_path,
+            trust_state_root=trust_root,
+        )
+        controller.write_text("print({'changed': True})\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
+        subprocess.run(["git", "commit", "-m", "change controller"], cwd=self.root, check=True, capture_output=True)
+        contract = inspect_repository(
+            self.root,
+            request="continue",
+            trust_state_root=trust_root,
+        )
+        self.assertEqual(contract["outcome"], "CONTROLLER_REVIEW_REQUIRED")
+        self.assertIn("missing or stale", contract["blocker"])
+
+    def test_controller_trust_rejects_repository_owned_evidence(self) -> None:
+        controller = self.root / ".autopilot" / "bin" / "autopilot.py"
+        controller.parent.mkdir(parents=True)
+        controller.write_text("print('{}')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
+        subprocess.run(["git", "commit", "-m", "controller"], cwd=self.root, check=True, capture_output=True)
+        review = inspect_repository(self.root, request="continue")
+        _authority_root, trust_root, capability_path = self._issue_controller_authorization(
+            dict(review),
+            evidence_inside_repository=True,
+        )
+        with self.assertRaisesRegex(PortableAutopilotError, "escapes the host authorization root"):
+            trust_controller(
+                self.root,
+                actor="host:trust-pinner",
+                authorization_capability=capability_path,
+                trust_state_root=trust_root,
+            )
 
 
 if __name__ == "__main__":
