@@ -384,8 +384,12 @@ class SelfPromotionDenialTests(unittest.TestCase):
             proposal, evaluator_id="curator:reviewer", evidence_complete=True
         )
 
+        self.assertIs(recommendation.proposal, proposal)
+        self.assertEqual(recommendation.proposal_digest, proposal.proposal_digest)
         with self.assertRaises((AttributeError, TypeError)):
             object.__setattr__(recommendation, "proposal_digest", "sha256:forged")
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(recommendation.proposal, "author_id", "curator:reviewer")
         for clone in (
             copy.copy(recommendation),
             copy.deepcopy(recommendation),
@@ -399,6 +403,88 @@ class SelfPromotionDenialTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "cannot be subclassed"):
             class MutableRecommendation(CourtRecommendation):
                 pass
+
+    def test_court_recommendation_rejects_unattested_construction(self) -> None:
+        optimizer = Optimizer()
+        proposal = optimizer.propose_challenger(
+            optimizer.attribute_outcome(_attribution()),
+            challenger_id="candidate:v2",
+            champion_id="champion:v1",
+            change_ref="prompt:sha256:change",
+            author_id="optimizer:author",
+        )
+        with self.assertRaisesRegex(OptimizerError, "proposal type is invalid"):
+            CourtRecommendation(
+                "sha256:forged",  # type: ignore[arg-type]
+                "optimizer:author",
+                True,
+                PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
+                "lies",
+            )
+        old_shape = tuple.__new__(
+            CourtRecommendation,
+            (
+                "sha256:forged",
+                "optimizer:author",
+                PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
+                "lies",
+            ),
+        )
+        with self.assertRaisesRegex(OptimizerError, "shape is invalid"):
+            optimizer.validate_recommendation(old_shape)
+        with self.assertRaisesRegex(OptimizerError, "cannot evaluate or promote"):
+            CourtRecommendation(
+                proposal,
+                "optimizer:author",
+                True,
+                PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
+                "independent court must evaluate before any promotion",
+            )
+        with self.assertRaisesRegex(OptimizerError, "does not match evidence state"):
+            CourtRecommendation(
+                proposal,
+                "curator:reviewer",
+                True,
+                PromotionRecommendation.DEFER,
+                "retained evidence is incomplete",
+            )
+
+        bypassed = tuple.__new__(
+            CourtRecommendation,
+            (
+                proposal,
+                "optimizer:author",
+                True,
+                PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
+                "independent court must evaluate before any promotion",
+            ),
+        )
+        with self.assertRaisesRegex(OptimizerError, "cannot evaluate or promote"):
+            optimizer.validate_recommendation(bypassed)
+
+        forged_proposal = tuple.__new__(
+            ChallengerProposal,
+            (
+                proposal.challenger_id,
+                proposal.parent_champion_id,
+                proposal.change_ref,
+                proposal.author_id,
+                proposal.lesson,
+                "sha256:forged",
+            ),
+        )
+        bypassed = tuple.__new__(
+            CourtRecommendation,
+            (
+                forged_proposal,
+                "curator:reviewer",
+                True,
+                PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
+                "independent court must evaluate before any promotion",
+            ),
+        )
+        with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
+            optimizer.validate_recommendation(bypassed)
 
     def test_self_promotion_denial_tests_reject_proposal_type_impersonation(self) -> None:
         @dataclass(frozen=True)

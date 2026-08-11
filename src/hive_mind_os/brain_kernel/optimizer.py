@@ -66,6 +66,9 @@ class OutcomeAttribution(tuple[object, ...]):
         _validate_outcome_attribution(value)
         return value
 
+    def __getnewargs__(self) -> tuple[object, ...]:
+        return tuple(self)
+
     evidence_refs = property(lambda self: cast(tuple[str, ...], self[0]))
     context_ref = property(lambda self: cast(str, self[1]))
     outcome_ref = property(lambda self: cast(str, self[2]))
@@ -87,6 +90,9 @@ class ScopedLesson(tuple[object, ...]):
         value = tuple.__new__(cls, (attribution, lesson_digest))
         _validate_scoped_lesson(value)
         return value
+
+    def __getnewargs__(self) -> tuple[object, ...]:
+        return tuple(self)
 
     attribution = property(lambda self: cast(OutcomeAttribution, self[0]))
     lesson_digest = property(lambda self: cast(str, self[1]))
@@ -120,6 +126,9 @@ class ChallengerProposal(tuple[object, ...]):
         _validate_challenger_proposal(value)
         return value
 
+    def __getnewargs__(self) -> tuple[object, ...]:
+        return tuple(self)
+
     challenger_id = property(lambda self: cast(str, self[0]))
     parent_champion_id = property(lambda self: cast(str, self[1]))
     change_ref = property(lambda self: cast(str, self[2]))
@@ -141,6 +150,8 @@ def _require_trimmed_string(value: object, label: str) -> str:
 def _validate_outcome_attribution(value: object) -> OutcomeAttribution:
     if type(value) is not OutcomeAttribution:
         raise OptimizerError("lesson attribution type is invalid")
+    if len(value) != 8:
+        raise OptimizerError("lesson attribution shape is invalid")
     if type(value.evidence_refs) is not tuple or type(value.applicability) is not tuple:
         raise OptimizerError("lesson sequence bindings must be immutable tuples")
     if not value.evidence_refs:
@@ -177,6 +188,8 @@ def _validate_outcome_attribution(value: object) -> OutcomeAttribution:
 def _validate_scoped_lesson(value: object) -> ScopedLesson:
     if type(value) is not ScopedLesson:
         raise OptimizerError("scoped lesson type is invalid")
+    if len(value) != 2:
+        raise OptimizerError("scoped lesson shape is invalid")
     attribution = _validate_outcome_attribution(value.attribution)
     _require_trimmed_string(value.lesson_digest, "lesson digest")
     if value.lesson_digest != canonical_digest(_attribution_material(attribution)):
@@ -210,6 +223,8 @@ def _proposal_material(value: ChallengerProposal) -> dict[str, str]:
 def _validate_challenger_proposal(value: object) -> ChallengerProposal:
     if type(value) is not ChallengerProposal:
         raise OptimizerError("challenger proposal type is invalid")
+    if len(value) != 6:
+        raise OptimizerError("challenger proposal shape is invalid")
     _validate_scoped_lesson(value.lesson)
     for item, label in (
         (value.challenger_id, "challenger identity"),
@@ -233,19 +248,18 @@ class CourtRecommendation(tuple[object, ...]):
 
     def __new__(
         cls,
-        proposal_digest: str,
+        proposal: ChallengerProposal,
         evaluator_id: str,
+        evidence_complete: bool,
         recommendation: PromotionRecommendation,
         reason: str,
     ) -> CourtRecommendation:
-        _require_trimmed_string(proposal_digest, "recommendation proposal digest")
-        _require_trimmed_string(evaluator_id, "recommendation evaluator identity")
-        if type(recommendation) is not PromotionRecommendation:
-            raise OptimizerError("recommendation disposition type is invalid")
-        _require_trimmed_string(reason, "recommendation reason")
-        return tuple.__new__(
-            cls, (proposal_digest, evaluator_id, recommendation, reason)
+        value = tuple.__new__(
+            cls,
+            (proposal, evaluator_id, evidence_complete, recommendation, reason),
         )
+        _validate_court_recommendation(value)
+        return value
 
     def __getnewargs__(self) -> tuple[object, ...]:
         return tuple(self)
@@ -253,10 +267,41 @@ class CourtRecommendation(tuple[object, ...]):
     def __init_subclass__(cls) -> None:
         raise TypeError("court recommendations cannot be subclassed")
 
-    proposal_digest = property(lambda self: cast(str, self[0]))
+    proposal = property(lambda self: cast(ChallengerProposal, self[0]))
     evaluator_id = property(lambda self: cast(str, self[1]))
-    recommendation = property(lambda self: cast(PromotionRecommendation, self[2]))
-    reason = property(lambda self: cast(str, self[3]))
+    evidence_complete = property(lambda self: cast(bool, self[2]))
+    recommendation = property(lambda self: cast(PromotionRecommendation, self[3]))
+    reason = property(lambda self: cast(str, self[4]))
+    proposal_digest = property(lambda self: self.proposal.proposal_digest)
+
+
+def _validate_court_recommendation(value: object) -> CourtRecommendation:
+    if type(value) is not CourtRecommendation:
+        raise OptimizerError("court recommendation type is invalid")
+    if len(value) != 5:
+        raise OptimizerError("court recommendation shape is invalid")
+    proposal = _validate_challenger_proposal(value.proposal)
+    _require_trimmed_string(value.evaluator_id, "recommendation evaluator identity")
+    if value.evaluator_id == proposal.author_id:
+        raise OptimizerError("optimizer candidate author cannot evaluate or promote it")
+    if type(value.evidence_complete) is not bool:
+        raise OptimizerError("evidence completeness must be a boolean")
+    expected_recommendation = (
+        PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW
+        if value.evidence_complete
+        else PromotionRecommendation.DEFER
+    )
+    expected_reason = (
+        "independent court must evaluate before any promotion"
+        if value.evidence_complete
+        else "retained evidence is incomplete"
+    )
+    if value.recommendation is not expected_recommendation:
+        raise OptimizerError("recommendation disposition does not match evidence state")
+    _require_trimmed_string(value.reason, "recommendation reason")
+    if value.reason != expected_reason:
+        raise OptimizerError("recommendation reason does not match evidence state")
+    return value
 
 
 class Optimizer:
@@ -319,14 +364,23 @@ class Optimizer:
             raise OptimizerError("evidence completeness must be a boolean")
         if not evidence_complete:
             return CourtRecommendation(
-                proposal.proposal_digest,
+                proposal,
                 evaluator_id,
+                evidence_complete,
                 PromotionRecommendation.DEFER,
                 "retained evidence is incomplete",
             )
         return CourtRecommendation(
-            proposal.proposal_digest,
+            proposal,
             evaluator_id,
+            evidence_complete,
             PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
             "independent court must evaluate before any promotion",
         )
+
+    def validate_recommendation(
+        self, recommendation: CourtRecommendation
+    ) -> CourtRecommendation:
+        """Revalidate every nested binding before a recommendation is consumed."""
+
+        return _validate_court_recommendation(recommendation)
