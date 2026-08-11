@@ -253,8 +253,8 @@ class CurrentStateAuditTests(unittest.TestCase):
         self.assertEqual(audit["artifact_type"], "CurrentStateAudit")
         self.assertGreaterEqual(audit["repository"]["full_ref_commit_count"], 79)
         self.assertEqual(audit["schema_version"], 6)
-        self.assertEqual(audit["docket"]["source_count"], 23)
-        self.assertEqual(audit["docket"]["claim_count"], 84)
+        self.assertEqual(audit["docket"]["source_count"], 25)
+        self.assertEqual(audit["docket"]["claim_count"], 88)
         self.assertTrue(audit["docket"]["inventory_complete"])
         self.assertFalse(audit["docket"]["release_ready"])
         self.assertEqual(
@@ -280,9 +280,11 @@ class CurrentStateAuditTests(unittest.TestCase):
                 "SRC-020",
                 "SRC-022",
                 "SRC-023",
+                "SRC-024",
+                "SRC-025",
             ],
         )
-        self.assertEqual(len(audit["docket"]["source_coverage"]), 23)
+        self.assertEqual(len(audit["docket"]["source_coverage"]), 25)
         self.assertTrue(audit["docket"]["machine_blocked_claim_ids"])
         self.assertEqual(
             audit["docket"]["implementation_state_audit"]["claims_by_maturity"][

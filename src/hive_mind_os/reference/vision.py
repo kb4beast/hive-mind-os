@@ -117,6 +117,8 @@ class HardenedVisionContract:
         "https://github.com/karpathy/autoresearch",
         "user-supplied:classic-gpt-simulation-instruction",
         "user-supplied-sibling:hive_os_classic_gpt_pack",
+        "https://github.com/kb4beast/Junk/blob/760d5e2468484924cbdd077a78584f570a67bd2c/Generic%20prompt",
+        "repository:docs/plan/genericprompt-execution-2026-08-09/SOURCE_GENERICPROMPT.txt",
     )
     target_unsupervised_routine_work: bool = True
     courtroom_required: bool = True

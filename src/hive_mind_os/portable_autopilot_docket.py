@@ -21,7 +21,7 @@ PORTABLE_AUTOPILOT_SOURCES: tuple[SourceRecord, ...] = (
         content_digest="sha256:f810b17311cebae09413abcfbb1c2155a4934d8ebefa483aadb512e36eed2c5b",
         provenance_complete=True,
         requires_complete_ingestion=True,
-        object_type="remote_content_snapshot",
+        object_type="content_snapshot",
         retrieved_at="2026-08-11T13:36:00Z",
         snapshot_ref="evidence/sources/SRC-024-genericprompt-lineage/manifest.json",
     ),
