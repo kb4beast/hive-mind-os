@@ -53,6 +53,7 @@ KERNEL_SCHEMA_NAMES = (
     "brain-kernel-candidate",
     "brain-kernel-historical-evidence-reference",
     "brain-kernel-technical-closeout-report",
+    "hive-cortex-consultation",
 )
 SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES, *KERNEL_SCHEMA_NAMES)
 ROLE_NAMES = frozenset(
