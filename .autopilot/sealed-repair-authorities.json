@@ -67,7 +67,7 @@
         "Fresh authenticated snapshot, reconciliation, full doctor, status, and explicit repair dispatch are required."
       ],
       "rollback": "If the repair claim remains the remote head, restore the canonical branch to the old receipt under an exact compare-and-swap lease; otherwise preserve both histories and require a new appeal.",
-      "capability_commit": "f8c4e15531a23f2ac92bb37857a7b4d142a19cc1"
+      "capability_commit": "82f355efe1382d247405ffbf9cb38c3b73346b0c"
     },
     {
       "schema_version": 1,
@@ -146,7 +146,7 @@
         "Fresh authenticated snapshot, reconciliation, full doctor, status, and explicit repair dispatch are required."
       ],
       "rollback": "If the repair merge claim remains the remote head, restore the canonical branch to the old receipt under an exact compare-and-swap lease; otherwise preserve both histories and require a new appeal.",
-      "capability_commit": "f8c4e15531a23f2ac92bb37857a7b4d142a19cc1"
+      "capability_commit": "82f355efe1382d247405ffbf9cb38c3b73346b0c"
     }
   ]
 }
