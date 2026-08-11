@@ -52,6 +52,17 @@ SUBTASK_EXECUTION_SEQUENCE = (
     "dispatch_explicit_start_now",
     "claim_remote_node_branch",
 )
+STALE_TARGET_RECOVERY_SEQUENCE = (
+    "preserve_scoped_work_with_node_named_stash",
+    "verify_current_singleton_remote_sha",
+    "refresh_validated_github_snapshot",
+    "archive_stale_runtime_projection",
+    "retire_exact_stale_remote_claim_ref",
+    "install_snapshot_and_reconcile",
+    "doctor_status_dispatch_and_reclaim",
+    "apply_exact_node_named_stash",
+    "verify_changed_paths_against_node_scope",
+)
 SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
     "HTTP_PROXY",
     "HTTPS_PROXY",
@@ -60,6 +71,17 @@ SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
     "https_proxy",
     "no_proxy",
 )
+SUBTASK_STATES = frozenset(
+    {
+        "PENDING",
+        "ACTIVE",
+        "IDLE_UNCOLLECTED",
+        "BLOCKED_RECOVERABLE",
+        "SUCCEEDED",
+        "BLOCKED_EXTERNAL_AUTHORITY",
+    }
+)
+SUBTASK_SETTLED_STATES = frozenset({"SUCCEEDED", "BLOCKED_EXTERNAL_AUTHORITY"})
 LEGAL_STATES = (
     "BOOTSTRAP_REQUIRED",
     "BOOTSTRAP_INVALID",
@@ -323,6 +345,8 @@ class ControlPlane:
         self.failures_dir = self.state_dir / "failures"
         self.blockers_dir = self.state_dir / "blockers"
         self.questions_dir = self.state_dir / "questions"
+        self.subtask_waves_dir = self.state_dir / "subtask-waves"
+        self.validation_lease_path = self.state_dir / "global-validation-lease.json"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -1038,6 +1062,150 @@ class ControlPlane:
         append_jsonl(self.questions_dir / f"{node_id}.jsonl", result)
         return result
 
+    def start_subtask_wave(
+        self,
+        wave_id: str,
+        node_ids: Sequence[str],
+        *,
+        target_sha: str | None = None,
+    ) -> Mapping[str, Any]:
+        """Register children that the orchestrator must supervise to settlement."""
+
+        if not isinstance(wave_id, str) or not wave_id.strip():
+            raise AutopilotError("subtask wave_id is required")
+        nodes = tuple(dict.fromkeys(str(node) for node in node_ids))
+        if not nodes:
+            raise AutopilotError("subtask wave requires at least one node")
+        unknown = sorted(set(nodes) - set(self._nodes))
+        if unknown:
+            raise AutopilotError("subtask wave has unknown nodes: " + ", ".join(unknown))
+        target = target_sha or self.current_target_sha()
+        if FULL_SHA.fullmatch(target) is None:
+            raise AutopilotError("subtask wave target_sha must be a full lowercase Git SHA")
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "SUBTASK_WAVE_STARTED",
+            "wave_id": wave_id,
+            "target_sha": target,
+            "nodes": list(nodes),
+            "statuses": {node: "PENDING" for node in nodes},
+            "timestamp": format_time(self.clock()),
+            "may_end_turn": False,
+            "target_mutation_allowed": False,
+            "next_action": "POLL_AGAIN",
+            "work_preservation_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
+        }
+        append_jsonl(self.subtask_waves_dir / f"{wave_id}.jsonl", record)
+        return record
+
+    def poll_subtask_wave(
+        self,
+        wave_id: str,
+        statuses: Mapping[str, str],
+    ) -> Mapping[str, Any]:
+        """Record one poll and require supervision until every result is collected.
+
+        UI ``idle`` is deliberately represented as ``IDLE_UNCOLLECTED``. It is
+        not success: the parent must read the result and classify it. Recoverable
+        blockers require retry; only success or genuine external authority can
+        settle a child and permit the parent turn to end.
+        """
+
+        path = self.subtask_waves_dir / f"{wave_id}.jsonl"
+        if not path.is_file():
+            raise AutopilotError(f"unknown subtask wave: {wave_id}")
+        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+        started = next((record for record in records if record.get("event") == "SUBTASK_WAVE_STARTED"), None)
+        if not isinstance(started, Mapping):
+            raise AutopilotError(f"subtask wave lacks start record: {wave_id}")
+        nodes = tuple(str(node) for node in started.get("nodes", ()))
+        if set(statuses) != set(nodes):
+            raise AutopilotError("subtask poll must classify every wave node exactly once")
+        normalized = {node: str(statuses[node]).upper() for node in nodes}
+        invalid = sorted({status for status in normalized.values() if status not in SUBTASK_STATES})
+        if invalid:
+            raise AutopilotError("invalid subtask states: " + ", ".join(invalid))
+        actions: dict[str, str] = {}
+        for node, state in normalized.items():
+            if state in {"PENDING", "ACTIVE"}:
+                actions[node] = "POLL_AGAIN"
+            elif state == "IDLE_UNCOLLECTED":
+                actions[node] = "COLLECT_RESULT_NOW"
+            elif state == "BLOCKED_RECOVERABLE":
+                actions[node] = "APPLY_FIX_AND_RETRY_NOW"
+        settled = all(state in SUBTASK_SETTLED_STATES for state in normalized.values())
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "SUBTASK_WAVE_POLLED",
+            "wave_id": wave_id,
+            "target_sha": started.get("target_sha"),
+            "statuses": normalized,
+            "recovery_actions": actions,
+            "timestamp": format_time(self.clock()),
+            "may_end_turn": settled,
+            "target_mutation_allowed": settled,
+            "next_action": "QUIESCENT" if settled else "CONTINUE_SUPERVISION",
+        }
+        append_jsonl(path, record)
+        return record
+
+    def acquire_global_validation_lease(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        lease_minutes: int = 10,
+    ) -> Mapping[str, Any]:
+        """Serialize repository-wide gates while focused node checks stay parallel."""
+
+        if node_id not in self._nodes:
+            raise AutopilotError(f"unknown validation node: {node_id}")
+        if not isinstance(owner, str) or not owner.strip():
+            raise AutopilotError("validation lease owner is required")
+        if type(lease_minutes) is not int or lease_minutes < 1:
+            raise AutopilotError("validation lease_minutes must be positive")
+        now = self.clock()
+        if self.validation_lease_path.is_file():
+            current = read_json(self.validation_lease_path)
+            if isinstance(current, Mapping):
+                expires = parse_time(current.get("expires_at"))
+                identity = (current.get("node_id"), current.get("owner"))
+                if expires > now and identity != (node_id, owner):
+                    raise AutopilotError(
+                        "global validation lease is active for "
+                        f"{current.get('node_id')} owned by {current.get('owner')}"
+                    )
+        lease = {
+            "schema_version": SCHEMA_VERSION,
+            "node_id": node_id,
+            "owner": owner,
+            "target_sha": self.current_target_sha(),
+            "acquired_at": format_time(now),
+            "expires_at": format_time(now + timedelta(minutes=lease_minutes)),
+            "status": "ACTIVE",
+        }
+        lease["lease_id"] = digest_json(lease)
+        atomic_write_json(self.validation_lease_path, lease)
+        return lease
+
+    def release_global_validation_lease(self, node_id: str, owner: str) -> None:
+        if not self.validation_lease_path.is_file():
+            raise AutopilotError("global validation lease is absent")
+        current = read_json(self.validation_lease_path)
+        identity = (
+            current.get("node_id"),
+            current.get("owner"),
+        ) if isinstance(current, Mapping) else (None, None)
+        if identity != (node_id, owner):
+            raise AutopilotError("global validation lease identity mismatch")
+        lease_id = str(current.get("lease_id", "unknown")).replace(":", "-")
+        archive = self.state_dir / "validation-leases" / f"{lease_id}.json"
+        atomic_write_json(
+            archive,
+            {**current, "status": "RELEASED", "released_at": format_time(self.clock())},
+        )
+        self.validation_lease_path.unlink()
+
     @staticmethod
     def recovery_action(packet: Mapping[str, Any]) -> Mapping[str, Any]:
         """Turn known orchestration blockers into bounded child-task work."""
@@ -1055,6 +1223,14 @@ class ControlPlane:
                 "objective": "refresh the singleton release snapshot, reconcile the current target, dispatch the exact eligible node, and retry its claim",
                 "required_sequence": list(SUBTASK_EXECUTION_SEQUENCE),
                 "stop_if": "target or snapshot changes again, or a protected/security control would need weakening",
+            }
+        if "snapshot" in text and any(marker in text for marker in ("stale", "target", "mismatch")):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "orchestrator",
+                "objective": "refresh the validated singleton snapshot and resume every child invalidated by the target advance",
+                "required_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
+                "stop_if": "remote SHA cannot be verified normally or recovery would weaken provenance/security controls",
             }
         return {
             "action": "REPORT_BLOCKER",

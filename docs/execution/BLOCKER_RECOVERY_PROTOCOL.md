@@ -55,3 +55,33 @@ turn. The answer is stored only as a digest; credentials, proxy secrets, and
 other sensitive values must never be copied into repository files or evidence.
 An unresolved question remains a blocker, not a reason to repeat the same
 question on the next run.
+
+## Parent supervision and quiescence
+
+Creating children transfers work, not responsibility. The parent registers the
+released wave with `subtask-wave-start` and continues polling with
+`subtask-wave-poll`. A UI state of `idle` is `IDLE_UNCOLLECTED`, never success;
+the parent must read and classify the child result. `BLOCKED_RECOVERABLE`
+requires the parent to apply the safe fix and retry immediately.
+
+The parent may end its turn, or mutate the singleton release target, only when
+every child is settled as `SUCCEEDED` or `BLOCKED_EXTERNAL_AUTHORITY`. Pending,
+active, idle-uncollected, and recoverably blocked children emit explicit
+continue/collect/retry actions. If an urgent target mutation invalidates a wave,
+the parent must refresh the validated snapshot, retire only the stale claim
+refs with their SHAs preserved, issue a fresh release, and resume every child
+before considering the wave quiescent.
+
+Git stashes are repository-wide across worktrees. Recovery must name every
+stash with its node ID, locate it by that exact message, and verify the restored
+paths against the node's write scope. Positional selectors such as `stash@{0}`
+must not be used for cross-worktree orchestration. Stale generated runtime state
+is archived under a named recovery directory before the current validated
+snapshot and release projections are installed; evidence ledgers are retained.
+
+Parallel nodes may run focused tests concurrently, but the repository-wide CI
+gate requires `validation-lease-acquire`. Only one node may own that lease at a
+time; every other child remains active and ready for the global gate. The owner
+releases it after recording the actual verdict. This prevents parallel full
+suites from exhausting process, clone, or filesystem resources and turning
+contention into false failures.

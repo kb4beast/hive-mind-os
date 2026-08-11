@@ -3,9 +3,12 @@ from __future__ import annotations
 import unittest
 
 from hive_mind_os.brain_kernel.canonical import canonical_bytes
-from hive_mind_os.brain_kernel.contracts import MissionCharter, MissionState, Budget
-from hive_mind_os.contracts import KERNEL_SCHEMA_NAMES, validate_contract, validate_schema_catalog
-
+from hive_mind_os.brain_kernel.contracts import Budget, MissionCharter, MissionState
+from hive_mind_os.contracts import (
+    KERNEL_SCHEMA_NAMES,
+    validate_contract,
+    validate_schema_catalog,
+)
 
 DIGEST = "sha256:" + "0" * 64
 SHA = "0" * 40

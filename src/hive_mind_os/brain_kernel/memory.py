@@ -557,6 +557,61 @@ class MemoryCatalog:
                 )
             return tuple(events)
 
+    def correct(
+        self, successor: MemoryRecord, access: MemoryAccess, *, now: str, reason: str
+    ) -> tuple[MemoryLifecycleEvent, ...]:
+        """Append a correction without rewriting the corrected record."""
+
+        return self.supersede(successor, access, now=now, reason=reason)
+
+    def quarantine(
+        self,
+        record_id: str,
+        *,
+        now: str,
+        reason: str,
+        event_id: str | None = None,
+    ) -> MemoryLifecycleEvent:
+        """Append a quarantine fact while retaining the original evidence."""
+
+        return self.transition(
+            record_id,
+            MemoryState.QUARANTINED,
+            event_id=event_id or f"memory.quarantined:{record_id}:{now}",
+            occurred_at=now,
+            reason=reason,
+        )
+
+    def contradict(
+        self,
+        record_ids: Iterable[str],
+        *,
+        now: str,
+        reason: str,
+    ) -> tuple[MemoryConflict, tuple[MemoryLifecycleEvent, ...]]:
+        """Preserve a contradiction and append terminal facts for its records."""
+
+        identities = tuple(sorted(set(record_ids)))
+        with self._lock:
+            if any(
+                record_id not in self._entries
+                or self._states[record_id] is not MemoryState.ACTIVE
+                for record_id in identities
+            ):
+                raise MemoryDenied("contradiction requires active registered records")
+            conflict = self.record_conflict(identities, reason=reason, recorded_at=now)
+            events = tuple(
+                self.transition(
+                    record_id,
+                    MemoryState.CONTRADICTED,
+                    event_id=f"memory.contradicted:{conflict.conflict_id}:{record_id}",
+                    occurred_at=now,
+                    reason=reason,
+                )
+                for record_id in identities
+            )
+            return conflict, events
+
     def consolidate(
         self,
         lesson: MemoryRecord,

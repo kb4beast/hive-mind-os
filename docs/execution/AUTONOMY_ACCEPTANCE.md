@@ -44,3 +44,23 @@ denied. Curator verifies an exact immutable commit and tree in a fresh workspace
 - **A4:** bounded draft-PR pilot with explicit credentials and grants; still no merge authority.
 - **A5:** governed full production autonomy only after external security, legal, operational, and
   owner gates.
+
+## ACCEPT-240 adversarial harness
+
+The executable harness lives under `tests/hive_cortex/` and never executes fixture source while
+checking the inventory. It loads declared manifests and requires these adversarial repository
+shapes:
+
+- a hidden-defect Python repository;
+- a misleading-README Node repository;
+- a no-test C# repository; and
+- a cross-language monorepo containing Python, Node, and C# components.
+
+`validate_run` rejects incomplete specialist-role wiring, consultation theater, self-approval,
+observations outside the sealed point-in-time commit set, software defects escalated as human
+authority blockers, and receipts whose candidate, role sequence, or effect sequence differs from
+the sealed run. Human escalation is accepted only for a declared genuine authority class.
+
+The receipt-facing test identifiers are `acceptance-harness-self-tests`, `negative-control-tests`,
+and `cross-language-fixture-tests`. Negative controls mutate a valid run one failure at a time so
+the harness proves that each gate fails closed rather than merely documenting the policy.

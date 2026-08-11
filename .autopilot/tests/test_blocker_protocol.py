@@ -123,3 +123,67 @@ class BlockerProtocolTests(unittest.TestCase):
             text = (root / ".autopilot" / "state" / "questions" / "ARCH-100.jsonl").read_text()
             self.assertIn("QUESTION_OPENED", text)
             self.assertIn("QUESTION_RESOLVED", text)
+
+    def test_subtask_wave_cannot_end_on_idle_or_recoverable_children(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = Path(__file__).resolve().parents[1]
+            shutil.copytree(source, root / ".autopilot")
+            control = controller.read_json(root / ".autopilot" / "control-plane.json")
+            control["verify_git_objects"] = False
+            controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
+            plane = controller.ControlPlane(root)
+            plane.start_subtask_wave(
+                "wave-l1",
+                ("ACCEPT-240", "CONSULT-210"),
+                target_sha="0" * 40,
+            )
+            active = plane.poll_subtask_wave(
+                "wave-l1",
+                {"ACCEPT-240": "IDLE_UNCOLLECTED", "CONSULT-210": "BLOCKED_RECOVERABLE"},
+            )
+            self.assertFalse(active["may_end_turn"])
+            self.assertFalse(active["target_mutation_allowed"])
+            self.assertEqual(active["recovery_actions"]["ACCEPT-240"], "COLLECT_RESULT_NOW")
+            self.assertEqual(active["recovery_actions"]["CONSULT-210"], "APPLY_FIX_AND_RETRY_NOW")
+            settled = plane.poll_subtask_wave(
+                "wave-l1",
+                {"ACCEPT-240": "SUCCEEDED", "CONSULT-210": "BLOCKED_EXTERNAL_AUTHORITY"},
+            )
+            self.assertTrue(settled["may_end_turn"])
+            self.assertTrue(settled["target_mutation_allowed"])
+
+    def test_stale_snapshot_recovery_is_ordered_and_stash_safe(self) -> None:
+        action = controller.ControlPlane.recovery_action(
+            {
+                "category": "snapshot",
+                "cause": "validated snapshot target mismatch after release advance",
+                "fix": "refresh stale snapshot and recover child work",
+            }
+        )
+        self.assertEqual(action["action"], "SPAWN_SUBTASK")
+        sequence = action["required_sequence"]
+        self.assertEqual(sequence, list(controller.STALE_TARGET_RECOVERY_SEQUENCE))
+        self.assertLess(sequence.index("refresh_validated_github_snapshot"), sequence.index("install_snapshot_and_reconcile"))
+        self.assertLess(sequence.index("doctor_status_dispatch_and_reclaim"), sequence.index("apply_exact_node_named_stash"))
+        self.assertTrue(all("stash@" not in step for step in sequence))
+
+    def test_repository_wide_validation_has_singleton_lease(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = Path(__file__).resolve().parents[1]
+            shutil.copytree(source, root / ".autopilot")
+            (root / ".autopilot" / "state" / "global-validation-lease.json").unlink(
+                missing_ok=True
+            )
+            control = controller.read_json(root / ".autopilot" / "control-plane.json")
+            control["verify_git_objects"] = False
+            controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
+            plane = controller.ControlPlane(root)
+            lease = plane.acquire_global_validation_lease("ACCEPT-240", "worker:accept")
+            self.assertEqual(lease["status"], "ACTIVE")
+            with self.assertRaises(controller.AutopilotError):
+                plane.acquire_global_validation_lease("CONSULT-210", "worker:consult")
+            plane.release_global_validation_lease("ACCEPT-240", "worker:accept")
+            second = plane.acquire_global_validation_lease("CONSULT-210", "worker:consult")
+            self.assertEqual(second["node_id"], "CONSULT-210")
