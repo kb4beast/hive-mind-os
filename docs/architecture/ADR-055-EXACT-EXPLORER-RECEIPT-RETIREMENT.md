@@ -18,6 +18,9 @@ only the sealed retirement ID and actor; it accepts no remote, branch, ref, SHA,
 replacement-node input. The record binds `origin`, `kb4beast/hive-mind-os`, the singleton
 target, candidate, receipt, blocker, court-quarantine digest, archive ref, and expected
 source SHA. The canonical court record is retained separately and its digest is checked.
+The configured origin URL must be the sole fetch URL; any `remote.origin.pushurl`,
+`url.*.insteadOf` / `pushInsteadOf`, or process-injected Git config causes a fail-closed
+refusal, because fetch identity alone does not prove the atomic push destination.
 
 The command requires current target reconciliation and snapshot evidence and no active
 Explorer claim. It fetches and validates the candidate and completion receipt, creates a

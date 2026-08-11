@@ -175,6 +175,8 @@ receipt branch. Its sealed record, independent court disposition, source SHA, ar
 and configured `origin` repository are fixed in repository artifacts. The command has no
 remote, branch, SHA, or replacement-node option. It creates and verifies a zero-path
 quarantine commit before atomically deleting the active receipt branch under an exact lease.
+The single literal `origin` fetch URL must also be the actual push destination: push URLs,
+Git URL rewrites, and injected Git configuration fail closed.
 It writes append-only runtime evidence only after remote verification. A fresh snapshot,
 reconciliation, and dispatcher release are mandatory before a replacement claim.
 

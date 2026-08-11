@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -52,6 +53,7 @@ EXPLORER_RETIREMENT = {
     "retirement_id": "explorer-310-rejected-receipt-branch-v1",
     "node_id": "EXPLORER-310",
     "origin_name": "origin",
+    "origin_url": "https://github.com/kb4beast/hive-mind-os.git",
     "repository": "kb4beast/hive-mind-os",
     "branch": "autopilot/explorer-310",
     "candidate_commit": "3d305e63391094846e8d8ebacad2fa73dbb2db8b",
@@ -206,22 +208,38 @@ class ControlPlane(ReleaseBarrierControlPlane):
         return EXPLORER_RETIREMENT
 
     def _origin_is_configured_repository(self, record: Mapping[str, Any]) -> bool:
-        """Accept only the configured GitHub origin; never a caller-supplied remote."""
+        """Accept only one literal configured origin with no rewrite channel.
 
-        completed = self._git(("remote", "get-url", "origin"), check=False)
-        if completed.returncode != 0:
+        ``git remote get-url origin`` reports the fetch URL when a distinct push URL
+        exists.  It is therefore insufficient proof of a push destination.  The
+        retirement transaction is deliberately unavailable when a push URL, URL
+        rewrite, or process-injected Git config could redirect its sole mutation.
+        """
+
+        if record.get("origin_name") != "origin" or not isinstance(record.get("origin_url"), str):
             return False
-        value = completed.stdout.strip().rstrip("/")
-        repository = str(record["repository"])
-        accepted = {
-            f"https://github.com/{repository}.git",
-            f"https://github.com/{repository}",
-            f"git@github.com:{repository}.git",
-            f"git@github.com:{repository}",
-            f"ssh://git@github.com/{repository}.git",
-            f"ssh://git@github.com/{repository}",
+        blocked_environment = {
+            "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS",
+            "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM",
         }
-        return value in accepted
+        if any(name in os.environ for name in blocked_environment) or any(
+            name.startswith("GIT_CONFIG_KEY_") or name.startswith("GIT_CONFIG_VALUE_")
+            for name in os.environ
+        ):
+            return False
+        urls = self._git(("config", "--get-all", "remote.origin.url"), check=False)
+        if urls.returncode != 0:
+            return False
+        configured_urls = [line.strip() for line in urls.stdout.splitlines() if line.strip()]
+        if configured_urls != [record["origin_url"]]:
+            return False
+        push_urls = self._git(("config", "--get-all", "remote.origin.pushurl"), check=False)
+        if push_urls.returncode not in {0, 1} or push_urls.stdout.strip():
+            return False
+        rewrites = self._git(("config", "--get-regexp", r"^url\..*\.(insteadOf|pushInsteadOf)$"), check=False)
+        if rewrites.returncode not in {0, 1} or rewrites.stdout.strip():
+            return False
+        return record["origin_url"] == f"https://github.com/{record['repository']}.git"
 
     def _remote_ref_sha(self, reference: str) -> str | None:
         completed = self._git(("ls-remote", "origin", reference), check=False)
@@ -264,6 +282,7 @@ class ControlPlane(ReleaseBarrierControlPlane):
             "retirement_id": record["retirement_id"],
             "node_id": record["node_id"],
             "repository": record["repository"],
+            "origin_url": record["origin_url"],
             "branch": record["branch"],
             "candidate_commit": record["candidate_commit"],
             "receipt_commit": record["receipt_commit"],

@@ -6,6 +6,7 @@
       "retirement_id": "explorer-310-rejected-receipt-branch-v1",
       "node_id": "EXPLORER-310",
       "origin_name": "origin",
+      "origin_url": "https://github.com/kb4beast/hive-mind-os.git",
       "repository": "kb4beast/hive-mind-os",
       "branch": "autopilot/explorer-310",
       "candidate_commit": "3d305e63391094846e8d8ebacad2fa73dbb2db8b",

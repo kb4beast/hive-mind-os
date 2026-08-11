@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
@@ -59,6 +61,37 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         self.assertFalse(hasattr(args, "remote"))
         with self.assertRaises(TypeError):
             self.plane.retire_receipt_branch(self.record["retirement_id"], actor="test", remote="evil")  # type: ignore[call-arg]
+
+    def test_pushurl_and_rewrite_injection_cannot_mutate_disposable_foreign_remote(self) -> None:
+        foreign = self.root / "foreign.git"
+
+        def run(*args: str) -> None:
+            subprocess.run(args, cwd=self.root, check=True, capture_output=True, text=True)
+
+        run("git", "init")
+        run("git", "remote", "add", "origin", self.record["origin_url"])
+        self.assertTrue(self.plane._origin_is_configured_repository(self.record))
+        run("git", "init", "--bare", str(foreign))
+        run("git", "config", "--add", "remote.origin.pushurl", str(foreign))
+        run("git", "config", "--add", "remote.origin.pushurl", str(foreign / "second"))
+        self.assertFalse(self.plane._origin_is_configured_repository(self.record))
+        with self.assertRaisesRegex(autopilot.ClaimError, "configured origin repository identity"):
+            self.plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
+        refs = subprocess.run(("git", "--git-dir", str(foreign), "for-each-ref"), check=True, capture_output=True, text=True)
+        self.assertEqual(refs.stdout, "")
+        run("git", "config", "--unset-all", "remote.origin.pushurl")
+        run("git", "config", "url.https://foreign.invalid/.pushInsteadOf", self.record["origin_url"])
+        self.assertFalse(self.plane._origin_is_configured_repository(self.record))
+        run("git", "config", "--unset-all", "url.https://foreign.invalid/.pushInsteadOf")
+        with mock.patch.dict(os.environ, {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "remote.origin.pushurl",
+            "GIT_CONFIG_VALUE_0": str(foreign),
+        }, clear=False):
+            self.assertFalse(self.plane._origin_is_configured_repository(self.record))
+        with mock.patch.dict(os.environ, {"GIT_CONFIG_PARAMETERS": "'remote.origin.pushurl=foreign'"}, clear=False):
+            self.assertFalse(self.plane._origin_is_configured_repository(self.record))
+        self.assertEqual(refs.stdout, "")
 
     def test_moved_source_and_archive_collision_never_push(self) -> None:
         plane = self._ready()
