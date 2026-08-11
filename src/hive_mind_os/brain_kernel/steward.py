@@ -139,6 +139,8 @@ class HealthObservation(tuple[object, ...]):
         try:
             frozen_evidence = _FrozenEvidence(evidence)
             expected = canonical_digest(_thaw(frozen_evidence))
+        except StewardIntegrityError:
+            raise
         except (RecursionError, TypeError, ValueError) as error:
             raise StewardIntegrityError("observation evidence must be a finite JSON value") from error
         if evidence_digest != expected:
