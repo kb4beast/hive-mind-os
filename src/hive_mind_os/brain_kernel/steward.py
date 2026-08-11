@@ -11,7 +11,10 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Iterable, Mapping, cast
+from hmac import compare_digest
+from hmac import digest as hmac_digest
+from secrets import token_bytes
+from typing import Callable, Iterable, Mapping, Protocol, cast
 
 from .canonical import canonical_digest
 from .reconciler import RepairKind
@@ -110,95 +113,142 @@ def _thaw(value: object) -> object:
     return value
 
 
-def _evidence_is_intact(observation: "HealthObservation") -> bool:
-    try:
-        return canonical_digest(_thaw(observation.evidence)) == observation.evidence_digest
-    except (AttributeError, TypeError, ValueError, StewardIntegrityError):
-        return False
+class HealthObservationValue(Protocol):
+    surface: HealthSurface
+    status: HealthStatus
+    subject_id: str
+    evidence: Mapping[str, object]
+    evidence_digest: str
+    recovery_ref: str | None
+
+    def to_document(self) -> dict[str, object]: ...
 
 
-class HealthObservation(tuple[object, ...]):
-    """One adapter-produced health observation with content-bound evidence."""
+def _health_observation_factory() -> tuple[type, Callable[[object], bool]]:
+    """Create an observation type with module-private provenance verification.
 
-    __slots__ = ()
+    This boundary resists mutation through the public module namespace and the
+    public tuple constructor.  It deliberately does not claim to defend against
+    arbitrary same-process code execution or reflection into function closures.
+    """
 
-    def __new__(
-        cls,
-        surface: HealthSurface,
-        status: HealthStatus,
-        subject_id: str,
-        evidence: Mapping[str, object],
-        evidence_digest: str,
-        recovery_ref: str | None = None,
-    ) -> "HealthObservation":
-        normalized_surface = HealthSurface(surface)
-        normalized_status = HealthStatus(status)
-        normalized_subject = _text(subject_id, "observation subject")
-        if not isinstance(evidence, Mapping) or not evidence:
-            raise StewardIntegrityError("observation evidence is required")
-        try:
-            frozen_evidence = _FrozenEvidence(evidence)
-            expected = canonical_digest(_thaw(frozen_evidence))
-        except StewardIntegrityError:
-            raise
-        except (RecursionError, TypeError, ValueError) as error:
-            raise StewardIntegrityError("observation evidence must be a finite JSON value") from error
-        if evidence_digest != expected:
-            raise StewardIntegrityError("observation evidence digest does not match its content")
-        normalized_digest = _sha256(evidence_digest, "observation evidence digest")
-        if normalized_status is HealthStatus.HEALTHY:
-            normalized_recovery = (
-                _text(recovery_ref, "recovery reference") if recovery_ref is not None else None
-            )
-        else:
-            if recovery_ref is None:
-                raise StewardIntegrityError("unhealthy observation requires a recovery reference")
-            normalized_recovery = _text(recovery_ref, "recovery reference")
-        return tuple.__new__(
+    captured_canonical_digest = canonical_digest
+    captured_frozen_evidence = _FrozenEvidence
+    captured_thaw = _thaw
+    captured_hmac_digest = hmac_digest
+    captured_compare_digest = compare_digest
+    secret = token_bytes(32)
+
+    def tag(values: tuple[object, ...]) -> str:
+        payload = captured_canonical_digest(
+            {
+                "surface": cast(HealthSurface, values[0]).value,
+                "status": cast(HealthStatus, values[1]).value,
+                "subject_id": values[2],
+                "evidence": captured_thaw(values[3]),
+                "evidence_digest": values[4],
+                "recovery_ref": values[5],
+            }
+        ).encode("ascii")
+        return captured_hmac_digest(secret, payload, "sha256").hex()
+
+    class HealthObservation(tuple[object, ...]):
+        """One adapter-produced health observation with content-bound evidence."""
+
+        __slots__ = ()
+
+        def __new__(
             cls,
-            (
+            surface: HealthSurface,
+            status: HealthStatus,
+            subject_id: str,
+            evidence: Mapping[str, object],
+            evidence_digest: str,
+            recovery_ref: str | None = None,
+        ) -> tuple[object, ...]:
+            normalized_surface = HealthSurface(surface)
+            normalized_status = HealthStatus(status)
+            normalized_subject = _text(subject_id, "observation subject")
+            if not isinstance(evidence, Mapping) or not evidence:
+                raise StewardIntegrityError("observation evidence is required")
+            try:
+                frozen_evidence = captured_frozen_evidence(evidence)
+                expected = captured_canonical_digest(captured_thaw(frozen_evidence))
+            except StewardIntegrityError:
+                raise
+            except (RecursionError, TypeError, ValueError) as error:
+                raise StewardIntegrityError("observation evidence must be a finite JSON value") from error
+            if evidence_digest != expected:
+                raise StewardIntegrityError("observation evidence digest does not match its content")
+            normalized_digest = _sha256(evidence_digest, "observation evidence digest")
+            if normalized_status is HealthStatus.HEALTHY:
+                normalized_recovery = (
+                    _text(recovery_ref, "recovery reference") if recovery_ref is not None else None
+                )
+            else:
+                if recovery_ref is None:
+                    raise StewardIntegrityError("unhealthy observation requires a recovery reference")
+                normalized_recovery = _text(recovery_ref, "recovery reference")
+            values = (
                 normalized_surface,
                 normalized_status,
                 normalized_subject,
                 frozen_evidence,
                 normalized_digest,
                 normalized_recovery,
-            ),
-        )
+            )
+            return tuple.__new__(cls, (*values, tag(values)))
 
-    @property
-    def surface(self) -> HealthSurface:
-        return cast(HealthSurface, self[0])
+        @property
+        def surface(self) -> HealthSurface:
+            return cast(HealthSurface, self[0])
 
-    @property
-    def status(self) -> HealthStatus:
-        return cast(HealthStatus, self[1])
+        @property
+        def status(self) -> HealthStatus:
+            return cast(HealthStatus, self[1])
 
-    @property
-    def subject_id(self) -> str:
-        return cast(str, self[2])
+        @property
+        def subject_id(self) -> str:
+            return cast(str, self[2])
 
-    @property
-    def evidence(self) -> Mapping[str, object]:
-        return cast(Mapping[str, object], self[3])
+        @property
+        def evidence(self) -> Mapping[str, object]:
+            return cast(Mapping[str, object], self[3])
 
-    @property
-    def evidence_digest(self) -> str:
-        return cast(str, self[4])
+        @property
+        def evidence_digest(self) -> str:
+            return cast(str, self[4])
 
-    @property
-    def recovery_ref(self) -> str | None:
-        return cast(str | None, self[5])
+        @property
+        def recovery_ref(self) -> str | None:
+            return cast(str | None, self[5])
 
-    def to_document(self) -> dict[str, object]:
-        return {
-            "surface": self.surface.value,
-            "status": self.status.value,
-            "subject_id": self.subject_id,
-            "evidence": _thaw(self.evidence),
-            "evidence_digest": self.evidence_digest,
-            "recovery_ref": self.recovery_ref,
-        }
+        def to_document(self) -> dict[str, object]:
+            return {
+                "surface": self.surface.value,
+                "status": self.status.value,
+                "subject_id": self.subject_id,
+                "evidence": captured_thaw(self.evidence),
+                "evidence_digest": self.evidence_digest,
+                "recovery_ref": self.recovery_ref,
+            }
+
+    def verify(observation: object) -> bool:
+        if type(observation) is not HealthObservation or len(observation) != 7:
+            return False
+        values = cast(tuple[object, ...], observation)
+        try:
+            return (
+                captured_canonical_digest(captured_thaw(values[3])) == values[4]
+                and captured_compare_digest(cast(str, values[6]), tag(values[:6]))
+            )
+        except (AttributeError, RecursionError, TypeError, ValueError, StewardIntegrityError):
+            return False
+
+    return HealthObservation, verify
+
+
+HealthObservation, _verify_observation = _health_observation_factory()
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,7 +293,7 @@ class StewardReport:
     """Deterministic Steward handoff with retained coverage and recovery proof."""
 
     readiness: OperationalReadiness
-    observations: tuple[HealthObservation, ...]
+    observations: tuple[HealthObservationValue, ...]
     proposals: tuple[MaintenanceProposal, ...]
     observed_digest: str
     report_digest: str
@@ -271,24 +321,19 @@ _RECOVERY_KIND = {
 class Steward:
     """Assess all required operational surfaces without executing a repair."""
 
-    def assess(self, observations: Iterable[HealthObservation]) -> StewardReport:
+    def assess(
+        self,
+        observations: Iterable[HealthObservationValue],
+        _observation_type: type = HealthObservation,
+        _verify: Callable[[object], bool] = _verify_observation,
+        _canonical: Callable[[object], str] = canonical_digest,
+    ) -> StewardReport:
         supplied = tuple(observations)
-        if not supplied or any(type(item) is not HealthObservation for item in supplied):
+        if not supplied or any(type(item) is not _observation_type for item in supplied):
             raise StewardIntegrityError("Steward requires HealthObservation values")
-        try:
-            records = tuple(
-                HealthObservation(
-                    item.surface,
-                    item.status,
-                    item.subject_id,
-                    item.evidence,
-                    item.evidence_digest,
-                    item.recovery_ref,
-                )
-                for item in supplied
-            )
-        except (AttributeError, TypeError, ValueError, StewardIntegrityError) as error:
-            raise StewardIntegrityError("health observation failed assessment revalidation") from error
+        if any(not _verify(item) for item in supplied):
+            raise StewardIntegrityError("health observation provenance is invalid")
+        records = supplied
         by_surface = {item.surface: item for item in records}
         if len(by_surface) != len(records):
             raise StewardIntegrityError("health surfaces must not be observed more than once")
@@ -296,7 +341,7 @@ class Steward:
         if missing:
             raise StewardIntegrityError("health assessment is missing: " + ", ".join(sorted(item.value for item in missing)))
         ordered = tuple(by_surface[item] for item in HealthSurface)
-        corrupted = tuple(item for item in ordered if not _evidence_is_intact(item))
+        corrupted = tuple(item for item in ordered if not _verify(item))
         if corrupted:
             proposals = tuple(
                 MaintenanceProposal(
@@ -309,7 +354,7 @@ class Steward:
                 )
                 for item in corrupted
             )
-            observed_digest = canonical_digest([item.to_document() for item in ordered])
+            observed_digest = _canonical([item.to_document() for item in ordered])
             document = {
                 "readiness": OperationalReadiness.QUARANTINED.value,
                 "observations": [item.to_document() for item in ordered],
@@ -321,7 +366,7 @@ class Steward:
                 ordered,
                 proposals,
                 observed_digest,
-                canonical_digest(document),
+                _canonical(document),
             )
         proposals = tuple(
             MaintenanceProposal(
@@ -343,7 +388,7 @@ class Steward:
             if proposals
             else OperationalReadiness.READY
         )
-        observed_digest = canonical_digest([item.to_document() for item in ordered])
+        observed_digest = _canonical([item.to_document() for item in ordered])
         document = {
             "readiness": readiness.value,
             "observations": [item.to_document() for item in ordered],
@@ -355,5 +400,5 @@ class Steward:
             ordered,
             proposals,
             observed_digest,
-            canonical_digest(document),
+            _canonical(document),
         )

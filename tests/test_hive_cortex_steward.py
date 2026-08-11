@@ -7,6 +7,7 @@ from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.reconciler import RepairKind
 from hive_mind_os.brain_kernel.steward import (
     HealthObservation,
+    HealthObservationValue,
     HealthStatus,
     HealthSurface,
     OperationalReadiness,
@@ -19,7 +20,7 @@ def observation(
     surface: HealthSurface,
     status: HealthStatus = HealthStatus.HEALTHY,
     **changes: object,
-) -> HealthObservation:
+) -> HealthObservationValue:
     evidence = {"surface": surface.value, "verified": True}
     values: dict[str, object] = {
         "surface": surface,
@@ -33,7 +34,7 @@ def observation(
     return HealthObservation(**values)  # type: ignore[arg-type]
 
 
-def complete_observations() -> tuple[HealthObservation, ...]:
+def complete_observations() -> tuple[HealthObservationValue, ...]:
     return tuple(observation(surface) for surface in HealthSurface)
 
 
@@ -142,10 +143,45 @@ class HiveCortexStewardTests(unittest.TestCase):
                 evidence,
                 canonical_digest(evidence),
                 None,
+                "forged-provenance-tag",
             ),
         )
-        with self.assertRaisesRegex(StewardIntegrityError, "assessment revalidation"):
+        with self.assertRaisesRegex(StewardIntegrityError, "provenance is invalid"):
             Steward().assess((bypassed, *complete_observations()[1:]))
+
+    def test_assessment_rejects_matching_digest_tuple_counterfeit(self) -> None:
+        evidence = {"surface": "queues", "verified": True}
+        counterfeit = tuple.__new__(
+            HealthObservation,
+            (
+                HealthSurface.QUEUES,
+                HealthStatus.HEALTHY,
+                "queues-1",
+                evidence,
+                canonical_digest(evidence),
+                None,
+                "forged-provenance-tag",
+            ),
+        )
+        with self.assertRaisesRegex(StewardIntegrityError, "provenance is invalid"):
+            Steward().assess((counterfeit, *complete_observations()[1:]))
+
+    def test_assessment_uses_closure_bound_primitives_after_public_rebinding(self) -> None:
+        sealed = observation(HealthSurface.QUEUES)
+        other_observations = complete_observations()[1:]
+        module = __import__("hive_mind_os.brain_kernel.steward", fromlist=["*"])
+        original = module.canonical_digest
+        object.__setattr__(
+            sealed.evidence,
+            "_items",
+            (("surface", "queues"), ("verified", False)),
+        )
+        module.canonical_digest = lambda _: sealed.evidence_digest
+        try:
+            with self.assertRaisesRegex(StewardIntegrityError, "provenance is invalid"):
+                Steward().assess((sealed, *other_observations))
+        finally:
+            module.canonical_digest = original
 
     def test_construction_rejects_non_json_or_recursive_evidence_fail_closed(self) -> None:
         with self.assertRaisesRegex(StewardIntegrityError, "finite JSON"):
