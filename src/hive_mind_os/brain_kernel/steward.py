@@ -136,8 +136,11 @@ class HealthObservation(tuple[object, ...]):
         normalized_subject = _text(subject_id, "observation subject")
         if not isinstance(evidence, Mapping) or not evidence:
             raise StewardIntegrityError("observation evidence is required")
-        frozen_evidence = _FrozenEvidence(evidence)
-        expected = canonical_digest(_thaw(frozen_evidence))
+        try:
+            frozen_evidence = _FrozenEvidence(evidence)
+            expected = canonical_digest(_thaw(frozen_evidence))
+        except (RecursionError, TypeError, ValueError) as error:
+            raise StewardIntegrityError("observation evidence must be a finite JSON value") from error
         if evidence_digest != expected:
             raise StewardIntegrityError("observation evidence digest does not match its content")
         normalized_digest = _sha256(evidence_digest, "observation evidence digest")

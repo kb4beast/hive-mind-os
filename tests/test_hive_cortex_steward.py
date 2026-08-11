@@ -147,6 +147,26 @@ class HiveCortexStewardTests(unittest.TestCase):
         with self.assertRaisesRegex(StewardIntegrityError, "assessment revalidation"):
             Steward().assess((bypassed, *complete_observations()[1:]))
 
+    def test_construction_rejects_non_json_or_recursive_evidence_fail_closed(self) -> None:
+        with self.assertRaisesRegex(StewardIntegrityError, "finite JSON"):
+            HealthObservation(
+                HealthSurface.QUEUES,
+                HealthStatus.HEALTHY,
+                "queues-1",
+                {"bad": object()},
+                "sha256:" + "0" * 64,
+            )
+        recursive: dict[str, object] = {"surface": "queues"}
+        recursive["self"] = recursive
+        with self.assertRaisesRegex(StewardIntegrityError, "finite JSON"):
+            HealthObservation(
+                HealthSurface.QUEUES,
+                HealthStatus.HEALTHY,
+                "queues-1",
+                recursive,
+                "sha256:" + "0" * 64,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
