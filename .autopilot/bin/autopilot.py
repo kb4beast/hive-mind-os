@@ -262,19 +262,43 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             for name in os.environ
         ):
             return False
-        urls = self._git(("config", "--get-all", "remote.origin.url"), check=False)
+        local_config = self._git(
+            ("config", "--local", "--no-includes", "--get-regexp", r".*"),
+            check=False,
+        )
+        if local_config.returncode not in {0, 1}:
+            return False
+        for line in local_config.stdout.splitlines():
+            key = line.split(None, 1)[0].casefold() if line.strip() else ""
+            if (
+                key.startswith(("include.", "includeif.", "protocol.", "http."))
+                or (key.startswith("url.") and key.endswith((".insteadof", ".pushinsteadof")))
+                or (
+                    key.startswith("remote.")
+                    and key.endswith((".vcs", ".proxy", ".uploadpack", ".receivepack"))
+                )
+            ):
+                return False
+        urls = self._git(("config", "--local", "--no-includes", "--get-all", "remote.origin.url"), check=False)
         if urls.returncode != 0:
             return False
         configured_urls = [line.strip() for line in urls.stdout.splitlines() if line.strip()]
         if configured_urls != [record["origin_url"]]:
             return False
-        push_urls = self._git(("config", "--get-all", "remote.origin.pushurl"), check=False)
+        push_urls = self._git(("config", "--local", "--no-includes", "--get-all", "remote.origin.pushurl"), check=False)
         if push_urls.returncode not in {0, 1} or push_urls.stdout.strip():
             return False
-        rewrites = self._git(("config", "--get-regexp", r"^url\..*\.(insteadOf|pushInsteadOf)$"), check=False)
-        if rewrites.returncode not in {0, 1} or rewrites.stdout.strip():
+        effective_fetch = self._git(("remote", "get-url", "--all", "origin"), check=False)
+        effective_push = self._git(("remote", "get-url", "--push", "--all", "origin"), check=False)
+        expected = f"https://github.com/{record['repository']}.git"
+        if (
+            effective_fetch.returncode != 0
+            or effective_push.returncode != 0
+            or effective_fetch.stdout.splitlines() != [expected]
+            or effective_push.stdout.splitlines() != [expected]
+        ):
             return False
-        return record["origin_url"] == f"https://github.com/{record['repository']}.git"
+        return record["origin_url"] == expected
 
     def _remote_ref_sha(self, reference: str) -> str | None:
         completed = self._git(("ls-remote", "origin", reference), check=False)
@@ -619,6 +643,10 @@ def parser() -> argparse.ArgumentParser:
     complete.add_argument("--owner", required=True)
     complete.add_argument("--receipt", required=True)
 
+    arm_optimizer = commands.add_parser("arm-optimizer-370-continuation")
+    arm_optimizer.add_argument("--owner", required=True)
+    arm_optimizer.add_argument("--target-sha", required=True)
+
     fail = commands.add_parser("fail")
     fail.add_argument("node_id")
     fail.add_argument("--owner", required=True)
@@ -819,6 +847,17 @@ def main(argv: list[str] | None = None) -> int:
             if not isinstance(receipt, dict):
                 raise ReceiptError("receipt file must contain an object")
             print(plane.complete(args.node_id, args.owner, receipt))
+            return 0
+        if args.command == "arm-optimizer-370-continuation":
+            print(
+                json.dumps(
+                    plane.arm_optimizer_completion_continuation(
+                        args.owner, args.target_sha
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
             return 0
         if args.command == "fail":
             print(

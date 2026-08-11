@@ -11,6 +11,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -368,6 +369,7 @@ class ControlPlane:
             for node in _require_list(self.plan.get("nodes"), "plan.nodes")
             if isinstance(node, Mapping) and "id" in node
         }
+        self._trusted_git_path: str | None = None
 
     @property
     def plan_fingerprint(self) -> str:
@@ -652,6 +654,17 @@ class ControlPlane:
         # persisted or printed, and prompts remain disabled.
         base_environment = dict(os.environ)
         base_environment["GIT_TERMINAL_PROMPT"] = "0"
+        # Transport-capable Git commands must not inherit host URL rewrites,
+        # include chains, remote helpers, or TLS overrides. Repository-local
+        # transport configuration is inspected separately before any mutation.
+        for key in tuple(base_environment):
+            if key.startswith(("GIT_CONFIG", "GIT_EXEC", "GIT_SSH")) or key in {
+                "GIT_PROXY_COMMAND",
+                "GIT_SSL_NO_VERIFY",
+            }:
+                base_environment.pop(key, None)
+        base_environment["GIT_CONFIG_GLOBAL"] = os.devnull
+        base_environment["GIT_CONFIG_NOSYSTEM"] = "1"
         # Keep the controller deterministic while allowing a trusted local
         # proxy/network path to reach GitHub. These values exist only in the
         # child process environment; they are never persisted or printed.
@@ -667,9 +680,22 @@ class ControlPlane:
                     continue
             base_environment[key] = value
         if environment is not None:
+            if any(
+                key.startswith(("GIT_CONFIG", "GIT_EXEC", "GIT_SSH"))
+                or key in {"GIT_PROXY_COMMAND", "GIT_SSL_NO_VERIFY"}
+                for key in environment
+            ):
+                raise AutopilotError("unsafe Git environment override is forbidden")
             base_environment.update(environment)
+        sealed_options: tuple[str, ...] = ()
+        if os.name == "nt":
+            sealed_options = (
+                "-c", "http.sslBackend=schannel",
+                "-c", "http.schannelCheckRevoke=true",
+                "-c", "credential.helper=manager",
+            )
         completed = subprocess.run(
-            ("git", "-C", str(self.repo_root), *args),
+            (self._trusted_git_executable(), *sealed_options, "-C", str(self.repo_root), *args),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -685,6 +711,75 @@ class ControlPlane:
                 f"git {' '.join(args)} failed: {completed.stderr.strip()}"
             )
         return completed
+
+    def _trusted_git_executable(self) -> str:
+        """Resolve Git outside caller-controlled PATH on Windows.
+
+        Git for Windows publishes its install directory in HKLM.  Both that
+        directory and git.exe must be ordinary paths whose ACL does not grant
+        modification to broad unprivileged principals.  Unix retains the
+        platform executable lookup while excluding repository/temp paths.
+        """
+
+        if self._trusted_git_path is not None:
+            return self._trusted_git_path
+        if os.name != "nt":
+            resolved = shutil.which("git")
+            if not resolved:
+                raise AutopilotError("trusted Git executable is unavailable")
+            candidate = Path(resolved).resolve()
+            if candidate.is_relative_to(self.repo_root) or candidate.is_relative_to(
+                Path(tempfile.gettempdir()).resolve()
+            ):
+                raise AutopilotError("trusted Git executable is in a mutable workspace")
+            self._trusted_git_path = str(candidate)
+            return self._trusted_git_path
+
+        try:
+            import winreg
+
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\GitForWindows") as key:
+                install_path = Path(str(winreg.QueryValueEx(key, "InstallPath")[0]))
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+            ) as key:
+                system_root = Path(str(winreg.QueryValueEx(key, "SystemRoot")[0]))
+        except (OSError, ValueError) as error:
+            raise AutopilotError("trusted Git registry identity is unavailable") from error
+        candidates = (install_path / "cmd" / "git.exe", install_path / "bin" / "git.exe")
+        candidate = next((path for path in candidates if path.is_file()), None)
+        if candidate is None:
+            raise AutopilotError("registry-bound Git executable is unavailable")
+        candidate = candidate.resolve()
+        for path in (install_path.resolve(), candidate):
+            stat = path.lstat()
+            if path.is_symlink() or bool(getattr(stat, "st_file_attributes", 0) & 0x400):
+                raise AutopilotError("trusted Git path is a link or reparse point")
+            icacls = system_root / "System32" / "icacls.exe"
+            inspected = subprocess.run(
+                (str(icacls), str(path)),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=10,
+                env={"SystemRoot": str(system_root)},
+            )
+            acl = inspected.stdout.casefold()
+            broad = ("everyone", "authenticated users", "builtin\\users")
+            writable = ("(f)", "(m)", "(w)")
+            if inspected.returncode != 0 or any(
+                principal in line and any(marker in line for marker in writable)
+                for line in acl.splitlines()
+                for principal in broad
+            ):
+                raise AutopilotError("trusted Git ACL permits unprivileged mutation")
+        self._trusted_git_path = str(candidate)
+        return self._trusted_git_path
 
     def git_object_exists(self, sha: str) -> bool:
         if FULL_SHA.fullmatch(sha) is None:
