@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "fixture_id": "no-test-csharp",
+  "scenario": "no-test",
+  "language": "csharp",
+  "languages": ["csharp"],
+  "tests_present": false
+}
