@@ -14,6 +14,10 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertEqual(policy["preferred_surface"], "capability_matched_durable_task")
         self.assertEqual(policy["host_policy"]["codex"]["create_primary"], "create_thread")
         self.assertIn("may not replace", policy["host_policy"]["nested_agents"])
+        self.assertTrue(policy["global_validation"]["single_authoritative_run"])
+        self.assertTrue(
+            policy["global_validation"]["lease_required_for_repository_wide_gate"]
+        )
         self.assertEqual(policy["response_contract"]["required_sections"], ["WHAT I DID", "NEXT STEPS", "BLOCKS"])
 
     def test_control_plane_and_model_routing_reference_policy(self) -> None:
@@ -31,6 +35,8 @@ class WorkflowPolicyTests(unittest.TestCase):
             self.assertIn("durable primary task owns this node", text)
             self.assertIn("WHAT I DID", text)
             self.assertIn("BLOCKS", text)
+            self.assertIn("validation-lease-acquire", text)
+            self.assertIn("non-verdict evidence", text)
 
     def test_human_escalation_is_novice_safe(self) -> None:
         text = (ROOT / "templates" / "human-escalation.md").read_text(encoding="utf-8")
@@ -50,6 +56,9 @@ class WorkflowPolicyTests(unittest.TestCase):
             policy["task_transport"]["binding_sequence"],
             ["PREPARED", "CREATED", "BOUND", "TERMINAL_OBSERVED", "RELEASED"],
         )
+        validation = policy["wave"]["repository_wide_validation"]
+        self.assertTrue(validation["lease_required"])
+        self.assertFalse(validation["retry_while_another_owner_holds_lease"])
 
 
 if __name__ == "__main__":

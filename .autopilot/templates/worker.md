@@ -15,6 +15,11 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
+Parallel tasks may run focused checks only. Before any repository-wide validation,
+acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
+stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
+not retry. Release the lease after the one authoritative run.
+
 ## Dispatcher release barrier
 
 `{{NODE_STATE}}`, DAG membership, level membership, and dependency readiness are eligibility signals only. They do **not** authorize execution. This worker may claim or implement `{{NODE_ID}}` only when the latest dispatcher release is current and the rendered prompt begins with `DISPATCH VERDICT FOR {{NODE_ID}}: START NOW`. Otherwise the verdict is `WAIT` or `STOP` and this worker must not begin.

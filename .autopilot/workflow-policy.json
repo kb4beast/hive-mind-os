@@ -21,6 +21,13 @@
     "static_dag_rule": "DAG/level membership and deterministic READY eligibility are necessary but never sufficient execution authority.",
     "while_dispatching": "All not-yet-explicitly-released primary tasks are WAIT until live repository reconciliation and release publication finish."
   },
+  "global_validation": {
+    "duplicate_run_disposition": "stop and retain as non-verdict evidence",
+    "focused_checks_without_lease": true,
+    "lease_command": "python .autopilot/bin/autopilot.py --repo-root . validation-lease-acquire <NODE-ID> --owner <provider>:<unique-session>",
+    "lease_required_for_repository_wide_gate": true,
+    "single_authoritative_run": true
+  },
   "host_policy": {
     "capability_blocker": "Return exact missing capability and evidence to the parent; do not silently downgrade the primary task or ask the user to perform repairable work.",
     "codex": {

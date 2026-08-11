@@ -8,6 +8,11 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
+Parallel tasks may run focused checks only. Before any repository-wide validation,
+acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
+stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
+not retry. Release the lease after the one authoritative run.
+
 Do not implement stale nodes. Reconstruct the graph from current code, receipts, PRs,
 changed interfaces, and blockers. Add, split, merge, supersede, or reorder nodes only
 with an append-only reason and updated plan fingerprint. Preserve completed receipt

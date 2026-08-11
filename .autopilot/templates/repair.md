@@ -8,6 +8,11 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
+Parallel tasks may run focused checks only. Before any repository-wide validation,
+acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
+stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
+not retry. Release the lease after the one authoritative run.
+
 Read `.autopilot/README.md`, the node contract, prior receipt/failure evidence, the open
 PR, and failing CI logs. Repair only the accepted node scope. Do not restart the node
 from memory, broaden authority, weaken tests, erase adverse evidence, or switch models

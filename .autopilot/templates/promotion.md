@@ -13,6 +13,11 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
+Parallel tasks may run focused checks only. Before any repository-wide validation,
+acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
+stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
+not retry. Release the lease after the one authoritative run.
+
 Promotion changes future behavior. Require immutable challenger identity, retained
 baseline/candidate observations, repeated measurements, noise and regression guardrails,
 proposer/builder/evaluator/judge separation, and an append-only court decision. Only a

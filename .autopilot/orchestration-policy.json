@@ -94,6 +94,12 @@
       "release"
     ],
     "mode": "deterministic_priority_ordered_maximal_conflict_free",
-    "never_start_next_level_before_required_current_cohort_quiescence": true
+    "never_start_next_level_before_required_current_cohort_quiescence": true,
+    "repository_wide_validation": {
+      "duplicate_run_disposition": "stop_and_record_non_verdict",
+      "focused_checks_without_lease": true,
+      "lease_required": true,
+      "retry_while_another_owner_holds_lease": false
+    }
   }
 }

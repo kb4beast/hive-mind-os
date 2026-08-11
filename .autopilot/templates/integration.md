@@ -13,6 +13,11 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
+Parallel tasks may run focused checks only. Before any repository-wide validation,
+acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
+stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
+not retry. Release the lease after the one authoritative run.
+
 Read `.autopilot/README.md` and every dependency receipt. Claim the integration node
 remotely. Integrate only accepted immutable candidates in the declared order. Re-run
 contract, compatibility, security, and exact-candidate verification. Preserve dissent
