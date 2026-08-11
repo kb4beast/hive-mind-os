@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import concurrent.futures
 import json
 import shutil
 import sys
@@ -128,10 +129,75 @@ class Optimizer370PostExpiryCompletionTests(unittest.TestCase):
         with self.sealed_capability():
             record = self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
             path = self.plane._state_path("AUTHORIZED")
+            pending = path.with_name(path.name + ".pending")
             self.assertEqual(path.read_bytes(), post_expiry._canonical_file_bytes(record))
+            self.assertTrue(pending.is_file())
+            self.assertTrue(Path.samefile(path, pending))
             self.assertEqual(record["predecessor_digest"], post_expiry.AUTHORITY_DIGEST)
             with self.assertRaisesRegex(ClaimError, "one-time"):
                 self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
+
+    def test_orphan_pending_is_terminal_adverse_and_denies_reprepare(self) -> None:
+        path = self.plane._state_path("AUTHORIZED")
+        path.parent.mkdir(parents=True)
+        pending = path.with_name(path.name + ".pending")
+        pending.write_bytes(b"partial")
+        status = self.plane.post_expiry_completion_status()
+        self.assertEqual(status["state"], "ADVERSE")
+        self.assertFalse(status["state_valid"])
+        self.assertIn("orphan AUTHORIZED pending evidence", " ".join(status["issues"]))
+        with self.sealed_capability(), self.assertRaisesRegex(Exception, "terminal ADVERSE"):
+            self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
+
+    def test_nonlinked_pending_and_final_are_terminal_adverse(self) -> None:
+        path = self.plane._state_path("AUTHORIZED")
+        path.parent.mkdir(parents=True)
+        pending = path.with_name(path.name + ".pending")
+        pending.write_bytes(b"same")
+        path.write_bytes(b"same")
+        status = self.plane.post_expiry_completion_status()
+        self.assertEqual(status["state"], "ADVERSE")
+        self.assertIn("pending/final mismatch", " ".join(status["issues"]))
+
+    def test_short_write_leaves_only_terminal_pending_evidence(self) -> None:
+        with self.sealed_capability(), mock.patch.object(post_expiry.os, "write", return_value=0):
+            with self.assertRaisesRegex(OSError, "short durable state write"):
+                self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
+        path = self.plane._state_path("AUTHORIZED")
+        self.assertFalse(path.exists())
+        self.assertTrue(path.with_name(path.name + ".pending").exists())
+        self.assertEqual(self.plane.post_expiry_completion_status()["state"], "ADVERSE")
+
+    def test_link_failure_never_publishes_a_final_record(self) -> None:
+        with self.sealed_capability(), mock.patch.object(
+            post_expiry.os, "link", side_effect=OSError("injected link failure")
+        ):
+            with self.assertRaisesRegex(OSError, "injected link failure"):
+                self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
+        path = self.plane._state_path("AUTHORIZED")
+        self.assertFalse(path.exists())
+        self.assertTrue(path.with_name(path.name + ".pending").exists())
+        self.assertEqual(self.plane.post_expiry_completion_status()["state"], "ADVERSE")
+
+    def test_concurrent_prepare_has_exactly_one_publication(self) -> None:
+        def prepare() -> str:
+            try:
+                self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
+                return "published"
+            except (ClaimError, post_expiry.AutopilotError):
+                return "rejected"
+
+        with self.sealed_capability(), concurrent.futures.ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(lambda _index: prepare(), range(2)))
+            self.assertEqual(results.count("published"), 1)
+            self.assertEqual(results.count("rejected"), 1)
+            self.assertEqual(
+                self.plane.post_expiry_completion_status()["state"], "AUTHORIZED"
+            )
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows directory flush only")
+    def test_windows_directory_flush_uses_a_real_handle(self) -> None:
+        post_expiry.PostExpiryCompletionMixin._fsync_directory(self.common)
 
     def test_expiry_boundary_is_reported_without_transition(self) -> None:
         with self.sealed_capability():

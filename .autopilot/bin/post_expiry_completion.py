@@ -160,23 +160,43 @@ class PostExpiryCompletionMixin:
             wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
         )
         create_file.restype = wintypes.HANDLE
+        flush_file_buffers = kernel32.FlushFileBuffers
+        flush_file_buffers.argtypes = (wintypes.HANDLE,)
+        flush_file_buffers.restype = wintypes.BOOL
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = (wintypes.HANDLE,)
+        close_handle.restype = wintypes.BOOL
         handle = create_file(
-            str(path), 0x80000000, 0x00000007, None, 3, 0x02000000, None
+            str(path), 0x40000000, 0x00000007, None, 3, 0x02000000, None
         )
         if handle == wintypes.HANDLE(-1).value:
             raise OSError(ctypes.get_last_error(), "cannot open durable state directory")
+        flush_error: OSError | None = None
         try:
-            if not kernel32.FlushFileBuffers(handle):
-                raise OSError(ctypes.get_last_error(), "cannot flush durable state directory")
+            if not flush_file_buffers(handle):
+                flush_error = OSError(
+                    ctypes.get_last_error(), "cannot flush durable state directory"
+                )
         finally:
-            kernel32.CloseHandle(handle)
+            closed = bool(close_handle(handle))
+            close_error = ctypes.get_last_error() if not closed else 0
+        if flush_error is not None:
+            raise flush_error
+        if not closed:
+            raise OSError(close_error, "cannot close durable state directory")
 
     def _o_excl_state_write(self, path: Path, value: Mapping[str, Any]) -> None:
+        parent_existed = path.parent.exists()
         path.parent.mkdir(parents=True, exist_ok=True)
+        if not parent_existed:
+            self._fsync_directory(path.parent.parent)
         encoded = _canonical_file_bytes(value)
+        pending = path.with_name(path.name + ".pending")
+        if path.exists() or pending.exists():
+            raise ClaimError(f"post-expiry immutable state already exists: {path.name}")
         try:
             descriptor = os.open(
-                path,
+                pending,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
                 0o600,
             )
@@ -193,20 +213,50 @@ class PostExpiryCompletionMixin:
         finally:
             os.close(descriptor)
         self._fsync_directory(path.parent)
+        try:
+            os.link(pending, path)
+        except FileExistsError as error:
+            raise ClaimError(
+                f"post-expiry immutable state publication collided: {path.name}"
+            ) from error
+        self._fsync_directory(path.parent)
 
     def _state_records(self) -> list[tuple[str, Mapping[str, Any], str]]:
         records: list[tuple[str, Mapping[str, Any], str]] = []
         for status in STATE_ORDER:
             path = self._state_path(status)
+            pending = path.with_name(path.name + ".pending")
+            if pending.exists() and not path.exists():
+                raise AutopilotError(
+                    f"post-expiry terminal ADVERSE: orphan {status} pending evidence"
+                )
+            if path.exists() and not pending.exists():
+                raise AutopilotError(
+                    f"post-expiry terminal ADVERSE: {status} final lacks pending evidence"
+                )
             if not path.exists():
                 continue
+            try:
+                same_file = os.path.samefile(path, pending)
+            except OSError as error:
+                raise AutopilotError(
+                    f"post-expiry terminal ADVERSE: {status} link identity is unavailable"
+                ) from error
             raw = path.read_bytes()
+            if not same_file or pending.read_bytes() != raw:
+                raise AutopilotError(
+                    f"post-expiry terminal ADVERSE: {status} pending/final mismatch"
+                )
             try:
                 value = json.loads(raw)
             except (UnicodeError, json.JSONDecodeError) as error:
-                raise AutopilotError(f"post-expiry {status} state is unreadable") from error
+                raise AutopilotError(
+                    f"post-expiry terminal ADVERSE: {status} state is unreadable"
+                ) from error
             if not isinstance(value, Mapping) or raw != _canonical_file_bytes(value):
-                raise AutopilotError(f"post-expiry {status} state is not canonical")
+                raise AutopilotError(
+                    f"post-expiry terminal ADVERSE: {status} state is not canonical"
+                )
             records.append((status, value, _bytes_digest(raw)))
         return records
 
@@ -260,7 +310,11 @@ class PostExpiryCompletionMixin:
         static_issues = self.post_expiry_static_issues()
         state_issues = self.post_expiry_state_issues()
         records = [] if state_issues else self._state_records()
-        latest = records[-1][0] if records else "UNPREPARED"
+        latest = (
+            "ADVERSE"
+            if any("terminal ADVERSE" in issue for issue in state_issues)
+            else records[-1][0] if records else "UNPREPARED"
+        )
         expired = False
         if records and latest not in TERMINAL_STATES:
             try:
