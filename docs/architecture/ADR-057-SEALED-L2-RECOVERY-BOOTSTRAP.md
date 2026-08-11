@@ -64,7 +64,8 @@ fetched into a bounded non-symbolic verification ref, and rechecked before and a
 claim, receipt, and Builder remote transaction. The validation lease uses an `O_EXCL`
 filesystem mutex rather than a check-then-replace sequence. Replacement receipts accept
 only their exact schema, nonblank role identities and strings, integer versions, string
-evidence references, and a typed model-runtime record.
+evidence references, a typed model-runtime record, exact consultation/identity nesting,
+unique consulted identities, and canonical lowercase SHA-256 digests.
 
 Claim and completion intents are persisted before remote CAS. On restart, an exact
 `PREPARING`, `PREPARED`, expired `CLAIMED`, or `COMPLETING` state is either rolled back by

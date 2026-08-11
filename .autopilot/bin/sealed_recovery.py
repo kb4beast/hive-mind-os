@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
@@ -24,6 +25,7 @@ REPAIR_AUTHORITY_DOCUMENT = ".autopilot/sealed-repair-authorities.json"
 REPAIR_CLAIM_KIND = "hive-mind-autopilot-sealed-repair-claim-v1"
 REPAIR_DOCTOR_KIND = "hive-mind-autopilot-full-doctor-evidence-v1"
 REPAIR_DOCTOR_FILE = "sealed-repair-doctor.json"
+DIGEST_SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 REPAIR_AUTHORITY_MATERIAL_DIGESTS = {
     "OPTIMIZER-370": "sha256:380b642ffbc32892eee60fab8b9a23f3b1fdd9e5c66a5309f97c2d9a842ab4dd",
     "ORCH-300": "sha256:348714232a0be8a82bbf168fa96c55c52a155d4549955b6d8e113abcb26adc9d",
@@ -906,6 +908,42 @@ class SealedRecoveryMixin:
                     or any(not isinstance(item, str) or not item for item in command)
                 ):
                     issues.append("sealed replacement test record fields are invalid")
+        consultations = receipt.get("consultations")
+        consultation_keys = {
+            "request_id", "mission_id", "question", "reason_code", "requesting_role",
+            "consulted_roles", "round", "suspected_cheating", "evidence_refs", "decision",
+            "answer", "dissent", "human_escalation", "authority_class",
+            "role_first_exhausted", "cheating_disposition", "identity_records",
+        }
+        if not isinstance(consultations, list):
+            issues.append("sealed replacement consultations must be a list")
+        else:
+            for consultation in consultations:
+                if not isinstance(consultation, Mapping) or set(consultation) != consultation_keys:
+                    issues.append("sealed replacement consultation shape is expanded or incomplete")
+                    continue
+                consulted = consultation.get("consulted_roles")
+                if (
+                    not isinstance(consulted, list)
+                    or any(not isinstance(role, str) for role in consulted)
+                    or len(consulted) != len(set(consulted))
+                ):
+                    issues.append("sealed replacement consultation roles must be unique")
+                    consulted = []
+                identities = consultation.get("identity_records")
+                if not isinstance(identities, list):
+                    issues.append("sealed replacement consultation identities must be a list")
+                    continue
+                identity_roles: list[str] = []
+                for identity in identities:
+                    if not isinstance(identity, Mapping) or set(identity) != {"role", "identity", "identity_kind"}:
+                        issues.append("sealed replacement consultation identity shape is invalid")
+                        continue
+                    identity_roles.append(str(identity.get("role")))
+                if len(identity_roles) != len(set(identity_roles)):
+                    issues.append("sealed replacement consultation identities contain a duplicate role")
+                if set(identity_roles) != set(consulted):
+                    issues.append("sealed replacement consultation identities do not exactly cover consulted roles")
         return tuple(dict.fromkeys(issues))
 
     def _replacement_receipt_issues(
@@ -951,7 +989,7 @@ class SealedRecoveryMixin:
         if not isinstance(execution_target, str) or FULL_SHA.fullmatch(execution_target) is None:
             issues.append("sealed replacement execution_target_sha is invalid")
         claim_payload_digest = authority.get("repair_claim_payload_digest")
-        if not isinstance(claim_payload_digest, str) or not claim_payload_digest.startswith("sha256:") or len(claim_payload_digest) != 71:
+        if not isinstance(claim_payload_digest, str) or DIGEST_SHA256.fullmatch(claim_payload_digest) is None:
             issues.append("sealed replacement repair_claim_payload_digest is invalid")
         expected_base = record["incident_target_sha"] if node_id == "OPTIMIZER-370" else execution_target
         if receipt.get("base_commit") != expected_base:

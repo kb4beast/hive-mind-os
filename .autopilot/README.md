@@ -199,7 +199,9 @@ so an exact interrupted or expired lease can be verified and resumed or rolled b
 restart. Ambiguous or failed compensation remains `ADVERSE` with its intent and audit
 evidence intact. The global validation lease is an exclusive-create mutex, and replacement
 receipts are rejected unless their complete schema, identities, evidence references, and
-model-runtime record have the sealed types and nonblank values.
+model-runtime record have the sealed types and nonblank values. Consultation and identity
+rows have exact nested schemas and unique roles; authority digests use canonical lowercase
+SHA-256 syntax.
 
 `retire-builder-330-branch --actor IDENTITY` has no caller-selected remote/ref/SHA inputs.
 It may archive and retire only the sealed stale Builder head under an atomic source-head and

@@ -487,6 +487,22 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             "rollback_ref": "revert:repair",
         }
 
+    @staticmethod
+    def _consultation() -> dict:
+        return {
+            "request_id": "CONSULT-sealed", "mission_id": "MISSION-sealed",
+            "question": "Is this recovery evidence sufficient?", "reason_code": "AMBIGUITY",
+            "requesting_role": "builder", "consulted_roles": ["architect", "curator"],
+            "round": 1, "suspected_cheating": False, "evidence_refs": ["evidence:sealed"],
+            "decision": "RESOLVED", "answer": "Resolved from exact evidence", "dissent": [],
+            "human_escalation": False, "authority_class": None, "role_first_exhausted": True,
+            "cheating_disposition": "NOT_APPLICABLE",
+            "identity_records": [
+                {"role": "architect", "identity": "role:architect", "identity_kind": "model_role"},
+                {"role": "curator", "identity": "role:curator", "identity_kind": "model_role"},
+            ],
+        }
+
     def test_replacement_requires_supersedes_grant_exact_pr_and_scope(self) -> None:
         for node_id in ("OPTIMIZER-370", "ORCH-300"):
             self.assertEqual(self.plane._replacement_receipt_issues(node_id, self._receipt(node_id)), ())
@@ -504,6 +520,22 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
                     self.assertTrue(self.plane._replacement_receipt_issues(node_id, receipt))
 
     def test_replacement_receipt_rejects_schema_expansion_and_weak_types(self) -> None:
+        def consultation_mutation(receipt: dict, mutation: str) -> None:
+            consultation = self._consultation()
+            receipt["consultations"] = [consultation]
+            if mutation == "extra_consultation_key":
+                consultation["unexpected_nested_key"] = True
+            elif mutation == "extra_identity_key":
+                consultation["identity_records"][0]["unexpected_nested_key"] = True
+            elif mutation == "duplicate_identity":
+                consultation["identity_records"].append(copy.deepcopy(consultation["identity_records"][0]))
+            else:
+                consultation["consulted_roles"].append("architect")
+
+        valid = self._receipt("OPTIMIZER-370")
+        valid["consultations"] = [self._consultation()]
+        self.assertEqual(self.plane._replacement_receipt_issues("OPTIMIZER-370", valid), ())
+
         mutations = {
             "extra_top_level": lambda receipt: receipt.__setitem__("unexpected", True),
             "blank_identity": lambda receipt: receipt["role_identities"][0].__setitem__("identity", "  "),
@@ -514,6 +546,13 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             "duplicate_role": lambda receipt: receipt["role_identities"].append(
                 copy.deepcopy(receipt["role_identities"][0])
             ),
+            "non_hex_claim_digest": lambda receipt: receipt["authority"].__setitem__(
+                "repair_claim_payload_digest", "sha256:" + "g" * 64
+            ),
+            "extra_consultation_key": lambda receipt: consultation_mutation(receipt, "extra_consultation_key"),
+            "extra_identity_key": lambda receipt: consultation_mutation(receipt, "extra_identity_key"),
+            "duplicate_identity": lambda receipt: consultation_mutation(receipt, "duplicate_identity"),
+            "duplicate_consulted_role": lambda receipt: consultation_mutation(receipt, "duplicate_consulted_role"),
         }
         for name, mutate in mutations.items():
             receipt = self._receipt("OPTIMIZER-370")
