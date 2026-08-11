@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -293,7 +294,16 @@ def atomic_write_json(path: Path, value: object) -> None:
         temporary.flush()
         os.fsync(temporary.fileno())
         temporary_path = Path(temporary.name)
-    os.replace(temporary_path, path)
+    # Windows cannot reliably replace an open NamedTemporaryFile. Close the
+    # handle first, then retain a bounded retry for transient scanner/indexer locks.
+    for attempt in range(5):
+        try:
+            os.replace(temporary_path, path)
+            break
+        except PermissionError:
+            if os.name != "nt" or attempt == 4:
+                raise
+            time.sleep(0.01 * (2**attempt))
 
 
 def append_jsonl(path: Path, value: Mapping[str, object]) -> None:

@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
 SPEC = importlib.util.spec_from_file_location("blocker_controller", MODULE_PATH)
@@ -16,6 +17,30 @@ SPEC.loader.exec_module(controller)
 
 
 class BlockerProtocolTests(unittest.TestCase):
+    def test_atomic_json_write_retries_transient_windows_file_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "state.json"
+            real_replace = controller.os.replace
+            attempts = 0
+
+            def transient_replace(source, destination):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise PermissionError("transient scanner lock")
+                return real_replace(source, destination)
+
+            with (
+                mock.patch.object(controller.os, "name", "nt"),
+                mock.patch.object(controller.os, "replace", side_effect=transient_replace),
+                mock.patch.object(controller.time, "sleep") as pause,
+            ):
+                controller.atomic_write_json(target, {"status": "durable"})
+
+            self.assertEqual(controller.read_json(target), {"status": "durable"})
+            self.assertEqual(attempts, 2)
+            pause.assert_called_once_with(0.01)
+
     def test_blocker_packet_names_cause_fix_and_retry_condition(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
