@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Any, Callable, Iterable, Mapping
 
 from ..scheduler import Job, Scheduler, StaleLeaseError
 from .canonical import canonical_digest
@@ -70,6 +70,25 @@ class KernelWorker:
 
     def cancel(self, job: Job) -> None:
         self._transition(job, "CANCELLED")
+
+    def reconcile(
+        self,
+        observed: Mapping[str, Any],
+        *,
+        now: float | None = None,
+        policy: Any | None = None,
+    ) -> Any:
+        """Derive a bounded recovery plan without executing any repair.
+
+        The worker is an adapter only.  Explicit repair handlers remain the
+        caller's responsibility, which keeps leases, effects, and event history
+        under their existing authorities.
+        """
+
+        from .reconciler import DesiredStateReconciler
+
+        clock_now = self.scheduler.clock.now() if now is None else now
+        return DesiredStateReconciler(policy).reconcile(observed, now=clock_now)
 
     def run_once(self) -> bool:
         job = self.scheduler.claim(self.owner)
