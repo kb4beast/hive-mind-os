@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import unittest
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from typing import cast
 
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.optimizer import (
@@ -52,6 +53,36 @@ def _attribution() -> OutcomeAttribution:
     )
 
 
+def _attribution_material(value: OutcomeAttribution) -> dict[str, object]:
+    return {
+        "evidence_refs": value.evidence_refs,
+        "context_ref": value.context_ref,
+        "outcome_ref": value.outcome_ref,
+        "error_class": value.error_class,
+        "applicability": value.applicability,
+        "confidence": value.confidence,
+        "expires_at": value.expires_at,
+        "provenance_ref": value.provenance_ref,
+    }
+
+
+def _replace_attribution(
+    value: OutcomeAttribution, **updates: object
+) -> OutcomeAttribution:
+    bindings = _attribution_material(value)
+    bindings.update(updates)
+    return OutcomeAttribution(
+        evidence_refs=cast(tuple[str, ...], bindings["evidence_refs"]),
+        context_ref=cast(str, bindings["context_ref"]),
+        outcome_ref=cast(str, bindings["outcome_ref"]),
+        error_class=cast(str, bindings["error_class"]),
+        applicability=cast(tuple[str, ...], bindings["applicability"]),
+        confidence=cast(float, bindings["confidence"]),
+        expires_at=cast(str, bindings["expires_at"]),
+        provenance_ref=cast(str, bindings["provenance_ref"]),
+    )
+
+
 class OptimizerLessonTests(unittest.TestCase):
     def test_optimizer_lesson_tests_bind_all_required_attribution_fields(self) -> None:
         lesson = Optimizer().attribute_outcome(_attribution())
@@ -66,7 +97,7 @@ class OptimizerLessonTests(unittest.TestCase):
                 (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(), "ledger:x",
             )
         with self.assertRaisesRegex(OptimizerError, "expiry"):
-            replace(
+            _replace_attribution(
                 _attribution(),
                 expires_at=(datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
             )
@@ -74,28 +105,32 @@ class OptimizerLessonTests(unittest.TestCase):
     def test_optimizer_lesson_tests_reject_mutable_sequence_bindings(self) -> None:
         values = _attribution()
         with self.assertRaisesRegex(OptimizerError, "immutable tuples"):
-            replace(values, evidence_refs=["evidence:mutable"])  # type: ignore[arg-type]
+            _replace_attribution(values, evidence_refs=["evidence:mutable"])
         with self.assertRaisesRegex(OptimizerError, "immutable tuples"):
-            replace(values, applicability=["scope:mutable"])  # type: ignore[arg-type]
+            _replace_attribution(values, applicability=["scope:mutable"])
 
     def test_optimizer_lesson_tests_reject_scalar_and_container_subclasses(self) -> None:
         values = _attribution()
         with self.assertRaisesRegex(OptimizerError, "immutable tuples"):
-            replace(
+            _replace_attribution(
                 values,
                 evidence_refs=_TupleImpersonator(("evidence:subclass",)),
             )
         with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
-            replace(values, evidence_refs=(_StringImpersonator("evidence:1"),))
+            _replace_attribution(
+                values, evidence_refs=(_StringImpersonator("evidence:1"),)
+            )
         with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
-            replace(values, context_ref=_StringImpersonator("context:1"))
+            _replace_attribution(
+                values, context_ref=_StringImpersonator("context:1")
+            )
         with self.assertRaisesRegex(OptimizerError, "confidence"):
-            replace(values, confidence=_FloatImpersonator(0.8))
+            _replace_attribution(values, confidence=_FloatImpersonator(0.8))
 
     def test_optimizer_lesson_tests_do_not_retain_original_mutable_containers(self) -> None:
         evidence = ["evidence:run-1", "evidence:run-2"]
         applicability = ["python", "unit-tests"]
-        attribution = replace(
+        attribution = _replace_attribution(
             _attribution(),
             evidence_refs=tuple(evidence),
             applicability=tuple(applicability),
@@ -107,7 +142,7 @@ class OptimizerLessonTests(unittest.TestCase):
 
         self.assertEqual(
             lesson.lesson_digest,
-            canonical_digest(asdict(lesson.attribution)),
+            canonical_digest(_attribution_material(lesson.attribution)),
         )
 
     def test_optimizer_lesson_tests_reject_attribution_type_impersonation(self) -> None:
@@ -123,10 +158,26 @@ class OptimizerLessonTests(unittest.TestCase):
 
     def test_optimizer_lesson_tests_revalidate_mutated_attribution_at_use(self) -> None:
         attribution = _attribution()
-        object.__setattr__(attribution, "evidence_refs", ())
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(
+                attribution, "evidence_refs", ("evidence:replacement",)
+            )
 
+        bypassed = tuple.__new__(
+            OutcomeAttribution,
+            (
+                (),
+                attribution.context_ref,
+                attribution.outcome_ref,
+                attribution.error_class,
+                attribution.applicability,
+                attribution.confidence,
+                attribution.expires_at,
+                attribution.provenance_ref,
+            ),
+        )
         with self.assertRaisesRegex(OptimizerError, "retained evidence"):
-            Optimizer().attribute_outcome(attribution)
+            Optimizer().attribute_outcome(bypassed)
 
 
 class ChallengerProposalTests(unittest.TestCase):
@@ -178,14 +229,18 @@ class ChallengerProposalTests(unittest.TestCase):
                 lesson=lesson,
                 proposal_digest="sha256:forged",
             )
-        object.__setattr__(lesson, "lesson_digest", "sha256:unattested")
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(lesson, "lesson_digest", "sha256:unattested")
+        unattested_lesson = tuple.__new__(
+            ScopedLesson, (lesson.attribution, "sha256:unattested")
+        )
         with self.assertRaisesRegex(OptimizerError, "does not match its attribution"):
             ChallengerProposal(
                 challenger_id="candidate:v2",
                 parent_champion_id="champion:v1",
                 change_ref="prompt:sha256:change",
                 author_id="optimizer:author",
-                lesson=lesson,
+                lesson=unattested_lesson,
                 proposal_digest=canonical_digest(
                     {**bindings, "lesson_digest": "sha256:unattested"}
                 ),
@@ -200,7 +255,9 @@ class ChallengerProposalTests(unittest.TestCase):
         attribution = _attribution()
         with self.assertRaisesRegex(OptimizerError, "scoped lesson type is invalid"):
             Optimizer().propose_challenger(
-                FakeLesson(attribution, canonical_digest(asdict(attribution))),  # type: ignore[arg-type]
+                FakeLesson(
+                    attribution, canonical_digest(_attribution_material(attribution))
+                ),  # type: ignore[arg-type]
                 challenger_id="candidate:v2",
                 champion_id="champion:v1",
                 change_ref="prompt:sha256:change",
@@ -220,15 +277,46 @@ class ChallengerProposalTests(unittest.TestCase):
     def test_challenger_proposal_tests_reject_mutated_and_spaced_bindings(self) -> None:
         optimizer = Optimizer()
         lesson = optimizer.attribute_outcome(_attribution())
-        object.__setattr__(lesson.attribution, "evidence_refs", ())
-        object.__setattr__(
-            lesson,
-            "lesson_digest",
-            canonical_digest(asdict(lesson.attribution)),
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(
+                lesson.attribution,
+                "evidence_refs",
+                ("evidence:replacement",),
+            )
+        replacement_attribution = _replace_attribution(
+            lesson.attribution, evidence_refs=("evidence:replacement",)
+        )
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(lesson, "attribution", replacement_attribution)
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(
+                lesson,
+                "lesson_digest",
+                canonical_digest(_attribution_material(replacement_attribution)),
+            )
+        invalid_attribution = tuple.__new__(
+            OutcomeAttribution,
+            (
+                (),
+                lesson.attribution.context_ref,
+                lesson.attribution.outcome_ref,
+                lesson.attribution.error_class,
+                lesson.attribution.applicability,
+                lesson.attribution.confidence,
+                lesson.attribution.expires_at,
+                lesson.attribution.provenance_ref,
+            ),
+        )
+        bypassed_lesson = tuple.__new__(
+            ScopedLesson,
+            (
+                invalid_attribution,
+                canonical_digest(_attribution_material(invalid_attribution)),
+            ),
         )
         with self.assertRaisesRegex(OptimizerError, "retained evidence"):
             optimizer.propose_challenger(
-                lesson,
+                bypassed_lesson,
                 challenger_id="candidate:v2",
                 champion_id="champion:v1",
                 change_ref="prompt:sha256:change",
@@ -314,10 +402,35 @@ class SelfPromotionDenialTests(unittest.TestCase):
             change_ref="prompt:sha256:change",
             author_id="optimizer:author",
         )
-        object.__setattr__(proposal, "author_id", "curator:reviewer")
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(proposal, "author_id", "curator:reviewer")
+        recomputed_bindings = {
+            "challenger_id": proposal.challenger_id,
+            "parent_champion_id": proposal.parent_champion_id,
+            "change_ref": proposal.change_ref,
+            "author_id": "curator:reviewer",
+            "lesson_digest": proposal.lesson_digest,
+        }
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(
+                proposal,
+                "proposal_digest",
+                canonical_digest(recomputed_bindings),
+            )
+        bypassed_proposal = tuple.__new__(
+            ChallengerProposal,
+            (
+                proposal.challenger_id,
+                proposal.parent_champion_id,
+                proposal.change_ref,
+                proposal.author_id,
+                proposal.lesson,
+                "sha256:forged",
+            ),
+        )
         with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
             optimizer.recommend_independent_review(
-                proposal,
+                bypassed_proposal,
                 evaluator_id="optimizer:author",
                 evidence_complete=True,
             )
@@ -329,10 +442,22 @@ class SelfPromotionDenialTests(unittest.TestCase):
             change_ref="prompt:sha256:change",
             author_id="optimizer:author",
         )
-        object.__setattr__(proposal, "proposal_digest", "sha256:forged")
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(proposal, "proposal_digest", "sha256:forged")
+        bypassed_proposal = tuple.__new__(
+            ChallengerProposal,
+            (
+                proposal.challenger_id,
+                proposal.parent_champion_id,
+                proposal.change_ref,
+                proposal.author_id,
+                proposal.lesson,
+                "sha256:forged",
+            ),
+        )
         with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
             optimizer.recommend_independent_review(
-                proposal,
+                bypassed_proposal,
                 evaluator_id="curator:reviewer",
                 evidence_complete=True,
             )

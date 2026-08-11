@@ -8,7 +8,7 @@ evaluation, or promote anything.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import cast
@@ -31,51 +31,99 @@ class PromotionRecommendation(StrEnum):
     REQUEST_INDEPENDENT_REVIEW = "request-independent-review"
 
 
-@dataclass(frozen=True, slots=True)
-class OutcomeAttribution:
+class OutcomeAttribution(tuple[object, ...]):
     """The minimum retained facts from which a reusable lesson can be derived."""
 
-    evidence_refs: tuple[str, ...]
-    context_ref: str
-    outcome_ref: str
-    error_class: str
-    applicability: tuple[str, ...]
-    confidence: float
-    expires_at: str
-    provenance_ref: str
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        _validate_outcome_attribution(self)
+    def __new__(
+        cls,
+        evidence_refs: tuple[str, ...],
+        context_ref: str,
+        outcome_ref: str,
+        error_class: str,
+        applicability: tuple[str, ...],
+        confidence: float,
+        expires_at: str,
+        provenance_ref: str,
+    ) -> OutcomeAttribution:
+        value = tuple.__new__(
+            cls,
+            (
+                evidence_refs,
+                context_ref,
+                outcome_ref,
+                error_class,
+                applicability,
+                confidence,
+                expires_at,
+                provenance_ref,
+            ),
+        )
+        _validate_outcome_attribution(value)
+        return value
+
+    evidence_refs = property(lambda self: cast(tuple[str, ...], self[0]))
+    context_ref = property(lambda self: cast(str, self[1]))
+    outcome_ref = property(lambda self: cast(str, self[2]))
+    error_class = property(lambda self: cast(str, self[3]))
+    applicability = property(lambda self: cast(tuple[str, ...], self[4]))
+    confidence = property(lambda self: cast(float, self[5]))
+    expires_at = property(lambda self: cast(str, self[6]))
+    provenance_ref = property(lambda self: cast(str, self[7]))
 
 
-@dataclass(frozen=True, slots=True)
-class ScopedLesson:
+class ScopedLesson(tuple[object, ...]):
     """An immutable, provenance-bound lesson candidate."""
 
-    attribution: OutcomeAttribution
-    lesson_digest: str
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        _validate_scoped_lesson(self)
+    def __new__(
+        cls, attribution: OutcomeAttribution, lesson_digest: str
+    ) -> ScopedLesson:
+        value = tuple.__new__(cls, (attribution, lesson_digest))
+        _validate_scoped_lesson(value)
+        return value
+
+    attribution = property(lambda self: cast(OutcomeAttribution, self[0]))
+    lesson_digest = property(lambda self: cast(str, self[1]))
 
 
-@dataclass(frozen=True, slots=True)
-class ChallengerProposal:
+class ChallengerProposal(tuple[object, ...]):
     """An immutable alternative; it contains no mutable champion reference."""
 
-    challenger_id: str
-    parent_champion_id: str
-    change_ref: str
-    author_id: str
-    lesson: ScopedLesson
-    proposal_digest: str
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        _validate_challenger_proposal(self)
+    def __new__(
+        cls,
+        challenger_id: str,
+        parent_champion_id: str,
+        change_ref: str,
+        author_id: str,
+        lesson: ScopedLesson,
+        proposal_digest: str,
+    ) -> ChallengerProposal:
+        value = tuple.__new__(
+            cls,
+            (
+                challenger_id,
+                parent_champion_id,
+                change_ref,
+                author_id,
+                lesson,
+                proposal_digest,
+            ),
+        )
+        _validate_challenger_proposal(value)
+        return value
 
-    @property
-    def lesson_digest(self) -> str:
-        return self.lesson.lesson_digest
+    challenger_id = property(lambda self: cast(str, self[0]))
+    parent_champion_id = property(lambda self: cast(str, self[1]))
+    change_ref = property(lambda self: cast(str, self[2]))
+    author_id = property(lambda self: cast(str, self[3]))
+    lesson = property(lambda self: cast(ScopedLesson, self[4]))
+    proposal_digest = property(lambda self: cast(str, self[5]))
+    lesson_digest = property(lambda self: self.lesson.lesson_digest)
 
 
 def _require_trimmed_string(value: object, label: str) -> str:
@@ -128,9 +176,22 @@ def _validate_scoped_lesson(value: object) -> ScopedLesson:
         raise OptimizerError("scoped lesson type is invalid")
     attribution = _validate_outcome_attribution(value.attribution)
     _require_trimmed_string(value.lesson_digest, "lesson digest")
-    if value.lesson_digest != canonical_digest(asdict(attribution)):
+    if value.lesson_digest != canonical_digest(_attribution_material(attribution)):
         raise OptimizerError("lesson digest does not match its attribution")
     return value
+
+
+def _attribution_material(value: OutcomeAttribution) -> dict[str, object]:
+    return {
+        "evidence_refs": value.evidence_refs,
+        "context_ref": value.context_ref,
+        "outcome_ref": value.outcome_ref,
+        "error_class": value.error_class,
+        "applicability": value.applicability,
+        "confidence": value.confidence,
+        "expires_at": value.expires_at,
+        "provenance_ref": value.provenance_ref,
+    }
 
 
 def _proposal_material(value: ChallengerProposal) -> dict[str, str]:
@@ -179,7 +240,7 @@ class Optimizer:
         _validate_outcome_attribution(attribution)
         return ScopedLesson(
             attribution=attribution,
-            lesson_digest=canonical_digest(asdict(attribution)),
+            lesson_digest=canonical_digest(_attribution_material(attribution)),
         )
 
     def propose_challenger(
