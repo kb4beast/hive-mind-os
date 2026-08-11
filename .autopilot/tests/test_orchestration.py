@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import copy
+import io
 import json
 import os
 import shutil
@@ -15,6 +17,7 @@ BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
+from autopilot import parser as autopilot_parser  # noqa: E402
 from autopilot import select_orchestration_status  # noqa: E402
 from orchestration import (  # noqa: E402
     OrchestrationError,
@@ -22,9 +25,8 @@ from orchestration import (  # noqa: E402
     binding_events,
     build_orchestration_contract,
     infer_intent,
-    observe_terminal_launch,
     prepare_launch,
-    release_launch,
+    release_terminal_launch,
     should_publish_release,
     simple_prompt,
     validate_policy,
@@ -218,6 +220,7 @@ class IntentOrchestrationTests(unittest.TestCase):
             "thread-123",
             host_id="local",
             cursor="cursor-1",
+            capability="capability-1",
         )
         self.assertEqual(bound["state"], "BOUND")
         running_status = self.status(
@@ -232,81 +235,98 @@ class IntentOrchestrationTests(unittest.TestCase):
         self.assertEqual(resumed["tasks"][0]["action"], "RESUME_BOUND")
         self.assertEqual(resumed["tasks"][0]["binding"]["task_id"], "thread-123")
         self.assertEqual([event["state"] for event in binding_events(self.root)], ["PREPARED", "CREATED", "BOUND"])
-        terminal = observe_terminal_launch(
+        released = release_terminal_launch(
             self.root,
             instruction_id,
+            host="codex",
+            host_id="local",
+            task_id="thread-123",
+            cursor="cursor-1",
+            capability="capability-1",
             terminal_state="SUCCEEDED",
-            host_event_ref="codex-thread:thread-123:terminal",
-            observed_by="orchestrator:fixture",
+            host_event_id="terminal-123",
+            host_event_cursor="terminal-cursor-123",
         )
-        release_launch(
-            self.root,
-            instruction_id,
-            terminal_event_id=terminal["event_id"],
-            reason="host task reached a terminal result",
-        )
+        self.assertEqual(released["state"], "RELEASED")
         self.assertEqual(
             [event["state"] for event in binding_events(self.root)],
-            ["PREPARED", "CREATED", "BOUND", "TERMINAL_OBSERVED", "RELEASED"],
+            ["PREPARED", "CREATED", "BOUND", "RELEASED"],
         )
 
     def test_release_launch_requires_terminal_evidence(self) -> None:
         instruction_id = "sha256:" + "2" * 64
         prepare_launch(self.root, instruction_id, "codex")
-        bind_launch(self.root, instruction_id, "codex", "thread-live")
+        bind_launch(
+            self.root, instruction_id, "codex", "thread-live",
+            host_id="host", cursor="cursor", capability="capability"
+        )
         with self.assertRaises(Exception):
-            observe_terminal_launch(
+            release_terminal_launch(
                 self.root,
                 instruction_id,
+                host="codex",
+                host_id="host",
+                task_id="thread-live",
+                cursor="cursor",
+                capability="forged",
                 terminal_state="SUCCEEDED",
-                host_event_ref="unbound-event",
-                observed_by="orchestrator:fixture",
+                host_event_id="forged-terminal",
+                host_event_cursor="forged-cursor",
             )
-        with self.assertRaises(Exception):
-            release_launch(
-                self.root,
-                instruction_id,
-                terminal_event_id="sha256:" + "0" * 64,
-                reason="still running",
-            )
+        self.assertEqual(binding_events(self.root)[-1]["state"], "BOUND")
+
+    def test_raw_cli_cannot_assert_terminal_host_evidence(self) -> None:
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                autopilot_parser().parse_args(
+                    ["--repo-root", str(self.root), "record-launch-terminal"]
+                )
+            with self.assertRaises(SystemExit):
+                autopilot_parser().parse_args(
+                    ["--repo-root", str(self.root), "release-launch"]
+                )
 
     def test_successful_release_is_an_idempotency_tombstone(self) -> None:
         instruction_id = "sha256:" + "5" * 64
         prepare_launch(self.root, instruction_id, "codex")
-        bind_launch(self.root, instruction_id, "codex", "thread-success")
-        terminal = observe_terminal_launch(
-            self.root,
-            instruction_id,
-            terminal_state="SUCCEEDED",
-            host_event_ref="codex-thread:thread-success:terminal",
-            observed_by="orchestrator:fixture",
+        bind_launch(
+            self.root, instruction_id, "codex", "thread-success",
+            host_id="host", cursor="cursor", capability="capability"
         )
-        released = release_launch(
+        released = release_terminal_launch(
             self.root,
             instruction_id,
-            terminal_event_id=str(terminal["event_id"]),
-            reason="successful host completion",
+            host="codex",
+            host_id="host",
+            task_id="thread-success",
+            cursor="cursor",
+            capability="capability",
+            terminal_state="SUCCEEDED",
+            host_event_id="success-terminal",
+            host_event_cursor="success-cursor",
         )
         replay = prepare_launch(self.root, instruction_id, "codex")
         self.assertEqual(replay["event_id"], released["event_id"])
-        self.assertEqual(len(binding_events(self.root)), 5)
+        self.assertEqual(len(binding_events(self.root)), 4)
 
     def test_failed_retry_requires_new_instruction_and_explicit_lineage(self) -> None:
         first_id = "sha256:" + "6" * 64
         prepare_launch(self.root, first_id, "codex")
-        bind_launch(self.root, first_id, "codex", "thread-failed")
-        terminal = observe_terminal_launch(
-            self.root,
-            first_id,
-            terminal_state="FAILED",
-            host_event_ref="codex-thread:thread-failed:terminal",
-            observed_by="orchestrator:fixture",
+        bind_launch(
+            self.root, first_id, "codex", "thread-failed",
+            host_id="host", cursor="cursor", capability="capability"
         )
-        released = release_launch(
+        released = release_terminal_launch(
             self.root,
             first_id,
-            terminal_event_id=str(terminal["event_id"]),
-            reason="failed host completion",
+            host="codex",
+            host_id="host",
+            task_id="thread-failed",
+            cursor="cursor",
+            capability="capability",
+            terminal_state="FAILED",
+            host_event_id="failed-terminal",
+            host_event_cursor="failed-cursor",
         )
         with self.assertRaises(OrchestrationError):
             prepare_launch(self.root, first_id, "codex")
@@ -315,6 +335,7 @@ class IntentOrchestrationTests(unittest.TestCase):
             self.root,
             second_id,
             "codex",
+            attempt=2,
             retry_of=str(released["event_id"]),
         )
         self.assertEqual(retry["attempt"], 2)
@@ -327,19 +348,21 @@ class IntentOrchestrationTests(unittest.TestCase):
         plane = FakePlane(self.root, status, self.nodes)
         first = build_orchestration_contract(plane, "start", status=status)["tasks"][0]
         prepare_launch(self.root, first["launch_instruction_id"], "codex")
-        bind_launch(self.root, first["launch_instruction_id"], "codex", "thread-failed-contract")
-        terminal = observe_terminal_launch(
-            self.root,
-            first["launch_instruction_id"],
-            terminal_state="FAILED",
-            host_event_ref="codex-thread:thread-failed-contract:terminal",
-            observed_by="orchestrator:fixture",
+        bind_launch(
+            self.root, first["launch_instruction_id"], "codex", "thread-failed-contract",
+            host_id="host", cursor="cursor", capability="capability"
         )
-        released = release_launch(
+        released = release_terminal_launch(
             self.root,
             first["launch_instruction_id"],
-            terminal_event_id=str(terminal["event_id"]),
-            reason="host task failed",
+            host="codex",
+            host_id="host",
+            task_id="thread-failed-contract",
+            cursor="cursor",
+            capability="capability",
+            terminal_state="FAILED",
+            host_event_id="contract-failed-terminal",
+            host_event_cursor="contract-failed-cursor",
         )
         retry = build_orchestration_contract(plane, "start", status=status)["tasks"][0]
         self.assertNotEqual(first["launch_instruction_id"], retry["launch_instruction_id"])
@@ -349,6 +372,7 @@ class IntentOrchestrationTests(unittest.TestCase):
             self.root,
             retry["launch_instruction_id"],
             "codex",
+            attempt=retry["attempt"],
             retry_of=retry["retry_of"],
         )
         self.assertEqual(prepared["attempt"], 2)
@@ -367,7 +391,10 @@ class IntentOrchestrationTests(unittest.TestCase):
         instruction_id = "sha256:" + "4" * 64
         prepare_launch(self.root, instruction_id, "codex")
         with self.assertRaises(Exception):
-            bind_launch(self.root, instruction_id, "other-host", "foreign-task")
+            bind_launch(
+                self.root, instruction_id, "other-host", "foreign-task",
+                capability="foreign-capability"
+            )
 
     def test_concurrent_prepare_launch_is_idempotent_and_hash_chained(self) -> None:
         instruction_id = "sha256:" + "3" * 64
@@ -413,7 +440,10 @@ class IntentOrchestrationTests(unittest.TestCase):
         plane = FakePlane(self.root, status, self.nodes)
         instruction_id = "sha256:" + "1" * 64
         prepare_launch(self.root, instruction_id, "codex")
-        bind_launch(self.root, instruction_id, "codex", "thread-live")
+        bind_launch(
+            self.root, instruction_id, "codex", "thread-live",
+            capability="capability"
+        )
         contract = build_orchestration_contract(plane, "check", status=status)
         self.assertEqual(contract["outcome"], "ACTIVE")
         self.assertFalse(contract["quiescent"])

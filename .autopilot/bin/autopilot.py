@@ -29,9 +29,7 @@ from orchestration import (
     build_orchestration_contract,
     infer_intent,
     load_policy,
-    observe_terminal_launch,
     prepare_launch,
-    release_launch,
     should_publish_release,
     simple_prompt,
 )
@@ -769,6 +767,7 @@ def parser() -> argparse.ArgumentParser:
     prepare = commands.add_parser("prepare-launch")
     prepare.add_argument("instruction_id")
     prepare.add_argument("--host", required=True)
+    prepare.add_argument("--attempt", type=int, default=1)
     prepare.add_argument("--retry-of")
 
     bind = commands.add_parser("bind-launch")
@@ -777,19 +776,7 @@ def parser() -> argparse.ArgumentParser:
     bind.add_argument("--task-id", required=True)
     bind.add_argument("--host-id")
     bind.add_argument("--cursor")
-
-    terminal = commands.add_parser("record-launch-terminal")
-    terminal.add_argument("instruction_id")
-    terminal.add_argument(
-        "--terminal-state", choices=("SUCCEEDED", "FAILED", "CANCELLED"), required=True
-    )
-    terminal.add_argument("--host-event-ref", required=True)
-    terminal.add_argument("--observed-by", required=True)
-
-    release_binding = commands.add_parser("release-launch")
-    release_binding.add_argument("instruction_id")
-    release_binding.add_argument("--terminal-event", required=True)
-    release_binding.add_argument("--reason", required=True)
+    bind.add_argument("--capability", required=True)
 
     commands.add_parser("launch-bindings")
 
@@ -1061,6 +1048,7 @@ def main(argv: list[str] | None = None) -> int:
                         plane.repo_root,
                         args.instruction_id,
                         args.host,
+                        attempt=args.attempt,
                         retry_of=args.retry_of,
                     ),
                     indent=2,
@@ -1078,35 +1066,7 @@ def main(argv: list[str] | None = None) -> int:
                         args.task_id,
                         host_id=args.host_id,
                         cursor=args.cursor,
-                    ),
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 0
-        if args.command == "release-launch":
-            print(
-                json.dumps(
-                    release_launch(
-                        plane.repo_root,
-                        args.instruction_id,
-                        terminal_event_id=args.terminal_event,
-                        reason=args.reason,
-                    ),
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 0
-        if args.command == "record-launch-terminal":
-            print(
-                json.dumps(
-                    observe_terminal_launch(
-                        plane.repo_root,
-                        args.instruction_id,
-                        terminal_state=args.terminal_state,
-                        host_event_ref=args.host_event_ref,
-                        observed_by=args.observed_by,
+                        capability=args.capability,
                     ),
                     indent=2,
                     sort_keys=True,

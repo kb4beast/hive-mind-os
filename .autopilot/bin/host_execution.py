@@ -1,9 +1,4 @@
-"""Bounded host execution for v1 Autopilot orchestration contracts.
-
-The repository controller emits host-neutral work.  This module is the reusable
-host-side loop that turns that work into durable tasks while keeping host events
-strictly bound to the task capability returned at creation time.
-"""
+"""Capability-bound, crash-safe host execution for Autopilot contracts."""
 
 from __future__ import annotations
 
@@ -15,10 +10,13 @@ from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
 from orchestration import (
+    active_launch_bindings,
     bind_launch,
-    observe_terminal_launch,
+    binding_events,
     prepare_launch,
-    release_launch,
+    record_host_progress,
+    release_terminal_launch,
+    singleton_target_branch,
 )
 
 CONTRACT_KIND = "hive-mind-autopilot-orchestration-contract-v1"
@@ -54,6 +52,7 @@ _ACK_KEYS = frozenset(
         "capability",
         "accepted",
         "message_id",
+        "idempotency_key",
     }
 )
 
@@ -63,7 +62,15 @@ class HostExecutionError(RuntimeError):
 
 
 class HostAdapter(Protocol):
-    """Durable task host used by :func:`execute_contract`."""
+    """Durable task host used by :func:`execute_contract`.
+
+    ``lookup_thread`` and idempotent messages make adoption safe after a parent
+    crash between an external side effect and its local ledger append.
+    """
+
+    def lookup_thread(self, *, idempotency_key: str) -> Mapping[str, object] | None: ...
+
+    def trusted_singleton_target(self, *, repo_root: Path) -> str: ...
 
     def create_thread(
         self, *, title: str, prompt: str, idempotency_key: str
@@ -81,12 +88,13 @@ class HostAdapter(Protocol):
         cursor: str,
         capability: str,
         message: str,
+        idempotency_key: str,
     ) -> Mapping[str, object]: ...
+
+    def inspect_runtime_authority(self, *, repo_root: Path) -> Mapping[str, object]: ...
 
 
 class SafeResolver(Protocol):
-    """Produces an in-authority answer for a task attention request."""
-
     def resolve_attention(
         self, task: Mapping[str, object], event: Mapping[str, object]
     ) -> str: ...
@@ -126,15 +134,18 @@ def _required_text(value: object, field: str) -> str:
 def _exact_keys(value: Mapping[str, object], expected: frozenset[str], subject: str) -> None:
     actual = frozenset(value)
     if actual != expected:
-        missing = sorted(expected - actual)
-        unknown = sorted(actual - expected)
         raise HostExecutionError(
-            f"{subject} has invalid fields; missing={missing}, unknown={unknown}"
+            f"{subject} has invalid fields; missing={sorted(expected - actual)}, "
+            f"unknown={sorted(actual - expected)}"
         )
 
 
-def validate_contract(contract: Mapping[str, object]) -> tuple[Mapping[str, object], ...]:
-    """Validate the executable subset of a v1 orchestration contract."""
+def validate_contract(
+    repo_root: Path,
+    contract: Mapping[str, object],
+    trusted_target_branch: str,
+) -> tuple[Mapping[str, object], ...]:
+    """Validate execution policy, retry lineage, and singleton target authority."""
 
     if contract.get("schema_version") != 1 or contract.get("kind") != CONTRACT_KIND:
         raise HostExecutionError("expected a v1 Autopilot orchestration contract")
@@ -143,9 +154,18 @@ def validate_contract(contract: Mapping[str, object]) -> tuple[Mapping[str, obje
         raise HostExecutionError("contract_id must be a SHA-256 digest")
     material = dict(contract)
     material.pop("contract_id", None)
-    expected_id = "sha256:" + sha256(_canonical(material)).hexdigest()
-    if contract_id != expected_id:
+    if contract_id != "sha256:" + sha256(_canonical(material)).hexdigest():
         raise HostExecutionError("contract_id does not authenticate the contract body")
+    target_branch = singleton_target_branch(repo_root)
+    if (
+        not isinstance(trusted_target_branch, str)
+        or not trusted_target_branch.strip()
+        or trusted_target_branch == "main"
+        or trusted_target_branch != target_branch
+    ):
+        raise HostExecutionError("host trust does not authorize the singleton target")
+    if contract.get("target_branch") != target_branch:
+        raise HostExecutionError("contract target does not match the trusted singleton target")
     execution = contract.get("execution")
     if not isinstance(execution, Mapping):
         raise HostExecutionError("contract execution policy is required")
@@ -161,6 +181,12 @@ def validate_contract(contract: Mapping[str, object]) -> tuple[Mapping[str, obje
     raw_tasks = contract.get("tasks")
     if not isinstance(raw_tasks, list):
         raise HostExecutionError("contract tasks must be a list")
+    claims = contract.get("active_claims", [])
+    lease = contract.get("active_validation_lease")
+    if not isinstance(claims, list):
+        raise HostExecutionError("contract active_claims must be a list")
+    if lease is not None and not isinstance(lease, Mapping):
+        raise HostExecutionError("contract active_validation_lease must be an object or null")
     tasks: list[Mapping[str, object]] = []
     seen: set[str] = set()
     for index, raw in enumerate(raw_tasks):
@@ -180,16 +206,24 @@ def validate_contract(contract: Mapping[str, object]) -> tuple[Mapping[str, obje
             raise HostExecutionError("task required must be boolean")
         if raw.get("transport") != "durable_user_owned_task":
             raise HostExecutionError("task transport must be durable_user_owned_task")
+        if raw.get("target_branch") != target_branch:
+            raise HostExecutionError("task target does not match the trusted singleton target")
+        attempt = raw.get("attempt")
+        retry_of = raw.get("retry_of")
+        if type(attempt) is not int or attempt < 1:
+            raise HostExecutionError("task attempt must be a positive integer")
+        if attempt == 1 and retry_of is not None:
+            raise HostExecutionError("first launch attempt cannot have retry lineage")
+        if attempt > 1 and (not isinstance(retry_of, str) or not _DIGEST.fullmatch(retry_of)):
+            raise HostExecutionError("retry attempt requires a released event digest")
         tasks.append(raw)
     return tuple(tasks)
 
 
 def _validate_creation(value: Mapping[str, object], instruction_id: str) -> _Binding:
-    _exact_keys(value, _CREATE_KEYS, "create_thread result")
-    if value.get("kind") != CREATE_KIND:
-        raise HostExecutionError("create_thread returned an unknown result kind")
-    if value.get("idempotency_key") != instruction_id:
-        raise HostExecutionError("create_thread did not bind the launch idempotency key")
+    _exact_keys(value, _CREATE_KEYS, "host task binding")
+    if value.get("kind") != CREATE_KIND or value.get("idempotency_key") != instruction_id:
+        raise HostExecutionError("host task does not bind the launch idempotency key")
     return _Binding(
         instruction_id=instruction_id,
         task={},
@@ -200,19 +234,33 @@ def _validate_creation(value: Mapping[str, object], instruction_id: str) -> _Bin
     )
 
 
+def _validate_adoption(created: _Binding, persisted: Mapping[str, object]) -> None:
+    for field, actual in {
+        "host_id": created.host_id,
+        "task_id": created.task_id,
+        "cursor": created.cursor,
+    }.items():
+        expected = persisted.get(field)
+        if expected is not None and expected != actual:
+            raise HostExecutionError(f"looked-up host task conflicts with persisted {field}")
+    expected_digest = persisted.get("capability_digest")
+    actual_digest = "sha256:" + sha256(created.capability.encode("utf-8")).hexdigest()
+    if expected_digest is not None and expected_digest != actual_digest:
+        raise HostExecutionError("looked-up host task has a different capability")
+
+
 def _validate_event(value: Mapping[str, object], binding: _Binding) -> None:
     state = value.get("state")
     expected_keys = _EVENT_BASE_KEYS | ({"attention"} if state == "NEEDS_ATTENTION" else set())
     _exact_keys(value, frozenset(expected_keys), "host event")
     if value.get("kind") != EVENT_KIND or state not in EVENT_STATES:
         raise HostExecutionError("host returned an unknown event kind or state")
-    expected_binding = {
+    for field, expected in {
         "host_id": binding.host_id,
         "task_id": binding.task_id,
         "cursor": binding.cursor,
         "capability": binding.capability,
-    }
-    for field, expected in expected_binding.items():
+    }.items():
         if value.get(field) != expected:
             raise HostExecutionError(f"host event has forged or mismatched {field}")
     _required_text(value.get("event_id"), "event_id")
@@ -221,7 +269,7 @@ def _validate_event(value: Mapping[str, object], binding: _Binding) -> None:
         _required_text(value.get("attention"), "attention")
 
 
-def _validate_ack(value: Mapping[str, object], binding: _Binding) -> None:
+def _validate_ack(value: Mapping[str, object], binding: _Binding, key: str) -> None:
     _exact_keys(value, _ACK_KEYS, "send_message_to_thread result")
     if value.get("kind") != ACK_KIND or value.get("accepted") is not True:
         raise HostExecutionError("host did not accept the recovery message")
@@ -230,20 +278,70 @@ def _validate_ack(value: Mapping[str, object], binding: _Binding) -> None:
         "task_id": binding.task_id,
         "cursor": binding.cursor,
         "capability": binding.capability,
+        "idempotency_key": key,
     }.items():
         if value.get(field) != expected:
             raise HostExecutionError(f"message acknowledgement has mismatched {field}")
     _required_text(value.get("message_id"), "message_id")
 
 
-def _blocker(code: str, message: str, active: Sequence[_Binding], limit: int) -> dict[str, object]:
+def _blocker(code: str, message: str, active: Sequence[_Binding], **extra: object) -> dict[str, object]:
     return {
         "kind": BLOCKER_KIND,
         "code": code,
         "message": message,
-        "max_no_progress_cycles": limit,
         "active_launch_instruction_ids": sorted(item.instruction_id for item in active),
+        **extra,
     }
+
+
+def _blocked(
+    code: str,
+    message: str,
+    active: Sequence[_Binding],
+    terminal: Mapping[str, str],
+    **extra: object,
+) -> dict[str, object]:
+    required = [item.instruction_id for item in active if item.task.get("required") is True]
+    return {
+        "schema_version": 1,
+        "kind": RESULT_KIND,
+        "outcome": "BLOCKED",
+        "successful": False,
+        "quiescent": False,
+        "required_active": sorted(required),
+        "terminal": dict(sorted(terminal.items())),
+        "blocker": _blocker(code, message, active, **extra),
+    }
+
+
+def _runtime_authority(
+    repo_root: Path,
+    contract: Mapping[str, object],
+    adapter: HostAdapter,
+    trusted_target_branch: str,
+) -> tuple[list[object], Mapping[str, object] | None, bool]:
+    current = adapter.inspect_runtime_authority(repo_root=repo_root)
+    if not isinstance(current, Mapping):
+        raise HostExecutionError("runtime authority inspection must return an object")
+    claims = current.get("active_claims")
+    lease = current.get("active_validation_lease")
+    quiescent = current.get("quiescent")
+    if current.get("target_branch") != trusted_target_branch:
+        raise HostExecutionError("runtime authority inspection changed the trusted target")
+    if not isinstance(claims, list):
+        raise HostExecutionError("runtime authority active_claims must be a list")
+    if lease is not None and not isinstance(lease, Mapping):
+        raise HostExecutionError("runtime authority validation lease must be an object or null")
+    if type(quiescent) is not bool:
+        raise HostExecutionError("runtime authority quiescent flag must be boolean")
+    snapshot_claims = contract.get("active_claims", [])
+    snapshot_lease = contract.get("active_validation_lease")
+    combined_claims = list(snapshot_claims) if isinstance(snapshot_claims, list) else []
+    combined_claims.extend(claims)
+    return combined_claims, lease if lease is not None else (
+        snapshot_lease if isinstance(snapshot_lease, Mapping) else None
+    ), quiescent
 
 
 def execute_contract(
@@ -254,28 +352,47 @@ def execute_contract(
     *,
     host: str = "codex",
     max_no_progress_cycles: int = 3,
+    max_poll_cycles: int = 100,
+    max_replay_events: int = 3,
 ) -> dict[str, object]:
-    """Create, supervise, recover, and close every task in a v1 contract."""
+    """Create or adopt a complete wave, supervise it, and close only on live truth."""
 
-    if max_no_progress_cycles < 1:
-        raise HostExecutionError("max_no_progress_cycles must be at least one")
-    tasks = validate_contract(contract)
+    if min(max_no_progress_cycles, max_poll_cycles, max_replay_events) < 1:
+        raise HostExecutionError("host polling bounds must be positive")
+    trusted_target_branch = adapter.trusted_singleton_target(repo_root=repo_root)
+    tasks = validate_contract(repo_root, contract, trusted_target_branch)
     active: dict[str, _Binding] = {}
     terminal: dict[str, str] = {}
-    event_cursors: dict[str, str] = {}
 
-    # This phase intentionally completes for every task before the first wait.
+    # Every task is created or crash-safely adopted before the first wait.
     for task in tasks:
         instruction_id = str(task["launch_instruction_id"])
-        prepare_launch(repo_root, instruction_id, host)
-        created_raw = adapter.create_thread(
-            title=str(task["title"]),
-            prompt=str(task["prompt"]),
-            idempotency_key=instruction_id,
+        attempt = task.get("attempt")
+        if type(attempt) is not int:
+            raise HostExecutionError("validated task attempt changed before launch")
+        prepared = prepare_launch(
+            repo_root,
+            instruction_id,
+            host,
+            attempt=attempt,
+            retry_of=str(task["retry_of"]) if task.get("retry_of") is not None else None,
         )
-        if not isinstance(created_raw, Mapping):
-            raise HostExecutionError("create_thread result must be an object")
-        created = _validate_creation(created_raw, instruction_id)
+        if prepared.get("state") == "RELEASED" and prepared.get("terminal_state") == "SUCCEEDED":
+            terminal[instruction_id] = "SUCCEEDED"
+            continue
+        looked_up = adapter.lookup_thread(idempotency_key=instruction_id)
+        if looked_up is None:
+            if prepared.get("state") not in {"PREPARED"}:
+                raise HostExecutionError("persisted host binding cannot be recovered by idempotency key")
+            looked_up = adapter.create_thread(
+                title=str(task["title"]),
+                prompt=str(task["prompt"]),
+                idempotency_key=instruction_id,
+            )
+        if not isinstance(looked_up, Mapping):
+            raise HostExecutionError("host task lookup or creation must return an object")
+        created = _validate_creation(looked_up, instruction_id)
+        _validate_adoption(created, prepared)
         binding = _Binding(
             instruction_id=instruction_id,
             task=task,
@@ -291,11 +408,25 @@ def execute_contract(
             binding.task_id,
             host_id=binding.host_id,
             cursor=binding.cursor,
+            capability=binding.capability,
         )
         active[instruction_id] = binding
 
+    event_cursors: dict[str, str] = {}
+    seen_event_ids: dict[str, tuple[str, str]] = {}
+    for event in binding_events(repo_root):
+        instruction_id = event.get("launch_instruction_id")
+        event_id = event.get("host_event_id")
+        event_cursor = event.get("host_event_cursor")
+        if instruction_id in active and isinstance(event_id, str) and isinstance(event_cursor, str):
+            event_cursors[str(instruction_id)] = event_cursor
+            seen_event_ids[event_id] = (str(instruction_id), event_cursor)
+
     no_progress = 0
+    poll_cycles = 0
+    replay_events = 0
     while active:
+        poll_cycles += 1
         waiting = tuple(active[key] for key in sorted(active))
         events_raw = adapter.wait_threads(
             [item.wait_target(event_cursors.get(item.instruction_id)) for item in waiting]
@@ -307,8 +438,7 @@ def execute_contract(
         for raw in events_raw:
             if not isinstance(raw, Mapping):
                 raise HostExecutionError("host event must be an object")
-            task_id = raw.get("task_id")
-            matches = [item for item in active.values() if item.task_id == task_id]
+            matches = [item for item in active.values() if item.task_id == raw.get("task_id")]
             if len(matches) != 1:
                 raise HostExecutionError("host event references an unknown or ambiguous task_id")
             binding = matches[0]
@@ -318,63 +448,109 @@ def execute_contract(
             if event_id in seen_in_batch:
                 raise HostExecutionError("wait_threads returned a duplicate event_id")
             seen_in_batch.add(event_id)
-            if event_cursors.get(binding.instruction_id) == event_cursor:
+            prior = seen_event_ids.get(event_id)
+            if prior is not None:
+                if prior != (binding.instruction_id, event_cursor):
+                    raise HostExecutionError("host replay changed an event cursor or task identity")
+                replay_events += 1
                 continue
-            event_cursors[binding.instruction_id] = event_cursor
-            progressed = True
+            if event_cursor == event_cursors.get(binding.instruction_id):
+                raise HostExecutionError("host replay reused an event cursor for new evidence")
             state = str(raw["state"])
             if state == "NEEDS_ATTENTION":
                 answer = resolver.resolve_attention(binding.task, raw)
                 if not isinstance(answer, str) or not answer.strip():
                     raise HostExecutionError("safe resolver must return a non-empty answer")
+                message_key = "sha256:" + sha256(
+                    _canonical(
+                        {
+                            "instruction_id": binding.instruction_id,
+                            "host_event_id": event_id,
+                            "answer": answer,
+                        }
+                    )
+                ).hexdigest()
                 ack_raw = adapter.send_message_to_thread(
                     host_id=binding.host_id,
                     task_id=binding.task_id,
                     cursor=binding.cursor,
                     capability=binding.capability,
                     message=answer,
+                    idempotency_key=message_key,
                 )
                 if not isinstance(ack_raw, Mapping):
                     raise HostExecutionError("send_message_to_thread result must be an object")
-                _validate_ack(ack_raw, binding)
-            elif state in TERMINAL_STATES:
-                observed = observe_terminal_launch(
+                _validate_ack(ack_raw, binding, message_key)
+                record_host_progress(
                     repo_root,
                     binding.instruction_id,
-                    terminal_state=state,
-                    host_event_ref=(
-                        f"{host}:{binding.host_id}:{binding.task_id}:{event_id}:{event_cursor}"
-                    ),
-                    observed_by=f"host-execution:{host}",
+                    host=host,
+                    host_id=binding.host_id,
+                    task_id=binding.task_id,
+                    cursor=binding.cursor,
+                    capability=binding.capability,
+                    host_state=state,
+                    host_event_id=event_id,
+                    host_event_cursor=event_cursor,
+                    message_id=str(ack_raw["message_id"]),
                 )
-                release_launch(
+            elif state == "ACTIVE":
+                record_host_progress(
                     repo_root,
                     binding.instruction_id,
-                    terminal_event_id=str(observed["event_id"]),
-                    reason="capability-bound host task reached a terminal state",
+                    host=host,
+                    host_id=binding.host_id,
+                    task_id=binding.task_id,
+                    cursor=binding.cursor,
+                    capability=binding.capability,
+                    host_state=state,
+                    host_event_id=event_id,
+                    host_event_cursor=event_cursor,
+                )
+            else:
+                release_terminal_launch(
+                    repo_root,
+                    binding.instruction_id,
+                    host=host,
+                    host_id=binding.host_id,
+                    task_id=binding.task_id,
+                    cursor=binding.cursor,
+                    capability=binding.capability,
+                    terminal_state=state,
+                    host_event_id=event_id,
+                    host_event_cursor=event_cursor,
                 )
                 terminal[binding.instruction_id] = state
                 del active[binding.instruction_id]
+            event_cursors[binding.instruction_id] = event_cursor
+            seen_event_ids[event_id] = (binding.instruction_id, event_cursor)
+            progressed = True
 
         no_progress = 0 if progressed else no_progress + 1
+        if active and replay_events >= max_replay_events:
+            return _blocked(
+                "HOST_REPLAY_LIMIT",
+                "host repeatedly replayed already persisted events",
+                tuple(active.values()),
+                terminal,
+                replay_events=replay_events,
+            )
+        if active and poll_cycles >= max_poll_cycles:
+            return _blocked(
+                "HOST_TOTAL_POLL_LIMIT",
+                "host tasks did not terminate before the total polling bound",
+                tuple(active.values()),
+                terminal,
+                max_poll_cycles=max_poll_cycles,
+            )
         if active and no_progress >= max_no_progress_cycles:
-            required_active = [item for item in active.values() if item.task.get("required") is True]
-            blocker = _blocker(
+            return _blocked(
                 "HOST_NO_PROGRESS_LIMIT",
                 "host tasks made no progress before the bounded polling limit",
                 tuple(active.values()),
-                max_no_progress_cycles,
+                terminal,
+                max_no_progress_cycles=max_no_progress_cycles,
             )
-            return {
-                "schema_version": 1,
-                "kind": RESULT_KIND,
-                "outcome": "BLOCKED",
-                "successful": False,
-                "quiescent": False,
-                "required_active": sorted(item.instruction_id for item in required_active),
-                "terminal": dict(sorted(terminal.items())),
-                "blocker": blocker,
-            }
 
     failed_required = sorted(
         str(task["launch_instruction_id"])
@@ -382,21 +558,42 @@ def execute_contract(
         if task.get("required") is True
         and terminal.get(str(task["launch_instruction_id"])) != "SUCCEEDED"
     )
-    successful = not failed_required
+    claims, lease, controller_quiescent = _runtime_authority(
+        repo_root, contract, adapter, trusted_target_branch
+    )
+    live_bindings = active_launch_bindings(repo_root)
+    if claims or lease is not None or live_bindings or not controller_quiescent:
+        return {
+            "schema_version": 1,
+            "kind": RESULT_KIND,
+            "outcome": "BLOCKED" if failed_required else "ACTIVE",
+            "successful": False,
+            "quiescent": False,
+            "required_active": [],
+            "terminal": dict(sorted(terminal.items())),
+            "blocker": _blocker(
+                "RUNTIME_AUTHORITY_ACTIVE",
+                "repository claims, leases, bindings, or controller state are not quiescent",
+                (),
+                active_claims=claims,
+                active_validation_lease=dict(lease) if lease is not None else None,
+                active_host_bindings=[dict(item) for item in live_bindings],
+                controller_quiescent=controller_quiescent,
+            ),
+        }
     blocker = None
     if failed_required:
         blocker = _blocker(
             "REQUIRED_TASK_TERMINAL_FAILURE",
             "one or more required host tasks ended without success",
             (),
-            max_no_progress_cycles,
+            failed_launch_instruction_ids=failed_required,
         )
-        blocker["failed_launch_instruction_ids"] = failed_required
     return {
         "schema_version": 1,
         "kind": RESULT_KIND,
-        "outcome": "SUCCESS" if successful else "BLOCKED",
-        "successful": successful,
+        "outcome": "SUCCESS" if not failed_required else "BLOCKED",
+        "successful": not failed_required,
         "quiescent": True,
         "required_active": [],
         "terminal": dict(sorted(terminal.items())),

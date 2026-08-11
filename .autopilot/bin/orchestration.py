@@ -8,6 +8,7 @@ contract and persist their task identifiers outside repository source files.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import re
@@ -35,6 +36,13 @@ BLOCKING_STATES = {
     "CANCELLED",
     "ESCALATION_REQUIRED",
     "QUARANTINED",
+}
+ACTIVE_BINDING_STATES = {
+    "PREPARED",
+    "CREATED",
+    "BOUND",
+    "HOST_EVENT_OBSERVED",
+    "ATTENTION_ACKNOWLEDGED",
 }
 READY_STATES = {"READY", "INTEGRATION_READY", "PROMOTION_READY"}
 SECRET_TEXT = re.compile(
@@ -76,6 +84,31 @@ def _managed_path(repo_root: Path, *parts: str) -> Path:
 
 def _binding_path(repo_root: Path) -> Path:
     return _managed_path(repo_root, ".autopilot", "state", "task-bindings.jsonl")
+
+
+def singleton_target_branch(repo_root: Path) -> str:
+    """Return the only live execution target from the trusted control plane."""
+
+    path = _managed_path(repo_root, ".autopilot", "control-plane.json")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise OrchestrationError(f"cannot read singleton control plane: {error}") from error
+    if not isinstance(value, Mapping) or not isinstance(value.get("target"), Mapping):
+        raise OrchestrationError("control-plane target must be an object")
+    target = value["target"]
+    branch = target.get("branch")
+    final = target.get("final_integration_branch")
+    if target.get("execution_mode") != "singleton-release-branch":
+        raise OrchestrationError("control plane must use singleton-release-branch execution")
+    if not isinstance(branch, str) or not branch.strip():
+        raise OrchestrationError("singleton target branch is required")
+    if not isinstance(final, str) or not final.strip():
+        raise OrchestrationError("final integration branch is required")
+    protected = target.get("protected_until_final_integration")
+    if branch == final or branch == "main" or not isinstance(protected, list) or final not in protected:
+        raise OrchestrationError("singleton execution target must not be main or the protected final branch")
+    return branch
 
 
 @contextmanager
@@ -200,9 +233,19 @@ def active_launch_bindings(repo_root: Path) -> tuple[Mapping[str, object], ...]:
     return tuple(
         latest[key]
         for key in sorted(latest)
-        if latest[key].get("state")
-        in {"PREPARED", "CREATED", "BOUND", "TERMINAL_OBSERVED"}
+        if latest[key].get("state") in ACTIVE_BINDING_STATES
     )
+
+
+def _capability_digest(capability: str) -> str:
+    if not isinstance(capability, str) or not capability.strip():
+        raise OrchestrationError("host task capability is required")
+    return "sha256:" + sha256(capability.encode("utf-8")).hexdigest()
+
+
+def _same_capability(event: Mapping[str, object], capability: str) -> bool:
+    expected = event.get("capability_digest")
+    return isinstance(expected, str) and hmac.compare_digest(expected, _capability_digest(capability))
 
 
 def prepare_launch(
@@ -210,12 +253,15 @@ def prepare_launch(
     instruction_id: str,
     host: str,
     *,
+    attempt: int = 1,
     retry_of: str | None = None,
 ) -> Mapping[str, object]:
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", instruction_id):
         raise OrchestrationError("launch instruction id must be a SHA-256 digest")
     if not host.strip():
         raise OrchestrationError("launch host is required")
+    if type(attempt) is not int or attempt < 1:
+        raise OrchestrationError("launch attempt must be a positive integer")
     with _binding_lock(repo_root):
         events = _binding_events_unlocked(repo_root)
         existing = next(
@@ -223,6 +269,12 @@ def prepare_launch(
             None,
         )
         if existing is not None and existing.get("state") != "RELEASED":
+            if (
+                existing.get("host") != host
+                or existing.get("attempt") != attempt
+                or existing.get("retry_of") != retry_of
+            ):
+                raise OrchestrationError("prepared launch identity or retry lineage changed")
             return existing
         if existing is not None:
             if existing.get("terminal_state") == "SUCCEEDED":
@@ -230,7 +282,6 @@ def prepare_launch(
             raise OrchestrationError(
                 "an unsuccessful released launch requires a new instruction id and explicit retry lineage"
             )
-        attempt = 1
         if retry_of is not None:
             if not re.fullmatch(r"sha256:[0-9a-f]{64}", retry_of):
                 raise OrchestrationError("retry lineage must name a released event digest")
@@ -244,7 +295,14 @@ def prepare_launch(
                 raise OrchestrationError(
                     "retry lineage must name a failed or cancelled release for another instruction"
                 )
-            attempt = int(prior.get("attempt", 1)) + 1
+            prior_attempt = prior.get("attempt")
+            if type(prior_attempt) is not int or prior_attempt < 1:
+                raise OrchestrationError("retry lineage has an invalid prior attempt")
+            expected_attempt = prior_attempt + 1
+            if attempt != expected_attempt:
+                raise OrchestrationError("launch attempt does not match retry lineage")
+        elif attempt != 1:
+            raise OrchestrationError("a retry attempt requires explicit retry lineage")
         return _append_binding_event_unlocked(
             repo_root,
             {
@@ -267,21 +325,36 @@ def bind_launch(
     *,
     host_id: str | None = None,
     cursor: str | None = None,
+    capability: str,
 ) -> Mapping[str, object]:
+    capability_digest = _capability_digest(capability)
     with _binding_lock(repo_root):
         events = list(_binding_events_unlocked(repo_root))
         existing = next(
             (event for event in reversed(events) if event.get("launch_instruction_id") == instruction_id),
             None,
         )
-        if existing is None or existing.get("state") not in {"PREPARED", "CREATED", "BOUND"}:
+        if existing is None or existing.get("state") not in ACTIVE_BINDING_STATES:
             raise OrchestrationError("prepare the launch before binding a host task")
         if existing.get("host") != host:
             raise OrchestrationError("prepared launch host cannot be rebound by another host")
-        if existing.get("state") == "BOUND":
-            if existing.get("task_id") != task_id or existing.get("host") != host:
+        if existing.get("state") in {"BOUND", "HOST_EVENT_OBSERVED", "ATTENTION_ACKNOWLEDGED"}:
+            if (
+                existing.get("task_id") != task_id
+                or existing.get("host") != host
+                or existing.get("host_id") != host_id
+                or existing.get("cursor") != cursor
+                or not _same_capability(existing, capability)
+            ):
                 raise OrchestrationError("launch instruction is already bound to another task")
             return existing
+        if existing.get("state") == "CREATED" and (
+            existing.get("task_id") != task_id
+            or existing.get("host_id") != host_id
+            or existing.get("cursor") != cursor
+            or not _same_capability(existing, capability)
+        ):
+            raise OrchestrationError("created launch cannot adopt a different host task")
         if not host.strip() or not task_id.strip():
             raise OrchestrationError("host and task id are required")
         if existing.get("state") == "PREPARED":
@@ -291,7 +364,10 @@ def bind_launch(
                     "kind": "hive-mind-task-binding-event-v1",
                     "launch_instruction_id": instruction_id,
                     "host": host,
+                    "host_id": host_id,
                     "task_id": task_id,
+                    "cursor": cursor,
+                    "capability_digest": capability_digest,
                     "attempt": existing.get("attempt", 1),
                     "retry_of": existing.get("retry_of"),
                     "state": "CREATED",
@@ -308,6 +384,7 @@ def bind_launch(
                 "host_id": host_id,
                 "task_id": task_id,
                 "cursor": cursor,
+                "capability_digest": capability_digest,
                 "attempt": existing.get("attempt", 1),
                 "retry_of": existing.get("retry_of"),
                 "state": "BOUND",
@@ -316,84 +393,143 @@ def bind_launch(
         )
 
 
-def observe_terminal_launch(
+def record_host_progress(
     repo_root: Path,
     instruction_id: str,
     *,
-    terminal_state: str,
-    host_event_ref: str,
-    observed_by: str,
+    host: str,
+    host_id: str,
+    task_id: str,
+    cursor: str,
+    capability: str,
+    host_state: str,
+    host_event_id: str,
+    host_event_cursor: str,
+    message_id: str | None = None,
 ) -> Mapping[str, object]:
-    if terminal_state not in {"SUCCEEDED", "FAILED", "CANCELLED"}:
-        raise OrchestrationError("host terminal state must be SUCCEEDED, FAILED, or CANCELLED")
-    if not host_event_ref.strip() or not observed_by.strip():
-        raise OrchestrationError("host terminal event reference and observer are required")
+    if host_state not in {"ACTIVE", "NEEDS_ATTENTION"}:
+        raise OrchestrationError("progress state must be ACTIVE or NEEDS_ATTENTION")
+    if not host_event_id.strip() or not host_event_cursor.strip():
+        raise OrchestrationError("host event id and cursor are required")
+    if host_state == "NEEDS_ATTENTION" and (not isinstance(message_id, str) or not message_id.strip()):
+        raise OrchestrationError("attention recovery requires an acknowledged message id")
     with _binding_lock(repo_root):
-        events = _binding_events_unlocked(repo_root)
+        events = list(_binding_events_unlocked(repo_root))
         existing = next(
             (event for event in reversed(events) if event.get("launch_instruction_id") == instruction_id),
             None,
         )
-        if existing is None or existing.get("state") != "BOUND":
-            raise OrchestrationError("only a bound launch can record terminal evidence")
-        task_id = str(existing.get("task_id", ""))
-        if task_id not in host_event_ref:
-            raise OrchestrationError("host terminal event reference must bind the exact task id")
+        if existing is None or existing.get("state") not in ACTIVE_BINDING_STATES - {"PREPARED", "CREATED"}:
+            raise OrchestrationError("only a capability-bound launch can record host progress")
+        expected = {
+            "host": host,
+            "host_id": host_id,
+            "task_id": task_id,
+            "cursor": cursor,
+        }
+        if any(existing.get(key) != value for key, value in expected.items()) or not _same_capability(existing, capability):
+            raise OrchestrationError("host progress does not match the capability-bound task")
+        prior = next(
+            (
+                event
+                for event in reversed(events)
+                if event.get("launch_instruction_id") == instruction_id
+                and (
+                    event.get("host_event_id") == host_event_id
+                    or event.get("host_event_cursor") == host_event_cursor
+                )
+            ),
+            None,
+        )
+        if prior is not None:
+            if (
+                prior.get("host_event_id") == host_event_id
+                and prior.get("host_event_cursor") == host_event_cursor
+                and prior.get("host_state") == host_state
+                and prior.get("message_id") == message_id
+            ):
+                return prior
+            raise OrchestrationError("host event id or cursor replayed with different evidence")
         return _append_binding_event_unlocked(
             repo_root,
             {
                 "kind": "hive-mind-task-binding-event-v1",
                 "launch_instruction_id": instruction_id,
-                "host": existing.get("host"),
-                "host_id": existing.get("host_id"),
-                "task_id": existing.get("task_id"),
-                "cursor": existing.get("cursor"),
-                "terminal_state": terminal_state,
-                "host_terminal_event_ref": host_event_ref,
-                "observed_by": observed_by,
+                **expected,
+                "capability_digest": existing.get("capability_digest"),
+                "host_state": host_state,
+                "host_event_id": host_event_id,
+                "host_event_cursor": host_event_cursor,
+                "message_id": message_id,
                 "attempt": existing.get("attempt", 1),
                 "retry_of": existing.get("retry_of"),
-                "state": "TERMINAL_OBSERVED",
+                "state": (
+                    "ATTENTION_ACKNOWLEDGED"
+                    if host_state == "NEEDS_ATTENTION"
+                    else "HOST_EVENT_OBSERVED"
+                ),
             },
             events,
         )
 
 
-def release_launch(
+def release_terminal_launch(
     repo_root: Path,
     instruction_id: str,
     *,
-    terminal_event_id: str,
-    reason: str,
+    host: str,
+    host_id: str,
+    task_id: str,
+    cursor: str,
+    capability: str,
+    terminal_state: str,
+    host_event_id: str,
+    host_event_cursor: str,
 ) -> Mapping[str, object]:
-    if not re.fullmatch(r"sha256:[0-9a-f]{64}", terminal_event_id):
-        raise OrchestrationError("terminal event id must be a SHA-256 digest")
-    if not reason.strip():
-        raise OrchestrationError("binding release reason is required")
+    if terminal_state not in {"SUCCEEDED", "FAILED", "CANCELLED"}:
+        raise OrchestrationError("host terminal state must be SUCCEEDED, FAILED, or CANCELLED")
+    if not host_event_id.strip() or not host_event_cursor.strip():
+        raise OrchestrationError("host terminal event id and cursor are required")
     with _binding_lock(repo_root):
         events = _binding_events_unlocked(repo_root)
         existing = next(
             (event for event in reversed(events) if event.get("launch_instruction_id") == instruction_id),
             None,
         )
-        if (
-            existing is None
-            or existing.get("state") != "TERMINAL_OBSERVED"
-            or existing.get("event_id") != terminal_event_id
+        expected = {"host": host, "host_id": host_id, "task_id": task_id, "cursor": cursor}
+        if existing is not None and existing.get("state") == "RELEASED":
+            if (
+                all(existing.get(key) == value for key, value in expected.items())
+                and existing.get("terminal_state") == terminal_state
+                and existing.get("host_event_id") == host_event_id
+                and existing.get("host_event_cursor") == host_event_cursor
+                and _same_capability(existing, capability)
+            ):
+                return existing
+            raise OrchestrationError("released launch cannot be replaced by different terminal evidence")
+        if existing is None or existing.get("state") not in ACTIVE_BINDING_STATES - {"PREPARED", "CREATED"}:
+            raise OrchestrationError("only a capability-bound launch can record terminal evidence")
+        if any(existing.get(key) != value for key, value in expected.items()) or not _same_capability(existing, capability):
+            raise OrchestrationError("terminal event does not match the capability-bound task")
+        if any(
+            event.get("host_event_id") == host_event_id
+            or event.get("host_event_cursor") == host_event_cursor
+            for event in events
+            if event.get("launch_instruction_id") == instruction_id
         ):
-            raise OrchestrationError("release requires the latest bound terminal observation event")
+            raise OrchestrationError("terminal host event replays previously observed evidence")
         return _append_binding_event_unlocked(
             repo_root,
             {
                 "kind": "hive-mind-task-binding-event-v1",
                 "launch_instruction_id": instruction_id,
-                "host": existing.get("host"),
-                "host_id": existing.get("host_id"),
-                "task_id": existing.get("task_id"),
-                "cursor": existing.get("cursor"),
-                "terminal_state": existing.get("terminal_state"),
-                "terminal_event_id": terminal_event_id,
-                "reason": reason,
+                **expected,
+                "capability_digest": existing.get("capability_digest"),
+                "terminal_state": terminal_state,
+                "host_event_id": host_event_id,
+                "host_event_cursor": host_event_cursor,
+                "observed_by": f"host-execution:{host}",
+                "reason": "capability-authenticated host terminal event",
                 "attempt": existing.get("attempt", 1),
                 "retry_of": existing.get("retry_of"),
                 "state": "RELEASED",
@@ -762,17 +898,24 @@ def _task(
         and binding.get("terminal_state") in {"FAILED", "CANCELLED"}
     ):
         retry_of = str(binding.get("event_id"))
-        instruction_material["attempt"] = int(binding.get("attempt", 1)) + 1
+        prior_attempt = binding.get("attempt")
+        if type(prior_attempt) is not int or prior_attempt < 1:
+            raise OrchestrationError("released launch has an invalid retry attempt")
+        instruction_material["attempt"] = prior_attempt + 1
         instruction_material["retry_of"] = retry_of
         instruction_id = instruction_digest(instruction_material)
         binding = launch_binding(Path(plane.repo_root), instruction_id)
     effective_action = action
-    if binding is not None and binding.get("state") == "BOUND":
+    if binding is not None and binding.get("state") in {
+        "BOUND",
+        "HOST_EVENT_OBSERVED",
+        "ATTENTION_ACKNOWLEDGED",
+    }:
         effective_action = "RESUME_BOUND"
     elif binding is not None and binding.get("state") in {"PREPARED", "CREATED"}:
         effective_action = "RECOVER_PREPARED"
-    elif binding is not None and binding.get("state") == "TERMINAL_OBSERVED":
-        effective_action = "RELEASE_TERMINAL"
+    raw_reasons = row.get("reasons", [])
+    reasons = list(raw_reasons) if isinstance(raw_reasons, (list, tuple)) else []
     return {
         "task_key": node_id,
         "node_id": node_id,
@@ -787,11 +930,7 @@ def _task(
         "branch": str(node.get("branch")),
         "target_branch": target_branch,
         "write_scope": list(node.get("write_scope", [])),
-        "reasons": (
-            list(row.get("reasons", []))
-            if isinstance(row.get("reasons"), (list, tuple))
-            else []
-        ),
+        "reasons": reasons,
         "expected_artifact": (
             "validated candidate, durable receipt, released claim, and draft PR "
             "targeting the configured integration branch"
