@@ -85,6 +85,8 @@ class ScopedLesson:
     lesson_digest: str
 
     def __post_init__(self) -> None:
+        if type(self.attribution) is not OutcomeAttribution:
+            raise OptimizerError("lesson attribution type is invalid")
         expected = canonical_digest(asdict(self.attribution))
         if self.lesson_digest != expected:
             raise OptimizerError("lesson digest does not match its attribution")
@@ -143,6 +145,8 @@ class Optimizer:
     """Create lessons and proposals without any champion-changing capability."""
 
     def attribute_outcome(self, attribution: OutcomeAttribution) -> ScopedLesson:
+        if type(attribution) is not OutcomeAttribution:
+            raise OptimizerError("lesson attribution type is invalid")
         return ScopedLesson(
             attribution=attribution,
             lesson_digest=canonical_digest(asdict(attribution)),
@@ -157,6 +161,8 @@ class Optimizer:
         change_ref: str,
         author_id: str,
     ) -> ChallengerProposal:
+        if type(lesson) is not ScopedLesson:
+            raise OptimizerError("scoped lesson type is invalid")
         if lesson.lesson_digest != canonical_digest(asdict(lesson.attribution)):
             raise OptimizerError("lesson digest does not match its attribution")
         if not challenger_id.strip() or not champion_id.strip() or not change_ref.strip() or not author_id.strip():
@@ -184,6 +190,8 @@ class Optimizer:
         evaluator_id: str,
         evidence_complete: bool,
     ) -> CourtRecommendation:
+        if type(proposal) is not ChallengerProposal:
+            raise OptimizerError("challenger proposal type is invalid")
         if not evaluator_id.strip():
             raise OptimizerError("evaluator identity is required")
         if evaluator_id != evaluator_id.strip():

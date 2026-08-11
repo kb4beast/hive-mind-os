@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta, timezone
 
 from hive_mind_os.brain_kernel.canonical import canonical_digest
@@ -75,6 +75,17 @@ class OptimizerLessonTests(unittest.TestCase):
             canonical_digest(asdict(lesson.attribution)),
         )
 
+    def test_optimizer_lesson_tests_reject_attribution_type_impersonation(self) -> None:
+        @dataclass(frozen=True)
+        class FakeAttribution:
+            attacker_controlled: str
+
+        fake = FakeAttribution("not retained evidence")
+        with self.assertRaisesRegex(OptimizerError, "attribution type is invalid"):
+            Optimizer().attribute_outcome(fake)  # type: ignore[arg-type]
+        with self.assertRaisesRegex(OptimizerError, "attribution type is invalid"):
+            ScopedLesson(fake, canonical_digest(asdict(fake)))  # type: ignore[arg-type]
+
 
 class ChallengerProposalTests(unittest.TestCase):
     def test_challenger_proposal_tests_do_not_mutate_champion(self) -> None:
@@ -114,6 +125,22 @@ class ChallengerProposalTests(unittest.TestCase):
         with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
             ChallengerProposal(**values, proposal_digest="sha256:forged")
 
+    def test_challenger_proposal_tests_reject_lesson_type_impersonation(self) -> None:
+        @dataclass(frozen=True)
+        class FakeLesson:
+            attribution: OutcomeAttribution
+            lesson_digest: str
+
+        attribution = _attribution()
+        with self.assertRaisesRegex(OptimizerError, "scoped lesson type is invalid"):
+            Optimizer().propose_challenger(
+                FakeLesson(attribution, canonical_digest(asdict(attribution))),  # type: ignore[arg-type]
+                challenger_id="candidate:v2",
+                champion_id="champion:v1",
+                change_ref="prompt:sha256:change",
+                author_id="optimizer:author",
+            )
+
 
 class SelfPromotionDenialTests(unittest.TestCase):
     def test_self_promotion_denial_tests_reject_candidate_author_as_evaluator(self) -> None:
@@ -145,6 +172,19 @@ class SelfPromotionDenialTests(unittest.TestCase):
             recommendation.recommendation,
             PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
         )
+
+    def test_self_promotion_denial_tests_reject_proposal_type_impersonation(self) -> None:
+        @dataclass(frozen=True)
+        class FakeProposal:
+            proposal_digest: str
+            author_id: str
+
+        with self.assertRaisesRegex(OptimizerError, "proposal type is invalid"):
+            Optimizer().recommend_independent_review(
+                FakeProposal("sha256:forged", "attacker"),  # type: ignore[arg-type]
+                evaluator_id="curator:reviewer",
+                evidence_complete=True,
+            )
 
 
 if __name__ == "__main__":
