@@ -8,11 +8,14 @@ workspace, invokes an adapter, merges a branch, or hides an incompatibility.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Iterable, Sequence
 
 from .canonical import canonical_digest
+
+_SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
 class IntegrationValidationError(ValueError):
@@ -46,6 +49,13 @@ def _items(
     if len(set(normalized)) != len(normalized):
         raise IntegrationValidationError(f"{label} must not contain duplicates")
     return normalized
+
+
+def _sha256(value: str, label: str) -> str:
+    value = _text(value, label)
+    if _SHA256.fullmatch(value) is None:
+        raise IntegrationValidationError(f"{label} must be lowercase sha256:<64 hex>")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,10 +104,7 @@ class VersionedContract:
         if type(self.version) is not int or self.version < 1:
             raise IntegrationValidationError("contract version must be a positive integer")
         object.__setattr__(self, "runtime_id", _text(self.runtime_id, "runtime id"))
-        digest = _text(self.schema_digest, "schema digest")
-        if not digest.startswith("sha256:"):
-            raise IntegrationValidationError("schema digest must be a sha256 reference")
-        object.__setattr__(self, "schema_digest", digest)
+        object.__setattr__(self, "schema_digest", _sha256(self.schema_digest, "schema digest"))
         if not isinstance(self.lineage, DataLineage):
             raise IntegrationValidationError("contract lineage must be DataLineage")
 
@@ -143,9 +150,7 @@ class ContractAdapter:
         contract_id = _text(contract_id, f"{label} contract id")
         if type(version) is not int or version < 1:
             raise IntegrationValidationError(f"{label} version must be a positive integer")
-        schema_digest = _text(schema_digest, f"{label} schema digest")
-        if not schema_digest.startswith("sha256:"):
-            raise IntegrationValidationError(f"{label} schema digest must be a sha256 reference")
+        schema_digest = _sha256(schema_digest, f"{label} schema digest")
         return (contract_id, version, schema_digest)
 
 

@@ -99,8 +99,28 @@ class HiveCortexIntegratorTests(unittest.TestCase):
     def test_malformed_lineage_and_incompatible_report_are_rejected(self) -> None:
         with self.assertRaisesRegex(IntegrationValidationError, "cannot cite itself"):
             DataLineage("artifact:self", ("artifact:self",), ("evidence:self",))
+        for malformed in ("sha256:" + "a" * 63, "sha256:" + "A" * 64, "sha256:not-hex"):
+            with self.subTest(malformed=malformed), self.assertRaisesRegex(
+                IntegrationValidationError,
+                "lowercase sha256",
+            ):
+                VersionedContract(
+                    "mission-result",
+                    1,
+                    "legacy-runtime",
+                    malformed,
+                    DataLineage("artifact:malformed", (), ("evidence:malformed",)),
+                )
         source = provider()
         target = consumer()
+        with self.assertRaisesRegex(IntegrationValidationError, "lowercase sha256"):
+            ContractAdapter(
+                "adapter:malformed",
+                ("mission-result", 1, "sha256:" + "f" * 8),
+                target.identity,
+                ("evidence:adapter",),
+                True,
+            )
         with self.assertRaisesRegex(IntegrationValidationError, "compatible report cannot request"):
             CompatibilityReport(
                 IntegrationStatus.COMPATIBLE,
