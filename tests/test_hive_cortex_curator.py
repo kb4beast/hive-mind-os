@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from hive_mind_os.brain_kernel.curator_runtime import (
     CandidateIdentity,
@@ -132,6 +133,20 @@ class CuratorRuntimeTests(unittest.TestCase):
             seal, self._workspace(), candidate=self.identity, check_runner=mutate_ref
         )
         self.assertEqual(CuratorVerdict.QUARANTINE, ref_report.verdict)
+
+    def test_fake_inherited_path_cannot_replace_trusted_git(self) -> None:
+        seal = self.runtime.seal_acceptance(mission_id="MISSION-1", work_id="WORK-1", curator_id="curator:independent", checks=("content",))
+        attacker_bin = self.root / "attacker-bin"
+        attacker_bin.mkdir()
+        (attacker_bin / "git.cmd").write_text("@echo forged-git-output\r\n", encoding="utf-8")
+        with patch.dict("os.environ", {"PATH": str(attacker_bin)}, clear=False):
+            report = self.runtime.verify(
+                seal,
+                self._workspace(),
+                candidate=self.identity,
+                check_runner=lambda _name, root: (root / "candidate.txt").read_text(encoding="utf-8") == "immutable\n",
+            )
+        self.assertEqual(CuratorVerdict.ADOPT, report.verdict)
 
 
 if __name__ == "__main__":

@@ -279,12 +279,19 @@ def _repository_binding(root: Path) -> _RepositoryBinding:
 
 
 def _git_output(root: Path, *arguments: str) -> str:
-    """Run one fixed local Git inspection with injected Git controls removed."""
+    """Run one fixed local Git inspection in a controller-owned environment."""
 
-    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    executable = _trusted_git_executable()
+    environment = {
+        "PATH": str(executable.parent),
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_PAGER": "cat",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
     try:
         completed = subprocess.run(
-            ("git", "-C", str(root.resolve()), *arguments),
+            (str(executable), "-C", str(root.resolve()), *arguments),
             check=False,
             capture_output=True,
             text=True,
@@ -299,6 +306,20 @@ def _git_output(root: Path, *arguments: str) -> str:
         return completed.stdout.strip()
     except AttributeError as error:
         raise CuratorVerificationError("isolated candidate Git output is malformed") from error
+
+
+def _trusted_git_executable() -> Path:
+    """Return Git only from a fixed operating-system installation location."""
+
+    candidates = (
+        (Path(r"C:\Program Files\Git\cmd\git.exe"), Path(r"C:\Program Files (x86)\Git\cmd\git.exe"))
+        if os.name == "nt"
+        else (Path("/usr/bin/git"), Path("/bin/git"))
+    )
+    for candidate in candidates:
+        if candidate.is_file() and not candidate.is_symlink():
+            return candidate
+    raise CuratorVerificationError("trusted operating-system Git executable is unavailable")
 
 
 def _seal_digest(
