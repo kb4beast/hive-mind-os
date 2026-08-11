@@ -102,8 +102,21 @@ class ChallengerProposal:
         ):
             if not value.strip():
                 raise OptimizerError("challenger proposal bindings must be nonempty")
+        if self.author_id != self.author_id.strip():
+            raise OptimizerError("author identity must not contain surrounding whitespace")
         if self.challenger_id == self.parent_champion_id:
             raise OptimizerError("challenger must differ from its champion")
+        expected = canonical_digest(
+            {
+                "challenger_id": self.challenger_id,
+                "parent_champion_id": self.parent_champion_id,
+                "change_ref": self.change_ref,
+                "author_id": self.author_id,
+                "lesson_digest": self.lesson_digest,
+            }
+        )
+        if self.proposal_digest != expected:
+            raise OptimizerError("proposal digest does not match its bindings")
 
 
 @dataclass(frozen=True, slots=True)

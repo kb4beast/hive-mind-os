@@ -6,7 +6,9 @@ import unittest
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
+from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.optimizer import (
+    ChallengerProposal,
     Optimizer,
     OptimizerError,
     OutcomeAttribution,
@@ -68,6 +70,24 @@ class ChallengerProposalTests(unittest.TestCase):
     def test_challenger_proposal_tests_reject_forged_lesson_digest(self) -> None:
         with self.assertRaisesRegex(OptimizerError, "does not match its attribution"):
             ScopedLesson(_attribution(), "sha256:forged")
+
+    def test_challenger_proposal_tests_reject_direct_construction_bypasses(self) -> None:
+        values = {
+            "challenger_id": "candidate:v2",
+            "parent_champion_id": "champion:v1",
+            "change_ref": "prompt:sha256:change",
+            "author_id": "optimizer:author",
+            "lesson_digest": "sha256:lesson",
+        }
+        with self.assertRaisesRegex(OptimizerError, "surrounding whitespace"):
+            ChallengerProposal(
+                **{**values, "author_id": " optimizer:author"},
+                proposal_digest=canonical_digest(
+                    {**values, "author_id": " optimizer:author"}
+                ),
+            )
+        with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
+            ChallengerProposal(**values, proposal_digest="sha256:forged")
 
 
 class SelfPromotionDenialTests(unittest.TestCase):
