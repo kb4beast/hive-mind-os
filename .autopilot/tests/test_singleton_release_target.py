@@ -8,7 +8,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
 SPEC = importlib.util.spec_from_file_location("singleton_controller", MODULE_PATH)
 assert SPEC and SPEC.loader
