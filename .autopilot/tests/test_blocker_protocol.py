@@ -123,3 +123,32 @@ class BlockerProtocolTests(unittest.TestCase):
             text = (root / ".autopilot" / "state" / "questions" / "ARCH-100.jsonl").read_text()
             self.assertIn("QUESTION_OPENED", text)
             self.assertIn("QUESTION_RESOLVED", text)
+
+    def test_subtask_wave_cannot_end_on_idle_or_recoverable_children(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = Path(__file__).resolve().parents[1]
+            shutil.copytree(source, root / ".autopilot")
+            control = controller.read_json(root / ".autopilot" / "control-plane.json")
+            control["verify_git_objects"] = False
+            controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
+            plane = controller.ControlPlane(root)
+            plane.start_subtask_wave(
+                "wave-l1",
+                ("ACCEPT-240", "CONSULT-210"),
+                target_sha="0" * 40,
+            )
+            active = plane.poll_subtask_wave(
+                "wave-l1",
+                {"ACCEPT-240": "IDLE_UNCOLLECTED", "CONSULT-210": "BLOCKED_RECOVERABLE"},
+            )
+            self.assertFalse(active["may_end_turn"])
+            self.assertFalse(active["target_mutation_allowed"])
+            self.assertEqual(active["recovery_actions"]["ACCEPT-240"], "COLLECT_RESULT_NOW")
+            self.assertEqual(active["recovery_actions"]["CONSULT-210"], "APPLY_FIX_AND_RETRY_NOW")
+            settled = plane.poll_subtask_wave(
+                "wave-l1",
+                {"ACCEPT-240": "SUCCEEDED", "CONSULT-210": "BLOCKED_EXTERNAL_AUTHORITY"},
+            )
+            self.assertTrue(settled["may_end_turn"])
+            self.assertTrue(settled["target_mutation_allowed"])

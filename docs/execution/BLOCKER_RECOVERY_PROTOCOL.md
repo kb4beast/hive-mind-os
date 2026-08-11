@@ -55,3 +55,19 @@ turn. The answer is stored only as a digest; credentials, proxy secrets, and
 other sensitive values must never be copied into repository files or evidence.
 An unresolved question remains a blocker, not a reason to repeat the same
 question on the next run.
+
+## Parent supervision and quiescence
+
+Creating children transfers work, not responsibility. The parent registers the
+released wave with `subtask-wave-start` and continues polling with
+`subtask-wave-poll`. A UI state of `idle` is `IDLE_UNCOLLECTED`, never success;
+the parent must read and classify the child result. `BLOCKED_RECOVERABLE`
+requires the parent to apply the safe fix and retry immediately.
+
+The parent may end its turn, or mutate the singleton release target, only when
+every child is settled as `SUCCEEDED` or `BLOCKED_EXTERNAL_AUTHORITY`. Pending,
+active, idle-uncollected, and recoverably blocked children emit explicit
+continue/collect/retry actions. If an urgent target mutation invalidates a wave,
+the parent must refresh the validated snapshot, retire only the stale claim
+refs with their SHAs preserved, issue a fresh release, and resume every child
+before considering the wave quiescent.

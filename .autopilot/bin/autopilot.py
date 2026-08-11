@@ -171,6 +171,15 @@ def parser() -> argparse.ArgumentParser:
     verify.add_argument("receipt")
     verify.add_argument("--require-integrated", action="store_true")
 
+    wave_start = commands.add_parser("subtask-wave-start")
+    wave_start.add_argument("wave_id")
+    wave_start.add_argument("--node", action="append", required=True)
+    wave_start.add_argument("--target-sha")
+
+    wave_poll = commands.add_parser("subtask-wave-poll")
+    wave_poll.add_argument("wave_id")
+    wave_poll.add_argument("--status", action="append", required=True)
+
     return root
 
 
@@ -365,6 +374,20 @@ def main(argv: list[str] | None = None) -> int:
                 print("\n".join(issues), file=sys.stderr)
                 return 1
             print("VALID")
+            return 0
+        if args.command == "subtask-wave-start":
+            print(json.dumps(plane.start_subtask_wave(args.wave_id, args.node, target_sha=args.target_sha), indent=2, sort_keys=True))
+            return 0
+        if args.command == "subtask-wave-poll":
+            statuses: dict[str, str] = {}
+            for item in args.status:
+                if "=" not in item:
+                    raise AutopilotError("subtask status must be NODE=STATE")
+                node, state = item.split("=", 1)
+                if not node or node in statuses:
+                    raise AutopilotError("subtask status nodes must be non-empty and unique")
+                statuses[node] = state
+            print(json.dumps(plane.poll_subtask_wave(args.wave_id, statuses), indent=2, sort_keys=True))
             return 0
         raise AssertionError(args.command)
     except (AutopilotError, ClaimError, ConfigurationError, ReceiptError) as error:

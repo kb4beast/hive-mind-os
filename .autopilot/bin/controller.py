@@ -60,6 +60,17 @@ SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
     "https_proxy",
     "no_proxy",
 )
+SUBTASK_STATES = frozenset(
+    {
+        "PENDING",
+        "ACTIVE",
+        "IDLE_UNCOLLECTED",
+        "BLOCKED_RECOVERABLE",
+        "SUCCEEDED",
+        "BLOCKED_EXTERNAL_AUTHORITY",
+    }
+)
+SUBTASK_SETTLED_STATES = frozenset({"SUCCEEDED", "BLOCKED_EXTERNAL_AUTHORITY"})
 LEGAL_STATES = (
     "BOOTSTRAP_REQUIRED",
     "BOOTSTRAP_INVALID",
@@ -323,6 +334,7 @@ class ControlPlane:
         self.failures_dir = self.state_dir / "failures"
         self.blockers_dir = self.state_dir / "blockers"
         self.questions_dir = self.state_dir / "questions"
+        self.subtask_waves_dir = self.state_dir / "subtask-waves"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -1037,6 +1049,92 @@ class ControlPlane:
         result["resolution_id"] = digest_json(result)
         append_jsonl(self.questions_dir / f"{node_id}.jsonl", result)
         return result
+
+    def start_subtask_wave(
+        self,
+        wave_id: str,
+        node_ids: Sequence[str],
+        *,
+        target_sha: str | None = None,
+    ) -> Mapping[str, Any]:
+        """Register children that the orchestrator must supervise to settlement."""
+
+        if not isinstance(wave_id, str) or not wave_id.strip():
+            raise AutopilotError("subtask wave_id is required")
+        nodes = tuple(dict.fromkeys(str(node) for node in node_ids))
+        if not nodes:
+            raise AutopilotError("subtask wave requires at least one node")
+        unknown = sorted(set(nodes) - set(self._nodes))
+        if unknown:
+            raise AutopilotError("subtask wave has unknown nodes: " + ", ".join(unknown))
+        target = target_sha or self.target_sha()
+        if FULL_SHA.fullmatch(target) is None:
+            raise AutopilotError("subtask wave target_sha must be a full lowercase Git SHA")
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "SUBTASK_WAVE_STARTED",
+            "wave_id": wave_id,
+            "target_sha": target,
+            "nodes": list(nodes),
+            "statuses": {node: "PENDING" for node in nodes},
+            "timestamp": format_time(self.clock()),
+            "may_end_turn": False,
+            "target_mutation_allowed": False,
+            "next_action": "POLL_AGAIN",
+        }
+        append_jsonl(self.subtask_waves_dir / f"{wave_id}.jsonl", record)
+        return record
+
+    def poll_subtask_wave(
+        self,
+        wave_id: str,
+        statuses: Mapping[str, str],
+    ) -> Mapping[str, Any]:
+        """Record one poll and require supervision until every result is collected.
+
+        UI ``idle`` is deliberately represented as ``IDLE_UNCOLLECTED``. It is
+        not success: the parent must read the result and classify it. Recoverable
+        blockers require retry; only success or genuine external authority can
+        settle a child and permit the parent turn to end.
+        """
+
+        path = self.subtask_waves_dir / f"{wave_id}.jsonl"
+        if not path.is_file():
+            raise AutopilotError(f"unknown subtask wave: {wave_id}")
+        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+        started = next((record for record in records if record.get("event") == "SUBTASK_WAVE_STARTED"), None)
+        if not isinstance(started, Mapping):
+            raise AutopilotError(f"subtask wave lacks start record: {wave_id}")
+        nodes = tuple(str(node) for node in started.get("nodes", ()))
+        if set(statuses) != set(nodes):
+            raise AutopilotError("subtask poll must classify every wave node exactly once")
+        normalized = {node: str(statuses[node]).upper() for node in nodes}
+        invalid = sorted({status for status in normalized.values() if status not in SUBTASK_STATES})
+        if invalid:
+            raise AutopilotError("invalid subtask states: " + ", ".join(invalid))
+        actions: dict[str, str] = {}
+        for node, state in normalized.items():
+            if state in {"PENDING", "ACTIVE"}:
+                actions[node] = "POLL_AGAIN"
+            elif state == "IDLE_UNCOLLECTED":
+                actions[node] = "COLLECT_RESULT_NOW"
+            elif state == "BLOCKED_RECOVERABLE":
+                actions[node] = "APPLY_FIX_AND_RETRY_NOW"
+        settled = all(state in SUBTASK_SETTLED_STATES for state in normalized.values())
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "SUBTASK_WAVE_POLLED",
+            "wave_id": wave_id,
+            "target_sha": started.get("target_sha"),
+            "statuses": normalized,
+            "recovery_actions": actions,
+            "timestamp": format_time(self.clock()),
+            "may_end_turn": settled,
+            "target_mutation_allowed": settled,
+            "next_action": "QUIESCENT" if settled else "CONTINUE_SUPERVISION",
+        }
+        append_jsonl(path, record)
+        return record
 
     @staticmethod
     def recovery_action(packet: Mapping[str, Any]) -> Mapping[str, Any]:
