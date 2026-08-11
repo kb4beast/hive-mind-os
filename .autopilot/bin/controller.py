@@ -346,6 +346,7 @@ class ControlPlane:
         self.blockers_dir = self.state_dir / "blockers"
         self.questions_dir = self.state_dir / "questions"
         self.subtask_waves_dir = self.state_dir / "subtask-waves"
+        self.validation_lease_path = self.state_dir / "global-validation-lease.json"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -1078,7 +1079,7 @@ class ControlPlane:
         unknown = sorted(set(nodes) - set(self._nodes))
         if unknown:
             raise AutopilotError("subtask wave has unknown nodes: " + ", ".join(unknown))
-        target = target_sha or self.target_sha()
+        target = target_sha or self.current_target_sha()
         if FULL_SHA.fullmatch(target) is None:
             raise AutopilotError("subtask wave target_sha must be a full lowercase Git SHA")
         record = {
@@ -1147,6 +1148,63 @@ class ControlPlane:
         }
         append_jsonl(path, record)
         return record
+
+    def acquire_global_validation_lease(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        lease_minutes: int = 10,
+    ) -> Mapping[str, Any]:
+        """Serialize repository-wide gates while focused node checks stay parallel."""
+
+        if node_id not in self._nodes:
+            raise AutopilotError(f"unknown validation node: {node_id}")
+        if not isinstance(owner, str) or not owner.strip():
+            raise AutopilotError("validation lease owner is required")
+        if type(lease_minutes) is not int or lease_minutes < 1:
+            raise AutopilotError("validation lease_minutes must be positive")
+        now = self.clock()
+        if self.validation_lease_path.is_file():
+            current = read_json(self.validation_lease_path)
+            if isinstance(current, Mapping):
+                expires = parse_time(current.get("expires_at"))
+                identity = (current.get("node_id"), current.get("owner"))
+                if expires > now and identity != (node_id, owner):
+                    raise AutopilotError(
+                        "global validation lease is active for "
+                        f"{current.get('node_id')} owned by {current.get('owner')}"
+                    )
+        lease = {
+            "schema_version": SCHEMA_VERSION,
+            "node_id": node_id,
+            "owner": owner,
+            "target_sha": self.current_target_sha(),
+            "acquired_at": format_time(now),
+            "expires_at": format_time(now + timedelta(minutes=lease_minutes)),
+            "status": "ACTIVE",
+        }
+        lease["lease_id"] = digest_json(lease)
+        atomic_write_json(self.validation_lease_path, lease)
+        return lease
+
+    def release_global_validation_lease(self, node_id: str, owner: str) -> None:
+        if not self.validation_lease_path.is_file():
+            raise AutopilotError("global validation lease is absent")
+        current = read_json(self.validation_lease_path)
+        identity = (
+            current.get("node_id"),
+            current.get("owner"),
+        ) if isinstance(current, Mapping) else (None, None)
+        if identity != (node_id, owner):
+            raise AutopilotError("global validation lease identity mismatch")
+        lease_id = str(current.get("lease_id", "unknown")).replace(":", "-")
+        archive = self.state_dir / "validation-leases" / f"{lease_id}.json"
+        atomic_write_json(
+            archive,
+            {**current, "status": "RELEASED", "released_at": format_time(self.clock())},
+        )
+        self.validation_lease_path.unlink()
 
     @staticmethod
     def recovery_action(packet: Mapping[str, Any]) -> Mapping[str, Any]:

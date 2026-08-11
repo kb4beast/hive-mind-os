@@ -180,6 +180,15 @@ def parser() -> argparse.ArgumentParser:
     wave_poll.add_argument("wave_id")
     wave_poll.add_argument("--status", action="append", required=True)
 
+    validation_acquire = commands.add_parser("validation-lease-acquire")
+    validation_acquire.add_argument("node_id")
+    validation_acquire.add_argument("--owner", required=True)
+    validation_acquire.add_argument("--lease-minutes", type=int, default=10)
+
+    validation_release = commands.add_parser("validation-lease-release")
+    validation_release.add_argument("node_id")
+    validation_release.add_argument("--owner", required=True)
+
     return root
 
 
@@ -388,6 +397,17 @@ def main(argv: list[str] | None = None) -> int:
                     raise AutopilotError("subtask status nodes must be non-empty and unique")
                 statuses[node] = state
             print(json.dumps(plane.poll_subtask_wave(args.wave_id, statuses), indent=2, sort_keys=True))
+            return 0
+        if args.command == "validation-lease-acquire":
+            result = plane.acquire_global_validation_lease(
+                args.node_id,
+                args.owner,
+                lease_minutes=args.lease_minutes,
+            )
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
+        if args.command == "validation-lease-release":
+            plane.release_global_validation_lease(args.node_id, args.owner)
             return 0
         raise AssertionError(args.command)
     except (AutopilotError, ClaimError, ConfigurationError, ReceiptError) as error:

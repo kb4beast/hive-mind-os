@@ -78,3 +78,10 @@ paths against the node's write scope. Positional selectors such as `stash@{0}`
 must not be used for cross-worktree orchestration. Stale generated runtime state
 is archived under a named recovery directory before the current validated
 snapshot and release projections are installed; evidence ledgers are retained.
+
+Parallel nodes may run focused tests concurrently, but the repository-wide CI
+gate requires `validation-lease-acquire`. Only one node may own that lease at a
+time; every other child remains active and ready for the global gate. The owner
+releases it after recording the actual verdict. This prevents parallel full
+suites from exhausting process, clone, or filesystem resources and turning
+contention into false failures.
