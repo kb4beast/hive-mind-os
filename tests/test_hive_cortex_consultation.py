@@ -15,7 +15,6 @@ from hive_mind_os.brain_kernel.consultation import (
     validate_consultation_document,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / ".autopilot" / "tests" / "fixtures" / "consultations"
 

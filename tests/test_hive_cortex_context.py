@@ -19,7 +19,6 @@ from hive_mind_os.brain_kernel.memory import (
 )
 from hive_mind_os.repository_learning import CommitState, RepositoryLearningCurriculum
 
-
 DIGEST = "sha256:" + "0" * 64
 TIME = "2026-08-07T12:00:00Z"
 LATER = "2026-08-08T12:00:00Z"

@@ -8,6 +8,7 @@ can later be compared with an independently supplied canonical observation.
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
+from enum import Enum
 from typing import Any, Generic, Mapping, TypeVar
 
 from ...brain_kernel.canonical import canonical_digest
@@ -31,7 +32,7 @@ def _plain(value: Any) -> Any:
         return {str(key): _plain(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_plain(item) for item in value]
-    if hasattr(value, "value") and not isinstance(value, (str, bytes)):
+    if isinstance(value, Enum):
         return value.value
     return value
 
@@ -161,7 +162,13 @@ class MissionLoopAdapter(LegacyAdapter[Any]):
             raise CompatibilityError(f"unsupported MissionLoop action: {name!r}")
         if not isinstance(payload, Mapping):
             raise CompatibilityError("MissionLoop action payload must be a mapping")
-        mission_id = str(getattr(self.legacy, "_state", {}).mission_id) if self.legacy is not None and hasattr(getattr(self.legacy, "_state", None), "mission_id") else "MISSION-compatibility"
+        state = getattr(self.legacy, "_state", None) if self.legacy is not None else None
+        raw_mission_id = (
+            state.get("mission_id")
+            if isinstance(state, Mapping)
+            else getattr(state, "mission_id", None)
+        )
+        mission_id = str(raw_mission_id) if raw_mission_id else "MISSION-compatibility"
         return self.request(mission_id, name, payload)
 
     def project_state(self, state: Any) -> CompatibilityObservation:

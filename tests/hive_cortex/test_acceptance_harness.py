@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import copy
 import unittest
 from dataclasses import replace
 from pathlib import Path
 
 from .acceptance_harness import (
-    SPECIALIST_ROLES,
     REQUIRED_RECEIPT_TESTS,
+    SPECIALIST_ROLES,
     AcceptanceRun,
     Approval,
     Consultation,
@@ -16,7 +15,6 @@ from .acceptance_harness import (
     validate_fixture_inventory,
     validate_run,
 )
-
 
 FIXTURE_ROOT = Path(__file__).parents[1] / "fixtures" / "hive_cortex"
 

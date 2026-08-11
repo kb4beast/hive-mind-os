@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Iterable, Mapping
 
-from ..contracts import ContractValidation, ROLE_NAMES
+from ..contracts import ROLE_NAMES, ContractValidation
 from .canonical import canonical_document
 
 MAX_CONSULTATION_ROUNDS = 3

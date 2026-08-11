@@ -11,7 +11,6 @@ from hive_mind_os.brain_kernel.role_runtime import RoleCapabilityDenied, RoleRun
 from hive_mind_os.brain_kernel.roles import KERNEL_IMPLEMENTED_ROLES, RoleInvocation
 from hive_mind_os.model_provider import ModelResponse, ProviderConfig, ProviderKind
 
-
 _DIGEST = "sha256:" + "a" * 64
 
 

@@ -14,7 +14,6 @@ from .canonical import canonical_bytes, canonical_digest
 from .contracts import ContextManifest
 from .memory import MemoryCatalog, RankedMemory, RetrievalRequest
 
-
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
