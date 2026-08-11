@@ -45,6 +45,9 @@ class OperationalReadiness(StrEnum):
     QUARANTINED = "quarantined"
 
 
+_OBSERVATION_SEALS: dict[int, str] = {}
+
+
 def _text(value: str, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise StewardIntegrityError(f"{label} is required")
@@ -110,10 +113,26 @@ def _thaw(value: object) -> object:
     return value
 
 
+def _observation_payload(observation: "HealthObservation", evidence_digest: str) -> dict[str, object]:
+    return {
+        "surface": observation.surface.value,
+        "status": observation.status.value,
+        "subject_id": observation.subject_id,
+        "evidence_digest": observation.evidence_digest,
+        "content_digest": evidence_digest,
+        "recovery_ref": observation.recovery_ref,
+    }
+
+
 def _evidence_is_intact(observation: "HealthObservation") -> bool:
     try:
-        return canonical_digest(_thaw(observation.evidence)) == observation.evidence_digest
-    except (TypeError, ValueError, StewardIntegrityError):
+        content_digest = canonical_digest(_thaw(observation.evidence))
+        return (
+            content_digest == observation.evidence_digest
+            and _OBSERVATION_SEALS.get(id(observation))
+            == canonical_digest(_observation_payload(observation, content_digest))
+        )
+    except (AttributeError, TypeError, ValueError, StewardIntegrityError):
         return False
 
 
@@ -143,10 +162,13 @@ class HealthObservation:
         if self.status is HealthStatus.HEALTHY:
             if self.recovery_ref is not None:
                 object.__setattr__(self, "recovery_ref", _text(self.recovery_ref, "recovery reference"))
-            return
-        if self.recovery_ref is None:
-            raise StewardIntegrityError("unhealthy observation requires a recovery reference")
-        object.__setattr__(self, "recovery_ref", _text(self.recovery_ref, "recovery reference"))
+        else:
+            if self.recovery_ref is None:
+                raise StewardIntegrityError("unhealthy observation requires a recovery reference")
+            object.__setattr__(self, "recovery_ref", _text(self.recovery_ref, "recovery reference"))
+        _OBSERVATION_SEALS[id(self)] = canonical_digest(
+            _observation_payload(self, self.evidence_digest)
+        )
 
     def to_document(self) -> dict[str, object]:
         return {

@@ -123,6 +123,15 @@ class HiveCortexStewardTests(unittest.TestCase):
         self.assertEqual(OperationalReadiness.QUARANTINED, report.readiness)
         self.assertEqual(RepairKind.QUARANTINE, report.proposals[0].repair_kind)
 
+    def test_assessment_rejects_coordinated_public_evidence_and_digest_forgery(self) -> None:
+        sealed = observation(HealthSurface.QUEUES)
+        forged = {"surface": "queues", "verified": False}
+        object.__setattr__(sealed, "evidence", forged)
+        object.__setattr__(sealed, "evidence_digest", canonical_digest(forged))
+        report = Steward().assess((sealed, *complete_observations()[1:]))
+        self.assertEqual(OperationalReadiness.QUARANTINED, report.readiness)
+        self.assertEqual(RepairKind.QUARANTINE, report.proposals[0].repair_kind)
+
 
 if __name__ == "__main__":
     unittest.main()
