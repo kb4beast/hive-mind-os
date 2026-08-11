@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-autopilot-optimizer-370-post-expiry-negative-state-v1",
+  "evidence_id": "optimizer-370-post-expiry-negative-state-20260811",
+  "observed_at": "2026-08-11T22:00:00Z",
+  "observation_scope": "pinned checkout and shared Git common directory after claim expiry and before C2 implementation",
+  "claim_expired_at": "2026-08-11T21:13:07.231123Z",
+  "repository_head": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+  "git_common_directory": "C:/Repos/HiveMind/hive-mind-os/.git",
+  "absent_paths": [
+    ".autopilot/state/claims/optimizer-370.json",
+    ".autopilot/state/sealed-repair-completion-optimizer-370.json",
+    "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-completion-continuation.json",
+    "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-authorization.json",
+    "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-intent.json",
+    "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-consumed.json"
+  ],
+  "observed_refs": {
+    "refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+    "refs/remotes/origin/main": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8",
+    "refs/remotes/origin/autopilot/optimizer-370": "948368b77ba8de920369f416970e83b909bd50ba"
+  },
+  "candidate_tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+  "prior_continuation_or_completion_intent": false,
+  "prior_completion_or_consumption_evidence": false,
+  "source": "delegated immutable incident evidence plus read-only local Git and filesystem observation",
+  "limitations": "This is a point-in-time negative-state attestation. Runtime activation must reproduce exact authenticated remote state immediately before any separately authorized CAS.",
+  "license": "repository-internal evidence; no external code copied"
+}

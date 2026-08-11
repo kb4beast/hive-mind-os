@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "case_id": "court-optimizer-370-post-expiry-completion-20260811",
+  "observed_at": "2026-08-11T22:00:00Z",
+  "disposition": "ADAPT",
+  "scope": "isolated G-to-C2-to-H2 construction only; activation and integration deferred",
+  "clerk_identity": "codex:clerk-optimizer-370-post-expiry",
+  "advocate_identity": "codex:advocate-373",
+  "cross_examiner_identity": "codex:cross-examiner-371",
+  "expert_witness_identity": "codex:expert-372",
+  "judge_identity": "codex:judge-374",
+  "atomic_claims": [
+    {
+      "id": "expired-claim-is-immutable-evidence",
+      "decision": "ADOPT",
+      "claim": "Claim 8fa51243327ae928e46df180bfd81fbf90062cf5 expired and is immutable provenance, not current authority.",
+      "control": "A new incident-only grant binds the complete old payload and never renews, mutates, deletes, or changes the old claim."
+    },
+    {
+      "id": "new-post-expiry-completion-authority",
+      "decision": "ADAPT",
+      "claim": "One append-only post-expiry completion authorization can restore truthful lifecycle evidence for the already adopted candidate.",
+      "control": "Bind the complete exact tuple and permit only a zero-path receipt child of 948368b77ba8de920369f416970e83b909bd50ba."
+    },
+    {
+      "id": "rollback-is-adverse",
+      "decision": "REJECT",
+      "claim": "Moving the live node branch from 948368b77ba8de920369f416970e83b909bd50ba to 88f2962b64f7cc9f88284c5dd30106de5313da7b is a safe recovery.",
+      "control": "No state transition or compensation may target 88f2962b64f7cc9f88284c5dd30106de5313da7b."
+    },
+    {
+      "id": "prior-overlay-authority",
+      "decision": "QUARANTINE",
+      "claim": "H=457f4608fcd1990fc89e30a2caa8019c3b02f788 or PR143 can authorize post-expiry completion.",
+      "control": "Prior overlay artifacts are evidence only and may not be integrated, reused, or treated as executable authority."
+    },
+    {
+      "id": "durable-one-time-state",
+      "decision": "ADAPT",
+      "claim": "A fresh bounded one-time grant can remain crash safe and replay proof.",
+      "control": "Use Git-common-dir O_EXCL records, file and directory fsync, digest-CAS transitions, irreversible CONSUMED evidence, and terminal EXPIRED or ADVERSE evidence."
+    },
+    {
+      "id": "exact-node-cas",
+      "decision": "ADOPT",
+      "claim": "The only permitted node mutation is exact CAS from 948368b77ba8de920369f416970e83b909bd50ba to its exact intended-receipt child.",
+      "control": "Reject siblings, descendants, foreign state, target drift, ADVERSE state, altered trees, and any third receipt."
+    },
+    {
+      "id": "separate-release-integration",
+      "decision": "ADOPT",
+      "claim": "Completion authority and release integration authority are different powers.",
+      "control": "Literal H2 must be separately judged and appealed before an exact one-time release CAS G-to-H2 can be authorized."
+    },
+    {
+      "id": "transport-security",
+      "decision": "ADOPT",
+      "claim": "Recovery must not weaken authenticated Git transport.",
+      "control": "TLS verification and certificate revocation remain enabled; environment overrides, includes, URL rewrites, helpers, protocol overrides, and HTTP trust overrides fail closed."
+    }
+  ],
+  "exact_bindings": {
+    "repository": "kb4beast/hive-mind-os",
+    "release_ref": "refs/heads/release/hive-mind-os-singleton-20260810-r2",
+    "release_sha": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+    "release_tree": "2a5b94489c368c0e3798c2d38d85f7631adb8604",
+    "main_sha": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8",
+    "old_receipt_commit": "926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+    "old_receipt_payload_digest": "sha256:7e493003cb9d3eefbdcabece3bdba56c1d11f2378594803924bcf6fee0f93334",
+    "expired_claim_commit": "8fa51243327ae928e46df180bfd81fbf90062cf5",
+    "expired_claim_payload_digest": "sha256:69d956a1ebfb6336cb341dcbceb67b3b22f97a93906841b7eb49627f8b5a36c4",
+    "expired_claim_owner": "codex:optimizer-370-repair",
+    "expired_claim_expires_at": "2026-08-11T21:13:07.231123Z",
+    "execution_merge_commit": "88f2962b64f7cc9f88284c5dd30106de5313da7b",
+    "candidate_commit": "948368b77ba8de920369f416970e83b909bd50ba",
+    "candidate_tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+    "pr": 135,
+    "pr_head_branch": "autopilot/optimizer-370",
+    "intended_receipt_digest": "sha256:bf5b2cdd03f40b88980a964d843bf8829b9dc2393864b4ded360f04a42e8afdd"
+  },
+  "adverse_findings": [
+    "The ordinary expired-claim recovery would classify the live adopted head as adverse and could not lawfully roll it back.",
+    "H required pre-expiry arming that did not occur.",
+    "Atomic replacement without immutable O_EXCL and consumed markers is replayable across crash cuts.",
+    "A candidate cannot self-authorize its own literal release integration SHA."
+  ],
+  "implementation_permission": "Construct and validate C2/H2 only in control-plane, evidence, test, and ADR paths.",
+  "mutation_ban": "No activation, release/main/node/claim/receipt/dispatcher/PR mutation, integration, or remote write is authorized by this Court.",
+  "dissent": [
+    "Literal-H2 release integration authority remains unavailable until H2 exists and receives a separate Court and Appeals disposition."
+  ]
+}

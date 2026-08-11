@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "appeal_id": "appeal-optimizer-370-post-expiry-completion-20260811",
+  "court_case_id": "court-optimizer-370-post-expiry-completion-20260811",
+  "court_disposition": "ADAPT",
+  "appeals_judge_identity": "codex:appeals-judge-375",
+  "disposition": "ADAPT",
+  "ruling": "AFFIRM AS NARROWED",
+  "construction_authority": "An isolated G-to-C2-to-H2 candidate may be constructed in control-plane, evidence, test, and ADR paths only.",
+  "conditions": [
+    "Seal append-only negative-state evidence observed after the old claim expiry and before C2 implementation.",
+    "Preserve claim 8fa51243327ae928e46df180bfd81fbf90062cf5 and its raw payload byte-exactly.",
+    "Treat H=457f4608fcd1990fc89e30a2caa8019c3b02f788 and PR143 as quarantined evidence only.",
+    "Bind the complete exact tuple and reject ADVERSE, foreign, target-drifted, third-receipt, or incompletely proven state.",
+    "Use fresh bounded O_EXCL state and digest-CAS progression to irreversible CONSUMED evidence.",
+    "Permit no rollback or compensation after the exact node CAS and never target 88f2962b64f7cc9f88284c5dd30106de5313da7b.",
+    "Preserve TLS verification and certificate revocation and reject unverifiable Git configuration or transport state.",
+    "Obtain a different Court and Appeals panel for a separate literal-H2 release-integration authority after final H2 and full-suite evidence exist."
+  ],
+  "authority_withheld": [
+    "node completion activation",
+    "receipt publication",
+    "remote mutation",
+    "release or main movement",
+    "claim, dispatcher, PR, or existing receipt mutation",
+    "integration of H, PR143, C2, or H2"
+  ],
+  "signed_by": "codex:appeals-judge-375"
+}
