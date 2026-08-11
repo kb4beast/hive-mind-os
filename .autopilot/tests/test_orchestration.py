@@ -153,7 +153,7 @@ class IntentOrchestrationTests(unittest.TestCase):
             with self.subTest(request=request):
                 self.assertEqual(infer_intent(request, {}).intent, "CHECK")
 
-    def test_closure_first_resumes_existing_work_and_does_not_widen(self) -> None:
+    def test_closure_first_manages_active_recovery_and_read_only_preparation_in_parallel(self) -> None:
         status = self.status(
             [
                 {"node_id": "ACTIVE-100", "state": "RUNNING", "reasons": []},
@@ -164,10 +164,16 @@ class IntentOrchestrationTests(unittest.TestCase):
         plane = FakePlane(self.root, status, self.nodes)
         contract = build_orchestration_contract(plane, "Handle the rest", status=status)
         tasks = {str(item["node_id"]): item for item in contract["tasks"]}
-        self.assertEqual(set(tasks), {"ACTIVE-100", "CLOSE-200"})
+        self.assertEqual(set(tasks), {"ACTIVE-100", "CLOSE-200", "NEW-300"})
         self.assertEqual(tasks["ACTIVE-100"]["action"], "RESUME")
         self.assertEqual(tasks["CLOSE-200"]["action"], "REPAIR_CI")
+        self.assertEqual(tasks["NEW-300"]["action"], "PREPARE_READ_ONLY")
+        self.assertEqual(tasks["NEW-300"]["authority_mode"], "PREPARATION_ONLY")
+        self.assertFalse(tasks["NEW-300"]["may_claim_or_write"])
         self.assertEqual(contract["closure_target"], "CLOSE-200")
+        self.assertTrue(
+            contract["execution"]["closure_target_prioritizes_collection_not_task_creation"]
+        )
         self.assertFalse(should_publish_release(infer_intent("finish", status), status))
 
     def test_released_parallel_wave_emits_durable_primary_tasks(self) -> None:
@@ -192,11 +198,54 @@ class IntentOrchestrationTests(unittest.TestCase):
             self.assertRegex(task["launch_instruction_id"], r"^sha256:[0-9a-f]{64}$")
             self.assertIn(task["launch_instruction_id"][7:19], task["title"])
             self.assertEqual(task["target_branch"], "release/test")
+            self.assertEqual(task["authority_mode"], "EXECUTION_AUTHORIZED")
+            self.assertTrue(task["may_claim_or_write"])
         self.assertEqual(
             contract["execution"]["executor_module"],
             ".autopilot/bin/host_execution.py",
         )
         self.assertFalse(contract["execution"]["parent_final_while_required_tasks_active"])
+
+    def test_existing_recovery_does_not_suppress_released_or_preparation_tasks(self) -> None:
+        rows = [
+            {"node_id": "ACTIVE-100", "state": "RUNNING", "reasons": []},
+            {"node_id": "CLOSE-200", "state": "READY", "reasons": []},
+            {"node_id": "NEW-300", "state": "READY", "reasons": []},
+        ]
+        status = self.status(rows)
+        status["dispatch_release"] = {
+            "valid": True,
+            "released_wave": ["CLOSE-200"],
+            "directive": "START NOW",
+        }
+        status["ready"] = ["CLOSE-200"]
+        plane = FakePlane(self.root, status, self.nodes)
+
+        contract = build_orchestration_contract(plane, "continue", status=status)
+        tasks = {str(task["node_id"]): task for task in contract["tasks"]}
+
+        self.assertEqual(set(tasks), {"ACTIVE-100", "CLOSE-200", "NEW-300"})
+        self.assertEqual(tasks["ACTIVE-100"]["authority_mode"], "RECOVERY_AUTHORIZED")
+        self.assertEqual(tasks["CLOSE-200"]["authority_mode"], "EXECUTION_AUTHORIZED")
+        self.assertEqual(tasks["NEW-300"]["authority_mode"], "PREPARATION_ONLY")
+        self.assertTrue(tasks["CLOSE-200"]["may_claim_or_write"])
+        self.assertFalse(tasks["NEW-300"]["may_claim_or_write"])
+        self.assertEqual(len({task["title"] for task in tasks.values()}), 3)
+        self.assertEqual(contract["task_cohort"]["size"], 3)
+        self.assertEqual(
+            contract["task_cohort"]["authority_counts"],
+            {
+                "EXECUTION_AUTHORIZED": 1,
+                "PREPARATION_ONLY": 1,
+                "RECOVERY_AUTHORIZED": 1,
+            },
+        )
+        self.assertTrue(contract["task_cohort"]["created_together_before_first_wait"])
+        self.assertTrue(contract["task_cohort"]["every_task_polled_to_terminal"])
+        for node_id, task in tasks.items():
+            self.assertIn(node_id, task["title"])
+            self.assertIn(str(task["action"]), task["title"])
+            self.assertIn(str(task["authority_mode"]), task["title"])
 
     def test_launch_binding_is_append_only_and_consumed_before_create(self) -> None:
         rows = [{"node_id": "ACTIVE-100", "state": "READY", "reasons": []}]
@@ -533,6 +582,19 @@ class IntentOrchestrationTests(unittest.TestCase):
             ("recovery", "blocker_is_completion", True),
             ("wave", "never_start_next_level_before_required_current_cohort_quiescence", False),
             ("task_transport", "record_task_id", False),
+            (
+                "parallel_task_cohort",
+                "create_released_tasks_even_when_recovery_tasks_exist",
+                False,
+            ),
+            ("parallel_task_cohort", "create_eligible_preparation_tasks", False),
+            ("parallel_task_cohort", "create_entire_cohort_before_first_wait", False),
+            ("parallel_task_cohort", "poll_every_created_task_to_terminal", False),
+            (
+                "parallel_task_cohort",
+                "closure_target_prioritizes_collection_not_creation",
+                False,
+            ),
         )
         for section, key, value in mutations:
             with self.subTest(section=section, key=key):

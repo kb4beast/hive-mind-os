@@ -771,6 +771,25 @@ def validate_policy(value: object) -> tuple[str, ...]:
             issues.append("wave mode must be deterministic priority-ordered maximal conflict-free")
         if wave.get("never_start_next_level_before_required_current_cohort_quiescence") is not True:
             issues.append("wave must wait for current cohort quiescence")
+    cohort = value.get("parallel_task_cohort")
+    if not isinstance(cohort, Mapping):
+        issues.append("parallel_task_cohort must be an object")
+    else:
+        for key in (
+            "create_released_tasks_even_when_recovery_tasks_exist",
+            "create_eligible_preparation_tasks",
+            "create_entire_cohort_before_first_wait",
+            "poll_every_created_task_to_terminal",
+            "closure_target_prioritizes_collection_not_creation",
+        ):
+            if cohort.get(key) is not True:
+                issues.append(f"parallel_task_cohort.{key} must be true")
+        if cohort.get("preparation_authority") != "read_only_until_start_now":
+            issues.append("parallel preparation authority must be read_only_until_start_now")
+        if cohort.get("title_fields") != [
+            "node_id", "action", "authority_mode", "instruction_digest"
+        ]:
+            issues.append("parallel task titles must be unambiguous")
     if isinstance(transport, Mapping):
         for key in ("record_host_id", "record_task_id", "resume_by_node_identity"):
             if transport.get(key) is not True:
@@ -838,12 +857,15 @@ def _node_map(plane: Any) -> dict[str, Mapping[str, Any]]:
     return {str(node.get("id")): node for node in plane.nodes()}
 
 
-def _task_prompt(plane: Any, node_id: str, action: str) -> str:
+def _task_prompt(plane: Any, node_id: str, action: str, authority_mode: str) -> str:
     base = plane.render_worker_prompt(node_id)
     return (
         "Read .autopilot/orchestration-policy.json and obey its durable-task, "
         "closure-first, polling, recovery, and quiescence contract.\n"
-        f"Primary task action: {action}. Reuse existing work for {node_id}; do not "
+        f"Primary task action: {action}. Authority mode: {authority_mode}. "
+        "PREPARATION_ONLY may inspect, diagnose, and prepare an exact handoff but may "
+        "not claim, write, commit, push, or publish completion until START NOW. "
+        f"Reuse existing work for {node_id}; do not "
         "duplicate a valid claim, branch, candidate, receipt, or PR. A blocker is not "
         "completion: record it, recover within authority, and resume.\n\n"
         + base
@@ -858,6 +880,7 @@ def _task(
     *,
     action: str,
     required: bool = True,
+    authority_mode: str = "RECOVERY_AUTHORIZED",
 ) -> dict[str, object]:
     node_id = str(node.get("id"))
     adapters = policy.get("host_adapters", {})
@@ -877,6 +900,14 @@ def _task(
         # lifecycle and must resume the same task. Target advancement or an
         # explicit failed retry creates a distinct identity below.
         "lifecycle": "NODE_DELIVERY",
+        # CREATE, RESUME, repair, and receipt work are one write-authorized
+        # lifecycle. Preparation is intentionally a different identity so a
+        # read-only task can never be mistaken for an execution grant.
+        "authority_class": (
+            "PREPARATION_ONLY"
+            if authority_mode == "PREPARATION_ONLY"
+            else "WRITE_AUTHORIZED"
+        ),
         "branch": str(node.get("branch")),
         "target_branch": target_branch,
         "plan_fingerprint": str(getattr(plane, "expected_plan_fingerprint", "unknown")),
@@ -923,8 +954,15 @@ def _task(
         "idempotency_key": instruction_id,
         "attempt": instruction_material["attempt"],
         "retry_of": retry_of,
-        "title": f"Hive Mind {node_id} [{instruction_id[7:19]}]",
+        "title": f"Hive Mind {node_id} — {action} — {authority_mode} [{instruction_id[7:19]}]",
         "action": effective_action,
+        "authority_mode": authority_mode,
+        "may_claim_or_write": authority_mode != "PREPARATION_ONLY",
+        "start_condition": (
+            "current dispatcher release says START NOW for this exact node"
+            if authority_mode == "PREPARATION_ONLY"
+            else "authority already established by release, claim, or checked-in repair grant"
+        ),
         "required": required,
         "state": str(row.get("state", "UNKNOWN")),
         "branch": str(node.get("branch")),
@@ -939,7 +977,7 @@ def _task(
         "binding_required": True,
         "binding": dict(binding) if binding is not None else None,
         "host_adapters": adapters,
-        "prompt": _task_prompt(plane, node_id, effective_action),
+        "prompt": _task_prompt(plane, node_id, effective_action, authority_mode),
     }
 
 
@@ -1052,12 +1090,31 @@ def build_orchestration_contract(
                 if isinstance(raw, list):
                     released = [str(item) for item in raw]
             existing = {str(task.get("node_id")) for task in tasks}
-            if not tasks:
-                for node_id in released:
+            for node_id in released:
+                if node_id in existing or node_id not in node_defs:
+                    continue
+                row = rows.get(node_id, {"node_id": node_id, "state": "READY"})
+                tasks.append(
+                    _task(
+                        plane, policy, node_defs[node_id], row, action="CREATE",
+                        authority_mode="EXECUTION_AUTHORIZED",
+                    )
+                )
+                existing.add(node_id)
+
+            eligible = current.get("eligible", [])
+            if isinstance(eligible, list):
+                for node_id in sorted(str(item) for item in eligible):
                     if node_id in existing or node_id not in node_defs:
                         continue
                     row = rows.get(node_id, {"node_id": node_id, "state": "READY"})
-                    tasks.append(_task(plane, policy, node_defs[node_id], row, action="CREATE"))
+                    tasks.append(
+                        _task(
+                            plane, policy, node_defs[node_id], row,
+                            action="PREPARE_READ_ONLY", authority_mode="PREPARATION_ONLY",
+                        )
+                    )
+                    existing.add(node_id)
 
     primary_tasks = [task for task in tasks if task.get("required") is True]
     closure_target = None
@@ -1098,6 +1155,11 @@ def build_orchestration_contract(
         outcome = "IDLE"
         quiescent = False
 
+    authority_counts: dict[str, int] = {}
+    for task in tasks:
+        mode = str(task.get("authority_mode", "UNKNOWN"))
+        authority_counts[mode] = authority_counts.get(mode, 0) + 1
+
     material = {
         "schema_version": 1,
         "kind": "hive-mind-autopilot-orchestration-contract-v1",
@@ -1111,6 +1173,13 @@ def build_orchestration_contract(
         "dispatch_release": release,
         "eligible": list(eligible) if isinstance(eligible, list) else [],
         "tasks": tasks,
+        "task_cohort": {
+            "size": len(tasks),
+            "task_keys": [str(task.get("task_key")) for task in tasks],
+            "authority_counts": dict(sorted(authority_counts.items())),
+            "created_together_before_first_wait": True,
+            "every_task_polled_to_terminal": True,
+        },
         "active_host_bindings": [dict(item) for item in live_bindings],
         "active_claims": list(active_claims) if isinstance(active_claims, list) else [],
         "active_validation_lease": (
@@ -1128,6 +1197,9 @@ def build_orchestration_contract(
             "primary_transport": "durable_user_owned_task",
             "nested_agents": "bounded_sidecars_only",
             "create_all_parallel_safe_primary_tasks": True,
+            "create_released_tasks_even_when_recovery_tasks_exist": True,
+            "create_eligible_read_only_preparation_tasks": True,
+            "closure_target_prioritizes_collection_not_task_creation": True,
             "resume_by_node_identity_before_create": True,
             "recover_unbound_launch_by_instruction_id": True,
             "record_task_id_host_id_and_cursor": True,

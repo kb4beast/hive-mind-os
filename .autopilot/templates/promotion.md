@@ -7,6 +7,11 @@ Target SHA: `{{TARGET_SHA}}`
 
 Read `.autopilot/workflow-policy.json`. **This durable primary task owns this node** through its stopping condition. Use the approved host's available reasoning, repository/GitHub tools, files, shell, and deterministic controller directly. Host choice never expands authority.
 
+The parent creates the complete visible task cohort before its first wait. Task creation
+is not claim or write authority: the title and prompt state either `EXECUTION_AUTHORIZED`,
+`RECOVERY_AUTHORIZED`, or `PREPARATION_ONLY`. A preparation-only task may inspect,
+diagnose, and prepare a handoff but must not mutate repository or remote state.
+
 Nested agents are bounded sidecars for research, independent review, or non-blocking validation; they do not replace this primary task. If a required capability is unavailable, return an exact typed capability blocker to the parent. The parent must repair or select an approved capable host and resume this same node rather than asking the user to perform repairable work.
 
 If genuine human action remains, never assume prior knowledge: give exact click-by-click UI steps or copy-paste commands, what should appear, what to send back, and safety/rollback guidance.

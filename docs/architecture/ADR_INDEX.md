@@ -32,9 +32,10 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-057`     | [Portable intent-driven Autopilot orchestration](ADR-057-PORTABLE-INTENT-DRIVEN-AUTOPILOT.md)                               | Autopilot portability      | adapted implementation candidate; independent Curator/Judge pending                  |
 | `ADR-058`     | [Capability-bound durable-task execution](ADR-058-CAPABILITY-BOUND-HOST-EXECUTION.md)                                      | Autopilot host execution   | adapted implementation candidate; independent Curator/security review pending        |
 | `ADR-059`     | [Host-authorized external controller trust](ADR-059-HOST-AUTHORIZED-CONTROLLER-TRUST.md)                                   | Autopilot controller trust | adapted implementation candidate; independent Curator/security review pending        |
+| `ADR-060`     | [Visible parallel task cohorts](ADR-060-VISIBLE-PARALLEL-TASK-COHORTS.md)                                                   | Autopilot task scheduling  | adapted implementation candidate; independent Curator/security review pending        |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-059; it must be unique at creation time.
+is ADR-061; it must be unique at creation time.

@@ -48,6 +48,20 @@
     "parent_final_while_required_tasks_active": false,
     "poll_until_terminal": true
   },
+  "parallel_task_cohort": {
+    "closure_target_prioritizes_collection_not_creation": true,
+    "create_eligible_preparation_tasks": true,
+    "create_entire_cohort_before_first_wait": true,
+    "create_released_tasks_even_when_recovery_tasks_exist": true,
+    "poll_every_created_task_to_terminal": true,
+    "preparation_authority": "read_only_until_start_now",
+    "title_fields": [
+      "node_id",
+      "action",
+      "authority_mode",
+      "instruction_digest"
+    ]
+  },
   "recovery": {
     "blocker_is_completion": false,
     "classifications": [

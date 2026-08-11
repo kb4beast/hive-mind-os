@@ -9,6 +9,11 @@ Target SHA at dispatch: `{{TARGET_SHA}}`
 
 Read `.autopilot/workflow-policy.json`. **This durable primary task owns this node** through its stopping condition. Use the approved host's available reasoning, repository/GitHub tools, files, shell, and deterministic controller directly. Host choice never expands authority.
 
+The parent creates the complete visible task cohort before its first wait. Task creation
+is not claim or write authority: the title and prompt state either `EXECUTION_AUTHORIZED`,
+`RECOVERY_AUTHORIZED`, or `PREPARATION_ONLY`. A preparation-only task may inspect,
+diagnose, and prepare a handoff but must not mutate repository or remote state.
+
 Nested agents are bounded sidecars for research, independent review, or non-blocking validation; they do not replace this primary task. If a required capability is unavailable, return an exact typed capability blocker to the parent. The parent must repair or select an approved capable host and resume this same node rather than asking the user to perform repairable work.
 
 If genuine human action remains, never assume prior knowledge: give exact click-by-click UI steps or copy-paste commands, what should appear, what to send back, and safety/rollback guidance.
@@ -24,7 +29,7 @@ not retry. Release the lease after the one authoritative run.
 
 `{{NODE_STATE}}`, DAG membership, level membership, and dependency readiness are eligibility signals only. They do **not** authorize execution. This worker may claim or implement `{{NODE_ID}}` only when the latest dispatcher release is current and the rendered prompt begins with `DISPATCH VERDICT FOR {{NODE_ID}}: START NOW`. Otherwise the verdict is `WAIT` or `STOP` and this worker must not begin.
 
-For a parallel wave, all workers may be opened together only when the same current dispatcher release says `START TOGETHER NOW` and names the wave. Any target-branch advance/merge, conflicting claim, GitHub snapshot change, or reconciliation event makes the prior release stale. Re-run the dispatcher instead of reusing an old prompt. The `claim` command independently enforces this gate and fails closed on stale or absent release authority.
+For a parallel wave, all released workers may begin claims and writes together only when the same current dispatcher release says `START TOGETHER NOW` and names the wave. Other eligible tasks may already be visible in `PREPARATION_ONLY` mode. Any target-branch advance/merge, conflicting claim, GitHub snapshot change, or reconciliation event makes the prior release stale. Re-run the dispatcher instead of reusing an old prompt. The `claim` command independently enforces this gate and fails closed on stale or absent release authority.
 
 Use a fresh, clean checkout with authenticated GitHub access. Read every applicable
 `AGENTS.md` and `CLAUDE.md`, then read `.autopilot/README.md` and the full contract for

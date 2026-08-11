@@ -86,7 +86,9 @@ python .autopilot/bin/autopilot.py --repo-root . orchestrate \
 ```
 
 The returned task effects contain a deterministic launch instruction ID, task title,
-node/branch/target, expected artifact, host adapter names, and canonical worker prompt.
+node/branch/target, explicit authority mode, expected artifact, host adapter names, and
+canonical worker prompt. Titles include node, action, authority mode, and instruction
+digest so operators and recovery logic can distinguish tasks without guessing.
 Before creation, the host runs `prepare-launch`. After the external task exists, it runs
 `bind-launch`, producing append-only `PREPARED -> CREATED -> BOUND` evidence. A restart
 consumes the binding; a prepared but unbound launch searches by the deterministic title
@@ -103,6 +105,13 @@ wait, capability-binds every host event, polls to terminal state, answers recove
 attention through the safe resolver, and returns a typed blocker after bounded
 no-progress cycles. The adapter is responsible only for the chat product's private API;
 the orchestration behavior is Hive Mind OS code, not an optional prompt convention.
+
+The visible cohort is broader than the write-authorized wave. It includes active and
+recovery tasks, every node in the current dispatcher release, and a read-only
+`PREPARATION_ONLY` task for each other eligible node. An existing recovery task never
+suppresses those tasks. `START NOW` and `START TOGETHER NOW` govern claims and writes,
+not whether a useful task can be created. Closure-first only prioritizes which result is
+collected first; every created task remains managed and is polled to terminal state.
 
 In Codex:
 

@@ -15,7 +15,8 @@
       "GitHub state snapshot change",
       "new reconciliation event"
     ],
-    "parallel_rule": "Parallel workers may start together only when one current release names the conflict-free parallel-safe wave and emits START TOGETHER NOW.",
+    "parallel_rule": "Create the complete visible task cohort before the first wait: active/recovery tasks, every explicitly released conflict-free execution task, and read-only preparation tasks for other eligible nodes. START TOGETHER NOW controls claims and writes; it does not suppress task creation.",
+    "preparation_rule": "An eligible node without START NOW receives a clearly titled PREPARATION_ONLY task. It may inspect, diagnose, and prepare a handoff, but may not claim, write, commit, push, or publish completion.",
     "plain_action_required": true,
     "release_command": "python .autopilot/bin/autopilot.py --repo-root . dispatch --actor <dispatcher> [--node NODE]",
     "static_dag_rule": "DAG/level membership and deterministic READY eligibility are necessary but never sufficient execution authority.",
@@ -37,7 +38,7 @@
       "wait_primary": "wait_threads"
     },
     "nested_agents": "Allowed only for bounded research, independent review, or non-blocking validation. A nested agent may not replace a primary node task.",
-    "primary_owner": "The approved durable task that receives the current released node owns that node through its stopping condition.",
+    "primary_owner": "A durable task owns its explicit node and authority mode through its stopping condition. A preparation task never inherits execution authority implicitly; a released write-authorized lifecycle is separately identified and managed.",
     "selection": "Select a host that can satisfy the node contract and configured route. Host choice never expands node or effect authority."
   },
   "human_instructions": "Never assume the user knows how to perform a manual action. Give exact click-by-click UI steps or copy-paste commands, what should appear, exactly what to send back, and safety/rollback guidance when genuine human authority remains.",

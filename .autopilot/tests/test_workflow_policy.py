@@ -14,6 +14,14 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertEqual(policy["preferred_surface"], "capability_matched_durable_task")
         self.assertEqual(policy["host_policy"]["codex"]["create_primary"], "create_thread")
         self.assertIn("may not replace", policy["host_policy"]["nested_agents"])
+        self.assertIn(
+            "does not suppress task creation",
+            policy["dispatcher_release_barrier"]["parallel_rule"],
+        )
+        self.assertIn(
+            "PREPARATION_ONLY",
+            policy["dispatcher_release_barrier"]["preparation_rule"],
+        )
         self.assertTrue(policy["global_validation"]["single_authoritative_run"])
         self.assertTrue(
             policy["global_validation"]["lease_required_for_repository_wide_gate"]
@@ -37,6 +45,8 @@ class WorkflowPolicyTests(unittest.TestCase):
             self.assertIn("BLOCKS", text)
             self.assertIn("validation-lease-acquire", text)
             self.assertIn("non-verdict evidence", text)
+            self.assertIn("complete visible task cohort", text)
+            self.assertIn("PREPARATION_ONLY", text)
 
     def test_human_escalation_is_novice_safe(self) -> None:
         text = (ROOT / "templates" / "human-escalation.md").read_text(encoding="utf-8")
@@ -59,6 +69,11 @@ class WorkflowPolicyTests(unittest.TestCase):
         validation = policy["wave"]["repository_wide_validation"]
         self.assertTrue(validation["lease_required"])
         self.assertFalse(validation["retry_while_another_owner_holds_lease"])
+        cohort = policy["parallel_task_cohort"]
+        self.assertTrue(cohort["create_released_tasks_even_when_recovery_tasks_exist"])
+        self.assertTrue(cohort["create_eligible_preparation_tasks"])
+        self.assertTrue(cohort["create_entire_cohort_before_first_wait"])
+        self.assertTrue(cohort["poll_every_created_task_to_terminal"])
 
 
 if __name__ == "__main__":

@@ -28,8 +28,15 @@ The initial dependency waves are:
 - Primary nodes run as durable user-owned tasks. On Codex, use `create_thread`, record
   thread/host IDs, poll with `wait_threads`, and resume with
   `send_message_to_thread`. Nested subagents are bounded sidecars only.
-- Resume active, receipt-pending, PR, CI-failed, and repair-required nodes before
-  widening the graph with new work.
+- Create the complete visible cohort before the first wait. Existing recovery work does
+  not suppress newly released tasks. Eligible but unreleased nodes receive clearly
+  titled `PREPARATION_ONLY` tasks, which may inspect and prepare but cannot claim, write,
+  commit, push, or publish completion.
+- Treat closure-first as polling priority, not task-creation exclusivity. Every created
+  primary task is polled to a terminal result and receives recovery answers in the same
+  task; the parent does not stop merely because one task finished.
+- Prioritize active, receipt-pending, PR, CI-failed, and repair-required nodes for
+  closure while concurrently creating all safe execution and preparation tasks.
 - Select and finish at least one closure target before optional audit expansion. Do not
   return a parent final while required primary tasks remain active.
 - Automatic multi-node releases require every co-released node to declare
