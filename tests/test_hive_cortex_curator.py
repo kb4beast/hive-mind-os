@@ -85,9 +85,14 @@ class CuratorRuntimeTests(unittest.TestCase):
 
     def test_candidate_mutation_is_quarantined(self) -> None:
         seal = self.runtime.seal_acceptance(mission_id="MISSION-1", work_id="WORK-1", curator_id="curator:independent", checks=("hostile",))
+
+        def mutate_candidate(_name: str, root: Path) -> bool:
+            (root / "candidate.txt").write_text("mutated\n", encoding="utf-8")
+            return True
+
         report = self.runtime.verify(
             seal, self._workspace(), candidate=self.identity,
-            check_runner=lambda _name, root: (root / "candidate.txt").write_text("mutated\n", encoding="utf-8") or True,
+            check_runner=mutate_candidate,
         )
         self.assertEqual(CuratorVerdict.QUARANTINE, report.verdict)
 
