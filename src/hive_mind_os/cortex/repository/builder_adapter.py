@@ -7,7 +7,10 @@ Builder coordinator.  It never pushes, merges, deploys, or installs packages.
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -18,6 +21,7 @@ from ...brain_kernel.builder import (
     BuilderAction,
     BuilderActionKind,
     BuilderActionOutcome,
+    BuilderCommandProfile,
 )
 from ...brain_kernel.canonical import canonical_digest
 from ...brain_kernel.contracts import EffectIntent, normalize_portable_path
@@ -50,9 +54,11 @@ class IsolatedBuilderAdapter:
 
     def register_action(self, action: BuilderAction) -> str:
         digest = action.parameters_digest
-        previous = self._actions.setdefault(digest, _RegisteredAction(action, digest))
+        previous = self._actions.setdefault(
+            action.idempotency_key, _RegisteredAction(action, digest)
+        )
         if previous.action != action:
-            raise AuthorityDenied("Builder payload digest is already bound to another action")
+            raise AuthorityDenied("Builder idempotency key is already bound to another action")
         return digest
 
     def outcome_for(self, intent_digest: str) -> BuilderActionOutcome:
@@ -72,7 +78,7 @@ class IsolatedBuilderAdapter:
 
     def _action_for(self, intent: EffectIntent) -> BuilderAction:
         try:
-            registered = self._actions[intent.parameters_digest]
+            registered = self._actions[intent.idempotency_key]
         except KeyError as error:
             raise AuthorityDenied("Builder effect payload was not registered") from error
         action = registered.action
@@ -109,14 +115,21 @@ class IsolatedBuilderAdapter:
         return self._outcome(intent_digest, action, "SUCCEEDED", "isolated write completed", 0)
 
     def _command(self, intent_digest: str, action: BuilderAction) -> BuilderActionOutcome:
-        raw_argv = action.payload.get("argv")
-        if not isinstance(raw_argv, (tuple, list)) or not all(
-            isinstance(item, str) for item in raw_argv
-        ):
-            raise BuilderAdapterError("validated command argv is unavailable")
-        completed = subprocess.run(
-            list(raw_argv), cwd=self.root, shell=False, capture_output=True,
-            timeout=self.command_timeout_seconds, check=False,
+        profile, paths = self._command_profile(action)
+        if profile is BuilderCommandProfile.FILE_EXISTS:
+            missing = tuple(path for path in paths if not self._path(path).is_file())
+            detail = canonical_digest({"profile": profile.value, "missing": missing})
+            return self._outcome(
+                intent_digest,
+                action,
+                "FAILED" if missing else "SUCCEEDED",
+                detail,
+                1 if missing else 0,
+            )
+        if profile is not BuilderCommandProfile.GIT_DIFF_CHECK:  # pragma: no cover
+            raise BuilderAdapterError("validated command profile has no implementation")
+        completed = self._run_git(
+            ["diff", "--no-ext-diff", "--no-textconv", "--check", "--", *paths]
         )
         # Command streams are bytes and may contain secrets.  Retain only their
         # individual digests in the outcome evidence; canonical JSON must never
@@ -128,17 +141,92 @@ class IsolatedBuilderAdapter:
             intent_digest, action, "SUCCEEDED" if completed.returncode == 0 else "FAILED", detail, completed.returncode
         )
 
-    def _git(self, intent_digest: str, action: BuilderAction, args: list[str]) -> BuilderActionOutcome:
-        completed = subprocess.run(
-            ["git", *args], cwd=self.root, shell=False, capture_output=True,
-            timeout=self.command_timeout_seconds, check=False,
+    def _command_profile(
+        self, action: BuilderAction
+    ) -> tuple[BuilderCommandProfile, tuple[str, ...]]:
+        try:
+            profile = BuilderCommandProfile(str(action.payload.get("profile")))
+        except ValueError as error:  # pragma: no cover - BuilderAction seals this value.
+            raise BuilderAdapterError("validated command profile is unavailable") from error
+        raw_paths = action.payload.get("paths")
+        if not isinstance(raw_paths, (tuple, list)):
+            raise BuilderAdapterError("validated command paths are unavailable")
+        paths = tuple(normalize_portable_path(str(path)) for path in raw_paths)
+        for path in paths:
+            self._path(path)
+        return profile, paths
+
+    @staticmethod
+    def _command_environment(runtime: Path) -> dict[str, str]:
+        allowed = ("PATH", "PATHEXT", "SystemRoot", "SYSTEMROOT", "WINDIR")
+        environment = {
+            key: value
+            for key in allowed
+            if (value := os.environ.get(key))
+            and not any(character in value for character in "\r\n")
+        }
+        runtime_text = str(runtime)
+        environment.update(
+            {
+                "HOME": runtime_text,
+                "USERPROFILE": runtime_text,
+                "XDG_CONFIG_HOME": runtime_text,
+                "TEMP": runtime_text,
+                "TMP": runtime_text,
+                "TMPDIR": runtime_text,
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_TERMINAL_PROMPT": "0",
+                "GIT_OPTIONAL_LOCKS": "0",
+                "GIT_ALLOW_PROTOCOL": "file",
+                "PYTHONNOUSERSITE": "1",
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
         )
+        return environment
+
+    def _git(self, intent_digest: str, action: BuilderAction, args: list[str]) -> BuilderActionOutcome:
+        completed = self._run_git(args)
         detail = canonical_digest(
             {"stdout_digest": self._stream_digest(completed.stdout), "stderr_digest": self._stream_digest(completed.stderr), "argv": args}
         )
         return self._outcome(
             intent_digest, action, "SUCCEEDED" if completed.returncode == 0 else "FAILED", detail, completed.returncode
         )
+
+    def _run_git(self, args: list[str]) -> subprocess.CompletedProcess[bytes]:
+        with tempfile.TemporaryDirectory(prefix=".hive-builder-", dir=self.root) as runtime:
+            runtime_path = Path(runtime)
+            environment = self._command_environment(runtime_path)
+            executable = shutil.which("git", path=environment.get("PATH"))
+            if executable is None:
+                raise BuilderAdapterError("Builder Git profile requires Git on the trusted host PATH")
+            try:
+                Path(executable).resolve().relative_to(self.root)
+            except ValueError:
+                pass
+            else:
+                raise BuilderAdapterError("command executable must not come from the target workspace")
+            return subprocess.run(
+                [
+                    executable,
+                    "-c",
+                    f"core.hooksPath={runtime_path / 'hooks'}",
+                    "-c",
+                    "credential.helper=",
+                    "-c",
+                    "protocol.ext.allow=never",
+                    "-c",
+                    "core.fsmonitor=false",
+                    *args,
+                ],
+                cwd=self.root,
+                shell=False,
+                capture_output=True,
+                timeout=self.command_timeout_seconds,
+                check=False,
+                env=environment,
+            )
 
     def _commit(self, intent_digest: str, action: BuilderAction) -> BuilderActionOutcome:
         raw_paths = action.payload.get("paths")

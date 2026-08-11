@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Mapping, Protocol, Sequence
 
 from .authority import AuthorityRegistry
@@ -33,6 +34,13 @@ class BuilderActionKind(StrEnum):
     COMMIT = "commit"
 
 
+class BuilderCommandProfile(StrEnum):
+    """Closed, portable command behaviors implemented by the trusted adapter."""
+
+    FILE_EXISTS = "file-exists"
+    GIT_DIFF_CHECK = "git-diff-check"
+
+
 _PROTECTED_BRANCHES = {"main", "master", "release"}
 _SEALED_OR_DEPENDENCY_PREFIXES = (
     ".autopilot/",
@@ -49,9 +57,6 @@ _DEPENDENCY_FILES = {
     "poetry.lock",
     "uv.lock",
 }
-_FORBIDDEN_COMMAND_TOKENS = {"git", "pip", "pip3", "poetry", "uv", "npm", "yarn"}
-
-
 def _deny_target(target: str) -> str:
     normalized = normalize_portable_path(target)
     if normalized in _DEPENDENCY_FILES or normalized.startswith("requirements/"):
@@ -59,6 +64,24 @@ def _deny_target(target: str) -> str:
     if normalized.startswith(_SEALED_OR_DEPENDENCY_PREFIXES):
         raise BuilderActionDenied("sealed acceptance or control-plane path is not writable")
     return normalized
+
+
+def _command_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
+    if set(payload) != {"profile", "paths"}:
+        raise BuilderActionDenied("command actions accept only profile and paths")
+    try:
+        profile = BuilderCommandProfile(str(payload.get("profile")))
+    except ValueError as error:
+        raise BuilderActionDenied("command profile is not allowlisted") from error
+    raw_paths = payload.get("paths")
+    if not isinstance(raw_paths, (tuple, list)) or not raw_paths:
+        raise ValueError("command profile requires non-empty paths")
+    paths: list[str] = []
+    for raw_path in raw_paths:
+        if not isinstance(raw_path, str) or not raw_path:
+            raise ValueError("command profile paths must be non-empty strings")
+        paths.append(normalize_portable_path(raw_path))
+    return MappingProxyType({"profile": profile.value, "paths": tuple(paths)})
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,18 +104,17 @@ class BuilderAction:
         if not isinstance(self.payload, Mapping):
             raise TypeError("Builder payload must be a mapping")
         normalized = normalize_portable_path(self.target)
+        sealed_payload: Mapping[str, object]
         if self.kind is BuilderActionKind.WRITE:
             normalized = _deny_target(normalized)
-            if not isinstance(self.payload.get("content"), str):
+            content = self.payload.get("content")
+            if set(self.payload) != {"content"} or not isinstance(content, str):
                 raise ValueError("write action requires string content")
+            sealed_payload = MappingProxyType({"content": content})
         elif self.kind is BuilderActionKind.COMMAND:
-            argv = self.payload.get("argv")
-            if normalized != "isolated-workspace" or not isinstance(argv, (tuple, list)) or not argv:
-                raise ValueError("command action requires isolated-workspace and a non-empty argv")
-            if not all(isinstance(item, str) and item for item in argv):
-                raise ValueError("command argv must contain non-empty strings")
-            if str(argv[0]).lower() in _FORBIDDEN_COMMAND_TOKENS or "install" in argv:
-                raise BuilderActionDenied("direct VCS or dependency command is forbidden")
+            if normalized != "isolated-workspace":
+                raise ValueError("command action requires isolated-workspace")
+            sealed_payload = _command_payload(self.payload)
         elif self.kind is BuilderActionKind.BRANCH:
             if normalized in _PROTECTED_BRANCHES or normalized.startswith("release/"):
                 raise BuilderActionDenied("protected branch mutation is forbidden")
@@ -102,6 +124,7 @@ class BuilderAction:
                 not isinstance(self.payload["base"], str) or not self.payload["base"].strip()
             ):
                 raise ValueError("branch base must be a non-empty string")
+            sealed_payload = MappingProxyType(dict(self.payload))
         elif self.kind is BuilderActionKind.COMMIT:
             if normalized in _PROTECTED_BRANCHES or normalized.startswith("release/"):
                 raise BuilderActionDenied("protected branch mutation is forbidden")
@@ -115,9 +138,13 @@ class BuilderAction:
                 if not isinstance(path, str):
                     raise ValueError("commit paths must be strings")
                 _deny_target(path)
+            sealed_payload = MappingProxyType(
+                {"message": message, "paths": tuple(_deny_target(str(path)) for path in paths)}
+            )
         else:  # pragma: no cover - protects callers passing a forged enum-like value.
             raise BuilderActionDenied("Builder action kind is not supported")
         object.__setattr__(self, "target", normalized)
+        object.__setattr__(self, "payload", sealed_payload)
 
     @property
     def parameters_digest(self) -> str:
