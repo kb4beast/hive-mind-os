@@ -44,6 +44,19 @@ UNSAFE_REMEDIATION_MARKERS = (
     "verify=false",
     "ignore certificate",
 )
+UNSAFE_RETRY_ARGUMENT_MARKERS = (
+    "git_ssl_no_verify",
+    "curl_insecure",
+    "sslverify=false",
+    "sslverify=0",
+    "http.sslverify=false",
+    "http.sslverify=0",
+    "schannel.checkrevoke=false",
+    "schannel.checkrevoke=0",
+    "gnutlsverify=false",
+    "--insecure",
+    "-k",
+)
 SUBTASK_EXECUTION_SEQUENCE = (
     "fetch_current_singleton_release",
     "install_current_github_snapshot",
@@ -146,6 +159,9 @@ CONSULTATION_DECISIONS = {
     "QUARANTINE",
 }
 CHEATING_DISPOSITIONS = {"NOT_APPLICABLE", "CONFIRMED", "DISPROVED", "UNRESOLVED"}
+_STATUS_READ_ONLY_GIT_COMMANDS = frozenset(
+    {"cat-file", "diff", "log", "merge-base", "rev-parse", "show"}
+)
 
 
 class AutopilotError(RuntimeError):
@@ -176,6 +192,54 @@ class NodeView:
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class _StatusCommitGraph:
+    """Commit facts proven by one immutable target-history observation."""
+
+    parents: dict[str, tuple[str, ...]]
+    trees: dict[str, str]
+    ancestor_cache: dict[str, frozenset[str]]
+
+    @classmethod
+    def from_log(cls, output: str) -> _StatusCommitGraph:
+        parents: dict[str, tuple[str, ...]] = {}
+        trees: dict[str, str] = {}
+        for raw_record in output.split("\x1e"):
+            parts = raw_record.strip("\n").split("\x1f", 3)
+            if len(parts) != 4:
+                continue
+            commit, parents_text, tree, _ = parts
+            commit_parents = tuple(parents_text.split())
+            if (
+                FULL_SHA.fullmatch(commit) is None
+                or FULL_SHA.fullmatch(tree) is None
+                or any(FULL_SHA.fullmatch(parent) is None for parent in commit_parents)
+            ):
+                continue
+            parents[commit] = commit_parents
+            trees[commit] = tree
+        return cls(parents, trees, {})
+
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool | None:
+        """Return graph truth, or ``None`` when the descendant was not observed."""
+
+        if descendant not in self.parents:
+            return None
+        cached = self.ancestor_cache.get(descendant)
+        if cached is None:
+            observed: set[str] = set()
+            pending = [descendant]
+            while pending:
+                commit = pending.pop()
+                if commit in observed:
+                    continue
+                observed.add(commit)
+                pending.extend(self.parents.get(commit, ()))
+            cached = frozenset(observed)
+            self.ancestor_cache[descendant] = cached
+        return ancestor in cached
 
 
 def utc_now() -> datetime:
@@ -1103,6 +1167,7 @@ class ControlPlane:
             for record in records
         ):
             raise AutopilotError("blocker is already resolved")
+        normalized_retry = self.validate_retry_command(retry_command)
         candidate = {**opened, "fix": fix, "retry_when": "retry command is now executable"}
         if not self.safe_retry_allowed(candidate):
             raise AutopilotError("blocker resolution would weaken a security control")
@@ -1113,7 +1178,7 @@ class ControlPlane:
             "blocker_id": blocker_id,
             "actor": actor,
             "fix": fix,
-            "retry_command": [str(item) for item in retry_command],
+            "retry_command": list(normalized_retry),
             "evidence_refs": [str(item) for item in evidence_refs],
             "plan_fingerprint": self.expected_plan_fingerprint,
             "timestamp": format_time(self.clock()),
@@ -1148,6 +1213,7 @@ class ControlPlane:
                 raise AutopilotError(f"question resolution {label} is required")
         if not retry_command:
             raise AutopilotError("question resolution retry_command is required")
+        normalized_retry = self.validate_retry_command(retry_command)
         result = {
             "schema_version": SCHEMA_VERSION,
             "event": "QUESTION_RESOLVED",
@@ -1155,7 +1221,7 @@ class ControlPlane:
             "question_id": question_id,
             "answer_digest": digest_json({"answer": answer}),
             "fix": fix,
-            "retry_command": [str(item) for item in retry_command],
+            "retry_command": list(normalized_retry),
             "plan_fingerprint": self.expected_plan_fingerprint,
             "timestamp": format_time(self.clock()),
             "status": "RESOLVED",
@@ -1371,6 +1437,43 @@ class ControlPlane:
             str(packet.get(key, "")) for key in ("fix", "retry_when")
         ).lower()
         return not any(marker in remediation for marker in UNSAFE_REMEDIATION_MARKERS)
+
+    @staticmethod
+    def validate_retry_command(command: Sequence[str]) -> tuple[str, ...]:
+        """Validate a tokenized retry without weakening transport or evidence controls."""
+
+        if isinstance(command, (str, bytes)) or not command:
+            raise AutopilotError("retry command must be a non-empty argv sequence")
+        normalized: list[str] = []
+        for item in command:
+            if not isinstance(item, str) or not item or len(item) > 4_096:
+                raise AutopilotError("retry command contains an invalid argument")
+            if any(character in item for character in "\x00\r\n"):
+                raise AutopilotError("retry command arguments must be single-line text")
+            normalized.append(item)
+        if len(normalized) > 128:
+            raise AutopilotError("retry command has too many arguments")
+
+        folded = " ".join(normalized).casefold()
+        compact = re.sub(r"[\s_-]+", "", folded)
+        unsafe = any(marker in folded for marker in UNSAFE_RETRY_ARGUMENT_MARKERS)
+        unsafe = unsafe or any(
+            marker in compact
+            for marker in (
+                "gitsslnoverify",
+                "curlinsecure",
+                "sslverify=false",
+                "sslverify=0",
+                "schannel.checkrevoke=false",
+                "schannel.checkrevoke=0",
+            )
+        )
+        if unsafe or any(
+            item.casefold().startswith(("git_config_", "git_config_count="))
+            for item in normalized
+        ):
+            raise AutopilotError("retry command would weaken a security control")
+        return tuple(normalized)
 
     def is_quarantined(self, node_id: str) -> bool:
         return (self.quarantine_dir / f"{node_id}.json").is_file()
@@ -1815,35 +1918,139 @@ class ControlPlane:
         )
 
     def _status_document(self) -> dict[str, object]:
-        target = self.current_target_sha()
-        changed = self.changed_paths_since_reconciliation()
-        active_claims = self.active_claims()
-        validation_lease: Mapping[str, Any] | None = None
-        if self.validation_lease_path.is_file():
-            candidate = read_json(self.validation_lease_path)
-            if (
-                isinstance(candidate, Mapping)
-                and parse_time(candidate.get("expires_at")) > self.clock()
-            ):
-                validation_lease = candidate
-        # The plan is a DAG with substantial fan-in.  Re-evaluating every
-        # dependency recursively for every node turns status into exponential
-        # work and can make the dispatcher appear hung on a full plan.  Keep
-        # this cache scoped to one status snapshot so all consumers observe a
-        # consistent view without retaining stale receipt or claim state.
-        uncached_node_view = self.node_view
-        view_cache: dict[str, NodeView] = {}
+        # Status is a point-in-time observation over a DAG with substantial fan-in.
+        # Keep every cache on the instance only for this call: dependency recursion,
+        # durable receipt reconstruction, state-file reads, and immutable Git facts
+        # can then be reused without leaking stale truth into the next snapshot.
+        missing = object()
+        installed: list[tuple[str, object]] = []
 
-        def cached_node_view(node_id: str) -> NodeView:
-            if node_id not in view_cache:
-                view_cache[node_id] = uncached_node_view(node_id)
-            return view_cache[node_id]
+        def install(name: str, value: object) -> None:
+            installed.append((name, self.__dict__.get(name, missing)))
+            setattr(self, name, value)
 
-        self.node_view = cached_node_view  # type: ignore[method-assign]
+        uncached_git = self._git
+        git_cache: dict[
+            tuple[tuple[str, ...], bool, tuple[tuple[str, str], ...]],
+            subprocess.CompletedProcess[str],
+        ] = {}
+
+        def cached_git(
+            args: Sequence[str],
+            *,
+            check: bool = False,
+            environment: Mapping[str, str] | None = None,
+        ) -> subprocess.CompletedProcess[str]:
+            if not args or args[0] not in _STATUS_READ_ONLY_GIT_COMMANDS:
+                return uncached_git(args, check=check, environment=environment)
+            key = (tuple(args), check, tuple(sorted((environment or {}).items())))
+            if key not in git_cache:
+                git_cache[key] = uncached_git(
+                    args,
+                    check=check,
+                    environment=environment,
+                )
+            return git_cache[key]
+
+        install("_git", cached_git)
         try:
+            target = self.current_target_sha()
+            reconciled_target = self.reconciled_target_sha()
+            install("current_target_sha", lambda: target)
+            install("reconciled_target_sha", lambda: reconciled_target)
+
+            graph: _StatusCommitGraph | None = None
+            if self.verify_git_objects and FULL_SHA.fullmatch(target):
+                history = self._git(
+                    ("log", "--format=%H%x1f%P%x1f%T%x1f%B%x1e", target),
+                    check=False,
+                )
+                if history.returncode == 0:
+                    candidate_graph = _StatusCommitGraph.from_log(history.stdout)
+                    if target in candidate_graph.parents:
+                        graph = candidate_graph
+            if graph is not None:
+                uncached_object_exists = self.git_object_exists
+                uncached_is_ancestor = self.is_ancestor
+
+                def cached_object_exists(sha: str) -> bool:
+                    if sha in graph.trees:
+                        return True
+                    return uncached_object_exists(sha)
+
+                def cached_is_ancestor(ancestor: str, descendant: str) -> bool:
+                    observed = graph.is_ancestor(ancestor, descendant)
+                    if observed is not None:
+                        return observed
+                    return uncached_is_ancestor(ancestor, descendant)
+
+                install("git_object_exists", cached_object_exists)
+                install("is_ancestor", cached_is_ancestor)
+
+                if hasattr(self, "_commit_tree"):
+                    uncached_commit_tree = self._commit_tree
+
+                    def cached_commit_tree(commit: str) -> str | None:
+                        tree = graph.trees.get(commit)
+                        return tree if tree is not None else uncached_commit_tree(commit)
+
+                    install("_commit_tree", cached_commit_tree)
+                if hasattr(self, "_commit_parents"):
+                    uncached_commit_parents = self._commit_parents
+
+                    def cached_commit_parents(commit: str) -> tuple[str, ...]:
+                        parents = graph.parents.get(commit)
+                        return (
+                            parents
+                            if parents is not None
+                            else uncached_commit_parents(commit)
+                        )
+
+                    install("_commit_parents", cached_commit_parents)
+
+            changed = self.changed_paths_since_reconciliation()
+            active_claims = self.active_claims()
+            github_snapshot = self.github_snapshot()
+            install("active_claims", lambda: dict(active_claims))
+            install("github_snapshot", lambda: github_snapshot)
+
+            validation_lease: Mapping[str, Any] | None = None
+            if self.validation_lease_path.is_file():
+                candidate = read_json(self.validation_lease_path)
+                if (
+                    isinstance(candidate, Mapping)
+                    and parse_time(candidate.get("expires_at")) > self.clock()
+                ):
+                    validation_lease = candidate
+
+            if hasattr(self, "_durable_receipt_records"):
+                uncached_durable_receipts = self._durable_receipt_records
+                durable_receipts: dict[str, list[dict[str, Any]]] | None = None
+
+                def cached_durable_receipts() -> dict[str, list[dict[str, Any]]]:
+                    nonlocal durable_receipts
+                    if durable_receipts is None:
+                        durable_receipts = uncached_durable_receipts()
+                    return durable_receipts
+
+                install("_durable_receipt_records", cached_durable_receipts)
+
+            uncached_node_view = self.node_view
+            view_cache: dict[str, NodeView] = {}
+
+            def cached_node_view(node_id: str) -> NodeView:
+                if node_id not in view_cache:
+                    view_cache[node_id] = uncached_node_view(node_id)
+                return view_cache[node_id]
+
+            install("node_view", cached_node_view)
             views = [cached_node_view(node_id) for node_id in sorted(self._nodes)]
         finally:
-            self.node_view = uncached_node_view  # type: ignore[method-assign]
+            for name, prior in reversed(installed):
+                if prior is missing:
+                    self.__dict__.pop(name, None)
+                else:
+                    setattr(self, name, prior)
         counts: dict[str, int] = {state: 0 for state in LEGAL_STATES}
         for view in views:
             counts[view.state] = counts.get(view.state, 0) + 1
