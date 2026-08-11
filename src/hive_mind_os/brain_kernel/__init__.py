@@ -71,8 +71,10 @@ from .roles import (
     next_role,
     result_digest,
     role_capabilities,
+    role_allows_action,
     role_prompt,
 )
+from .role_runtime import RoleCapabilityDenied, RoleRuntime
 from .verification import (
     ExactCandidateVerificationError,
     TreeSnapshot,
@@ -176,7 +178,10 @@ __all__ = (
     "append_role_result",
     "result_digest",
     "role_capabilities",
+    "role_allows_action",
     "role_prompt",
+    "RoleCapabilityDenied",
+    "RoleRuntime",
     "record_evaluation_bundle",
     "technical_closeout_digest",
     "next_role",

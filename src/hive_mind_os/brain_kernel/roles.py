@@ -49,6 +49,16 @@ class RoleCapabilities:
         if set(self.allowed_actions) & set(self.forbidden_actions):
             raise RoleProtocolError("role action sets overlap")
 
+    def allows(self, action: str) -> bool:
+        """Return whether the role may request an action through an adapter.
+
+        This is intentionally only a request check.  It does not authorize or
+        execute an effect; authority and effect adapters remain separate kernel
+        boundaries.
+        """
+
+        return action in self.allowed_actions and action not in self.forbidden_actions
+
 
 @dataclass(frozen=True, slots=True)
 class RoleInvocation:
@@ -221,6 +231,14 @@ def role_capabilities(role: str) -> RoleCapabilities:
         raise RoleProtocolError("role has no executable kernel handler") from error
 
 
+def role_allows_action(role: str, action: str) -> bool:
+    """Return the closed capability decision for one role/action pair."""
+
+    if not isinstance(action, str) or not action.strip():
+        raise RoleProtocolError("role action is required")
+    return role_capabilities(role).allows(action)
+
+
 def next_role(role: str) -> str | None:
     """Return a fixed handoff recommendation without scheduling any work."""
 
@@ -237,7 +255,7 @@ def role_prompt(role: str) -> str:
     return "\n".join(
         (
             f"Hive Mind OS local kernel role: {role}",
-            "This role has no provider, network, or direct-effect capability.",
+            "RoleRuntime may provide bounded cognition; this role has no direct-effect capability.",
             "Allowed requests: " + ", ".join(capabilities.allowed_actions),
             "Forbidden actions: " + ", ".join(capabilities.forbidden_actions),
             "Required outputs: " + ", ".join(capabilities.required_outputs),
