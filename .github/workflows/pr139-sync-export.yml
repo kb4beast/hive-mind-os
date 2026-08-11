@@ -1,4 +1,4 @@
-name: PR139 Sync Workspace Export
+name: PR139 Exact Base Sync
 
 on:
   push:
@@ -6,43 +6,342 @@ on:
       - release/hive-mind-os-singleton-20260811-r4
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export-merge-inputs:
-    name: export immutable merge inputs
+  merge-current-base:
+    if: contains(github.event.head_commit.message, '[pr139-base-sync]')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR139 head with complete history
+      - name: Checkout exact PR139 head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: false
-      - name: Fetch exact singleton base
+          persist-credentials: true
+      - name: Configure Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Fetch and verify exact singleton base
         shell: bash
         run: |
           set -euo pipefail
+          BASE=9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379
           git fetch --no-tags origin \
             release/hive-mind-os-singleton-20260810-r2:refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2
-          test "$(git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2)" = \
-            "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
-      - name: Build immutable Git bundle
+          test "$(git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2)" = "$BASE"
+          git merge-base --is-ancestor 344f87f77a9a3433444d209cc2a3d21f6996ff4f HEAD
+          git status --porcelain | test ! -s /dev/stdin
+      - name: Three-way merge and resolve only the known conflicts
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p sync-artifact
-          git bundle create sync-artifact/pr139-sync.bundle \
-            HEAD \
-            refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2
-          git rev-parse HEAD > sync-artifact/exported-head.txt
-          git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2 \
-            > sync-artifact/exported-base.txt
-          git bundle verify sync-artifact/pr139-sync.bundle \
-            > sync-artifact/bundle-verification.txt 2>&1
-      - name: Upload immutable merge inputs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: pr139-sync-merge-inputs
-          path: sync-artifact/
-          if-no-files-found: error
-          retention-days: 1
+          BASE=9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379
+          git config user.name "Hive Mind PR139 Sync"
+          git config user.email "actions@users.noreply.github.com"
+          set +e
+          git merge --no-ff --no-commit "$BASE"
+          merge_rc=$?
+          set -e
+          test "$merge_rc" -eq 1
+          mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
+          expected=(
+            .autopilot/bin/autopilot.py
+            .autopilot/bin/controller.py
+            .autopilot/tests/test_explorer_receipt_retirement.py
+            .gitignore
+            docs/architecture/ADR_INDEX.md
+          )
+          test "${#conflicts[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do test "${conflicts[$i]}" = "${expected[$i]}"; done
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.autopilot/bin/controller.py')
+          s = p.read_text()
+          marker = '''<<<<<<< HEAD
+          import time
+          =======
+          >>>>>>> 9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379
+          '''
+          if marker not in s:
+              raise SystemExit('unexpected controller conflict')
+          p.write_text(s.replace(marker, 'import time\n'))
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.autopilot/tests/test_explorer_receipt_retirement.py')
+          s = p.read_text()
+          out = []
+          pos = 0
+          end_marker = '>>>>>>> 9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379\n'
+          while True:
+              a = s.find('<<<<<<< HEAD\n', pos)
+              if a < 0:
+                  out.append(s[pos:])
+                  break
+              out.append(s[pos:a])
+              b = s.find('=======\n', a)
+              c = s.find(end_marker, b)
+              if b < 0 or c < 0:
+                  raise SystemExit('unexpected Explorer retirement conflict')
+              out.append(s[b + len('=======\n'):c])
+              pos = c + len(end_marker)
+          merged = ''.join(out)
+          if '<<<<<<<' in merged or '>>>>>>>' in merged:
+              raise SystemExit('Explorer retirement markers remain')
+          p.write_text(merged)
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.gitignore')
+          s = p.read_text()
+          old = '''<<<<<<< HEAD
+          !.autopilot/bin/orchestration.py
+          !.autopilot/bin/sidecar_execution.py
+          =======
+          !/.autopilot/bin/sealed_recovery.py
+          >>>>>>> 9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379
+          '''
+          new = '''!.autopilot/bin/orchestration.py
+          !.autopilot/bin/sidecar_execution.py
+          !/.autopilot/bin/sealed_recovery.py
+          '''
+          if old not in s:
+              raise SystemExit('unexpected gitignore conflict')
+          p.write_text(s.replace(old, new))
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('docs/architecture/ADR_INDEX.md')
+          s = p.read_text()
+          start = s.index('<<<<<<< HEAD\n', s.index('| `ADR-055`'))
+          end_marker = '>>>>>>> 9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379\n'
+          end = s.index(end_marker, start) + len(end_marker)
+          replacement = '''| `ADR-056`     | [Singleton release branch execution](ADR-056-SINGLETON-RELEASE-BRANCH-EXECUTION.md)                                         | Singleton execution        | adopted; `main` remains excluded until final promotion                               |
+          | `ADR-057-PORTABLE` | [Portable intent-driven Autopilot orchestration](ADR-057-PORTABLE-INTENT-DRIVEN-AUTOPILOT.md)                          | Autopilot portability      | adapted implementation candidate; independent Curator/Judge pending                  |
+          | `ADR-057-RECOVERY` | [Sealed L2 recovery bootstrap](ADR-057-SEALED-L2-RECOVERY-BOOTSTRAP.md)                                                   | Singleton L2 recovery      | adapted only for OPTIMIZER-370, ORCH-300, and BUILDER-330                            |
+          | `ADR-058`     | [Capability-bound durable-task execution](ADR-058-CAPABILITY-BOUND-HOST-EXECUTION.md)                                      | Autopilot host execution   | adapted implementation candidate; independent Curator/security review pending        |
+          | `ADR-059`     | [Host-authorized external controller trust](ADR-059-HOST-AUTHORIZED-CONTROLLER-TRUST.md)                                   | Autopilot controller trust | adapted implementation candidate; independent Curator/security review pending        |
+          | `ADR-060`     | [Visible parallel task cohorts](ADR-060-VISIBLE-PARALLEL-TASK-COHORTS.md)                                                   | Autopilot task scheduling  | adapted implementation candidate; independent Curator/security review pending        |
+          | `ADR-061`     | [Token-aware root-mediated sidecars](ADR-061-TOKEN-AWARE-ROOT-MEDIATED-SIDECARS.md)                                        | Autopilot execution topology | adapted implementation candidate; independent Curator promotion review pending      |
+          '''
+          s = s[:start] + replacement + s[end:]
+          start = s.index('<<<<<<< HEAD\n', s.index('The collisions are preserved'))
+          end = s.index(end_marker, start) + len(end_marker)
+          s = s[:start] + 'is ADR-062; it must be unique at creation time.\n' + s[end:]
+          s = s.replace(
+              'This registry disambiguates two historical numeric collisions without renaming or deleting\nrecords referenced by committed audits. Use the qualified key or the full filename in new\nevidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.',
+              'This registry disambiguates three historical numeric collisions without renaming or deleting\nrecords referenced by committed audits. Use the qualified key or the full filename in new\nevidence. Numeric-only references to ADR-008, ADR-012, or ADR-057 are ambiguous.'
+          )
+          if '<<<<<<<' in s or '>>>>>>>' in s:
+              raise SystemExit('ADR conflict markers remain')
+          p.write_text(s)
+          PY
+
+          git checkout --ours -- .autopilot/bin/autopilot.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.autopilot/bin/autopilot.py')
+          s = p.read_text()
+          needle = '''from release_barrier import (
+              ControlPlane as ReleaseBarrierControlPlane,
+          )
+          '''
+          if needle not in s:
+              raise SystemExit('release barrier import changed')
+          s = s.replace(needle, needle + 'from sealed_recovery import SealedRecoveryMixin\n', 1)
+          s = s.replace('class ControlPlane(ReleaseBarrierControlPlane):', 'class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):', 1)
+          old = '''    def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
+              records = super()._durable_receipt_records()
+              recon = records.get("RECON-010")
+              if not isinstance(recon, list):
+                  return records
+              resolved = self._resolve_recon_receipt_records(recon)
+              if resolved is recon:
+                  return records
+              updated = dict(records)
+              updated["RECON-010"] = resolved
+              return updated
+          '''
+          new = '''    def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
+              records = super()._durable_receipt_records()
+              recon = records.get("RECON-010")
+              updated = dict(records)
+              if isinstance(recon, list):
+                  resolved = self._resolve_recon_receipt_records(recon)
+                  if resolved is not recon:
+                      updated["RECON-010"] = resolved
+              for node_id in ("OPTIMIZER-370", "ORCH-300"):
+                  node_records = updated.get(node_id)
+                  if isinstance(node_records, list):
+                      resolved = self.resolve_sealed_repair_records(node_id, node_records)
+                      if resolved is not node_records:
+                          updated[node_id] = resolved
+              return updated
+          '''
+          if old not in s:
+              raise SystemExit('durable receipt block changed')
+          s = s.replace(old, new, 1)
+          old = '''    def validate_configuration(self) -> tuple[str, ...]:
+              issues = list(super().validate_configuration())
+              issues.extend(self.receipt_retirement_issues())
+              try:
+                  load_policy(self.repo_root)
+              except OrchestrationError as error:
+                  issues.append(str(error))
+              return tuple(dict.fromkeys(issues))
+          '''
+          new = old.replace('        try:\n', '        issues.extend(self.sealed_recovery_issues())\n        try:\n')
+          if old not in s:
+              raise SystemExit('configuration block changed')
+          s = s.replace(old, new, 1)
+          old = '''        if execution is not None:
+              atomic_write_json(self.retirement_recovery_path, {
+                  "schema_version": 1, "kind": RETIREMENT_KIND, "retirement_id": execution["retirement_id"],
+                  "snapshot_digest": self._snapshot_digest(), "reconciliation_digest": None,
+                  "target_sha": self.current_target_sha(), "recorded_at": format_time(self.clock()),
+              })
+              return path
+          '''
+          if old not in s:
+              raise SystemExit('snapshot block changed')
+          s = s.replace(old, old.replace('        return path\n', '        self.after_install_github_snapshot()\n        return path\n'), 1)
+          old = '''        if execution is not None and recovery is not None and recovery.get("snapshot_digest") == self._snapshot_digest():
+              updated = dict(recovery)
+              updated["reconciliation_digest"] = self._reconciliation_digest()
+              updated["target_sha"] = self.current_target_sha()
+              updated["recorded_at"] = format_time(self.clock())
+              atomic_write_json(self.retirement_recovery_path, updated)
+              return path
+          '''
+          if old not in s:
+              raise SystemExit('reconcile block changed')
+          s = s.replace(old, old.replace('        return path\n', '        self.after_reconcile()\n        return path\n'), 1)
+          old = '''        if execution is not None:
+              expected = digest_json(execution)
+              if not isinstance(record, Mapping) or record.get("receipt_retirement_execution_digest") != expected:
+                  issues.append("dispatcher release was issued before receipt retirement recovery")
+              return tuple(dict.fromkeys(issues))
+          '''
+          new = '''        if execution is not None:
+              expected = digest_json(execution)
+              if not isinstance(record, Mapping) or record.get("receipt_retirement_execution_digest") != expected:
+                  issues.append("dispatcher release was issued before receipt retirement recovery")
+              builder_execution = self._builder_execution()
+              if builder_execution is not None:
+                  expected = digest_json(builder_execution)
+                  if not isinstance(record, Mapping) or record.get("builder_retirement_execution_digest") != expected:
+                      issues.append("dispatcher release was issued before Builder retirement recovery")
+              return tuple(dict.fromkeys(issues))
+          '''
+          if old not in s:
+              raise SystemExit('release issues block changed')
+          s = s.replace(old, new, 1)
+          old = '''        recovery_issues = self._recovery_issues()
+              if recovery_issues:
+                  raise AutopilotError("; ".join(recovery_issues))
+              if not actor.strip():
+          '''
+          new = '''        recovery_issues = self._recovery_issues()
+              if recovery_issues:
+                  raise AutopilotError("; ".join(recovery_issues))
+              builder_recovery_issues = self._builder_recovery_issues()
+              if builder_recovery_issues:
+                  raise AutopilotError("; ".join(builder_recovery_issues))
+              if not actor.strip():
+          '''
+          if old not in s:
+              raise SystemExit('dispatch preflight block changed')
+          s = s.replace(old, new, 1)
+          old = '''            "issued_at": format_time(self.clock()),
+                  "receipt_retirement_execution_digest": digest_json(self._execution()) if self._execution() is not None else None,
+              }
+          '''
+          new = '''            "issued_at": format_time(self.clock()),
+                  "receipt_retirement_execution_digest": digest_json(self._execution()) if self._execution() is not None else None,
+                  "builder_retirement_execution_digest": digest_json(self._builder_execution()) if self._builder_execution() is not None else None,
+              }
+          '''
+          if old not in s:
+              raise SystemExit('dispatch receipt block changed')
+          s = s.replace(old, new, 1)
+          needle = '''    retirement = commands.add_parser("retire-receipt-branch")
+              retirement.add_argument("retirement_id")
+              retirement.add_argument("--actor", required=True)
+          
+          '''
+          if needle not in s:
+              raise SystemExit('retirement parser block changed')
+          s = s.replace(needle, needle + '''    builder_retirement = commands.add_parser("retire-builder-330-branch")
+              builder_retirement.add_argument("--actor", required=True)
+          
+          ''', 1)
+          needle = '''        if args.command == "retire-receipt-branch":
+                  print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor), indent=2, sort_keys=True))
+                  return 0
+          '''
+          if needle not in s:
+              raise SystemExit('retirement main block changed')
+          s = s.replace(needle, needle + '''        if args.command == "retire-builder-330-branch":
+                  print(json.dumps(plane.retire_builder_branch(actor=args.actor), indent=2, sort_keys=True))
+                  return 0
+          ''', 1)
+          p.write_text(s)
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.autopilot/tests/test_blocker_protocol.py')
+          s = p.read_text()
+          if s.count('shutil.copytree(source, root / ".autopilot")') != 2:
+              raise SystemExit('blocker fixture merge changed unexpectedly')
+          p.write_text(s.replace('shutil.copytree(source, root / ".autopilot")', 'copy_autopilot_fixture(source, root / ".autopilot")'))
+          p = Path('.autopilot/tests/test_sealed_recovery_bootstrap.py')
+          s = p.read_text()
+          needle = '''        copy_autopilot_fixture(Path(__file__).resolve().parents[1], repository / ".autopilot")
+          
+                  def run(*args: str, check: bool = True) -> str:
+          '''
+          replacement = '''        copy_autopilot_fixture(Path(__file__).resolve().parents[1], repository / ".autopilot")
+                  control = json.loads((repository / ".autopilot" / "control-plane.json").read_text(encoding="utf-8"))
+                  fixture_target_branch = str(control["target"]["branch"])
+          
+                  def run(*args: str, check: bool = True) -> str:
+          '''
+          if needle not in s:
+              raise SystemExit('sealed recovery real-flow fixture changed')
+          s = s.replace(needle, replacement, 1)
+          s = s.replace('run("git", "branch", "release/hive-mind-os-singleton-20260810-r2", target)', 'run("git", "branch", fixture_target_branch, target)', 1)
+          s = s.replace('f"{target}:refs/heads/release/hive-mind-os-singleton-20260810-r2",', 'f"{target}:refs/heads/{fixture_target_branch}",', 1)
+          s = s.replace('f"{published_receipt}:refs/heads/release/hive-mind-os-singleton-20260810-r2",', 'f"{published_receipt}:refs/heads/{fixture_target_branch}",', 1)
+          s = s.replace('run("git", "fetch", "origin", "release/hive-mind-os-singleton-20260810-r2")', 'run("git", "fetch", "origin", fixture_target_branch)', 1)
+          p.write_text(s)
+          PY
+
+          git add -A
+          test -z "$(git diff --name-only --diff-filter=U)"
+          grep -RInE '^(<<<<<<<|=======|>>>>>>>)' .autopilot/bin/autopilot.py .autopilot/bin/controller.py .autopilot/tests/test_explorer_receipt_retirement.py .gitignore docs/architecture/ADR_INDEX.md && exit 1 || true
+      - name: Validate exact merged tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q .autopilot/bin .autopilot/tests
+          python -m unittest discover -s .autopilot/tests -v
+          git diff --check
+      - name: Publish ancestry-preserving merge commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379
+          git rm .github/workflows/pr139-sync-export.yml
+          git commit -m "Merge current singleton base into PR #139 aggregation"
+          parents="$(git show -s --format=%P HEAD)"
+          second="$(printf '%s\n' "$parents" | awk '{print $2}')"
+          test "$second" = "$BASE"
+          python -m unittest discover -s .autopilot/tests >/dev/null
+          git diff --check HEAD^1 HEAD
+          git push origin "HEAD:${GITHUB_REF_NAME}"
