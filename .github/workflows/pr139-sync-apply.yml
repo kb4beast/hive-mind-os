@@ -1,0 +1,302 @@
+name: PR139 Apply Singleton Base Synchronization
+
+on:
+  push:
+    branches:
+      - release/hive-mind-os-singleton-20260811-r4
+
+permissions:
+  contents: write
+
+jobs:
+  merge-current-base:
+    if: github.event.head_commit.message == 'chore: run PR139 base synchronization'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR139 head with complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Merge current singleton base and resolve the reviewed overlap
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEAD_BRANCH='release/hive-mind-os-singleton-20260811-r4'
+          BASE_BRANCH='release/hive-mind-os-singleton-20260810-r2'
+
+          git config user.name 'Hive Mind Sync'
+          git config user.email 'hive-mind-sync@users.noreply.github.com'
+          git fetch --no-tags origin \
+            "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          BASE_SHA="$(git rev-parse "refs/remotes/origin/${BASE_BRANCH}")"
+          HEAD_BEFORE="$(git rev-parse HEAD)"
+
+          set +e
+          git merge --no-ff --no-commit "$BASE_SHA"
+          MERGE_STATUS=$?
+          set -e
+          if [ "$MERGE_STATUS" -ne 0 ] && [ "$MERGE_STATUS" -ne 1 ]; then
+            exit "$MERGE_STATUS"
+          fi
+
+          mapfile -t UNMERGED < <(git diff --name-only --diff-filter=U | sort)
+          EXPECTED=(
+            '.autopilot/bin/autopilot.py'
+            '.autopilot/bin/controller.py'
+            '.autopilot/tests/test_explorer_receipt_retirement.py'
+            '.gitignore'
+            'docs/architecture/ADR_INDEX.md'
+          )
+          if [ "${UNMERGED[*]}" != "${EXPECTED[*]}" ]; then
+            printf 'Unexpected conflict set.\nExpected:\n%s\nObserved:\n%s\n' \
+              "$(printf '%s\n' "${EXPECTED[@]}")" \
+              "$(printf '%s\n' "${UNMERGED[@]}")" >&2
+            exit 1
+          fi
+
+          git show :2:.autopilot/bin/autopilot.py > /tmp/autopilot-ours.py
+          python - <<'PY'
+          from pathlib import Path
+
+          src = Path('/tmp/autopilot-ours.py').read_text(encoding='utf-8')
+
+          needle = '''from release_barrier import (
+              ControlPlane as ReleaseBarrierControlPlane,
+          )
+          '''
+          replacement = needle + 'from sealed_recovery import SealedRecoveryMixin\n'
+          assert src.count(needle) == 1
+          src = src.replace(needle, replacement)
+
+          assert src.count('class ControlPlane(ReleaseBarrierControlPlane):') == 1
+          src = src.replace(
+              'class ControlPlane(ReleaseBarrierControlPlane):',
+              'class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):',
+          )
+
+          old_doc_tail = '''    receipt commits are direct children of the candidate on the current target.
+              Every other duplicate-receipt situation remains fail-closed.
+              """
+          '''
+          new_doc_tail = '''    receipt commits are direct children of the candidate on the current target.
+
+              The sealed recovery mixin additionally admits only the exact retained recovery
+              authorities for OPTIMIZER-370, ORCH-300, and BUILDER-330. All unrelated duplicate
+              receipts and branch-recovery attempts remain fail-closed.
+              """
+          '''
+          assert src.count(old_doc_tail) == 1
+          src = src.replace(old_doc_tail, new_doc_tail)
+
+          old_receipts = '''    def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
+              records = super()._durable_receipt_records()
+              recon = records.get("RECON-010")
+              if not isinstance(recon, list):
+                  return records
+              resolved = self._resolve_recon_receipt_records(recon)
+              if resolved is recon:
+                  return records
+              updated = dict(records)
+              updated["RECON-010"] = resolved
+              return updated
+          '''
+          new_receipts = '''    def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
+              records = super()._durable_receipt_records()
+              updated = dict(records)
+              recon = updated.get("RECON-010")
+              if isinstance(recon, list):
+                  resolved = self._resolve_recon_receipt_records(recon)
+                  if resolved is not recon:
+                      updated["RECON-010"] = resolved
+              for node_id in ("OPTIMIZER-370", "ORCH-300"):
+                  node_records = updated.get(node_id)
+                  if isinstance(node_records, list):
+                      resolved = self.resolve_sealed_repair_records(node_id, node_records)
+                      if resolved is not node_records:
+                          updated[node_id] = resolved
+              return updated
+          '''
+          assert src.count(old_receipts) == 1
+          src = src.replace(old_receipts, new_receipts)
+
+          old_validate = '''    def validate_configuration(self) -> tuple[str, ...]:
+              issues = list(super().validate_configuration())
+              issues.extend(self.receipt_retirement_issues())
+              try:
+                  load_policy(self.repo_root)
+              except OrchestrationError as error:
+                  issues.append(str(error))
+              return tuple(dict.fromkeys(issues))
+          '''
+          new_validate = '''    def validate_configuration(self) -> tuple[str, ...]:
+              issues = list(super().validate_configuration())
+              issues.extend(self.receipt_retirement_issues())
+              issues.extend(self.sealed_recovery_issues())
+              try:
+                  load_policy(self.repo_root)
+              except OrchestrationError as error:
+                  issues.append(str(error))
+              return tuple(dict.fromkeys(issues))
+          '''
+          assert src.count(old_validate) == 1
+          src = src.replace(old_validate, new_validate)
+
+          old_parser = '''    retirement = commands.add_parser("retire-receipt-branch")
+              retirement.add_argument("retirement_id")
+              retirement.add_argument("--actor", required=True)
+
+              orchestrate = commands.add_parser("orchestrate")
+          '''
+          new_parser = '''    retirement = commands.add_parser("retire-receipt-branch")
+              retirement.add_argument("retirement_id")
+              retirement.add_argument("--actor", required=True)
+
+              builder_retirement = commands.add_parser("retire-builder-330-branch")
+              builder_retirement.add_argument("--actor", required=True)
+
+              orchestrate = commands.add_parser("orchestrate")
+          '''
+          assert src.count(old_parser) == 1
+          src = src.replace(old_parser, new_parser)
+
+          old_handler = '''        if args.command == "retire-receipt-branch":
+                  print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor), indent=2, sort_keys=True))
+                  return 0
+              if args.command == "infer-intent":
+          '''
+          new_handler = '''        if args.command == "retire-receipt-branch":
+                  print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor), indent=2, sort_keys=True))
+                  return 0
+              if args.command == "retire-builder-330-branch":
+                  print(json.dumps(plane.retire_builder_branch(actor=args.actor), indent=2, sort_keys=True))
+                  return 0
+              if args.command == "infer-intent":
+          '''
+          assert src.count(old_handler) == 1
+          src = src.replace(old_handler, new_handler)
+
+          Path('.autopilot/bin/autopilot.py').write_text(src, encoding='utf-8')
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('.autopilot/bin/controller.py')
+          text = path.read_text(encoding='utf-8')
+          text, count = re.subn(
+              r'<<<<<<< HEAD\nimport time\n=======\n>>>>>>> [0-9a-f]{40}\n',
+              'import time\n',
+              text,
+              count=1,
+          )
+          assert count == 1
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          git show :3:.autopilot/tests/test_explorer_receipt_retirement.py \
+            > .autopilot/tests/test_explorer_receipt_retirement.py
+
+          git show :2:.gitignore > /tmp/gitignore-ours
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('/tmp/gitignore-ours').read_text(encoding='utf-8')
+          needle = '!.autopilot/bin/sidecar_execution.py\n'
+          assert text.count(needle) == 1
+          text = text.replace(
+              needle,
+              needle + '!/.autopilot/bin/sealed_recovery.py\n',
+          )
+          Path('.gitignore').write_text(text, encoding='utf-8')
+          PY
+
+          git show :2:docs/architecture/ADR_INDEX.md > /tmp/adr-index-ours
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('docs/architecture/ADR_INDEX.md')
+          text = Path('/tmp/adr-index-ours').read_text(encoding='utf-8')
+          needle = '| `ADR-056`     | [Singleton release branch execution](ADR-056-SINGLETON-RELEASE-BRANCH-EXECUTION.md)                                         | Singleton execution        | adopted; `main` remains excluded until final promotion                               |\n'
+          sealed = '| `ADR-057`     | [Sealed L2 recovery bootstrap](ADR-057-SEALED-L2-RECOVERY-BOOTSTRAP.md)                                                     | Singleton L2 recovery      | adapted only for OPTIMIZER-370, ORCH-300, and BUILDER-330                            |\n'
+          assert text.count(needle) == 1
+          assert sealed not in text
+          text = text.replace(needle, needle + sealed)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.autopilot/tests/test_blocker_protocol.py')
+          text = path.read_text(encoding='utf-8')
+          needle = '            shutil.copytree(source, root / ".autopilot")\n'
+          assert text.count(needle) == 2
+          text = text.replace(
+              needle,
+              '            copy_autopilot_fixture(source, root / ".autopilot")\n',
+          )
+          path.write_text(text, encoding='utf-8')
+
+          path = Path('.autopilot/tests/test_sealed_recovery_bootstrap.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''        repository = self.root / "sealed-real-flow"
+              remote = self.root / "sealed-real-flow.git"
+              copy_autopilot_fixture(Path(__file__).resolve().parents[1], repository / ".autopilot")
+
+              def run(*args: str, check: bool = True) -> str:
+          '''
+          new = '''        repository = self.root / "sealed-real-flow"
+              remote = self.root / "sealed-real-flow.git"
+              copy_autopilot_fixture(Path(__file__).resolve().parents[1], repository / ".autopilot")
+              control = json.loads(
+                  (repository / ".autopilot" / "control-plane.json").read_text(encoding="utf-8")
+              )
+              target_branch = str(control["target"]["branch"])
+
+              def run(*args: str, check: bool = True) -> str:
+          '''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+          replacements = {
+              '        run("git", "branch", "release/hive-mind-os-singleton-20260810-r2", target)\n':
+                  '        run("git", "branch", target_branch, target)\n',
+              '            f"{target}:refs/heads/release/hive-mind-os-singleton-20260810-r2",\n':
+                  '            f"{target}:refs/heads/{target_branch}",\n',
+              '            f"{published_receipt}:refs/heads/release/hive-mind-os-singleton-20260810-r2",\n':
+                  '            f"{published_receipt}:refs/heads/{target_branch}",\n',
+              '        run("git", "fetch", "origin", "release/hive-mind-os-singleton-20260810-r2")\n':
+                  '        run("git", "fetch", "origin", target_branch)\n',
+          }
+          for before, after in replacements.items():
+              assert text.count(before) == 1, before
+              text = text.replace(before, after)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          git rm -f \
+            .github/workflows/pr139-sync-export.yml \
+            .github/workflows/pr139-sync-apply.yml
+
+          mapfile -t STILL_UNMERGED < <(git diff --name-only --diff-filter=U)
+          if [ "${#STILL_UNMERGED[@]}" -ne 0 ]; then
+            printf 'Unresolved files:\n%s\n' "$(printf '%s\n' "${STILL_UNMERGED[@]}")" >&2
+            exit 1
+          fi
+          if grep -RInE '^(<<<<<<<|=======|>>>>>>>)' \
+            .autopilot .gitignore docs/architecture/ADR_INDEX.md; then
+            exit 1
+          fi
+
+          git add -A
+          git diff --cached --check
+          python -m compileall -q .autopilot/bin .autopilot/tests
+          python -m unittest discover -s .autopilot/tests -v
+
+          git commit \
+            -m 'Merge current singleton base into PR #139 release branch' \
+            -m 'Preserve PR #139 portable orchestration and token-aware sidecars while integrating the sealed L2 recovery bootstrap from the current singleton base. Resolve overlapping control-plane and fixture changes without rewriting either parent history.'
+
+          test "$(git rev-parse HEAD^)" = "$HEAD_BEFORE"
+          test "$(git rev-parse HEAD^2)" = "$BASE_SHA"
+          git push origin "HEAD:refs/heads/${HEAD_BRANCH}"
