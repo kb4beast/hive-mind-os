@@ -22,12 +22,6 @@ from durable_controller import (
     digest_json,
     read_json,
 )
-from release_barrier import (
-    CURRENT_RELEASE,
-    RELEASE_HISTORY,
-    RELEASE_KIND,
-    ControlPlane as ReleaseBarrierControlPlane,
-)
 from orchestration import (
     OrchestrationError,
     bind_launch,
@@ -40,6 +34,13 @@ from orchestration import (
     release_launch,
     should_publish_release,
     simple_prompt,
+)
+from release_barrier import (
+    RELEASE_HISTORY,
+    RELEASE_KIND,
+)
+from release_barrier import (
+    ControlPlane as ReleaseBarrierControlPlane,
 )
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
@@ -231,7 +232,13 @@ class ControlPlane(ReleaseBarrierControlPlane):
         return tuple(dict.fromkeys(issues))
 
     def validate_configuration(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys((*super().validate_configuration(), *self.receipt_retirement_issues())))
+        issues = list(super().validate_configuration())
+        issues.extend(self.receipt_retirement_issues())
+        try:
+            load_policy(self.repo_root)
+        except OrchestrationError as error:
+            issues.append(str(error))
+        return tuple(dict.fromkeys(issues))
 
     def _retirement_record(self, retirement_id: str) -> Mapping[str, Any]:
         issues = self.receipt_retirement_issues()
@@ -564,15 +571,6 @@ class ControlPlane(ReleaseBarrierControlPlane):
         append_jsonl(self.state_dir / RETIREMENT_AUDIT, {"event": "receipt_branch_retired", **execution})
         return execution
 
-    def validate_configuration(self) -> tuple[str, ...]:
-        issues = list(super().validate_configuration())
-        try:
-            load_policy(self.repo_root)
-        except OrchestrationError as error:
-            issues.append(str(error))
-        return tuple(dict.fromkeys(issues))
-
-
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="autopilot")
     root.add_argument("--repo-root", default=".")
@@ -685,6 +683,7 @@ def parser() -> argparse.ArgumentParser:
     prepare = commands.add_parser("prepare-launch")
     prepare.add_argument("instruction_id")
     prepare.add_argument("--host", required=True)
+    prepare.add_argument("--retry-of")
 
     bind = commands.add_parser("bind-launch")
     bind.add_argument("instruction_id")
@@ -954,7 +953,18 @@ def main(argv: list[str] | None = None) -> int:
             print(simple_prompt())
             return 0
         if args.command == "prepare-launch":
-            print(json.dumps(prepare_launch(plane.repo_root, args.instruction_id, args.host), indent=2, sort_keys=True))
+            print(
+                json.dumps(
+                    prepare_launch(
+                        plane.repo_root,
+                        args.instruction_id,
+                        args.host,
+                        retry_of=args.retry_of,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
             return 0
         if args.command == "bind-launch":
             print(

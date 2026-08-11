@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
+from hashlib import sha256
 from pathlib import Path
 
 from hive_mind_os.autopilot_workflow import (
@@ -133,6 +135,42 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         self.assertEqual(contract["intent"]["intent"], "CHECK")
         self.assertEqual(contract["tasks"], [])
         self.assertTrue(contract["bootstrap_required"])
+
+    def test_explanation_language_does_not_bootstrap(self) -> None:
+        initialize_repository(self.root)
+        contract = inspect_repository(self.root, request="Explain how to finish the DAG")
+        self.assertEqual(contract["intent"]["intent"], "CHECK")
+        self.assertEqual(contract["tasks"], [])
+
+    def test_persisted_request_cannot_redeclare_target_as_protected(self) -> None:
+        result = initialize_repository(self.root, target_branch="release/widgets")
+        path = Path(result["path"])
+        request = json.loads(path.read_text(encoding="utf-8"))
+        request["protected_branches"].append("release/*")
+        material = dict(request)
+        material.pop("request_id")
+        request["request_id"] = "sha256:" + sha256(
+            json.dumps(
+                material,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        path.write_text(json.dumps(request), encoding="utf-8")
+        with self.assertRaises(PortableAutopilotError):
+            inspect_repository(self.root, request="continue")
+
+    def test_repository_state_symlink_escape_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as outside_name:
+            managed = self.root / ".hive-mind"
+            try:
+                os.symlink(outside_name, managed, target_is_directory=True)
+            except OSError as error:
+                self.skipTest(f"directory symlinks unavailable: {error}")
+            with self.assertRaises(PortableAutopilotError):
+                initialize_repository(self.root)
 
     def test_simple_prompt_is_repository_neutral(self) -> None:
         prompt = simple_prompt()

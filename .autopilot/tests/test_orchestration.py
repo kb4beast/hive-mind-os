@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -16,6 +17,7 @@ if str(BIN) not in sys.path:
 
 from autopilot import select_orchestration_status  # noqa: E402
 from orchestration import (  # noqa: E402
+    OrchestrationError,
     bind_launch,
     binding_events,
     build_orchestration_contract,
@@ -135,6 +137,7 @@ class IntentOrchestrationTests(unittest.TestCase):
             "Don't make any changes.",
             "What would you do next?",
             "Why didn't it start?",
+            "Explain how to finish the DAG",
             "Should we finish the DAG?",
             "Is it safe to start now?",
             "Could this continue without review?",
@@ -257,6 +260,66 @@ class IntentOrchestrationTests(unittest.TestCase):
                 terminal_event_id="sha256:" + "0" * 64,
                 reason="still running",
             )
+
+    def test_successful_release_is_an_idempotency_tombstone(self) -> None:
+        instruction_id = "sha256:" + "5" * 64
+        prepare_launch(self.root, instruction_id, "codex")
+        bind_launch(self.root, instruction_id, "codex", "thread-success")
+        terminal = observe_terminal_launch(
+            self.root,
+            instruction_id,
+            terminal_state="SUCCEEDED",
+            host_event_ref="codex-thread:thread-success:terminal",
+            observed_by="orchestrator:fixture",
+        )
+        released = release_launch(
+            self.root,
+            instruction_id,
+            terminal_event_id=str(terminal["event_id"]),
+            reason="successful host completion",
+        )
+        replay = prepare_launch(self.root, instruction_id, "codex")
+        self.assertEqual(replay["event_id"], released["event_id"])
+        self.assertEqual(len(binding_events(self.root)), 5)
+
+    def test_failed_retry_requires_new_instruction_and_explicit_lineage(self) -> None:
+        first_id = "sha256:" + "6" * 64
+        prepare_launch(self.root, first_id, "codex")
+        bind_launch(self.root, first_id, "codex", "thread-failed")
+        terminal = observe_terminal_launch(
+            self.root,
+            first_id,
+            terminal_state="FAILED",
+            host_event_ref="codex-thread:thread-failed:terminal",
+            observed_by="orchestrator:fixture",
+        )
+        released = release_launch(
+            self.root,
+            first_id,
+            terminal_event_id=str(terminal["event_id"]),
+            reason="failed host completion",
+        )
+        with self.assertRaises(OrchestrationError):
+            prepare_launch(self.root, first_id, "codex")
+        second_id = "sha256:" + "7" * 64
+        retry = prepare_launch(
+            self.root,
+            second_id,
+            "codex",
+            retry_of=str(released["event_id"]),
+        )
+        self.assertEqual(retry["attempt"], 2)
+        self.assertEqual(retry["retry_of"], released["event_id"])
+
+    def test_binding_state_symlink_escape_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as outside_name:
+            state = self.root / ".autopilot" / "state"
+            try:
+                os.symlink(outside_name, state, target_is_directory=True)
+            except OSError as error:
+                self.skipTest(f"directory symlinks unavailable: {error}")
+            with self.assertRaises(OrchestrationError):
+                prepare_launch(self.root, "sha256:" + "8" * 64, "codex")
 
     def test_prepared_launch_cannot_be_taken_over_by_another_host(self) -> None:
         instruction_id = "sha256:" + "4" * 64

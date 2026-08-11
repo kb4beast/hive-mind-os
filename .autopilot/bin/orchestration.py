@@ -49,17 +49,38 @@ def _canonical(value: Mapping[str, object]) -> bytes:
     ).encode("utf-8")
 
 
+def _is_link_like(path: Path) -> bool:
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    return bool(callable(is_junction) and is_junction())
+
+
+def _managed_path(repo_root: Path, *parts: str) -> Path:
+    root = repo_root.resolve()
+    current = root
+    for part in parts:
+        current = current / part
+        if _is_link_like(current):
+            raise OrchestrationError(
+                f"task binding path uses a symlink or junction: {current}"
+            )
+        if current.exists() and not current.resolve().is_relative_to(root):
+            raise OrchestrationError(f"task binding path escapes the repository: {current}")
+    return current
+
+
 def _binding_path(repo_root: Path) -> Path:
-    return repo_root / ".autopilot" / "state" / "task-bindings.jsonl"
+    return _managed_path(repo_root, ".autopilot", "state", "task-bindings.jsonl")
 
 
 @contextmanager
 def _binding_lock(repo_root: Path):
-    path = repo_root / ".autopilot" / "task-bindings.lock"
-    if not path.is_file():
+    path = _managed_path(repo_root, ".autopilot", "task-bindings.lock")
+    if not path.is_file() or _is_link_like(path):
         raise OrchestrationError("required task binding lock file is missing")
     deadline = time.monotonic() + 10.0
-    descriptor = os.open(path, os.O_RDWR)
+    descriptor = os.open(path, os.O_RDWR | getattr(os, "O_NOFOLLOW", 0))
     locked = False
     while not locked:
         try:
@@ -147,8 +168,11 @@ def _append_binding_event_unlocked(
     event = {**material, "event_id": "sha256:" + sha256(_canonical(material)).hexdigest()}
     path = _binding_path(repo_root)
     path.parent.mkdir(parents=True, exist_ok=True)
+    path = _binding_path(repo_root)
     encoded = json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n"
-    with path.open("a", encoding="utf-8", newline="\n") as handle:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags, 0o600)
+    with os.fdopen(descriptor, "a", encoding="utf-8", newline="\n") as handle:
         handle.write(encoded)
         handle.flush()
         os.fsync(handle.fileno())
@@ -177,7 +201,13 @@ def active_launch_bindings(repo_root: Path) -> tuple[Mapping[str, object], ...]:
     )
 
 
-def prepare_launch(repo_root: Path, instruction_id: str, host: str) -> Mapping[str, object]:
+def prepare_launch(
+    repo_root: Path,
+    instruction_id: str,
+    host: str,
+    *,
+    retry_of: str | None = None,
+) -> Mapping[str, object]:
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", instruction_id):
         raise OrchestrationError("launch instruction id must be a SHA-256 digest")
     if not host.strip():
@@ -190,12 +220,35 @@ def prepare_launch(repo_root: Path, instruction_id: str, host: str) -> Mapping[s
         )
         if existing is not None and existing.get("state") != "RELEASED":
             return existing
+        if existing is not None:
+            if existing.get("terminal_state") == "SUCCEEDED":
+                return existing
+            raise OrchestrationError(
+                "an unsuccessful released launch requires a new instruction id and explicit retry lineage"
+            )
+        attempt = 1
+        if retry_of is not None:
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", retry_of):
+                raise OrchestrationError("retry lineage must name a released event digest")
+            prior = next((event for event in events if event.get("event_id") == retry_of), None)
+            if (
+                prior is None
+                or prior.get("state") != "RELEASED"
+                or prior.get("terminal_state") not in {"FAILED", "CANCELLED"}
+                or prior.get("launch_instruction_id") == instruction_id
+            ):
+                raise OrchestrationError(
+                    "retry lineage must name a failed or cancelled release for another instruction"
+                )
+            attempt = int(prior.get("attempt", 1)) + 1
         return _append_binding_event_unlocked(
             repo_root,
             {
                 "kind": "hive-mind-task-binding-event-v1",
                 "launch_instruction_id": instruction_id,
                 "host": host,
+                "attempt": attempt,
+                "retry_of": retry_of,
                 "state": "PREPARED",
             },
             events,
@@ -235,6 +288,8 @@ def bind_launch(
                     "launch_instruction_id": instruction_id,
                     "host": host,
                     "task_id": task_id,
+                    "attempt": existing.get("attempt", 1),
+                    "retry_of": existing.get("retry_of"),
                     "state": "CREATED",
                 },
                 events,
@@ -249,6 +304,8 @@ def bind_launch(
                 "host_id": host_id,
                 "task_id": task_id,
                 "cursor": cursor,
+                "attempt": existing.get("attempt", 1),
+                "retry_of": existing.get("retry_of"),
                 "state": "BOUND",
             },
             events,
@@ -290,6 +347,8 @@ def observe_terminal_launch(
                 "terminal_state": terminal_state,
                 "host_terminal_event_ref": host_event_ref,
                 "observed_by": observed_by,
+                "attempt": existing.get("attempt", 1),
+                "retry_of": existing.get("retry_of"),
                 "state": "TERMINAL_OBSERVED",
             },
             events,
@@ -331,6 +390,8 @@ def release_launch(
                 "terminal_state": existing.get("terminal_state"),
                 "terminal_event_id": terminal_event_id,
                 "reason": reason,
+                "attempt": existing.get("attempt", 1),
+                "retry_of": existing.get("retry_of"),
                 "state": "RELEASED",
             },
             events,
@@ -365,6 +426,8 @@ def _requests_read_only(value: str) -> bool:
     if re.search(rf"\b(?:do\s+not|don['’]?t|dont|never)\s+(?:\w+\s+){{0,3}}{action}\b", text):
         return True
     if re.search(r"\b(?:only|just)\s+(?:check|inspect|report|summari[sz]e|explain|review)\b", text):
+        return True
+    if re.search(r"\b(?:explain|describe|summari[sz]e|tell\s+me|show\s+me)\s+(?:how|why|what|when|where|whether)\b", text):
         return True
     if re.search(r"\b(?:check|inspect|report|summari[sz]e|explain|review)\s+only\b", text):
         return True

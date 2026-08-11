@@ -8,6 +8,7 @@ import re
 import subprocess
 import tempfile
 from datetime import UTC, datetime
+from fnmatch import fnmatchcase
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -47,8 +48,37 @@ def _canonical_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
-def _atomic_write_json(path: Path, value: object) -> None:
+def _is_link_like(path: Path) -> bool:
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    return bool(callable(is_junction) and is_junction())
+
+
+def _validate_managed_path(root: Path, path: Path) -> Path:
+    root = root.resolve()
+    try:
+        relative = path.absolute().relative_to(root)
+    except ValueError as error:
+        raise PortableAutopilotError("managed Autopilot state path escapes the repository") from error
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if _is_link_like(current):
+            raise PortableAutopilotError(
+                f"managed Autopilot state path uses a symlink or junction: {current}"
+            )
+        if current.exists() and not current.resolve().is_relative_to(root):
+            raise PortableAutopilotError(
+                f"managed Autopilot state path escapes the repository: {current}"
+            )
+    return root / relative
+
+
+def _atomic_write_json(root: Path, path: Path, value: object) -> None:
+    path = _validate_managed_path(root, path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    path = _validate_managed_path(root, path)
     payload = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     with tempfile.NamedTemporaryFile(
         "w",
@@ -321,6 +351,7 @@ def _validate_contract(value: object, root: Path) -> Mapping[str, Any]:
 
 
 def _load_bootstrap_request(path: Path, root: Path) -> Mapping[str, Any]:
+    path = _validate_managed_path(root, path)
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -329,7 +360,8 @@ def _load_bootstrap_request(path: Path, root: Path) -> Mapping[str, Any]:
         raise PortableAutopilotError("portable Autopilot request must be an object")
     required = {
         "schema_version", "kind", "repository_root", "repository_id", "objective",
-        "target_branch", "protected_branches", "source", "orchestration_requirements",
+        "target_branch", "protected_branches", "protection_verification", "source",
+        "orchestration_requirements",
         "request_id",
     }
     missing = sorted(required - set(value))
@@ -344,9 +376,31 @@ def _load_bootstrap_request(path: Path, root: Path) -> Mapping[str, Any]:
         raise PortableAutopilotError("portable Autopilot request identity is invalid")
     if Path(str(value.get("repository_root"))).resolve() != root:
         raise PortableAutopilotError("portable Autopilot request is bound to another repository")
+    remote = value.get("repository_remote")
+    if remote is not None and not isinstance(remote, str):
+        raise PortableAutopilotError("portable Autopilot request remote identity is invalid")
+    if value.get("repository_id") != _repository_id(root, remote):
+        raise PortableAutopilotError("portable Autopilot request repository identity is invalid")
     target = str(value.get("target_branch", ""))
     if not target or target.casefold() in {"main", "master", "trunk"} or target.casefold().startswith("refs/heads/"):
         raise PortableAutopilotError("portable Autopilot request target is unsafe")
+    protected = value.get("protected_branches")
+    if not isinstance(protected, list) or any(
+        not isinstance(item, str) or not item.strip() for item in protected
+    ):
+        raise PortableAutopilotError("portable Autopilot protected branches are invalid")
+    folded_target = target.casefold()
+    if any(fnmatchcase(folded_target, item.strip().casefold()) for item in protected):
+        raise PortableAutopilotError("portable Autopilot target is declared protected")
+    protection = value.get("protection_verification")
+    if not isinstance(protection, Mapping) or protection.get("status") != "RECHECK_REQUIRED_BEFORE_REMOTE_MUTATION":
+        raise PortableAutopilotError("portable Autopilot protection verification is invalid")
+    requirements = value.get("orchestration_requirements")
+    if not isinstance(requirements, Mapping) or requirements.get("protected_branch_mutation") is not False:
+        raise PortableAutopilotError("portable Autopilot request permits protected branch mutation")
+    source = value.get("source")
+    if not isinstance(source, Mapping) or source.get("sha256") != GENERIC_PROMPT_SOURCE["sha256"]:
+        raise PortableAutopilotError("portable Autopilot source provenance is invalid")
     _git(root, ["check-ref-format", "--branch", target])
     return value
 
@@ -406,6 +460,9 @@ def trust_controller(
     evidence_ref: str,
     trust_state_root: str | Path | None = None,
 ) -> Mapping[str, Any]:
+    raise PortableAutopilotError(
+        "self-attested controller trust is disabled; the active host sandbox owns independent review and execution authority"
+    )
     root = Path(repository).resolve()
     root = Path(_git(root, ["rev-parse", "--show-toplevel"])).resolve()
     if not actor.strip() or not evidence_ref.strip():
@@ -471,6 +528,8 @@ def _requests_read_only(request: str) -> bool:
     if re.search(rf"\b(?:do\s+not|don['’]?t|dont|never)\s+(?:\w+\s+){{0,3}}{action}\b", text):
         return True
     if re.search(r"\b(?:only|just)\s+(?:check|inspect|report|summari[sz]e|explain|review)\b", text):
+        return True
+    if re.search(r"\b(?:explain|describe|summari[sz]e|tell\s+me|show\s+me)\s+(?:how|why|what|when|where|whether)\b", text):
         return True
     if re.search(r"\b(?:check|inspect|report|summari[sz]e|explain|review)\s+only\b", text):
         return True
@@ -570,7 +629,7 @@ def initialize_repository(
         "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
     }
     request["request_id"] = "sha256:" + sha256(_canonical_bytes(request)).hexdigest()
-    path = root / ".hive-mind" / "autopilot-request.json"
+    path = _validate_managed_path(root, root / ".hive-mind" / "autopilot-request.json")
     if path.exists():
         existing = json.loads(path.read_text(encoding="utf-8"))
         stable_keys = (
@@ -591,7 +650,7 @@ def initialize_repository(
         raise PortableAutopilotError(
             f"portable Autopilot request already exists: {path}; inspect it before replacing"
         )
-    _atomic_write_json(path, request)
+    _atomic_write_json(root, path, request)
     return {"status": "initialized", "request": request, "path": str(path)}
 
 
@@ -657,9 +716,9 @@ def _uninstalled_contract(root: Path, request: str) -> Mapping[str, Any]:
         "boundaries, receipts, tests, rollback, and the portable orchestration policy. "
         "Before any push or PR, verify current protected-ref rules and fail closed if they "
         "cannot be established. Target the configured release branch, never a protected "
-        "branch. Obtain independent review of the clean controller bundle, then pin it "
-        "with `hive-mind autopilot trust-controller`; checked-in provenance alone is not "
-        "execution trust. Finish the DAG "
+        "branch. The active host must independently review the clean controller bundle "
+        "and execute it only inside its approved deny-by-default sandbox; checked-in "
+        "provenance alone is not execution trust. Finish the DAG "
         "bootstrap candidate and independent validation in this durable task."
     )
     contract: dict[str, Any] = {
