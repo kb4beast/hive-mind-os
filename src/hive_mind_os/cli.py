@@ -160,7 +160,7 @@ def build_autopilot_parser() -> argparse.ArgumentParser:
     )
     trust.add_argument("--repository", default=".")
     trust.add_argument("--actor", required=True)
-    trust.add_argument("--evidence-ref", required=True)
+    trust.add_argument("--authorization-capability", required=True)
     trust.add_argument("--trust-state-root")
     commands.add_parser("prompt", help="Print the one reusable operator prompt")
     return parser
@@ -188,7 +188,7 @@ def _run_autopilot(args: argparse.Namespace) -> int:
             result = trust_controller(
                 args.repository,
                 actor=args.actor,
-                evidence_ref=args.evidence_ref,
+                authorization_capability=args.authorization_capability,
                 trust_state_root=args.trust_state_root,
             )
         else:

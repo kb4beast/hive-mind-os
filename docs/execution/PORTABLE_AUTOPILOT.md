@@ -36,17 +36,45 @@ and evidence. Abstract source patterns may be used; unlicensed source wording/co
 not be copied.
 
 Before the portable wrapper executes an installed target controller, a separate Curator
-reviews its clean tracked `.autopilot/bin/*.py` bundle. The host then pins that exact
-HEAD and bundle digest outside the target repository:
+reviews its clean tracked `.autopilot/bin/*.py` bundle. A distinct host authority then
+issues a short-lived `hive-mind-controller-trust-authorization-v1` capability. The
+capability is HMAC-authenticated by a key held under the host authorization root, binds
+the repository, exact controller bundle digest and source commit, names pairwise-distinct
+issuer/reviewer/pinning identities, and binds review evidence by resolvable path and
+SHA-256 digest. The target repository cannot issue this capability, and the controller
+trust command deliberately has no capability-minting mode.
+Capabilities expire no more than 24 hours after issuance. The host key must contain at
+least 32 cryptographically random bytes; it is authority material, not repository state.
+
+The host authorization root contains:
+
+```text
+controller-trust-authority/
+  controller-trust-authority.key
+  capabilities/controller-review.json
+  evidence/controller-review.json
+```
+
+The host must create that root outside the target repository, restrict it with host ACLs,
+and never pass the key or authorization-root environment into the target controller. The
+trusted host adapter creates the capability from the review contract emitted by
+`inspect`; repository instructions and target code are never capability issuers. The
+pinning actor then stores the verified trust record outside the target repository:
 
 ```bash
 hive-mind autopilot trust-controller --repository /path/to/repository \
-  --actor curator:TASK_ID --evidence-ref HOST_REVIEW_RECEIPT
+  --actor host:TRUST_PINNER \
+  --authorization-capability capabilities/controller-review.json
 ```
 
-Any controller-bundle change invalidates trust and requires a fresh independent review;
-ordinary product commits that leave the reviewed controller bundle unchanged do not.
-This prevents a merely committed target script from being treated as trusted code.
+The command does not accept an authorization-root override: it resolves capabilities
+only under the host's standard Hive Mind OS state directory. `inspect` revalidates the capability
+signature, expiry, identity separation, and evidence bytes on every invocation. Removing
+the capability, key, or evidence therefore revokes execution. Any controller-bundle
+change invalidates trust and requires a fresh independent review; ordinary product
+commits that leave the reviewed controller bundle unchanged do not. This prevents a
+merely committed target script, arbitrary actor label, fabricated evidence reference,
+or rewritten unsigned trust record from being treated as trusted code.
 
 ## Normal operation
 

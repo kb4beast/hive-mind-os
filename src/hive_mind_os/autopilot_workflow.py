@@ -7,9 +7,11 @@ import os
 import re
 import subprocess
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatchcase
 from hashlib import sha256
+from hmac import compare_digest
+from hmac import new as hmac_new
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlsplit, urlunsplit
@@ -205,6 +207,10 @@ def _default_trust_root() -> Path:
     return Path.home() / ".local" / "state" / "hive-mind-os" / "controller-trust"
 
 
+def _default_authorization_root() -> Path:
+    return _default_trust_root().parent / "controller-trust-authority"
+
+
 def _canonical_contract_id(value: Mapping[str, Any]) -> str:
     material = dict(value)
     material.pop("contract_id", None)
@@ -219,6 +225,52 @@ def _load_json_object(path: Path, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise PortableAutopilotError(f"{label} must be an object")
     return value
+
+
+def _digest(value: object) -> str:
+    return "sha256:" + sha256(_canonical_bytes(value)).hexdigest()
+
+
+def _external_file(
+    repository: Path,
+    authority_root: Path,
+    reference: str | Path,
+    label: str,
+) -> Path:
+    root = authority_root.resolve()
+    if root.is_relative_to(repository) or _is_link_like(authority_root):
+        raise PortableAutopilotError(f"{label} root must be host-owned and outside the target repository")
+    candidate = Path(reference)
+    candidate = candidate if candidate.is_absolute() else authority_root / candidate
+    try:
+        relative = candidate.absolute().relative_to(authority_root.absolute())
+    except ValueError as error:
+        raise PortableAutopilotError(f"{label} escapes the host authorization root") from error
+    current = authority_root
+    for part in relative.parts:
+        current = current / part
+        if _is_link_like(current):
+            raise PortableAutopilotError(f"{label} must not use a symlink or junction")
+    resolved = candidate.resolve()
+    if not resolved.is_relative_to(root) or resolved.is_relative_to(repository):
+        raise PortableAutopilotError(f"{label} escapes the host authorization root")
+    if not resolved.is_file():
+        raise PortableAutopilotError(f"{label} is not a resolvable regular file")
+    return resolved
+
+
+def _parse_authorization_time(value: object, label: str) -> datetime:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise PortableAutopilotError(f"controller trust authorization {label} must be UTC RFC3339")
+    try:
+        parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError as error:
+        raise PortableAutopilotError(
+            f"controller trust authorization {label} must be UTC RFC3339"
+        ) from error
+    if parsed.tzinfo is None:
+        raise PortableAutopilotError(f"controller trust authorization {label} must include a timezone")
+    return parsed.astimezone(UTC)
 
 
 def _validate_contract(value: object, root: Path) -> Mapping[str, Any]:
@@ -466,17 +518,180 @@ def _trust_path(repository_id: str, trust_state_root: str | Path | None) -> Path
     return root / f"{repository_id.removeprefix('sha256:')}.json"
 
 
+def _controller_bundle_digest(bundle: Sequence[Mapping[str, str]]) -> str:
+    return _digest(list(bundle))
+
+
+def _verify_controller_trust_authorization(
+    repository: Path,
+    *,
+    repository_id: str,
+    controller_bundle: Sequence[Mapping[str, str]],
+    authorization_capability: str | Path,
+    actor: str | None = None,
+    controller_source_commit: str | None = None,
+) -> tuple[Mapping[str, Any], str]:
+    authority_root = _default_authorization_root().resolve()
+    capability_path = _external_file(
+        repository,
+        authority_root,
+        authorization_capability,
+        "controller trust authorization capability",
+    )
+    key_path = _external_file(
+        repository,
+        authority_root,
+        "controller-trust-authority.key",
+        "controller trust authorization key",
+    )
+    if os.name != "nt" and (
+        authority_root.stat().st_mode & 0o077 or key_path.stat().st_mode & 0o077
+    ):
+        raise PortableAutopilotError(
+            "controller trust authorization root and key must be accessible only to the host owner"
+        )
+    try:
+        key = key_path.read_bytes()
+    except OSError as error:
+        raise PortableAutopilotError(
+            f"controller trust authorization key is unreadable: {error}"
+        ) from error
+    if len(key) < 32 or len(key) > 4096:
+        raise PortableAutopilotError("controller trust authorization key length is invalid")
+    capability = _load_json_object(
+        capability_path,
+        "controller trust authorization capability",
+    )
+    expected_top_level = {
+        "schema_version",
+        "kind",
+        "key_id",
+        "authorization",
+        "signature",
+        "capability_id",
+    }
+    if set(capability) != expected_top_level:
+        raise PortableAutopilotError("controller trust authorization capability fields are invalid")
+    material = dict(capability)
+    capability_id = material.pop("capability_id", None)
+    if capability_id != _digest(material):
+        raise PortableAutopilotError("controller trust authorization capability digest is invalid")
+    key_id = "sha256:" + sha256(key).hexdigest()
+    authorization = capability.get("authorization")
+    signature = capability.get("signature")
+    if (
+        capability.get("schema_version") != 1
+        or capability.get("kind") != "hive-mind-controller-trust-authorization-v1"
+        or capability.get("key_id") != key_id
+        or not isinstance(authorization, Mapping)
+        or not isinstance(signature, str)
+        or not signature.startswith("sha256:")
+    ):
+        raise PortableAutopilotError("controller trust authorization capability identity is invalid")
+    signed_material = {
+        "schema_version": capability["schema_version"],
+        "kind": capability["kind"],
+        "key_id": capability["key_id"],
+        "authorization": authorization,
+    }
+    expected_signature = "sha256:" + hmac_new(
+        key,
+        _canonical_bytes(signed_material),
+        "sha256",
+    ).hexdigest()
+    if not compare_digest(signature, expected_signature):
+        raise PortableAutopilotError("controller trust authorization signature is invalid")
+    expected_authorization_fields = {
+        "grant",
+        "repository_id",
+        "controller_source_commit",
+        "controller_bundle_digest",
+        "authorized_actor",
+        "issuer",
+        "independent_reviewer",
+        "evidence",
+        "issued_at",
+        "expires_at",
+    }
+    if set(authorization) != expected_authorization_fields:
+        raise PortableAutopilotError("controller trust authorization grant fields are invalid")
+    authorized_actor = authorization.get("authorized_actor")
+    issuer = authorization.get("issuer")
+    reviewer = authorization.get("independent_reviewer")
+    identities = (authorized_actor, issuer, reviewer)
+    if (
+        any(not isinstance(identity, str) or not identity.strip() for identity in identities)
+        or len({str(identity).strip().casefold() for identity in identities}) != 3
+    ):
+        raise PortableAutopilotError(
+            "controller trust requires distinct authorized actor, host issuer, and independent reviewer"
+        )
+    for identity_label, identity in zip(
+        ("authorized actor", "host issuer", "independent reviewer"),
+        identities,
+        strict=True,
+    ):
+        _reject_secret_like_text(str(identity), identity_label)
+    if actor is not None and authorized_actor != actor:
+        raise PortableAutopilotError("controller trust capability does not authorize this actor")
+    if (
+        authorization.get("grant") != "PIN_CONTROLLER_TRUST"
+        or authorization.get("repository_id") != repository_id
+        or authorization.get("controller_bundle_digest")
+        != _controller_bundle_digest(controller_bundle)
+    ):
+        raise PortableAutopilotError("controller trust authorization scope is stale or invalid")
+    if (
+        controller_source_commit is not None
+        and authorization.get("controller_source_commit") != controller_source_commit
+    ):
+        raise PortableAutopilotError("controller trust authorization source commit is stale")
+    issued_at = _parse_authorization_time(authorization.get("issued_at"), "issued_at")
+    expires_at = _parse_authorization_time(authorization.get("expires_at"), "expires_at")
+    now = datetime.now(UTC)
+    if (
+        expires_at <= issued_at
+        or expires_at - issued_at > timedelta(hours=24)
+        or issued_at > now
+        or expires_at <= now
+    ):
+        raise PortableAutopilotError("controller trust authorization is not currently valid")
+    evidence = authorization.get("evidence")
+    if not isinstance(evidence, Mapping) or set(evidence) != {"uri", "sha256"}:
+        raise PortableAutopilotError("controller trust authorization evidence binding is invalid")
+    evidence_uri = evidence.get("uri")
+    evidence_digest = evidence.get("sha256")
+    if (
+        not isinstance(evidence_uri, str)
+        or not evidence_uri.strip()
+        or not isinstance(evidence_digest, str)
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", evidence_digest)
+    ):
+        raise PortableAutopilotError("controller trust authorization evidence binding is invalid")
+    _reject_secret_like_text(evidence_uri, "independent controller review evidence URI")
+    evidence_path = _external_file(
+        repository,
+        authority_root,
+        evidence_uri,
+        "independent controller review evidence",
+    )
+    if "sha256:" + sha256(evidence_path.read_bytes()).hexdigest() != evidence_digest:
+        raise PortableAutopilotError("independent controller review evidence digest is invalid")
+    capability_uri = capability_path.relative_to(authority_root).as_posix()
+    return capability, capability_uri
+
+
 def trust_controller(
     repository: str | Path,
     *,
     actor: str,
-    evidence_ref: str,
+    authorization_capability: str | Path,
     trust_state_root: str | Path | None = None,
 ) -> Mapping[str, Any]:
     root = Path(repository).resolve()
     root = Path(_git(root, ["rev-parse", "--show-toplevel"])).resolve()
-    if not actor.strip() or not evidence_ref.strip():
-        raise PortableAutopilotError("controller trust requires actor and independent review evidence")
+    if not actor.strip():
+        raise PortableAutopilotError("controller trust requires an authorized actor")
     controller = root / ".autopilot" / "bin" / "autopilot.py"
     if not controller.is_file():
         raise PortableAutopilotError("repository has no installed Autopilot controller")
@@ -484,17 +699,33 @@ def trust_controller(
     raw_remote = _git_optional(root, ["remote", "get-url", "origin"])
     remote = _safe_remote(raw_remote) if raw_remote else None
     repository_id = _repository_id(root, remote)
+    source_commit = _git(root, ["rev-parse", "HEAD"])
+    capability, capability_uri = _verify_controller_trust_authorization(
+        root,
+        repository_id=repository_id,
+        controller_bundle=bundle,
+        authorization_capability=authorization_capability,
+        actor=actor,
+        controller_source_commit=source_commit,
+    )
+    authorization = capability["authorization"]
     material: dict[str, Any] = {
-        "schema_version": 1,
-        "kind": "hive-mind-controller-trust-v1",
+        "schema_version": 2,
+        "kind": "hive-mind-controller-trust-v2",
         "repository_id": repository_id,
-        "controller_source_commit": _git(root, ["rev-parse", "HEAD"]),
+        "controller_source_commit": source_commit,
         "controller_bundle": list(bundle),
-        "actor": actor,
-        "independent_review_evidence_ref": evidence_ref,
+        "controller_bundle_digest": _controller_bundle_digest(bundle),
+        "authorized_actor": actor,
+        "authorization_capability_id": capability["capability_id"],
+        "authorization_capability_uri": capability_uri,
+        "authorization_key_id": capability["key_id"],
+        "authorization_issuer": authorization["issuer"],
+        "independent_reviewer": authorization["independent_reviewer"],
+        "independent_review_evidence": authorization["evidence"],
         "trusted_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
     }
-    material["trust_id"] = "sha256:" + sha256(_canonical_bytes(material)).hexdigest()
+    material["trust_id"] = _digest(material)
     path = _trust_path(repository_id, trust_state_root)
     if path.resolve().is_relative_to(root):
         raise PortableAutopilotError("controller trust must be stored outside the target repository")
@@ -519,17 +750,38 @@ def _require_controller_trust(
     trust = _load_json_object(path, "external controller trust record")
     material = dict(trust)
     trust_id = material.pop("trust_id", None)
-    if trust_id != "sha256:" + sha256(_canonical_bytes(material)).hexdigest():
+    if trust_id != _digest(material):
         raise PortableAutopilotError("external controller trust record digest is invalid")
     if (
-        trust.get("kind") != "hive-mind-controller-trust-v1"
+        trust.get("schema_version") != 2
+        or trust.get("kind") != "hive-mind-controller-trust-v2"
         or trust.get("repository_id") != repository_id
         or trust.get("controller_bundle") != list(bundle)
-        or not trust.get("independent_review_evidence_ref")
+        or trust.get("controller_bundle_digest") != _controller_bundle_digest(bundle)
     ):
         raise PortableAutopilotError(
-            "controller trust is missing or stale; independently review and re-pin the clean controller bundle"
+            "controller trust is missing or stale; obtain host authorization for the clean controller bundle"
         )
+    capability_uri = trust.get("authorization_capability_uri")
+    if not isinstance(capability_uri, str) or not capability_uri:
+        raise PortableAutopilotError("external controller trust authorization reference is invalid")
+    capability, resolved_uri = _verify_controller_trust_authorization(
+        root,
+        repository_id=repository_id,
+        controller_bundle=bundle,
+        authorization_capability=capability_uri,
+    )
+    authorization = capability["authorization"]
+    if (
+        resolved_uri != capability_uri
+        or trust.get("authorization_capability_id") != capability.get("capability_id")
+        or trust.get("authorization_key_id") != capability.get("key_id")
+        or trust.get("authorized_actor") != authorization.get("authorized_actor")
+        or trust.get("authorization_issuer") != authorization.get("issuer")
+        or trust.get("independent_reviewer") != authorization.get("independent_reviewer")
+        or trust.get("independent_review_evidence") != authorization.get("evidence")
+    ):
+        raise PortableAutopilotError("external controller trust authorization binding is invalid")
     return trust
 
 
@@ -794,11 +1046,20 @@ def inspect_repository(
     read_only = _requests_read_only(request)
     intent = "CHECK" if read_only else "CONTINUE"
     try:
-        trust = _require_controller_trust(root, bundle, trust_state_root)
+        trust = _require_controller_trust(
+            root,
+            bundle,
+            trust_state_root,
+        )
     except PortableAutopilotError as error:
+        raw_remote = _git_optional(root, ["remote", "get-url", "origin"])
+        remote = _safe_remote(raw_remote) if raw_remote else None
         review_material = {
             "repository": str(root),
+            "repository_id": _repository_id(root, remote),
+            "controller_source_commit": _git(root, ["rev-parse", "HEAD"]),
             "controller_bundle": list(bundle),
+            "controller_bundle_digest": _controller_bundle_digest(bundle),
             "action": "INDEPENDENT_CONTROLLER_REVIEW",
         }
         review_id = "sha256:" + sha256(_canonical_bytes(review_material)).hexdigest()
@@ -812,7 +1073,21 @@ def inspect_repository(
                 "reasons": ["target controller execution requires an external independent bundle pin"],
             },
             "operator_request": request,
+            "repository_id": review_material["repository_id"],
+            "controller_source_commit": review_material["controller_source_commit"],
             "controller_bundle": list(bundle),
+            "controller_bundle_digest": review_material["controller_bundle_digest"],
+            "authorization_requirements": {
+                "kind": "hive-mind-controller-trust-authorization-v1",
+                "grant": "PIN_CONTROLLER_TRUST",
+                "host_owned": True,
+                "pairwise_distinct_identities": [
+                    "authorized_actor",
+                    "issuer",
+                    "independent_reviewer",
+                ],
+                "evidence": "resolvable host-external artifact with an exact sha256 digest",
+            },
             "tasks": [] if read_only else [
                 {
                     "task_key": "CONTROLLER-TRUST",
@@ -822,10 +1097,11 @@ def inspect_repository(
                     "transport": "durable_user_owned_task",
                     "prompt": (
                         "Independently review the exact clean controller bundle listed in this "
-                        "contract. If and only if it is safe, pin it outside the target repository "
-                        "with `hive-mind autopilot trust-controller`, using your distinct Curator "
-                        "identity and durable review evidence reference. Do not execute the target "
-                        "controller during review."
+                        "contract. A distinct host authority must issue a digest-bound capability "
+                        "authorizing another actor to pin it; the capability must name your Curator "
+                        "identity and resolve to exact external evidence bytes. Then use "
+                        "`hive-mind autopilot trust-controller` with that capability. Do not execute "
+                        "the target controller during review."
                     ),
                 }
             ],
