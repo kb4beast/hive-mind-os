@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+from fixture_support import copy_autopilot_fixture
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
 SPEC = importlib.util.spec_from_file_location("singleton_controller", MODULE_PATH)
@@ -22,7 +22,7 @@ class SingletonReleaseTargetTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         source = Path(__file__).resolve().parents[1]
-        shutil.copytree(source, self.root / ".autopilot")
+        copy_autopilot_fixture(source, self.root / ".autopilot")
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False

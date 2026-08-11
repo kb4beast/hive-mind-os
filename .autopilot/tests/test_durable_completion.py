@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from fixture_support import copy_autopilot_fixture
+
 BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
@@ -28,7 +30,7 @@ class DurableCompletionTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         source = Path(__file__).resolve().parents[1]
-        shutil.copytree(source, self.root / ".autopilot")
+        copy_autopilot_fixture(source, self.root / ".autopilot")
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
