@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "fixture_id": "misleading-readme-node",
+  "scenario": "misleading-README",
+  "language": "node",
+  "languages": ["node"],
+  "tests_present": true
+}
