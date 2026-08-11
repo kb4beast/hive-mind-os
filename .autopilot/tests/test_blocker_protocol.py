@@ -71,7 +71,6 @@ class BlockerProtocolTests(unittest.TestCase):
             control = controller.read_json(root / ".autopilot" / "control-plane.json")
             control["verify_git_objects"] = False
             controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
-            plane = controller.ControlPlane(root)
             original = controller.os.environ.get("HTTPS_PROXY")
             controller.os.environ["HTTPS_PROXY"] = "https://proxy.example.test:8443"
             try:

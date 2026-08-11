@@ -7,8 +7,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
+from unittest import mock
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
@@ -256,7 +256,8 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         run("git", "clone", "--no-local", str(remote), str(clone))
         shutil.copytree(source / ".autopilot", clone / ".autopilot")
         control = clone / ".autopilot" / "control-plane.json"
-        value = json.loads(control.read_text(encoding="utf-8")); value["verify_git_objects"] = False
+        value = json.loads(control.read_text(encoding="utf-8"))
+        value["verify_git_objects"] = False
         control.write_text(json.dumps(value), encoding="utf-8")
         plane = self._ready(autopilot.ControlPlane(clone))
         result = plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
@@ -267,7 +268,8 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         run("git", "clone", "--no-local", str(remote), str(fresh))
         shutil.copytree(source / ".autopilot", fresh / ".autopilot")
         fresh_control = fresh / ".autopilot" / "control-plane.json"
-        fresh_value = json.loads(fresh_control.read_text(encoding="utf-8")); fresh_value["verify_git_objects"] = False
+        fresh_value = json.loads(fresh_control.read_text(encoding="utf-8"))
+        fresh_value["verify_git_objects"] = False
         fresh_control.write_text(json.dumps(fresh_value), encoding="utf-8")
         resumed = self._ready(autopilot.ControlPlane(fresh))
         resumed_result = resumed.retire_receipt_branch(self.record["retirement_id"], actor="test:recovery")
