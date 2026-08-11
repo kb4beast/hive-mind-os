@@ -35,10 +35,11 @@ local or origin state rather than checked-in test inputs.
 ## Decision
 
 Add one exact registry containing only Optimizer and ORCH supersession authorities, plus
-the separately sealed Builder record chain. Compile the first implementation commit SHA
-into all three authorities in a second sealing commit. Execution is permitted only from a
-current singleton target containing that exact capability commit. The incident SHAs remain
-provenance and are never interpreted as permission to move the release backward.
+the separately sealed Builder record chain. Each implementation or corrective capability
+commit is followed by a sealing commit that compiles the latest exact capability SHA into
+all three authorities without rewriting the earlier pairs. Execution is permitted only
+from a current singleton target containing that exact capability commit. The incident SHAs
+remain provenance and are never interpreted as permission to move the release backward.
 
 Optimizer publishes a zero-path repair claim whose only parent is the exact old receipt,
 then an immediate deterministic merge whose parents are the repair claim and captured
@@ -72,6 +73,9 @@ payload, authority, execution release, and local evidence. A failed or ambiguous
 compensation retains an `ADVERSE` claim, intent, and append-only event; it never deletes
 the only recovery record. The exact historical plus replacement durable receipt pair is
 projected as `COMPLETE` only after the full sealed validator succeeds.
+If the singleton release advances after an exact remote CAS, restart recovery first
+reconciles or rolls back only that already-bound transaction; any new mutation still needs
+a fresh authenticated current release and dispatcher evidence.
 
 Builder accepts no caller-selected node, remote, branch, SHA, or ref. It requires the
 controller to show exact `REPAIR_REQUIRED` and a dispatcher `STOP`, verifies the literal
@@ -116,5 +120,6 @@ An untouched Optimizer/ORCH repair publication rolls back by CAS to its exact ol
 An untouched Builder retirement rolls back by atomically restoring the exact candidate from
 the exact archive while deleting that archive. Once a branch advances to a correction or
 replacement claim, histories are preserved and rollback requires a separately judged
-appeal. The singleton release can revert the two bootstrap commits to remove all three
-capabilities; generated execution evidence remains append-only. `main` is never a target.
+appeal. The singleton release can revert the complete bootstrap implementation-and-seal
+commit chain to remove all three capabilities; generated execution evidence remains
+append-only. `main` is never a target.

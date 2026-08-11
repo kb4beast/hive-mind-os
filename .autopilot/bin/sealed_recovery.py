@@ -787,9 +787,6 @@ class SealedRecoveryMixin:
         record = self._repair_record(node_id)
         if not self._origin_is_configured_repository(record):
             raise ClaimError("sealed repair release requires literal configured origin")
-        live_issues = self._live_release_issues(record, str(value.get("target_sha")))
-        if live_issues:
-            raise ClaimError("; ".join(live_issues))
         if value.get("status") == "COMPLETING":
             intent_path = self.state_dir / f"sealed-repair-completion-{node_id.lower()}.json"
             intent = read_json(intent_path) if intent_path.is_file() else None
@@ -811,6 +808,9 @@ class SealedRecoveryMixin:
                     value = read_json(path)
                     if not isinstance(value, Mapping):
                         return
+        live_issues = self._live_release_issues(record, str(value.get("target_sha")))
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
         remote_head = value.get("remote_head_commit")
         observed = self.remote_branch_sha(str(record["branch"]))
         if isinstance(remote_head, str) and observed == remote_head:
@@ -867,29 +867,33 @@ class SealedRecoveryMixin:
             ):
                 issues.append(f"sealed replacement receipt {key} must contain nonblank strings")
         runtime = receipt.get("model_runtime")
-        if not isinstance(runtime, Mapping) or not isinstance(runtime.get("provider"), str) or not runtime.get(
-            "provider", ""
-        ).strip() or not any(
-            isinstance(runtime.get(key), str) and runtime.get(key, "").strip()
-            for key in ("model", "execution_surface")
+        if (
+            not isinstance(runtime, Mapping)
+            or set(runtime) != {"provider", "model"}
+            or any(not isinstance(runtime.get(key), str) or not runtime.get(key, "").strip() for key in runtime)
         ):
             issues.append("sealed replacement receipt model_runtime is incomplete")
         roles = receipt.get("role_identities")
         if not isinstance(roles, list) or not roles:
             issues.append("sealed replacement receipt role_identities must be nonempty")
         else:
+            seen_roles: set[str] = set()
             for role in roles:
                 if not isinstance(role, Mapping) or set(role) != {"role", "identity", "identity_kind"}:
                     issues.append("sealed replacement role identity shape is invalid")
                     continue
                 if any(not isinstance(role.get(key), str) or not role.get(key, "").strip() for key in role):
                     issues.append("sealed replacement role identity fields must be nonblank")
+                role_name = str(role.get("role"))
+                if role_name in seen_roles:
+                    issues.append("sealed replacement role identities contain a duplicate role")
+                seen_roles.add(role_name)
         tests = receipt.get("tests")
         if not isinstance(tests, list) or not tests:
             issues.append("sealed replacement receipt tests must be nonempty")
         else:
             for test in tests:
-                if not isinstance(test, Mapping) or not {"name", "status", "command"}.issubset(test):
+                if not isinstance(test, Mapping) or set(test) != {"name", "status", "command"}:
                     issues.append("sealed replacement test record shape is invalid")
                     continue
                 command = test.get("command")
@@ -1191,10 +1195,8 @@ class SealedRecoveryMixin:
         claimed_material.pop("adverse_reason", None)
         if intent.get("active_claim_digest") != digest_json(claimed_material):
             raise ClaimError("sealed repair completion intent claim binding is invalid")
-        if claim.get("status") != "COMPLETING" or intent.get("target_sha") != self.current_target_sha():
+        if claim.get("status") != "COMPLETING" or intent.get("target_sha") != claim.get("target_sha"):
             raise ClaimError("sealed repair completion recovery target or state is invalid")
-        if self._release_binding_issues(claim):
-            raise ClaimError("sealed repair completion recovery release is stale")
         final = str(intent["remote_expected_final"])
         receipt_commit = intent.get("receipt_commit")
         remote = self.remote_branch_sha(str(record["branch"]))
@@ -1215,6 +1217,29 @@ class SealedRecoveryMixin:
                 error = ClaimError("sealed repair completion stopped before commit but remote moved")
                 adverse(error)
                 raise error
+            local_ref = f"refs/heads/{record['branch']}"
+            local = self._git(("rev-parse", "--verify", local_ref), check=False).stdout.strip()
+            if local != final:
+                if (
+                    FULL_SHA.fullmatch(local) is None
+                    or self._commit_parents(local) != (final,)
+                    or self._commit_tree(local) != receipt.get("final_tree")
+                ):
+                    error = ReceiptError("sealed repair interrupted local receipt is ambiguous")
+                    adverse(error)
+                    raise error
+                shown = self._git(("show", "-s", "--format=%B", local), check=False)
+                local_receipt = self._parse_receipt_message(shown.stdout) if shown.returncode == 0 else None
+                if not isinstance(local_receipt, Mapping) or digest_json(local_receipt) != digest_json(receipt):
+                    error = ReceiptError("sealed repair interrupted local receipt payload is invalid")
+                    adverse(error)
+                    raise error
+                rolled_back = self._git(("update-ref", local_ref, final, local), check=False)
+                observed = self._git(("rev-parse", "--verify", local_ref), check=False).stdout.strip()
+                if rolled_back.returncode != 0 or observed != final:
+                    error = ReceiptError("sealed repair interrupted local receipt rollback failed")
+                    adverse(error)
+                    raise error
             restored = dict(claim)
             restored["status"] = "CLAIMED"
             atomic_write_json(self.claim_path(node_id), restored)
@@ -1225,7 +1250,19 @@ class SealedRecoveryMixin:
             adverse(error)
             raise error
         if remote == final:
-            self._git(("update-ref", f"refs/heads/{record['branch']}", final, receipt_commit), check=False)
+            local_ref = f"refs/heads/{record['branch']}"
+            local = self._git(("rev-parse", "--verify", local_ref), check=False).stdout.strip()
+            if local == receipt_commit:
+                updated = self._git(("update-ref", local_ref, final, receipt_commit), check=False)
+                local = self._git(("rev-parse", "--verify", local_ref), check=False).stdout.strip()
+                if updated.returncode != 0 or local != final:
+                    error = ReceiptError("sealed repair local receipt rollback failed")
+                    adverse(error)
+                    raise error
+            elif local != final:
+                error = ReceiptError("sealed repair local receipt ref is ambiguous")
+                adverse(error)
+                raise error
             restored = dict(claim)
             restored["status"] = "CLAIMED"
             atomic_write_json(self.claim_path(node_id), restored)
@@ -1290,9 +1327,6 @@ class SealedRecoveryMixin:
         record = self._repair_record(node_id)
         if not self._origin_is_configured_repository(record):
             raise ClaimError("sealed repair completion requires literal configured origin")
-        live_issues = self._live_release_issues(record, str(claim.get("target_sha")))
-        if live_issues:
-            raise ClaimError("; ".join(live_issues))
         if claim.get("authority_digest") != digest_json(record):
             raise ClaimError("sealed repair completion claim authority is stale")
         recovered = self._recover_interrupted_repair_completion(
@@ -1303,6 +1337,9 @@ class SealedRecoveryMixin:
         claim = read_json(claim_path)
         if not isinstance(claim, Mapping):
             raise ClaimError("sealed repair completion claim disappeared during recovery")
+        live_issues = self._live_release_issues(record, str(claim.get("target_sha")))
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
         if parse_time(claim.get("expires_at")) <= self.clock():
             raise ClaimError("sealed repair completion lease expired")
         binding_issues = self._release_binding_issues(claim)
@@ -1379,12 +1416,17 @@ class SealedRecoveryMixin:
                     compensated = self.remote_branch_sha(str(record["branch"])) == final
                 except ClaimError:
                     compensated = False
+            local_rolled_back = receipt_commit is None
             if receipt_commit is not None:
-                self._git(("update-ref", f"refs/heads/{record['branch']}", str(final), receipt_commit), check=False)
+                local_ref = f"refs/heads/{record['branch']}"
+                local_update = self._git(("update-ref", local_ref, str(final), receipt_commit), check=False)
+                local_head = self._git(("rev-parse", "--verify", local_ref), check=False).stdout.strip()
+                local_rolled_back = local_update.returncode == 0 and local_head == final
             local_path.unlink(missing_ok=True)
-            if compensated:
+            if compensated and local_rolled_back:
                 claim_state["status"] = "CLAIMED"
                 atomic_write_json(claim_path, claim_state)
+                intent_path.unlink(missing_ok=True)
             else:
                 claim_state["status"] = "ADVERSE"
                 claim_state["adverse_reason"] = "receipt publication could not be rolled back"
@@ -1558,9 +1600,14 @@ class SealedRecoveryMixin:
             raise ClaimError("Builder retirement prepared intent is foreign or malformed")
         if intent.get("kind") != BUILDER_EXECUTION_KIND or intent.get("status") != "PREPARED":
             raise ClaimError("Builder retirement prepared intent requires reconciliation")
-        live_issues = self._live_release_issues(replan, str(intent.get("target_sha")))
-        if live_issues:
-            raise ClaimError("; ".join(live_issues))
+        if not self.builder_lease_path.is_file():
+            raise ClaimError("Builder interrupted retirement lease is missing")
+        lease = read_json(self.builder_lease_path)
+        if not isinstance(lease, Mapping) or digest_json(lease) != intent.get("lease_digest"):
+            raise ClaimError("Builder interrupted retirement lease binding differs")
+        for key in ("recovery_id", "source_head", "archive_ref", "target_sha", "release_id", "actor"):
+            if lease.get(key) != intent.get(key):
+                raise ClaimError(f"Builder interrupted retirement lease {key} differs")
         expected = str(replan["expected_remote_head"])
         source_ref = f"refs/heads/{replan['branch']}"
         archive_ref = str(replan["archive_ref"])
@@ -1586,16 +1633,6 @@ class SealedRecoveryMixin:
                 raise ClaimError("Builder interrupted retirement archive verification failed")
             if self._commit_tree(expected) != replan["candidate_tree"]:
                 raise ClaimError("Builder interrupted retirement archive tree differs")
-            if intent.get("target_sha") != self.current_target_sha() or intent.get("release_id") != (
-                self.current_release() or {}
-            ).get("release_id"):
-                raise ClaimError("Builder interrupted retirement execution release is stale")
-            if (
-                intent.get("snapshot_digest") != self._snapshot_digest()
-                or intent.get("reconciliation_digest") != self._reconciliation_digest()
-                or intent.get("doctor_evidence_digest") != self._doctor_evidence_digest()
-            ):
-                raise ClaimError("Builder interrupted retirement evidence binding is stale")
             execution = {
                 "schema_version": 1,
                 "kind": BUILDER_EXECUTION_KIND,
@@ -1614,11 +1651,11 @@ class SealedRecoveryMixin:
             atomic_write_json(self.builder_execution_path, execution)
             append_jsonl(self.state_dir / BUILDER_AUDIT_FILE, {"event": "builder_branch_retirement_recovered", **execution})
             if self.builder_lease_path.is_file():
-                lease = read_json(self.builder_lease_path)
+                retained_lease = read_json(self.builder_lease_path)
                 lease_archive = self.state_dir / "builder-retirement-leases" / (
-                    digest_json(lease).replace(":", "-") + ".json"
+                    digest_json(retained_lease).replace(":", "-") + ".json"
                 )
-                atomic_write_json(lease_archive, {**lease, "status": "RECOVERED", "released_at": format_time(self.clock())})
+                atomic_write_json(lease_archive, {**retained_lease, "status": "RECOVERED", "released_at": format_time(self.clock())})
                 self.builder_lease_path.unlink()
             self.builder_intent_path.unlink()
             return execution
@@ -1665,9 +1702,6 @@ class SealedRecoveryMixin:
 
         if not self.builder_intent_path.is_file():
             return None
-        live_issues = self._live_release_issues(replan, str(execution.get("target_sha")))
-        if live_issues:
-            raise ClaimError("; ".join(live_issues))
         intent = read_json(self.builder_intent_path)
         if not isinstance(intent, Mapping) or intent.get("status") != "PREPARED":
             raise ClaimError("Builder post-execution intent is invalid")

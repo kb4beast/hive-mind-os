@@ -509,6 +509,11 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             "blank_identity": lambda receipt: receipt["role_identities"][0].__setitem__("identity", "  "),
             "missing_runtime": lambda receipt: receipt.__setitem__("model_runtime", None),
             "non_string_evidence": lambda receipt: receipt.__setitem__("evidence_refs", [1]),
+            "extra_test_key": lambda receipt: receipt["tests"][0].__setitem__("unexpected", True),
+            "extra_runtime_key": lambda receipt: receipt["model_runtime"].__setitem__("unexpected", True),
+            "duplicate_role": lambda receipt: receipt["role_identities"].append(
+                copy.deepcopy(receipt["role_identities"][0])
+            ),
         }
         for name, mutate in mutations.items():
             receipt = self._receipt("OPTIMIZER-370")
@@ -638,20 +643,116 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             "target_sha": "d" * 40,
         }
         autopilot.atomic_write_json(self.plane.claim_path(node_id), claim)
-        self.plane.remote_branch_sha = lambda _branch: final  # type: ignore[method-assign]
+        state = {"remote": final, "local": final, "cas_attempts": 0}
+        self.plane.remote_branch_sha = lambda _branch: state["remote"]  # type: ignore[method-assign]
         self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
         self.plane._release_binding_issues = lambda _claim=None: ()  # type: ignore[method-assign]
         self.plane._replacement_receipt_issues = lambda *_args, **_kwargs: ()  # type: ignore[method-assign]
         self.plane.acquire_global_validation_lease = lambda *_args, **_kwargs: {"lease_id": "lease"}  # type: ignore[method-assign]
         self.plane.release_global_validation_lease = lambda *_args, **_kwargs: None  # type: ignore[method-assign]
-        self.plane._create_receipt_commit = lambda *_args: "f" * 40  # type: ignore[method-assign]
-        self.plane._cas_update_branch = lambda *_args: (_ for _ in ()).throw(autopilot.ClaimError("CAS rejected"))  # type: ignore[method-assign]
-        self.plane._git = lambda args, **_kwargs: subprocess.CompletedProcess(args, 0, "", "")  # type: ignore[method-assign]
+        def create_receipt(*_args):
+            state["local"] = "f" * 40
+            return state["local"]
+
+        self.plane._create_receipt_commit = create_receipt  # type: ignore[method-assign]
+
+        def cas(_branch: str, expected: str, new: str) -> None:
+            state["cas_attempts"] += 1
+            if state["cas_attempts"] == 1:
+                raise autopilot.ClaimError("CAS rejected")
+            self.assertEqual(state["remote"], expected)
+            state["remote"] = new
+
+        self.plane._cas_update_branch = cas  # type: ignore[method-assign]
+
+        def git(args, **_kwargs):
+            command = tuple(args)
+            if command[0] == "update-ref":
+                self.assertEqual(state["local"], command[3])
+                state["local"] = command[2]
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:2] == ("rev-parse", "--verify"):
+                return subprocess.CompletedProcess(command, 0, state["local"] + "\n", "")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        self.plane._git = git  # type: ignore[method-assign]
         with self.assertRaisesRegex(autopilot.ClaimError, "CAS rejected"):
             self.plane.complete(node_id, "test:owner", receipt)
         retained = json.loads(self.plane.claim_path(node_id).read_text(encoding="utf-8"))
         self.assertEqual(retained["status"], "CLAIMED")
         self.assertFalse(self.plane.receipt_path(node_id).exists())
+        self.assertFalse((self.plane.state_dir / "sealed-repair-completion-optimizer-370.json").exists())
+        self.assertEqual(state["local"], final)
+        self.assertEqual(self.plane.complete(node_id, "test:owner", receipt), "f" * 40)
+        self.assertEqual(state["remote"], "f" * 40)
+
+    def test_restart_after_local_receipt_creation_rolls_back_and_retries(self) -> None:
+        node_id = "OPTIMIZER-370"
+        record = self._record(node_id)
+        receipt = self._receipt(node_id)
+        final = receipt["final_commit"]
+        receipt_commit = "f" * 40
+        claim = {
+            "kind": sealed_recovery.REPAIR_CLAIM_KIND, "owner": "test:owner", "status": "CLAIMED",
+            "expires_at": "2030-01-01T00:00:00Z", "authority_digest": autopilot.digest_json(record),
+            "target_sha": "d" * 40,
+        }
+        autopilot.atomic_write_json(self.plane.claim_path(node_id), claim)
+        state = {"remote": final, "local": final}
+        self.plane.remote_branch_sha = lambda _branch: state["remote"]  # type: ignore[method-assign]
+        self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
+        self.plane._release_binding_issues = lambda _claim=None: ()  # type: ignore[method-assign]
+        self.plane._replacement_receipt_issues = lambda *_args, **_kwargs: ()  # type: ignore[method-assign]
+        self.plane.acquire_global_validation_lease = lambda *_args, **_kwargs: {"lease_id": "lease"}  # type: ignore[method-assign]
+        self.plane.release_global_validation_lease = lambda *_args, **_kwargs: None  # type: ignore[method-assign]
+
+        def create_receipt(*_args):
+            state["local"] = receipt_commit
+            return receipt_commit
+
+        self.plane._create_receipt_commit = create_receipt  # type: ignore[method-assign]
+        self.plane._commit_parents = lambda _sha: (final,)  # type: ignore[method-assign]
+        self.plane._commit_tree = lambda _sha: receipt["final_tree"]  # type: ignore[method-assign]
+
+        def git(args, **_kwargs):
+            command = tuple(args)
+            if command[:2] == ("rev-parse", "--verify"):
+                return subprocess.CompletedProcess(command, 0, state["local"] + "\n", "")
+            if command[0] == "update-ref":
+                self.assertEqual(state["local"], command[3])
+                state["local"] = command[2]
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:3] == ("show", "-s", "--format=%B"):
+                return subprocess.CompletedProcess(command, 0, self.plane._receipt_message(receipt), "")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        self.plane._git = git  # type: ignore[method-assign]
+
+        def cas(_branch: str, expected: str, new: str) -> None:
+            self.assertEqual(state["remote"], expected)
+            state["remote"] = new
+
+        self.plane._cas_update_branch = cas  # type: ignore[method-assign]
+        original_write = sealed_recovery.atomic_write_json
+        intent_writes = 0
+
+        def crash_before_receipt_identity(path, value):
+            nonlocal intent_writes
+            if path.name == "sealed-repair-completion-optimizer-370.json":
+                intent_writes += 1
+                if intent_writes == 2:
+                    raise SystemExit("crash after local receipt creation")
+            return original_write(path, value)
+
+        try:
+            sealed_recovery.atomic_write_json = crash_before_receipt_identity
+            with self.assertRaises(SystemExit):
+                self.plane.complete(node_id, "test:owner", receipt)
+        finally:
+            sealed_recovery.atomic_write_json = original_write
+        self.assertEqual(state, {"remote": final, "local": receipt_commit})
+        self.assertEqual(self.plane.complete(node_id, "test:owner", receipt), receipt_commit)
+        self.assertEqual(state, {"remote": receipt_commit, "local": receipt_commit})
 
     def test_hard_restart_after_receipt_remote_cas_resumes_local_evidence_cleanup(self) -> None:
         node_id = "OPTIMIZER-370"
@@ -699,6 +800,9 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             sealed_recovery.atomic_write_json = original_write
         self.assertEqual(state["head"], receipt_commit)
         self.assertTrue(self.plane.claim_path(node_id).is_file())
+        self.plane.current_target_sha = lambda: "9" * 40  # type: ignore[method-assign]
+        self.plane._release_binding_issues = lambda _claim=None: ("release advanced",)  # type: ignore[method-assign]
+        self.plane._live_release_issues = lambda _record, _expected=None: ("literal origin release advanced",)  # type: ignore[method-assign]
         self.plane.clock = lambda: autopilot.parse_time("2031-01-01T00:00:00Z")  # type: ignore[method-assign]
         recovered = self.plane.complete(node_id, "test:owner", receipt)
         self.assertEqual(recovered, receipt_commit)
@@ -852,32 +956,31 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
     def test_builder_prepared_intent_recovers_verified_post_push_state(self) -> None:
         replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
         assert isinstance(replan, dict)
-        self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
-        self.plane.current_release = lambda: {"release_id": "release"}  # type: ignore[method-assign]
-        self.plane._snapshot_digest = lambda: "snapshot"  # type: ignore[method-assign]
-        self.plane._reconciliation_digest = lambda: "reconciliation"  # type: ignore[method-assign]
-        self.plane._doctor_evidence_digest = lambda: "doctor"  # type: ignore[method-assign]
+        self.plane.current_target_sha = lambda: "e" * 40  # type: ignore[method-assign]
+        self.plane.current_release = lambda: {"release_id": "new-release"}  # type: ignore[method-assign]
+        self.plane._live_release_issues = lambda _record, _expected=None: ("literal origin release advanced",)  # type: ignore[method-assign]
         self.plane._builder_history_issues = lambda _replan: ()  # type: ignore[method-assign]
         self.plane._commit_tree = lambda _sha: replan["candidate_tree"]  # type: ignore[method-assign]
         self.plane._remote_ref_sha = lambda ref: None if ref.startswith("refs/heads/") else replan["candidate_commit"]  # type: ignore[method-assign]
         self.plane._git = lambda args, **_kwargs: subprocess.CompletedProcess(args, 0, "", "")  # type: ignore[method-assign]
-        intent = {
+        lease = {
             "schema_version": 1, "kind": sealed_recovery.BUILDER_EXECUTION_KIND,
-            "status": "PREPARED", "recovery_id": "builder-330-stale-candidate-recovery-v1",
-            "source_head": replan["candidate_commit"], "archive_ref": replan["archive_ref"],
-            "target_sha": "d" * 40, "release_id": "release", "snapshot_digest": "snapshot",
-            "reconciliation_digest": "reconciliation", "doctor_evidence_digest": "doctor",
-            "actor": "test:builder", "lease_digest": "sha256:" + "0" * 64,
-            "prepared_at": "2026-08-11T00:00:00Z",
-        }
-        autopilot.atomic_write_json(self.plane.builder_intent_path, intent)
-        autopilot.atomic_write_json(self.plane.builder_lease_path, {
-            "schema_version": 1, "kind": sealed_recovery.BUILDER_EXECUTION_KIND,
-            "recovery_id": intent["recovery_id"], "node_id": "BUILDER-330", "actor": "test:builder",
+            "recovery_id": "builder-330-stale-candidate-recovery-v1", "node_id": "BUILDER-330", "actor": "test:builder",
             "source_head": replan["candidate_commit"], "archive_ref": replan["archive_ref"],
             "target_sha": "d" * 40, "release_id": "release",
             "expires_at": "2030-01-01T00:00:00Z", "status": "ACTIVE",
-        })
+        }
+        intent = {
+            "schema_version": 1, "kind": sealed_recovery.BUILDER_EXECUTION_KIND,
+            "status": "PREPARED", "recovery_id": lease["recovery_id"],
+            "source_head": replan["candidate_commit"], "archive_ref": replan["archive_ref"],
+            "target_sha": "d" * 40, "release_id": "release", "snapshot_digest": "snapshot",
+            "reconciliation_digest": "reconciliation", "doctor_evidence_digest": "doctor",
+            "actor": "test:builder", "lease_digest": autopilot.digest_json(lease),
+            "prepared_at": "2026-08-11T00:00:00Z",
+        }
+        autopilot.atomic_write_json(self.plane.builder_intent_path, intent)
+        autopilot.atomic_write_json(self.plane.builder_lease_path, lease)
         recovered = self.plane._recover_interrupted_builder_retirement(replan)
         assert recovered is not None
         self.assertEqual(recovered["status"], "RETIRED")
