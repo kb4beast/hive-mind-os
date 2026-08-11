@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import pickle
 import unittest
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
@@ -10,6 +12,7 @@ from typing import cast
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.optimizer import (
     ChallengerProposal,
+    CourtRecommendation,
     Optimizer,
     OptimizerError,
     OutcomeAttribution,
@@ -126,6 +129,10 @@ class OptimizerLessonTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(OptimizerError, "confidence"):
             _replace_attribution(values, confidence=_FloatImpersonator(0.8))
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
+            _replace_attribution(values, evidence_refs=(" evidence:1",))
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
+            _replace_attribution(values, provenance_ref="ledger:event-42 ")
 
     def test_optimizer_lesson_tests_do_not_retain_original_mutable_containers(self) -> None:
         evidence = ["evidence:run-1", "evidence:run-2"]
@@ -363,6 +370,35 @@ class SelfPromotionDenialTests(unittest.TestCase):
             recommendation.recommendation,
             PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
         )
+
+    def test_court_recommendation_is_non_writable_and_round_trips(self) -> None:
+        optimizer = Optimizer()
+        proposal = optimizer.propose_challenger(
+            optimizer.attribute_outcome(_attribution()),
+            challenger_id="candidate:v2",
+            champion_id="champion:v1",
+            change_ref="prompt:sha256:change",
+            author_id="optimizer:author",
+        )
+        recommendation = optimizer.recommend_independent_review(
+            proposal, evaluator_id="curator:reviewer", evidence_complete=True
+        )
+
+        with self.assertRaises((AttributeError, TypeError)):
+            object.__setattr__(recommendation, "proposal_digest", "sha256:forged")
+        for clone in (
+            copy.copy(recommendation),
+            copy.deepcopy(recommendation),
+            pickle.loads(pickle.dumps(recommendation)),
+        ):
+            self.assertIs(type(clone), CourtRecommendation)
+            self.assertEqual(clone, recommendation)
+            with self.assertRaises((AttributeError, TypeError)):
+                object.__setattr__(clone, "proposal_digest", "sha256:forged")
+
+        with self.assertRaisesRegex(TypeError, "cannot be subclassed"):
+            class MutableRecommendation(CourtRecommendation):
+                pass
 
     def test_self_promotion_denial_tests_reject_proposal_type_impersonation(self) -> None:
         @dataclass(frozen=True)

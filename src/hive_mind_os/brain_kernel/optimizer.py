@@ -8,7 +8,6 @@ evaluation, or promote anything.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import cast
@@ -32,7 +31,11 @@ class PromotionRecommendation(StrEnum):
 
 
 class OutcomeAttribution(tuple[object, ...]):
-    """The minimum retained facts from which a reusable lesson can be derived."""
+    """Retained structural bindings from which a reusable lesson can be derived.
+
+    Evidence and provenance references are canonical labels. Resolution and
+    authentication belong to the external evidence and courtroom layers.
+    """
 
     __slots__ = ()
 
@@ -223,14 +226,37 @@ def _validate_challenger_proposal(value: object) -> ChallengerProposal:
     return value
 
 
-@dataclass(frozen=True, slots=True)
-class CourtRecommendation:
-    """A non-executable independent-review request."""
+class CourtRecommendation(tuple[object, ...]):
+    """A non-executable request whose identity fields are structural labels."""
 
-    proposal_digest: str
-    evaluator_id: str
-    recommendation: PromotionRecommendation
-    reason: str
+    __slots__ = ()
+
+    def __new__(
+        cls,
+        proposal_digest: str,
+        evaluator_id: str,
+        recommendation: PromotionRecommendation,
+        reason: str,
+    ) -> CourtRecommendation:
+        _require_trimmed_string(proposal_digest, "recommendation proposal digest")
+        _require_trimmed_string(evaluator_id, "recommendation evaluator identity")
+        if type(recommendation) is not PromotionRecommendation:
+            raise OptimizerError("recommendation disposition type is invalid")
+        _require_trimmed_string(reason, "recommendation reason")
+        return tuple.__new__(
+            cls, (proposal_digest, evaluator_id, recommendation, reason)
+        )
+
+    def __getnewargs__(self) -> tuple[object, ...]:
+        return tuple(self)
+
+    def __init_subclass__(cls) -> None:
+        raise TypeError("court recommendations cannot be subclassed")
+
+    proposal_digest = property(lambda self: cast(str, self[0]))
+    evaluator_id = property(lambda self: cast(str, self[1]))
+    recommendation = property(lambda self: cast(PromotionRecommendation, self[2]))
+    reason = property(lambda self: cast(str, self[3]))
 
 
 class Optimizer:
