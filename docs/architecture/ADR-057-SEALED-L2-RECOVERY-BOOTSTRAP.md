@@ -71,6 +71,8 @@ enum, digest, node-defined ordering, array uniqueness, separated identity, and
 non-self-consultation invariant. A table-driven mutation matrix and a disposable real bare
 remote exercise claim CAS, hard restart after receipt CAS, recovery, integration, durable
 Git-log scanning, and final `COMPLETE` projection without consuming a live origin ref.
+Every string and command token is nonblank after trimming, and timestamps must equal their
+canonical UTC `Z` rendering; naive, offset, space-separated, and fractional aliases fail.
 
 Claim and completion intents are persisted before remote CAS. On restart, an exact
 `PREPARING`, `PREPARED`, expired `CLAIMED`, or `COMPLETING` state is either rolled back by

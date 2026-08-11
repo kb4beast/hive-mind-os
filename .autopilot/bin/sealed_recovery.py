@@ -870,9 +870,12 @@ class SealedRecoveryMixin:
             if not isinstance(receipt.get(key), str) or FULL_SHA.fullmatch(str(receipt.get(key))) is None:
                 issues.append(f"sealed replacement receipt {key} must be a full lowercase Git SHA")
         try:
-            parse_time(receipt.get("timestamp"))
+            parsed_timestamp = parse_time(receipt.get("timestamp"))
         except (TypeError, ValueError):
             issues.append("sealed replacement receipt timestamp must be canonical date-time text")
+        else:
+            if receipt.get("timestamp") != format_time(parsed_timestamp):
+                issues.append("sealed replacement receipt timestamp must be canonical UTC Z text")
         if type(receipt.get("pr")) is not int:
             issues.append("sealed replacement receipt pr must be an integer")
         for key in ("changed_paths", "evidence_refs"):
@@ -934,7 +937,7 @@ class SealedRecoveryMixin:
                     or test.get("status") != "passed"
                     or not isinstance(command, list)
                     or not command
-                    or any(not isinstance(item, str) or not item for item in command)
+                    or any(not isinstance(item, str) or not item.strip() for item in command)
                 ):
                     issues.append("sealed replacement test record fields are invalid")
                 else:

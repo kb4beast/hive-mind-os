@@ -590,6 +590,29 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         mutations: list[tuple[str, Callable[[dict], object]]] = []
         for key in baseline():
             mutations.append((f"missing_top_level_{key}", lambda value, key=key: value.pop(key)))
+        for key in (
+            "plan_fingerprint", "node_id", "base_commit", "base_tree", "final_commit",
+            "final_tree", "branch", "timestamp", "rollback_ref", "acceptance_decision",
+        ):
+            mutations.append((f"blank_top_level_{key}", lambda value, key=key: value.__setitem__(key, " ")))
+        for key in ("provider", "model"):
+            mutations.append((f"blank_runtime_{key}", lambda value, key=key: value["model_runtime"].__setitem__(key, " ")))
+        for key in ("role", "identity", "identity_kind"):
+            mutations.append((f"blank_role_{key}", lambda value, key=key: value["role_identities"][0].__setitem__(key, " ")))
+        for key in ("node_id", "autonomy_level", "grant_id"):
+            mutations.append((f"blank_authority_{key}", lambda value, key=key: value["authority"].__setitem__(key, " ")))
+        for key in (
+            "supersedes_receipt_commit", "repair_authority_digest", "repair_claim_commit",
+            "execution_merge_commit", "execution_target_sha", "repair_claim_payload_digest",
+        ):
+            mutations.append((f"blank_authority_binding_{key}", lambda value, key=key: value["authority"].__setitem__(key, " ")))
+        for key in (
+            "request_id", "mission_id", "question", "reason_code", "requesting_role",
+            "decision", "cheating_disposition",
+        ):
+            mutations.append((f"blank_consultation_{key}", lambda value, key=key: value["consultations"][0].__setitem__(key, " ")))
+        for key in ("role", "identity", "identity_kind"):
+            mutations.append((f"blank_consultation_identity_{key}", lambda value, key=key: value["consultations"][0]["identity_records"][0].__setitem__(key, " ")))
         mutations.extend([
             ("unknown_top_level", lambda value: value.__setitem__("unknown", True)),
             ("schema_bool", lambda value: value.__setitem__("schema_version", True)),
@@ -601,9 +624,14 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             ("tree_upper", lambda value: value.__setitem__("final_tree", "A" * 40)),
             ("pr_bool", lambda value: value.__setitem__("pr", True)),
             ("timestamp_invalid", lambda value: value.__setitem__("timestamp", "not-a-time")),
+            ("timestamp_naive", lambda value: value.__setitem__("timestamp", "2030-01-01T00:00:00")),
+            ("timestamp_offset", lambda value: value.__setitem__("timestamp", "2029-12-31T18:00:00-06:00")),
+            ("timestamp_space", lambda value: value.__setitem__("timestamp", "2030-01-01 00:00:00Z")),
+            ("timestamp_fraction", lambda value: value.__setitem__("timestamp", "2030-01-01T00:00:00.000Z")),
             ("rollback_blank", lambda value: value.__setitem__("rollback_ref", " ")),
             ("decision_unknown", lambda value: value.__setitem__("acceptance_decision", "ADOPT")),
             ("paths_typed", lambda value: value.__setitem__("changed_paths", None)),
+            ("paths_blank", lambda value: value.__setitem__("changed_paths", [" "])),
             ("paths_duplicate", lambda value: value["changed_paths"].append(value["changed_paths"][0])),
             ("paths_unsorted", lambda value: value["changed_paths"].reverse()),
             ("evidence_blank", lambda value: value.__setitem__("evidence_refs", [" "])),
@@ -615,7 +643,9 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             ("test_missing", lambda value: value["tests"][0].pop("command")),
             ("test_blank", lambda value: value["tests"][0].__setitem__("name", " ")),
             ("test_status", lambda value: value["tests"][0].__setitem__("status", "failed")),
+            ("test_status_blank", lambda value: value["tests"][0].__setitem__("status", " ")),
             ("test_command_type", lambda value: value["tests"][0].__setitem__("command", [1])),
+            ("test_command_blank", lambda value: value["tests"][0].__setitem__("command", [" "])),
             ("test_order", lambda value: value["tests"].reverse()),
             ("role_extra", lambda value: value["role_identities"][0].__setitem__("extra", True)),
             ("role_missing", lambda value: value["role_identities"][0].pop("identity")),
@@ -629,6 +659,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             ("authority_missing", lambda value: value["authority"].pop("grant_id")),
             ("authority_grants_type", lambda value: value["authority"].__setitem__("grants", "grant")),
             ("authority_grants_duplicate", lambda value: value["authority"].__setitem__("grants", ["g", "g"])),
+            ("authority_grants_blank", lambda value: value["authority"].__setitem__("grants", [" "])),
             ("authority_blank", lambda value: value["authority"].__setitem__("grant_id", " ")),
             ("authority_sha", lambda value: value["authority"].__setitem__("repair_claim_commit", "A" * 40)),
             ("authority_digest", lambda value: value["authority"].__setitem__(
@@ -647,10 +678,23 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             ("consultation_array_duplicate", lambda value: value["consultations"][0].__setitem__(
                 "dissent", ["same", "same"]
             )),
+            ("consultation_evidence_blank", lambda value: value["consultations"][0].__setitem__(
+                "evidence_refs", [" "]
+            )),
+            ("consultation_dissent_blank", lambda value: value["consultations"][0].__setitem__(
+                "dissent", [" "]
+            )),
             ("consultation_decision", lambda value: value["consultations"][0].__setitem__(
                 "decision", "UNKNOWN"
             )),
             ("consultation_answer_type", lambda value: value["consultations"][0].__setitem__("answer", 1)),
+            ("consultation_answer_blank", lambda value: value["consultations"][0].__setitem__("answer", " ")),
+            ("consultation_authority_blank", lambda value: value["consultations"][0].__setitem__(
+                "authority_class", " "
+            )),
+            ("consultation_role_blank", lambda value: value["consultations"][0]["consulted_roles"].__setitem__(
+                0, " "
+            )),
             ("consultation_self", lambda value: value["consultations"][0]["consulted_roles"].__setitem__(
                 0, "builder"
             )),
