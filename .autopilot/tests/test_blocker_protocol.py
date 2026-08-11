@@ -152,3 +152,18 @@ class BlockerProtocolTests(unittest.TestCase):
             )
             self.assertTrue(settled["may_end_turn"])
             self.assertTrue(settled["target_mutation_allowed"])
+
+    def test_stale_snapshot_recovery_is_ordered_and_stash_safe(self) -> None:
+        action = controller.ControlPlane.recovery_action(
+            {
+                "category": "snapshot",
+                "cause": "validated snapshot target mismatch after release advance",
+                "fix": "refresh stale snapshot and recover child work",
+            }
+        )
+        self.assertEqual(action["action"], "SPAWN_SUBTASK")
+        sequence = action["required_sequence"]
+        self.assertEqual(sequence, list(controller.STALE_TARGET_RECOVERY_SEQUENCE))
+        self.assertLess(sequence.index("refresh_validated_github_snapshot"), sequence.index("install_snapshot_and_reconcile"))
+        self.assertLess(sequence.index("doctor_status_dispatch_and_reclaim"), sequence.index("apply_exact_node_named_stash"))
+        self.assertTrue(all("stash@" not in step for step in sequence))

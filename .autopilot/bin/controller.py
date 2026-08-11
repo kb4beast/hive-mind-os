@@ -52,6 +52,17 @@ SUBTASK_EXECUTION_SEQUENCE = (
     "dispatch_explicit_start_now",
     "claim_remote_node_branch",
 )
+STALE_TARGET_RECOVERY_SEQUENCE = (
+    "preserve_scoped_work_with_node_named_stash",
+    "verify_current_singleton_remote_sha",
+    "refresh_validated_github_snapshot",
+    "archive_stale_runtime_projection",
+    "retire_exact_stale_remote_claim_ref",
+    "install_snapshot_and_reconcile",
+    "doctor_status_dispatch_and_reclaim",
+    "apply_exact_node_named_stash",
+    "verify_changed_paths_against_node_scope",
+)
 SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
     "HTTP_PROXY",
     "HTTPS_PROXY",
@@ -1081,6 +1092,7 @@ class ControlPlane:
             "may_end_turn": False,
             "target_mutation_allowed": False,
             "next_action": "POLL_AGAIN",
+            "work_preservation_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
         }
         append_jsonl(self.subtask_waves_dir / f"{wave_id}.jsonl", record)
         return record
@@ -1153,6 +1165,14 @@ class ControlPlane:
                 "objective": "refresh the singleton release snapshot, reconcile the current target, dispatch the exact eligible node, and retry its claim",
                 "required_sequence": list(SUBTASK_EXECUTION_SEQUENCE),
                 "stop_if": "target or snapshot changes again, or a protected/security control would need weakening",
+            }
+        if "snapshot" in text and any(marker in text for marker in ("stale", "target", "mismatch")):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "orchestrator",
+                "objective": "refresh the validated singleton snapshot and resume every child invalidated by the target advance",
+                "required_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
+                "stop_if": "remote SHA cannot be verified normally or recovery would weaken provenance/security controls",
             }
         return {
             "action": "REPORT_BLOCKER",

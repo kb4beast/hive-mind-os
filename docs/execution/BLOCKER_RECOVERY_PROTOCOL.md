@@ -71,3 +71,10 @@ continue/collect/retry actions. If an urgent target mutation invalidates a wave,
 the parent must refresh the validated snapshot, retire only the stale claim
 refs with their SHAs preserved, issue a fresh release, and resume every child
 before considering the wave quiescent.
+
+Git stashes are repository-wide across worktrees. Recovery must name every
+stash with its node ID, locate it by that exact message, and verify the restored
+paths against the node's write scope. Positional selectors such as `stash@{0}`
+must not be used for cross-worktree orchestration. Stale generated runtime state
+is archived under a named recovery directory before the current validated
+snapshot and release projections are installed; evidence ledgers are retained.
