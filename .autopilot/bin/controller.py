@@ -1961,6 +1961,8 @@ class ControlPlane:
             if not self.is_ancestor(self.baseline_sha, target_sha):
                 raise AutopilotError("target no longer descends from the sealed baseline")
         normalized = [normalize_path(path) for path in changed_paths]
+        path = self.state_dir / "target.json"
+        prior = read_json(path) if path.is_file() else None
         record = {
             "schema_version": SCHEMA_VERSION,
             "target_sha": target_sha,
@@ -1969,8 +1971,8 @@ class ControlPlane:
             "changed_paths": normalized,
             "timestamp": format_time(self.clock()),
             "plan_fingerprint": self.expected_plan_fingerprint,
+            "previous_reconciliation_digest": digest_json(prior) if prior is not None else None,
         }
-        path = self.state_dir / "target.json"
         atomic_write_json(path, record)
         append_jsonl(self.state_dir / "graph-changes.jsonl", record)
         return path
@@ -1986,7 +1988,14 @@ class ControlPlane:
             if not isinstance(value.get(key, []), list):
                 raise AutopilotError(f"GitHub snapshot {key} must be a list")
         path = self.state_dir / "github-state.json"
-        atomic_write_json(path, value)
+        prior = read_json(path) if path.is_file() else None
+        installed = dict(value)
+        # Installation is an observed recovery event, not merely the source
+        # payload.  Chaining the prior digest makes a deliberate re-install of
+        # identical GitHub state distinguishable from a stale release replay.
+        installed["installed_at"] = format_time(self.clock())
+        installed["previous_snapshot_digest"] = digest_json(prior) if prior is not None else None
+        atomic_write_json(path, installed)
         return path
 
     def render_worker_prompt(self, node_id: str) -> str:

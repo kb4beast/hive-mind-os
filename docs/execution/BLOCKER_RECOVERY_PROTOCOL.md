@@ -22,6 +22,18 @@ is an unsafe remediation and remains ineligible for automatic retry. The
 controller may pursue safe alternatives, but must stop and report the exact
 repair when no safe alternative is available.
 
+## Rejected durable receipt branch recovery
+
+An unintegrated receipt branch that is proven unsafe is not a normal stale
+claim. It may be retired only by a separately sealed exact record under
+`.autopilot/receipt-branch-retirements.json`; generic amendments and plan edits
+are not authority. The controller must validate the candidate/receipt lineage,
+create a zero-path retirement child, and atomically archive it to the configured
+quarantine ref while deleting the active branch under its expected-SHA lease.
+Any archive conflict, lineage mismatch, push failure, or postcondition mismatch
+fails closed. After success, install a fresh GitHub snapshot, reconcile the
+target, and issue a fresh dispatcher release before the node can be claimed.
+
 Known orchestration blockers are actionable: a missing or stale dispatcher
 release produces a `SPAWN_SUBTASK` recovery action for an orchestrator child
 task. That child refreshes the current singleton snapshot, reconciles the

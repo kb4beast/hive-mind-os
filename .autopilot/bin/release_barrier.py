@@ -70,6 +70,16 @@ class ControlPlane(DurableControlPlane):
     def current_release_path(self):
         return self.state_dir / CURRENT_RELEASE
 
+    def receipt_branch_retirement_digest(self) -> str | None:
+        """Bind releases to any completed branch-retirement recovery.
+
+        The base plane has no retirement records.  A narrowly authorized subclass
+        may expose one; recording its digest here ensures a release made before a
+        retirement cannot be replayed afterward.
+        """
+
+        return None
+
     def _authority_document(self) -> Mapping[str, Any] | None:
         if not self.authority_amendments_path.is_file():
             return None
@@ -357,6 +367,7 @@ class ControlPlane(DurableControlPlane):
             "plan_fingerprint": self.expected_plan_fingerprint,
             "reconciliation_digest": reconciliation_digest,
             "github_snapshot_digest": snapshot_digest,
+            "receipt_branch_retirement_digest": self.receipt_branch_retirement_digest(),
             "released_wave": wave,
             "directive": directive,
             "action": action,
@@ -388,6 +399,10 @@ class ControlPlane(DurableControlPlane):
         if record.get("github_snapshot_digest") != self._snapshot_digest():
             issues.append(
                 "dispatcher release was invalidated by GitHub snapshot change"
+            )
+        if record.get("receipt_branch_retirement_digest") != self.receipt_branch_retirement_digest():
+            issues.append(
+                "dispatcher release was invalidated by receipt-branch retirement recovery"
             )
         wave = _string_list(record.get("released_wave"))
         verdicts = record.get("verdicts")

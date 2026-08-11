@@ -8,18 +8,40 @@ import json
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from durable_controller import (
     AutopilotError,
     ClaimError,
     ConfigurationError,
     ReceiptError,
+    atomic_write_json,
+    digest_json,
     read_json,
 )
 from release_barrier import ControlPlane as ReleaseBarrierControlPlane
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
+RECEIPT_BRANCH_RETIREMENTS = ".autopilot/receipt-branch-retirements.json"
+RETIREMENT_KIND = "hive-mind-autopilot-receipt-branch-retirement-v1"
+EXPLORER_RETIREMENT = {
+    "retirement_id": "explorer-310-rejected-receipt-branch-v1",
+    "node_id": "EXPLORER-310",
+    "branch": "autopilot/explorer-310",
+    "candidate_commit": "3d305e63391094846e8d8ebacad2fa73dbb2db8b",
+    "receipt_commit": "2304036fe92e7fe499785a500c173300943a55fb",
+    "expected_remote_head": "2304036fe92e7fe499785a500c173300943a55fb",
+    "contract_version": 1,
+    "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+    "blocker_id": "sha256:e3d19e5a17fb286d55eb7bf82d975aaed569c514d37553218391e13518b48382",
+    "violation": "Explorer's broad Git argv allowlist admitted git diff --output=escaped.patch, a repository-writing flag outside its read-only authority.",
+    "evidence_refs": [
+        "git:3d305e63391094846e8d8ebacad2fa73dbb2db8b:src/hive_mind_os/brain_kernel/explorer.py",
+        "git:2304036fe92e7fe499785a500c173300943a55fb",
+    ],
+    "archive_ref": "refs/hive-mind-autopilot/quarantine/explorer-310/2304036fe92e7fe499785a500c173300943a55fb",
+    "replacement_required": True,
+}
 
 
 class ControlPlane(ReleaseBarrierControlPlane):
@@ -98,6 +120,243 @@ class ControlPlane(ReleaseBarrierControlPlane):
         updated = dict(records)
         updated["RECON-010"] = resolved
         return updated
+
+    @property
+    def receipt_branch_retirements_path(self) -> Path:
+        return self.repo_root / RECEIPT_BRANCH_RETIREMENTS
+
+    @property
+    def receipt_branch_retirement_state_path(self) -> Path:
+        return self.state_dir / "receipt-branch-retirements" / "EXPLORER-310.json"
+
+    def _retirement_document(self) -> Mapping[str, Any] | None:
+        if not self.receipt_branch_retirements_path.is_file():
+            return None
+        value = read_json(self.receipt_branch_retirements_path)
+        return value if isinstance(value, Mapping) else None
+
+    def receipt_branch_retirement_issues(self) -> tuple[str, ...]:
+        document = self._retirement_document()
+        if document is None:
+            return (f"required receipt-branch retirement file is missing: {RECEIPT_BRANCH_RETIREMENTS}",)
+        if document.get("schema_version") != 1:
+            return ("receipt-branch retirements schema_version is unsupported",)
+        records = document.get("receipt_branch_retirements")
+        if not isinstance(records, list) or len(records) != 1:
+            return ("receipt-branch retirements must contain exactly one sealed EXPLORER-310 record",)
+        if not isinstance(records[0], Mapping) or dict(records[0]) != EXPLORER_RETIREMENT:
+            return ("receipt-branch retirement record is not the sealed EXPLORER-310 receipt retirement",)
+        if EXPLORER_RETIREMENT["plan_fingerprint"] != self.expected_plan_fingerprint:
+            return ("receipt-branch retirement plan fingerprint is stale",)
+        node = super().node("EXPLORER-310")
+        if node.get("branch") != EXPLORER_RETIREMENT["branch"]:
+            return ("receipt-branch retirement branch does not match EXPLORER-310 contract",)
+        if node.get("contract_version") != EXPLORER_RETIREMENT["contract_version"]:
+            return ("receipt-branch retirement contract version does not match EXPLORER-310",)
+        return ()
+
+    def _retirement_record(self, retirement_id: str) -> Mapping[str, Any]:
+        issues = self.receipt_branch_retirement_issues()
+        if issues:
+            raise AutopilotError("; ".join(issues))
+        if retirement_id != EXPLORER_RETIREMENT["retirement_id"]:
+            raise AutopilotError("receipt-branch retirement id is not authorized")
+        return EXPLORER_RETIREMENT
+
+    def validate_configuration(self) -> tuple[str, ...]:
+        issues = list(super().validate_configuration())
+        issues.extend(self.receipt_branch_retirement_issues())
+        return tuple(dict.fromkeys(issues))
+
+    def _remote_ref_sha(self, reference: str, *, remote: str) -> str | None:
+        completed = self._git(("ls-remote", remote, reference), check=False)
+        if completed.returncode != 0:
+            raise ClaimError(f"cannot inspect remote {remote!r}: {completed.stderr.strip()}")
+        fields = completed.stdout.strip().split()
+        if not fields:
+            return None
+        if len(fields) != 2 or fields[1] != reference or len(fields[0]) != 40:
+            raise ClaimError("remote ref returned an invalid commit identity")
+        return fields[0]
+
+    def _retirement_history_issues(self, record: Mapping[str, Any]) -> tuple[str, ...]:
+        if not self._has_git_repository():
+            return ()
+        candidate = str(record["candidate_commit"])
+        receipt = str(record["receipt_commit"])
+        if not (self.git_object_exists(candidate) and self.git_object_exists(receipt)):
+            return ("receipt-branch retirement requires the pinned candidate and receipt Git objects",)
+        parents = self._git(("show", "-s", "--format=%P", receipt), check=True).stdout.strip().split()
+        if parents != [candidate]:
+            return ("receipt-branch retirement receipt must have only the pinned candidate parent",)
+        if self._commit_tree(candidate) != self._commit_tree(receipt):
+            return ("receipt-branch retirement receipt must preserve the candidate tree",)
+        message = self._git(("show", "-s", "--format=%B", receipt), check=True).stdout
+        sealed = self._parse_receipt_message(message)
+        if not isinstance(sealed, Mapping):
+            return ("receipt-branch retirement receipt message is not a durable completion receipt",)
+        for key in ("node_id", "branch", "plan_fingerprint", "contract_version"):
+            if sealed.get(key) != record.get(key):
+                return (f"receipt-branch retirement receipt {key} does not match sealed record",)
+        if sealed.get("final_commit") != candidate:
+            return ("receipt-branch retirement receipt final_commit does not match pinned candidate",)
+        return ()
+
+    def _create_retirement_commit(self, record: Mapping[str, Any], *, actor: str) -> str:
+        if not self._has_git_repository():
+            raise AutopilotError("receipt-branch retirement requires a Git repository")
+        receipt = str(record["receipt_commit"])
+        tree = self._git(("rev-parse", f"{receipt}^{{tree}}"), check=True).stdout.strip()
+        payload = {
+            "kind": RETIREMENT_KIND,
+            "retirement_id": record["retirement_id"],
+            "node_id": record["node_id"],
+            "branch": record["branch"],
+            "candidate_commit": record["candidate_commit"],
+            "receipt_commit": receipt,
+            "expected_remote_head": record["expected_remote_head"],
+            "plan_fingerprint": record["plan_fingerprint"],
+            "contract_version": record["contract_version"],
+            "blocker_id": record["blocker_id"],
+            "reason": record["violation"],
+            "actor": actor,
+            "timestamp": self.clock().astimezone().isoformat(),
+        }
+        message = RETIREMENT_KIND + "\n" + json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        created = self._git(
+            ("-c", "user.name=Hive Mind Autopilot Retirement", "-c", "user.email=autopilot-retirement@hive-mind.invalid", "commit-tree", tree, "-p", receipt, "-m", message),
+            check=True,
+            environment={
+                "GIT_AUTHOR_NAME": "Hive Mind Autopilot Retirement",
+                "GIT_AUTHOR_EMAIL": "autopilot-retirement@hive-mind.invalid",
+                "GIT_COMMITTER_NAME": "Hive Mind Autopilot Retirement",
+                "GIT_COMMITTER_EMAIL": "autopilot-retirement@hive-mind.invalid",
+            },
+        ).stdout.strip()
+        if len(created) != 40:
+            raise AutopilotError("failed to create zero-path receipt-branch retirement commit")
+        parents = self._git(("show", "-s", "--format=%P", created), check=True).stdout.strip().split()
+        if parents != [receipt] or self._commit_tree(created) != tree:
+            raise AutopilotError("receipt-branch retirement commit is not an immutable zero-path child of the receipt")
+        return created
+
+    def _retirement_execution(self) -> Mapping[str, Any] | None:
+        if not self.receipt_branch_retirement_state_path.is_file():
+            return None
+        value = read_json(self.receipt_branch_retirement_state_path)
+        if not isinstance(value, Mapping):
+            raise AutopilotError("receipt-branch retirement execution record is invalid")
+        required = {
+            "schema_version", "kind", "status", "retirement_id", "retirement_commit",
+            "archive_ref", "expected_remote_head", "actor", "github_snapshot_digest",
+            "reconciliation_digest",
+        }
+        if set(value) != required or value.get("schema_version") != 1 or value.get("kind") != RETIREMENT_KIND or value.get("status") != "RETIRED":
+            raise AutopilotError("receipt-branch retirement execution record is invalid")
+        return value
+
+    def receipt_branch_retirement_digest(self) -> str | None:
+        execution = self._retirement_execution()
+        if execution is None:
+            return None
+        if execution.get("retirement_id") != EXPLORER_RETIREMENT["retirement_id"]:
+            raise AutopilotError("receipt-branch retirement execution record is invalid")
+        return digest_json(execution)
+
+    def _retirement_recovery_issues(self) -> tuple[str, ...]:
+        execution = self._retirement_execution()
+        if execution is None:
+            return ()
+        issues: list[str] = []
+        if execution.get("github_snapshot_digest") == self._snapshot_digest():
+            issues.append("receipt-branch retirement requires a fresh GitHub snapshot")
+        if execution.get("reconciliation_digest") == self._reconciliation_digest():
+            issues.append("receipt-branch retirement requires fresh target reconciliation")
+        return tuple(issues)
+
+    def dispatch(self, *, actor: str, requested_nodes: Sequence[str] = ()) -> Mapping[str, Any]:
+        issues = self._retirement_recovery_issues()
+        if issues:
+            raise AutopilotError("; ".join(issues))
+        return super().dispatch(actor=actor, requested_nodes=requested_nodes)
+
+    def retire_receipt_branch(self, retirement_id: str, *, actor: str, remote: str = "origin") -> Mapping[str, Any]:
+        """Archive then retire the one sealed bad Explorer receipt branch.
+
+        This method is intentionally never invoked by the implementation change.
+        Its one remote transaction creates the immutable quarantine reference and
+        deletes the source only under the pinned expected-head lease.
+        """
+
+        if not actor.strip():
+            raise AutopilotError("receipt-branch retirement actor is required")
+        record = self._retirement_record(retirement_id)
+        if self.claim_path(str(record["node_id"])).is_file():
+            raise ClaimError("receipt-branch retirement is forbidden while the node has an active claim")
+        prior = self._retirement_execution()
+        if prior is not None:
+            if prior.get("retirement_id") == retirement_id and prior.get("status") == "RETIRED":
+                return prior
+            raise AutopilotError("receipt-branch retirement execution record conflicts with sealed record")
+        expected = str(record["expected_remote_head"])
+        branch = str(record["branch"])
+        source_head = self.remote_branch_sha(branch, remote=remote)
+        archive_ref = str(record["archive_ref"])
+        archive = self._remote_ref_sha(archive_ref, remote=remote)
+        if archive is not None:
+            if source_head is not None:
+                raise ClaimError("receipt-branch retirement quarantine ref already exists; refuse mutation")
+            fetched = self._git(("fetch", "--no-tags", remote, archive_ref), check=False)
+            if fetched.returncode != 0:
+                raise ClaimError("cannot fetch receipt-branch retirement quarantine ref for verification")
+            history_issues = self._retirement_history_issues(record)
+            if history_issues:
+                raise AutopilotError("; ".join(history_issues))
+            message = self._git(("show", "-s", "--format=%B", archive), check=False)
+            if message.returncode != 0 or not message.stdout.startswith(RETIREMENT_KIND + "\n"):
+                raise ClaimError("receipt-branch retirement quarantine ref is not the sealed retirement commit")
+            try:
+                payload = json.loads(message.stdout.split("\n", 1)[1])
+            except (IndexError, json.JSONDecodeError):
+                payload = None
+            if not isinstance(payload, Mapping) or payload.get("retirement_id") != retirement_id or payload.get("receipt_commit") != record["receipt_commit"]:
+                raise ClaimError("receipt-branch retirement quarantine ref does not bind the sealed receipt")
+            retirement_commit = archive
+        else:
+            if source_head != expected:
+                raise ClaimError("receipt-branch retirement remote head does not match the sealed expected SHA")
+            history_issues = self._retirement_history_issues(record)
+            if history_issues:
+                raise AutopilotError("; ".join(history_issues))
+            retirement_commit = self._create_retirement_commit(record, actor=actor)
+            pushed = self._git(
+                (
+                    "push", "--atomic", f"--force-with-lease=refs/heads/{branch}:{expected}",
+                    f"--force-with-lease={archive_ref}:", remote,
+                    f"{retirement_commit}:{archive_ref}", f":refs/heads/{branch}",
+                ),
+                check=False,
+            )
+            if pushed.returncode != 0:
+                raise ClaimError("receipt-branch retirement archive/delete transaction failed: " + pushed.stderr.strip())
+        if self._remote_ref_sha(archive_ref, remote=remote) != retirement_commit:
+            raise ClaimError("receipt-branch retirement quarantine ref verification failed after atomic transaction")
+        if self.remote_branch_sha(branch, remote=remote) is not None:
+            raise ClaimError("receipt-branch retirement source branch still exists after atomic transaction")
+        execution = {
+            "schema_version": 1,
+            "kind": RETIREMENT_KIND,
+            "status": "RETIRED",
+            "retirement_id": retirement_id,
+            "retirement_commit": retirement_commit,
+            "archive_ref": archive_ref,
+            "expected_remote_head": expected,
+            "actor": actor,
+            "github_snapshot_digest": self._snapshot_digest(),
+            "reconciliation_digest": self._reconciliation_digest(),
+        }
+        atomic_write_json(self.receipt_branch_retirement_state_path, execution)
+        return execution
 
 
 def parser() -> argparse.ArgumentParser:
@@ -188,6 +447,11 @@ def parser() -> argparse.ArgumentParser:
     validation_release = commands.add_parser("validation-lease-release")
     validation_release.add_argument("node_id")
     validation_release.add_argument("--owner", required=True)
+
+    retirement = commands.add_parser("retire-receipt-branch")
+    retirement.add_argument("retirement_id")
+    retirement.add_argument("--actor", required=True)
+    retirement.add_argument("--remote", default="origin")
 
     return root
 
@@ -408,6 +672,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "validation-lease-release":
             plane.release_global_validation_lease(args.node_id, args.owner)
+            return 0
+        if args.command == "retire-receipt-branch":
+            print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor, remote=args.remote), indent=2, sort_keys=True))
             return 0
         raise AssertionError(args.command)
     except (AutopilotError, ClaimError, ConfigurationError, ReceiptError) as error:
