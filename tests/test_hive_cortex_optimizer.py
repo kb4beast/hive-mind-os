@@ -17,6 +17,27 @@ from hive_mind_os.brain_kernel.optimizer import (
 )
 
 
+class _StringImpersonator(str):
+    def strip(self, chars: str | None = None) -> str:
+        return self
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    __hash__ = str.__hash__
+
+
+class _TupleImpersonator(tuple):  # type: ignore[type-arg]
+    pass
+
+
+class _FloatImpersonator(float):
+    pass
+
+
 def _attribution() -> OutcomeAttribution:
     expiry = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
     return OutcomeAttribution(
@@ -57,6 +78,20 @@ class OptimizerLessonTests(unittest.TestCase):
         with self.assertRaisesRegex(OptimizerError, "immutable tuples"):
             replace(values, applicability=["scope:mutable"])  # type: ignore[arg-type]
 
+    def test_optimizer_lesson_tests_reject_scalar_and_container_subclasses(self) -> None:
+        values = _attribution()
+        with self.assertRaisesRegex(OptimizerError, "immutable tuples"):
+            replace(
+                values,
+                evidence_refs=_TupleImpersonator(("evidence:subclass",)),
+            )
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
+            replace(values, evidence_refs=(_StringImpersonator("evidence:1"),))
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
+            replace(values, context_ref=_StringImpersonator("context:1"))
+        with self.assertRaisesRegex(OptimizerError, "confidence"):
+            replace(values, confidence=_FloatImpersonator(0.8))
+
     def test_optimizer_lesson_tests_do_not_retain_original_mutable_containers(self) -> None:
         evidence = ["evidence:run-1", "evidence:run-2"]
         applicability = ["python", "unit-tests"]
@@ -86,6 +121,13 @@ class OptimizerLessonTests(unittest.TestCase):
         with self.assertRaisesRegex(OptimizerError, "attribution type is invalid"):
             ScopedLesson(fake, canonical_digest(asdict(fake)))  # type: ignore[arg-type]
 
+    def test_optimizer_lesson_tests_revalidate_mutated_attribution_at_use(self) -> None:
+        attribution = _attribution()
+        object.__setattr__(attribution, "evidence_refs", ())
+
+        with self.assertRaisesRegex(OptimizerError, "retained evidence"):
+            Optimizer().attribute_outcome(attribution)
+
 
 class ChallengerProposalTests(unittest.TestCase):
     def test_challenger_proposal_tests_do_not_mutate_champion(self) -> None:
@@ -108,22 +150,46 @@ class ChallengerProposalTests(unittest.TestCase):
             ScopedLesson(_attribution(), "sha256:forged")
 
     def test_challenger_proposal_tests_reject_direct_construction_bypasses(self) -> None:
-        values = {
+        lesson = Optimizer().attribute_outcome(_attribution())
+        bindings = {
             "challenger_id": "candidate:v2",
             "parent_champion_id": "champion:v1",
             "change_ref": "prompt:sha256:change",
             "author_id": "optimizer:author",
-            "lesson_digest": "sha256:lesson",
+            "lesson_digest": lesson.lesson_digest,
         }
-        with self.assertRaisesRegex(OptimizerError, "surrounding whitespace"):
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
             ChallengerProposal(
-                **{**values, "author_id": " optimizer:author"},
+                challenger_id="candidate:v2",
+                parent_champion_id="champion:v1",
+                change_ref="prompt:sha256:change",
+                author_id=" optimizer:author",
+                lesson=lesson,
                 proposal_digest=canonical_digest(
-                    {**values, "author_id": " optimizer:author"}
+                    {**bindings, "author_id": " optimizer:author"}
                 ),
             )
         with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
-            ChallengerProposal(**values, proposal_digest="sha256:forged")
+            ChallengerProposal(
+                challenger_id="candidate:v2",
+                parent_champion_id="champion:v1",
+                change_ref="prompt:sha256:change",
+                author_id="optimizer:author",
+                lesson=lesson,
+                proposal_digest="sha256:forged",
+            )
+        object.__setattr__(lesson, "lesson_digest", "sha256:unattested")
+        with self.assertRaisesRegex(OptimizerError, "does not match its attribution"):
+            ChallengerProposal(
+                challenger_id="candidate:v2",
+                parent_champion_id="champion:v1",
+                change_ref="prompt:sha256:change",
+                author_id="optimizer:author",
+                lesson=lesson,
+                proposal_digest=canonical_digest(
+                    {**bindings, "lesson_digest": "sha256:unattested"}
+                ),
+            )
 
     def test_challenger_proposal_tests_reject_lesson_type_impersonation(self) -> None:
         @dataclass(frozen=True)
@@ -136,6 +202,43 @@ class ChallengerProposalTests(unittest.TestCase):
             Optimizer().propose_challenger(
                 FakeLesson(attribution, canonical_digest(asdict(attribution))),  # type: ignore[arg-type]
                 challenger_id="candidate:v2",
+                champion_id="champion:v1",
+                change_ref="prompt:sha256:change",
+                author_id="optimizer:author",
+            )
+
+    def test_challenger_proposal_tests_reject_string_subclass_bindings(self) -> None:
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
+            Optimizer().propose_challenger(
+                Optimizer().attribute_outcome(_attribution()),
+                challenger_id="candidate:v2",
+                champion_id="champion:v1",
+                change_ref="prompt:sha256:change",
+                author_id=_StringImpersonator("optimizer:author"),
+            )
+
+    def test_challenger_proposal_tests_reject_mutated_and_spaced_bindings(self) -> None:
+        optimizer = Optimizer()
+        lesson = optimizer.attribute_outcome(_attribution())
+        object.__setattr__(lesson.attribution, "evidence_refs", ())
+        object.__setattr__(
+            lesson,
+            "lesson_digest",
+            canonical_digest(asdict(lesson.attribution)),
+        )
+        with self.assertRaisesRegex(OptimizerError, "retained evidence"):
+            optimizer.propose_challenger(
+                lesson,
+                challenger_id="candidate:v2",
+                champion_id="champion:v1",
+                change_ref="prompt:sha256:change",
+                author_id="optimizer:author",
+            )
+
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
+            optimizer.propose_challenger(
+                optimizer.attribute_outcome(_attribution()),
+                challenger_id="champion:v1 ",
                 champion_id="champion:v1",
                 change_ref="prompt:sha256:change",
                 author_id="optimizer:author",
@@ -157,7 +260,7 @@ class SelfPromotionDenialTests(unittest.TestCase):
             optimizer.recommend_independent_review(
                 proposal, evaluator_id="optimizer:author", evidence_complete=True
             )
-        with self.assertRaisesRegex(OptimizerError, "surrounding whitespace"):
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
             optimizer.recommend_independent_review(
                 proposal, evaluator_id=" optimizer:author", evidence_complete=True
             )
@@ -182,6 +285,54 @@ class SelfPromotionDenialTests(unittest.TestCase):
         with self.assertRaisesRegex(OptimizerError, "proposal type is invalid"):
             Optimizer().recommend_independent_review(
                 FakeProposal("sha256:forged", "attacker"),  # type: ignore[arg-type]
+                evaluator_id="curator:reviewer",
+                evidence_complete=True,
+            )
+
+    def test_self_promotion_denial_tests_reject_string_subclass_impersonation(self) -> None:
+        optimizer = Optimizer()
+        proposal = optimizer.propose_challenger(
+            optimizer.attribute_outcome(_attribution()),
+            challenger_id="candidate:v2",
+            champion_id="champion:v1",
+            change_ref="prompt:sha256:change",
+            author_id="optimizer:author",
+        )
+        with self.assertRaisesRegex(OptimizerError, "exact trimmed string"):
+            optimizer.recommend_independent_review(
+                proposal,
+                evaluator_id=_StringImpersonator("optimizer:author"),
+                evidence_complete=True,
+            )
+
+    def test_self_promotion_denial_tests_revalidate_mutated_proposal(self) -> None:
+        optimizer = Optimizer()
+        proposal = optimizer.propose_challenger(
+            optimizer.attribute_outcome(_attribution()),
+            challenger_id="candidate:v2",
+            champion_id="champion:v1",
+            change_ref="prompt:sha256:change",
+            author_id="optimizer:author",
+        )
+        object.__setattr__(proposal, "author_id", "curator:reviewer")
+        with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
+            optimizer.recommend_independent_review(
+                proposal,
+                evaluator_id="optimizer:author",
+                evidence_complete=True,
+            )
+
+        proposal = optimizer.propose_challenger(
+            optimizer.attribute_outcome(_attribution()),
+            challenger_id="candidate:v2",
+            champion_id="champion:v1",
+            change_ref="prompt:sha256:change",
+            author_id="optimizer:author",
+        )
+        object.__setattr__(proposal, "proposal_digest", "sha256:forged")
+        with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
+            optimizer.recommend_independent_review(
+                proposal,
                 evaluator_id="curator:reviewer",
                 evidence_complete=True,
             )
