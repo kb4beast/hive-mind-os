@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
-import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from fixture_support import copy_autopilot_fixture
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
 SPEC = importlib.util.spec_from_file_location("blocker_controller", MODULE_PATH)
@@ -20,7 +21,7 @@ class BlockerProtocolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).resolve().parents[1]
-            shutil.copytree(source, root / ".autopilot")
+            copy_autopilot_fixture(source, root / ".autopilot")
             control = controller.read_json(root / ".autopilot" / "control-plane.json")
             control["verify_git_objects"] = False
             controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
@@ -67,7 +68,7 @@ class BlockerProtocolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).resolve().parents[1]
-            shutil.copytree(source, root / ".autopilot")
+            copy_autopilot_fixture(source, root / ".autopilot")
             control = controller.read_json(root / ".autopilot" / "control-plane.json")
             control["verify_git_objects"] = False
             controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
@@ -99,7 +100,7 @@ class BlockerProtocolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).resolve().parents[1]
-            shutil.copytree(source, root / ".autopilot")
+            copy_autopilot_fixture(source, root / ".autopilot")
             control = controller.read_json(root / ".autopilot" / "control-plane.json")
             control["verify_git_objects"] = False
             controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
@@ -127,7 +128,7 @@ class BlockerProtocolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).resolve().parents[1]
-            shutil.copytree(source, root / ".autopilot")
+            copy_autopilot_fixture(source, root / ".autopilot")
             control = controller.read_json(root / ".autopilot" / "control-plane.json")
             control["verify_git_objects"] = False
             controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
@@ -171,7 +172,7 @@ class BlockerProtocolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).resolve().parents[1]
-            shutil.copytree(source, root / ".autopilot")
+            copy_autopilot_fixture(source, root / ".autopilot")
             (root / ".autopilot" / "state" / "global-validation-lease.json").unlink(
                 missing_ok=True
             )

@@ -28,6 +28,10 @@ from release_barrier import (
     RELEASE_KIND,
     ControlPlane as ReleaseBarrierControlPlane,
 )
+from sealed_recovery import (
+    BUILDER_EXECUTION_KIND,
+    SealedRecoveryMixin,
+)
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
 RETIREMENT_KIND = "hive-mind-autopilot-receipt-branch-retirement-v1"
@@ -84,7 +88,7 @@ EXPLORER_RETIREMENT = {
 }
 
 
-class ControlPlane(ReleaseBarrierControlPlane):
+class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
     """CLI plane with one fail-closed RECON receipt supersession repair.
 
     RECON-010 published a durable receipt before the merged PR #120 release-barrier
@@ -152,13 +156,17 @@ class ControlPlane(ReleaseBarrierControlPlane):
     def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
         records = super()._durable_receipt_records()
         recon = records.get("RECON-010")
-        if not isinstance(recon, list):
-            return records
-        resolved = self._resolve_recon_receipt_records(recon)
-        if resolved is recon:
-            return records
         updated = dict(records)
-        updated["RECON-010"] = resolved
+        if isinstance(recon, list):
+            resolved = self._resolve_recon_receipt_records(recon)
+            if resolved is not recon:
+                updated["RECON-010"] = resolved
+        for node_id in ("OPTIMIZER-370", "ORCH-300"):
+            node_records = updated.get(node_id)
+            if isinstance(node_records, list):
+                resolved = self.resolve_sealed_repair_records(node_id, node_records)
+                if resolved is not node_records:
+                    updated[node_id] = resolved
         return updated
 
     @property
@@ -218,7 +226,15 @@ class ControlPlane(ReleaseBarrierControlPlane):
         return tuple(dict.fromkeys(issues))
 
     def validate_configuration(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys((*super().validate_configuration(), *self.receipt_retirement_issues())))
+        return tuple(
+            dict.fromkeys(
+                (
+                    *super().validate_configuration(),
+                    *self.receipt_retirement_issues(),
+                    *self.sealed_recovery_issues(),
+                )
+            )
+        )
 
     def _retirement_record(self, retirement_id: str) -> Mapping[str, Any]:
         issues = self.receipt_retirement_issues()
@@ -391,6 +407,7 @@ class ControlPlane(ReleaseBarrierControlPlane):
                 "snapshot_digest": self._snapshot_digest(), "reconciliation_digest": None,
                 "target_sha": self.current_target_sha(), "recorded_at": format_time(self.clock()),
             })
+        self.after_install_github_snapshot()
         return path
 
     def reconcile(self, target_sha: str, *, actor: str, reason: str, changed_paths: Sequence[str] = ()) -> Path:
@@ -403,6 +420,7 @@ class ControlPlane(ReleaseBarrierControlPlane):
             updated["target_sha"] = self.current_target_sha()
             updated["recorded_at"] = format_time(self.clock())
             atomic_write_json(self.retirement_recovery_path, updated)
+        self.after_reconcile()
         return path
 
     def _release_issues(self, record: object) -> tuple[str, ...]:
@@ -412,12 +430,20 @@ class ControlPlane(ReleaseBarrierControlPlane):
             expected = digest_json(execution)
             if not isinstance(record, Mapping) or record.get("receipt_retirement_execution_digest") != expected:
                 issues.append("dispatcher release was issued before receipt retirement recovery")
+        builder_execution = self._builder_execution()
+        if builder_execution is not None:
+            expected = digest_json(builder_execution)
+            if not isinstance(record, Mapping) or record.get("builder_retirement_execution_digest") != expected:
+                issues.append("dispatcher release was issued before Builder retirement recovery")
         return tuple(dict.fromkeys(issues))
 
     def dispatch(self, *, actor: str, requested_nodes: Sequence[str] = ()) -> Mapping[str, Any]:
         recovery_issues = self._recovery_issues()
         if recovery_issues:
             raise AutopilotError("; ".join(recovery_issues))
+        builder_recovery_issues = self._builder_recovery_issues()
+        if builder_recovery_issues:
+            raise AutopilotError("; ".join(builder_recovery_issues))
         if not actor.strip():
             raise AutopilotError("dispatcher actor is required")
         if self.target_requires_reconciliation():
@@ -452,6 +478,7 @@ class ControlPlane(ReleaseBarrierControlPlane):
             "released_wave": wave, "directive": directive, "action": action, "verdicts": verdicts,
             "issued_at": format_time(self.clock()),
             "receipt_retirement_execution_digest": digest_json(self._execution()) if self._execution() is not None else None,
+            "builder_retirement_execution_digest": digest_json(self._builder_execution()) if self._builder_execution() is not None else None,
         }
         record["release_id"] = digest_json(record)
         atomic_write_json(self.current_release_path, record)
@@ -644,6 +671,9 @@ def parser() -> argparse.ArgumentParser:
     retirement = commands.add_parser("retire-receipt-branch")
     retirement.add_argument("retirement_id")
     retirement.add_argument("--actor", required=True)
+
+    builder_retirement = commands.add_parser("retire-builder-330-branch")
+    builder_retirement.add_argument("--actor", required=True)
 
     return root
 
@@ -867,6 +897,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "retire-receipt-branch":
             print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor), indent=2, sort_keys=True))
+            return 0
+        if args.command == "retire-builder-330-branch":
+            print(json.dumps(plane.retire_builder_branch(actor=args.actor), indent=2, sort_keys=True))
             return 0
         raise AssertionError(args.command)
     except (AutopilotError, ClaimError, ConfigurationError, ReceiptError) as error:
