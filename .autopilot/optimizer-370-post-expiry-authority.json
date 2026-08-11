@@ -444,7 +444,7 @@
     "pull_request_mutation"
   ],
   "max_lease_minutes": 10,
-  "capability_commit": "7b87eab3a287884549be94415add07825c08c172",
+  "capability_commit": "b7714f256908f7d779678bc84fe2f475651e3143",
   "court_case_id": "court-optimizer-370-post-expiry-completion-20260811",
   "appeal_id": "appeal-optimizer-370-post-expiry-completion-20260811"
 }

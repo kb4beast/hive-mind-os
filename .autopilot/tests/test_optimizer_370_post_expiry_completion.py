@@ -24,7 +24,7 @@ from durable_controller import ClaimError, digest_json  # noqa: E402
 
 
 class Optimizer370PostExpiryCompletionTests(unittest.TestCase):
-    AUTHORITY_DIGEST = "sha256:2933893fbb414005877e06dc5e478b04c33b451e0de4ce19e64b5cf7fd3d4d55"
+    AUTHORITY_DIGEST = "sha256:8c35a82d1d313044b8170b58131ec46339ca101007353e8e04e0f3dfaea39391"
     SCHEMA_DIGEST = "sha256:df1cf230da72e6b4e924ed8c90f70324cc886578f7d1f578e51c2e02a11e18ac"
 
     def setUp(self) -> None:

@@ -31,10 +31,10 @@ TERMINAL_STATES = frozenset({"CONSUMED", "EXPIRED", "ADVERSE"})
 ZERO_CAPABILITY = "0" * 40
 # Resealed to literal C2 only after the construction commit exists.  Keeping this
 # equal to ZERO_CAPABILITY preserves validation while making prepare unavailable.
-SEALED_CAPABILITY_COMMIT = "7b87eab3a287884549be94415add07825c08c172"
+SEALED_CAPABILITY_COMMIT = "b7714f256908f7d779678bc84fe2f475651e3143"
 
 # Resealed after the static documents are constructed.  A mismatch fails closed.
-AUTHORITY_DIGEST = "sha256:2933893fbb414005877e06dc5e478b04c33b451e0de4ce19e64b5cf7fd3d4d55"
+AUTHORITY_DIGEST = "sha256:8c35a82d1d313044b8170b58131ec46339ca101007353e8e04e0f3dfaea39391"
 AUTHORITY_SCHEMA_DIGEST = "sha256:df1cf230da72e6b4e924ed8c90f70324cc886578f7d1f578e51c2e02a11e18ac"
 INTENDED_RECEIPT_DIGEST = (
     "sha256:bf5b2cdd03f40b88980a964d843bf8829b9dc2393864b4ded360f04a42e8afdd"
