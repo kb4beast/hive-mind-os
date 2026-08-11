@@ -43,3 +43,11 @@ remote movement, malformed court record, missing evidence, or failed verificatio
 the active source untouched and requires investigation. Restoration, if ever separately
 authorized, must create a new named ref from the retained archive parent; it is not part of
 this command.
+
+## Appeals ordering adaptation
+
+The separate sealed Appeals disposition is `ADAPT`, not a replacement for the Court's
+`QUARANTINE` decision. It preserves `01ca563a8a11fddde6f698abe42d10db3dd1bc71` as the
+incident target and binds capability commit `e57790de9b6db7a426db620f4db59db8c13495bc`.
+The operation requires a current reconciled singleton target that contains that commit.
+This prevents a recovery from becoming impossible after its capability is integrated.

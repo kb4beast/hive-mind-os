@@ -48,6 +48,18 @@ EXPLORER_COURT_DISPOSITION = {
     "blocker_id": "sha256:e3d19e5a17fb286d55eb7bf82d975aaed569c514d37553218391e13518b48382",
 }
 
+EXPLORER_APPEALS_ORDERING_DISPOSITION = {
+    "schema_version": 1,
+    "appeals_id": "appeals-explorer-310-retirement-ordering-20260811",
+    "node_id": "EXPLORER-310",
+    "decision": "ADAPT",
+    "preserves_court_disposition": "QUARANTINE",
+    "appeals_judge_identity": "appeals:independent-retirement-ordering",
+    "incident_target_sha": "01ca563a8a11fddde6f698abe42d10db3dd1bc71",
+    "capability_commit": "e57790de9b6db7a426db620f4db59db8c13495bc",
+    "finding": "The sealed incident target is provenance, while execution requires a current reconciled singleton target containing the integrated retirement capability.",
+}
+
 EXPLORER_RETIREMENT = {
     "schema_version": 1,
     "retirement_id": "explorer-310-rejected-receipt-branch-v1",
@@ -59,12 +71,14 @@ EXPLORER_RETIREMENT = {
     "candidate_commit": "3d305e63391094846e8d8ebacad2fa73dbb2db8b",
     "receipt_commit": "2304036fe92e7fe499785a500c173300943a55fb",
     "expected_remote_head": "2304036fe92e7fe499785a500c173300943a55fb",
-    "target_sha": "01ca563a8a11fddde6f698abe42d10db3dd1bc71",
+    "incident_target_sha": "01ca563a8a11fddde6f698abe42d10db3dd1bc71",
+    "capability_commit": "e57790de9b6db7a426db620f4db59db8c13495bc",
     "contract_version": 1,
     "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
     "blocker_id": "sha256:e3d19e5a17fb286d55eb7bf82d975aaed569c514d37553218391e13518b48382",
     "violation": "Explorer's broad Git argv allowlist admitted git diff --output=escaped.patch, a repository-writing flag outside its read-only authority.",
     "court_disposition_digest": digest_json(EXPLORER_COURT_DISPOSITION),
+    "appeals_ordering_disposition_digest": digest_json(EXPLORER_APPEALS_ORDERING_DISPOSITION),
     "archive_ref": "refs/hive-mind-autopilot/quarantine/explorer-310/2304036fe92e7fe499785a500c173300943a55fb",
     "replacement_required": True,
 }
@@ -156,6 +170,10 @@ class ControlPlane(ReleaseBarrierControlPlane):
         return self.repo_root / RETIREMENT_COURT_DOCUMENT
 
     @property
+    def retirement_appeals_path(self) -> Path:
+        return self.repo_root / ".autopilot/receipt-branch-retirement-appeals.json"
+
+    @property
     def retirement_execution_path(self) -> Path:
         return self.state_dir / RETIREMENT_EXECUTION
 
@@ -174,6 +192,9 @@ class ControlPlane(ReleaseBarrierControlPlane):
         court = self._sealed_document(self.retirement_court_path)
         if court is None or dict(court) != EXPLORER_COURT_DISPOSITION:
             issues.append("receipt retirement court disposition is not the sealed Explorer quarantine record")
+        appeals = self._sealed_document(self.retirement_appeals_path)
+        if appeals is None or dict(appeals) != EXPLORER_APPEALS_ORDERING_DISPOSITION:
+            issues.append("receipt retirement appeals ordering disposition is not the sealed ADAPT record")
         document = self._sealed_document(self.retirement_document_path)
         if document is None:
             issues.append("required receipt retirement document is missing")
@@ -287,11 +308,13 @@ class ControlPlane(ReleaseBarrierControlPlane):
             "candidate_commit": record["candidate_commit"],
             "receipt_commit": record["receipt_commit"],
             "expected_remote_head": record["expected_remote_head"],
-            "target_sha": record["target_sha"],
+            "incident_target_sha": record["incident_target_sha"],
+            "capability_commit": record["capability_commit"],
             "plan_fingerprint": record["plan_fingerprint"],
             "contract_version": record["contract_version"],
             "blocker_id": record["blocker_id"],
             "court_disposition_digest": record["court_disposition_digest"],
+            "appeals_ordering_disposition_digest": record["appeals_ordering_disposition_digest"],
             "violation": record["violation"],
         }
 
@@ -448,8 +471,12 @@ class ControlPlane(ReleaseBarrierControlPlane):
         record = self._retirement_record(retirement_id)
         if not self._origin_is_configured_repository(record):
             raise ClaimError("receipt retirement requires configured origin repository identity")
-        if self.current_target_sha() != record["target_sha"] or self.target_requires_reconciliation():
-            raise ClaimError("receipt retirement requires the sealed current singleton target and reconciliation")
+        current_target = self.current_target_sha()
+        if self.target_requires_reconciliation():
+            raise ClaimError("receipt retirement requires a current singleton target reconciliation")
+        capability = str(record["capability_commit"])
+        if not self.git_object_exists(capability) or not self.is_ancestor(capability, current_target):
+            raise ClaimError("receipt retirement requires a current singleton target containing the sealed capability commit")
         if self._snapshot_digest() is None or self._reconciliation_digest() is None:
             raise ClaimError("receipt retirement requires current GitHub snapshot and reconciliation evidence")
         if self.claim_path(str(record["node_id"])).is_file():

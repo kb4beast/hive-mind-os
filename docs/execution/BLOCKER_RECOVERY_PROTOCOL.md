@@ -97,3 +97,8 @@ transaction. No source ref is deleted if the archive is missing, forged, moved, 
 or unable to be verified. The archive retains the receipt as its parent and exactly the same
 tree. After success, install a fresh validated snapshot, reconcile, dispatch, and only then
 claim the replacement Explorer branch.
+
+The sealed incident target is evidence of the rejected branch, not a requirement to move the
+singleton release backward. The sealed Appeals `ADAPT` ordering disposition requires the
+current reconciled singleton target to contain the integrated retirement capability before
+the one-time operation can run, while preserving the Court `QUARANTINE` disposition.

@@ -34,11 +34,14 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
 
     def _ready(self, plane: autopilot.ControlPlane | None = None) -> autopilot.ControlPlane:
         plane = plane or self.plane
+        execution_target = "d" * 40
         plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
-        plane.current_target_sha = lambda: self.record["target_sha"]  # type: ignore[method-assign]
+        plane.current_target_sha = lambda: execution_target  # type: ignore[method-assign]
         plane.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
         plane._snapshot_digest = lambda: "snapshot"  # type: ignore[method-assign]
         plane._reconciliation_digest = lambda: "reconciliation"  # type: ignore[method-assign]
+        plane.git_object_exists = lambda _sha: True  # type: ignore[method-assign]
+        plane.is_ancestor = lambda ancestor, descendant: ancestor == self.record["capability_commit"] and descendant == execution_target  # type: ignore[method-assign]
         return plane
 
     def test_sealed_record_binds_canonical_court_and_rejects_tampering(self) -> None:
@@ -52,6 +55,11 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         value = json.loads(document.read_text(encoding="utf-8"))
         value["receipt_branch_retirements"].append(dict(value["receipt_branch_retirements"][0]))
         document.write_text(json.dumps(value), encoding="utf-8")
+        self.assertTrue(self.plane.receipt_retirement_issues())
+        appeals = self.root / ".autopilot" / "receipt-branch-retirement-appeals.json"
+        value = json.loads(appeals.read_text(encoding="utf-8"))
+        value["decision"] = "QUARANTINE"
+        appeals.write_text(json.dumps(value), encoding="utf-8")
         self.assertTrue(self.plane.receipt_retirement_issues())
 
     def test_no_remote_injection_surface_exists(self) -> None:
@@ -211,11 +219,29 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         autopilot.atomic_write_json(plane.retirement_execution_path, execution)
         self.assertTrue(plane._recovery_issues())
         snapshot = self.root / "snapshot.json"
-        snapshot.write_text(json.dumps({"target_sha": self.record["target_sha"], "pull_requests": [], "branches": []}), encoding="utf-8")
+        snapshot.write_text(json.dumps({"target_sha": "d" * 40, "pull_requests": [], "branches": []}), encoding="utf-8")
         plane.install_github_snapshot(snapshot)
-        plane.reconcile(self.record["target_sha"], actor="test", reason="fresh after retirement")
+        plane.reconcile("d" * 40, actor="test", reason="fresh after retirement")
         self.assertEqual(plane._recovery_issues(), ())
         self.assertEqual(json.loads((plane.state_dir / "github-state.json").read_text()), json.loads(snapshot.read_text()))
+
+    def test_execution_requires_integrated_capability_and_current_snapshot_reconciliation(self) -> None:
+        plane = self._ready()
+        plane.is_ancestor = lambda _ancestor, _descendant: False  # type: ignore[method-assign]
+        with self.assertRaisesRegex(autopilot.ClaimError, "containing the sealed capability commit"):
+            plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
+        plane = self._ready()
+        plane._snapshot_digest = lambda: None  # type: ignore[method-assign]
+        with self.assertRaisesRegex(autopilot.ClaimError, "snapshot and reconciliation evidence"):
+            plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
+        plane = self._ready()
+        plane._reconciliation_digest = lambda: None  # type: ignore[method-assign]
+        with self.assertRaisesRegex(autopilot.ClaimError, "snapshot and reconciliation evidence"):
+            plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
+        plane = self._ready()
+        plane.target_requires_reconciliation = lambda: True  # type: ignore[method-assign]
+        with self.assertRaisesRegex(autopilot.ClaimError, "current singleton target reconciliation"):
+            plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
 
     def test_real_bare_remote_retains_archive_and_fresh_clone_resumes(self) -> None:
         source = Path(__file__).resolve().parents[2]

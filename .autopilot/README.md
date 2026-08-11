@@ -179,6 +179,8 @@ The single literal `origin` fetch URL must also be the actual push destination: 
 Git URL rewrites, and injected Git configuration fail closed.
 It writes append-only runtime evidence only after remote verification. A fresh snapshot,
 reconciliation, and dispatcher release are mandatory before a replacement claim.
+The sealed incident target remains provenance; the independent Appeals `ADAPT` record
+requires the current reconciled singleton target to contain the integrated capability.
 
 Worker publication order is mandatory:
 
