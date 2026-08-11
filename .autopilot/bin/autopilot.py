@@ -40,6 +40,7 @@ from release_barrier import (
 from release_barrier import (
     ControlPlane as ReleaseBarrierControlPlane,
 )
+from sealed_recovery import SealedRecoveryMixin
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
 RECON_ANCESTRY_DUPLICATE_RECEIPT = "4191ebfd571c9852f5f6faaa43cea0f48f3e0fe8"
@@ -98,7 +99,7 @@ EXPLORER_RETIREMENT = {
 }
 
 
-class ControlPlane(ReleaseBarrierControlPlane):
+class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
     """CLI plane with sealed, fail-closed RECON receipt repairs.
 
     RECON-010 published a durable receipt before the merged PR #120 release-barrier
@@ -111,7 +112,10 @@ class ControlPlane(ReleaseBarrierControlPlane):
     the expanded receipt is accepted only when all immutable candidate fields match,
     its scope and grants strictly contain the older receipt, and Git confirms both
     receipt commits are direct children of the candidate on the current target.
-    Every other duplicate-receipt situation remains fail-closed.
+
+    The sealed recovery mixin additionally admits only the exact retained recovery
+    authorities for OPTIMIZER-370, ORCH-300, and BUILDER-330. All unrelated duplicate
+    receipts and branch-recovery attempts remain fail-closed.
     """
 
     def _resolve_integrated_recon_ancestry_duplicate(
@@ -241,14 +245,18 @@ class ControlPlane(ReleaseBarrierControlPlane):
 
     def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
         records = super()._durable_receipt_records()
-        recon = records.get("RECON-010")
-        if not isinstance(recon, list):
-            return records
-        resolved = self._resolve_recon_receipt_records(recon)
-        if resolved is recon:
-            return records
         updated = dict(records)
-        updated["RECON-010"] = resolved
+        recon = updated.get("RECON-010")
+        if isinstance(recon, list):
+            resolved = self._resolve_recon_receipt_records(recon)
+            if resolved is not recon:
+                updated["RECON-010"] = resolved
+        for node_id in ("OPTIMIZER-370", "ORCH-300"):
+            node_records = updated.get(node_id)
+            if isinstance(node_records, list):
+                resolved = self.resolve_sealed_repair_records(node_id, node_records)
+                if resolved is not node_records:
+                    updated[node_id] = resolved
         return updated
 
     @property
@@ -310,6 +318,7 @@ class ControlPlane(ReleaseBarrierControlPlane):
     def validate_configuration(self) -> tuple[str, ...]:
         issues = list(super().validate_configuration())
         issues.extend(self.receipt_retirement_issues())
+        issues.extend(self.sealed_recovery_issues())
         try:
             load_policy(self.repo_root)
         except OrchestrationError as error:
@@ -748,6 +757,9 @@ def parser() -> argparse.ArgumentParser:
     retirement.add_argument("retirement_id")
     retirement.add_argument("--actor", required=True)
 
+    builder_retirement = commands.add_parser("retire-builder-330-branch")
+    builder_retirement.add_argument("--actor", required=True)
+
     orchestrate = commands.add_parser("orchestrate")
     orchestrate.add_argument("--request", default="")
     orchestrate.add_argument("--actor", default="autopilot:orchestrator")
@@ -1030,6 +1042,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "retire-receipt-branch":
             print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor), indent=2, sort_keys=True))
+            return 0
+        if args.command == "retire-builder-330-branch":
+            print(json.dumps(plane.retire_builder_branch(actor=args.actor), indent=2, sort_keys=True))
             return 0
         if args.command == "infer-intent":
             result = infer_intent(args.request, plane.observe_status()).to_dict()

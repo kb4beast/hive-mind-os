@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+
+from fixture_support import copy_autopilot_fixture
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
@@ -21,7 +22,7 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        shutil.copytree(Path(__file__).resolve().parents[1], self.root / ".autopilot")
+        copy_autopilot_fixture(Path(__file__).resolve().parents[1], self.root / ".autopilot")
         control = self.root / ".autopilot" / "control-plane.json"
         value = json.loads(control.read_text(encoding="utf-8"))
         value["verify_git_objects"] = False
@@ -244,72 +245,66 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
             plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
 
     def test_real_bare_remote_retains_archive_and_fresh_clone_resumes(self) -> None:
-        source = self.root / "source"
+        source = Path(__file__).resolve().parents[2]
+        seed = self.root / "seed"
         remote = self.root / "origin.git"
         clone = self.root / "clone"
 
         def run(*args: str, cwd: Path | None = None) -> str:
-            result = subprocess.run(
-                args, cwd=cwd, check=True, capture_output=True, text=True
-            )
-            return result.stdout.strip()
+            return subprocess.run(args, cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
-        source.mkdir()
-        run("git", "init", cwd=source)
-        run("git", "config", "user.name", "Autopilot Test", cwd=source)
-        run("git", "config", "user.email", "autopilot-test@example.invalid", cwd=source)
-        (source / "fixture.txt").write_text("sealed fixture\n", encoding="utf-8")
-        run("git", "add", "fixture.txt", cwd=source)
-        run("git", "commit", "-m", "synthetic rejected candidate", cwd=source)
-        candidate = run("git", "rev-parse", "HEAD", cwd=source)
-        tree = run("git", "rev-parse", "HEAD^{tree}", cwd=source)
+        run("git", "init", str(seed))
+        run("git", "config", "user.name", "Fixture", cwd=seed)
+        run("git", "config", "user.email", "fixture@example.invalid", cwd=seed)
+        (seed / "candidate.txt").write_text("candidate\n", encoding="utf-8")
+        run("git", "add", "candidate.txt", cwd=seed)
+        run("git", "commit", "-m", "synthetic candidate", cwd=seed)
+        candidate = run("git", "rev-parse", "HEAD", cwd=seed)
         receipt_payload = {
-            "node_id": self.record["node_id"],
-            "branch": self.record["branch"],
+            "node_id": "EXPLORER-310",
+            "branch": "autopilot/explorer-310",
             "plan_fingerprint": self.record["plan_fingerprint"],
             "contract_version": self.record["contract_version"],
             "final_commit": candidate,
         }
-        receipt_message = "HIVE-MIND-AUTOPILOT-COMPLETION-V1\n" + json.dumps(
-            receipt_payload, sort_keys=True, separators=(",", ":")
-        )
-        receipt = run(
-            "git", "commit-tree", tree, "-p", candidate, "-m", receipt_message,
-            cwd=source,
-        )
-        record = {
-            **self.record,
+        receipt_message = self.plane._receipt_message(receipt_payload)
+        tree = run("git", "rev-parse", "HEAD^{tree}", cwd=seed)
+        receipt = run("git", "commit-tree", tree, "-p", candidate, "-m", receipt_message, cwd=seed)
+        synthetic = dict(self.record)
+        synthetic.update({
             "candidate_commit": candidate,
             "receipt_commit": receipt,
             "expected_remote_head": receipt,
             "archive_ref": f"refs/hive-mind-autopilot/quarantine/explorer-310/{receipt}",
-        }
-
+        })
         run("git", "init", "--bare", str(remote))
-        run("git", "push", str(remote), f"{receipt}:refs/heads/{record['branch']}", cwd=source)
+        run("git", "push", str(remote), f"{receipt}:refs/heads/{synthetic['branch']}", cwd=seed)
         run("git", "clone", "--no-local", str(remote), str(clone))
-        shutil.copytree(Path(__file__).resolve().parents[1], clone / ".autopilot")
+        copy_autopilot_fixture(source / ".autopilot", clone / ".autopilot")
         control = clone / ".autopilot" / "control-plane.json"
         value = json.loads(control.read_text(encoding="utf-8"))
         value["verify_git_objects"] = False
         control.write_text(json.dumps(value), encoding="utf-8")
+        prior_record = self.record
+        self.record = synthetic
         plane = self._ready(autopilot.ControlPlane(clone))
-        plane._retirement_record = lambda _retirement_id: record  # type: ignore[method-assign]
-        result = plane.retire_receipt_branch(self.record["retirement_id"], actor="test:builder")
-        archive = record["archive_ref"]
-        self.assertIsNone(plane._remote_ref_sha(f"refs/heads/{record['branch']}"))
+        plane._retirement_record = lambda _retirement_id: synthetic  # type: ignore[method-assign]
+        result = plane.retire_receipt_branch(synthetic["retirement_id"], actor="test:builder")
+        archive = synthetic["archive_ref"]
+        self.assertIsNone(plane._remote_ref_sha(f"refs/heads/{synthetic['branch']}"))
         self.assertEqual(plane._remote_ref_sha(archive), result["archive_commit"])
         fresh = self.root / "fresh"
         run("git", "clone", "--no-local", str(remote), str(fresh))
-        shutil.copytree(Path(__file__).resolve().parents[1], fresh / ".autopilot")
+        copy_autopilot_fixture(source / ".autopilot", fresh / ".autopilot")
         fresh_control = fresh / ".autopilot" / "control-plane.json"
         fresh_value = json.loads(fresh_control.read_text(encoding="utf-8"))
         fresh_value["verify_git_objects"] = False
         fresh_control.write_text(json.dumps(fresh_value), encoding="utf-8")
         resumed = self._ready(autopilot.ControlPlane(fresh))
-        resumed._retirement_record = lambda _retirement_id: record  # type: ignore[method-assign]
-        resumed_result = resumed.retire_receipt_branch(self.record["retirement_id"], actor="test:recovery")
+        resumed._retirement_record = lambda _retirement_id: synthetic  # type: ignore[method-assign]
+        resumed_result = resumed.retire_receipt_branch(synthetic["retirement_id"], actor="test:recovery")
         self.assertEqual(resumed_result["archive_commit"], result["archive_commit"])
+        self.record = prior_record
 
 
 if __name__ == "__main__":

@@ -1355,11 +1355,17 @@ class ControlPlane:
             if isinstance(current, Mapping):
                 expires = parse_time(current.get("expires_at"))
                 identity = (current.get("node_id"), current.get("owner"))
-                if expires > now and identity != (node_id, owner):
+                if expires > now:
+                    if identity == (node_id, owner):
+                        return current
                     raise AutopilotError(
                         "global validation lease is active for "
                         f"{current.get('node_id')} owned by {current.get('owner')}"
                     )
+                raise AutopilotError(
+                    "expired global validation lease requires exact-identity release before reacquisition"
+                )
+            raise AutopilotError("global validation lease is malformed")
         lease = {
             "schema_version": SCHEMA_VERSION,
             "node_id": node_id,
@@ -1370,7 +1376,23 @@ class ControlPlane:
             "status": "ACTIVE",
         }
         lease["lease_id"] = digest_json(lease)
-        atomic_write_json(self.validation_lease_path, lease)
+        self.validation_lease_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            descriptor = os.open(
+                self.validation_lease_path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+            )
+        except FileExistsError as error:
+            raise AutopilotError("global validation lease acquisition raced") from error
+        try:
+            os.write(descriptor, (json.dumps(lease, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+            os.fsync(descriptor)
+        except Exception:
+            self.validation_lease_path.unlink(missing_ok=True)
+            raise
+        finally:
+            os.close(descriptor)
         return lease
 
     def release_global_validation_lease(self, node_id: str, owner: str) -> None:
