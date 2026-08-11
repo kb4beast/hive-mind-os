@@ -85,3 +85,15 @@ time; every other child remains active and ready for the global gate. The owner
 releases it after recording the actual verdict. This prevents parallel full
 suites from exhausting process, clone, or filesystem resources and turning
 contention into false failures.
+
+## Sealed rejected-receipt retirement
+
+`EXPLORER-310` has one court-quarantined rejected receipt branch. Its recovery is not a
+generic branch-delete facility. `retire-receipt-branch` accepts only the sealed record in
+`.autopilot/receipt-branch-retirements.json`, verifies the separate canonical court record,
+and contacts only configured `origin` for the configured repository. It archives the exact
+receipt under its sealed quarantine ref and deletes the active branch in one leased atomic
+transaction. No source ref is deleted if the archive is missing, forged, moved, colliding,
+or unable to be verified. The archive retains the receipt as its parent and exactly the same
+tree. After success, install a fresh validated snapshot, reconcile, dispatch, and only then
+claim the replacement Explorer branch.

@@ -168,6 +168,16 @@ The receipt still contains exact base/final commit **and tree** identities, plan
 contract binding, changed paths, passing required tests, evidence, role identities,
 authority, consultations, acceptance decision, and rollback reference.
 
+### Sealed receipt-branch retirement
+
+The controller has one non-generic recovery for the court-quarantined `EXPLORER-310`
+receipt branch. Its sealed record, independent court disposition, source SHA, archive ref,
+and configured `origin` repository are fixed in repository artifacts. The command has no
+remote, branch, SHA, or replacement-node option. It creates and verifies a zero-path
+quarantine commit before atomically deleting the active receipt branch under an exact lease.
+It writes append-only runtime evidence only after remote verification. A fresh snapshot,
+reconciliation, and dispatcher release are mandatory before a replacement claim.
+
 Worker publication order is mandatory:
 
 1. Receive a current explicit dispatcher `START NOW` for the exact node.
