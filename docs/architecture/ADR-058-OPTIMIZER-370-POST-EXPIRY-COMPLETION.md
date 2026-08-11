@@ -60,3 +60,18 @@ Before a node CAS, an unused authorization may become terminal `EXPIRED` while t
 remains unchanged. At or after the node CAS, rollback is forbidden; restart can only reconcile the
 same exact receipt to `CONSUMED`. C2/H2 can be abandoned without integration. Any later release or
 product reversal requires new append-only Court authority.
+
+## Corrective durability appeal
+
+Independent Steward `codex:steward-381` rejected initial reseal `8430a1f...` for
+activation or integration. Its Windows directory flush lacked explicit 64-bit handle API
+signatures, and its direct O_EXCL final-file write could expose a partial permanent record
+after a crash. Judge `codex:judge-383` and Appeals Judge `codex:appeals-judge-384`
+issued a narrowed `ADAPT` for only those durability defects.
+
+The correction must fully write and fsync a deterministic exclusive pending object before
+atomically publishing the final pathname with a no-replace hard link. Pending evidence is
+retained. An orphan, mismatch, collision, short write, or ambiguous API result is terminal
+`ADVERSE`; it is never promoted, replaced, deleted, or renewed. Explicit Win64 signatures and
+failure-injection tests are mandatory. No activation or integration authority follows from the
+corrective appeal.

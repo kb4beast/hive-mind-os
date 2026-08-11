@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "appeal_id": "appeal-optimizer-370-post-expiry-durability-correction-20260811",
+  "court_case_id": "court-optimizer-370-post-expiry-durability-correction-20260811",
+  "appeals_judge_identity": "codex:appeals-judge-384",
+  "disposition": "ADAPT",
+  "ruling": "AFFIRM AS NARROWED",
+  "implementation_permission": "Correct only Win64 durability and complete-file exclusive publication on an isolated candidate.",
+  "authority_withheld": [
+    "activation",
+    "receipt publication",
+    "remote mutation",
+    "release integration",
+    "claim, node, main, dispatcher, or PR mutation"
+  ],
+  "required_tests": [
+    "Win64 ABI and native directory flush",
+    "short and failed write, file flush, close, link, and directory flush",
+    "orphan pending and matching or mismatching final",
+    "simultaneous publishers with one winner",
+    "crash at every write, flush, close, link, and directory-flush boundary",
+    "protected state remains unchanged on every failure"
+  ],
+  "signed_by": "codex:appeals-judge-384"
+}

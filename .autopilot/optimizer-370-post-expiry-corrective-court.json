@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "case_id": "court-optimizer-370-post-expiry-durability-correction-20260811",
+  "predecessor_candidate": "8430a1fceb6df229438fb06e52a7cf3d75b96f06",
+  "steward_identity": "codex:steward-381",
+  "judge_identity": "codex:judge-383",
+  "disposition": "ADAPT",
+  "activation_or_integration_disposition": "REJECT",
+  "atomic_claims": [
+    {
+      "id": "win64-handle-abi",
+      "decision": "ADAPT",
+      "finding": "FlushFileBuffers and CloseHandle require explicit HANDLE signatures and return types before directory durability is established."
+    },
+    {
+      "id": "partial-final-publication",
+      "decision": "REJECT",
+      "finding": "Streaming bytes directly into the final O_EXCL pathname can expose a permanently partial authorization record."
+    },
+    {
+      "id": "complete-file-visibility",
+      "decision": "ADAPT",
+      "finding": "Write and fsync a deterministic pending object before atomic no-replace hard-link publication of the final pathname."
+    },
+    {
+      "id": "orphan-and-collision-state",
+      "decision": "ADOPT",
+      "finding": "Orphan pending, mismatched links, collision, short write, or ambiguous durability state is terminal ADVERSE and never resumable."
+    }
+  ],
+  "required_controls": [
+    "Explicit Win64 ctypes signatures for every invoked kernel API.",
+    "O_EXCL binary pending creation, complete bounded write, file fsync, and successful close before publication.",
+    "Atomic no-replace hard-link publication; never rename-over, truncate, delete, recycle, or compensate.",
+    "Retain pending evidence and verify pending/final identity and canonical bytes.",
+    "No activation, remote mutation, or release integration surface."
+  ],
+  "signed_by": "codex:judge-383"
+}
