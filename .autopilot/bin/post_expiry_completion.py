@@ -31,10 +31,10 @@ TERMINAL_STATES = frozenset({"CONSUMED", "EXPIRED", "ADVERSE"})
 ZERO_CAPABILITY = "0" * 40
 # Resealed to literal C2 only after the construction commit exists.  Keeping this
 # equal to ZERO_CAPABILITY preserves validation while making prepare unavailable.
-SEALED_CAPABILITY_COMMIT = ZERO_CAPABILITY
+SEALED_CAPABILITY_COMMIT = "7b87eab3a287884549be94415add07825c08c172"
 
 # Resealed after the static documents are constructed.  A mismatch fails closed.
-AUTHORITY_DIGEST = "sha256:9302862efd2da6d59e7eff8c2f830fb0172acf53736a932c08662297993befb2"
+AUTHORITY_DIGEST = "sha256:2933893fbb414005877e06dc5e478b04c33b451e0de4ce19e64b5cf7fd3d4d55"
 AUTHORITY_SCHEMA_DIGEST = "sha256:df1cf230da72e6b4e924ed8c90f70324cc886578f7d1f578e51c2e02a11e18ac"
 INTENDED_RECEIPT_DIGEST = (
     "sha256:bf5b2cdd03f40b88980a964d843bf8829b9dc2393864b4ded360f04a42e8afdd"
@@ -283,7 +283,12 @@ class PostExpiryCompletionMixin:
 
         status = dict(self.post_expiry_completion_status())
         status["valid"] = status["static_valid"] and status["state_valid"]
-        status["capability_sealed"] = False
+        status["capability_sealed"] = (
+            SEALED_CAPABILITY_COMMIT != ZERO_CAPABILITY
+            and self._post_expiry_authority() is not None
+            and self._post_expiry_authority().get("capability_commit")
+            == SEALED_CAPABILITY_COMMIT
+        )
         return status
 
     def prepare_post_expiry_completion(

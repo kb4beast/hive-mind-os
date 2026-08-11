@@ -23,7 +23,7 @@ from durable_controller import ClaimError, digest_json  # noqa: E402
 
 
 class Optimizer370PostExpiryCompletionTests(unittest.TestCase):
-    AUTHORITY_DIGEST = "sha256:9302862efd2da6d59e7eff8c2f830fb0172acf53736a932c08662297993befb2"
+    AUTHORITY_DIGEST = "sha256:2933893fbb414005877e06dc5e478b04c33b451e0de4ce19e64b5cf7fd3d4d55"
     SCHEMA_DIGEST = "sha256:df1cf230da72e6b4e924ed8c90f70324cc886578f7d1f578e51c2e02a11e18ac"
 
     def setUp(self) -> None:
@@ -54,7 +54,6 @@ class Optimizer370PostExpiryCompletionTests(unittest.TestCase):
         )
         post_expiry.AUTHORITY_DIGEST = self.AUTHORITY_DIGEST
         post_expiry.AUTHORITY_SCHEMA_DIGEST = self.SCHEMA_DIGEST
-        post_expiry.SEALED_CAPABILITY_COMMIT = post_expiry.ZERO_CAPABILITY
 
     def tearDown(self) -> None:
         (
@@ -113,8 +112,16 @@ class Optimizer370PostExpiryCompletionTests(unittest.TestCase):
         self.assertIn("post-expiry intended receipt was altered", self.plane.post_expiry_static_issues())
 
     def test_prepare_rejects_zero_capability(self) -> None:
-        with self.assertRaisesRegex(ClaimError, "not yet sealed"):
-            self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
+        authority = json.loads(self.authority_path.read_text(encoding="utf-8"))
+        authority["capability_commit"] = post_expiry.ZERO_CAPABILITY
+        self.authority_path.write_text(json.dumps(authority), encoding="utf-8")
+        with mock.patch.multiple(
+            post_expiry,
+            AUTHORITY_DIGEST=digest_json(authority),
+            SEALED_CAPABILITY_COMMIT=post_expiry.ZERO_CAPABILITY,
+        ):
+            with self.assertRaisesRegex(ClaimError, "not yet sealed"):
+                self.plane.prepare_post_expiry_completion(actor="codex:builder-379")
         self.assertFalse(self.plane._state_path("AUTHORIZED").exists())
 
     def test_sealed_prepare_is_canonical_o_excl_and_one_time(self) -> None:
