@@ -1,0 +1,235 @@
+"""Typed, authority-bound Builder action planning.
+
+The Builder never receives a repository handle.  It can only describe an
+isolated write, test command, branch, or commit and submit that description to
+the kernel effect gateway with a capability token.  Concrete local execution
+lives in :mod:`hive_mind_os.cortex.repository.builder_adapter`.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Mapping, Protocol, Sequence
+
+from .authority import AuthorityRegistry
+from .canonical import canonical_digest
+from .contracts import EffectIntent, normalize_portable_path
+from .effects import EffectGateway, EffectResult
+
+
+class BuilderActionDenied(PermissionError):
+    """An action would exceed Builder's deliberately narrow authority."""
+
+
+class BuilderIterationExhausted(RuntimeError):
+    """A bounded repair loop ended without passing its requested commands."""
+
+
+class BuilderActionKind(StrEnum):
+    WRITE = "write"
+    COMMAND = "command"
+    BRANCH = "branch"
+    COMMIT = "commit"
+
+
+_PROTECTED_BRANCHES = {"main", "master", "release"}
+_SEALED_OR_DEPENDENCY_PREFIXES = (
+    ".autopilot/",
+    ".github/",
+    "tests/acceptance/",
+    "tests/sealed/",
+)
+_DEPENDENCY_FILES = {
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "package.json",
+    "package-lock.json",
+    "poetry.lock",
+    "uv.lock",
+}
+_FORBIDDEN_COMMAND_TOKENS = {"git", "pip", "pip3", "poetry", "uv", "npm", "yarn"}
+
+
+def _deny_target(target: str) -> str:
+    normalized = normalize_portable_path(target)
+    if normalized in _DEPENDENCY_FILES or normalized.startswith("requirements/"):
+        raise BuilderActionDenied("dependency changes require a separate authority grant")
+    if normalized.startswith(_SEALED_OR_DEPENDENCY_PREFIXES):
+        raise BuilderActionDenied("sealed acceptance or control-plane path is not writable")
+    return normalized
+
+
+@dataclass(frozen=True, slots=True)
+class BuilderAction:
+    """One declarative Builder effect request.
+
+    ``payload`` is intentionally opaque to the planner.  Its canonical digest,
+    rather than its contents, is embedded in the durable effect intent.
+    """
+
+    action_id: str
+    kind: BuilderActionKind
+    target: str
+    payload: Mapping[str, object]
+    rollback_description: str
+
+    def __post_init__(self) -> None:
+        if not self.action_id.strip() or not self.rollback_description.strip():
+            raise ValueError("Builder action_id and rollback_description are required")
+        if not isinstance(self.payload, Mapping):
+            raise TypeError("Builder payload must be a mapping")
+        normalized = normalize_portable_path(self.target)
+        if self.kind is BuilderActionKind.WRITE:
+            normalized = _deny_target(normalized)
+            if not isinstance(self.payload.get("content"), str):
+                raise ValueError("write action requires string content")
+        elif self.kind is BuilderActionKind.COMMAND:
+            argv = self.payload.get("argv")
+            if normalized != "isolated-workspace" or not isinstance(argv, (tuple, list)) or not argv:
+                raise ValueError("command action requires isolated-workspace and a non-empty argv")
+            if not all(isinstance(item, str) and item for item in argv):
+                raise ValueError("command argv must contain non-empty strings")
+            if str(argv[0]).lower() in _FORBIDDEN_COMMAND_TOKENS or "install" in argv:
+                raise BuilderActionDenied("direct VCS or dependency command is forbidden")
+        elif self.kind is BuilderActionKind.BRANCH:
+            if normalized in _PROTECTED_BRANCHES or normalized.startswith("release/"):
+                raise BuilderActionDenied("protected branch mutation is forbidden")
+            if set(self.payload) - {"base"}:
+                raise ValueError("branch action only accepts an optional base")
+            if "base" in self.payload and (
+                not isinstance(self.payload["base"], str) or not self.payload["base"].strip()
+            ):
+                raise ValueError("branch base must be a non-empty string")
+        elif self.kind is BuilderActionKind.COMMIT:
+            if normalized in _PROTECTED_BRANCHES or normalized.startswith("release/"):
+                raise BuilderActionDenied("protected branch mutation is forbidden")
+            paths = self.payload.get("paths")
+            if not isinstance(self.payload.get("message"), str) or not self.payload["message"].strip():
+                raise ValueError("commit action requires a message")
+            if not isinstance(paths, (tuple, list)) or not paths:
+                raise ValueError("commit action requires non-empty declared paths")
+            for path in paths:
+                if not isinstance(path, str):
+                    raise ValueError("commit paths must be strings")
+                _deny_target(path)
+        else:  # pragma: no cover - protects callers passing a forged enum-like value.
+            raise BuilderActionDenied("Builder action kind is not supported")
+        object.__setattr__(self, "target", normalized)
+
+    @property
+    def parameters_digest(self) -> str:
+        return canonical_digest({"kind": self.kind, "target": self.target, "payload": dict(self.payload)})
+
+    @property
+    def idempotency_key(self) -> str:
+        return canonical_digest({"builder_action": self.action_id, "parameters": self.parameters_digest})
+
+
+@dataclass(frozen=True, slots=True)
+class BuilderActionOutcome:
+    action_id: str
+    intent_digest: str
+    status: str
+    detail: str
+    output_digest: str
+    exit_code: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.status not in {"SUCCEEDED", "FAILED"}:
+            raise ValueError("invalid Builder action outcome")
+
+
+class BuilderEffectAdapter(Protocol):
+    """The minimal adapter surface required by the Builder coordinator."""
+
+    adapter_name: str
+
+    def register_action(self, action: BuilderAction) -> str: ...
+
+    def outcome_for(self, intent_digest: str) -> BuilderActionOutcome: ...
+
+
+@dataclass(frozen=True, slots=True)
+class BuilderExecution:
+    action: BuilderAction
+    effect: EffectResult
+    outcome: BuilderActionOutcome
+
+
+class BuilderCoordinator:
+    """Submit bounded Builder action rounds exclusively through ``EffectGateway``."""
+
+    def __init__(
+        self,
+        gateway: EffectGateway,
+        authority: AuthorityRegistry,
+        adapter: BuilderEffectAdapter,
+        *,
+        mission_id: str,
+        work_id: str,
+        actor_id: str,
+        authority_envelope_digest: str,
+        policy_decision_ref: str,
+        risk_tier: str = "R1",
+        now: str,
+    ) -> None:
+        self.gateway = gateway
+        self.authority = authority
+        self.adapter = adapter
+        self.mission_id = mission_id
+        self.work_id = work_id
+        self.actor_id = actor_id
+        self.authority_envelope_digest = authority_envelope_digest
+        self.policy_decision_ref = policy_decision_ref
+        self.risk_tier = risk_tier
+        self.now = now
+
+    def execute_round(self, attempt_id: str, actions: Sequence[BuilderAction]) -> tuple[BuilderExecution, ...]:
+        if not actions:
+            raise ValueError("Builder round requires at least one action")
+        executions: list[BuilderExecution] = []
+        for action in actions:
+            parameters_digest = self.adapter.register_action(action)
+            if parameters_digest != action.parameters_digest:
+                raise BuilderActionDenied("adapter changed the sealed Builder payload")
+            intent = EffectIntent(
+                self.mission_id,
+                self.work_id,
+                attempt_id,
+                self.actor_id,
+                "builder",
+                str(action.kind),
+                self.risk_tier,
+                self.adapter.adapter_name,
+                action.target,
+                parameters_digest,
+                action.idempotency_key,
+                self.authority_envelope_digest,
+                ("isolated workspace is present",),
+                action.rollback_description,
+                self.policy_decision_ref,
+                canonical_digest({"action": action.action_id, "attempt": attempt_id, "parameters": parameters_digest}),
+            )
+            token = self.authority.authorize(
+                self.authority_envelope_digest, str(action.kind), action.target, now=self.now
+            )
+            effect = self.gateway.execute(intent, token)
+            outcome = self.adapter.outcome_for(intent.intent_digest)
+            executions.append(BuilderExecution(action, effect, outcome))
+        return tuple(executions)
+
+    def repair(self, rounds: Sequence[Sequence[BuilderAction]], *, max_retries: int) -> tuple[BuilderExecution, ...]:
+        """Run bounded repair rounds; a failing test may be followed by a repair round."""
+
+        if max_retries < 0 or not rounds or len(rounds) > max_retries + 1:
+            raise BuilderIterationExhausted("Builder repair rounds exceed the sealed retry budget")
+        all_executions: list[BuilderExecution] = []
+        for number, actions in enumerate(rounds, start=1):
+            executions = self.execute_round(f"ATTEMPT-builder-{number}", actions)
+            all_executions.extend(executions)
+            failures = [item for item in executions if item.outcome.status != "SUCCEEDED"]
+            if not failures:
+                return tuple(all_executions)
+        raise BuilderIterationExhausted("Builder tests still fail after the sealed retry budget")
