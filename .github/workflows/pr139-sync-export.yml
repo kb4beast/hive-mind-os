@@ -1,0 +1,48 @@
+name: PR139 Sync Workspace Export
+
+on:
+  push:
+    branches:
+      - release/hive-mind-os-singleton-20260811-r4
+
+permissions:
+  contents: read
+
+jobs:
+  export-merge-inputs:
+    name: export immutable merge inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR139 head with complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch exact singleton base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            release/hive-mind-os-singleton-20260810-r2:refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2
+          test "$(git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2)" = \
+            "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+      - name: Build immutable Git bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sync-artifact
+          git bundle create sync-artifact/pr139-sync.bundle \
+            HEAD \
+            refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2
+          git rev-parse HEAD > sync-artifact/exported-head.txt
+          git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2 \
+            > sync-artifact/exported-base.txt
+          git bundle verify sync-artifact/pr139-sync.bundle \
+            > sync-artifact/bundle-verification.txt 2>&1
+      - name: Upload immutable merge inputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr139-sync-merge-inputs
+          path: sync-artifact/
+          if-no-files-found: error
+          retention-days: 1
