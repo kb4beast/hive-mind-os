@@ -11,6 +11,7 @@ from hive_mind_os.brain_kernel.optimizer import (
     OptimizerError,
     OutcomeAttribution,
     PromotionRecommendation,
+    ScopedLesson,
 )
 
 
@@ -64,6 +65,10 @@ class ChallengerProposalTests(unittest.TestCase):
         self.assertNotEqual(proposal.challenger_id, proposal.parent_champion_id)
         self.assertTrue(proposal.proposal_digest.startswith("sha256:"))
 
+    def test_challenger_proposal_tests_reject_forged_lesson_digest(self) -> None:
+        with self.assertRaisesRegex(OptimizerError, "does not match its attribution"):
+            ScopedLesson(_attribution(), "sha256:forged")
+
 
 class SelfPromotionDenialTests(unittest.TestCase):
     def test_self_promotion_denial_tests_reject_candidate_author_as_evaluator(self) -> None:
@@ -79,6 +84,14 @@ class SelfPromotionDenialTests(unittest.TestCase):
         with self.assertRaisesRegex(OptimizerError, "cannot evaluate or promote"):
             optimizer.recommend_independent_review(
                 proposal, evaluator_id="optimizer:author", evidence_complete=True
+            )
+        with self.assertRaisesRegex(OptimizerError, "surrounding whitespace"):
+            optimizer.recommend_independent_review(
+                proposal, evaluator_id=" optimizer:author", evidence_complete=True
+            )
+        with self.assertRaisesRegex(OptimizerError, "must be a boolean"):
+            optimizer.recommend_independent_review(
+                proposal, evaluator_id="curator:reviewer", evidence_complete=1  # type: ignore[arg-type]
             )
         recommendation = optimizer.recommend_independent_review(
             proposal, evaluator_id="curator:reviewer", evidence_complete=True

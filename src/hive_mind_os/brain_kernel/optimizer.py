@@ -74,6 +74,11 @@ class ScopedLesson:
     attribution: OutcomeAttribution
     lesson_digest: str
 
+    def __post_init__(self) -> None:
+        expected = canonical_digest(asdict(self.attribution))
+        if self.lesson_digest != expected:
+            raise OptimizerError("lesson digest does not match its attribution")
+
 
 @dataclass(frozen=True, slots=True)
 class ChallengerProposal:
@@ -131,6 +136,8 @@ class Optimizer:
     ) -> ChallengerProposal:
         if not challenger_id.strip() or not champion_id.strip() or not change_ref.strip() or not author_id.strip():
             raise OptimizerError("challenger proposal bindings must be nonempty")
+        if author_id != author_id.strip():
+            raise OptimizerError("author identity must not contain surrounding whitespace")
         if challenger_id == champion_id:
             raise OptimizerError("challenger must differ from its champion")
         values: Mapping[str, str] = {
@@ -154,8 +161,12 @@ class Optimizer:
     ) -> CourtRecommendation:
         if not evaluator_id.strip():
             raise OptimizerError("evaluator identity is required")
+        if evaluator_id != evaluator_id.strip():
+            raise OptimizerError("evaluator identity must not contain surrounding whitespace")
         if evaluator_id == proposal.author_id:
             raise OptimizerError("optimizer candidate author cannot evaluate or promote it")
+        if not isinstance(evidence_complete, bool):
+            raise OptimizerError("evidence completeness must be a boolean")
         if not evidence_complete:
             return CourtRecommendation(
                 proposal.proposal_digest,
