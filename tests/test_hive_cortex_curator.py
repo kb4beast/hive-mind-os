@@ -109,7 +109,7 @@ class CuratorRuntimeTests(unittest.TestCase):
         self.assertEqual(CuratorVerdict.QUARANTINE, report.verdict)
         self.assertEqual(report.pre_check_snapshot, report.post_check_snapshot)
 
-    def test_index_and_ref_mutations_are_quarantined(self) -> None:
+    def test_index_mutation_is_quarantined(self) -> None:
         seal = self.runtime.seal_acceptance(mission_id="MISSION-1", work_id="WORK-1", curator_id="curator:independent", checks=("metadata",))
 
         def mutate_index(_name: str, _root: Path) -> bool:
@@ -120,6 +120,18 @@ class CuratorRuntimeTests(unittest.TestCase):
             seal, self._workspace(), candidate=self.identity, check_runner=mutate_index
         )
         self.assertEqual(CuratorVerdict.QUARANTINE, index_report.verdict)
+
+    def test_ref_mutation_is_quarantined(self) -> None:
+        seal = self.runtime.seal_acceptance(mission_id="MISSION-1", work_id="WORK-1", curator_id="curator:independent", checks=("metadata",))
+
+        def mutate_ref(_name: str, _root: Path) -> bool:
+            self._git("branch", "hostile-ref")
+            return True
+
+        ref_report = self.runtime.verify(
+            seal, self._workspace(), candidate=self.identity, check_runner=mutate_ref
+        )
+        self.assertEqual(CuratorVerdict.QUARANTINE, ref_report.verdict)
 
 
 if __name__ == "__main__":
