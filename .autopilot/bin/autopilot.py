@@ -29,6 +29,7 @@ from release_barrier import (
 from release_barrier import (
     ControlPlane as ReleaseBarrierControlPlane,
 )
+from post_expiry_completion import PostExpiryCompletionMixin
 from sealed_recovery import SealedRecoveryMixin
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
@@ -86,7 +87,11 @@ EXPLORER_RETIREMENT = {
 }
 
 
-class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
+class ControlPlane(
+    PostExpiryCompletionMixin,
+    SealedRecoveryMixin,
+    ReleaseBarrierControlPlane,
+):
     """CLI plane with one fail-closed RECON receipt supersession repair.
 
     RECON-010 published a durable receipt before the merged PR #120 release-barrier
@@ -673,6 +678,12 @@ def parser() -> argparse.ArgumentParser:
     builder_retirement = commands.add_parser("retire-builder-330-branch")
     builder_retirement.add_argument("--actor", required=True)
 
+    commands.add_parser("optimizer-370-post-expiry-validate")
+    commands.add_parser("optimizer-370-post-expiry-status")
+    post_expiry_prepare = commands.add_parser("optimizer-370-post-expiry-prepare")
+    post_expiry_prepare.add_argument("--actor", required=True)
+    post_expiry_prepare.add_argument("--lease-minutes", type=int, default=10)
+
     return root
 
 
@@ -898,6 +909,25 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "retire-builder-330-branch":
             print(json.dumps(plane.retire_builder_branch(actor=args.actor), indent=2, sort_keys=True))
+            return 0
+        if args.command == "optimizer-370-post-expiry-validate":
+            result = plane.validate_post_expiry_completion()
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0 if result.get("valid") is True else 1
+        if args.command == "optimizer-370-post-expiry-status":
+            print(json.dumps(plane.post_expiry_completion_status(), indent=2, sort_keys=True))
+            return 0
+        if args.command == "optimizer-370-post-expiry-prepare":
+            print(
+                json.dumps(
+                    plane.prepare_post_expiry_completion(
+                        actor=args.actor,
+                        lease_minutes=args.lease_minutes,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
             return 0
         raise AssertionError(args.command)
     except (AutopilotError, ClaimError, ConfigurationError, ReceiptError) as error:

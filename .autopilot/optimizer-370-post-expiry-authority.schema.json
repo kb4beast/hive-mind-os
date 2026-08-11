@@ -1,0 +1,2075 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hive-mind-autopilot-optimizer-370-post-expiry-authority-v1",
+  "title": "Closed OPTIMIZER-370 post-expiry completion construction authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "authorization_id",
+    "repository",
+    "origin_name",
+    "origin_url",
+    "node_id",
+    "claim_owner",
+    "branch",
+    "release",
+    "main",
+    "old_receipt",
+    "expired_claim",
+    "execution_merge",
+    "candidate",
+    "pull_request",
+    "intended_receipt",
+    "negative_state",
+    "quarantined_prior_overlay",
+    "authorized_paths",
+    "withheld_powers",
+    "max_lease_minutes",
+    "capability_commit",
+    "court_case_id",
+    "appeal_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "hive-mind-autopilot-optimizer-370-post-expiry-authority-v1"
+    },
+    "authorization_id": {
+      "type": "string",
+      "const": "optimizer-370-post-expiry-completion-v1"
+    },
+    "repository": {
+      "type": "string",
+      "const": "kb4beast/hive-mind-os"
+    },
+    "origin_name": {
+      "type": "string",
+      "const": "origin"
+    },
+    "origin_url": {
+      "type": "string",
+      "const": "https://github.com/kb4beast/hive-mind-os.git"
+    },
+    "node_id": {
+      "type": "string",
+      "const": "OPTIMIZER-370"
+    },
+    "claim_owner": {
+      "type": "string",
+      "const": "codex:optimizer-370-repair"
+    },
+    "branch": {
+      "type": "string",
+      "const": "autopilot/optimizer-370"
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "commit",
+        "tree",
+        "observed_remote_commit",
+        "movement_authorized"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "const": "refs/heads/release/hive-mind-os-singleton-20260810-r2"
+        },
+        "commit": {
+          "type": "string",
+          "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+        },
+        "tree": {
+          "type": "string",
+          "const": "2a5b94489c368c0e3798c2d38d85f7631adb8604"
+        },
+        "observed_remote_commit": {
+          "type": "string",
+          "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+        },
+        "movement_authorized": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "main": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "commit",
+        "tree",
+        "observed_remote_commit",
+        "movement_authorized"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "const": "refs/heads/main"
+        },
+        "commit": {
+          "type": "string",
+          "const": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8"
+        },
+        "tree": {
+          "type": "string",
+          "const": "ea9a3d31153145d3ddd9aefa2a23c35f50e5a5ad"
+        },
+        "observed_remote_commit": {
+          "type": "string",
+          "const": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8"
+        },
+        "movement_authorized": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "old_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "parent",
+        "tree",
+        "message_marker",
+        "payload_digest",
+        "raw_payload",
+        "immutable"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "const": "926f60ec345d7bf5b5eb9229009de1f7e7888a97"
+        },
+        "parent": {
+          "type": "string",
+          "const": "df73beb1a234b457b3d35bcbf58b80242b18c8a6"
+        },
+        "tree": {
+          "type": "string",
+          "const": "260bef36a3f7132d2af316e2a0c6564fabf6e7c7"
+        },
+        "message_marker": {
+          "type": "string",
+          "const": "HIVE-MIND-AUTOPILOT-COMPLETION-V1"
+        },
+        "payload_digest": {
+          "type": "string",
+          "const": "sha256:7e493003cb9d3eefbdcabece3bdba56c1d11f2378594803924bcf6fee0f93334"
+        },
+        "raw_payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "acceptance_decision",
+            "authority",
+            "base_commit",
+            "base_tree",
+            "branch",
+            "changed_paths",
+            "consultations",
+            "contract_version",
+            "evidence_refs",
+            "final_commit",
+            "final_tree",
+            "model_runtime",
+            "node_id",
+            "plan_fingerprint",
+            "pr",
+            "role_identities",
+            "rollback_ref",
+            "schema_version",
+            "tests",
+            "timestamp"
+          ],
+          "properties": {
+            "acceptance_decision": {
+              "type": "string",
+              "const": "ADOPT"
+            },
+            "authority": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "autonomy_level",
+                "dispatch_release",
+                "grants",
+                "node_id"
+              ],
+              "properties": {
+                "autonomy_level": {
+                  "type": "string",
+                  "const": "A3"
+                },
+                "dispatch_release": {
+                  "type": "string",
+                  "const": "sha256:0150b69871cfec32d405a5837c7f9c4b89c3a2470e98e8d7a14f029cc02408c8"
+                },
+                "grants": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "string",
+                      "const": "bounded-implementation"
+                    },
+                    {
+                      "type": "string",
+                      "const": "evidence-publication"
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "node_id": {
+                  "type": "string",
+                  "const": "OPTIMIZER-370"
+                }
+              }
+            },
+            "base_commit": {
+              "type": "string",
+              "const": "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58"
+            },
+            "base_tree": {
+              "type": "string",
+              "const": "8bfe011cb1ac5cbbc4772d5b77dd981638a38b8d"
+            },
+            "branch": {
+              "type": "string",
+              "const": "autopilot/optimizer-370"
+            },
+            "changed_paths": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "const": "src/hive_mind_os/brain_kernel/optimizer.py"
+                },
+                {
+                  "type": "string",
+                  "const": "tests/test_hive_cortex_optimizer.py"
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "consultations": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "answer",
+                    "authority_class",
+                    "cheating_disposition",
+                    "consulted_roles",
+                    "decision",
+                    "dissent",
+                    "evidence_refs",
+                    "human_escalation",
+                    "identity_records",
+                    "mission_id",
+                    "question",
+                    "reason_code",
+                    "request_id",
+                    "requesting_role",
+                    "role_first_exhausted",
+                    "round",
+                    "suspected_cheating"
+                  ],
+                  "properties": {
+                    "answer": {
+                      "type": "string",
+                      "const": "Independent Steward assessment reproduced the focused tests, Ruff, and Pyright on the exact candidate. The module is local and effect-free: it derives lessons and immutable challenger proposals, rejects a candidate author as evaluator, and returns only an independent-review recommendation. No operational or recovery blocker was found for the bounded candidate. This is not a promotion, integration, or superiority verdict; the independent court remains required before any champion change."
+                    },
+                    "authority_class": {
+                      "const": null
+                    },
+                    "cheating_disposition": {
+                      "type": "string",
+                      "const": "NOT_APPLICABLE"
+                    },
+                    "consulted_roles": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "optimizer"
+                        },
+                        {
+                          "type": "string",
+                          "const": "curator"
+                        },
+                        {
+                          "type": "string",
+                          "const": "steward"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "decision": {
+                      "type": "string",
+                      "const": "RESOLVED"
+                    },
+                    "dissent": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "The Steward review did not evaluate outcome quality, held-out benchmark superiority, or court sufficiency; those remain separate required controls."
+                        },
+                        {
+                          "type": "string",
+                          "const": "Expiry evaluation is wall-clock dependent but fails closed for stale lessons."
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "evidence_refs": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "git:df73beb1a234b457b3d35bcbf58b80242b18c8a6"
+                        },
+                        {
+                          "type": "string",
+                          "const": "git:cfcdf257655669aec6c18d10b8db641ec2874546"
+                        },
+                        {
+                          "type": "string",
+                          "const": "test:independent-steward-focused-optimizer-4-of-4"
+                        },
+                        {
+                          "type": "string",
+                          "const": "lint:independent-steward-ruff-pass"
+                        },
+                        {
+                          "type": "string",
+                          "const": "typecheck:independent-steward-pyright-pass"
+                        },
+                        {
+                          "type": "string",
+                          "const": "curator:/root/l2_optimizer_370_review:pass"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 6,
+                      "maxItems": 6
+                    },
+                    "human_escalation": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "identity_records": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "identity",
+                            "identity_kind",
+                            "role",
+                            "task"
+                          ],
+                          "properties": {
+                            "identity": {
+                              "type": "string",
+                              "const": "/root/l2_optimizer_370"
+                            },
+                            "identity_kind": {
+                              "type": "string",
+                              "const": "model_role"
+                            },
+                            "role": {
+                              "type": "string",
+                              "const": "optimizer"
+                            },
+                            "task": {
+                              "type": "string",
+                              "const": "candidate author and consultation requester"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "identity",
+                            "identity_kind",
+                            "role",
+                            "task"
+                          ],
+                          "properties": {
+                            "identity": {
+                              "type": "string",
+                              "const": "/root/l2_optimizer_370_review"
+                            },
+                            "identity_kind": {
+                              "type": "string",
+                              "const": "model_role"
+                            },
+                            "role": {
+                              "type": "string",
+                              "const": "curator"
+                            },
+                            "task": {
+                              "type": "string",
+                              "const": "independent candidate review"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "identity",
+                            "identity_kind",
+                            "role",
+                            "task"
+                          ],
+                          "properties": {
+                            "identity": {
+                              "type": "string",
+                              "const": "/root/l2_steward_360"
+                            },
+                            "identity_kind": {
+                              "type": "string",
+                              "const": "model_role"
+                            },
+                            "role": {
+                              "type": "string",
+                              "const": "steward"
+                            },
+                            "task": {
+                              "type": "string",
+                              "const": "independent operational and recovery-safety assessment"
+                            }
+                          }
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "mission_id": {
+                      "type": "string",
+                      "const": "hive-mind-os-verifiable-hive-cortex-v1"
+                    },
+                    "question": {
+                      "type": "string",
+                      "const": "Does df73beb1a234b457b3d35bcbf58b80242b18c8a6 preserve operational and recovery safety without a path to mutate or self-promote a champion?"
+                    },
+                    "reason_code": {
+                      "type": "string",
+                      "const": "optimizer-independent-steward-review"
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "const": "CONSULT-OPTIMIZER-370-STEWARD-20260811-01"
+                    },
+                    "requesting_role": {
+                      "type": "string",
+                      "const": "optimizer"
+                    },
+                    "role_first_exhausted": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "round": {
+                      "type": "integer",
+                      "const": 1
+                    },
+                    "suspected_cheating": {
+                      "type": "boolean",
+                      "const": false
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 1,
+              "maxItems": 1
+            },
+            "contract_version": {
+              "type": "integer",
+              "const": 1
+            },
+            "evidence_refs": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "const": "src/hive_mind_os/brain_kernel/optimizer.py"
+                },
+                {
+                  "type": "string",
+                  "const": "tests/test_hive_cortex_optimizer.py"
+                },
+                {
+                  "type": "string",
+                  "const": ".autopilot/state/optimizer-370-full-ci.err"
+                },
+                {
+                  "type": "string",
+                  "const": "review:/root/l2_optimizer_370_review"
+                }
+              ],
+              "items": false,
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "final_commit": {
+              "type": "string",
+              "const": "df73beb1a234b457b3d35bcbf58b80242b18c8a6"
+            },
+            "final_tree": {
+              "type": "string",
+              "const": "260bef36a3f7132d2af316e2a0c6564fabf6e7c7"
+            },
+            "model_runtime": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "execution_surface",
+                "provider"
+              ],
+              "properties": {
+                "execution_surface": {
+                  "type": "string",
+                  "const": "Codex multi-agent singleton release automation"
+                },
+                "provider": {
+                  "type": "string",
+                  "const": "openai"
+                }
+              }
+            },
+            "node_id": {
+              "type": "string",
+              "const": "OPTIMIZER-370"
+            },
+            "plan_fingerprint": {
+              "type": "string",
+              "const": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39"
+            },
+            "pr": {
+              "type": "integer",
+              "const": 135
+            },
+            "role_identities": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "identity",
+                    "identity_kind",
+                    "role"
+                  ],
+                  "properties": {
+                    "identity": {
+                      "type": "string",
+                      "const": "codex:optimizer-370"
+                    },
+                    "identity_kind": {
+                      "type": "string",
+                      "const": "model_role"
+                    },
+                    "role": {
+                      "type": "string",
+                      "const": "optimizer"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "identity",
+                    "identity_kind",
+                    "role"
+                  ],
+                  "properties": {
+                    "identity": {
+                      "type": "string",
+                      "const": "/root/l2_optimizer_370_review"
+                    },
+                    "identity_kind": {
+                      "type": "string",
+                      "const": "model_role"
+                    },
+                    "role": {
+                      "type": "string",
+                      "const": "curator"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "identity",
+                    "identity_kind",
+                    "role"
+                  ],
+                  "properties": {
+                    "identity": {
+                      "type": "string",
+                      "const": "/root/l2_steward_360"
+                    },
+                    "identity_kind": {
+                      "type": "string",
+                      "const": "model_role"
+                    },
+                    "role": {
+                      "type": "string",
+                      "const": "steward"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "rollback_ref": {
+              "type": "string",
+              "const": "revert:df73beb1a234b457b3d35bcbf58b80242b18c8a6"
+            },
+            "schema_version": {
+              "type": "integer",
+              "const": 1
+            },
+            "tests": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "command",
+                    "name",
+                    "receipt_ref",
+                    "status"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "python"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-m"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unittest"
+                        },
+                        {
+                          "type": "string",
+                          "const": "tests/test_hive_cortex_optimizer.py"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-v"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 5,
+                      "maxItems": 5
+                    },
+                    "name": {
+                      "type": "string",
+                      "const": "optimizer-lesson-tests"
+                    },
+                    "receipt_ref": {
+                      "type": "string",
+                      "const": "tests/test_hive_cortex_optimizer.py"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "passed"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "command",
+                    "name",
+                    "receipt_ref",
+                    "status"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "python"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-m"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unittest"
+                        },
+                        {
+                          "type": "string",
+                          "const": "tests/test_hive_cortex_optimizer.py"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-v"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 5,
+                      "maxItems": 5
+                    },
+                    "name": {
+                      "type": "string",
+                      "const": "challenger-proposal-tests"
+                    },
+                    "receipt_ref": {
+                      "type": "string",
+                      "const": "tests/test_hive_cortex_optimizer.py"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "passed"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "command",
+                    "name",
+                    "receipt_ref",
+                    "status"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "python"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-m"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unittest"
+                        },
+                        {
+                          "type": "string",
+                          "const": "tests/test_hive_cortex_optimizer.py"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-v"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 5,
+                      "maxItems": 5
+                    },
+                    "name": {
+                      "type": "string",
+                      "const": "self-promotion-denial-tests"
+                    },
+                    "receipt_ref": {
+                      "type": "string",
+                      "const": "tests/test_hive_cortex_optimizer.py"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "passed"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "command",
+                    "name",
+                    "receipt_ref",
+                    "status"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "python"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-m"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unittest"
+                        },
+                        {
+                          "type": "string",
+                          "const": "discover"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-s"
+                        },
+                        {
+                          "type": "string",
+                          "const": "tests"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-v"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 7,
+                      "maxItems": 7
+                    },
+                    "name": {
+                      "type": "string",
+                      "const": "ci-gate"
+                    },
+                    "receipt_ref": {
+                      "type": "string",
+                      "const": ".autopilot/state/optimizer-370-full-ci.err"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "passed"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "timestamp": {
+              "type": "string",
+              "const": "2026-08-11T08:43:43Z"
+            }
+          }
+        },
+        "immutable": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "expired_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "parent",
+        "tree",
+        "message_marker",
+        "payload_digest",
+        "raw_payload",
+        "owner",
+        "expires_at",
+        "renewal_or_mutation_authorized"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "const": "8fa51243327ae928e46df180bfd81fbf90062cf5"
+        },
+        "parent": {
+          "type": "string",
+          "const": "926f60ec345d7bf5b5eb9229009de1f7e7888a97"
+        },
+        "tree": {
+          "type": "string",
+          "const": "260bef36a3f7132d2af316e2a0c6564fabf6e7c7"
+        },
+        "message_marker": {
+          "type": "string",
+          "const": "hive-mind-autopilot-sealed-repair-claim-v1"
+        },
+        "payload_digest": {
+          "type": "string",
+          "const": "sha256:69d956a1ebfb6336cb341dcbceb67b3b22f97a93906841b7eb49627f8b5a36c4"
+        },
+        "raw_payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority_digest",
+            "branch",
+            "claim_topology",
+            "doctor_evidence_digest",
+            "execution_target_sha",
+            "expires_at",
+            "github_snapshot_digest",
+            "grant_id",
+            "kind",
+            "node_id",
+            "old_receipt_commit",
+            "owner",
+            "plan_fingerprint",
+            "pr",
+            "reconciliation_digest",
+            "release_id",
+            "repair_id",
+            "repository",
+            "schema_version"
+          ],
+          "properties": {
+            "authority_digest": {
+              "type": "string",
+              "const": "sha256:d185d4b9d4b2e90c5ba6b683b12edeb978e3bbfe16c1c3cca15f6733b0c90eeb"
+            },
+            "branch": {
+              "type": "string",
+              "const": "autopilot/optimizer-370"
+            },
+            "claim_topology": {
+              "type": "string",
+              "const": "direct_zero_path_child_of_old_receipt_then_merge_current_release"
+            },
+            "doctor_evidence_digest": {
+              "type": "string",
+              "const": "sha256:67b5d50b23906e443c10ae278039821f8e8abe1d75fe8b532fe569b583276a63"
+            },
+            "execution_target_sha": {
+              "type": "string",
+              "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+            },
+            "expires_at": {
+              "type": "string",
+              "const": "2026-08-11T21:13:07.231123Z"
+            },
+            "github_snapshot_digest": {
+              "type": "string",
+              "const": "sha256:c09fe66ac8dd4232fbd2d4b06ff3b1271382e9a0af6174113c00d2055bc11662"
+            },
+            "grant_id": {
+              "type": "string",
+              "const": "optimizer-370-invalid-receipt-supersession-v1"
+            },
+            "kind": {
+              "type": "string",
+              "const": "hive-mind-autopilot-sealed-repair-claim-v1"
+            },
+            "node_id": {
+              "type": "string",
+              "const": "OPTIMIZER-370"
+            },
+            "old_receipt_commit": {
+              "type": "string",
+              "const": "926f60ec345d7bf5b5eb9229009de1f7e7888a97"
+            },
+            "owner": {
+              "type": "string",
+              "const": "codex:optimizer-370-repair"
+            },
+            "plan_fingerprint": {
+              "type": "string",
+              "const": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39"
+            },
+            "pr": {
+              "type": "integer",
+              "const": 135
+            },
+            "reconciliation_digest": {
+              "type": "string",
+              "const": "sha256:20bae7f8572d86fe6756d98604f04cd5c9cad2500121c1e12a07394e6857a54f"
+            },
+            "release_id": {
+              "type": "string",
+              "const": "sha256:9242be371f66a7f8314ac1550a68a2385c7de92c1342330006817ca0958de273"
+            },
+            "repair_id": {
+              "type": "string",
+              "const": "optimizer-370-invalid-receipt-supersession-v1"
+            },
+            "repository": {
+              "type": "string",
+              "const": "kb4beast/hive-mind-os"
+            },
+            "schema_version": {
+              "type": "integer",
+              "const": 1
+            }
+          }
+        },
+        "owner": {
+          "type": "string",
+          "const": "codex:optimizer-370-repair"
+        },
+        "expires_at": {
+          "type": "string",
+          "const": "2026-08-11T21:13:07.231123Z"
+        },
+        "renewal_or_mutation_authorized": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "execution_merge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "parents",
+        "tree",
+        "message_marker",
+        "payload_digest",
+        "raw_payload",
+        "rollback_target_forbidden"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "const": "88f2962b64f7cc9f88284c5dd30106de5313da7b"
+        },
+        "parents": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "string",
+              "const": "8fa51243327ae928e46df180bfd81fbf90062cf5"
+            },
+            {
+              "type": "string",
+              "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "tree": {
+          "type": "string",
+          "const": "e4ddc0838e897c5b4c9d35e8c35fd146eb901561"
+        },
+        "message_marker": {
+          "type": "string",
+          "const": "hive-mind-autopilot-sealed-execution-merge-v1"
+        },
+        "payload_digest": {
+          "type": "string",
+          "const": "sha256:496214b19ed2444847cc2bc15c87daca7686345cd718750ff02935a7b5e98515"
+        },
+        "raw_payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority_digest",
+            "execution_target_sha",
+            "grant_id",
+            "kind",
+            "node_id",
+            "repair_claim_commit",
+            "schema_version"
+          ],
+          "properties": {
+            "authority_digest": {
+              "type": "string",
+              "const": "sha256:d185d4b9d4b2e90c5ba6b683b12edeb978e3bbfe16c1c3cca15f6733b0c90eeb"
+            },
+            "execution_target_sha": {
+              "type": "string",
+              "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+            },
+            "grant_id": {
+              "type": "string",
+              "const": "optimizer-370-invalid-receipt-supersession-v1"
+            },
+            "kind": {
+              "type": "string",
+              "const": "hive-mind-autopilot-sealed-execution-merge-v1"
+            },
+            "node_id": {
+              "type": "string",
+              "const": "OPTIMIZER-370"
+            },
+            "repair_claim_commit": {
+              "type": "string",
+              "const": "8fa51243327ae928e46df180bfd81fbf90062cf5"
+            },
+            "schema_version": {
+              "type": "integer",
+              "const": 1
+            }
+          }
+        },
+        "rollback_target_forbidden": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree",
+        "first_parent",
+        "execution_merge_ancestor",
+        "observed_remote_commit",
+        "terminal_green",
+        "only_permitted_node_cas_source"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "const": "948368b77ba8de920369f416970e83b909bd50ba"
+        },
+        "tree": {
+          "type": "string",
+          "const": "e7fe4cdec441550a0007306182b222ac76ba73b3"
+        },
+        "first_parent": {
+          "type": "string",
+          "const": "badb93d049eefe8aba8371f6ff4bc122e30c06b9"
+        },
+        "execution_merge_ancestor": {
+          "type": "string",
+          "const": "88f2962b64f7cc9f88284c5dd30106de5313da7b"
+        },
+        "observed_remote_commit": {
+          "type": "string",
+          "const": "948368b77ba8de920369f416970e83b909bd50ba"
+        },
+        "terminal_green": {
+          "type": "boolean",
+          "const": true
+        },
+        "only_permitted_node_cas_source": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "pull_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "head_branch",
+        "head_commit",
+        "terminal_status",
+        "mutation_authorized"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "const": 135
+        },
+        "head_branch": {
+          "type": "string",
+          "const": "autopilot/optimizer-370"
+        },
+        "head_commit": {
+          "type": "string",
+          "const": "948368b77ba8de920369f416970e83b909bd50ba"
+        },
+        "terminal_status": {
+          "type": "string",
+          "const": "green"
+        },
+        "mutation_authorized": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "intended_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "payload_digest",
+        "raw_payload",
+        "commit_parent",
+        "expected_tree",
+        "changed_paths",
+        "message_marker",
+        "provenance_object",
+        "prior_overlay_authority_reused"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-intended-receipt.json"
+        },
+        "payload_digest": {
+          "type": "string",
+          "const": "sha256:bf5b2cdd03f40b88980a964d843bf8829b9dc2393864b4ded360f04a42e8afdd"
+        },
+        "raw_payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "acceptance_decision",
+            "authority",
+            "base_commit",
+            "base_tree",
+            "branch",
+            "changed_paths",
+            "consultations",
+            "contract_version",
+            "evidence_refs",
+            "final_commit",
+            "final_tree",
+            "model_runtime",
+            "node_id",
+            "plan_fingerprint",
+            "pr",
+            "role_identities",
+            "rollback_ref",
+            "schema_version",
+            "tests",
+            "timestamp"
+          ],
+          "properties": {
+            "acceptance_decision": {
+              "type": "string",
+              "const": "ADAPT"
+            },
+            "authority": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "autonomy_level",
+                "execution_merge_commit",
+                "execution_target_sha",
+                "grant_id",
+                "grants",
+                "node_id",
+                "repair_authority_digest",
+                "repair_claim_commit",
+                "repair_claim_payload_digest",
+                "supersedes_receipt_commit"
+              ],
+              "properties": {
+                "autonomy_level": {
+                  "type": "string",
+                  "const": "A3"
+                },
+                "execution_merge_commit": {
+                  "type": "string",
+                  "const": "88f2962b64f7cc9f88284c5dd30106de5313da7b"
+                },
+                "execution_target_sha": {
+                  "type": "string",
+                  "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+                },
+                "grant_id": {
+                  "type": "string",
+                  "const": "optimizer-370-invalid-receipt-supersession-v1"
+                },
+                "grants": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "string",
+                      "const": "optimizer-370-invalid-receipt-supersession-v1"
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 1,
+                  "maxItems": 1
+                },
+                "node_id": {
+                  "type": "string",
+                  "const": "OPTIMIZER-370"
+                },
+                "repair_authority_digest": {
+                  "type": "string",
+                  "const": "sha256:d185d4b9d4b2e90c5ba6b683b12edeb978e3bbfe16c1c3cca15f6733b0c90eeb"
+                },
+                "repair_claim_commit": {
+                  "type": "string",
+                  "const": "8fa51243327ae928e46df180bfd81fbf90062cf5"
+                },
+                "repair_claim_payload_digest": {
+                  "type": "string",
+                  "const": "sha256:69d956a1ebfb6336cb341dcbceb67b3b22f97a93906841b7eb49627f8b5a36c4"
+                },
+                "supersedes_receipt_commit": {
+                  "type": "string",
+                  "const": "926f60ec345d7bf5b5eb9229009de1f7e7888a97"
+                }
+              }
+            },
+            "base_commit": {
+              "type": "string",
+              "const": "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58"
+            },
+            "base_tree": {
+              "type": "string",
+              "const": "8bfe011cb1ac5cbbc4772d5b77dd981638a38b8d"
+            },
+            "branch": {
+              "type": "string",
+              "const": "autopilot/optimizer-370"
+            },
+            "changed_paths": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "const": "src/hive_mind_os/brain_kernel/optimizer.py"
+                },
+                {
+                  "type": "string",
+                  "const": "tests/test_hive_cortex_optimizer.py"
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "consultations": {
+              "type": "array",
+              "prefixItems": [],
+              "items": false,
+              "minItems": 0,
+              "maxItems": 0
+            },
+            "contract_version": {
+              "type": "integer",
+              "const": 1
+            },
+            "evidence_refs": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "const": "git:948368b77ba8de920369f416970e83b909bd50ba"
+                },
+                {
+                  "type": "string",
+                  "const": "git:3e46eff7ce1dc058fba817c4911c5d408178b86e:rejected-attempt"
+                },
+                {
+                  "type": "string",
+                  "const": "git:305bd78023ef2b3c04d7bbf961b89ae3aa82db68:rejected-attempt"
+                },
+                {
+                  "type": "string",
+                  "const": "git:926f60ec345d7bf5b5eb9229009de1f7e7888a97:superseded-receipt"
+                },
+                {
+                  "type": "string",
+                  "const": "pr:https://github.com/kb4beast/hive-mind-os/pull/135"
+                },
+                {
+                  "type": "string",
+                  "const": "validation-lease:sha256:2bf411f8cb1037f45d5005109fc7826fb1dcd452e0fe5df370c9d1f415e51b48:released"
+                },
+                {
+                  "type": "string",
+                  "const": "test:focused-optimizer:19-of-19-passed"
+                },
+                {
+                  "type": "string",
+                  "const": "test:canonical-unittest:662-passed-6-platform-skipped"
+                },
+                {
+                  "type": "string",
+                  "const": "static:ruff-all-passed"
+                },
+                {
+                  "type": "string",
+                  "const": "static:pyright-0-errors-6-preexisting-dunder-all-warnings"
+                },
+                {
+                  "type": "string",
+                  "const": "review:curator-poincare:adopt:948368b77ba8de920369f416970e83b909bd50ba"
+                },
+                {
+                  "type": "string",
+                  "const": "review:parent-independent-audit:adopt:948368b77ba8de920369f416970e83b909bd50ba"
+                },
+                {
+                  "type": "string",
+                  "const": "court:court-optimizer-370-invalid-receipt-supersession-20260811:adapt"
+                },
+                {
+                  "type": "string",
+                  "const": "contract:references-and-identities-are-structural-labels-not-authenticated-principals"
+                }
+              ],
+              "items": false,
+              "minItems": 14,
+              "maxItems": 14
+            },
+            "final_commit": {
+              "type": "string",
+              "const": "948368b77ba8de920369f416970e83b909bd50ba"
+            },
+            "final_tree": {
+              "type": "string",
+              "const": "e7fe4cdec441550a0007306182b222ac76ba73b3"
+            },
+            "model_runtime": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model",
+                "provider"
+              ],
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "const": "GPT-5 Codex"
+                },
+                "provider": {
+                  "type": "string",
+                  "const": "openai"
+                }
+              }
+            },
+            "node_id": {
+              "type": "string",
+              "const": "OPTIMIZER-370"
+            },
+            "plan_fingerprint": {
+              "type": "string",
+              "const": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39"
+            },
+            "pr": {
+              "type": "integer",
+              "const": 135
+            },
+            "role_identities": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "identity",
+                    "identity_kind",
+                    "role"
+                  ],
+                  "properties": {
+                    "identity": {
+                      "type": "string",
+                      "const": "codex:optimizer-370-repair"
+                    },
+                    "identity_kind": {
+                      "type": "string",
+                      "const": "model_role"
+                    },
+                    "role": {
+                      "type": "string",
+                      "const": "optimizer"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "identity",
+                    "identity_kind",
+                    "role"
+                  ],
+                  "properties": {
+                    "identity": {
+                      "type": "string",
+                      "const": "agent:poincare:optimizer-370-independent-curator"
+                    },
+                    "identity_kind": {
+                      "type": "string",
+                      "const": "model_role"
+                    },
+                    "role": {
+                      "type": "string",
+                      "const": "curator"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "identity",
+                    "identity_kind",
+                    "role"
+                  ],
+                  "properties": {
+                    "identity": {
+                      "type": "string",
+                      "const": "codex-parent:optimizer-370-independent-auditor"
+                    },
+                    "identity_kind": {
+                      "type": "string",
+                      "const": "model_role"
+                    },
+                    "role": {
+                      "type": "string",
+                      "const": "steward"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "rollback_ref": {
+              "type": "string",
+              "const": "git-revert:948368b77ba8de920369f416970e83b909bd50ba;close-pr:135;preserve-append-only-receipts"
+            },
+            "schema_version": {
+              "type": "integer",
+              "const": 1
+            },
+            "tests": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "command",
+                    "name",
+                    "status"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "python"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-m"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unittest"
+                        },
+                        {
+                          "type": "string",
+                          "const": "tests.test_hive_cortex_optimizer"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-v"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 5,
+                      "maxItems": 5
+                    },
+                    "name": {
+                      "type": "string",
+                      "const": "optimizer-lesson-tests"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "passed"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "command",
+                    "name",
+                    "status"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "python"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-m"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unittest"
+                        },
+                        {
+                          "type": "string",
+                          "const": "tests.test_hive_cortex_optimizer"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-v"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 5,
+                      "maxItems": 5
+                    },
+                    "name": {
+                      "type": "string",
+                      "const": "challenger-proposal-tests"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "passed"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "command",
+                    "name",
+                    "status"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string",
+                          "const": "python"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-m"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unittest"
+                        },
+                        {
+                          "type": "string",
+                          "const": "discover"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-s"
+                        },
+                        {
+                          "type": "string",
+                          "const": "tests"
+                        },
+                        {
+                          "type": "string",
+                          "const": "-v"
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 7,
+                      "maxItems": 7
+                    },
+                    "name": {
+                      "type": "string",
+                      "const": "self-promotion-denial-tests"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "passed"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "timestamp": {
+              "type": "string",
+              "const": "2026-08-11T19:25:13.519537Z"
+            }
+          }
+        },
+        "commit_parent": {
+          "type": "string",
+          "const": "948368b77ba8de920369f416970e83b909bd50ba"
+        },
+        "expected_tree": {
+          "type": "string",
+          "const": "e7fe4cdec441550a0007306182b222ac76ba73b3"
+        },
+        "changed_paths": {
+          "type": "array",
+          "prefixItems": [],
+          "items": false,
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "message_marker": {
+          "type": "string",
+          "const": "HIVE-MIND-AUTOPILOT-COMPLETION-V1"
+        },
+        "provenance_object": {
+          "type": "string",
+          "const": "457f4608fcd1990fc89e30a2caa8019c3b02f788:.autopilot/optimizer-370-intended-receipt.json"
+        },
+        "prior_overlay_authority_reused": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "negative_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "payload_digest",
+        "raw_payload",
+        "prior_continuation_or_completion_intent",
+        "prior_completion_or_consumption_evidence",
+        "court_payload_digest",
+        "appeals_payload_digest"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-negative-state.json"
+        },
+        "payload_digest": {
+          "type": "string",
+          "const": "sha256:f24623707611ac10e83fcbd9fcaa2418f470440b472309bccc4783e9bd87fd66"
+        },
+        "raw_payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "kind",
+            "evidence_id",
+            "observed_at",
+            "observation_scope",
+            "claim_expired_at",
+            "repository_head",
+            "git_common_directory",
+            "absent_paths",
+            "observed_refs",
+            "candidate_tree",
+            "prior_continuation_or_completion_intent",
+            "prior_completion_or_consumption_evidence",
+            "source",
+            "limitations",
+            "license"
+          ],
+          "properties": {
+            "schema_version": {
+              "type": "integer",
+              "const": 1
+            },
+            "kind": {
+              "type": "string",
+              "const": "hive-mind-autopilot-optimizer-370-post-expiry-negative-state-v1"
+            },
+            "evidence_id": {
+              "type": "string",
+              "const": "optimizer-370-post-expiry-negative-state-20260811"
+            },
+            "observed_at": {
+              "type": "string",
+              "const": "2026-08-11T22:00:00Z"
+            },
+            "observation_scope": {
+              "type": "string",
+              "const": "pinned checkout and shared Git common directory after claim expiry and before C2 implementation"
+            },
+            "claim_expired_at": {
+              "type": "string",
+              "const": "2026-08-11T21:13:07.231123Z"
+            },
+            "repository_head": {
+              "type": "string",
+              "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+            },
+            "git_common_directory": {
+              "type": "string",
+              "const": "C:/Repos/HiveMind/hive-mind-os/.git"
+            },
+            "absent_paths": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "const": ".autopilot/state/claims/optimizer-370.json"
+                },
+                {
+                  "type": "string",
+                  "const": ".autopilot/state/sealed-repair-completion-optimizer-370.json"
+                },
+                {
+                  "type": "string",
+                  "const": "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-completion-continuation.json"
+                },
+                {
+                  "type": "string",
+                  "const": "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-authorization.json"
+                },
+                {
+                  "type": "string",
+                  "const": "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-intent.json"
+                },
+                {
+                  "type": "string",
+                  "const": "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-consumed.json"
+                }
+              ],
+              "items": false,
+              "minItems": 6,
+              "maxItems": 6
+            },
+            "observed_refs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2",
+                "refs/remotes/origin/main",
+                "refs/remotes/origin/autopilot/optimizer-370"
+              ],
+              "properties": {
+                "refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2": {
+                  "type": "string",
+                  "const": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+                },
+                "refs/remotes/origin/main": {
+                  "type": "string",
+                  "const": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8"
+                },
+                "refs/remotes/origin/autopilot/optimizer-370": {
+                  "type": "string",
+                  "const": "948368b77ba8de920369f416970e83b909bd50ba"
+                }
+              }
+            },
+            "candidate_tree": {
+              "type": "string",
+              "const": "e7fe4cdec441550a0007306182b222ac76ba73b3"
+            },
+            "prior_continuation_or_completion_intent": {
+              "type": "boolean",
+              "const": false
+            },
+            "prior_completion_or_consumption_evidence": {
+              "type": "boolean",
+              "const": false
+            },
+            "source": {
+              "type": "string",
+              "const": "delegated immutable incident evidence plus read-only local Git and filesystem observation"
+            },
+            "limitations": {
+              "type": "string",
+              "const": "This is a point-in-time negative-state attestation. Runtime activation must reproduce exact authenticated remote state immediately before any separately authorized CAS."
+            },
+            "license": {
+              "type": "string",
+              "const": "repository-internal evidence; no external code copied"
+            }
+          }
+        },
+        "prior_continuation_or_completion_intent": {
+          "type": "boolean",
+          "const": false
+        },
+        "prior_completion_or_consumption_evidence": {
+          "type": "boolean",
+          "const": false
+        },
+        "court_payload_digest": {
+          "type": "string",
+          "const": "sha256:0f531127970c5a966ae50ad083f74b381256b1a9c59f376472d39ea2eee8b744"
+        },
+        "appeals_payload_digest": {
+          "type": "string",
+          "const": "sha256:17c4701d245a6185354027057e9c1399333f887a8d8a56eab0e1a70dc91355f6"
+        }
+      }
+    },
+    "quarantined_prior_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "pull_request",
+        "disposition",
+        "integration_forbidden",
+        "authority_reuse_forbidden",
+        "pre_expiry_arm_observed"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "const": "457f4608fcd1990fc89e30a2caa8019c3b02f788"
+        },
+        "pull_request": {
+          "type": "integer",
+          "const": 143
+        },
+        "disposition": {
+          "type": "string",
+          "const": "evidence_only"
+        },
+        "integration_forbidden": {
+          "type": "boolean",
+          "const": true
+        },
+        "authority_reuse_forbidden": {
+          "type": "boolean",
+          "const": true
+        },
+        "pre_expiry_arm_observed": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "authorized_paths": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string",
+          "const": ".autopilot/bin/autopilot.py"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/bin/post_expiry_completion.py"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-appeals.json"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-authority.json"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-authority.schema.json"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-court.json"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-intended-receipt.json"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/optimizer-370-post-expiry-negative-state.json"
+        },
+        {
+          "type": "string",
+          "const": ".autopilot/tests/test_optimizer_370_post_expiry_completion.py"
+        },
+        {
+          "type": "string",
+          "const": "docs/architecture/ADR-058-OPTIMIZER-370-POST-EXPIRY-COMPLETION.md"
+        },
+        {
+          "type": "string",
+          "const": "docs/architecture/ADR_INDEX.md"
+        }
+      ],
+      "items": false,
+      "minItems": 11,
+      "maxItems": 11
+    },
+    "withheld_powers": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string",
+          "const": "node_completion_activation"
+        },
+        {
+          "type": "string",
+          "const": "receipt_publication"
+        },
+        {
+          "type": "string",
+          "const": "remote_mutation"
+        },
+        {
+          "type": "string",
+          "const": "release_integration"
+        },
+        {
+          "type": "string",
+          "const": "main_movement"
+        },
+        {
+          "type": "string",
+          "const": "claim_or_dispatcher_mutation"
+        },
+        {
+          "type": "string",
+          "const": "pull_request_mutation"
+        }
+      ],
+      "items": false,
+      "minItems": 7,
+      "maxItems": 7
+    },
+    "max_lease_minutes": {
+      "type": "integer",
+      "const": 10
+    },
+    "capability_commit": {
+      "type": "string",
+      "const": "0000000000000000000000000000000000000000"
+    },
+    "court_case_id": {
+      "type": "string",
+      "const": "court-optimizer-370-post-expiry-completion-20260811"
+    },
+    "appeal_id": {
+      "type": "string",
+      "const": "appeal-optimizer-370-post-expiry-completion-20260811"
+    }
+  }
+}

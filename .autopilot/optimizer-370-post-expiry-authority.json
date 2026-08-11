@@ -1,0 +1,450 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-autopilot-optimizer-370-post-expiry-authority-v1",
+  "authorization_id": "optimizer-370-post-expiry-completion-v1",
+  "repository": "kb4beast/hive-mind-os",
+  "origin_name": "origin",
+  "origin_url": "https://github.com/kb4beast/hive-mind-os.git",
+  "node_id": "OPTIMIZER-370",
+  "claim_owner": "codex:optimizer-370-repair",
+  "branch": "autopilot/optimizer-370",
+  "release": {
+    "ref": "refs/heads/release/hive-mind-os-singleton-20260810-r2",
+    "commit": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+    "tree": "2a5b94489c368c0e3798c2d38d85f7631adb8604",
+    "observed_remote_commit": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+    "movement_authorized": false
+  },
+  "main": {
+    "ref": "refs/heads/main",
+    "commit": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8",
+    "tree": "ea9a3d31153145d3ddd9aefa2a23c35f50e5a5ad",
+    "observed_remote_commit": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8",
+    "movement_authorized": false
+  },
+  "old_receipt": {
+    "commit": "926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+    "parent": "df73beb1a234b457b3d35bcbf58b80242b18c8a6",
+    "tree": "260bef36a3f7132d2af316e2a0c6564fabf6e7c7",
+    "message_marker": "HIVE-MIND-AUTOPILOT-COMPLETION-V1",
+    "payload_digest": "sha256:7e493003cb9d3eefbdcabece3bdba56c1d11f2378594803924bcf6fee0f93334",
+    "raw_payload": {
+      "acceptance_decision": "ADOPT",
+      "authority": {
+        "autonomy_level": "A3",
+        "dispatch_release": "sha256:0150b69871cfec32d405a5837c7f9c4b89c3a2470e98e8d7a14f029cc02408c8",
+        "grants": [
+          "bounded-implementation",
+          "evidence-publication"
+        ],
+        "node_id": "OPTIMIZER-370"
+      },
+      "base_commit": "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58",
+      "base_tree": "8bfe011cb1ac5cbbc4772d5b77dd981638a38b8d",
+      "branch": "autopilot/optimizer-370",
+      "changed_paths": [
+        "src/hive_mind_os/brain_kernel/optimizer.py",
+        "tests/test_hive_cortex_optimizer.py"
+      ],
+      "consultations": [
+        {
+          "answer": "Independent Steward assessment reproduced the focused tests, Ruff, and Pyright on the exact candidate. The module is local and effect-free: it derives lessons and immutable challenger proposals, rejects a candidate author as evaluator, and returns only an independent-review recommendation. No operational or recovery blocker was found for the bounded candidate. This is not a promotion, integration, or superiority verdict; the independent court remains required before any champion change.",
+          "authority_class": null,
+          "cheating_disposition": "NOT_APPLICABLE",
+          "consulted_roles": [
+            "optimizer",
+            "curator",
+            "steward"
+          ],
+          "decision": "RESOLVED",
+          "dissent": [
+            "The Steward review did not evaluate outcome quality, held-out benchmark superiority, or court sufficiency; those remain separate required controls.",
+            "Expiry evaluation is wall-clock dependent but fails closed for stale lessons."
+          ],
+          "evidence_refs": [
+            "git:df73beb1a234b457b3d35bcbf58b80242b18c8a6",
+            "git:cfcdf257655669aec6c18d10b8db641ec2874546",
+            "test:independent-steward-focused-optimizer-4-of-4",
+            "lint:independent-steward-ruff-pass",
+            "typecheck:independent-steward-pyright-pass",
+            "curator:/root/l2_optimizer_370_review:pass"
+          ],
+          "human_escalation": false,
+          "identity_records": [
+            {
+              "identity": "/root/l2_optimizer_370",
+              "identity_kind": "model_role",
+              "role": "optimizer",
+              "task": "candidate author and consultation requester"
+            },
+            {
+              "identity": "/root/l2_optimizer_370_review",
+              "identity_kind": "model_role",
+              "role": "curator",
+              "task": "independent candidate review"
+            },
+            {
+              "identity": "/root/l2_steward_360",
+              "identity_kind": "model_role",
+              "role": "steward",
+              "task": "independent operational and recovery-safety assessment"
+            }
+          ],
+          "mission_id": "hive-mind-os-verifiable-hive-cortex-v1",
+          "question": "Does df73beb1a234b457b3d35bcbf58b80242b18c8a6 preserve operational and recovery safety without a path to mutate or self-promote a champion?",
+          "reason_code": "optimizer-independent-steward-review",
+          "request_id": "CONSULT-OPTIMIZER-370-STEWARD-20260811-01",
+          "requesting_role": "optimizer",
+          "role_first_exhausted": false,
+          "round": 1,
+          "suspected_cheating": false
+        }
+      ],
+      "contract_version": 1,
+      "evidence_refs": [
+        "src/hive_mind_os/brain_kernel/optimizer.py",
+        "tests/test_hive_cortex_optimizer.py",
+        ".autopilot/state/optimizer-370-full-ci.err",
+        "review:/root/l2_optimizer_370_review"
+      ],
+      "final_commit": "df73beb1a234b457b3d35bcbf58b80242b18c8a6",
+      "final_tree": "260bef36a3f7132d2af316e2a0c6564fabf6e7c7",
+      "model_runtime": {
+        "execution_surface": "Codex multi-agent singleton release automation",
+        "provider": "openai"
+      },
+      "node_id": "OPTIMIZER-370",
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "pr": 135,
+      "role_identities": [
+        {
+          "identity": "codex:optimizer-370",
+          "identity_kind": "model_role",
+          "role": "optimizer"
+        },
+        {
+          "identity": "/root/l2_optimizer_370_review",
+          "identity_kind": "model_role",
+          "role": "curator"
+        },
+        {
+          "identity": "/root/l2_steward_360",
+          "identity_kind": "model_role",
+          "role": "steward"
+        }
+      ],
+      "rollback_ref": "revert:df73beb1a234b457b3d35bcbf58b80242b18c8a6",
+      "schema_version": 1,
+      "tests": [
+        {
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "tests/test_hive_cortex_optimizer.py",
+            "-v"
+          ],
+          "name": "optimizer-lesson-tests",
+          "receipt_ref": "tests/test_hive_cortex_optimizer.py",
+          "status": "passed"
+        },
+        {
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "tests/test_hive_cortex_optimizer.py",
+            "-v"
+          ],
+          "name": "challenger-proposal-tests",
+          "receipt_ref": "tests/test_hive_cortex_optimizer.py",
+          "status": "passed"
+        },
+        {
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "tests/test_hive_cortex_optimizer.py",
+            "-v"
+          ],
+          "name": "self-promotion-denial-tests",
+          "receipt_ref": "tests/test_hive_cortex_optimizer.py",
+          "status": "passed"
+        },
+        {
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-v"
+          ],
+          "name": "ci-gate",
+          "receipt_ref": ".autopilot/state/optimizer-370-full-ci.err",
+          "status": "passed"
+        }
+      ],
+      "timestamp": "2026-08-11T08:43:43Z"
+    },
+    "immutable": true
+  },
+  "expired_claim": {
+    "commit": "8fa51243327ae928e46df180bfd81fbf90062cf5",
+    "parent": "926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+    "tree": "260bef36a3f7132d2af316e2a0c6564fabf6e7c7",
+    "message_marker": "hive-mind-autopilot-sealed-repair-claim-v1",
+    "payload_digest": "sha256:69d956a1ebfb6336cb341dcbceb67b3b22f97a93906841b7eb49627f8b5a36c4",
+    "raw_payload": {
+      "authority_digest": "sha256:d185d4b9d4b2e90c5ba6b683b12edeb978e3bbfe16c1c3cca15f6733b0c90eeb",
+      "branch": "autopilot/optimizer-370",
+      "claim_topology": "direct_zero_path_child_of_old_receipt_then_merge_current_release",
+      "doctor_evidence_digest": "sha256:67b5d50b23906e443c10ae278039821f8e8abe1d75fe8b532fe569b583276a63",
+      "execution_target_sha": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+      "expires_at": "2026-08-11T21:13:07.231123Z",
+      "github_snapshot_digest": "sha256:c09fe66ac8dd4232fbd2d4b06ff3b1271382e9a0af6174113c00d2055bc11662",
+      "grant_id": "optimizer-370-invalid-receipt-supersession-v1",
+      "kind": "hive-mind-autopilot-sealed-repair-claim-v1",
+      "node_id": "OPTIMIZER-370",
+      "old_receipt_commit": "926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+      "owner": "codex:optimizer-370-repair",
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "pr": 135,
+      "reconciliation_digest": "sha256:20bae7f8572d86fe6756d98604f04cd5c9cad2500121c1e12a07394e6857a54f",
+      "release_id": "sha256:9242be371f66a7f8314ac1550a68a2385c7de92c1342330006817ca0958de273",
+      "repair_id": "optimizer-370-invalid-receipt-supersession-v1",
+      "repository": "kb4beast/hive-mind-os",
+      "schema_version": 1
+    },
+    "owner": "codex:optimizer-370-repair",
+    "expires_at": "2026-08-11T21:13:07.231123Z",
+    "renewal_or_mutation_authorized": false
+  },
+  "execution_merge": {
+    "commit": "88f2962b64f7cc9f88284c5dd30106de5313da7b",
+    "parents": [
+      "8fa51243327ae928e46df180bfd81fbf90062cf5",
+      "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+    ],
+    "tree": "e4ddc0838e897c5b4c9d35e8c35fd146eb901561",
+    "message_marker": "hive-mind-autopilot-sealed-execution-merge-v1",
+    "payload_digest": "sha256:496214b19ed2444847cc2bc15c87daca7686345cd718750ff02935a7b5e98515",
+    "raw_payload": {
+      "authority_digest": "sha256:d185d4b9d4b2e90c5ba6b683b12edeb978e3bbfe16c1c3cca15f6733b0c90eeb",
+      "execution_target_sha": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+      "grant_id": "optimizer-370-invalid-receipt-supersession-v1",
+      "kind": "hive-mind-autopilot-sealed-execution-merge-v1",
+      "node_id": "OPTIMIZER-370",
+      "repair_claim_commit": "8fa51243327ae928e46df180bfd81fbf90062cf5",
+      "schema_version": 1
+    },
+    "rollback_target_forbidden": true
+  },
+  "candidate": {
+    "commit": "948368b77ba8de920369f416970e83b909bd50ba",
+    "tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+    "first_parent": "badb93d049eefe8aba8371f6ff4bc122e30c06b9",
+    "execution_merge_ancestor": "88f2962b64f7cc9f88284c5dd30106de5313da7b",
+    "observed_remote_commit": "948368b77ba8de920369f416970e83b909bd50ba",
+    "terminal_green": true,
+    "only_permitted_node_cas_source": true
+  },
+  "pull_request": {
+    "number": 135,
+    "head_branch": "autopilot/optimizer-370",
+    "head_commit": "948368b77ba8de920369f416970e83b909bd50ba",
+    "terminal_status": "green",
+    "mutation_authorized": false
+  },
+  "intended_receipt": {
+    "path": ".autopilot/optimizer-370-post-expiry-intended-receipt.json",
+    "payload_digest": "sha256:bf5b2cdd03f40b88980a964d843bf8829b9dc2393864b4ded360f04a42e8afdd",
+    "raw_payload": {
+      "acceptance_decision": "ADAPT",
+      "authority": {
+        "autonomy_level": "A3",
+        "execution_merge_commit": "88f2962b64f7cc9f88284c5dd30106de5313da7b",
+        "execution_target_sha": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+        "grant_id": "optimizer-370-invalid-receipt-supersession-v1",
+        "grants": [
+          "optimizer-370-invalid-receipt-supersession-v1"
+        ],
+        "node_id": "OPTIMIZER-370",
+        "repair_authority_digest": "sha256:d185d4b9d4b2e90c5ba6b683b12edeb978e3bbfe16c1c3cca15f6733b0c90eeb",
+        "repair_claim_commit": "8fa51243327ae928e46df180bfd81fbf90062cf5",
+        "repair_claim_payload_digest": "sha256:69d956a1ebfb6336cb341dcbceb67b3b22f97a93906841b7eb49627f8b5a36c4",
+        "supersedes_receipt_commit": "926f60ec345d7bf5b5eb9229009de1f7e7888a97"
+      },
+      "base_commit": "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58",
+      "base_tree": "8bfe011cb1ac5cbbc4772d5b77dd981638a38b8d",
+      "branch": "autopilot/optimizer-370",
+      "changed_paths": [
+        "src/hive_mind_os/brain_kernel/optimizer.py",
+        "tests/test_hive_cortex_optimizer.py"
+      ],
+      "consultations": [],
+      "contract_version": 1,
+      "evidence_refs": [
+        "git:948368b77ba8de920369f416970e83b909bd50ba",
+        "git:3e46eff7ce1dc058fba817c4911c5d408178b86e:rejected-attempt",
+        "git:305bd78023ef2b3c04d7bbf961b89ae3aa82db68:rejected-attempt",
+        "git:926f60ec345d7bf5b5eb9229009de1f7e7888a97:superseded-receipt",
+        "pr:https://github.com/kb4beast/hive-mind-os/pull/135",
+        "validation-lease:sha256:2bf411f8cb1037f45d5005109fc7826fb1dcd452e0fe5df370c9d1f415e51b48:released",
+        "test:focused-optimizer:19-of-19-passed",
+        "test:canonical-unittest:662-passed-6-platform-skipped",
+        "static:ruff-all-passed",
+        "static:pyright-0-errors-6-preexisting-dunder-all-warnings",
+        "review:curator-poincare:adopt:948368b77ba8de920369f416970e83b909bd50ba",
+        "review:parent-independent-audit:adopt:948368b77ba8de920369f416970e83b909bd50ba",
+        "court:court-optimizer-370-invalid-receipt-supersession-20260811:adapt",
+        "contract:references-and-identities-are-structural-labels-not-authenticated-principals"
+      ],
+      "final_commit": "948368b77ba8de920369f416970e83b909bd50ba",
+      "final_tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+      "model_runtime": {
+        "model": "GPT-5 Codex",
+        "provider": "openai"
+      },
+      "node_id": "OPTIMIZER-370",
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "pr": 135,
+      "role_identities": [
+        {
+          "identity": "codex:optimizer-370-repair",
+          "identity_kind": "model_role",
+          "role": "optimizer"
+        },
+        {
+          "identity": "agent:poincare:optimizer-370-independent-curator",
+          "identity_kind": "model_role",
+          "role": "curator"
+        },
+        {
+          "identity": "codex-parent:optimizer-370-independent-auditor",
+          "identity_kind": "model_role",
+          "role": "steward"
+        }
+      ],
+      "rollback_ref": "git-revert:948368b77ba8de920369f416970e83b909bd50ba;close-pr:135;preserve-append-only-receipts",
+      "schema_version": 1,
+      "tests": [
+        {
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "tests.test_hive_cortex_optimizer",
+            "-v"
+          ],
+          "name": "optimizer-lesson-tests",
+          "status": "passed"
+        },
+        {
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "tests.test_hive_cortex_optimizer",
+            "-v"
+          ],
+          "name": "challenger-proposal-tests",
+          "status": "passed"
+        },
+        {
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-v"
+          ],
+          "name": "self-promotion-denial-tests",
+          "status": "passed"
+        }
+      ],
+      "timestamp": "2026-08-11T19:25:13.519537Z"
+    },
+    "commit_parent": "948368b77ba8de920369f416970e83b909bd50ba",
+    "expected_tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+    "changed_paths": [],
+    "message_marker": "HIVE-MIND-AUTOPILOT-COMPLETION-V1",
+    "provenance_object": "457f4608fcd1990fc89e30a2caa8019c3b02f788:.autopilot/optimizer-370-intended-receipt.json",
+    "prior_overlay_authority_reused": false
+  },
+  "negative_state": {
+    "path": ".autopilot/optimizer-370-post-expiry-negative-state.json",
+    "payload_digest": "sha256:f24623707611ac10e83fcbd9fcaa2418f470440b472309bccc4783e9bd87fd66",
+    "raw_payload": {
+      "schema_version": 1,
+      "kind": "hive-mind-autopilot-optimizer-370-post-expiry-negative-state-v1",
+      "evidence_id": "optimizer-370-post-expiry-negative-state-20260811",
+      "observed_at": "2026-08-11T22:00:00Z",
+      "observation_scope": "pinned checkout and shared Git common directory after claim expiry and before C2 implementation",
+      "claim_expired_at": "2026-08-11T21:13:07.231123Z",
+      "repository_head": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+      "git_common_directory": "C:/Repos/HiveMind/hive-mind-os/.git",
+      "absent_paths": [
+        ".autopilot/state/claims/optimizer-370.json",
+        ".autopilot/state/sealed-repair-completion-optimizer-370.json",
+        "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-completion-continuation.json",
+        "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-authorization.json",
+        "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-intent.json",
+        "C:/Repos/HiveMind/hive-mind-os/.git/hive-mind-autopilot/optimizer-370-post-expiry-consumed.json"
+      ],
+      "observed_refs": {
+        "refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+        "refs/remotes/origin/main": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8",
+        "refs/remotes/origin/autopilot/optimizer-370": "948368b77ba8de920369f416970e83b909bd50ba"
+      },
+      "candidate_tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+      "prior_continuation_or_completion_intent": false,
+      "prior_completion_or_consumption_evidence": false,
+      "source": "delegated immutable incident evidence plus read-only local Git and filesystem observation",
+      "limitations": "This is a point-in-time negative-state attestation. Runtime activation must reproduce exact authenticated remote state immediately before any separately authorized CAS.",
+      "license": "repository-internal evidence; no external code copied"
+    },
+    "prior_continuation_or_completion_intent": false,
+    "prior_completion_or_consumption_evidence": false,
+    "court_payload_digest": "sha256:0f531127970c5a966ae50ad083f74b381256b1a9c59f376472d39ea2eee8b744",
+    "appeals_payload_digest": "sha256:17c4701d245a6185354027057e9c1399333f887a8d8a56eab0e1a70dc91355f6"
+  },
+  "quarantined_prior_overlay": {
+    "commit": "457f4608fcd1990fc89e30a2caa8019c3b02f788",
+    "pull_request": 143,
+    "disposition": "evidence_only",
+    "integration_forbidden": true,
+    "authority_reuse_forbidden": true,
+    "pre_expiry_arm_observed": false
+  },
+  "authorized_paths": [
+    ".autopilot/bin/autopilot.py",
+    ".autopilot/bin/post_expiry_completion.py",
+    ".autopilot/optimizer-370-post-expiry-appeals.json",
+    ".autopilot/optimizer-370-post-expiry-authority.json",
+    ".autopilot/optimizer-370-post-expiry-authority.schema.json",
+    ".autopilot/optimizer-370-post-expiry-court.json",
+    ".autopilot/optimizer-370-post-expiry-intended-receipt.json",
+    ".autopilot/optimizer-370-post-expiry-negative-state.json",
+    ".autopilot/tests/test_optimizer_370_post_expiry_completion.py",
+    "docs/architecture/ADR-058-OPTIMIZER-370-POST-EXPIRY-COMPLETION.md",
+    "docs/architecture/ADR_INDEX.md"
+  ],
+  "withheld_powers": [
+    "node_completion_activation",
+    "receipt_publication",
+    "remote_mutation",
+    "release_integration",
+    "main_movement",
+    "claim_or_dispatcher_mutation",
+    "pull_request_mutation"
+  ],
+  "max_lease_minutes": 10,
+  "capability_commit": "0000000000000000000000000000000000000000",
+  "court_case_id": "court-optimizer-370-post-expiry-completion-20260811",
+  "appeal_id": "appeal-optimizer-370-post-expiry-completion-20260811"
+}
