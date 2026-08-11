@@ -20,6 +20,10 @@ from .courtroom import (
 from .founding_docket import CLAIMS as FOUNDING_CLAIMS
 from .founding_docket import SOURCES as FOUNDING_SOURCES
 from .founding_docket import ClaimSpec
+from .portable_autopilot_docket import (
+    PORTABLE_AUTOPILOT_CLAIMS,
+    PORTABLE_AUTOPILOT_SOURCES,
+)
 from .recursive_improvement_docket import (
     RECURSIVE_IMPROVEMENT_CLAIMS,
     RECURSIVE_IMPROVEMENT_SOURCES,
@@ -32,6 +36,7 @@ SOURCES = (
     *RECURSIVE_IMPROVEMENT_SOURCES,
     *CLASSIC_GPT_SOURCES,
     *SIBLING_GPT_SOURCES,
+    *PORTABLE_AUTOPILOT_SOURCES,
 )
 CLAIMS = (
     *FOUNDING_CLAIMS,
@@ -39,6 +44,7 @@ CLAIMS = (
     *RECURSIVE_IMPROVEMENT_CLAIMS,
     *CLASSIC_GPT_CLAIMS,
     *SIBLING_GPT_CLAIMS,
+    *PORTABLE_AUTOPILOT_CLAIMS,
 )
 
 

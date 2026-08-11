@@ -28,9 +28,11 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-053`     | [Verifiable Hive Kernel local technical closeout](ADR-053-VERIFIABLE-HIVE-KERNEL-LOCAL-TECHNICAL-CLOSEOUT.md)               | Verifiable Hive Kernel P9  | proposed; local-only first slice, independent courtroom disposition remains required |
 | `ADR-054`     | [Verifiable Hive Kernel local compatibility firewall](ADR-054-VERIFIABLE-HIVE-KERNEL-LOCAL-COMPATIBILITY-FIREWALL.md)       | Verifiable Hive Kernel P10 | implemented locally; local Builder gate passed, independent court remains deferred   |
 | `ADR-055`     | [Exact Explorer receipt-branch retirement](ADR-055-EXACT-EXPLORER-RECEIPT-RETIREMENT.md)                                    | Singleton L2 recovery      | adopted only for the sealed rejected receipt branch                                  |
+| `ADR-056`     | [Singleton release branch execution](ADR-056-SINGLETON-RELEASE-BRANCH-EXECUTION.md)                                         | Singleton execution        | adopted; `main` remains excluded until final promotion                               |
+| `ADR-057`     | [Portable intent-driven Autopilot orchestration](ADR-057-PORTABLE-INTENT-DRIVEN-AUTOPILOT.md)                               | Autopilot portability      | adapted implementation candidate; independent Curator/Judge pending                  |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-056; it must be unique at creation time.
+is ADR-058; it must be unique at creation time.

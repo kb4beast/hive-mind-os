@@ -28,6 +28,19 @@ from release_barrier import (
     RELEASE_KIND,
     ControlPlane as ReleaseBarrierControlPlane,
 )
+from orchestration import (
+    OrchestrationError,
+    bind_launch,
+    binding_events,
+    build_orchestration_contract,
+    infer_intent,
+    load_policy,
+    observe_terminal_launch,
+    prepare_launch,
+    release_launch,
+    should_publish_release,
+    simple_prompt,
+)
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
 RETIREMENT_KIND = "hive-mind-autopilot-receipt-branch-retirement-v1"
@@ -551,6 +564,14 @@ class ControlPlane(ReleaseBarrierControlPlane):
         append_jsonl(self.state_dir / RETIREMENT_AUDIT, {"event": "receipt_branch_retired", **execution})
         return execution
 
+    def validate_configuration(self) -> tuple[str, ...]:
+        issues = list(super().validate_configuration())
+        try:
+            load_policy(self.repo_root)
+        except OrchestrationError as error:
+            issues.append(str(error))
+        return tuple(dict.fromkeys(issues))
+
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="autopilot")
@@ -645,6 +666,48 @@ def parser() -> argparse.ArgumentParser:
     retirement.add_argument("retirement_id")
     retirement.add_argument("--actor", required=True)
 
+    orchestrate = commands.add_parser("orchestrate")
+    orchestrate.add_argument("--request", default="")
+    orchestrate.add_argument("--actor", default="autopilot:orchestrator")
+    orchestrate.add_argument(
+        "--apply",
+        action="store_true",
+        help="Publish a safe release when inferred intent and live state allow it",
+    )
+    orchestrate.add_argument("--json", action="store_true", dest="json_output")
+
+    intent = commands.add_parser("infer-intent")
+    intent.add_argument("request", nargs="?", default="")
+    intent.add_argument("--json", action="store_true", dest="json_output")
+
+    commands.add_parser("simple-prompt")
+
+    prepare = commands.add_parser("prepare-launch")
+    prepare.add_argument("instruction_id")
+    prepare.add_argument("--host", required=True)
+
+    bind = commands.add_parser("bind-launch")
+    bind.add_argument("instruction_id")
+    bind.add_argument("--host", required=True)
+    bind.add_argument("--task-id", required=True)
+    bind.add_argument("--host-id")
+    bind.add_argument("--cursor")
+
+    terminal = commands.add_parser("record-launch-terminal")
+    terminal.add_argument("instruction_id")
+    terminal.add_argument(
+        "--terminal-state", choices=("SUCCEEDED", "FAILED", "CANCELLED"), required=True
+    )
+    terminal.add_argument("--host-event-ref", required=True)
+    terminal.add_argument("--observed-by", required=True)
+
+    release_binding = commands.add_parser("release-launch")
+    release_binding.add_argument("instruction_id")
+    release_binding.add_argument("--terminal-event", required=True)
+    release_binding.add_argument("--reason", required=True)
+
+    commands.add_parser("launch-bindings")
+
     return root
 
 
@@ -699,6 +762,18 @@ def print_dispatch(result: Mapping[str, object]) -> None:
             print(f"{node_id}: {verdicts[node_id]}")
     print(str(result.get("directive", "WAIT")))
     print(str(result.get("action", "Do not open any worker sessions yet")))
+
+
+def select_orchestration_status(
+    plane: ControlPlane,
+    request: str,
+) -> tuple[Mapping[str, object], object]:
+    """Select mutating recovery status only after a pure state-aware intent decision."""
+
+    observed = plane.observe_status()
+    decision = infer_intent(request, observed)
+    status = observed if decision.intent == "CHECK" else plane.status()
+    return status, decision
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -868,8 +943,98 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "retire-receipt-branch":
             print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor), indent=2, sort_keys=True))
             return 0
+        if args.command == "infer-intent":
+            result = infer_intent(args.request, plane.observe_status()).to_dict()
+            if args.json_output:
+                print(json.dumps(result, indent=2, sort_keys=True))
+            else:
+                print(result["intent"])
+            return 0
+        if args.command == "simple-prompt":
+            print(simple_prompt())
+            return 0
+        if args.command == "prepare-launch":
+            print(json.dumps(prepare_launch(plane.repo_root, args.instruction_id, args.host), indent=2, sort_keys=True))
+            return 0
+        if args.command == "bind-launch":
+            print(
+                json.dumps(
+                    bind_launch(
+                        plane.repo_root,
+                        args.instruction_id,
+                        args.host,
+                        args.task_id,
+                        host_id=args.host_id,
+                        cursor=args.cursor,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "release-launch":
+            print(
+                json.dumps(
+                    release_launch(
+                        plane.repo_root,
+                        args.instruction_id,
+                        terminal_event_id=args.terminal_event,
+                        reason=args.reason,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "record-launch-terminal":
+            print(
+                json.dumps(
+                    observe_terminal_launch(
+                        plane.repo_root,
+                        args.instruction_id,
+                        terminal_state=args.terminal_state,
+                        host_event_ref=args.host_event_ref,
+                        observed_by=args.observed_by,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "launch-bindings":
+            print(json.dumps(binding_events(plane.repo_root), indent=2, sort_keys=True))
+            return 0
+        if args.command == "orchestrate":
+            status, decision = select_orchestration_status(plane, args.request)
+            if args.apply and should_publish_release(decision, status):
+                plane.dispatch(actor=args.actor)
+                status = plane.status()
+            result = build_orchestration_contract(
+                plane,
+                args.request,
+                status=status,
+            )
+            if args.json_output:
+                print(json.dumps(result, indent=2, sort_keys=True))
+            else:
+                print(f"INTENT: {result['intent']['intent']}")
+                print(f"CONTRACT: {result['contract_id']}")
+                print(f"CLOSURE TARGET: {result['closure_target'] or 'none'}")
+                print(f"QUIESCENT: {'yes' if result['quiescent'] else 'no'}")
+                for task in result["tasks"]:
+                    print(
+                        f"{task['action']}: {task['title']} "
+                        f"[{task['transport']}]"
+                    )
+            return 0
         raise AssertionError(args.command)
-    except (AutopilotError, ClaimError, ConfigurationError, ReceiptError) as error:
+    except (
+        AutopilotError,
+        ClaimError,
+        ConfigurationError,
+        OrchestrationError,
+        ReceiptError,
+    ) as error:
         print(f"autopilot: {error}", file=sys.stderr)
         return 2
 

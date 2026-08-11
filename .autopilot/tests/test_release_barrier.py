@@ -172,6 +172,53 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         )
         self.assertEqual(verdicts["BOOT-000"], "STOP")
 
+    def test_04a_serial_node_cannot_be_co_released(self) -> None:
+        self.plane._nodes["RECON-010"]["parallel_safe"] = False
+        with self.assertRaisesRegex(Exception, "serial node"):
+            self.plane.dispatch(
+                actor="test:dispatcher",
+                requested_nodes=["RECON-010", "BASE-020"],
+            )
+
+    def test_04b_automatic_wave_prioritizes_and_isolates_serial_node(self) -> None:
+        self.plane._nodes["RECON-010"]["parallel_safe"] = False
+        self.plane._nodes["RECON-010"]["critical_path_importance"] = 100
+        self.plane._nodes["BASE-020"]["critical_path_importance"] = 1
+        release = self.plane.dispatch(actor="test:dispatcher")
+        self.assertEqual(release["released_wave"], ["RECON-010"])
+
+    def test_04c_observe_status_does_not_reap_stale_claims(self) -> None:
+        claim_path = self.plane.claim_path("RECON-010")
+        claim_path.parent.mkdir(parents=True, exist_ok=True)
+        claim_path.write_text(
+            json.dumps(
+                {
+                    "node_id": "RECON-010",
+                    "owner": "fixture:stale",
+                    "status": "RUNNING",
+                    "expires_at": "2000-01-01T00:00:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.plane.observe_status()
+        self.assertTrue(claim_path.exists())
+
+    def test_04d_persisted_wave_revalidates_serial_safety(self) -> None:
+        self.plane.dispatch(
+            actor="test:dispatcher",
+            requested_nodes=["RECON-010", "BASE-020"],
+        )
+        self.plane._nodes["RECON-010"]["parallel_safe"] = False
+        status = self.plane.status()
+        self.assertFalse(status["dispatch_release"]["valid"])
+        self.assertTrue(
+            any(
+                "serial node pair" in issue
+                for issue in status["dispatch_release"]["issues"]
+            )
+        )
+
     def test_05_target_advance_invalidates_release(self) -> None:
         self.plane.dispatch(
             actor="test:dispatcher",

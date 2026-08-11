@@ -1,0 +1,396 @@
+from __future__ import annotations
+
+import copy
+import json
+import shutil
+import sys
+import tempfile
+import unittest
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Mapping
+
+BIN = Path(__file__).resolve().parents[1] / "bin"
+if str(BIN) not in sys.path:
+    sys.path.insert(0, str(BIN))
+
+from autopilot import select_orchestration_status  # noqa: E402
+from orchestration import (  # noqa: E402
+    bind_launch,
+    binding_events,
+    build_orchestration_contract,
+    infer_intent,
+    observe_terminal_launch,
+    prepare_launch,
+    release_launch,
+    should_publish_release,
+    simple_prompt,
+    validate_policy,
+)
+
+
+class FakePlane:
+    def __init__(
+        self,
+        root: Path,
+        status: Mapping[str, object],
+        nodes: list[Mapping[str, Any]],
+    ) -> None:
+        self.repo_root = root
+        self._status = dict(status)
+        self._nodes = nodes
+
+    def status(self) -> Mapping[str, object]:
+        return self._status
+
+    def nodes(self) -> tuple[Mapping[str, Any], ...]:
+        return tuple(self._nodes)
+
+    def render_worker_prompt(self, node_id: str) -> str:
+        return f"canonical worker prompt for {node_id}"
+
+
+class IntentOrchestrationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        (self.root / ".autopilot").mkdir()
+        source = Path(__file__).resolve().parents[1] / "orchestration-policy.json"
+        shutil.copy2(source, self.root / ".autopilot" / "orchestration-policy.json")
+        shutil.copy2(
+            Path(__file__).resolve().parents[1] / "task-bindings.lock",
+            self.root / ".autopilot" / "task-bindings.lock",
+        )
+        self.nodes = [
+            {
+                "id": "ACTIVE-100",
+                "branch": "autopilot/active-100",
+                "pr_target": "release/test",
+                "write_scope": ["src/active/**"],
+                "critical_path_importance": 50,
+                "downstream_unlock_value": 40,
+            },
+            {
+                "id": "CLOSE-200",
+                "branch": "autopilot/close-200",
+                "pr_target": "release/test",
+                "write_scope": ["src/close/**"],
+                "critical_path_importance": 90,
+                "downstream_unlock_value": 80,
+            },
+            {
+                "id": "NEW-300",
+                "branch": "autopilot/new-300",
+                "pr_target": "release/test",
+                "write_scope": ["src/new/**"],
+                "critical_path_importance": 100,
+                "downstream_unlock_value": 100,
+            },
+        ]
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def status(self, rows: list[dict[str, object]]) -> dict[str, object]:
+        return {
+            "plan_id": "portable-test",
+            "plan_fingerprint": "sha256:test",
+            "target_branch": "release/test",
+            "target_sha": "a" * 40,
+            "reconciliation_required": False,
+            "eligible": [
+                str(row["node_id"])
+                for row in rows
+                if row.get("state") == "READY"
+            ],
+            "ready": [],
+            "dispatch_release": {
+                "valid": False,
+                "released_wave": [],
+                "issues": ["no current dispatcher release"],
+            },
+            "nodes": rows,
+            "complete": False,
+        }
+
+    def test_explicit_and_implicit_intents(self) -> None:
+        self.assertEqual(infer_intent("Finish everything to quiescence", {}).intent, "FINISH")
+        self.assertEqual(infer_intent("Pick up where it stopped", {}).intent, "CONTINUE")
+        self.assertEqual(infer_intent("What is left?", {}).intent, "CHECK")
+        self.assertEqual(infer_intent("Kick off the next wave", {}).intent, "START")
+        self.assertEqual(infer_intent("Build an autopilot DAG", None).intent, "BUILD_DAG")
+        inferred = infer_intent(
+            "Handle the rest",
+            self.status([{"node_id": "ACTIVE-100", "state": "RUNNING"}]),
+        )
+        self.assertEqual(inferred.intent, "CONTINUE")
+        self.assertFalse(inferred.explicit)
+
+    def test_negation_advice_and_quoted_text_do_not_authorize_execution(self) -> None:
+        cases = (
+            "Don't start anything; just summarize the state.",
+            "Do not continue this DAG.",
+            "Check only; do not build or start anything.",
+            "Do nothing.",
+            "Don't make any changes.",
+            "What would you do next?",
+            "Why didn't it start?",
+            "Should we finish the DAG?",
+            "Is it safe to start now?",
+            "Could this continue without review?",
+            'Explain the README sentence "keep going until done".',
+        )
+        for request in cases:
+            with self.subTest(request=request):
+                self.assertEqual(infer_intent(request, {}).intent, "CHECK")
+
+    def test_closure_first_resumes_existing_work_and_does_not_widen(self) -> None:
+        status = self.status(
+            [
+                {"node_id": "ACTIVE-100", "state": "RUNNING", "reasons": []},
+                {"node_id": "CLOSE-200", "state": "CI_FAILED", "reasons": ["CI failed"]},
+                {"node_id": "NEW-300", "state": "READY", "reasons": []},
+            ]
+        )
+        plane = FakePlane(self.root, status, self.nodes)
+        contract = build_orchestration_contract(plane, "Handle the rest", status=status)
+        tasks = {str(item["node_id"]): item for item in contract["tasks"]}
+        self.assertEqual(set(tasks), {"ACTIVE-100", "CLOSE-200"})
+        self.assertEqual(tasks["ACTIVE-100"]["action"], "RESUME")
+        self.assertEqual(tasks["CLOSE-200"]["action"], "REPAIR_CI")
+        self.assertEqual(contract["closure_target"], "CLOSE-200")
+        self.assertFalse(should_publish_release(infer_intent("finish", status), status))
+
+    def test_released_parallel_wave_emits_durable_primary_tasks(self) -> None:
+        rows = [
+            {"node_id": "ACTIVE-100", "state": "READY", "reasons": []},
+            {"node_id": "CLOSE-200", "state": "READY", "reasons": []},
+        ]
+        status = self.status(rows)
+        status["dispatch_release"] = {
+            "valid": True,
+            "released_wave": ["ACTIVE-100", "CLOSE-200"],
+            "directive": "START TOGETHER NOW",
+        }
+        status["ready"] = ["ACTIVE-100", "CLOSE-200"]
+        plane = FakePlane(self.root, status, self.nodes)
+        contract = build_orchestration_contract(plane, "start", status=status)
+        self.assertEqual(len(contract["tasks"]), 2)
+        for task in contract["tasks"]:
+            self.assertEqual(task["transport"], "durable_user_owned_task")
+            self.assertEqual(task["host_adapters"]["codex"]["create"], "create_thread")
+            self.assertIn("orchestration-policy.json", task["prompt"])
+            self.assertRegex(task["launch_instruction_id"], r"^sha256:[0-9a-f]{64}$")
+            self.assertIn(task["launch_instruction_id"][7:19], task["title"])
+        self.assertFalse(contract["execution"]["parent_final_while_required_tasks_active"])
+
+    def test_launch_binding_is_append_only_and_consumed_before_create(self) -> None:
+        rows = [{"node_id": "ACTIVE-100", "state": "READY", "reasons": []}]
+        status = self.status(rows)
+        status["dispatch_release"] = {
+            "valid": True,
+            "released_wave": ["ACTIVE-100"],
+            "directive": "START NOW",
+        }
+        plane = FakePlane(self.root, status, self.nodes)
+        first = build_orchestration_contract(plane, "start", status=status)
+        instruction_id = first["tasks"][0]["launch_instruction_id"]
+        prepared = prepare_launch(self.root, instruction_id, "codex")
+        self.assertEqual(prepared["state"], "PREPARED")
+        recovering = build_orchestration_contract(plane, "continue", status=status)
+        self.assertEqual(recovering["tasks"][0]["action"], "RECOVER_PREPARED")
+        bound = bind_launch(
+            self.root,
+            instruction_id,
+            "codex",
+            "thread-123",
+            host_id="local",
+            cursor="cursor-1",
+        )
+        self.assertEqual(bound["state"], "BOUND")
+        running_status = self.status(
+            [{"node_id": "ACTIVE-100", "state": "RUNNING", "reasons": []}]
+        )
+        resumed = build_orchestration_contract(
+            plane, "continue", status=running_status
+        )
+        self.assertEqual(
+            resumed["tasks"][0]["launch_instruction_id"], instruction_id
+        )
+        self.assertEqual(resumed["tasks"][0]["action"], "RESUME_BOUND")
+        self.assertEqual(resumed["tasks"][0]["binding"]["task_id"], "thread-123")
+        self.assertEqual([event["state"] for event in binding_events(self.root)], ["PREPARED", "CREATED", "BOUND"])
+        terminal = observe_terminal_launch(
+            self.root,
+            instruction_id,
+            terminal_state="SUCCEEDED",
+            host_event_ref="codex-thread:thread-123:terminal",
+            observed_by="orchestrator:fixture",
+        )
+        release_launch(
+            self.root,
+            instruction_id,
+            terminal_event_id=terminal["event_id"],
+            reason="host task reached a terminal result",
+        )
+        self.assertEqual(
+            [event["state"] for event in binding_events(self.root)],
+            ["PREPARED", "CREATED", "BOUND", "TERMINAL_OBSERVED", "RELEASED"],
+        )
+
+    def test_release_launch_requires_terminal_evidence(self) -> None:
+        instruction_id = "sha256:" + "2" * 64
+        prepare_launch(self.root, instruction_id, "codex")
+        bind_launch(self.root, instruction_id, "codex", "thread-live")
+        with self.assertRaises(Exception):
+            observe_terminal_launch(
+                self.root,
+                instruction_id,
+                terminal_state="SUCCEEDED",
+                host_event_ref="unbound-event",
+                observed_by="orchestrator:fixture",
+            )
+        with self.assertRaises(Exception):
+            release_launch(
+                self.root,
+                instruction_id,
+                terminal_event_id="sha256:" + "0" * 64,
+                reason="still running",
+            )
+
+    def test_prepared_launch_cannot_be_taken_over_by_another_host(self) -> None:
+        instruction_id = "sha256:" + "4" * 64
+        prepare_launch(self.root, instruction_id, "codex")
+        with self.assertRaises(Exception):
+            bind_launch(self.root, instruction_id, "other-host", "foreign-task")
+
+    def test_concurrent_prepare_launch_is_idempotent_and_hash_chained(self) -> None:
+        instruction_id = "sha256:" + "3" * 64
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            results = list(
+                executor.map(
+                    lambda _: prepare_launch(self.root, instruction_id, "codex"),
+                    range(12),
+                )
+            )
+        self.assertEqual({item["event_id"] for item in results}, {results[0]["event_id"]})
+        self.assertEqual(len(binding_events(self.root)), 1)
+
+    def test_first_binding_read_requires_the_preexisting_os_lock(self) -> None:
+        (self.root / ".autopilot" / "task-bindings.lock").unlink()
+        with self.assertRaises(Exception):
+            binding_events(self.root)
+
+    def test_implicit_completed_check_never_calls_mutating_status(self) -> None:
+        completed = self.status([{"node_id": "ACTIVE-100", "state": "COMPLETE"}])
+        completed["complete"] = True
+
+        class StatusProbe:
+            def __init__(self) -> None:
+                self.status_calls = 0
+
+            def observe_status(self):
+                return completed
+
+            def status(self):
+                self.status_calls += 1
+                return completed
+
+        for request in ("", "What happened?"):
+            probe = StatusProbe()
+            _, decision = select_orchestration_status(probe, request)
+            self.assertEqual(decision.intent, "CHECK")
+            self.assertEqual(probe.status_calls, 0)
+
+    def test_bound_host_task_prevents_false_quiescence(self) -> None:
+        status = self.status([{"node_id": "ACTIVE-100", "state": "COMPLETE"}])
+        status["complete"] = True
+        plane = FakePlane(self.root, status, self.nodes)
+        instruction_id = "sha256:" + "1" * 64
+        prepare_launch(self.root, instruction_id, "codex")
+        bind_launch(self.root, instruction_id, "codex", "thread-live")
+        contract = build_orchestration_contract(plane, "check", status=status)
+        self.assertEqual(contract["outcome"], "ACTIVE")
+        self.assertFalse(contract["quiescent"])
+
+    def test_launch_identity_is_repository_scoped(self) -> None:
+        rows = [{"node_id": "ACTIVE-100", "state": "READY", "reasons": []}]
+        status = self.status(rows)
+        status["dispatch_release"] = {"valid": True, "released_wave": ["ACTIVE-100"]}
+        first = FakePlane(self.root, status, self.nodes)
+        first.control = {"target": {"repository": "acme/one"}}
+        other_root = self.root / "other"
+        (other_root / ".autopilot").mkdir(parents=True)
+        shutil.copy2(
+            self.root / ".autopilot" / "orchestration-policy.json",
+            other_root / ".autopilot" / "orchestration-policy.json",
+        )
+        shutil.copy2(
+            self.root / ".autopilot" / "task-bindings.lock",
+            other_root / ".autopilot" / "task-bindings.lock",
+        )
+        second = FakePlane(other_root, status, self.nodes)
+        second.control = {"target": {"repository": "acme/two"}}
+        first_id = build_orchestration_contract(first, "start", status=status)["tasks"][0]["launch_instruction_id"]
+        second_id = build_orchestration_contract(second, "start", status=status)["tasks"][0]["launch_instruction_id"]
+        self.assertNotEqual(first_id, second_id)
+
+    def test_check_is_read_only_even_when_work_is_ready(self) -> None:
+        status = self.status([{"node_id": "NEW-300", "state": "READY"}])
+        plane = FakePlane(self.root, status, self.nodes)
+        contract = build_orchestration_contract(plane, "check status", status=status)
+        self.assertEqual(contract["tasks"], [])
+        self.assertFalse(contract["dispatch_required"])
+
+    def test_adverse_settled_state_is_quiescent_but_not_success(self) -> None:
+        status = self.status([{"node_id": "ACTIVE-100", "state": "QUARANTINED"}])
+        status["complete"] = True
+        plane = FakePlane(self.root, status, self.nodes)
+        contract = build_orchestration_contract(plane, "finish", status=status)
+        self.assertTrue(contract["quiescent"])
+        self.assertEqual(contract["outcome"], "BLOCKED")
+        self.assertFalse(contract["successful"])
+
+    def test_nonterminal_blocker_is_not_quiescent(self) -> None:
+        status = self.status([{"node_id": "ACTIVE-100", "state": "BLOCKED"}])
+        plane = FakePlane(self.root, status, self.nodes)
+        contract = build_orchestration_contract(plane, "finish", status=status)
+        self.assertEqual(contract["outcome"], "BLOCKED")
+        self.assertFalse(contract["quiescent"])
+
+    def test_policy_and_simple_prompt_encode_required_behavior(self) -> None:
+        policy = json.loads(
+            (self.root / ".autopilot" / "orchestration-policy.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(validate_policy(policy), ())
+        policy["task_transport"]["nested_primary_forbidden"] = False
+        self.assertTrue(validate_policy(policy))
+        prompt = simple_prompt()
+        self.assertIn("Infer whether I mean", prompt)
+        self.assertIn("quiescent", prompt)
+
+    def test_policy_validation_rejects_disabled_execution_invariants(self) -> None:
+        source = json.loads(
+            (self.root / ".autopilot" / "orchestration-policy.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        mutations = (
+            ("polling", "poll_until_terminal", False),
+            ("polling", "answer_questions_then_resume", False),
+            ("recovery", "resume_same_task_after_fix", False),
+            ("recovery", "blocker_is_completion", True),
+            ("wave", "never_start_next_level_before_required_current_cohort_quiescence", False),
+            ("task_transport", "record_task_id", False),
+        )
+        for section, key, value in mutations:
+            with self.subTest(section=section, key=key):
+                candidate = copy.deepcopy(source)
+                candidate[section][key] = value
+                self.assertTrue(validate_policy(candidate))
+
+
+if __name__ == "__main__":
+    unittest.main()

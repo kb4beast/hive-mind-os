@@ -1,0 +1,25 @@
+{
+  "actor": "codex:portable-autopilot-source-clerk",
+  "captured_at": "2026-08-11T13:36:00Z",
+  "claims": [
+    "CLM-085",
+    "CLM-086",
+    "CLM-087",
+    "CLM-088"
+  ],
+  "content_ingestion": "BLOCKED_UNRESOLVED_LICENSE_AND_LINEAGE",
+  "dispositions": {
+    "CLM-085": "quarantine",
+    "CLM-086": "defer",
+    "CLM-087": "defer",
+    "CLM-088": "defer"
+  },
+  "kind": "hive-mind-blocked-source-ingestion-receipt-v1",
+  "manifest": "evidence/sources/SRC-024-genericprompt-lineage/manifest.json",
+  "registered_sources": [
+    "SRC-024",
+    "SRC-025"
+  ],
+  "schema_version": 1,
+  "source_copy_authorized": false
+}

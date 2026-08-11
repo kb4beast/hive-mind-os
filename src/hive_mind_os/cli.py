@@ -24,6 +24,16 @@ from .autonomous_os import (
     HostKind,
 )
 from .autonomy import AutonomyBudget
+from .autopilot_workflow import (
+    DEFAULT_OBJECTIVE,
+    DEFAULT_TARGET_BRANCH,
+    PortableAutopilotError,
+    initialize_repository,
+    inspect_repository,
+)
+from .autopilot_workflow import (
+    simple_prompt as portable_autopilot_prompt,
+)
 from .benchmark_harness import BenchmarkHarness
 from .brain_kernel.context import ContextManifestStore
 from .brain_kernel.contracts import MissionCharter
@@ -118,6 +128,59 @@ def build_audit_parser() -> argparse.ArgumentParser:
         help="Required stable identifier when --signing-key-file is used",
     )
     return parser
+
+
+def build_autopilot_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind autopilot",
+        description="Initialize or operate a reusable intent-driven repository DAG.",
+    )
+    commands = parser.add_subparsers(dest="autopilot_command", required=True)
+    init = commands.add_parser("init", help="Record a portable governed DAG-build request")
+    init.add_argument("--repository", default=".")
+    init.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    init.add_argument("--target-branch", default=DEFAULT_TARGET_BRANCH)
+    init.add_argument("--remote", default="origin", help="Git remote to identify, or an empty value for local-only use")
+    init.add_argument(
+        "--protected-branch",
+        action="append",
+        default=[],
+        help="Additional protected branch name; repeat for repository-specific policy",
+    )
+    inspect = commands.add_parser("inspect", help="Infer intent and emit the next orchestration contract")
+    inspect.add_argument("--repository", default=".")
+    inspect.add_argument("--request", default="")
+    inspect.add_argument("--actor", default="hive-mind:portable-orchestrator")
+    inspect.add_argument("--apply", action="store_true")
+    commands.add_parser("prompt", help="Print the one reusable operator prompt")
+    return parser
+
+
+def _run_autopilot(args: argparse.Namespace) -> int:
+    try:
+        if args.autopilot_command == "init":
+            result = initialize_repository(
+                args.repository,
+                objective=args.objective,
+                target_branch=args.target_branch,
+                remote_name=args.remote,
+                protected_branches=args.protected_branch,
+            )
+        elif args.autopilot_command == "inspect":
+            result = inspect_repository(
+                args.repository,
+                request=args.request,
+                apply=args.apply,
+                actor=args.actor,
+            )
+        else:
+            print(portable_autopilot_prompt())
+            return 0
+    except PortableAutopilotError as error:
+        print(f"hive-mind autopilot: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
 
 
 def build_kernel_parser() -> argparse.ArgumentParser:
@@ -1676,6 +1739,9 @@ def _run_defer(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "autopilot":
+        args = build_autopilot_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_autopilot(args))
     if arguments and arguments[0] == "kernel":
         args = build_kernel_parser().parse_args(arguments[1:])
         if args.kernel_command == "doctor":

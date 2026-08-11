@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
 FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -313,6 +313,10 @@ class ControlPlane:
         ".autopilot/receipt.schema.json",
         ".autopilot/consultation.schema.json",
         ".autopilot/role-wiring.schema.json",
+        ".autopilot/orchestration-policy.json",
+        ".autopilot/orchestration-policy.schema.json",
+        ".autopilot/bin/orchestration.py",
+        ".autopilot/task-bindings.lock",
         ".autopilot/acceptance-matrix.json",
         ".autopilot/templates/worker.md",
         ".autopilot/templates/repair.md",
@@ -1690,8 +1694,7 @@ class ControlPlane:
             branch=str(node.get("branch")),
         )
 
-    def status(self) -> dict[str, object]:
-        self.clean_stale_claims()
+    def _status_document(self) -> dict[str, object]:
         target = self.current_target_sha()
         changed = self.changed_paths_since_reconciliation()
         # The plan is a DAG with substantial fan-in.  Re-evaluating every
@@ -1735,6 +1738,15 @@ class ControlPlane:
             "complete": all(view.state in TERMINAL_STATES for view in views),
             "generated_at": format_time(self.clock()),
         }
+
+    def observe_status(self) -> dict[str, object]:
+        """Return controller truth without reaping or otherwise mutating state."""
+
+        return self._status_document()
+
+    def status(self) -> dict[str, object]:
+        self.clean_stale_claims()
+        return self._status_document()
 
     def ready_nodes(self) -> tuple[str, ...]:
         status = self.status()
@@ -2006,6 +2018,12 @@ class ControlPlane:
             routes.get("anthropic"), f"{node_id}.routes.anthropic"
         )
         values = {
+            "REPOSITORY": str(
+                _require_mapping(self.control.get("target"), "control-plane.target").get(
+                    "repository", "local-repository"
+                )
+            ),
+            "TARGET_BRANCH": self.target_branch,
             "NODE_ID": node_id,
             "NODE_STATE": view.state,
             "OBJECTIVE": str(node.get("objective")),
