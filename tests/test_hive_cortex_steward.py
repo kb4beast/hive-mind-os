@@ -116,21 +116,20 @@ class HiveCortexStewardTests(unittest.TestCase):
                 evidence_digest=canonical_digest({"surface": "queues"}),
             )
 
-    def test_assessment_quarantines_object_setattr_evidence_tampering(self) -> None:
+    def test_observation_blocks_object_setattr_evidence_tampering(self) -> None:
         sealed = observation(HealthSurface.QUEUES)
-        object.__setattr__(sealed, "evidence", {"surface": "queues", "verified": False})
-        report = Steward().assess((sealed, *complete_observations()[1:]))
-        self.assertEqual(OperationalReadiness.QUARANTINED, report.readiness)
-        self.assertEqual(RepairKind.QUARANTINE, report.proposals[0].repair_kind)
+        with self.assertRaises(AttributeError):
+            object.__setattr__(sealed, "evidence", {"surface": "queues", "verified": False})
+        self.assertEqual(OperationalReadiness.READY, Steward().assess((sealed, *complete_observations()[1:])).readiness)
 
-    def test_assessment_rejects_coordinated_public_evidence_and_digest_forgery(self) -> None:
+    def test_observation_has_no_mutable_public_pair_or_registry_to_forge(self) -> None:
         sealed = observation(HealthSurface.QUEUES)
         forged = {"surface": "queues", "verified": False}
-        object.__setattr__(sealed, "evidence", forged)
-        object.__setattr__(sealed, "evidence_digest", canonical_digest(forged))
-        report = Steward().assess((sealed, *complete_observations()[1:]))
-        self.assertEqual(OperationalReadiness.QUARANTINED, report.readiness)
-        self.assertEqual(RepairKind.QUARANTINE, report.proposals[0].repair_kind)
+        with self.assertRaises(AttributeError):
+            object.__setattr__(sealed, "evidence", forged)
+        with self.assertRaises(AttributeError):
+            object.__setattr__(sealed, "evidence_digest", canonical_digest(forged))
+        self.assertFalse(hasattr(__import__("hive_mind_os.brain_kernel.steward", fromlist=["*"],), "_OBSERVATION_SEALS"))
 
 
 if __name__ == "__main__":

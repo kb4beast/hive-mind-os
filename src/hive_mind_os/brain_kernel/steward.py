@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, cast
 
 from .canonical import canonical_digest
 from .reconciler import RepairKind
@@ -43,9 +43,6 @@ class OperationalReadiness(StrEnum):
     READY = "ready"
     REPAIR_REQUIRED = "repair_required"
     QUARANTINED = "quarantined"
-
-
-_OBSERVATION_SEALS: dict[int, str] = {}
 
 
 def _text(value: str, label: str) -> str:
@@ -113,62 +110,80 @@ def _thaw(value: object) -> object:
     return value
 
 
-def _observation_payload(observation: "HealthObservation", evidence_digest: str) -> dict[str, object]:
-    return {
-        "surface": observation.surface.value,
-        "status": observation.status.value,
-        "subject_id": observation.subject_id,
-        "evidence_digest": observation.evidence_digest,
-        "content_digest": evidence_digest,
-        "recovery_ref": observation.recovery_ref,
-    }
-
-
 def _evidence_is_intact(observation: "HealthObservation") -> bool:
     try:
-        content_digest = canonical_digest(_thaw(observation.evidence))
-        return (
-            content_digest == observation.evidence_digest
-            and _OBSERVATION_SEALS.get(id(observation))
-            == canonical_digest(_observation_payload(observation, content_digest))
-        )
+        return canonical_digest(_thaw(observation.evidence)) == observation.evidence_digest
     except (AttributeError, TypeError, ValueError, StewardIntegrityError):
         return False
 
 
-@dataclass(frozen=True, slots=True)
-class HealthObservation:
+class HealthObservation(tuple[object, ...]):
     """One adapter-produced health observation with content-bound evidence."""
 
-    surface: HealthSurface
-    status: HealthStatus
-    subject_id: str
-    evidence: Mapping[str, object]
-    evidence_digest: str
-    recovery_ref: str | None = None
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "surface", HealthSurface(self.surface))
-        object.__setattr__(self, "status", HealthStatus(self.status))
-        object.__setattr__(self, "subject_id", _text(self.subject_id, "observation subject"))
-        if not isinstance(self.evidence, Mapping) or not self.evidence:
+    def __new__(
+        cls,
+        surface: HealthSurface,
+        status: HealthStatus,
+        subject_id: str,
+        evidence: Mapping[str, object],
+        evidence_digest: str,
+        recovery_ref: str | None = None,
+    ) -> "HealthObservation":
+        normalized_surface = HealthSurface(surface)
+        normalized_status = HealthStatus(status)
+        normalized_subject = _text(subject_id, "observation subject")
+        if not isinstance(evidence, Mapping) or not evidence:
             raise StewardIntegrityError("observation evidence is required")
-        evidence = _FrozenEvidence(self.evidence)
-        object.__setattr__(self, "evidence", evidence)
-        expected = canonical_digest(_thaw(evidence))
-        if self.evidence_digest != expected:
+        frozen_evidence = _FrozenEvidence(evidence)
+        expected = canonical_digest(_thaw(frozen_evidence))
+        if evidence_digest != expected:
             raise StewardIntegrityError("observation evidence digest does not match its content")
-        object.__setattr__(self, "evidence_digest", _sha256(self.evidence_digest, "observation evidence digest"))
-        if self.status is HealthStatus.HEALTHY:
-            if self.recovery_ref is not None:
-                object.__setattr__(self, "recovery_ref", _text(self.recovery_ref, "recovery reference"))
+        normalized_digest = _sha256(evidence_digest, "observation evidence digest")
+        if normalized_status is HealthStatus.HEALTHY:
+            normalized_recovery = (
+                _text(recovery_ref, "recovery reference") if recovery_ref is not None else None
+            )
         else:
-            if self.recovery_ref is None:
+            if recovery_ref is None:
                 raise StewardIntegrityError("unhealthy observation requires a recovery reference")
-            object.__setattr__(self, "recovery_ref", _text(self.recovery_ref, "recovery reference"))
-        _OBSERVATION_SEALS[id(self)] = canonical_digest(
-            _observation_payload(self, self.evidence_digest)
+            normalized_recovery = _text(recovery_ref, "recovery reference")
+        return tuple.__new__(
+            cls,
+            (
+                normalized_surface,
+                normalized_status,
+                normalized_subject,
+                frozen_evidence,
+                normalized_digest,
+                normalized_recovery,
+            ),
         )
+
+    @property
+    def surface(self) -> HealthSurface:
+        return cast(HealthSurface, self[0])
+
+    @property
+    def status(self) -> HealthStatus:
+        return cast(HealthStatus, self[1])
+
+    @property
+    def subject_id(self) -> str:
+        return cast(str, self[2])
+
+    @property
+    def evidence(self) -> Mapping[str, object]:
+        return cast(Mapping[str, object], self[3])
+
+    @property
+    def evidence_digest(self) -> str:
+        return cast(str, self[4])
+
+    @property
+    def recovery_ref(self) -> str | None:
+        return cast(str | None, self[5])
 
     def to_document(self) -> dict[str, object]:
         return {
