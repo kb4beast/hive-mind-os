@@ -5,5 +5,5 @@
   "appeals_ordering_disposition_digest": "sha256:52c32912394146f36cfa55e11f5777da9d81b18885059408c4c791d186a54607",
   "replan_digest": "sha256:afeda169e182db86dc8309d08493ce4a00f3ce806c96231be8ca2e18fcb28a13",
   "evidence_record_digest": "sha256:fa08e2cbd40acfe15b6d42c7005348b63b414d586814d8d4257abaffd7c66d06",
-  "capability_commit": "ded7093cffe5429c5983f15708092b934fbfb5bd"
+  "capability_commit": "76f3f7a1fa49cad109cab87a3938496afa9297f1"
 }
