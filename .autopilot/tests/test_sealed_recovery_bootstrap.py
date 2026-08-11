@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from unittest import mock
 
@@ -529,6 +530,17 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
                 consultation["identity_records"][0]["unexpected_nested_key"] = True
             elif mutation == "duplicate_identity":
                 consultation["identity_records"].append(copy.deepcopy(consultation["identity_records"][0]))
+            elif mutation == "blank_consultation_identity":
+                consultation["identity_records"][0]["identity"] = "  "
+            elif mutation == "typed_consultation_identity":
+                consultation["identity_records"][0]["identity"] = 1
+            elif mutation == "reused_consultation_identity":
+                consultation["identity_records"][1]["identity"] = consultation["identity_records"][0]["identity"]
+            elif mutation == "wrong_consultation_identity_kind":
+                consultation["identity_records"][0]["identity_kind"] = "fixture"
+            elif mutation == "requester_self_consultation":
+                consultation["consulted_roles"][0] = "builder"
+                consultation["identity_records"][0]["role"] = "builder"
             else:
                 consultation["consulted_roles"].append("architect")
 
@@ -553,12 +565,123 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             "extra_identity_key": lambda receipt: consultation_mutation(receipt, "extra_identity_key"),
             "duplicate_identity": lambda receipt: consultation_mutation(receipt, "duplicate_identity"),
             "duplicate_consulted_role": lambda receipt: consultation_mutation(receipt, "duplicate_consulted_role"),
+            "blank_consultation_identity": lambda receipt: consultation_mutation(receipt, "blank_consultation_identity"),
+            "typed_consultation_identity": lambda receipt: consultation_mutation(receipt, "typed_consultation_identity"),
+            "reused_consultation_identity": lambda receipt: consultation_mutation(receipt, "reused_consultation_identity"),
+            "wrong_consultation_identity_kind": lambda receipt: consultation_mutation(receipt, "wrong_consultation_identity_kind"),
+            "requester_self_consultation": lambda receipt: consultation_mutation(receipt, "requester_self_consultation"),
         }
         for name, mutate in mutations.items():
             receipt = self._receipt("OPTIMIZER-370")
             mutate(receipt)
             with self.subTest(name=name):
                 self.assertTrue(self.plane._replacement_receipt_issues("OPTIMIZER-370", receipt))
+
+    def test_canonical_receipt_schema_mutation_matrix_fails_closed(self) -> None:
+        node_id = "OPTIMIZER-370"
+
+        def baseline() -> dict:
+            receipt = self._receipt(node_id)
+            receipt["consultations"] = [self._consultation()]
+            return receipt
+
+        self.assertEqual(self.plane._sealed_receipt_shape_issues(node_id, baseline()), ())
+
+        mutations: list[tuple[str, Callable[[dict], object]]] = []
+        for key in baseline():
+            mutations.append((f"missing_top_level_{key}", lambda value, key=key: value.pop(key)))
+        mutations.extend([
+            ("unknown_top_level", lambda value: value.__setitem__("unknown", True)),
+            ("schema_bool", lambda value: value.__setitem__("schema_version", True)),
+            ("contract_wrong", lambda value: value.__setitem__("contract_version", 2)),
+            ("fingerprint_nonhex", lambda value: value.__setitem__("plan_fingerprint", "sha256:" + "g" * 64)),
+            ("node_blank", lambda value: value.__setitem__("node_id", " ")),
+            ("branch_typed", lambda value: value.__setitem__("branch", 1)),
+            ("commit_short", lambda value: value.__setitem__("final_commit", "abc")),
+            ("tree_upper", lambda value: value.__setitem__("final_tree", "A" * 40)),
+            ("pr_bool", lambda value: value.__setitem__("pr", True)),
+            ("timestamp_invalid", lambda value: value.__setitem__("timestamp", "not-a-time")),
+            ("rollback_blank", lambda value: value.__setitem__("rollback_ref", " ")),
+            ("decision_unknown", lambda value: value.__setitem__("acceptance_decision", "ADOPT")),
+            ("paths_typed", lambda value: value.__setitem__("changed_paths", None)),
+            ("paths_duplicate", lambda value: value["changed_paths"].append(value["changed_paths"][0])),
+            ("paths_unsorted", lambda value: value["changed_paths"].reverse()),
+            ("evidence_blank", lambda value: value.__setitem__("evidence_refs", [" "])),
+            ("evidence_duplicate", lambda value: value.__setitem__("evidence_refs", ["e", "e"])),
+            ("runtime_extra", lambda value: value["model_runtime"].__setitem__("extra", True)),
+            ("runtime_missing", lambda value: value["model_runtime"].pop("model")),
+            ("runtime_blank", lambda value: value["model_runtime"].__setitem__("provider", " ")),
+            ("test_extra", lambda value: value["tests"][0].__setitem__("extra", True)),
+            ("test_missing", lambda value: value["tests"][0].pop("command")),
+            ("test_blank", lambda value: value["tests"][0].__setitem__("name", " ")),
+            ("test_status", lambda value: value["tests"][0].__setitem__("status", "failed")),
+            ("test_command_type", lambda value: value["tests"][0].__setitem__("command", [1])),
+            ("test_order", lambda value: value["tests"].reverse()),
+            ("role_extra", lambda value: value["role_identities"][0].__setitem__("extra", True)),
+            ("role_missing", lambda value: value["role_identities"][0].pop("identity")),
+            ("role_blank", lambda value: value["role_identities"][0].__setitem__("identity", " ")),
+            ("role_kind", lambda value: value["role_identities"][0].__setitem__("identity_kind", "other")),
+            ("role_reused_identity", lambda value: value["role_identities"][1].__setitem__(
+                "identity", value["role_identities"][0]["identity"]
+            )),
+            ("role_order", lambda value: value["role_identities"].reverse()),
+            ("authority_extra", lambda value: value["authority"].__setitem__("extra", True)),
+            ("authority_missing", lambda value: value["authority"].pop("grant_id")),
+            ("authority_grants_type", lambda value: value["authority"].__setitem__("grants", "grant")),
+            ("authority_grants_duplicate", lambda value: value["authority"].__setitem__("grants", ["g", "g"])),
+            ("authority_blank", lambda value: value["authority"].__setitem__("grant_id", " ")),
+            ("authority_sha", lambda value: value["authority"].__setitem__("repair_claim_commit", "A" * 40)),
+            ("authority_digest", lambda value: value["authority"].__setitem__(
+                "repair_authority_digest", "sha256:" + "G" * 64
+            )),
+            ("consultation_extra", lambda value: value["consultations"][0].__setitem__("extra", True)),
+            ("consultation_missing", lambda value: value["consultations"][0].pop("reason_code")),
+            ("consultation_blank", lambda value: value["consultations"][0].__setitem__("question", " ")),
+            ("consultation_round_bool", lambda value: value["consultations"][0].__setitem__("round", True)),
+            ("consultation_bool_type", lambda value: value["consultations"][0].__setitem__(
+                "suspected_cheating", 0
+            )),
+            ("consultation_array_type", lambda value: value["consultations"][0].__setitem__(
+                "evidence_refs", "evidence"
+            )),
+            ("consultation_array_duplicate", lambda value: value["consultations"][0].__setitem__(
+                "dissent", ["same", "same"]
+            )),
+            ("consultation_decision", lambda value: value["consultations"][0].__setitem__(
+                "decision", "UNKNOWN"
+            )),
+            ("consultation_answer_type", lambda value: value["consultations"][0].__setitem__("answer", 1)),
+            ("consultation_self", lambda value: value["consultations"][0]["consulted_roles"].__setitem__(
+                0, "builder"
+            )),
+            ("consultation_duplicate_role", lambda value: value["consultations"][0].__setitem__(
+                "consulted_roles", ["architect", "architect"]
+            )),
+            ("identity_extra", lambda value: value["consultations"][0]["identity_records"][0].__setitem__(
+                "extra", True
+            )),
+            ("identity_missing", lambda value: value["consultations"][0]["identity_records"][0].pop(
+                "identity_kind"
+            )),
+            ("identity_typed", lambda value: value["consultations"][0]["identity_records"][0].__setitem__(
+                "identity", 1
+            )),
+            ("identity_kind", lambda value: value["consultations"][0]["identity_records"][0].__setitem__(
+                "identity_kind", "other"
+            )),
+            ("identity_reuse", lambda value: value["consultations"][0]["identity_records"][1].__setitem__(
+                "identity", value["consultations"][0]["identity_records"][0]["identity"]
+            )),
+            ("identity_order", lambda value: value["consultations"][0]["identity_records"].reverse()),
+            ("duplicate_request", lambda value: value["consultations"].append(
+                copy.deepcopy(value["consultations"][0])
+            )),
+        ])
+        for label, mutate in mutations:
+            receipt = baseline()
+            mutate(receipt)
+            with self.subTest(label=label):
+                self.assertTrue(self.plane._sealed_receipt_shape_issues(node_id, receipt))
 
     def test_only_exact_old_new_pair_resolves_and_extra_receipt_fails_closed(self) -> None:
         node_id = "ORCH-300"
@@ -595,6 +718,162 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane.sealed_recovery_issues = lambda: ()  # type: ignore[method-assign]
         with mock.patch.object(DurableControlPlane, "_durable_receipt_records", return_value=durable_records):
             view = self.plane.node_view(node_id)
+        self.assertEqual(view.state, "COMPLETE", view.reasons)
+
+    def test_real_bare_optimizer_claim_restart_receipt_and_integrated_complete(self) -> None:
+        repository = self.root / "sealed-real-flow"
+        remote = self.root / "sealed-real-flow.git"
+        copy_autopilot_fixture(Path(__file__).resolve().parents[1], repository / ".autopilot")
+
+        def run(*args: str, check: bool = True) -> str:
+            completed = subprocess.run(
+                args, cwd=repository, text=True, capture_output=True, check=False
+            )
+            if check and completed.returncode != 0:
+                self.fail(f"{' '.join(args)} failed: {completed.stderr}")
+            return completed.stdout.strip()
+
+        subprocess.run(("git", "init", "--bare", str(remote)), check=True, capture_output=True)
+        run("git", "init")
+        run("git", "config", "user.name", "Sealed Flow Fixture")
+        run("git", "config", "user.email", "sealed-flow@example.invalid")
+        run("git", "remote", "add", "origin", str(remote))
+        record = copy.deepcopy(self._record("OPTIMIZER-370"))
+        other_record = copy.deepcopy(self._record("ORCH-300"))
+        for relative in record["allowed_paths"]:
+            path = repository / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("baseline\n", encoding="utf-8")
+        run("git", "add", "-A")
+        run("git", "commit", "-m", "synthetic current release")
+        target = run("git", "rev-parse", "HEAD")
+        target_tree = run("git", "rev-parse", f"{target}^{{tree}}")
+        run("git", "branch", "release/hive-mind-os-singleton-20260810-r2", target)
+
+        original_claim_payload = {
+            "kind": "hive-mind-autopilot-remote-claim-v1",
+            "node_id": "OPTIMIZER-370",
+            "target_sha": target,
+            "branch": record["branch"],
+            "plan_fingerprint": record["plan_fingerprint"],
+        }
+        original_claim = run(
+            "git", "commit-tree", target_tree, "-p", target,
+            "-m", json.dumps(original_claim_payload, sort_keys=True, separators=(",", ":")),
+        )
+        run("git", "checkout", "-B", "synthetic-candidate", original_claim)
+        for index, relative in enumerate(record["allowed_paths"], start=1):
+            (repository / relative).write_text(f"rejected candidate {index}\n", encoding="utf-8")
+        run("git", "add", "-A")
+        run("git", "commit", "-m", "synthetic rejected candidate")
+        candidate = run("git", "rev-parse", "HEAD")
+        candidate_tree = run("git", "rev-parse", f"{candidate}^{{tree}}")
+        old_receipt_payload = {
+            "node_id": "OPTIMIZER-370", "branch": record["branch"],
+            "plan_fingerprint": record["plan_fingerprint"], "contract_version": 1,
+            "base_commit": target, "final_commit": candidate, "final_tree": candidate_tree,
+            "pr": record["expected_old_pr"],
+        }
+        old_receipt = run(
+            "git", "commit-tree", candidate_tree, "-p", candidate, "-m",
+            "HIVE-MIND-AUTOPILOT-COMPLETION-V1\n" + json.dumps(
+                old_receipt_payload, sort_keys=True, separators=(",", ":")
+            ),
+        )
+        run("git", "branch", "-f", record["branch"], old_receipt)
+        run(
+            "git", "push", "origin",
+            f"{target}:refs/heads/release/hive-mind-os-singleton-20260810-r2",
+            f"{old_receipt}:refs/heads/{record['branch']}",
+        )
+        record.update({
+            "incident_target_sha": target,
+            "original_claim_commit": original_claim,
+            "candidate_commit": candidate,
+            "candidate_tree": candidate_tree,
+            "old_receipt_commit": old_receipt,
+            "old_receipt_tree": candidate_tree,
+            "old_receipt_payload_digest": autopilot.digest_json(old_receipt_payload),
+        })
+
+        def configure(plane) -> None:
+            plane._repair_records = lambda: {  # type: ignore[method-assign]
+                "OPTIMIZER-370": record, "ORCH-300": other_record,
+            }
+            plane.sealed_recovery_issues = lambda: ()  # type: ignore[method-assign]
+            plane._repair_live_issues = lambda _record: ()  # type: ignore[method-assign]
+            plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
+            plane._live_release_issues = lambda _record, _expected=None: ()  # type: ignore[method-assign]
+            plane.assert_start_now = lambda _node: {"release_id": "sealed-real-release"}  # type: ignore[method-assign]
+            plane.current_release = lambda: {  # type: ignore[method-assign]
+                "release_id": "sealed-real-release", "target_sha": target,
+            }
+            plane._snapshot_digest = lambda: "snapshot"  # type: ignore[method-assign]
+            plane._reconciliation_digest = lambda: "reconciliation"  # type: ignore[method-assign]
+            plane._doctor_evidence_digest = lambda: "doctor"  # type: ignore[method-assign]
+            plane._release_binding_issues = lambda _claim=None: ()  # type: ignore[method-assign]
+
+        plane = autopilot.ControlPlane(repository)
+        configure(plane)
+        claim = plane.claim("OPTIMIZER-370", "test:real-flow", publish_remote=True)
+        execution_merge = str(claim["execution_merge_commit"])
+        self.assertEqual(plane.remote_branch_sha(record["branch"]), execution_merge)
+        run("git", "checkout", "-B", record["branch"], execution_merge)
+        for index, relative in enumerate(record["allowed_paths"], start=1):
+            (repository / relative).write_text(f"repaired candidate {index}\n", encoding="utf-8")
+        run("git", "add", "-A")
+        run("git", "commit", "-m", "synthetic repaired candidate")
+        final = run("git", "rev-parse", "HEAD")
+        final_tree = run("git", "rev-parse", f"{final}^{{tree}}")
+        run("git", "push", "origin", f"{final}:refs/heads/{record['branch']}")
+        receipt = self._receipt("OPTIMIZER-370")
+        receipt.update({
+            "base_commit": target, "base_tree": target_tree,
+            "final_commit": final, "final_tree": final_tree,
+            "changed_paths": sorted(record["allowed_paths"]),
+        })
+        receipt["authority"].update({
+            "supersedes_receipt_commit": old_receipt,
+            "repair_authority_digest": autopilot.digest_json(record),
+            "repair_claim_commit": claim["remote_claim_commit"],
+            "execution_merge_commit": execution_merge,
+            "execution_target_sha": target,
+            "repair_claim_payload_digest": autopilot.digest_json(
+                plane._repair_claim_message(str(claim["remote_claim_commit"]))
+            ),
+        })
+        original_write = sealed_recovery.atomic_write_json
+
+        def crash_after_receipt_cas(path, value):
+            if path == plane.receipt_path("OPTIMIZER-370"):
+                raise SystemExit("synthetic hard restart")
+            return original_write(path, value)
+
+        try:
+            sealed_recovery.atomic_write_json = crash_after_receipt_cas
+            with self.assertRaises(SystemExit):
+                plane.complete("OPTIMIZER-370", "test:real-flow", receipt)
+        finally:
+            sealed_recovery.atomic_write_json = original_write
+        published_receipt = plane.remote_branch_sha(record["branch"])
+        self.assertNotEqual(published_receipt, final)
+        restarted = autopilot.ControlPlane(repository)
+        configure(restarted)
+        self.assertEqual(
+            restarted.complete("OPTIMIZER-370", "test:real-flow", receipt),
+            published_receipt,
+        )
+        run(
+            "git", "push", "origin",
+            f"{published_receipt}:refs/heads/release/hive-mind-os-singleton-20260810-r2",
+        )
+        run("git", "fetch", "origin", "release/hive-mind-os-singleton-20260810-r2")
+        integrated = autopilot.ControlPlane(repository)
+        configure(integrated)
+        integrated.current_release = lambda: {  # type: ignore[method-assign]
+            "release_id": "integrated", "target_sha": published_receipt,
+        }
+        view = integrated.node_view("OPTIMIZER-370")
         self.assertEqual(view.state, "COMPLETE", view.reasons)
 
     def test_orch_exact_inherited_claim_provenance_can_validate_integrated_successor(self) -> None:

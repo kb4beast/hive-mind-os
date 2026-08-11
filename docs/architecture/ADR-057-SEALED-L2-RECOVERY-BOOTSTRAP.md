@@ -66,6 +66,11 @@ filesystem mutex rather than a check-then-replace sequence. Replacement receipts
 only their exact schema, nonblank role identities and strings, integer versions, string
 evidence references, a typed model-runtime record, exact consultation/identity nesting,
 unique consulted identities, and canonical lowercase SHA-256 digests.
+One canonical sealed-envelope validator covers every top-level and nested key, scalar,
+enum, digest, node-defined ordering, array uniqueness, separated identity, and
+non-self-consultation invariant. A table-driven mutation matrix and a disposable real bare
+remote exercise claim CAS, hard restart after receipt CAS, recovery, integration, durable
+Git-log scanning, and final `COMPLETE` projection without consuming a live origin ref.
 
 Claim and completion intents are persisted before remote CAS. On restart, an exact
 `PREPARING`, `PREPARED`, expired `CLAIMED`, or `COMPLETING` state is either rolled back by

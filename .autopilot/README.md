@@ -202,6 +202,10 @@ receipts are rejected unless their complete schema, identities, evidence referen
 model-runtime record have the sealed types and nonblank values. Consultation and identity
 rows have exact nested schemas and unique roles; authority digests use canonical lowercase
 SHA-256 syntax.
+The sealed envelope also fixes node-defined test/role ordering and forbids identity reuse
+or requester self-consultation. Its end-to-end regression uses a wholly disposable bare
+remote through real claim and receipt CAS, restart recovery, integration, and durable
+`COMPLETE` reconstruction.
 
 `retire-builder-330-branch --actor IDENTITY` has no caller-selected remote/ref/SHA inputs.
 It may archive and retire only the sealed stale Builder head under an atomic source-head and

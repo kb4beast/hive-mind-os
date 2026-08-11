@@ -841,8 +841,9 @@ class SealedRecoveryMixin:
             return None
         return value if isinstance(value, Mapping) else None
 
-    @staticmethod
-    def _sealed_receipt_shape_issues(receipt: Mapping[str, Any]) -> tuple[str, ...]:
+    def _sealed_receipt_shape_issues(
+        self, node_id: str, receipt: Mapping[str, Any]
+    ) -> tuple[str, ...]:
         required = {
             "schema_version", "plan_fingerprint", "node_id", "contract_version",
             "base_commit", "base_tree", "final_commit", "final_tree", "branch", "pr",
@@ -852,14 +853,26 @@ class SealedRecoveryMixin:
         issues: list[str] = []
         if set(receipt) != required:
             issues.append("sealed replacement receipt schema is expanded or incomplete")
-        for key in (
-            "plan_fingerprint", "node_id", "base_commit", "base_tree", "final_commit",
-            "final_tree", "branch", "timestamp", "rollback_ref",
-        ):
+        for key in ("node_id", "branch", "timestamp", "rollback_ref"):
             if not isinstance(receipt.get(key), str) or not str(receipt.get(key)).strip():
                 issues.append(f"sealed replacement receipt {key} must be a nonblank string")
-        if type(receipt.get("schema_version")) is not int or type(receipt.get("contract_version")) is not int:
-            issues.append("sealed replacement receipt schema and contract versions must be integers")
+        if receipt.get("node_id") != node_id:
+            issues.append("sealed replacement receipt node identity is invalid")
+        if receipt.get("schema_version") != 1 or type(receipt.get("schema_version")) is not int:
+            issues.append("sealed replacement receipt schema_version must be integer 1")
+        if receipt.get("contract_version") != 1 or type(receipt.get("contract_version")) is not int:
+            issues.append("sealed replacement receipt contract_version must be integer 1")
+        if not isinstance(receipt.get("plan_fingerprint"), str) or DIGEST_SHA256.fullmatch(
+            str(receipt.get("plan_fingerprint"))
+        ) is None:
+            issues.append("sealed replacement receipt plan_fingerprint must be canonical SHA-256")
+        for key in ("base_commit", "base_tree", "final_commit", "final_tree"):
+            if not isinstance(receipt.get(key), str) or FULL_SHA.fullmatch(str(receipt.get(key))) is None:
+                issues.append(f"sealed replacement receipt {key} must be a full lowercase Git SHA")
+        try:
+            parse_time(receipt.get("timestamp"))
+        except (TypeError, ValueError):
+            issues.append("sealed replacement receipt timestamp must be canonical date-time text")
         if type(receipt.get("pr")) is not int:
             issues.append("sealed replacement receipt pr must be an integer")
         for key in ("changed_paths", "evidence_refs"):
@@ -868,6 +881,11 @@ class SealedRecoveryMixin:
                 not isinstance(value, str) or not value.strip() for value in values
             ):
                 issues.append(f"sealed replacement receipt {key} must contain nonblank strings")
+            elif len(values) != len(set(values)):
+                issues.append(f"sealed replacement receipt {key} must be unique")
+        changed_paths = receipt.get("changed_paths")
+        if isinstance(changed_paths, list) and changed_paths != sorted(changed_paths):
+            issues.append("sealed replacement receipt changed_paths must be sorted")
         runtime = receipt.get("model_runtime")
         if (
             not isinstance(runtime, Mapping)
@@ -880,6 +898,7 @@ class SealedRecoveryMixin:
             issues.append("sealed replacement receipt role_identities must be nonempty")
         else:
             seen_roles: set[str] = set()
+            seen_identities: set[str] = set()
             for role in roles:
                 if not isinstance(role, Mapping) or set(role) != {"role", "identity", "identity_kind"}:
                     issues.append("sealed replacement role identity shape is invalid")
@@ -890,10 +909,20 @@ class SealedRecoveryMixin:
                 if role_name in seen_roles:
                     issues.append("sealed replacement role identities contain a duplicate role")
                 seen_roles.add(role_name)
+                identity = str(role.get("identity"))
+                if identity in seen_identities:
+                    issues.append("sealed replacement role identities reuse an identity")
+                seen_identities.add(identity)
+                if role.get("identity_kind") not in {"model_role", "service", "human"}:
+                    issues.append("sealed replacement role identity kind is invalid")
+            expected_roles = list(self.node(node_id)["roles"])
+            if [role.get("role") for role in roles if isinstance(role, Mapping)] != expected_roles:
+                issues.append("sealed replacement role identity ordering differs from the node contract")
         tests = receipt.get("tests")
         if not isinstance(tests, list) or not tests:
             issues.append("sealed replacement receipt tests must be nonempty")
         else:
+            observed_test_names: list[str] = []
             for test in tests:
                 if not isinstance(test, Mapping) or set(test) != {"name", "status", "command"}:
                     issues.append("sealed replacement test record shape is invalid")
@@ -908,6 +937,42 @@ class SealedRecoveryMixin:
                     or any(not isinstance(item, str) or not item for item in command)
                 ):
                     issues.append("sealed replacement test record fields are invalid")
+                else:
+                    observed_test_names.append(str(test["name"]))
+            if observed_test_names != list(self.node(node_id)["required_tests"]):
+                issues.append("sealed replacement test ordering differs from the node contract")
+        authority = receipt.get("authority")
+        authority_keys = {
+            "node_id", "autonomy_level", "grants", "grant_id",
+            "supersedes_receipt_commit", "repair_authority_digest",
+            "repair_claim_commit", "execution_merge_commit", "execution_target_sha",
+            "repair_claim_payload_digest",
+        }
+        if not isinstance(authority, Mapping) or set(authority) != authority_keys:
+            issues.append("sealed replacement authority shape is expanded or incomplete")
+        else:
+            for key in ("node_id", "autonomy_level", "grant_id"):
+                if not isinstance(authority.get(key), str) or not authority.get(key, "").strip():
+                    issues.append(f"sealed replacement authority {key} must be nonblank text")
+            grants = authority.get("grants")
+            if (
+                not isinstance(grants, list)
+                or len(grants) != 1
+                or not isinstance(grants[0], str)
+                or not grants[0].strip()
+            ):
+                issues.append("sealed replacement authority grants must contain one nonblank grant")
+            for key in (
+                "supersedes_receipt_commit", "repair_claim_commit",
+                "execution_merge_commit", "execution_target_sha",
+            ):
+                if not isinstance(authority.get(key), str) or FULL_SHA.fullmatch(str(authority.get(key))) is None:
+                    issues.append(f"sealed replacement authority {key} must be a full lowercase Git SHA")
+            for key in ("repair_authority_digest", "repair_claim_payload_digest"):
+                if not isinstance(authority.get(key), str) or DIGEST_SHA256.fullmatch(
+                    str(authority.get(key))
+                ) is None:
+                    issues.append(f"sealed replacement authority {key} must be canonical SHA-256")
         consultations = receipt.get("consultations")
         consultation_keys = {
             "request_id", "mission_id", "question", "reason_code", "requesting_role",
@@ -918,32 +983,89 @@ class SealedRecoveryMixin:
         if not isinstance(consultations, list):
             issues.append("sealed replacement consultations must be a list")
         else:
+            request_ids: list[str] = []
             for consultation in consultations:
                 if not isinstance(consultation, Mapping) or set(consultation) != consultation_keys:
                     issues.append("sealed replacement consultation shape is expanded or incomplete")
                     continue
+                for key in (
+                    "request_id", "mission_id", "question", "reason_code",
+                    "requesting_role", "decision", "cheating_disposition",
+                ):
+                    if not isinstance(consultation.get(key), str) or not consultation.get(key, "").strip():
+                        issues.append(f"sealed replacement consultation {key} must be nonblank text")
+                request_ids.append(str(consultation.get("request_id")))
+                if type(consultation.get("round")) is not int or not 1 <= consultation.get("round", 0) <= 3:
+                    issues.append("sealed replacement consultation round must be integer 1 through 3")
+                for key in ("suspected_cheating", "human_escalation", "role_first_exhausted"):
+                    if type(consultation.get(key)) is not bool:
+                        issues.append(f"sealed replacement consultation {key} must be boolean")
+                for key in ("evidence_refs", "dissent"):
+                    values = consultation.get(key)
+                    if not isinstance(values, list) or any(
+                        not isinstance(value, str) or not value.strip() for value in values
+                    ):
+                        issues.append(f"sealed replacement consultation {key} must contain nonblank strings")
+                    elif len(values) != len(set(values)):
+                        issues.append(f"sealed replacement consultation {key} must be unique")
+                if consultation.get("decision") not in {
+                    "RESOLVED", "REMAND", "REPLAN", "BLOCKED_EVIDENCE",
+                    "TRUE_AUTHORITY_REQUIRED", "QUARANTINE",
+                }:
+                    issues.append("sealed replacement consultation decision is invalid")
+                if consultation.get("cheating_disposition") not in {
+                    "NOT_APPLICABLE", "CONFIRMED", "DISPROVED", "UNRESOLVED",
+                }:
+                    issues.append("sealed replacement consultation cheating disposition is invalid")
+                answer = consultation.get("answer")
+                if answer is not None and (not isinstance(answer, str) or not answer.strip()):
+                    issues.append("sealed replacement consultation answer must be null or nonblank text")
+                authority_class = consultation.get("authority_class")
+                if authority_class is not None and (
+                    not isinstance(authority_class, str) or not authority_class.strip()
+                ):
+                    issues.append("sealed replacement consultation authority_class must be null or nonblank text")
                 consulted = consultation.get("consulted_roles")
                 if (
                     not isinstance(consulted, list)
                     or any(not isinstance(role, str) for role in consulted)
+                    or len(consulted) < 2
                     or len(consulted) != len(set(consulted))
                 ):
-                    issues.append("sealed replacement consultation roles must be unique")
+                    issues.append("sealed replacement consultation roles must contain two unique roles")
                     consulted = []
+                if consultation.get("requesting_role") in consulted:
+                    issues.append("sealed replacement consultation cannot consult the requesting role")
                 identities = consultation.get("identity_records")
                 if not isinstance(identities, list):
                     issues.append("sealed replacement consultation identities must be a list")
                     continue
                 identity_roles: list[str] = []
+                identity_values: list[str] = []
                 for identity in identities:
                     if not isinstance(identity, Mapping) or set(identity) != {"role", "identity", "identity_kind"}:
                         issues.append("sealed replacement consultation identity shape is invalid")
                         continue
-                    identity_roles.append(str(identity.get("role")))
+                    if any(
+                        not isinstance(identity.get(key), str) or not identity.get(key, "").strip()
+                        for key in ("role", "identity", "identity_kind")
+                    ):
+                        issues.append("sealed replacement consultation identity fields must be nonblank strings")
+                        continue
+                    if identity.get("identity_kind") not in {"model_role", "service", "human"}:
+                        issues.append("sealed replacement consultation identity kind is invalid")
+                    identity_roles.append(str(identity["role"]))
+                    identity_values.append(str(identity["identity"]))
                 if len(identity_roles) != len(set(identity_roles)):
                     issues.append("sealed replacement consultation identities contain a duplicate role")
-                if set(identity_roles) != set(consulted):
-                    issues.append("sealed replacement consultation identities do not exactly cover consulted roles")
+                if len(identity_values) != len(set(identity_values)):
+                    issues.append("sealed replacement consultation identities reuse an identity")
+                if identity_roles != consulted:
+                    issues.append("sealed replacement consultation identities do not exactly order consulted roles")
+            if len(request_ids) != len(set(request_ids)):
+                issues.append("sealed replacement consultations contain a duplicate request_id")
+        if receipt.get("acceptance_decision") != "ADAPT":
+            issues.append("sealed replacement acceptance_decision must be ADAPT")
         return tuple(dict.fromkeys(issues))
 
     def _replacement_receipt_issues(
@@ -953,7 +1075,7 @@ class SealedRecoveryMixin:
         *,
         active_claim: Mapping[str, Any] | None = None,
     ) -> tuple[str, ...]:
-        issues = list(self._sealed_receipt_shape_issues(receipt))
+        issues = list(self._sealed_receipt_shape_issues(node_id, receipt))
         issues.extend(super().validate_receipt(node_id, receipt, require_integrated=False))
         record = self._repair_records().get(node_id)
         if record is None:
