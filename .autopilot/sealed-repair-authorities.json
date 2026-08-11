@@ -5,6 +5,7 @@
       "schema_version": 1,
       "repair_id": "optimizer-370-invalid-receipt-supersession-v1",
       "grant_id": "optimizer-370-invalid-receipt-supersession-v1",
+      "court_id": "court-optimizer-370-invalid-receipt-supersession-20260811",
       "decision": "ADAPT",
       "node_id": "OPTIMIZER-370",
       "repository": "kb4beast/hive-mind-os",
@@ -38,6 +39,21 @@
       "cross_examiner_identity": "curator:optimizer-370-repair-cross-examiner",
       "expert_witness_identity": "steward:optimizer-370-repair-expert",
       "judge_identity": "court:optimizer-370-independent-repair-judge",
+      "owner_identity": "optimizer:optimizer-370-repair-owner",
+      "outcome_metric": "All three reproduced evaluator and evidence integrity gaps are rejected by focused adversarial tests without changing nonsealed controller behavior.",
+      "authenticated_snapshot_retrieval_digest": "sha256:f6173bc314c507727c43c0553c6e1fce0d3107803dbbedc07169da6c1c589e95",
+      "evidence_refs": [
+        "git:926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+        "git:df73beb1a234b457b3d35bcbf58b80242b18c8a6",
+        "pr:https://github.com/kb4beast/hive-mind-os/pull/135",
+        "test:sealed-recovery-bootstrap"
+      ],
+      "acceptance_test_mapping": [
+        {"finding": "forged lesson digest", "test": "optimizer repair adversarial receipt tests"},
+        {"finding": "whitespace identity bypass", "test": "optimizer repair evaluator identity tests"},
+        {"finding": "boolean integer coercion", "test": "optimizer repair evidence type tests"}
+      ],
+      "dissent": [],
       "adverse_findings": [
         "A forged ScopedLesson.lesson_digest is accepted.",
         "Surrounding whitespace bypasses evaluator self-review identity denial.",
@@ -57,6 +73,7 @@
       "schema_version": 1,
       "repair_id": "orch-300-continuation-supersession-v1",
       "grant_id": "orch-300-continuation-supersession-v1",
+      "court_id": "court-orch-300-continuation-supersession-20260811",
       "decision": "ADAPT",
       "node_id": "ORCH-300",
       "repository": "kb4beast/hive-mind-os",
@@ -92,6 +109,23 @@
       "cross_examiner_identity": "curator:orch-300-repair-cross-examiner",
       "expert_witness_identity": "steward:orch-300-repair-expert",
       "judge_identity": "court:orch-300-independent-repair-judge",
+      "owner_identity": "orchestrator:orch-300-repair-owner",
+      "outcome_metric": "The corrected planner persists and restores mission-bound plans under charter, consultation, budget, stop, and replan invariants with Ruff, Pyright, focused, and full-suite receipts.",
+      "authenticated_snapshot_retrieval_digest": "sha256:f6173bc314c507727c43c0553c6e1fce0d3107803dbbedc07169da6c1c589e95",
+      "evidence_refs": [
+        "git:dbb8cb736eb98e77ef35eb141b2e55e492fbcf88",
+        "git:4f77d1b14042d02ec49035037f6f2077b659e50b",
+        "pr:https://github.com/kb4beast/hive-mind-os/pull/131",
+        "test:sealed-recovery-bootstrap"
+      ],
+      "acceptance_test_mapping": [
+        {"finding": "planner static type failures", "test": "Ruff and Pyright exact-candidate gates"},
+        {"finding": "cross-mission and non-atomic supersession", "test": "mission-specific persistence and failure-atomicity tests"},
+        {"finding": "lost schedules and charter invariants", "test": "restart, budget, stop, consultation, and digest binding tests"}
+      ],
+      "dissent": [
+        "The historical eight focused tests passed but did not cover the retained adverse findings; they are not promotion evidence."
+      ],
       "adverse_findings": [
         "Pyright reports an optional startswith error at planner.py:107 and union narrowing errors at planner.py:295-296.",
         "persist_plan globally supersedes unrelated missions' PROPOSED work without a mission or replaces filter or reason evidence.",

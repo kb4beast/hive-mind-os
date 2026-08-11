@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -187,3 +188,32 @@ class BlockerProtocolTests(unittest.TestCase):
             plane.release_global_validation_lease("ACCEPT-240", "worker:accept")
             second = plane.acquire_global_validation_lease("CONSULT-210", "worker:consult")
             self.assertEqual(second["node_id"], "CONSULT-210")
+
+    def test_validation_lease_concurrent_acquisition_has_exactly_one_winner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_autopilot_fixture(Path(__file__).resolve().parents[1], root / ".autopilot")
+            control = controller.read_json(root / ".autopilot" / "control-plane.json")
+            control["verify_git_objects"] = False
+            controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
+            plane = controller.ControlPlane(root)
+            barrier = threading.Barrier(2)
+            outcomes: list[str] = []
+
+            def acquire(node_id: str, owner: str) -> None:
+                barrier.wait()
+                try:
+                    plane.acquire_global_validation_lease(node_id, owner)
+                    outcomes.append("won")
+                except controller.AutopilotError:
+                    outcomes.append("lost")
+
+            threads = [
+                threading.Thread(target=acquire, args=("ACCEPT-240", "worker:accept")),
+                threading.Thread(target=acquire, args=("CONSULT-210", "worker:consult")),
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            self.assertEqual(sorted(outcomes), ["lost", "won"])

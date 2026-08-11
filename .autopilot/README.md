@@ -193,6 +193,14 @@ old receipt, complete repair-claim payload, captured execution release, and dete
 merge. Only the exact historical/replacement pair resolves; every other duplicate remains
 fail closed.
 
+The literal-origin singleton release ref is fetched and compared immediately before and
+after each recovery CAS. Repair claim and receipt intents are written before publication,
+so an exact interrupted or expired lease can be verified and resumed or rolled back after
+restart. Ambiguous or failed compensation remains `ADVERSE` with its intent and audit
+evidence intact. The global validation lease is an exclusive-create mutex, and replacement
+receipts are rejected unless their complete schema, identities, evidence references, and
+model-runtime record have the sealed types and nonblank values.
+
 `retire-builder-330-branch --actor IDENTITY` has no caller-selected remote/ref/SHA inputs.
 It may archive and retire only the sealed stale Builder head under an atomic source-head and
 archive-absence lease. A fresh snapshot must then show the canonical branch absent and the

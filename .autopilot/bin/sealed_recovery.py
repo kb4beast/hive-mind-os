@@ -25,8 +25,8 @@ REPAIR_CLAIM_KIND = "hive-mind-autopilot-sealed-repair-claim-v1"
 REPAIR_DOCTOR_KIND = "hive-mind-autopilot-full-doctor-evidence-v1"
 REPAIR_DOCTOR_FILE = "sealed-repair-doctor.json"
 REPAIR_AUTHORITY_MATERIAL_DIGESTS = {
-    "OPTIMIZER-370": "sha256:cbac176ea815a893b49bd6bfb4953471f9a6e3fa0ca2f1d52527a8a5f023a986",
-    "ORCH-300": "sha256:9d1ac329e0d79b45abc285d9b6cb4e79c0331a487f0376d24c84fd427d27ecba",
+    "OPTIMIZER-370": "sha256:380b642ffbc32892eee60fab8b9a23f3b1fdd9e5c66a5309f97c2d9a842ab4dd",
+    "ORCH-300": "sha256:348714232a0be8a82bbf168fa96c55c52a155d4549955b6d8e113abcb26adc9d",
 }
 SEALED_CAPABILITY_COMMIT = "ded7093cffe5429c5983f15708092b934fbfb5bd"
 REPAIR_PRIOR_STATES = {
@@ -38,6 +38,8 @@ BUILDER_COURT_PATH = ".autopilot/builder-330-recovery-court.json"
 BUILDER_APPEALS_PATH = ".autopilot/builder-330-recovery-appeals.json"
 BUILDER_REPLAN_PATH = ".autopilot/builder-330-recovery-replan.json"
 BUILDER_BOOTSTRAP_PATH = ".autopilot/builder-330-recovery-bootstrap.json"
+BUILDER_EVIDENCE_PATH = ".autopilot/builder-330-recovery-evidence.json"
+BUILDER_EVIDENCE_DIGEST = "sha256:fa08e2cbd40acfe15b6d42c7005348b63b414d586814d8d4257abaffd7c66d06"
 BUILDER_DIGESTS = {
     BUILDER_COURT_PATH: "sha256:b3cbb1178dde47c22d365218cc306e6aa31a59af252782a5edf572ab5858e69a",
     BUILDER_APPEALS_PATH: "sha256:52c32912394146f36cfa55e11f5777da9d81b18885059408c4c791d186a54607",
@@ -180,7 +182,8 @@ class SealedRecoveryMixin:
         bootstrap = self._builder_document(BUILDER_BOOTSTRAP_PATH)
         if not isinstance(bootstrap, Mapping) or set(bootstrap) != {
             "schema_version", "recovery_id", "court_disposition_digest",
-            "appeals_ordering_disposition_digest", "replan_digest", "capability_commit",
+            "appeals_ordering_disposition_digest", "replan_digest", "evidence_record_digest",
+            "capability_commit",
         }:
             issues.append("Builder recovery bootstrap record shape is invalid")
             bootstrap = {}
@@ -190,10 +193,14 @@ class SealedRecoveryMixin:
             ("court_disposition_digest", BUILDER_DIGESTS[BUILDER_COURT_PATH]),
             ("appeals_ordering_disposition_digest", BUILDER_DIGESTS[BUILDER_APPEALS_PATH]),
             ("replan_digest", BUILDER_DIGESTS[BUILDER_REPLAN_PATH]),
+            ("evidence_record_digest", BUILDER_EVIDENCE_DIGEST),
         ):
             if bootstrap.get(key) != expected:
                 issues.append(f"Builder recovery bootstrap {key} is invalid")
         issues.extend(self._capability_issues(bootstrap.get("capability_commit")))
+        evidence = self._builder_document(BUILDER_EVIDENCE_PATH)
+        if evidence is None or digest_json(evidence) != BUILDER_EVIDENCE_DIGEST:
+            issues.append("Builder recovery evidence record digest is invalid")
         if appeals.get("court_disposition_digest") != digest_json(court):
             issues.append("Builder Appeals record does not bind the Court record")
         if replan.get("court_disposition_digest") != digest_json(court) or replan.get(
@@ -547,6 +554,36 @@ class SealedRecoveryMixin:
                     issues.append(f"sealed recovery active lease {key} is stale")
         return tuple(dict.fromkeys(issues))
 
+    def _live_release_issues(
+        self,
+        record: Mapping[str, Any],
+        expected_target: str | None = None,
+    ) -> tuple[str, ...]:
+        """Authenticate one literal-origin release ref and its fetched object twice."""
+
+        if not self._origin_is_configured_repository(record):
+            return ("sealed recovery live release check requires literal configured origin",)
+        reference = f"refs/heads/{self.target_branch}"
+        expected = expected_target or self.current_target_sha()
+        observed = self._remote_ref_sha(reference)
+        if observed != expected:
+            return ("literal origin singleton release differs from captured execution target",)
+        local_ref = f"refs/hive-mind-autopilot/release-fetch/{expected}"
+        self._git(("update-ref", "-d", local_ref), check=False)
+        try:
+            fetched = self._git(
+                ("fetch", "--no-tags", "origin", f"{reference}:{local_ref}"),
+                check=False,
+            )
+            fetched_sha = self._git(("rev-parse", "--verify", local_ref), check=False).stdout.strip()
+            if fetched.returncode != 0 or fetched_sha != expected or not self.git_object_exists(expected):
+                return ("literal origin singleton release object cannot be authenticated",)
+            if self._remote_ref_sha(reference) != expected:
+                return ("literal origin singleton release raced during authentication",)
+            return ()
+        finally:
+            self._git(("update-ref", "-d", local_ref), check=False)
+
     def _recover_interrupted_repair_claim(self, record: Mapping[str, Any]) -> None:
         path = self.claim_path(str(record["node_id"]))
         if not path.is_file():
@@ -558,6 +595,26 @@ class SealedRecoveryMixin:
             raise ClaimError("sealed repair existing claim authority is stale")
         status = value.get("status")
         if status not in {"PREPARING", "PREPARED"}:
+            if status == "CLAIMED" and parse_time(value.get("expires_at")) <= self.clock():
+                remote_head = value.get("remote_head_commit")
+                observed = self.remote_branch_sha(str(record["branch"]))
+                if observed == remote_head and isinstance(remote_head, str):
+                    self._cas_update_branch(
+                        str(record["branch"]), remote_head, str(record["old_receipt_commit"])
+                    )
+                    observed = self.remote_branch_sha(str(record["branch"]))
+                if observed == record["old_receipt_commit"]:
+                    append_jsonl(self.state_dir / "sealed-repair-adverse.jsonl", {
+                        "event": "expired_claim_rolled_back", "node_id": record["node_id"],
+                        "remote_head_commit": remote_head,
+                    })
+                    path.unlink()
+                    return
+                retained = dict(value)
+                retained["status"] = "ADVERSE"
+                retained["adverse_reason"] = "expired repair claim advanced beyond exact rollback head"
+                atomic_write_json(path, retained)
+                raise ClaimError("expired sealed repair claim requires reconciliation")
             return
         old = str(record["old_receipt_commit"])
         created = value.get("remote_claim_commit")
@@ -617,6 +674,9 @@ class SealedRecoveryMixin:
             raise ClaimError("; ".join(self._repair_live_issues(record)))
         if not self._origin_is_configured_repository(record):
             raise ClaimError("sealed repair requires literal configured origin repository")
+        live_issues = self._live_release_issues(record)
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
         old = str(record["old_receipt_commit"])
         branch = str(record["branch"])
         if self.remote_branch_sha(branch) != old:
@@ -686,6 +746,9 @@ class SealedRecoveryMixin:
                 raise ClaimError("sealed repair remote claim verification failed")
             if self._release_binding_issues(local):
                 raise ClaimError("sealed repair release changed during claim publication")
+            live_issues = self._live_release_issues(record, str(local["target_sha"]))
+            if live_issues:
+                raise ClaimError("; ".join(live_issues))
             local["status"] = "CLAIMED"
             atomic_write_json(path, local)
             return local
@@ -722,6 +785,32 @@ class SealedRecoveryMixin:
         if not isinstance(value, Mapping) or value.get("owner") != owner:
             raise ClaimError("sealed repair claim owner does not match")
         record = self._repair_record(node_id)
+        if not self._origin_is_configured_repository(record):
+            raise ClaimError("sealed repair release requires literal configured origin")
+        live_issues = self._live_release_issues(record, str(value.get("target_sha")))
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
+        if value.get("status") == "COMPLETING":
+            intent_path = self.state_dir / f"sealed-repair-completion-{node_id.lower()}.json"
+            intent = read_json(intent_path) if intent_path.is_file() else None
+            receipt_commit = intent.get("receipt_commit") if isinstance(intent, Mapping) else None
+            if isinstance(receipt_commit, str):
+                shown = self._git(("show", "-s", "--format=%B", receipt_commit), check=False)
+                receipt = self._parse_receipt_message(shown.stdout) if shown.returncode == 0 else None
+                if isinstance(receipt, Mapping):
+                    recovered = self._recover_interrupted_repair_completion(
+                        node_id, owner, receipt, value, record
+                    )
+                    if recovered is not None:
+                        append_jsonl(self.state_dir / "releases.jsonl", {
+                            "node_id": node_id, "owner": owner,
+                            "reason": reason + "; recovered committed receipt",
+                            "released_at": format_time(self.clock()),
+                        })
+                        return
+                    value = read_json(path)
+                    if not isinstance(value, Mapping):
+                        return
         remote_head = value.get("remote_head_commit")
         observed = self.remote_branch_sha(str(record["branch"]))
         if isinstance(remote_head, str) and observed == remote_head:
@@ -750,6 +839,71 @@ class SealedRecoveryMixin:
             return None
         return value if isinstance(value, Mapping) else None
 
+    @staticmethod
+    def _sealed_receipt_shape_issues(receipt: Mapping[str, Any]) -> tuple[str, ...]:
+        required = {
+            "schema_version", "plan_fingerprint", "node_id", "contract_version",
+            "base_commit", "base_tree", "final_commit", "final_tree", "branch", "pr",
+            "changed_paths", "tests", "evidence_refs", "model_runtime", "role_identities",
+            "authority", "consultations", "acceptance_decision", "timestamp", "rollback_ref",
+        }
+        issues: list[str] = []
+        if set(receipt) != required:
+            issues.append("sealed replacement receipt schema is expanded or incomplete")
+        for key in (
+            "plan_fingerprint", "node_id", "base_commit", "base_tree", "final_commit",
+            "final_tree", "branch", "timestamp", "rollback_ref",
+        ):
+            if not isinstance(receipt.get(key), str) or not str(receipt.get(key)).strip():
+                issues.append(f"sealed replacement receipt {key} must be a nonblank string")
+        if type(receipt.get("schema_version")) is not int or type(receipt.get("contract_version")) is not int:
+            issues.append("sealed replacement receipt schema and contract versions must be integers")
+        if type(receipt.get("pr")) is not int:
+            issues.append("sealed replacement receipt pr must be an integer")
+        for key in ("changed_paths", "evidence_refs"):
+            values = receipt.get(key)
+            if not isinstance(values, list) or not values or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                issues.append(f"sealed replacement receipt {key} must contain nonblank strings")
+        runtime = receipt.get("model_runtime")
+        if not isinstance(runtime, Mapping) or not isinstance(runtime.get("provider"), str) or not runtime.get(
+            "provider", ""
+        ).strip() or not any(
+            isinstance(runtime.get(key), str) and runtime.get(key, "").strip()
+            for key in ("model", "execution_surface")
+        ):
+            issues.append("sealed replacement receipt model_runtime is incomplete")
+        roles = receipt.get("role_identities")
+        if not isinstance(roles, list) or not roles:
+            issues.append("sealed replacement receipt role_identities must be nonempty")
+        else:
+            for role in roles:
+                if not isinstance(role, Mapping) or set(role) != {"role", "identity", "identity_kind"}:
+                    issues.append("sealed replacement role identity shape is invalid")
+                    continue
+                if any(not isinstance(role.get(key), str) or not role.get(key, "").strip() for key in role):
+                    issues.append("sealed replacement role identity fields must be nonblank")
+        tests = receipt.get("tests")
+        if not isinstance(tests, list) or not tests:
+            issues.append("sealed replacement receipt tests must be nonempty")
+        else:
+            for test in tests:
+                if not isinstance(test, Mapping) or not {"name", "status", "command"}.issubset(test):
+                    issues.append("sealed replacement test record shape is invalid")
+                    continue
+                command = test.get("command")
+                if (
+                    not isinstance(test.get("name"), str)
+                    or not test.get("name", "").strip()
+                    or test.get("status") != "passed"
+                    or not isinstance(command, list)
+                    or not command
+                    or any(not isinstance(item, str) or not item for item in command)
+                ):
+                    issues.append("sealed replacement test record fields are invalid")
+        return tuple(dict.fromkeys(issues))
+
     def _replacement_receipt_issues(
         self,
         node_id: str,
@@ -757,7 +911,8 @@ class SealedRecoveryMixin:
         *,
         active_claim: Mapping[str, Any] | None = None,
     ) -> tuple[str, ...]:
-        issues = list(super().validate_receipt(node_id, receipt, require_integrated=False))
+        issues = list(self._sealed_receipt_shape_issues(receipt))
+        issues.extend(super().validate_receipt(node_id, receipt, require_integrated=False))
         record = self._repair_records().get(node_id)
         if record is None:
             return ("sealed replacement authority is unavailable",)
@@ -989,6 +1144,138 @@ class SealedRecoveryMixin:
             return records
         return [replacement]
 
+    def _receipt_index_contains(self, node_id: str, receipt_commit: str) -> bool:
+        path = self.state_dir / "receipt-index.jsonl"
+        if not path.is_file():
+            return False
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, Mapping) and value.get("node_id") == node_id and value.get(
+                "receipt_commit"
+            ) == receipt_commit:
+                return True
+        return False
+
+    def _recover_interrupted_repair_completion(
+        self,
+        node_id: str,
+        owner: str,
+        receipt: Mapping[str, Any],
+        claim: Mapping[str, Any],
+        record: Mapping[str, Any],
+    ) -> str | None:
+        intent_path = self.state_dir / f"sealed-repair-completion-{node_id.lower()}.json"
+        if not intent_path.is_file():
+            return None
+        intent = read_json(intent_path)
+        required = {
+            "schema_version", "kind", "status", "node_id", "owner", "target_sha",
+            "remote_expected_final", "receipt_digest", "receipt_commit",
+            "active_claim_digest", "prepared_at",
+        }
+        if not isinstance(intent, Mapping) or set(intent) != required:
+            raise ClaimError("sealed repair completion intent is foreign or malformed")
+        if (
+            intent.get("kind") != "hive-mind-autopilot-sealed-repair-completion-v1"
+            or intent.get("status") != "PREPARED"
+            or intent.get("node_id") != node_id
+            or intent.get("owner") != owner
+            or intent.get("receipt_digest") != digest_json(receipt)
+        ):
+            raise ClaimError("sealed repair completion intent identity is invalid")
+        claimed_material = dict(claim)
+        claimed_material["status"] = "CLAIMED"
+        claimed_material.pop("adverse_reason", None)
+        if intent.get("active_claim_digest") != digest_json(claimed_material):
+            raise ClaimError("sealed repair completion intent claim binding is invalid")
+        if claim.get("status") != "COMPLETING" or intent.get("target_sha") != self.current_target_sha():
+            raise ClaimError("sealed repair completion recovery target or state is invalid")
+        if self._release_binding_issues(claim):
+            raise ClaimError("sealed repair completion recovery release is stale")
+        final = str(intent["remote_expected_final"])
+        receipt_commit = intent.get("receipt_commit")
+        remote = self.remote_branch_sha(str(record["branch"]))
+
+        def adverse(error: Exception) -> None:
+            retained = dict(claim)
+            retained["status"] = "ADVERSE"
+            retained["adverse_reason"] = str(error)
+            atomic_write_json(self.claim_path(node_id), retained)
+            append_jsonl(self.state_dir / "sealed-repair-adverse.jsonl", {
+                "event": "receipt_restart_recovery_failed", "node_id": node_id,
+                "remote_head": remote, "receipt_commit": receipt_commit,
+                "error": str(error),
+            })
+
+        if receipt_commit is None:
+            if remote != final:
+                error = ClaimError("sealed repair completion stopped before commit but remote moved")
+                adverse(error)
+                raise error
+            restored = dict(claim)
+            restored["status"] = "CLAIMED"
+            atomic_write_json(self.claim_path(node_id), restored)
+            intent_path.unlink()
+            return None
+        if not isinstance(receipt_commit, str) or FULL_SHA.fullmatch(receipt_commit) is None:
+            error = ClaimError("sealed repair completion intent receipt commit is invalid")
+            adverse(error)
+            raise error
+        if remote == final:
+            self._git(("update-ref", f"refs/heads/{record['branch']}", final, receipt_commit), check=False)
+            restored = dict(claim)
+            restored["status"] = "CLAIMED"
+            atomic_write_json(self.claim_path(node_id), restored)
+            intent_path.unlink()
+            return None
+        if remote != receipt_commit:
+            error = ClaimError("sealed repair completion recovery remote head is ambiguous")
+            adverse(error)
+            raise error
+        if self._commit_parents(receipt_commit) != (final,) or self._commit_tree(receipt_commit) != receipt.get("final_tree"):
+            error = ReceiptError("sealed repair recovered receipt topology or tree is invalid")
+            adverse(error)
+            raise error
+        shown = self._git(("show", "-s", "--format=%B", receipt_commit), check=False)
+        recovered_receipt = self._parse_receipt_message(shown.stdout) if shown.returncode == 0 else None
+        if not isinstance(recovered_receipt, Mapping) or digest_json(recovered_receipt) != digest_json(receipt):
+            error = ReceiptError("sealed repair recovered receipt payload is invalid")
+            adverse(error)
+            raise error
+        validation_owner = f"sealed-repair-completion:{owner}"
+        self.acquire_global_validation_lease(node_id, validation_owner, lease_minutes=10)
+        try:
+            local_path = self.receipt_path(node_id)
+            if local_path.is_file():
+                if digest_json(read_json(local_path)) != digest_json(receipt):
+                    raise ReceiptError("sealed repair recovered local receipt conflicts")
+            else:
+                atomic_write_json(local_path, receipt)
+            if not self._receipt_index_contains(node_id, receipt_commit):
+                append_jsonl(
+                    self.state_dir / "receipt-index.jsonl",
+                    {
+                        "node_id": node_id,
+                        "receipt_commit": receipt_commit,
+                        "receipt_digest": digest_json(receipt),
+                        "final_commit": final,
+                        "supersedes_receipt_commit": record["old_receipt_commit"],
+                        "timestamp": receipt.get("timestamp"),
+                    },
+                )
+            self.claim_path(node_id).unlink()
+            intent_path.unlink()
+            append_jsonl(self.state_dir / "sealed-repair-adverse.jsonl", {
+                "event": "receipt_publication_recovered_after_restart",
+                "node_id": node_id, "receipt_commit": receipt_commit,
+            })
+            return receipt_commit
+        finally:
+            self.release_global_validation_lease(node_id, validation_owner)
+
     def complete(self, node_id: str, owner: str, receipt: Mapping[str, Any]) -> str:
         if node_id not in REPAIR_AUTHORITY_MATERIAL_DIGESTS:
             return super().complete(node_id, owner, receipt)
@@ -1000,11 +1287,24 @@ class SealedRecoveryMixin:
             raise ClaimError("sealed repair completion claim is invalid")
         if claim.get("owner") != owner:
             raise ClaimError("sealed repair completion owner differs")
-        if parse_time(claim.get("expires_at")) <= self.clock():
-            raise ClaimError("sealed repair completion lease expired")
         record = self._repair_record(node_id)
+        if not self._origin_is_configured_repository(record):
+            raise ClaimError("sealed repair completion requires literal configured origin")
+        live_issues = self._live_release_issues(record, str(claim.get("target_sha")))
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
         if claim.get("authority_digest") != digest_json(record):
             raise ClaimError("sealed repair completion claim authority is stale")
+        recovered = self._recover_interrupted_repair_completion(
+            node_id, owner, receipt, claim, record
+        )
+        if recovered is not None:
+            return recovered
+        claim = read_json(claim_path)
+        if not isinstance(claim, Mapping):
+            raise ClaimError("sealed repair completion claim disappeared during recovery")
+        if parse_time(claim.get("expires_at")) <= self.clock():
+            raise ClaimError("sealed repair completion lease expired")
         binding_issues = self._release_binding_issues(claim)
         if binding_issues:
             raise ClaimError("; ".join(binding_issues))
@@ -1037,6 +1337,7 @@ class SealedRecoveryMixin:
                 "target_sha": claim["target_sha"],
                 "remote_expected_final": final,
                 "receipt_digest": digest_json(receipt),
+                "receipt_commit": None,
                 "active_claim_digest": digest_json(claim),
                 "prepared_at": format_time(self.clock()),
             }
@@ -1044,12 +1345,17 @@ class SealedRecoveryMixin:
             claim_state["status"] = "COMPLETING"
             atomic_write_json(claim_path, claim_state)
             receipt_commit = self._create_receipt_commit(node_id, receipt)
+            intent["receipt_commit"] = receipt_commit
+            atomic_write_json(intent_path, intent)
             self._cas_update_branch(str(record["branch"]), str(final), receipt_commit)
             remote_published = self.remote_branch_sha(str(record["branch"])) == receipt_commit
             if not remote_published:
                 raise ReceiptError("sealed repair receipt remote CAS verification failed")
             if self._release_binding_issues(claim):
                 raise ClaimError("sealed repair release changed during receipt publication")
+            live_issues = self._live_release_issues(record, str(claim["target_sha"]))
+            if live_issues:
+                raise ClaimError("; ".join(live_issues))
             atomic_write_json(local_path, receipt)
             append_jsonl(
                 self.state_dir / "receipt-index.jsonl",
@@ -1252,6 +1558,9 @@ class SealedRecoveryMixin:
             raise ClaimError("Builder retirement prepared intent is foreign or malformed")
         if intent.get("kind") != BUILDER_EXECUTION_KIND or intent.get("status") != "PREPARED":
             raise ClaimError("Builder retirement prepared intent requires reconciliation")
+        live_issues = self._live_release_issues(replan, str(intent.get("target_sha")))
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
         expected = str(replan["expected_remote_head"])
         source_ref = f"refs/heads/{replan['branch']}"
         archive_ref = str(replan["archive_ref"])
@@ -1347,19 +1656,63 @@ class SealedRecoveryMixin:
             and self._remote_ref_sha(archive_ref) is None
         )
 
+    def _finalize_builder_execution_cleanup(
+        self,
+        execution: Mapping[str, Any],
+        replan: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
+        """Finish only the local cleanup window after a durable RETIRED record exists."""
+
+        if not self.builder_intent_path.is_file():
+            return None
+        live_issues = self._live_release_issues(replan, str(execution.get("target_sha")))
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
+        intent = read_json(self.builder_intent_path)
+        if not isinstance(intent, Mapping) or intent.get("status") != "PREPARED":
+            raise ClaimError("Builder post-execution intent is invalid")
+        for key in ("recovery_id", "source_head", "archive_ref", "target_sha", "release_id", "actor"):
+            if intent.get(key) != execution.get(key):
+                raise ClaimError(f"Builder post-execution cleanup {key} differs")
+        source_ref = f"refs/heads/{replan['branch']}"
+        archive_ref = str(replan["archive_ref"])
+        expected = str(replan["expected_remote_head"])
+        if self._remote_ref_sha(source_ref) is not None or self._remote_ref_sha(archive_ref) != expected:
+            raise ClaimError("Builder post-execution cleanup remote state differs")
+        if self.builder_lease_path.is_file():
+            lease = read_json(self.builder_lease_path)
+            if not isinstance(lease, Mapping) or digest_json(lease) != intent.get("lease_digest"):
+                raise ClaimError("Builder post-execution cleanup lease differs")
+            archive = self.state_dir / "builder-retirement-leases" / (
+                digest_json(lease).replace(":", "-") + ".json"
+            )
+            atomic_write_json(archive, {**lease, "status": "RELEASED", "released_at": format_time(self.clock())})
+            self.builder_lease_path.unlink()
+        self.builder_intent_path.unlink()
+        append_jsonl(self.state_dir / BUILDER_AUDIT_FILE, {
+            "event": "builder_post_execution_cleanup_recovered",
+            "recovery_id": execution["recovery_id"],
+            "recorded_at": format_time(self.clock()),
+        })
+        return execution
+
     def retire_builder_branch(self, *, actor: str) -> Mapping[str, Any]:
         if not actor.strip():
             raise AutopilotError("Builder retirement actor is required")
         issues = self.sealed_recovery_issues()
         if issues:
             raise AutopilotError("; ".join(issues))
-        if self._builder_execution() is not None:
-            raise ClaimError("Builder retirement attempted reuse is forbidden")
         replan = self._builder_document(BUILDER_REPLAN_PATH)
         bootstrap = self._builder_document(BUILDER_BOOTSTRAP_PATH)
         assert isinstance(replan, Mapping) and isinstance(bootstrap, Mapping)
         if not self._origin_is_configured_repository(replan):
             raise ClaimError("Builder retirement requires literal origin repository identity")
+        prior = self._builder_execution()
+        if prior is not None:
+            recovered_cleanup = self._finalize_builder_execution_cleanup(prior, replan)
+            if recovered_cleanup is not None:
+                return recovered_cleanup
+            raise ClaimError("Builder retirement attempted reuse is forbidden")
         recovered = self._recover_interrupted_builder_retirement(replan)
         if recovered is not None:
             return recovered
@@ -1369,6 +1722,9 @@ class SealedRecoveryMixin:
         if self._doctor_evidence_digest() is None:
             raise ClaimError("Builder retirement requires current full doctor evidence")
         release = self._builder_release_preflight()
+        live_issues = self._live_release_issues(replan, self.current_target_sha())
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
         capability = str(bootstrap["capability_commit"])
         if self.verify_git_objects and not self.is_ancestor(capability, self.current_target_sha()):
             raise ClaimError("Builder retirement current release omits capability")
@@ -1432,6 +1788,9 @@ class SealedRecoveryMixin:
                 raise ClaimError("Builder retirement refs changed during verification")
             if self._release_binding_issues():
                 raise ClaimError("Builder retirement release changed before archive transaction")
+            live_issues = self._live_release_issues(replan, str(lease["target_sha"]))
+            if live_issues:
+                raise ClaimError("; ".join(live_issues))
             intent = {
                 "schema_version": 1,
                 "kind": BUILDER_EXECUTION_KIND,
@@ -1469,6 +1828,9 @@ class SealedRecoveryMixin:
                     raise ClaimError("Builder retirement archive tree or ancestry verification failed")
                 if self._release_binding_issues():
                     raise ClaimError("Builder retirement release changed during archive transaction")
+                live_issues = self._live_release_issues(replan, str(lease["target_sha"]))
+                if live_issues:
+                    raise ClaimError("; ".join(live_issues))
                 execution = {
                     "schema_version": 1,
                     "kind": BUILDER_EXECUTION_KIND,

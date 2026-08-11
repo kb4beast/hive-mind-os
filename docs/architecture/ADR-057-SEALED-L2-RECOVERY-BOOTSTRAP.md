@@ -22,6 +22,10 @@ Each incident has separate Advocate, Cross-Examiner, Expert Witness, and Judge i
 an `ADAPT` decision, adverse findings, acceptance conditions, and rollback. The Builder
 Court, Appeals, and replan documents retain the supplied canonical digests. This combined
 delivery does not combine their authority or make any recovery primitive generic.
+The Optimizer and ORCH records also bind their court IDs, owner, measurable outcome,
+authenticated-snapshot retrieval digest, evidence references, acceptance-test mapping,
+and preserved dissent. Builder retains the byte-exact supplied court chain and binds a
+separate evidence receipt so those original digests do not change.
 
 The shared baseline also had two test-isolation defects. Controller fixtures copied live
 ignored `.autopilot/state/**`, and one Explorer disposable-remote test imported a live
@@ -54,6 +58,21 @@ supersession, wrong PR (including any transition other than `null` to 131 for OR
 receipt, mixed-case identity, non-fast-forward topology, expanded path, stale evidence, or
 attempted reuse remains `REPAIR_REQUIRED`.
 
+The current singleton release is authenticated against the literal origin release ref,
+fetched into a bounded non-symbolic verification ref, and rechecked before and after each
+claim, receipt, and Builder remote transaction. The validation lease uses an `O_EXCL`
+filesystem mutex rather than a check-then-replace sequence. Replacement receipts accept
+only their exact schema, nonblank role identities and strings, integer versions, string
+evidence references, and a typed model-runtime record.
+
+Claim and completion intents are persisted before remote CAS. On restart, an exact
+`PREPARING`, `PREPARED`, expired `CLAIMED`, or `COMPLETING` state is either rolled back by
+its exact lease or resumed after verifying the remote commit topology, tree, receipt
+payload, authority, execution release, and local evidence. A failed or ambiguous
+compensation retains an `ADVERSE` claim, intent, and append-only event; it never deletes
+the only recovery record. The exact historical plus replacement durable receipt pair is
+projected as `COMPLETE` only after the full sealed validator succeeds.
+
 Builder accepts no caller-selected node, remote, branch, SHA, or ref. It requires the
 controller to show exact `REPAIR_REQUIRED` and a dispatcher `STOP`, verifies the literal
 origin and pinned history, then atomically creates the dedicated archive ref at candidate
@@ -78,8 +97,10 @@ PR mappings, missing Git objects in a release-only clone, wrong parent ordering,
 conflicts, force/rebase/squash histories, scope expansion, duplicate receipts, expired or
 foreign leases, crash windows, partial remote mutations, archive reuse, and evidence-write
 failure after publication. Exact prefetch refs, deterministic trees, before/after release
-checks, prepared state records, CAS leases, compensation, and retained adverse evidence
-address those threats. Generic claims, completion, duplicate-receipt handling, Explorer
+checks against the authenticated literal origin, prepared state records, CAS leases,
+exclusive validation mutexes, restart recovery, strict receipt schemas, compensation, and
+retained adverse evidence address those threats. Generic claims, completion,
+duplicate-receipt handling, Explorer
 retirement, TLS, revocation, provenance, tests, courtroom rules, and protected branches are
 not weakened.
 

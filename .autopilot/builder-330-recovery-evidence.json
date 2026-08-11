@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "evidence_id": "builder-330-stale-candidate-recovery-evidence-20260811",
+  "node_id": "BUILDER-330",
+  "owner_identity": "builder:builder-330-recovery-owner",
+  "outcome_metric": "The exact stale source is archived and retired under CAS, then the preserved three-file candidate is restored only after fresh controller gating and passes command-boundary, branch-binding, Ruff, Pyright, focused, and full-suite checks.",
+  "court_disposition_digest": "sha256:b3cbb1178dde47c22d365218cc306e6aa31a59af252782a5edf572ab5858e69a",
+  "appeals_ordering_disposition_digest": "sha256:52c32912394146f36cfa55e11f5777da9d81b18885059408c4c791d186a54607",
+  "replan_digest": "sha256:afeda169e182db86dc8309d08493ce4a00f3ce806c96231be8ca2e18fcb28a13",
+  "authenticated_snapshot_retrieval_digest": "sha256:f6173bc314c507727c43c0553c6e1fce0d3107803dbbedc07169da6c1c589e95",
+  "evidence_refs": [
+    "git:1268050ff22f3af5338adf16284b9083aafd8bf1",
+    "git:93a9c46b57fe581216021e791e61403b09494c5f",
+    "tree:0b7c26beb8d7cfbf1752c7625d3cdb0dce87c556",
+    "archive:refs/hive-mind-autopilot/archive/builder-330/93a9c46b57fe581216021e791e61403b09494c5f"
+  ],
+  "test_receipt_refs": [
+    "test:builder-wrapper-workspace-escape-adversarial",
+    "test:builder-current-branch-binding-adversarial",
+    "lint:builder-ruff",
+    "typecheck:builder-pyright",
+    "test:sealed-recovery-bootstrap",
+    "test:canonical-full-suite"
+  ],
+  "dissent": [
+    "The preserved candidate is evidence only and must not be restored as accepted product code before fresh dispatch and independent verification."
+  ]
+}
