@@ -35,9 +35,14 @@
       "create_primary": "create_thread",
       "message_primary": "send_message_to_thread",
       "nested_sidecar": "multi_agent_v1.spawn_agent",
+      "close_sidecar": "multi_agent_v1.close_agent",
+      "message_sidecar": "multi_agent_v1.send_input",
+      "wait_activity": "bounded fair multiplex of wait_threads and multi_agent_v1.wait_agent",
       "wait_primary": "wait_threads"
     },
-    "nested_agents": "Allowed only for bounded research, independent review, or non-blocking validation. A nested agent may not replace a primary node task.",
+    "nested_agents": "Allowed only when root-admitted by the token-aware sidecar policy for bounded research, independent review, or non-blocking validation. Sidecars are read-only, may not replace a primary node task, and all descendants must settle with acknowledged parent delivery before quiescence.",
+    "sidecar_registry": ".autopilot/state/sidecar-bindings.jsonl",
+    "sidecar_rule": "Create only token-positive sidecars. Child requests are advisory; the root alone validates evidence, depth, duplicate identity, count, and ancestor token budget before spawning. Never end a primary successfully with an active descendant.",
     "primary_owner": "A durable task owns its explicit node and authority mode through its stopping condition. A preparation task never inherits execution authority implicitly; a released write-authorized lifecycle is separately identified and managed.",
     "selection": "Select a host that can satisfy the node contract and configured route. Host choice never expands node or effect authority."
   },

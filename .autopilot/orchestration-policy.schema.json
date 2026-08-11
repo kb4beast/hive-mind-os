@@ -7,8 +7,50 @@
     "intent": {"type": "object"},
     "kind": {"const": "hive-mind-autopilot-orchestration-policy-v1"},
     "polling": {"type": "object"},
+    "host_executor": {"type": "object"},
+    "parallel_task_cohort": {"type": "object"},
     "recovery": {"type": "object"},
     "schema_version": {"const": 1},
+    "sidecars": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_purposes": {
+          "items": {"enum": ["bounded_read_only_research", "independent_review", "non_blocking_validation"]},
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "close_descendants_before_parent_terminal": {"const": true},
+        "coordination_overhead_tokens": {"minimum": 0, "type": "integer"},
+        "enabled": {"const": true},
+        "max_depth": {"maximum": 2, "minimum": 1, "type": "integer"},
+        "max_no_progress_cycles": {"minimum": 1, "type": "integer"},
+        "max_poll_cycles": {"minimum": 1, "type": "integer"},
+        "max_replay_events": {"minimum": 1, "type": "integer"},
+        "max_result_tokens": {"minimum": 1, "type": "integer"},
+        "max_sidecars_per_primary": {"minimum": 1, "type": "integer"},
+        "max_targets_per_wait": {"maximum": 8, "minimum": 1, "type": "integer"},
+        "max_total_sidecars": {"minimum": 1, "type": "integer"},
+        "min_net_savings_tokens": {"minimum": 1, "type": "integer"},
+        "per_sidecar_token_budget": {"minimum": 1, "type": "integer"},
+        "primary_authority_inheritance": {"const": false},
+        "require_parent_ack": {"const": true},
+        "root_mediates_descendants": {"const": true},
+        "total_token_budget": {"minimum": 1, "type": "integer"},
+        "wait_timeout_seconds": {"minimum": 1, "type": "integer"}
+      },
+      "required": [
+        "allowed_purposes", "close_descendants_before_parent_terminal",
+        "coordination_overhead_tokens", "enabled", "max_depth",
+        "max_no_progress_cycles", "max_poll_cycles", "max_replay_events",
+        "max_result_tokens", "max_sidecars_per_primary", "max_targets_per_wait",
+        "max_total_sidecars", "min_net_savings_tokens", "per_sidecar_token_budget",
+        "primary_authority_inheritance", "require_parent_ack",
+        "root_mediates_descendants", "total_token_budget", "wait_timeout_seconds"
+      ],
+      "type": "object"
+    },
     "task_transport": {"type": "object"},
     "wave": {"type": "object"}
   },
@@ -21,7 +63,10 @@
     "wave",
     "closure_first",
     "polling",
-    "recovery"
+    "recovery",
+    "host_executor",
+    "parallel_task_cohort",
+    "sidecars"
   ],
   "title": "Hive Mind Autopilot Orchestration Policy",
   "type": "object"

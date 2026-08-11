@@ -61,6 +61,12 @@ class WorkflowPolicyTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 1)
+        sidecar_result = subprocess.run(
+            ["git", "check-ignore", "--quiet", ".autopilot/bin/sidecar_execution.py"],
+            cwd=repository,
+            check=False,
+        )
+        self.assertEqual(sidecar_result.returncode, 1)
         policy = json.loads((ROOT / "orchestration-policy.json").read_text(encoding="utf-8"))
         self.assertEqual(
             policy["task_transport"]["binding_sequence"],
@@ -74,6 +80,12 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertTrue(cohort["create_eligible_preparation_tasks"])
         self.assertTrue(cohort["create_entire_cohort_before_first_wait"])
         self.assertTrue(cohort["poll_every_created_task_to_terminal"])
+        sidecars = policy["sidecars"]
+        self.assertTrue(sidecars["root_mediates_descendants"])
+        self.assertFalse(sidecars["primary_authority_inheritance"])
+        self.assertEqual(sidecars["max_depth"], 2)
+        self.assertLessEqual(sidecars["max_targets_per_wait"], 8)
+        self.assertTrue(sidecars["require_parent_ack"])
 
 
 if __name__ == "__main__":

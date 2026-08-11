@@ -136,6 +136,18 @@ primary task owns its released node through the stopping condition. Host selecti
 capability-matched and never expands authority. Nested agents are bounded sidecars for
 research, review, or non-blocking validation; they cannot replace primary delivery.
 
+Sidecars are admitted only when deterministic token accounting predicts a positive net
+saving above policy margin. The root creates them with read-only authority, reserves a
+shared descendant budget, and records every preparation, binding, progress event, and
+terminal result in the hash-chained `state/sidecar-bindings.jsonl` registry. A sidecar
+may request a depth-two descendant, but only the root may authenticate and spawn it;
+deeper, duplicate, unevidenced, or over-budget requests are denied before side effects.
+The host waits for primary and sidecar activity together in fair groups of at most eight
+with a wall-clock deadline. Parent tasks receive idempotent spawn and terminal notices.
+Early parent termination cancels and settles its whole sidecar subtree first. Poll,
+replay, timeout, malformed-result, and cancellation paths fail closed and active
+sidecars prevent a quiescent verdict.
+
 When a capability is unavailable, return an exact typed blocker to the parent. The parent
 repairs the workflow or selects an approved capable host and resumes the same node. A
 repairable host/tool gap is not a reason to make the user execute commands manually.

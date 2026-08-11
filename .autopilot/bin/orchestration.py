@@ -20,6 +20,8 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from sidecar_execution import plan_sidecars, validate_sidecar_policy
+
 INTENTS = ("BUILD_DAG", "START", "CONTINUE", "CHECK", "FINISH")
 ACTIVE_STATES = {"CLAIMED", "RUNNING", "WAITING_FOR_RECEIPT", "PR_OPEN"}
 RECOVERY_STATES = {
@@ -721,6 +723,7 @@ def validate_policy(value: object) -> tuple[str, ...]:
     if not isinstance(value, Mapping):
         return ("policy must be an object",)
     issues: list[str] = []
+    issues.extend(validate_sidecar_policy(value.get("sidecars")))
     if value.get("schema_version") != 1:
         issues.append("schema_version must be 1")
     if value.get("kind") != "hive-mind-autopilot-orchestration-policy-v1":
@@ -813,6 +816,11 @@ def validate_policy(value: object) -> tuple[str, ...]:
             "create": "create_thread",
             "wait": "wait_threads",
             "message": "send_message_to_thread",
+            "nested_sidecar": "multi_agent_v1.spawn_agent",
+            "sidecar_close": "multi_agent_v1.close_agent",
+            "sidecar_lookup": "lookup_sidecar",
+            "sidecar_message": "multi_agent_v1.send_input",
+            "sidecar_wait": "wait_activity",
         }
         for key, expected_value in expected.items():
             if codex.get(key) != expected_value:
@@ -1160,6 +1168,13 @@ def build_orchestration_contract(
         mode = str(task.get("authority_mode", "UNKNOWN"))
         authority_counts[mode] = authority_counts.get(mode, 0) + 1
 
+    sidecars = plan_sidecars(tasks, node_defs, policy["sidecars"])
+    sidecars_by_parent: dict[str, list[dict[str, object]]] = {}
+    for sidecar in sidecars:
+        sidecars_by_parent.setdefault(str(sidecar["parent_launch_instruction_id"]), []).append(sidecar)
+    for task in tasks:
+        task["sidecars"] = sidecars_by_parent.get(str(task.get("launch_instruction_id")), [])
+
     material = {
         "schema_version": 1,
         "kind": "hive-mind-autopilot-orchestration-contract-v1",
@@ -1179,6 +1194,17 @@ def build_orchestration_contract(
             "authority_counts": dict(sorted(authority_counts.items())),
             "created_together_before_first_wait": True,
             "every_task_polled_to_terminal": True,
+        },
+        "sidecar_cohort": {
+            "size": len(sidecars),
+            "sidecar_ids": [str(item["sidecar_id"]) for item in sidecars],
+            "planned_token_budget": sum(int(item["token_budget"]) for item in sidecars),
+            "estimated_net_savings_tokens": sum(
+                int(item["estimated_net_savings_tokens"]) for item in sidecars
+            ),
+            "root_mediated": True,
+            "all_parents_require_terminal_ack": True,
+            "policy": dict(policy["sidecars"]),
         },
         "active_host_bindings": [dict(item) for item in live_bindings],
         "active_claims": list(active_claims) if isinstance(active_claims, list) else [],

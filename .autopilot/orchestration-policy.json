@@ -15,11 +15,19 @@
       "durable_task_title": "Hive Mind <NODE-ID>",
       "message": "send_message_to_thread",
       "nested_sidecar": "multi_agent_v1.spawn_agent",
+      "sidecar_close": "multi_agent_v1.close_agent",
+      "sidecar_lookup": "lookup_sidecar",
+      "sidecar_message": "multi_agent_v1.send_input",
+      "sidecar_wait": "wait_activity",
       "wait": "wait_threads"
     },
     "generic": {
       "create": "create_durable_task",
       "message": "send_message_to_task",
+      "sidecar_close": "close_sidecar",
+      "sidecar_lookup": "lookup_sidecar",
+      "sidecar_message": "send_message_to_sidecar",
+      "sidecar_wait": "wait_activity",
       "wait": "wait_durable_tasks"
     }
   },
@@ -75,6 +83,31 @@
     "resume_same_task_after_fix": true
   },
   "schema_version": 1,
+  "sidecars": {
+    "allowed_purposes": [
+      "bounded_read_only_research",
+      "independent_review",
+      "non_blocking_validation"
+    ],
+    "close_descendants_before_parent_terminal": true,
+    "coordination_overhead_tokens": 450,
+    "enabled": true,
+    "max_depth": 2,
+    "max_no_progress_cycles": 3,
+    "max_poll_cycles": 40,
+    "max_replay_events": 3,
+    "max_result_tokens": 700,
+    "max_sidecars_per_primary": 2,
+    "max_targets_per_wait": 8,
+    "max_total_sidecars": 8,
+    "min_net_savings_tokens": 1200,
+    "per_sidecar_token_budget": 2600,
+    "primary_authority_inheritance": false,
+    "require_parent_ack": true,
+    "root_mediates_descendants": true,
+    "total_token_budget": 20800,
+    "wait_timeout_seconds": 120
+  },
   "task_transport": {
     "binding_ledger": ".autopilot/state/task-bindings.jsonl",
     "binding_sequence": [
