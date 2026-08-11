@@ -23,15 +23,13 @@ from durable_controller import (
     read_json,
 )
 from release_barrier import (
-    CURRENT_RELEASE,
     RELEASE_HISTORY,
     RELEASE_KIND,
+)
+from release_barrier import (
     ControlPlane as ReleaseBarrierControlPlane,
 )
-from sealed_recovery import (
-    BUILDER_EXECUTION_KIND,
-    SealedRecoveryMixin,
-)
+from sealed_recovery import SealedRecoveryMixin
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
 RETIREMENT_KIND = "hive-mind-autopilot-receipt-branch-retirement-v1"
