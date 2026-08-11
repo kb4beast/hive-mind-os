@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from hive_mind_os.brain_kernel.optimizer import (
@@ -35,12 +36,15 @@ class OptimizerLessonTests(unittest.TestCase):
         self.assertEqual(lesson.attribution.outcome_ref, "outcome:regression-fixed")
 
     def test_optimizer_lesson_tests_reject_expired_or_missing_evidence(self) -> None:
-        values = _attribution().__dict__ if hasattr(_attribution(), "__dict__") else None
-        self.assertIsNone(values)  # slots prevent accidental mutable attribution state.
         with self.assertRaisesRegex(OptimizerError, "retained evidence"):
             OutcomeAttribution(
                 (), "context:x", "outcome:x", "error", ("scope",), 0.5,
                 (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(), "ledger:x",
+            )
+        with self.assertRaisesRegex(OptimizerError, "expiry"):
+            replace(
+                _attribution(),
+                expires_at=(datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
             )
 
 
