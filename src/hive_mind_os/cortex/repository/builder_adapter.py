@@ -14,7 +14,11 @@ from pathlib import Path
 from typing import Mapping
 
 from ...brain_kernel.authority import AuthorityDenied
-from ...brain_kernel.builder import BuilderAction, BuilderActionKind, BuilderActionOutcome
+from ...brain_kernel.builder import (
+    BuilderAction,
+    BuilderActionKind,
+    BuilderActionOutcome,
+)
 from ...brain_kernel.canonical import canonical_digest
 from ...brain_kernel.contracts import EffectIntent, normalize_portable_path
 
@@ -105,8 +109,13 @@ class IsolatedBuilderAdapter:
         return self._outcome(intent_digest, action, "SUCCEEDED", "isolated write completed", 0)
 
     def _command(self, intent_digest: str, action: BuilderAction) -> BuilderActionOutcome:
+        raw_argv = action.payload.get("argv")
+        if not isinstance(raw_argv, (tuple, list)) or not all(
+            isinstance(item, str) for item in raw_argv
+        ):
+            raise BuilderAdapterError("validated command argv is unavailable")
         completed = subprocess.run(
-            list(action.payload["argv"]), cwd=self.root, shell=False, capture_output=True,
+            list(raw_argv), cwd=self.root, shell=False, capture_output=True,
             timeout=self.command_timeout_seconds, check=False,
         )
         # Command streams are bytes and may contain secrets.  Retain only their
@@ -132,7 +141,10 @@ class IsolatedBuilderAdapter:
         )
 
     def _commit(self, intent_digest: str, action: BuilderAction) -> BuilderActionOutcome:
-        paths = [normalize_portable_path(str(path)) for path in action.payload["paths"]]
+        raw_paths = action.payload.get("paths")
+        if not isinstance(raw_paths, (tuple, list)):
+            raise BuilderAdapterError("validated commit paths are unavailable")
+        paths = [normalize_portable_path(str(path)) for path in raw_paths]
         staged = self._git(intent_digest, action, ["add", "--", *paths])
         if staged.status != "SUCCEEDED":
             return staged

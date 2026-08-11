@@ -106,7 +106,8 @@ class BuilderAction:
             if normalized in _PROTECTED_BRANCHES or normalized.startswith("release/"):
                 raise BuilderActionDenied("protected branch mutation is forbidden")
             paths = self.payload.get("paths")
-            if not isinstance(self.payload.get("message"), str) or not self.payload["message"].strip():
+            message = self.payload.get("message")
+            if not isinstance(message, str) or not message.strip():
                 raise ValueError("commit action requires a message")
             if not isinstance(paths, (tuple, list)) or not paths:
                 raise ValueError("commit action requires non-empty declared paths")
