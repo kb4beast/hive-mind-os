@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import unittest
+
+from hive_mind_os.brain_kernel.canonical import canonical_digest
+from hive_mind_os.brain_kernel.reconciler import RepairKind
+from hive_mind_os.brain_kernel.steward import (
+    HealthObservation,
+    HealthStatus,
+    HealthSurface,
+    OperationalReadiness,
+    Steward,
+    StewardIntegrityError,
+)
+
+
+def observation(
+    surface: HealthSurface,
+    status: HealthStatus = HealthStatus.HEALTHY,
+    **changes: object,
+) -> HealthObservation:
+    evidence = {"surface": surface.value, "verified": True}
+    values: dict[str, object] = {
+        "surface": surface,
+        "status": status,
+        "subject_id": f"{surface.value}-1",
+        "evidence": evidence,
+        "evidence_digest": canonical_digest(evidence),
+        "recovery_ref": None if status is HealthStatus.HEALTHY else f"recovery:{surface.value}",
+    }
+    values.update(changes)
+    return HealthObservation(**values)  # type: ignore[arg-type]
+
+
+def complete_observations() -> tuple[HealthObservation, ...]:
+    return tuple(observation(surface) for surface in HealthSurface)
+
+
+class HiveCortexStewardTests(unittest.TestCase):
+    def test_complete_healthy_evidence_proves_operational_readiness(self) -> None:
+        report = Steward().assess(reversed(complete_observations()))
+        self.assertEqual(OperationalReadiness.READY, report.readiness)
+        self.assertEqual((), report.proposals)
+        self.assertEqual(tuple(HealthSurface), tuple(item.surface for item in report.observations))
+        self.assertEqual(report.report_digest, Steward().assess(complete_observations()).report_digest)
+
+    def test_health_checks_cover_every_required_operational_surface(self) -> None:
+        with self.assertRaisesRegex(StewardIntegrityError, "missing: providers"):
+            Steward().assess(complete_observations()[:-1])
+        with self.assertRaisesRegex(StewardIntegrityError, "more than once"):
+            Steward().assess((*complete_observations(), observation(HealthSurface.QUEUES)))
+
+    def test_degraded_health_only_proposes_bounded_reversible_recovery(self) -> None:
+        observations = list(complete_observations())
+        observations[1] = observation(HealthSurface.LEASES, HealthStatus.DEGRADED)
+        report = Steward().assess(observations)
+        self.assertEqual(OperationalReadiness.REPAIR_REQUIRED, report.readiness)
+        self.assertEqual(1, len(report.proposals))
+        proposal = report.proposals[0]
+        self.assertEqual(RepairKind.RELEASE_STALE_LEASE, proposal.repair_kind)
+        self.assertEqual(1, proposal.max_attempts)
+        self.assertTrue(proposal.rollback_ref.startswith("rollback:"))
+
+    def test_critical_evidence_or_recovery_failures_fail_closed(self) -> None:
+        observations = list(complete_observations())
+        observations[5] = observation(HealthSurface.RECEIPTS, HealthStatus.CRITICAL)
+        self.assertEqual(OperationalReadiness.QUARANTINED, Steward().assess(observations).readiness)
+        with self.assertRaisesRegex(StewardIntegrityError, "digest does not match"):
+            observation(HealthSurface.EVENT_CHAINS, evidence_digest="sha256:" + "0" * 64)
+        with self.assertRaisesRegex(StewardIntegrityError, "requires a recovery reference"):
+            observation(HealthSurface.WORKSPACES, HealthStatus.DEGRADED, recovery_ref=None)
+
+
+if __name__ == "__main__":
+    unittest.main()
