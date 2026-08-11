@@ -77,8 +77,6 @@ class BlockerProtocolTests(unittest.TestCase):
             try:
                 environment = {
                     "PATH": controller.os.environ.get("PATH", ""),
-                    "GIT_CONFIG_GLOBAL": controller.os.devnull,
-                    "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_TERMINAL_PROMPT": "0",
                 }
                 for key in controller.SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS:
