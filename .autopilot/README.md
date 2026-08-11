@@ -182,6 +182,42 @@ reconciliation, and dispatcher release are mandatory before a replacement claim.
 The sealed incident target remains provenance; the independent Appeals `ADAPT` record
 requires the current reconciled singleton target to contain the integrated capability.
 
+### Sealed L2 recovery bootstrap
+
+ADR-057 adds three separately sealed, release-only recovery primitives. `OPTIMIZER-370`
+and `ORCH-300` may receive an exact repair dispatch and CAS-published ancestry-preserving
+repair claim only when their committed authorities, current authenticated snapshot,
+reconciliation, full doctor evidence, dispatcher release, literal origin, branch head,
+PR mapping, and node scope all match. Their replacement receipts must bind the exact grant,
+old receipt, complete repair-claim payload, captured execution release, and deterministic
+merge. Only the exact historical/replacement pair resolves; every other duplicate remains
+fail closed.
+
+The literal-origin singleton release ref is fetched and compared immediately before and
+after each recovery CAS. Repair claim and receipt intents are written before publication,
+so an exact interrupted or expired lease can be verified and resumed or rolled back after
+restart. Ambiguous or failed compensation remains `ADVERSE` with its intent and audit
+evidence intact. The global validation lease is an exclusive-create mutex, and replacement
+receipts are rejected unless their complete schema, identities, evidence references, and
+model-runtime record have the sealed types and nonblank values. Consultation and identity
+rows have exact nested schemas and unique roles; authority digests use canonical lowercase
+SHA-256 syntax.
+The sealed envelope also fixes node-defined test/role ordering and forbids identity reuse
+or requester self-consultation. Its end-to-end regression uses a wholly disposable bare
+remote through real claim and receipt CAS, restart recovery, integration, and durable
+`COMPLETE` reconstruction.
+
+`retire-builder-330-branch --actor IDENTITY` has no caller-selected remote/ref/SHA inputs.
+It may archive and retire only the sealed stale Builder head under an atomic source-head and
+archive-absence lease. A fresh snapshot must then show the canonical branch absent and the
+dedicated archive ref at the exact candidate before reconciliation, full doctor, status,
+dispatch, and ordinary canonical reclaim. It does not reuse the Explorer retirement grant.
+
+Controller test fixtures are built from the Git-tracked `.autopilot` manifest with an empty
+runtime state directory. Tests must never import ignored `.autopilot/state/**`, generated
+modules, bytecode caches, or live origin refs. Production generated-state and literal-origin
+verification semantics are unchanged.
+
 Worker publication order is mandatory:
 
 1. Receive a current explicit dispatcher `START NOW` for the exact node.
