@@ -49,12 +49,18 @@ class HiveCortexExplorerTests(unittest.TestCase):
         self.assertEqual(("tests/test_safe.py",), self.explorer.discover_tests())
 
         history = self.explorer.history(limit=1)
-        self.assertEqual(("git", "log", "--no-decorate", "--no-patch", "--format=%H", "-n", "1"), history.argv)
+        self.assertEqual(
+            (str(self.explorer.git_executable), "log", "--no-decorate", "--no-patch", "--format=%H", "-n", "1"),
+            history.argv,
+        )
         self.assertEqual("untrusted-command-output", history.trust_boundary)
         self.assertIn(self.commit_sha, history.stdout)
         self.assertTrue(self.explorer.commit(self.commit_sha).receipt_digest.startswith("sha256:"))
-        self.assertEqual(("git", "ls-files", "--cached", "-z"), self.explorer.tracked_files().argv)
-        self.assertEqual(("git", "status", "--porcelain=v1", "--untracked-files=no", "-z"), self.explorer.status().argv)
+        self.assertEqual((str(self.explorer.git_executable), "ls-files", "--cached", "-z"), self.explorer.tracked_files().argv)
+        self.assertEqual(
+            (str(self.explorer.git_executable), "status", "--porcelain=v1", "--untracked-files=no", "-z"),
+            self.explorer.status().argv,
+        )
 
     def test_strict_git_grammar_rejects_option_injection_before_spawn_without_mutation(self) -> None:
         before = _tree_digest(self.root)
@@ -93,6 +99,23 @@ class HiveCortexExplorerTests(unittest.TestCase):
             os.environ.pop("GIT_CONFIG_VALUE_0", None)
         self.assertEqual(before, _tree_digest(self.root))
         self.assertEqual(self.commit_sha, subprocess.check_output(("git", "rev-parse", "HEAD"), cwd=self.root, text=True).strip())
+
+    def test_fake_git_path_entry_is_not_invoked(self) -> None:
+        fake_bin = self.root / "fake-bin"
+        fake_bin.mkdir()
+        sentinel = self.root / "fake-git-wrote.txt"
+        fake_git = fake_bin / "git.cmd"
+        fake_git.write_text(f'@echo off\r\necho escaped > "{sentinel}"\r\n', encoding="utf-8")
+        before = _tree_digest(self.root)
+        old_path = os.environ.get("PATH", "")
+        os.environ["PATH"] = str(fake_bin) + os.pathsep + old_path
+        try:
+            receipt = self.explorer.history(limit=1)
+        finally:
+            os.environ["PATH"] = old_path
+        self.assertEqual(str(self.explorer.git_executable), receipt.argv[0])
+        self.assertFalse(sentinel.exists())
+        self.assertEqual(before, _tree_digest(self.root))
 
     def test_explorer_rejects_path_escape_and_has_no_generic_command_runner(self) -> None:
         with self.assertRaises(ExplorerDenied):

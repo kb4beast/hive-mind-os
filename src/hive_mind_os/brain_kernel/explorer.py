@@ -34,6 +34,12 @@ _BLOCKED_GIT_ENV_NAMES = frozenset(
         "GIT_DIFF_OPTS",
     }
 )
+_TRUSTED_GIT_DIRECTORIES = (
+    Path("C:/Program Files/Git/cmd"),
+    Path("C:/Program Files/Git/bin"),
+    Path("/usr/bin"),
+    Path("/bin"),
+)
 
 
 class ExplorerDenied(ValueError):
@@ -160,6 +166,19 @@ class RepositoryExplorer:
         if not root.is_dir() or not (root / ".git").exists():
             raise ExplorerDenied("repository root must be a Git working tree")
         self.root = root
+        self.git_executable = self._trusted_git_executable()
+
+    @staticmethod
+    def _trusted_git_executable() -> Path:
+        """Resolve Git only from an OS-managed absolute location, never PATH."""
+
+        executable_names = ("git.exe", "git") if os.name == "nt" else ("git",)
+        for directory in _TRUSTED_GIT_DIRECTORIES:
+            for executable_name in executable_names:
+                candidate = directory / executable_name
+                if candidate.is_file() and not candidate.is_symlink():
+                    return candidate.resolve()
+        raise ExplorerDenied("a trusted absolute Git executable is required")
 
     def _path(self, relative_path: str) -> tuple[str, Path]:
         if not isinstance(relative_path, str) or not relative_path:
@@ -241,9 +260,10 @@ class RepositoryExplorer:
         if type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 60:
             raise ExplorerDenied("command timeout must be between one and sixty seconds")
         command = self._validate_command(command)
+        executable_command = (str(self.git_executable), *command[1:])
         try:
             completed = subprocess.run(
-                command,
+                executable_command,
                 cwd=self.root,
                 env=self._git_environment(),
                 shell=False,
@@ -257,7 +277,7 @@ class RepositoryExplorer:
         except (OSError, subprocess.TimeoutExpired) as error:
             raise ExplorerDenied(f"approved observation command could not complete: {type(error).__name__}") from error
         return CommandReceipt(
-            command,
+            executable_command,
             completed.returncode,
             completed.stdout,
             completed.stderr,
