@@ -117,6 +117,15 @@ class CuratorReport:
 CheckRunner = Callable[[str, Path], bool]
 
 
+@dataclass(frozen=True, slots=True)
+class _RepositoryBinding:
+    """Git metadata which must remain unchanged while the Curator checks run."""
+
+    identity: CandidateIdentity
+    index_digest: str
+    refs_digest: str
+
+
 class CuratorRuntime:
     """Run a deterministic, blind-first verification without candidate authority."""
 
@@ -161,10 +170,10 @@ class CuratorRuntime:
         if workspace.identity != candidate:
             return self._blocked(seal, "workspace candidate identity does not match requested candidate")
         try:
-            observed_identity = _repository_identity(workspace.root)
+            before_binding = _repository_binding(workspace.root)
         except CuratorVerificationError as error:
             return self._blocked(seal, f"candidate reconstruction unavailable: {error}")
-        if observed_identity != candidate:
+        if before_binding.identity != candidate:
             return self._blocked(seal, "reconstructed Git commit/tree do not match requested candidate")
         try:
             before = snapshot_tree(workspace.root)
@@ -185,6 +194,12 @@ class CuratorRuntime:
             return self._report(seal, candidate, workspace.workspace_id, before, None, results, CuratorVerdict.QUARANTINE, (f"candidate became unreadable during verification: {error}",))
         if after != before:
             return self._report(seal, candidate, workspace.workspace_id, before, after, results, CuratorVerdict.QUARANTINE, ("candidate tree changed during verification",))
+        try:
+            after_binding = _repository_binding(workspace.root)
+        except CuratorVerificationError as error:
+            return self._report(seal, candidate, workspace.workspace_id, before, after, results, CuratorVerdict.QUARANTINE, (f"candidate Git metadata became unavailable during verification: {error}",))
+        if after_binding != before_binding:
+            return self._report(seal, candidate, workspace.workspace_id, before, after, results, CuratorVerdict.QUARANTINE, ("candidate Git commit, tree, index, or refs changed during verification",))
         if all(passed for _, passed in results):
             return self._report(seal, candidate, workspace.workspace_id, before, after, results, CuratorVerdict.ADOPT, ())
         failed = tuple(f"acceptance check failed: {name}" for name, passed in results if not passed)
@@ -236,10 +251,40 @@ def _require_sha(value: str, label: str) -> None:
 def _repository_identity(root: Path) -> CandidateIdentity:
     """Read the candidate identities from its own Git worktree, fail closed."""
 
+    values = _git_output(root, "rev-parse", "HEAD^{commit}", "HEAD^{tree}").splitlines()
+    if len(values) != 2:
+        raise CuratorVerificationError("isolated candidate is not a resolvable Git worktree")
+    try:
+        return CandidateIdentity(values[0], values[1])
+    except CuratorVerificationError as error:
+        raise CuratorVerificationError("isolated candidate Git identities are malformed") from error
+
+
+def _repository_binding(root: Path) -> _RepositoryBinding:
+    """Capture candidate identity plus mutable Git control metadata."""
+
+    index_location = Path(_git_output(root, "rev-parse", "--git-path", "index"))
+    if not index_location.is_absolute():
+        index_location = root.resolve() / index_location
+    try:
+        index_bytes = index_location.read_bytes()
+    except OSError as error:
+        raise CuratorVerificationError("isolated candidate Git index is unavailable") from error
+    refs = _git_output(root, "for-each-ref", "--format=%(refname) %(objectname)")
+    return _RepositoryBinding(
+        _repository_identity(root),
+        canonical_digest({"index": index_bytes.hex()}),
+        canonical_digest({"refs": refs.splitlines()}),
+    )
+
+
+def _git_output(root: Path, *arguments: str) -> str:
+    """Run one fixed local Git inspection with injected Git controls removed."""
+
     environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     try:
         completed = subprocess.run(
-            ("git", "-C", str(root.resolve()), "rev-parse", "HEAD^{commit}", "HEAD^{tree}"),
+            ("git", "-C", str(root.resolve()), *arguments),
             check=False,
             capture_output=True,
             text=True,
@@ -247,14 +292,13 @@ def _repository_identity(root: Path) -> CandidateIdentity:
             env=environment,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
-        raise CuratorVerificationError("cannot read isolated candidate Git identities") from error
-    values = completed.stdout.splitlines()
-    if completed.returncode != 0 or len(values) != 2:
-        raise CuratorVerificationError("isolated candidate is not a resolvable Git worktree")
+        raise CuratorVerificationError("cannot read isolated candidate Git metadata") from error
+    if completed.returncode != 0:
+        raise CuratorVerificationError("isolated candidate Git inspection failed")
     try:
-        return CandidateIdentity(values[0], values[1])
-    except CuratorVerificationError as error:
-        raise CuratorVerificationError("isolated candidate Git identities are malformed") from error
+        return completed.stdout.strip()
+    except AttributeError as error:
+        raise CuratorVerificationError("isolated candidate Git output is malformed") from error
 
 
 def _seal_digest(
