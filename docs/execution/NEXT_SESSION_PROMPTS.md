@@ -1,4 +1,9 @@
-# Next Sessions After BOOT-000 Is Merged
+# Historical next sessions after BOOT-000
+
+This sealed handoff is retained for provenance. Its current-`main` assumptions are not
+the active workflow. Current execution uses the configured target branch and
+`.autopilot/orchestration-policy.json`; start from
+`USER_GUIDE/02_ONE_PROMPT_FOREVER.md`.
 
 This handoff is bound to plan `hive-mind-os-verifiable-hive-cortex-v1` and fingerprint
 `sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39`. The original baseline SHA is provenance only. Each new

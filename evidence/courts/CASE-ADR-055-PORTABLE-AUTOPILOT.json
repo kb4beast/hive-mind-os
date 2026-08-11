@@ -1,0 +1,27 @@
+{
+  "case_id": "CASE-ADR-055-PORTABLE-AUTOPILOT",
+  "decision": "ADAPT_CANDIDATE",
+  "dissent": [
+    "Repository code cannot directly guarantee that every host exposes durable visible tasks.",
+    "The source license is unresolved, so only independently expressed abstract patterns may be used.",
+    "Independent Curator and Judge promotion remain outstanding."
+  ],
+  "evidence": [
+    "evidence/sources/SRC-024-genericprompt-lineage/manifest.json",
+    "docs/architecture/ADR-055-PORTABLE-INTENT-DRIVEN-AUTOPILOT.md",
+    ".autopilot/tests/test_orchestration.py",
+    ".autopilot/tests/test_release_barrier.py",
+    "tests/test_autopilot_workflow.py"
+  ],
+  "identities": {
+    "advocate_architect": "controller-extension-019ff107-e756-70e2-a000-feb6726d0f52",
+    "builder": "codex:portable-autopilot-implementation",
+    "clerk_explorer": "source-lineage-019ff107-ea0d-7d52-8a5c-ad22df21c3fb",
+    "cross_examiner_test_expert": "orchestration-tests-019ff107-e8dd-7252-8043-855698b7160e",
+    "judge": "PENDING_INDEPENDENT_CURATOR"
+  },
+  "kind": "hive-mind-court-case-v1",
+  "rollback": "Revert the additive orchestration layer without deleting retained task, source, claim, receipt, or dissent evidence.",
+  "schema_version": 1,
+  "status": "IMPLEMENTED_CANDIDATE_PENDING_INDEPENDENT_JUDGMENT"
+}

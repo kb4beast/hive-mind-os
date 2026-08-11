@@ -1,48 +1,75 @@
-# One Prompt Forever — Permanent Dispatcher
+# One reusable Autopilot prompt
 
-Paste the following into one fresh **ChatGPT Classic** session whenever you need the next work. Classic is the default owner; Codex is only a bounded last-resort subtask executor.
-The dispatcher reads current repository state each time; you do not carry forward its prior answer or any prior worker release.
+The operating rules now live in `.autopilot/orchestration-policy.json` and executable
+controller code. Users do not need to paste the controller constitution into every task.
+
+Use this prompt in a repository with an installed Autopilot:
 
 ```text
-Repository: kb4beast/hive-mind-os
+Use Hive Mind OS Autopilot on this repository. Infer whether I mean build, start,
+continue, check, or finish; execute its durable parallel-task contract, recover
+blockers, and continue until the current DAG is quiescent.
+```
 
-Act only as the Hive Mind OS implementation dispatcher. Use a fresh clean checkout with
-authenticated GitHub access. Do not implement product nodes.
+The host must run:
 
-Until this dispatcher finishes reconciliation and publishes a current explicit release,
-all not-yet-released workers are WAIT. Static DAG or level membership is never permission
-to start.
+```bash
+python .autopilot/bin/autopilot.py --repo-root . orchestrate \
+  --request "THE USER'S ACTUAL MESSAGE" --apply --json
+```
 
-1. Read every applicable AGENTS.md and CLAUDE.md.
-2. Read .autopilot/README.md, .autopilot/workflow-policy.json, .autopilot/control-plane.json, .autopilot/authority-amendments.json, and .autopilot/plan.json.
-3. Fetch current main and record its exact commit and tree.
-4. Inspect current open, merged, and closed-unmerged PRs; remote autopilot branches; CI; validated
-   receipts; active/stale claims; and unplanned changes since the reconciled target.
-5. Install a current .autopilot/state/github-state.json snapshot through the controller.
-6. Run the deterministic doctor and status commands.
-7. If main advanced, reconcile it before issuing work. Add, remove, split, merge, supersede, or
-   reprioritize nodes only through an append-only replan/reconciliation record.
-8. Determine the smallest conflict-free dependency-eligible wave, but do not call it released yet.
-9. Publish the release through `python .autopilot/bin/autopilot.py --repo-root . dispatch --actor <dispatcher> [--node NODE ...]`.
-10. Require exactly one verdict for every candidate: START NOW, WAIT, or STOP. If multiple workers
-    are released together, the same release must say START TOGETHER NOW.
-11. State one plain-language action sentence: `Open these N sessions now: ...` or
-    `Do not open any worker sessions yet`.
-12. Only for nodes whose current verdict is START NOW, state the minimum safe OpenAI model/effort
-    and Anthropic model/effort from the current provider catalog and render the full copy-ready worker prompt.
-13. State exactly how many parallel chats I should open, which prompts go into each, what must not
-    start, and the merge/stop condition.
-14. Never mark work complete from a branch name, PR title, plan prose, or status file. Completion
-    requires target ancestry plus a validated integrated receipt.
-15. Before any human question, require the typed role-first consultation protocol. A software
-    defect, ambiguity, missing evidence, failing test, or suspected cheating is not human authority.
-16. Same-model role labels are procedural separation, not independent humans. Do not merge or
-    enable auto-merge.
-17. Keep ChatGPT Classic as the owner of every node. Exhaust Classic tools and role consultation before Codex. If a concrete capability gap remains, emit only a short token-aware Codex subtask for that blocked action and resume in Classic afterward.
-18. If human action is truly required, give novice-safe exact click-by-click/copy-paste steps and say what result to return.
-19. Treat any target-branch advance/merge, new conflicting claim, GitHub snapshot change, or new
-    reconciliation event as invalidating every prior release instruction. Re-run the dispatcher.
-20. Every response must include WHAT I DID, NEXT STEPS, and BLOCKS.
+The active host adapter—not the repository CLI—executes the returned external effects.
+On Codex, primary nodes use separate durable user-owned tasks through `create_thread`;
+the parent records each thread/host identity in the append-only launch ledger, polls
+through `wait_threads`, and answers/restarts blocked work through
+`send_message_to_thread`. Nested subagents are sidecars for bounded research, review, or
+non-blocking validation only.
 
-Output: CURRENT TRUTH, RECONCILIATION, CANDIDATE VERDICTS, RELEASE DIRECTIVE, PLAIN ACTION, COPY-READY PROMPTS FOR START NOW ONLY, MERGE/STOP RULE, NEXT DISPATCH TRIGGER, then WHAT I DID, NEXT STEPS, and BLOCKS.
+The deterministic controller enforces repository state and release boundaries. The
+versioned policy plus active host adapter enforce external task creation, binding,
+polling, and resumption:
+
+- build/start/continue/check/finish intent inference;
+- negation and advice as read-only intent;
+- snapshot → doctor → reconciliation → dispatch → claim ordering;
+- dependency, file-lock, semantic-lock, and `parallel_safe` boundaries;
+- resuming existing node work before creating duplicates;
+- one closure target before optional audit expansion;
+- blocker classification, role consultation, repair, and same-task resumption;
+- polling until required primary tasks are terminal;
+- repository ancestry and validated receipts as completion truth; and
+- quiescence before the parent returns or starts the next required cohort.
+
+`CHECK` is observational and does not publish a release. Terse language never grants a
+protected-branch merge, deployment, credential, spending, or authority expansion.
+
+## Use Hive Mind OS from another checkout
+
+Install this repository and initialize the target repository once:
+
+```bash
+python -m pip install --no-deps -e C:/path/to/hive-mind-os
+hive-mind autopilot init --repository C:/path/to/target \
+  --objective "OUTCOME OR LEAVE THE SAFE DEFAULT" \
+  --target-branch release/hive-mind-autopilot
+```
+
+Then use the same short prompt. Before the target has an installed `.autopilot` DAG,
+`hive-mind autopilot inspect` emits a repository-scoped durable `DAG-BUILD-<digest>`
+task. That bootstrap includes independent controller review and external digest pinning.
+After installation, the portable wrapper delegates only to the exact reviewed controller
+bundle; a changed HEAD fails closed until it is reviewed and pinned again.
+
+For a machine-readable preview without applying a release:
+
+```bash
+hive-mind autopilot inspect --repository C:/path/to/target \
+  --request "check progress"
+```
+
+For an execution-authorizing start/continue/finish request:
+
+```bash
+hive-mind autopilot inspect --repository C:/path/to/target \
+  --request "finish the current DAG" --apply
 ```

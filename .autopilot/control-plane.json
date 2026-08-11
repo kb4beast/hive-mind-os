@@ -27,10 +27,11 @@
     "No role, worker, or dispatcher may expand authority.",
     "No same-model role label may be presented as an independent human.",
     "No human escalation may substitute for a software repair or role-resolvable question.",
-    "ChatGPT Classic is the default node owner; Codex may be used only for the smallest proven unavailable execution capability after Classic/tool/role paths are exhausted.",
+    "The approved durable primary task owns its released node; nested agents may not replace it, and host choice never expands authority.",
     "Never ask the user for a manual action without novice-safe exact instructions and proof that genuine human authority or access is required."
   ],
   "schema_version": 1,
+  "orchestration_policy_file": ".autopilot/orchestration-policy.json",
   "source_of_truth": [
     "target branch ancestry",
     "durable validated node receipt commits and sealed bootstrap attestation",

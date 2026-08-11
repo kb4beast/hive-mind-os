@@ -47,6 +47,19 @@ python .autopilot/bin/autopilot.py --repo-root . ready
 python .autopilot/bin/autopilot.py --repo-root . dispatch \
   --actor DISPATCHER_ID [--node NODE_ID ...]
 python .autopilot/bin/autopilot.py --repo-root . render-prompt NODE_ID
+python .autopilot/bin/autopilot.py --repo-root . infer-intent "USER MESSAGE"
+python .autopilot/bin/autopilot.py --repo-root . orchestrate \
+  --request "USER MESSAGE" [--apply] --json
+python .autopilot/bin/autopilot.py --repo-root . simple-prompt
+python .autopilot/bin/autopilot.py --repo-root . prepare-launch INSTRUCTION_ID --host HOST
+python .autopilot/bin/autopilot.py --repo-root . bind-launch INSTRUCTION_ID \
+  --host HOST --task-id TASK_ID [--host-id HOST_ID] [--cursor CURSOR]
+python .autopilot/bin/autopilot.py --repo-root . record-launch-terminal INSTRUCTION_ID \
+  --terminal-state SUCCEEDED --host-event-ref HOST_TERMINAL_EVENT \
+  --observed-by ORCHESTRATOR_ID
+python .autopilot/bin/autopilot.py --repo-root . release-launch INSTRUCTION_ID \
+  --terminal-event TERMINAL_OBSERVATION_EVENT_ID \
+  --reason "terminal host result recorded"
 python .autopilot/bin/autopilot.py --repo-root . claim NODE_ID \
   --owner PROVIDER:SESSION --publish-remote
 python .autopilot/bin/autopilot.py --repo-root . heartbeat NODE_ID \
@@ -54,6 +67,21 @@ python .autopilot/bin/autopilot.py --repo-root . heartbeat NODE_ID \
 python .autopilot/bin/autopilot.py --repo-root . complete NODE_ID \
   --owner PROVIDER:SESSION --receipt PATH
 ```
+
+`orchestrate` is the normal host entrypoint. It reads live controller truth, infers
+build/start/continue/check/finish intent, resumes unfinished node work before widening
+the wave, and emits digest-bound durable-task instructions. `--apply` may publish the
+existing safe dispatcher release for start/continue/finish intent; it never grants merge,
+deployment, credential, spending, or protected-ref authority. `CHECK` uses non-mutating
+observation.
+
+The mandatory host-neutral behavior is versioned in
+`.autopilot/orchestration-policy.json`. Codex maps primary work to `create_thread`,
+`wait_threads`, and `send_message_to_thread`. Nested subagents cannot replace primary
+node tasks. External task operations are performed by the active host adapter. The CLI
+records `PREPARED -> CREATED -> BOUND -> TERMINAL_OBSERVED -> RELEASED` events and
+consumes existing bindings;
+emitting JSON alone is not task creation.
 
 `status` distinguishes static **eligibility** from current execution **release**.
 `ready` returns only nodes whose latest valid dispatcher release assigns `START NOW`.
@@ -72,7 +100,7 @@ all not-yet-released workers are `WAIT`.
 
 1. Read this file, `workflow-policy.json`, `control-plane.json`,
    `authority-amendments.json`, and `plan.json`.
-2. Fetch current `main` and record its exact commit and tree.
+2. Fetch the configured target branch and record its exact commit and tree.
 3. Inspect open/merged/closed PRs, CI, remote node branches, claims, durable receipts, and
    plan-impacting changes.
 4. Install a current `.autopilot/state/github-state.json` snapshot through
@@ -96,13 +124,21 @@ release instructions stale. Run the dispatcher again rather than reusing an old 
 The claim command independently revalidates the release before creating a claim.
 
 Target reconciliation remains intentionally live and session-local: a fresh dispatcher
-must inspect whatever `main` is now before releasing work. Completion evidence is the
+must inspect whatever configured target is current before releasing work. Completion evidence is the
 opposite: once integrated and validated, it survives deletion of local
 `.autopilot/state/` and a completely fresh checkout.
 
-## ChatGPT Classic-first execution workflow
+## Host-neutral durable primary-task workflow
 
-`.autopilot/workflow-policy.json` is a mandatory plan-wide policy for every node and every dispatcher/repair/reconciliation/integration/promotion/replan session. ChatGPT Classic is the normal node owner and must exhaust its available reasoning, connectors/tools, bounded repair paths, and role-first consultation before Codex is considered. Codex is a last-resort executor for only the smallest concrete subtask requiring a capability unavailable in Classic; ownership returns to Classic afterward. Difficulty or convenience alone is never a Codex reason.
+`.autopilot/workflow-policy.json` is mandatory for every node and every
+dispatcher/repair/reconciliation/integration/promotion/replan task. The approved durable
+primary task owns its released node through the stopping condition. Host selection is
+capability-matched and never expands authority. Nested agents are bounded sidecars for
+research, review, or non-blocking validation; they cannot replace primary delivery.
+
+When a capability is unavailable, return an exact typed blocker to the parent. The parent
+repairs the workflow or selects an approved capable host and resumes the same node. A
+repairable host/tool gap is not a reason to make the user execute commands manually.
 
 If human action is genuinely required, never assume the user knows the UI, command, or terminology. Give exact novice-safe steps, expected results, what to return, and safety/rollback guidance. Every session response ends with `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`.
 
@@ -195,6 +231,7 @@ provenance, or otherwise inconsistent, the node fails closed as `REPAIR_REQUIRED
 
 ## Permanent dispatcher prompt
 
-Use the exact prompt in `USER_GUIDE/02_ONE_PROMPT_FOREVER.md`. The human should never need
-to remember the prior dispatcher response, and prior releases must never be carried into
+Use the short prompt in `USER_GUIDE/02_ONE_PROMPT_FOREVER.md`. Its behavior is defined by
+the versioned policy and controller rather than repeated prompt prose. The human should
+never need to remember the prior response, and prior releases must never be carried into
 a new dispatcher session.

@@ -1,0 +1,92 @@
+{
+  "closure_first": {
+    "before_optional_audits": 1,
+    "enabled": true,
+    "selection": [
+      "closest_to_valid_receipt",
+      "critical_path_importance",
+      "downstream_unlock_value",
+      "node_id"
+    ]
+  },
+  "host_adapters": {
+    "codex": {
+      "create": "create_thread",
+      "durable_task_title": "Hive Mind <NODE-ID>",
+      "message": "send_message_to_thread",
+      "nested_sidecar": "multi_agent_v1.spawn_agent",
+      "wait": "wait_threads"
+    },
+    "generic": {
+      "create": "create_durable_task",
+      "message": "send_message_to_task",
+      "wait": "wait_durable_tasks"
+    }
+  },
+  "intent": {
+    "implicit_installed_default": "CONTINUE",
+    "implicit_uninstalled_default": "BUILD_DAG",
+    "supported": [
+      "BUILD_DAG",
+      "START",
+      "CONTINUE",
+      "CHECK",
+      "FINISH"
+    ]
+  },
+  "kind": "hive-mind-autopilot-orchestration-policy-v1",
+  "polling": {
+    "answer_questions_then_resume": true,
+    "minimum_primary_completions_before_parent_yield": 1,
+    "parent_final_while_required_tasks_active": false,
+    "poll_until_terminal": true
+  },
+  "recovery": {
+    "blocker_is_completion": false,
+    "classifications": [
+      "SUCCEEDED",
+      "RECOVERABLE",
+      "EXTERNALLY_BLOCKED",
+      "INCOMPLETE"
+    ],
+    "consult_roles_before_human": true,
+    "record_resolved_questions": true,
+    "resume_same_task_after_fix": true
+  },
+  "schema_version": 1,
+  "task_transport": {
+    "binding_ledger": ".autopilot/state/task-bindings.jsonl",
+    "binding_sequence": [
+      "PREPARED",
+      "CREATED",
+      "BOUND",
+      "TERMINAL_OBSERVED",
+      "RELEASED"
+    ],
+    "nested_allowed_for": [
+      "bounded_read_only_research",
+      "independent_review",
+      "non_blocking_validation"
+    ],
+    "nested_primary_forbidden": true,
+    "primary": "durable_user_owned_task",
+    "record_host_id": true,
+    "record_task_id": true,
+    "resume_by_node_identity": true
+  },
+  "wave": {
+    "dispatch_order": [
+      "snapshot",
+      "doctor",
+      "reconcile",
+      "dispatch",
+      "claim",
+      "execute",
+      "validate",
+      "complete",
+      "release"
+    ],
+    "mode": "deterministic_priority_ordered_maximal_conflict_free",
+    "never_start_next_level_before_required_current_cohort_quiescence": true
+  }
+}

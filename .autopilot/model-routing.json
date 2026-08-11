@@ -1,10 +1,10 @@
 {
   "execution_surface_policy": {
-    "fallback": "codex_bounded_subtask_only",
-    "fallback_rule": "Codex requires a specific evidenced capability gap after Classic tools and role-first consultation are exhausted.",
-    "human_after": "Only genuine authority/access after self-resolution and any necessary bounded Codex subtask.",
-    "preferred": "chatgpt_classic",
-    "return_to_classic": true
+    "fallback": "typed_host_capability_blocker",
+    "fallback_rule": "Return the exact capability gap to the parent, repair or select an approved capable host, then resume the same durable primary task.",
+    "human_after": "Only genuine authority/access after self-resolution, parent recovery, role consultation, and supported host/tool paths.",
+    "preferred": "capability_matched_durable_task",
+    "return_to_parent": true
   },
   "mandatory_escalation_signals": [
     "node assumptions contradicted by current main",

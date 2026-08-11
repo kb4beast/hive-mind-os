@@ -15,4 +15,9 @@ authority.
 
 ## Execution surface
 
-Model tier and execution surface are separate. **ChatGPT Classic is always attempted first**, even for code work. Use its available GitHub/connectors, files, web, and deterministic tools to complete as much of the node as possible. Codex is permitted only for the smallest remaining action that requires a capability Classic actually lacks (for example local shell/test/build/benchmark execution). Keep the Codex prompt short, return its evidence to Classic, and resume the node in Classic.
+Model tier and execution surface are separate. Select an approved host that can satisfy
+the node contract, then keep the released durable primary task as owner through its
+stopping condition. Codex may own a primary coding task when its local shell, tests, Git,
+or task tools are required. Nested agents remain bounded sidecars. A capability gap
+returns to the parent for repair or host selection; model or host changes never expand
+authority.

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "closure_first": {"type": "object"},
+    "host_adapters": {"type": "object"},
+    "intent": {"type": "object"},
+    "kind": {"const": "hive-mind-autopilot-orchestration-policy-v1"},
+    "polling": {"type": "object"},
+    "recovery": {"type": "object"},
+    "schema_version": {"const": 1},
+    "task_transport": {"type": "object"},
+    "wave": {"type": "object"}
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "intent",
+    "task_transport",
+    "host_adapters",
+    "wave",
+    "closure_first",
+    "polling",
+    "recovery"
+  ],
+  "title": "Hive Mind Autopilot Orchestration Policy",
+  "type": "object"
+}

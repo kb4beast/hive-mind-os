@@ -15,14 +15,15 @@ from controller import format_time, scopes_overlap
 from durable_controller import (
     AutopilotError,
     ClaimError,
-    ConfigurationError,
-    ControlPlane as DurableControlPlane,
-    atomic_write_json,
     append_jsonl,
+    atomic_write_json,
     digest_json,
     normalize_path,
     path_matches_scope,
     read_json,
+)
+from durable_controller import (
+    ControlPlane as DurableControlPlane,
 )
 
 AUTHORITY_AMENDMENTS = ".autopilot/authority-amendments.json"
@@ -335,16 +336,39 @@ class ControlPlane(DurableControlPlane):
                 )
             for index, first in enumerate(wave):
                 for second in wave[index + 1 :]:
+                    if not bool(self.node(first).get("parallel_safe")) or not bool(
+                        self.node(second).get("parallel_safe")
+                    ):
+                        raise AutopilotError(
+                            "requested parallel release contains a serial node: "
+                            f"{first} vs {second}"
+                        )
                     if self._nodes_conflict(first, second):
                         raise AutopilotError(
                             f"requested parallel release conflicts: {first} vs {second}"
                         )
         else:
             wave = []
-            for node_id in sorted(eligible):
-                if all(
-                    not self._nodes_conflict(node_id, chosen) for chosen in wave
+            ordered = sorted(
+                eligible,
+                key=lambda node_id: (
+                    -int(self.node(node_id).get("critical_path_importance", 0)),
+                    -int(self.node(node_id).get("downstream_unlock_value", 0)),
+                    node_id,
+                ),
+            )
+            for node_id in ordered:
+                if not wave:
+                    wave.append(node_id)
+                    continue
+                if not bool(self.node(node_id).get("parallel_safe")):
+                    continue
+                if any(
+                    not bool(self.node(chosen).get("parallel_safe"))
+                    for chosen in wave
                 ):
+                    continue
+                if all(not self._nodes_conflict(node_id, chosen) for chosen in wave):
                     wave.append(node_id)
 
         verdicts = self._candidate_verdicts(base_status, wave)
@@ -402,6 +426,24 @@ class ControlPlane(DurableControlPlane):
         for node_id in wave:
             if verdicts.get(node_id) != "START NOW":
                 issues.append(f"released node lacks START NOW verdict: {node_id}")
+        for index, first in enumerate(wave):
+            if first not in self._nodes:
+                issues.append(f"dispatcher release contains unknown node: {first}")
+                continue
+            for second in wave[index + 1 :]:
+                if second not in self._nodes:
+                    issues.append(f"dispatcher release contains unknown node: {second}")
+                    continue
+                if not bool(self.node(first).get("parallel_safe")) or not bool(
+                    self.node(second).get("parallel_safe")
+                ):
+                    issues.append(
+                        f"dispatcher release contains a serial node pair: {first} vs {second}"
+                    )
+                elif self._nodes_conflict(first, second):
+                    issues.append(
+                        f"dispatcher release contains a conflicting pair: {first} vs {second}"
+                    )
         directive, action = self._action_sentence(wave)
         if record.get("directive") != directive or record.get("action") != action:
             issues.append(
@@ -424,8 +466,7 @@ class ControlPlane(DurableControlPlane):
         value = read_json(self.current_release_path)
         return value if isinstance(value, Mapping) else None
 
-    def status(self) -> dict[str, object]:
-        base = self._base_status()
+    def _status_with_release(self, base: dict[str, object]) -> dict[str, object]:
         original_eligible = (
             list(base.get("ready", []))
             if isinstance(base.get("ready"), list)
@@ -471,6 +512,12 @@ class ControlPlane(DurableControlPlane):
             "verdicts": verdicts,
         }
         return base
+
+    def observe_status(self) -> dict[str, object]:
+        return self._status_with_release(super().observe_status())
+
+    def status(self) -> dict[str, object]:
+        return self._status_with_release(self._base_status())
 
     def ready_nodes(self) -> tuple[str, ...]:
         status = self.status()
