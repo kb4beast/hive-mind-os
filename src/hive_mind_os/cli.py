@@ -30,6 +30,7 @@ from .autopilot_workflow import (
     PortableAutopilotError,
     initialize_repository,
     inspect_repository,
+    trust_controller,
 )
 from .autopilot_workflow import (
     simple_prompt as portable_autopilot_prompt,
@@ -152,6 +153,15 @@ def build_autopilot_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--request", default="")
     inspect.add_argument("--actor", default="hive-mind:portable-orchestrator")
     inspect.add_argument("--apply", action="store_true")
+    inspect.add_argument("--trust-state-root")
+    trust = commands.add_parser(
+        "trust-controller",
+        help="Pin an independently reviewed target-controller bundle outside the repository",
+    )
+    trust.add_argument("--repository", default=".")
+    trust.add_argument("--actor", required=True)
+    trust.add_argument("--evidence-ref", required=True)
+    trust.add_argument("--trust-state-root")
     commands.add_parser("prompt", help="Print the one reusable operator prompt")
     return parser
 
@@ -172,6 +182,14 @@ def _run_autopilot(args: argparse.Namespace) -> int:
                 request=args.request,
                 apply=args.apply,
                 actor=args.actor,
+                trust_state_root=args.trust_state_root,
+            )
+        elif args.autopilot_command == "trust-controller":
+            result = trust_controller(
+                args.repository,
+                actor=args.actor,
+                evidence_ref=args.evidence_ref,
+                trust_state_root=args.trust_state_root,
             )
         else:
             print(portable_autopilot_prompt())

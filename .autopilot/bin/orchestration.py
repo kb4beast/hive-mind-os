@@ -37,6 +37,10 @@ BLOCKING_STATES = {
     "QUARANTINED",
 }
 READY_STATES = {"READY", "INTEGRATION_READY", "PROMOTION_READY"}
+SECRET_TEXT = re.compile(
+    r"(?i)(?:\b(?:api[_ -]?key|access[_ -]?token|client[_ -]?secret|password)\b\s*[:=]\s*\S+|"
+    r"\bBearer\s+[A-Za-z0-9._~+/=-]{12,}|\b(?:gh[oprsu]_|sk-)[A-Za-z0-9_-]{12,})"
+)
 
 
 class OrchestrationError(RuntimeError):
@@ -429,6 +433,10 @@ def _requests_read_only(value: str) -> bool:
         return True
     if re.search(r"\b(?:explain|describe|summari[sz]e|tell\s+me|show\s+me)\s+(?:how|why|what|when|where|whether)\b", text):
         return True
+    if re.search(r"\b(?:review|audit|analy[sz]e|discuss)\s+(?:how|why|what|when|where|whether)\b", text):
+        return True
+    if re.search(r"\bhow\s+(?:can|could|would|should|do|does|did)\s+(?:i|we|you|this|it|the\s+dag)\b", text):
+        return True
     if re.search(r"\b(?:check|inspect|report|summari[sz]e|explain|review)\s+only\b", text):
         return True
     if re.search(r"\bshould\s+(?:i|we|you)\b", text):
@@ -470,6 +478,10 @@ def infer_intent(request: str, status: Mapping[str, object] | None) -> IntentDec
     build when no plan is installed, and inspect a completed graph.
     """
 
+    if SECRET_TEXT.search(request):
+        raise OrchestrationError(
+            "operator request appears to contain a credential; remove it and use the host secret store"
+        )
     text = request.strip()
     # Quoted examples and documentation excerpts are context, not authority.
     actionable = re.sub(r'"[^"]*"|“[^”]*”', " ", text)
@@ -650,6 +662,21 @@ def validate_policy(value: object) -> tuple[str, ...]:
         for key, expected_value in expected.items():
             if codex.get(key) != expected_value:
                 issues.append(f"Codex adapter {key} must be {expected_value}")
+    executor = value.get("host_executor")
+    if not isinstance(executor, Mapping):
+        issues.append("host_executor is required")
+    else:
+        if executor.get("module") != ".autopilot/bin/host_execution.py":
+            issues.append("host executor module is invalid")
+        if executor.get("entrypoint") != "execute_contract":
+            issues.append("host executor entrypoint is invalid")
+        for key in (
+            "capability_bound_events",
+            "create_entire_wave_before_wait",
+            "bounded_no_progress_blocker",
+        ):
+            if executor.get(key) is not True:
+                issues.append(f"host_executor.{key} must be true")
     return tuple(dict.fromkeys(issues))
 
 
@@ -704,18 +731,41 @@ def _task(
         if isinstance(target, Mapping) and target.get("repository")
         else str(Path(plane.repo_root).resolve())
     )
+    target_branch = str(getattr(plane, "target_branch", "") or node.get("pr_target", ""))
+    if not target_branch:
+        raise OrchestrationError("the controller has no singleton target branch")
     instruction_material = {
         "repository": repository,
         "node_id": node_id,
+        # All actions from claim through receipt are one durable node-delivery
+        # lifecycle and must resume the same task. Target advancement or an
+        # explicit failed retry creates a distinct identity below.
+        "lifecycle": "NODE_DELIVERY",
         "branch": str(node.get("branch")),
-        "target_branch": str(node.get("pr_target")),
+        "target_branch": target_branch,
         "plan_fingerprint": str(getattr(plane, "expected_plan_fingerprint", "unknown")),
         "target_sha": str(plane.current_target_sha()) if hasattr(plane, "current_target_sha") else "unknown",
+        "attempt": 1,
+        "retry_of": None,
     }
-    instruction_id = "sha256:" + sha256(
-        json.dumps(instruction_material, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    def instruction_digest(material: Mapping[str, object]) -> str:
+        return "sha256:" + sha256(
+            json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
+    instruction_id = instruction_digest(instruction_material)
     binding = launch_binding(Path(plane.repo_root), instruction_id)
+    retry_of: str | None = None
+    while (
+        binding is not None
+        and binding.get("state") == "RELEASED"
+        and binding.get("terminal_state") in {"FAILED", "CANCELLED"}
+    ):
+        retry_of = str(binding.get("event_id"))
+        instruction_material["attempt"] = int(binding.get("attempt", 1)) + 1
+        instruction_material["retry_of"] = retry_of
+        instruction_id = instruction_digest(instruction_material)
+        binding = launch_binding(Path(plane.repo_root), instruction_id)
     effective_action = action
     if binding is not None and binding.get("state") == "BOUND":
         effective_action = "RESUME_BOUND"
@@ -728,12 +778,14 @@ def _task(
         "node_id": node_id,
         "launch_instruction_id": instruction_id,
         "idempotency_key": instruction_id,
+        "attempt": instruction_material["attempt"],
+        "retry_of": retry_of,
         "title": f"Hive Mind {node_id} [{instruction_id[7:19]}]",
         "action": effective_action,
         "required": required,
         "state": str(row.get("state", "UNKNOWN")),
         "branch": str(node.get("branch")),
-        "target_branch": str(node.get("pr_target")),
+        "target_branch": target_branch,
         "write_scope": list(node.get("write_scope", [])),
         "reasons": (
             list(row.get("reasons", []))
@@ -885,7 +937,12 @@ def build_orchestration_contract(
     )
     observed_states = {str(row.get("state", "")) for row in rows.values()}
     live_bindings = active_launch_bindings(Path(plane.repo_root))
-    if tasks or live_bindings:
+    active_claims = current.get("active_claims", [])
+    active_validation_lease = current.get("active_validation_lease")
+    runtime_authority_active = (
+        isinstance(active_claims, list) and bool(active_claims)
+    ) or isinstance(active_validation_lease, Mapping)
+    if tasks or live_bindings or runtime_authority_active:
         outcome = "ACTIVE"
         quiescent = False
     elif observed_states and observed_states.issubset(SUCCESS_STATES):
@@ -916,11 +973,19 @@ def build_orchestration_contract(
         "eligible": list(eligible) if isinstance(eligible, list) else [],
         "tasks": tasks,
         "active_host_bindings": [dict(item) for item in live_bindings],
+        "active_claims": list(active_claims) if isinstance(active_claims, list) else [],
+        "active_validation_lease": (
+            dict(active_validation_lease)
+            if isinstance(active_validation_lease, Mapping)
+            else None
+        ),
         "closure_target": closure_target,
         "outcome": outcome,
         "successful": outcome == "SUCCESS",
         "quiescent": quiescent,
         "execution": {
+            "executor_module": policy["host_executor"]["module"],
+            "executor_entrypoint": policy["host_executor"]["entrypoint"],
             "primary_transport": "durable_user_owned_task",
             "nested_agents": "bounded_sidecars_only",
             "create_all_parallel_safe_primary_tasks": True,

@@ -23,6 +23,13 @@
       "wait": "wait_durable_tasks"
     }
   },
+  "host_executor": {
+    "module": ".autopilot/bin/host_execution.py",
+    "entrypoint": "execute_contract",
+    "capability_bound_events": true,
+    "create_entire_wave_before_wait": true,
+    "bounded_no_progress_blocker": true
+  },
   "intent": {
     "implicit_installed_default": "CONTINUE",
     "implicit_uninstalled_default": "BUILD_DAG",

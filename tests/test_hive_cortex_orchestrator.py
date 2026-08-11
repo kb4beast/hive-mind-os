@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, cast
 
 from hive_mind_os.brain_kernel.contracts import (
     Budget,
@@ -19,7 +20,6 @@ from hive_mind_os.brain_kernel.planner import (
     persist_plan,
 )
 from hive_mind_os.brain_kernel.store import KernelStore
-
 
 DIGEST = "sha256:" + "0" * 64
 SHA = "0" * 40
@@ -108,8 +108,14 @@ class OrchestratorPlannerTests(unittest.TestCase):
             item.work_id for item in plan.graph.ordered_items()
         ))
         document = plan.to_document()
-        release_schedule = next(item for item in document["schedules"] if item["work_id"] == release.work_id)
-        release_work = next(item for item in document["work_items"] if item["work_id"] == release.work_id)
+        schedules = cast(list[dict[str, Any]], document["schedules"])
+        work_items = cast(list[dict[str, Any]], document["work_items"])
+        release_schedule = next(
+            item for item in schedules if item["work_id"] == release.work_id
+        )
+        release_work = next(
+            item for item in work_items if item["work_id"] == release.work_id
+        )
         self.assertEqual(["HUMAN-RELEASE"], release_schedule["human_gates"])
         self.assertEqual("R2", release_schedule["risk_lane"])
         self.assertEqual(60, release_schedule["budget"]["max_wall_seconds"])

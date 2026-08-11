@@ -44,6 +44,8 @@ from release_barrier import (
 )
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
+RECON_ANCESTRY_DUPLICATE_RECEIPT = "4191ebfd571c9852f5f6faaa43cea0f48f3e0fe8"
+RECON_CANONICAL_RECEIPT = "369f956817ff10231c06d09c7c802f47f76d57b0"
 RETIREMENT_KIND = "hive-mind-autopilot-receipt-branch-retirement-v1"
 RETIREMENT_DOCUMENT = ".autopilot/receipt-branch-retirements.json"
 RETIREMENT_COURT_DOCUMENT = ".autopilot/receipt-branch-retirement-court.json"
@@ -99,19 +101,95 @@ EXPLORER_RETIREMENT = {
 
 
 class ControlPlane(ReleaseBarrierControlPlane):
-    """CLI plane with one fail-closed RECON receipt supersession repair.
+    """CLI plane with sealed, fail-closed RECON receipt repairs.
 
     RECON-010 published a durable receipt before the merged PR #120 release-barrier
     amendment was fully implemented. The historical receipt must remain in Git history,
     but the replacement receipt required by the amended contract must become the only
     active RECON completion record. This repair recognizes only that exact historical
     receipt and only when the replacement explicitly binds it in receipt authority.
+    PR #124 later integrated a second receipt for the same candidate alongside the
+    already-expanded canonical receipt. The exact sibling pair is also sealed here:
+    the expanded receipt is accepted only when all immutable candidate fields match,
+    its scope and grants strictly contain the older receipt, and Git confirms both
+    receipt commits are direct children of the candidate on the current target.
     Every other duplicate-receipt situation remains fail-closed.
     """
+
+    def _resolve_integrated_recon_ancestry_duplicate(
+        self, records: list[dict[str, Any]]
+    ) -> list[dict[str, Any]] | None:
+        by_commit = {
+            record.get("commit"): record
+            for record in records
+            if isinstance(record.get("commit"), str)
+        }
+        if set(by_commit) != {
+            RECON_ANCESTRY_DUPLICATE_RECEIPT,
+            RECON_CANONICAL_RECEIPT,
+        }:
+            return None
+        duplicate = by_commit[RECON_ANCESTRY_DUPLICATE_RECEIPT]
+        canonical = by_commit[RECON_CANONICAL_RECEIPT]
+        old_receipt = duplicate.get("receipt")
+        new_receipt = canonical.get("receipt")
+        if not isinstance(old_receipt, Mapping) or not isinstance(new_receipt, Mapping):
+            return None
+        for key in (
+            "schema_version",
+            "plan_fingerprint",
+            "node_id",
+            "contract_version",
+            "base_commit",
+            "base_tree",
+            "branch",
+            "pr",
+            "final_commit",
+            "final_tree",
+        ):
+            if new_receipt.get(key) != old_receipt.get(key):
+                return None
+        final = new_receipt.get("final_commit")
+        if new_receipt.get("node_id") != "RECON-010" or not isinstance(final, str):
+            return None
+        old_paths = old_receipt.get("changed_paths")
+        new_paths = new_receipt.get("changed_paths")
+        old_authority = old_receipt.get("authority")
+        new_authority = new_receipt.get("authority")
+        old_grants = old_authority.get("grants") if isinstance(old_authority, Mapping) else None
+        new_grants = new_authority.get("grants") if isinstance(new_authority, Mapping) else None
+        evidence_refs = new_receipt.get("evidence_refs")
+        if not (
+            isinstance(old_paths, list)
+            and isinstance(new_paths, list)
+            and set(old_paths) < set(new_paths)
+            and isinstance(old_grants, list)
+            and isinstance(new_grants, list)
+            and set(old_grants) < set(new_grants)
+            and "dispatcher-release-barrier" in new_grants
+            and isinstance(evidence_refs, list)
+            and f"historical-receipt:{RECON_PREMATURE_RECEIPT}" in evidence_refs
+        ):
+            return None
+        if self._has_git_repository():
+            target = self.current_target_sha()
+            for receipt_commit in (
+                RECON_ANCESTRY_DUPLICATE_RECEIPT,
+                RECON_CANONICAL_RECEIPT,
+            ):
+                parent = self._git(
+                    ("rev-parse", f"{receipt_commit}^"), check=True
+                ).stdout.strip()
+                if parent != final or not self.is_ancestor(receipt_commit, target):
+                    return None
+        return [canonical]
 
     def _resolve_recon_receipt_records(
         self, records: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
+        integrated = self._resolve_integrated_recon_ancestry_duplicate(records)
+        if integrated is not None:
+            return integrated
         if len(records) != 2:
             return records
         historical = next(
@@ -625,6 +703,14 @@ def parser() -> argparse.ArgumentParser:
     fail.add_argument("--attempted-command", action="append", default=[])
     fail.add_argument("--blocker-category", default="execution")
 
+    blocker_resolve = commands.add_parser("blocker-resolve")
+    blocker_resolve.add_argument("node_id")
+    blocker_resolve.add_argument("blocker_id")
+    blocker_resolve.add_argument("--actor", required=True)
+    blocker_resolve.add_argument("--fix", required=True)
+    blocker_resolve.add_argument("--retry-command", action="append", required=True)
+    blocker_resolve.add_argument("--evidence-ref", action="append", default=[])
+
     reconcile = commands.add_parser("reconcile")
     reconcile.add_argument("--target-sha", required=True)
     reconcile.add_argument("--actor", required=True)
@@ -880,6 +966,22 @@ def main(argv: list[str] | None = None) -> int:
                         retry_when=args.retry_when,
                         attempted_command=args.attempted_command,
                         blocker_category=args.blocker_category,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "blocker-resolve":
+            print(
+                json.dumps(
+                    plane.resolve_blocker(
+                        args.node_id,
+                        args.blocker_id,
+                        actor=args.actor,
+                        fix=args.fix,
+                        retry_command=args.retry_command,
+                        evidence_refs=args.evidence_ref,
                     ),
                     indent=2,
                     sort_keys=True,

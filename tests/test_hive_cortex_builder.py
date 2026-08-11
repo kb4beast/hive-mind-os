@@ -17,7 +17,6 @@ from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope
 from hive_mind_os.brain_kernel.effects import EffectGateway
 from hive_mind_os.cortex.repository.builder_adapter import IsolatedBuilderAdapter
 
-
 DIGEST = "sha256:" + "b" * 64
 NOW = "2030-01-01T00:00:00Z"
 

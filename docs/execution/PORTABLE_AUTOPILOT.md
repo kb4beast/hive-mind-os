@@ -68,10 +68,13 @@ task after `wait_threads` reports a terminal result, and passes that event ID to
 `release-launch`. A terminal label or free-form reference alone cannot release a live
 binding.
 
-The repository CLI emits and records host-effect contracts; it cannot itself call a
-chat product's private task API. The Codex host adapter is responsible for executing the
-named operations. This boundary is explicit so a JSON preview is never misreported as
-task creation.
+The repository CLI emits and records host-effect contracts. The checked-in
+`.autopilot/bin/host_execution.py` loop then executes those contracts through an
+injected host adapter: it creates the complete parallel-safe wave before its first
+wait, capability-binds every host event, polls to terminal state, answers recoverable
+attention through the safe resolver, and returns a typed blocker after bounded
+no-progress cycles. The adapter is responsible only for the chat product's private API;
+the orchestration behavior is Hive Mind OS code, not an optional prompt convention.
 
 In Codex:
 

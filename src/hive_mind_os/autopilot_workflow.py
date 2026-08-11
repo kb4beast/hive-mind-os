@@ -184,6 +184,19 @@ def _repository_id(root: Path, remote: str | None) -> str:
     return "sha256:" + sha256(identity.casefold().encode("utf-8")).hexdigest()
 
 
+_SECRET_TEXT = re.compile(
+    r"(?i)(?:\b(?:api[_ -]?key|access[_ -]?token|client[_ -]?secret|password)\b\s*[:=]\s*\S+|"
+    r"\bBearer\s+[A-Za-z0-9._~+/=-]{12,}|\b(?:gh[oprsu]_|sk-)[A-Za-z0-9_-]{12,})"
+)
+
+
+def _reject_secret_like_text(value: str, label: str) -> None:
+    if _SECRET_TEXT.search(value):
+        raise PortableAutopilotError(
+            f"{label} appears to contain a credential; remove it and use the host secret store"
+        )
+
+
 def _default_trust_root() -> Path:
     if os.environ.get("XDG_STATE_HOME"):
         return Path(os.environ["XDG_STATE_HOME"]) / "hive-mind-os" / "controller-trust"
@@ -460,9 +473,6 @@ def trust_controller(
     evidence_ref: str,
     trust_state_root: str | Path | None = None,
 ) -> Mapping[str, Any]:
-    raise PortableAutopilotError(
-        "self-attested controller trust is disabled; the active host sandbox owns independent review and execution authority"
-    )
     root = Path(repository).resolve()
     root = Path(_git(root, ["rev-parse", "--show-toplevel"])).resolve()
     if not actor.strip() or not evidence_ref.strip():
@@ -488,7 +498,10 @@ def trust_controller(
     path = _trust_path(repository_id, trust_state_root)
     if path.resolve().is_relative_to(root):
         raise PortableAutopilotError("controller trust must be stored outside the target repository")
-    _atomic_write_json(path, material)
+    if _is_link_like(path.parent):
+        raise PortableAutopilotError("controller trust root must not be a symlink or junction")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write_json(path.parent, path, material)
     return {"status": "trusted", "path": str(path), "trust": material}
 
 
@@ -531,6 +544,10 @@ def _requests_read_only(request: str) -> bool:
         return True
     if re.search(r"\b(?:explain|describe|summari[sz]e|tell\s+me|show\s+me)\s+(?:how|why|what|when|where|whether)\b", text):
         return True
+    if re.search(r"\b(?:review|audit|analy[sz]e|discuss)\s+(?:how|why|what|when|where|whether)\b", text):
+        return True
+    if re.search(r"\bhow\s+(?:can|could|would|should|do|does|did)\s+(?:i|we|you|this|it|the\s+dag)\b", text):
+        return True
     if re.search(r"\b(?:check|inspect|report|summari[sz]e|explain|review)\s+only\b", text):
         return True
     if re.search(r"\bshould\s+(?:i|we|you)\b", text):
@@ -565,6 +582,7 @@ def initialize_repository(
     remote_name: str | None = "origin",
     protected_branches: Sequence[str] = (),
 ) -> Mapping[str, Any]:
+    _reject_secret_like_text(objective, "objective")
     root = Path(repository).resolve()
     if not root.is_dir():
         raise PortableAutopilotError(f"repository directory does not exist: {root}")
@@ -765,7 +783,9 @@ def inspect_repository(
     request: str = "",
     apply: bool = False,
     actor: str = "hive-mind:portable-orchestrator",
+    trust_state_root: str | Path | None = None,
 ) -> Mapping[str, Any]:
+    _reject_secret_like_text(request, "operator request")
     root = Path(repository).resolve()
     controller = root / ".autopilot" / "bin" / "autopilot.py"
     if not controller.is_file():
@@ -773,9 +793,52 @@ def inspect_repository(
     resolved_controller, bundle = _verify_tracked_python_bundle(root, controller)
     read_only = _requests_read_only(request)
     intent = "CHECK" if read_only else "CONTINUE"
+    try:
+        trust = _require_controller_trust(root, bundle, trust_state_root)
+    except PortableAutopilotError as error:
+        review_material = {
+            "repository": str(root),
+            "controller_bundle": list(bundle),
+            "action": "INDEPENDENT_CONTROLLER_REVIEW",
+        }
+        review_id = "sha256:" + sha256(_canonical_bytes(review_material)).hexdigest()
+        return {
+            "schema_version": 1,
+            "kind": "hive-mind-portable-controller-review-required-v1",
+            "intent": {
+                "intent": "CHECK" if read_only else "CONTINUE",
+                "explicit": read_only,
+                "confidence": "high",
+                "reasons": ["target controller execution requires an external independent bundle pin"],
+            },
+            "operator_request": request,
+            "controller_bundle": list(bundle),
+            "tasks": [] if read_only else [
+                {
+                    "task_key": "CONTROLLER-TRUST",
+                    "launch_instruction_id": review_id,
+                    "idempotency_key": review_id,
+                    "action": "INDEPENDENT_REVIEW",
+                    "transport": "durable_user_owned_task",
+                    "prompt": (
+                        "Independently review the exact clean controller bundle listed in this "
+                        "contract. If and only if it is safe, pin it outside the target repository "
+                        "with `hive-mind autopilot trust-controller`, using your distinct Curator "
+                        "identity and durable review evidence reference. Do not execute the target "
+                        "controller during review."
+                    ),
+                }
+            ],
+            "outcome": "CONTROLLER_REVIEW_REQUIRED",
+            "successful": False,
+            "quiescent": read_only,
+            "blocker": str(error),
+            "stop_condition": "an independent external pin authorizes this exact controller bundle",
+        }
     instruction_material = {
         "repository": str(root),
         "controller_bundle": list(bundle),
+        "controller_trust": trust,
         "request": request,
         "apply": apply,
         "actor": actor,
@@ -811,7 +874,7 @@ def inspect_repository(
             "execution_owner": "active_host_sandbox",
             "deny_outside_repository_filesystem": True,
             "deny_network_unless_separately_authorized": True,
-            "deny_descendant_processes": True,
+            "allow_descendant_processes": ["git", "approved test commands declared by the controller"],
             "validate_returned_contract": True,
         },
         "outcome": "HOST_EXECUTION_REQUIRED",

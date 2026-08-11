@@ -14,12 +14,12 @@ import re
 import subprocess
 import sys
 import tempfile
-from urllib.parse import urlparse
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
+from urllib.parse import urlparse
 
 SCHEMA_VERSION = 1
 FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -70,6 +70,23 @@ SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
     "http_proxy",
     "https_proxy",
     "no_proxy",
+)
+SAFE_GIT_RUNTIME_ENVIRONMENT_KEYS = (
+    "PATH",
+    "PATHEXT",
+    "SystemRoot",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "LOCALAPPDATA",
+    "APPDATA",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "LANG",
+    "LC_ALL",
 )
 SUBTASK_STATES = frozenset(
     {
@@ -426,12 +443,17 @@ class ControlPlane:
 
     def node(self, node_id: str) -> Mapping[str, Any]:
         try:
-            return self._nodes[node_id]
+            node = self._nodes[node_id]
         except KeyError as error:
             raise AutopilotError(f"unknown node: {node_id}") from error
+        # Historical plans named the final integration branch in ``pr_target``.
+        # In singleton mode that field is legacy plan provenance, never live
+        # authority.  The control-plane target is the only executable target and
+        # is overlaid without rewriting the fingerprinted historical plan.
+        return {**node, "pr_target": self.target_branch}
 
     def nodes(self) -> tuple[Mapping[str, Any], ...]:
-        return tuple(self._nodes[node_id] for node_id in sorted(self._nodes))
+        return tuple(self.node(node_id) for node_id in sorted(self._nodes))
 
     def validate_configuration(self) -> tuple[str, ...]:
         issues: list[str] = []
@@ -466,7 +488,8 @@ class ControlPlane:
         if len(self._nodes) != len(raw_nodes):
             issues.append("every node must be an object with an id")
         dependencies: dict[str, tuple[str, ...]] = {}
-        for node_id, node in self._nodes.items():
+        for node_id in self._nodes:
+            node = self.node(node_id)
             issues.extend(self._validate_node(node_id, node))
             deps = node.get("dependencies", [])
             if not isinstance(deps, list) or any(not isinstance(item, str) for item in deps):
@@ -545,6 +568,8 @@ class ControlPlane:
         for key in required_text:
             if not isinstance(node.get(key), str) or not str(node.get(key)).strip():
                 issues.append(f"{node_id}: {key} must be non-empty text")
+        if node.get("pr_target") != self.target_branch:
+            issues.append(f"{node_id}: effective pr_target must equal the singleton target branch")
         if node.get("contract_version") != 1:
             issues.append(f"{node_id}: contract_version must be 1")
         list_fields = (
@@ -649,12 +674,15 @@ class ControlPlane:
         check: bool = False,
         environment: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        # Preserve the host runtime environment in memory. Windows Git and
-        # Schannel need variables such as SystemRoot, TEMP, USERPROFILE, and
-        # LOCALAPPDATA; reducing this to PATH makes getaddrinfo/credential
-        # helpers fail even when standalone Git succeeds. Nothing here is
-        # persisted or printed, and prompts remain disabled.
-        base_environment = dict(os.environ)
+        # Git gets only the runtime locations needed by Windows/Schannel and the
+        # explicitly validated transport path. Credentials and GIT_CONFIG_*
+        # injection variables are never inherited by the child process.
+        base_environment = {
+            key: value
+            for key in SAFE_GIT_RUNTIME_ENVIRONMENT_KEYS
+            if (value := os.environ.get(key))
+            and not any(character in value for character in "\r\n")
+        }
         base_environment["GIT_TERMINAL_PROMPT"] = "0"
         # Keep the controller deterministic while allowing a trusted local
         # proxy/network path to reach GitHub. These values exist only in the
@@ -671,7 +699,10 @@ class ControlPlane:
                     continue
             base_environment[key] = value
         if environment is not None:
-            base_environment.update(environment)
+            for key, value in environment.items():
+                if key.startswith("GIT_CONFIG_"):
+                    raise AutopilotError("Git config injection variables are forbidden")
+                base_environment[key] = value
         completed = subprocess.run(
             ("git", "-C", str(self.repo_root), *args),
             stdin=subprocess.DEVNULL,
@@ -782,6 +813,8 @@ class ControlPlane:
         return None
 
     def remote_branch_sha(self, branch: str, *, remote: str = "origin") -> str | None:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         completed = self._git(
             ("ls-remote", "--heads", remote, f"refs/heads/{branch}"),
             check=False,
@@ -806,6 +839,8 @@ class ControlPlane:
         *,
         remote: str = "origin",
     ) -> str:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         node = self.node(node_id)
         branch = str(node.get("branch"))
         if self.remote_branch_sha(branch, remote=remote) is not None:
@@ -869,6 +904,8 @@ class ControlPlane:
         *,
         remote: str = "origin",
     ) -> None:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         branch = str(self.node(node_id).get("branch"))
         observed = self.remote_branch_sha(branch, remote=remote)
         if observed is None:
@@ -1028,6 +1065,68 @@ class ControlPlane:
         record["question_id"] = digest_json(record)
         append_jsonl(self.questions_dir / f"{node_id}.jsonl", record)
         return record
+
+    def resolve_blocker(
+        self,
+        node_id: str,
+        blocker_id: str,
+        *,
+        actor: str,
+        fix: str,
+        retry_command: Sequence[str],
+        evidence_refs: Sequence[str] = (),
+    ) -> Mapping[str, Any]:
+        """Close one exact runtime blocker and make its verified retry actionable."""
+
+        if not actor.strip() or not fix.strip() or not retry_command:
+            raise AutopilotError("blocker resolution requires actor, fix, and retry command")
+        path = self.blockers_dir / f"{node_id}.jsonl"
+        records = (
+            [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+            if path.is_file()
+            else []
+        )
+        opened = next(
+            (
+                record
+                for record in records
+                if record.get("blocker_id") == blocker_id
+                and record.get("status") == "OPEN"
+            ),
+            None,
+        )
+        if not isinstance(opened, Mapping):
+            raise AutopilotError("blocker resolution must name an exact open blocker")
+        if any(
+            record.get("event") == "BLOCKER_RESOLVED"
+            and record.get("blocker_id") == blocker_id
+            for record in records
+        ):
+            raise AutopilotError("blocker is already resolved")
+        candidate = {**opened, "fix": fix, "retry_when": "retry command is now executable"}
+        if not self.safe_retry_allowed(candidate):
+            raise AutopilotError("blocker resolution would weaken a security control")
+        resolution = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "BLOCKER_RESOLVED",
+            "node_id": node_id,
+            "blocker_id": blocker_id,
+            "actor": actor,
+            "fix": fix,
+            "retry_command": [str(item) for item in retry_command],
+            "evidence_refs": [str(item) for item in evidence_refs],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "RESOLVED",
+            "recovery_action": {"action": "RETRY_NOW", "reason": "verified_fix_recorded"},
+            "lesson": {
+                "trigger_category": opened.get("category"),
+                "policy": "spawn a bounded repair task, verify the fix, record the result, and resume the same task",
+            },
+        }
+        resolution["resolution_id"] = digest_json(resolution)
+        append_jsonl(path, resolution)
+        return resolution
 
     def resolve_human_question(
         self,
@@ -1235,6 +1334,27 @@ class ControlPlane:
                 "objective": "refresh the validated singleton snapshot and resume every child invalidated by the target advance",
                 "required_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
                 "stop_if": "remote SHA cannot be verified normally or recovery would weaken provenance/security controls",
+            }
+        category = str(packet.get("category", "")).casefold()
+        if not category.endswith("authority") and category not in {
+            "external-authority",
+            "human-authority",
+            "credential-authority",
+            "destructive-authority",
+        } and ControlPlane.safe_retry_allowed(packet):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "steward",
+                "objective": "diagnose the exact failure, implement the bounded safe fix, verify it, record the blocker resolution and lesson, then resume the same task",
+                "required_sequence": [
+                    "inspect_exact_failure_evidence",
+                    "verify_current_target_and_authority",
+                    "apply_bounded_safe_fix",
+                    "rerun_failed_operation",
+                    "record_blocker_resolution_and_lesson",
+                    "resume_same_task",
+                ],
+                "stop_if": "the fix requires new external authority, secrets, destructive action, or weaker security/evidence controls",
             }
         return {
             "action": "REPORT_BLOCKER",
@@ -1697,6 +1817,15 @@ class ControlPlane:
     def _status_document(self) -> dict[str, object]:
         target = self.current_target_sha()
         changed = self.changed_paths_since_reconciliation()
+        active_claims = self.active_claims()
+        validation_lease: Mapping[str, Any] | None = None
+        if self.validation_lease_path.is_file():
+            candidate = read_json(self.validation_lease_path)
+            if (
+                isinstance(candidate, Mapping)
+                and parse_time(candidate.get("expires_at")) > self.clock()
+            ):
+                validation_lease = candidate
         # The plan is a DAG with substantial fan-in.  Re-evaluating every
         # dependency recursively for every node turns status into exponential
         # work and can make the dispatcher appear hung on a full plan.  Keep
@@ -1736,6 +1865,10 @@ class ControlPlane:
             "ready": ready,
             "nodes": [view.to_dict() for view in views],
             "complete": all(view.state in TERMINAL_STATES for view in views),
+            "active_claims": sorted(active_claims),
+            "active_validation_lease": (
+                dict(validation_lease) if validation_lease is not None else None
+            ),
             "generated_at": format_time(self.clock()),
         }
 

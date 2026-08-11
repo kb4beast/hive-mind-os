@@ -113,6 +113,8 @@ class IntentOrchestrationTests(unittest.TestCase):
             },
             "nodes": rows,
             "complete": False,
+            "active_claims": [],
+            "active_validation_lease": None,
         }
 
     def test_explicit_and_implicit_intents(self) -> None:
@@ -138,6 +140,8 @@ class IntentOrchestrationTests(unittest.TestCase):
             "What would you do next?",
             "Why didn't it start?",
             "Explain how to finish the DAG",
+            "How can I finish the DAG?",
+            "Review how to start the next level",
             "Should we finish the DAG?",
             "Is it safe to start now?",
             "Could this continue without review?",
@@ -185,6 +189,11 @@ class IntentOrchestrationTests(unittest.TestCase):
             self.assertIn("orchestration-policy.json", task["prompt"])
             self.assertRegex(task["launch_instruction_id"], r"^sha256:[0-9a-f]{64}$")
             self.assertIn(task["launch_instruction_id"][7:19], task["title"])
+            self.assertEqual(task["target_branch"], "release/test")
+        self.assertEqual(
+            contract["execution"]["executor_module"],
+            ".autopilot/bin/host_execution.py",
+        )
         self.assertFalse(contract["execution"]["parent_final_while_required_tasks_active"])
 
     def test_launch_binding_is_append_only_and_consumed_before_create(self) -> None:
@@ -311,6 +320,39 @@ class IntentOrchestrationTests(unittest.TestCase):
         self.assertEqual(retry["attempt"], 2)
         self.assertEqual(retry["retry_of"], released["event_id"])
 
+    def test_contract_generates_attempt_specific_retry_lineage(self) -> None:
+        rows = [{"node_id": "ACTIVE-100", "state": "READY", "reasons": []}]
+        status = self.status(rows)
+        status["dispatch_release"] = {"valid": True, "released_wave": ["ACTIVE-100"]}
+        plane = FakePlane(self.root, status, self.nodes)
+        first = build_orchestration_contract(plane, "start", status=status)["tasks"][0]
+        prepare_launch(self.root, first["launch_instruction_id"], "codex")
+        bind_launch(self.root, first["launch_instruction_id"], "codex", "thread-failed-contract")
+        terminal = observe_terminal_launch(
+            self.root,
+            first["launch_instruction_id"],
+            terminal_state="FAILED",
+            host_event_ref="codex-thread:thread-failed-contract:terminal",
+            observed_by="orchestrator:fixture",
+        )
+        released = release_launch(
+            self.root,
+            first["launch_instruction_id"],
+            terminal_event_id=str(terminal["event_id"]),
+            reason="host task failed",
+        )
+        retry = build_orchestration_contract(plane, "start", status=status)["tasks"][0]
+        self.assertNotEqual(first["launch_instruction_id"], retry["launch_instruction_id"])
+        self.assertEqual(retry["attempt"], 2)
+        self.assertEqual(retry["retry_of"], released["event_id"])
+        prepared = prepare_launch(
+            self.root,
+            retry["launch_instruction_id"],
+            "codex",
+            retry_of=retry["retry_of"],
+        )
+        self.assertEqual(prepared["attempt"], 2)
+
     def test_binding_state_symlink_escape_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as outside_name:
             state = self.root / ".autopilot" / "state"
@@ -374,6 +416,20 @@ class IntentOrchestrationTests(unittest.TestCase):
         bind_launch(self.root, instruction_id, "codex", "thread-live")
         contract = build_orchestration_contract(plane, "check", status=status)
         self.assertEqual(contract["outcome"], "ACTIVE")
+        self.assertFalse(contract["quiescent"])
+
+    def test_active_validation_lease_prevents_false_quiescence(self) -> None:
+        status = self.status([{"node_id": "ACTIVE-100", "state": "COMPLETE"}])
+        status["complete"] = True
+        status["active_validation_lease"] = {
+            "node_id": "ACTIVE-100",
+            "owner": "curator:fixture",
+            "expires_at": "2030-01-01T00:00:00Z",
+        }
+        plane = FakePlane(self.root, status, self.nodes)
+        contract = build_orchestration_contract(plane, "check", status=status)
+        self.assertEqual(contract["outcome"], "ACTIVE")
+        self.assertFalse(contract["successful"])
         self.assertFalse(contract["quiescent"])
 
     def test_launch_identity_is_repository_scoped(self) -> None:

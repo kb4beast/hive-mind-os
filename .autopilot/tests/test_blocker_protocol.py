@@ -41,6 +41,34 @@ class BlockerProtocolTests(unittest.TestCase):
             stored = root / ".autopilot" / "state" / "blockers" / "ARCH-100.jsonl"
             self.assertIn("retry_when", stored.read_text(encoding="utf-8"))
 
+    def test_generic_software_blocker_spawns_repair_and_can_be_resolved(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = Path(__file__).resolve().parents[1]
+            shutil.copytree(source, root / ".autopilot")
+            control = controller.read_json(root / ".autopilot" / "control-plane.json")
+            control["verify_git_objects"] = False
+            controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
+            plane = controller.ControlPlane(root)
+            packet = plane.record_blocker(
+                "ARCH-100",
+                cause="controller subprocess could not inspect the remote",
+                fix="repair the bounded subprocess environment",
+                retry_when="normal verified remote inspection succeeds",
+                category="software",
+            )
+            self.assertEqual(packet["recovery_action"]["action"], "SPAWN_SUBTASK")
+            resolution = plane.resolve_blocker(
+                "ARCH-100",
+                packet["blocker_id"],
+                actor="steward:fixture",
+                fix="passed validated proxy variables through the safe allowlist",
+                retry_command=["git", "ls-remote", "origin"],
+                evidence_refs=["test:remote-inspection"],
+            )
+            self.assertEqual(resolution["status"], "RESOLVED")
+            self.assertEqual(resolution["recovery_action"]["action"], "RETRY_NOW")
+
     def test_permission_does_not_authorize_security_bypass(self) -> None:
         self.assertFalse(
             controller.ControlPlane.safe_retry_allowed(

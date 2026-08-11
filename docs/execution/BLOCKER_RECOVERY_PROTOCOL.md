@@ -44,6 +44,12 @@ Runtime packets are append-only under `.autopilot/state/blockers/`.  The
 protocol, tests, and failed-attempt evidence are repository artifacts, so a
 fresh session learns the recovery rule rather than repeating an opaque failure.
 
+Generic in-authority software blockers select `SPAWN_SUBTASK`: a Steward child
+inspects the exact evidence, applies a bounded safe fix, reruns the failed
+operation, records `blocker-resolve`, and resumes the same primary task. Runtime
+details remain local; the generalized sequence and regression tests are
+checked-in policy, so clean checkouts and other repositories inherit the lesson.
+
 ## Human-question learning rule
 
 If a human question is unavoidable, record it under

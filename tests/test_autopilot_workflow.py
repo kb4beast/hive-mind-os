@@ -14,6 +14,7 @@ from hive_mind_os.autopilot_workflow import (
     initialize_repository,
     inspect_repository,
     simple_prompt,
+    trust_controller,
 )
 
 
@@ -108,6 +109,13 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         )
         self.assertNotIn("secret", json.dumps(request))
 
+    def test_secret_like_operator_text_is_rejected_before_persistence(self) -> None:
+        with self.assertRaises(PortableAutopilotError):
+            initialize_repository(self.root, objective="Use api_key=sk-example-secret-123456")
+        initialize_repository(self.root)
+        with self.assertRaises(PortableAutopilotError):
+            inspect_repository(self.root, request="continue with Bearer abcdefghijklmnop")
+
     def test_ssh_user_info_and_missing_origin_are_safe(self) -> None:
         subprocess.run(["git", "remote", "remove", "origin"], cwd=self.root, check=True)
         subprocess.run(
@@ -141,6 +149,14 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         contract = inspect_repository(self.root, request="Explain how to finish the DAG")
         self.assertEqual(contract["intent"]["intent"], "CHECK")
         self.assertEqual(contract["tasks"], [])
+
+    def test_review_and_how_question_language_does_not_bootstrap(self) -> None:
+        initialize_repository(self.root)
+        for request in ("How can I finish the DAG?", "Review how to start the next level"):
+            with self.subTest(request=request):
+                contract = inspect_repository(self.root, request=request)
+                self.assertEqual(contract["intent"]["intent"], "CHECK")
+                self.assertEqual(contract["tasks"], [])
 
     def test_persisted_request_cannot_redeclare_target_as_protected(self) -> None:
         result = initialize_repository(self.root, target_branch="release/widgets")
@@ -189,15 +205,14 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
         subprocess.run(["git", "commit", "-m", "controller"], cwd=self.root, check=True, capture_output=True)
         contract = inspect_repository(self.root, request="check")
-        self.assertEqual(contract["kind"], "hive-mind-portable-controller-invocation-v1")
-        self.assertEqual(contract["invocation"]["execution_owner"], "active_host_sandbox")
+        self.assertEqual(contract["kind"], "hive-mind-portable-controller-review-required-v1")
         self.assertFalse(escaped.exists())
         (self.root / "README.md").write_text("# Product-only change\n", encoding="utf-8")
         subprocess.run(["git", "add", "README.md"], cwd=self.root, check=True)
         subprocess.run(["git", "commit", "-m", "product"], cwd=self.root, check=True, capture_output=True)
         self.assertEqual(
             inspect_repository(self.root, request="check")["outcome"],
-            "HOST_EXECUTION_REQUIRED",
+            "CONTROLLER_REVIEW_REQUIRED",
         )
         controller.write_text(controller.read_text(encoding="utf-8") + "# dirty\n", encoding="utf-8")
         with self.assertRaises(PortableAutopilotError):
@@ -209,9 +224,23 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         controller.write_text("print('{}')\n", encoding="utf-8")
         subprocess.run(["git", "add", "-f", ".autopilot/bin/autopilot.py"], cwd=self.root, check=True)
         subprocess.run(["git", "commit", "-m", "controller"], cwd=self.root, check=True, capture_output=True)
+        trust_root = self.root.parent / f"{self.root.name}-trust"
+        self.addCleanup(lambda: __import__("shutil").rmtree(trust_root, ignore_errors=True))
+        trust_controller(
+            self.root,
+            actor="curator:independent-fixture",
+            evidence_ref="fixture-review:controller-bundle",
+            trust_state_root=trust_root,
+        )
         contract = inspect_repository(self.root, request="check")
+        self.assertEqual(contract["outcome"], "CONTROLLER_REVIEW_REQUIRED")
+        contract = inspect_repository(
+            self.root,
+            request="check",
+            trust_state_root=trust_root,
+        )
         self.assertTrue(contract["invocation"]["deny_outside_repository_filesystem"])
-        self.assertTrue(contract["invocation"]["deny_descendant_processes"])
+        self.assertIn("git", contract["invocation"]["allow_descendant_processes"])
 
 
 if __name__ == "__main__":

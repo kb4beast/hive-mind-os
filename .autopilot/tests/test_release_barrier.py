@@ -19,6 +19,8 @@ BASELINE = "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23"
 SECOND = "b" * 40
 PLAN_FINGERPRINT = "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39"
 PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
+ANCESTRY_DUPLICATE_RECEIPT = "4191ebfd571c9852f5f6faaa43cea0f48f3e0fe8"
+CANONICAL_RECEIPT = "369f956817ff10231c06d09c7c802f47f76d57b0"
 
 
 class DispatcherReleaseBarrierTests(unittest.TestCase):
@@ -95,6 +97,7 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         commit: str,
         *,
         supersedes: str | None = None,
+        expanded: bool = False,
     ) -> dict[str, object]:
         authority: dict[str, object] = {
             "autonomy_level": "A3",
@@ -102,6 +105,19 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         }
         if supersedes is not None:
             authority["supersedes_receipt_commit"] = supersedes
+        if expanded:
+            authority["grants"] = [
+                "repository-reconciliation",
+                "documentation",
+                "evidence-publication",
+                "dispatcher-release-barrier",
+            ]
+        else:
+            authority["grants"] = [
+                "repository-reconciliation",
+                "documentation",
+                "evidence-publication",
+            ]
         return {
             "commit": commit,
             "receipt": {
@@ -114,6 +130,17 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
                 "branch": "autopilot/recon-010",
                 "pr": 122,
                 "final_commit": "c" * 40,
+                "final_tree": "f" * 40,
+                "changed_paths": (
+                    ["docs/reconciliation.md", ".autopilot/bin/release_barrier.py"]
+                    if expanded
+                    else ["docs/reconciliation.md"]
+                ),
+                "evidence_refs": (
+                    [f"historical-receipt:{PREMATURE_RECEIPT}"]
+                    if expanded
+                    else ["evidence/reconciliation.json"]
+                ),
                 "authority": authority,
             },
         }
@@ -363,6 +390,21 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         historical = self._receipt_record(PREMATURE_RECEIPT)
         duplicate = self._receipt_record("d" * 40)
         records = [historical, duplicate]
+        self.assertIs(plane._resolve_recon_receipt_records(records), records)
+
+    def test_14_exact_integrated_ancestry_duplicate_uses_expanded_receipt(self) -> None:
+        plane = self._cli_plane()
+        duplicate = self._receipt_record(ANCESTRY_DUPLICATE_RECEIPT)
+        canonical = self._receipt_record(CANONICAL_RECEIPT, expanded=True)
+        records = [canonical, duplicate]
+        self.assertEqual(plane._resolve_recon_receipt_records(records), [canonical])
+
+    def test_15_integrated_ancestry_duplicate_remains_fail_closed_if_mutated(self) -> None:
+        plane = self._cli_plane()
+        duplicate = self._receipt_record(ANCESTRY_DUPLICATE_RECEIPT)
+        canonical = self._receipt_record(CANONICAL_RECEIPT, expanded=True)
+        canonical["receipt"]["final_tree"] = "e" * 40  # type: ignore[index]
+        records = [duplicate, canonical]
         self.assertIs(plane._resolve_recon_receipt_records(records), records)
 
 
