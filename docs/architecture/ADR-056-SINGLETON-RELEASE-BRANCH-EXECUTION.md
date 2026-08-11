@@ -9,7 +9,7 @@ Date: 2026-08-10; target amendment 2026-08-11
 All Autopilot nodes execute, validate, reconcile, claim, publish receipts, and open
 node PRs against one configured singleton release branch:
 
-`release/hive-mind-os-singleton-20260811-r3`
+`release/hive-mind-os-singleton-20260811-r4`
 
 The r3 target is an ancestry-preserving successor to r2 that integrates all then-open
 PR heads before the portable orchestration change. This target amendment changes no

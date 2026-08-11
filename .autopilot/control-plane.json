@@ -45,7 +45,7 @@
     "baseline_rule": "The baseline must remain an ancestor. Any target advancement must be reconciled before new claims.",
     "baseline_sha": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
     "baseline_tree": "ac76686aa004cf8188f0281b1ec9ac1f5c666929",
-    "branch": "release/hive-mind-os-singleton-20260811-r3",
+    "branch": "release/hive-mind-os-singleton-20260811-r4",
     "repository": "kb4beast/hive-mind-os",
     "execution_mode": "singleton-release-branch",
     "final_integration_branch": "main",

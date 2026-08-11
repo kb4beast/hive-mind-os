@@ -1,7 +1,7 @@
 # Singleton release-branch execution policy
 
 The active execution target is the singleton branch
-`release/hive-mind-os-singleton-20260811-r3`. The controller reads this target from
+`release/hive-mind-os-singleton-20260811-r4`. The controller reads this target from
 `.autopilot/control-plane.json`.
 
 This r3 branch supersedes r2 as the single execution target after incorporating every
