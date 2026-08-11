@@ -148,7 +148,9 @@ class HiveCortexBuilderTests(unittest.TestCase):
         self.assertNotIn("HIVE_SECRET_TOKEN", environment)
         self.assertEqual("1", environment["GIT_CONFIG_NOSYSTEM"])
         self.assertEqual(os.devnull, environment["GIT_CONFIG_GLOBAL"])
-        self.assertTrue(Path(environment["HOME"]).is_relative_to(self.root))
+        self.assertTrue(
+            Path(environment["HOME"]).resolve().is_relative_to(self.root.resolve())
+        )
         self.assertFalse(run.call_args.kwargs["shell"])
 
     def test_git_diff_check_profile_runs_only_the_fixed_validation_command(self) -> None:

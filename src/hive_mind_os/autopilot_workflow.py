@@ -231,6 +231,30 @@ def _digest(value: object) -> str:
     return "sha256:" + sha256(_canonical_bytes(value)).hexdigest()
 
 
+def _relative_by_file_identity(candidate: Path, root: Path) -> Path | None:
+    """Return a lexical relative path when an ancestor is physically ``root``.
+
+    Windows can expose the same directory through both a long path and an 8.3
+    short-path alias. ``Path.relative_to`` compares spelling, so it can reject a
+    legitimate host-owned file. Walking ancestors with ``samefile`` preserves the
+    fail-closed boundary while recognizing aliases to the same directory object.
+    """
+
+    current = candidate.absolute()
+    parts: list[str] = []
+    while True:
+        try:
+            if os.path.samefile(current, root):
+                return Path(*reversed(parts))
+        except OSError:
+            pass
+        parent = current.parent
+        if parent == current:
+            return None
+        parts.append(current.name)
+        current = parent
+
+
 def _external_file(
     repository: Path,
     authority_root: Path,
@@ -238,21 +262,26 @@ def _external_file(
     label: str,
 ) -> Path:
     root = authority_root.resolve()
-    if root.is_relative_to(repository) or _is_link_like(authority_root):
+    if (
+        _relative_by_file_identity(root, repository.resolve()) is not None
+        or _is_link_like(authority_root)
+    ):
         raise PortableAutopilotError(f"{label} root must be host-owned and outside the target repository")
     candidate = Path(reference)
     candidate = candidate if candidate.is_absolute() else authority_root / candidate
-    try:
-        relative = candidate.absolute().relative_to(authority_root.absolute())
-    except ValueError as error:
-        raise PortableAutopilotError(f"{label} escapes the host authorization root") from error
+    relative = _relative_by_file_identity(candidate, authority_root)
+    if relative is None:
+        raise PortableAutopilotError(f"{label} escapes the host authorization root")
     current = authority_root
     for part in relative.parts:
         current = current / part
         if _is_link_like(current):
             raise PortableAutopilotError(f"{label} must not use a symlink or junction")
     resolved = candidate.resolve()
-    if not resolved.is_relative_to(root) or resolved.is_relative_to(repository):
+    if (
+        _relative_by_file_identity(resolved, root) is None
+        or _relative_by_file_identity(resolved, repository.resolve()) is not None
+    ):
         raise PortableAutopilotError(f"{label} escapes the host authorization root")
     if not resolved.is_file():
         raise PortableAutopilotError(f"{label} is not a resolvable regular file")
