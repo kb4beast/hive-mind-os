@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "court_id": "court-explorer-310-receipt-boundary-20260811",
+  "node_id": "EXPLORER-310",
+  "decision": "QUARANTINE",
+  "judge_identity": "court:appeals-independent-explorer-310",
+  "cross_examiner_identity": "curator:receipt-retirement-cross-examination",
+  "finding": "The rejected receipt branch must be retained under a sealed quarantine ref before its active node ref can be retired.",
+  "blocker_id": "sha256:e3d19e5a17fb286d55eb7bf82d975aaed569c514d37553218391e13518b48382"
+}
