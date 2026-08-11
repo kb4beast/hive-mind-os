@@ -43,3 +43,15 @@ A child must never attempt step 6 before step 5 has produced a valid release.
 Runtime packets are append-only under `.autopilot/state/blockers/`.  The
 protocol, tests, and failed-attempt evidence are repository artifacts, so a
 fresh session learns the recovery rule rather than repeating an opaque failure.
+
+## Human-question learning rule
+
+If a human question is unavoidable, record it under
+`.autopilot/state/questions/<node>.jsonl` with `record_human_question`. When the
+human and system establish the result, immediately call
+`resolve_human_question`. That appends the fix and an explicit `RETRY_NOW`
+action, allowing the controller to resume the failed operation in the same
+turn. The answer is stored only as a digest; credentials, proxy secrets, and
+other sensitive values must never be copied into repository files or evidence.
+An unresolved question remains a blocker, not a reason to repeat the same
+question on the next run.

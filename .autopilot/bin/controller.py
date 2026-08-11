@@ -322,6 +322,7 @@ class ControlPlane:
         self.receipts_dir = self.state_dir / "receipts"
         self.failures_dir = self.state_dir / "failures"
         self.blockers_dir = self.state_dir / "blockers"
+        self.questions_dir = self.state_dir / "questions"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -966,6 +967,76 @@ class ControlPlane:
         }
         append_jsonl(self.blockers_dir / f"{node_id}.jsonl", packet)
         return packet
+
+    def record_human_question(
+        self,
+        node_id: str,
+        *,
+        question: str,
+        cause: str,
+        attempted_command: Sequence[str] = (),
+    ) -> Mapping[str, Any]:
+        """Track a human question without persisting its potentially sensitive answer.
+
+        Asking a human is a recoverable control-plane event, not a stopping point.
+        The question is append-only; ``resolve_human_question`` records the answer
+        digest, fix, and immediate retry action so the next run can resume itself.
+        """
+
+        for value, label in ((question, "question"), (cause, "cause")):
+            if not isinstance(value, str) or not value.strip():
+                raise AutopilotError(f"human question {label} is required")
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "QUESTION_OPENED",
+            "node_id": node_id,
+            "question": question,
+            "cause": cause,
+            "attempted_command": [str(item) for item in attempted_command],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "OPEN",
+        }
+        record["question_id"] = digest_json(record)
+        append_jsonl(self.questions_dir / f"{node_id}.jsonl", record)
+        return record
+
+    def resolve_human_question(
+        self,
+        node_id: str,
+        question_id: str,
+        *,
+        answer: str,
+        fix: str,
+        retry_command: Sequence[str],
+    ) -> Mapping[str, Any]:
+        """Record a human result and make the safe retry immediately actionable.
+
+        Only a digest of ``answer`` is retained. Secrets therefore cannot be
+        copied into repository or runtime evidence by the learning mechanism.
+        """
+
+        for value, label in ((answer, "answer"), (fix, "fix")):
+            if not isinstance(value, str) or not value.strip():
+                raise AutopilotError(f"question resolution {label} is required")
+        if not retry_command:
+            raise AutopilotError("question resolution retry_command is required")
+        result = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "QUESTION_RESOLVED",
+            "node_id": node_id,
+            "question_id": question_id,
+            "answer_digest": digest_json({"answer": answer}),
+            "fix": fix,
+            "retry_command": [str(item) for item in retry_command],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "RESOLVED",
+            "recovery_action": {"action": "RETRY_NOW", "reason": "human_result_recorded"},
+        }
+        result["resolution_id"] = digest_json(result)
+        append_jsonl(self.questions_dir / f"{node_id}.jsonl", result)
+        return result
 
     @staticmethod
     def recovery_action(packet: Mapping[str, Any]) -> Mapping[str, Any]:

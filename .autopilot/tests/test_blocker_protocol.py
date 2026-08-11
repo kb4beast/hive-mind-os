@@ -95,3 +95,31 @@ class BlockerProtocolTests(unittest.TestCase):
                     controller.os.environ.pop("HTTPS_PROXY", None)
                 else:
                     controller.os.environ["HTTPS_PROXY"] = original
+
+    def test_human_question_is_resolved_into_immediate_safe_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = Path(__file__).resolve().parents[1]
+            shutil.copytree(source, root / ".autopilot")
+            control = controller.read_json(root / ".autopilot" / "control-plane.json")
+            control["verify_git_objects"] = False
+            controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
+            plane = controller.ControlPlane(root)
+            opened = plane.record_human_question(
+                "ARCH-100",
+                question="Which trusted proxy environment is available?",
+                cause="Git remote inspection cannot start without the runtime transport path",
+                attempted_command=["git", "ls-remote", "origin"],
+            )
+            resolved = plane.resolve_human_question(
+                "ARCH-100",
+                opened["question_id"],
+                answer="Use the existing trusted HTTPS proxy environment.",
+                fix="Pass validated HTTP_PROXY, HTTPS_PROXY, and NO_PROXY to the Git subprocess.",
+                retry_command=["git", "ls-remote", "origin"],
+            )
+            self.assertEqual(resolved["recovery_action"]["action"], "RETRY_NOW")
+            self.assertNotIn("trusted HTTPS proxy", resolved["answer_digest"])
+            text = (root / ".autopilot" / "state" / "questions" / "ARCH-100.jsonl").read_text()
+            self.assertIn("QUESTION_OPENED", text)
+            self.assertIn("QUESTION_RESOLVED", text)
