@@ -67,7 +67,16 @@ class _FrozenEvidence(Mapping[str, object]):
     __slots__ = ("_items",)
 
     def __init__(self, values: Mapping[str, object]) -> None:
-        object.__setattr__(self, "_items", tuple((str(key), _freeze(value)) for key, value in values.items()))
+        items: list[tuple[str, object]] = []
+        keys: set[str] = set()
+        for key, value in values.items():
+            if not isinstance(key, str):
+                raise StewardIntegrityError("evidence mapping keys must be strings")
+            if key in keys:
+                raise StewardIntegrityError("evidence mapping keys must not collide")
+            keys.add(key)
+            items.append((key, _freeze(value)))
+        object.__setattr__(self, "_items", tuple(items))
 
     def __setattr__(self, _: str, __: object) -> None:
         raise AttributeError("health evidence is immutable")
@@ -87,7 +96,7 @@ class _FrozenEvidence(Mapping[str, object]):
 
 def _freeze(value: object) -> object:
     if isinstance(value, Mapping):
-        return _FrozenEvidence({str(key): item for key, item in value.items()})
+        return _FrozenEvidence(value)
     if isinstance(value, (list, tuple)):
         return tuple(_freeze(item) for item in value)
     return value
@@ -99,6 +108,13 @@ def _thaw(value: object) -> object:
     if isinstance(value, tuple):
         return [_thaw(item) for item in value]
     return value
+
+
+def _evidence_is_intact(observation: "HealthObservation") -> bool:
+    try:
+        return canonical_digest(_thaw(observation.evidence)) == observation.evidence_digest
+    except (TypeError, ValueError, StewardIntegrityError):
+        return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,6 +240,33 @@ class Steward:
         if missing:
             raise StewardIntegrityError("health assessment is missing: " + ", ".join(sorted(item.value for item in missing)))
         ordered = tuple(by_surface[item] for item in HealthSurface)
+        corrupted = tuple(item for item in ordered if not _evidence_is_intact(item))
+        if corrupted:
+            proposals = tuple(
+                MaintenanceProposal(
+                    RepairKind.QUARANTINE,
+                    item.surface,
+                    item.subject_id,
+                    "health evidence integrity failed; quarantine until independently re-observed",
+                    f"reobserve:{item.surface.value}:{item.subject_id}",
+                    f"rollback:{item.surface.value}:{item.subject_id}",
+                )
+                for item in corrupted
+            )
+            observed_digest = canonical_digest([item.to_document() for item in ordered])
+            document = {
+                "readiness": OperationalReadiness.QUARANTINED.value,
+                "observations": [item.to_document() for item in ordered],
+                "proposals": [item.to_document() for item in proposals],
+                "observed_digest": observed_digest,
+            }
+            return StewardReport(
+                OperationalReadiness.QUARANTINED,
+                ordered,
+                proposals,
+                observed_digest,
+                canonical_digest(document),
+            )
         proposals = tuple(
             MaintenanceProposal(
                 _RECOVERY_KIND[item.surface],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from collections.abc import Iterator, Mapping
 
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.reconciler import RepairKind
@@ -83,6 +84,44 @@ class HiveCortexStewardTests(unittest.TestCase):
             sealed.evidence["nested"]["state"] = "corrupted"  # type: ignore[index]
         report = Steward().assess((sealed, *complete_observations()[1:]))
         self.assertEqual(OperationalReadiness.READY, report.readiness)
+
+    def test_rejects_lossy_or_colliding_evidence_mapping_keys(self) -> None:
+        non_string = {"surface": "queues", "nested": {1: "would be coerced"}}
+        with self.assertRaisesRegex(StewardIntegrityError, "keys must be strings"):
+            observation(
+                HealthSurface.QUEUES,
+                evidence=non_string,
+                evidence_digest=canonical_digest(non_string),
+            )
+
+        class CollidingEvidence(Mapping[str, object]):
+            def __getitem__(self, key: str) -> object:
+                if key == "surface":
+                    return "queues"
+                raise KeyError(key)
+
+            def __iter__(self) -> Iterator[str]:
+                return iter(("surface",))
+
+            def __len__(self) -> int:
+                return 1
+
+            def items(self) -> object:  # type: ignore[override]
+                return (("surface", "queues"), ("surface", "forged"))
+
+        with self.assertRaisesRegex(StewardIntegrityError, "must not collide"):
+            observation(
+                HealthSurface.QUEUES,
+                evidence=CollidingEvidence(),
+                evidence_digest=canonical_digest({"surface": "queues"}),
+            )
+
+    def test_assessment_quarantines_object_setattr_evidence_tampering(self) -> None:
+        sealed = observation(HealthSurface.QUEUES)
+        object.__setattr__(sealed, "evidence", {"surface": "queues", "verified": False})
+        report = Steward().assess((sealed, *complete_observations()[1:]))
+        self.assertEqual(OperationalReadiness.QUARANTINED, report.readiness)
+        self.assertEqual(RepairKind.QUARANTINE, report.proposals[0].repair_kind)
 
 
 if __name__ == "__main__":
