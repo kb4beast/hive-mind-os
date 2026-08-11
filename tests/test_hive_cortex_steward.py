@@ -70,6 +70,20 @@ class HiveCortexStewardTests(unittest.TestCase):
         with self.assertRaisesRegex(StewardIntegrityError, "requires a recovery reference"):
             observation(HealthSurface.WORKSPACES, HealthStatus.DEGRADED, recovery_ref=None)
 
+    def test_nested_evidence_is_defensively_immutable_after_validation(self) -> None:
+        evidence = {"surface": "queues", "nested": {"state": "healthy"}}
+        sealed = observation(
+            HealthSurface.QUEUES,
+            evidence=evidence,
+            evidence_digest=canonical_digest(evidence),
+        )
+        evidence["nested"]["state"] = "corrupted"  # type: ignore[index]
+        self.assertEqual("healthy", sealed.evidence["nested"]["state"])  # type: ignore[index]
+        with self.assertRaises(TypeError):
+            sealed.evidence["nested"]["state"] = "corrupted"  # type: ignore[index]
+        report = Steward().assess((sealed, *complete_observations()[1:]))
+        self.assertEqual(OperationalReadiness.READY, report.readiness)
+
 
 if __name__ == "__main__":
     unittest.main()

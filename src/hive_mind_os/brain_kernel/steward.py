@@ -8,6 +8,7 @@ authority, effects, and verification remain separate boundaries.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Iterable, Mapping
@@ -60,6 +61,46 @@ def _sha256(value: str, label: str) -> str:
     return value
 
 
+class _FrozenEvidence(Mapping[str, object]):
+    """A JSON-shaped mapping which cannot be mutated after validation."""
+
+    __slots__ = ("_items",)
+
+    def __init__(self, values: Mapping[str, object]) -> None:
+        object.__setattr__(self, "_items", tuple((str(key), _freeze(value)) for key, value in values.items()))
+
+    def __setattr__(self, _: str, __: object) -> None:
+        raise AttributeError("health evidence is immutable")
+
+    def __getitem__(self, key: str) -> object:
+        for item_key, value in self._items:
+            if item_key == key:
+                return value
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (key for key, _ in self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
+def _freeze(value: object) -> object:
+    if isinstance(value, Mapping):
+        return _FrozenEvidence({str(key): item for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def _thaw(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {str(key): _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class HealthObservation:
     """One adapter-produced health observation with content-bound evidence."""
@@ -77,9 +118,9 @@ class HealthObservation:
         object.__setattr__(self, "subject_id", _text(self.subject_id, "observation subject"))
         if not isinstance(self.evidence, Mapping) or not self.evidence:
             raise StewardIntegrityError("observation evidence is required")
-        evidence = dict(self.evidence)
+        evidence = _FrozenEvidence(self.evidence)
         object.__setattr__(self, "evidence", evidence)
-        expected = canonical_digest(evidence)
+        expected = canonical_digest(_thaw(evidence))
         if self.evidence_digest != expected:
             raise StewardIntegrityError("observation evidence digest does not match its content")
         object.__setattr__(self, "evidence_digest", _sha256(self.evidence_digest, "observation evidence digest"))
@@ -96,7 +137,7 @@ class HealthObservation:
             "surface": self.surface.value,
             "status": self.status.value,
             "subject_id": self.subject_id,
-            "evidence": dict(self.evidence),
+            "evidence": _thaw(self.evidence),
             "evidence_digest": self.evidence_digest,
             "recovery_ref": self.recovery_ref,
         }
