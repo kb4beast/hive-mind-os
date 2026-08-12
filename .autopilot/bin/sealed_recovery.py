@@ -22,6 +22,18 @@ from durable_controller import (
 )
 
 REPAIR_AUTHORITY_DOCUMENT = ".autopilot/sealed-repair-authorities.json"
+POST_MERGE_REPAIR_AUTHORITY_DOCUMENT = (
+    ".autopilot/post-merge-repair-authorities.json"
+)
+POST_MERGE_REPAIR_KIND = (
+    "hive-mind-autopilot-post-merge-repair-authorities-v1"
+)
+POST_MERGE_REPAIR_AUTHORITY_DIGEST = (
+    "sha256:d09ada8bad4e967e18d19a303c15d52feca4fee5a0ba3b749dd2b77e7e7dfebd"
+)
+POST_MERGE_REPAIR_NODES = frozenset(
+    {"BUILDER-330", "ORCH-300", "OPTIMIZER-370"}
+)
 REPAIR_CLAIM_KIND = "hive-mind-autopilot-sealed-repair-claim-v1"
 REPAIR_DOCTOR_KIND = "hive-mind-autopilot-full-doctor-evidence-v1"
 REPAIR_DOCTOR_FILE = "sealed-repair-doctor.json"
@@ -85,6 +97,328 @@ class SealedRecoveryMixin:
             for record in records
             if isinstance(record, Mapping) and isinstance(record.get("node_id"), str)
         }
+
+    @property
+    def post_merge_repair_authority_path(self) -> Path:
+        return self.repo_root / POST_MERGE_REPAIR_AUTHORITY_DOCUMENT
+
+    def _post_merge_repair_authority_document(self) -> Mapping[str, Any] | None:
+        if not self.post_merge_repair_authority_path.is_file():
+            return None
+        value = read_json(self.post_merge_repair_authority_path)
+        return value if isinstance(value, Mapping) else None
+
+    def _post_merge_repair_records(self) -> dict[str, Mapping[str, Any]]:
+        document = self._post_merge_repair_authority_document()
+        if not isinstance(document, Mapping):
+            return {}
+        records = document.get("records")
+        if not isinstance(records, list):
+            return {}
+        return {
+            str(record.get("node_id")): record
+            for record in records
+            if isinstance(record, Mapping) and isinstance(record.get("node_id"), str)
+        }
+
+    def _post_merge_receipt_issues(
+        self,
+        node_id: str,
+        receipt: object,
+        record: Mapping[str, Any] | None = None,
+    ) -> tuple[str, ...]:
+        issues: list[str] = []
+        if record is None:
+            record = self._post_merge_repair_records().get(node_id)
+        if not isinstance(record, Mapping):
+            return (f"{node_id}: post-merge repair authority is unavailable",)
+        if not isinstance(receipt, Mapping):
+            return (f"{node_id}: post-merge replacement receipt is missing",)
+
+        issues.extend(
+            super().validate_receipt(
+                node_id,
+                receipt,
+                require_integrated=False,
+            )
+        )
+        expected_authority = {
+            "node_id": node_id,
+            "autonomy_level": "A3",
+            "grants": [f"post-merge-repair:{node_id}"],
+            "post_merge_grant_id": record["grant_id"],
+            "post_merge_supersedes_receipt_commit": record["old_receipt_commit"],
+            "claim_commit": record["claim_commit"],
+        }
+        authority = receipt.get("authority")
+        if not isinstance(authority, Mapping) or dict(authority) != expected_authority:
+            issues.append("post-merge receipt authority differs from the exact grant")
+
+        exact_bindings = {
+            "schema_version": 1,
+            "plan_fingerprint": record["plan_fingerprint"],
+            "node_id": node_id,
+            "contract_version": record["contract_version"],
+            "base_commit": record["base_commit"],
+            "base_tree": record["base_tree"],
+            "final_commit": record["candidate_commit"],
+            "final_tree": record["candidate_tree"],
+            "branch": record["branch"],
+            "pr": record["pr"],
+            "changed_paths": record["changed_paths"],
+            "acceptance_decision": record["decision"],
+        }
+        for key, expected in exact_bindings.items():
+            if receipt.get(key) != expected:
+                issues.append(f"post-merge receipt {key} differs from the exact grant")
+        if digest_json(receipt) != record["receipt_payload_digest"]:
+            issues.append("post-merge replacement receipt payload digest differs")
+        return tuple(dict.fromkeys(issues))
+
+    def _post_merge_repair_issues(self) -> tuple[str, ...]:
+        issues: list[str] = []
+        document = self._post_merge_repair_authority_document()
+        expected_document_keys = {"schema_version", "kind", "records"}
+        if not isinstance(document, Mapping) or set(document) != expected_document_keys:
+            return ("post-merge repair authority document shape is invalid",)
+        if document.get("schema_version") != 1:
+            issues.append("post-merge repair authority schema_version is unsupported")
+        if document.get("kind") != POST_MERGE_REPAIR_KIND:
+            issues.append("post-merge repair authority kind is invalid")
+        if digest_json(document) != POST_MERGE_REPAIR_AUTHORITY_DIGEST:
+            issues.append("post-merge repair authority document was altered")
+
+        raw_records = document.get("records")
+        if not isinstance(raw_records, list) or len(raw_records) != 3:
+            issues.append("post-merge repair authority must contain exactly three records")
+            return tuple(dict.fromkeys(issues))
+
+        required_keys = {
+            "base_commit",
+            "base_tree",
+            "branch",
+            "candidate_commit",
+            "candidate_tree",
+            "changed_paths",
+            "claim_commit",
+            "contract_version",
+            "decision",
+            "evidence_refs",
+            "grant_id",
+            "local_ref",
+            "node_id",
+            "old_receipt_commit",
+            "old_receipt_payload_digest",
+            "plan_fingerprint",
+            "pr",
+            "receipt_commit",
+            "receipt_payload_digest",
+        }
+        observed: set[str] = set()
+        target = self.current_target_sha() if self.verify_git_objects else None
+        for raw_record in raw_records:
+            if not isinstance(raw_record, Mapping):
+                issues.append("post-merge repair authority entry must be an object")
+                continue
+            if set(raw_record) != required_keys:
+                issues.append("post-merge repair authority record shape is invalid")
+                continue
+            node_id = raw_record.get("node_id")
+            if node_id not in POST_MERGE_REPAIR_NODES or node_id in observed:
+                issues.append("post-merge repair authority node set is invalid")
+                continue
+            node_id = str(node_id)
+            observed.add(node_id)
+            node = super().node(node_id)
+
+            if raw_record.get("branch") != node.get("branch"):
+                issues.append(f"{node_id}: post-merge repair branch differs")
+            if raw_record.get("contract_version") != node.get("contract_version"):
+                issues.append(f"{node_id}: post-merge contract version differs")
+            if raw_record.get("plan_fingerprint") != self.expected_plan_fingerprint:
+                issues.append(f"{node_id}: post-merge plan fingerprint is stale")
+            if raw_record.get("decision") != "ADAPT":
+                issues.append(f"{node_id}: post-merge disposition must be ADAPT")
+            if raw_record.get("grant_id") != f"post-merge-repair:{node_id}:v1":
+                issues.append(f"{node_id}: post-merge grant identity is invalid")
+            expected_local_ref = f"refs/heads/post-merge/{node_id.lower()}"
+            if raw_record.get("local_ref") != expected_local_ref:
+                issues.append(f"{node_id}: post-merge retained ref is invalid")
+
+            changed_paths = raw_record.get("changed_paths")
+            write_scope = set(str(item) for item in node.get("write_scope", []))
+            if (
+                not isinstance(changed_paths, list)
+                or not changed_paths
+                or changed_paths != sorted(set(changed_paths))
+                or any(not isinstance(item, str) or item not in write_scope for item in changed_paths)
+            ):
+                issues.append(f"{node_id}: post-merge changed paths exceed exact scope")
+            evidence_refs = raw_record.get("evidence_refs")
+            if (
+                not isinstance(evidence_refs, list)
+                or len(evidence_refs) != 4
+                or any(not isinstance(item, str) or not item for item in evidence_refs)
+                or len(set(evidence_refs)) != 4
+            ):
+                issues.append(f"{node_id}: post-merge evidence references are invalid")
+            for key in (
+                "base_commit",
+                "base_tree",
+                "claim_commit",
+                "candidate_commit",
+                "candidate_tree",
+                "old_receipt_commit",
+                "receipt_commit",
+            ):
+                value = raw_record.get(key)
+                if not isinstance(value, str) or FULL_SHA.fullmatch(value) is None:
+                    issues.append(f"{node_id}: post-merge {key} is invalid")
+            for key in ("old_receipt_payload_digest", "receipt_payload_digest"):
+                value = raw_record.get(key)
+                if not isinstance(value, str) or DIGEST_SHA256.fullmatch(value) is None:
+                    issues.append(f"{node_id}: post-merge {key} is invalid")
+            pr = raw_record.get("pr")
+            if pr is not None and (type(pr) is not int or pr <= 0):
+                issues.append(f"{node_id}: post-merge PR identity is invalid")
+
+            if not self.verify_git_objects:
+                continue
+            commit_fields = (
+                "base_commit",
+                "claim_commit",
+                "candidate_commit",
+                "old_receipt_commit",
+                "receipt_commit",
+            )
+            missing = [
+                key
+                for key in commit_fields
+                if not self.git_object_exists(str(raw_record[key]))
+            ]
+            if missing:
+                issues.append(
+                    f"{node_id}: post-merge Git objects are unavailable: "
+                    + ", ".join(missing)
+                )
+                continue
+
+            base = str(raw_record["base_commit"])
+            claim = str(raw_record["claim_commit"])
+            candidate = str(raw_record["candidate_commit"])
+            receipt_commit = str(raw_record["receipt_commit"])
+            old_receipt_commit = str(raw_record["old_receipt_commit"])
+            if self._commit_tree(base) != raw_record["base_tree"]:
+                issues.append(f"{node_id}: post-merge base tree differs")
+            if self._commit_parents(claim) != (base,):
+                issues.append(f"{node_id}: post-merge claim parent is invalid")
+            if self._commit_tree(claim) != raw_record["base_tree"]:
+                issues.append(f"{node_id}: post-merge claim is not zero-path")
+            if self._commit_parents(candidate) != (claim,):
+                issues.append(f"{node_id}: post-merge candidate parent is invalid")
+            if self._commit_tree(candidate) != raw_record["candidate_tree"]:
+                issues.append(f"{node_id}: post-merge candidate tree differs")
+            if self._commit_parents(receipt_commit) != (candidate,):
+                issues.append(f"{node_id}: post-merge receipt parent is invalid")
+            if self._commit_tree(receipt_commit) != raw_record["candidate_tree"]:
+                issues.append(f"{node_id}: post-merge receipt tree differs")
+            if list(self._diff_paths(base, candidate)) != raw_record["changed_paths"]:
+                issues.append(f"{node_id}: post-merge candidate diff differs")
+
+            shown = self._git(("show", "-s", "--format=%B", claim), check=False)
+            try:
+                claim_payload = json.loads(shown.stdout.strip())
+            except json.JSONDecodeError:
+                claim_payload = None
+            expected_claim_keys = {
+                "branch",
+                "expires_at",
+                "kind",
+                "node_id",
+                "owner",
+                "plan_fingerprint",
+                "target_sha",
+            }
+            if not isinstance(claim_payload, Mapping) or set(claim_payload) != expected_claim_keys:
+                issues.append(f"{node_id}: post-merge claim payload shape is invalid")
+            else:
+                expected_claim = {
+                    "kind": "hive-mind-autopilot-remote-claim-v1",
+                    "node_id": node_id,
+                    "target_sha": base,
+                    "branch": raw_record["branch"],
+                    "plan_fingerprint": raw_record["plan_fingerprint"],
+                }
+                if any(claim_payload.get(key) != value for key, value in expected_claim.items()):
+                    issues.append(f"{node_id}: post-merge claim payload differs")
+                for key in ("owner", "expires_at"):
+                    if not isinstance(claim_payload.get(key), str) or not claim_payload.get(key):
+                        issues.append(f"{node_id}: post-merge claim {key} is invalid")
+
+            old_message = self._git(
+                ("show", "-s", "--format=%B", old_receipt_commit),
+                check=False,
+            )
+            new_message = self._git(
+                ("show", "-s", "--format=%B", receipt_commit),
+                check=False,
+            )
+            old_receipt = self._parse_receipt_message(old_message.stdout)
+            new_receipt = self._parse_receipt_message(new_message.stdout)
+            if (
+                not isinstance(old_receipt, Mapping)
+                or digest_json(old_receipt) != raw_record["old_receipt_payload_digest"]
+            ):
+                issues.append(f"{node_id}: historical receipt payload differs")
+            issues.extend(
+                f"{node_id}: {issue}"
+                for issue in self._post_merge_receipt_issues(
+                    node_id,
+                    new_receipt,
+                    raw_record,
+                )
+            )
+            if target is not None:
+                for label, commit in (
+                    ("historical receipt", old_receipt_commit),
+                    ("replacement receipt", receipt_commit),
+                ):
+                    if not self.is_ancestor(commit, target):
+                        issues.append(f"{node_id}: post-merge {label} is not integrated")
+
+        if observed != POST_MERGE_REPAIR_NODES:
+            issues.append("post-merge repair authority omits an exact node")
+        return tuple(dict.fromkeys(issues))
+
+    def _resolve_post_merge_repair_records(
+        self,
+        node_id: str,
+        records: list[dict[str, Any]],
+    ) -> list[dict[str, Any]] | None:
+        record = self._post_merge_repair_records().get(node_id)
+        if record is None or len(records) != 2 or self._post_merge_repair_issues():
+            return None
+        by_commit = {
+            item.get("commit"): item
+            for item in records
+            if isinstance(item.get("commit"), str)
+        }
+        if set(by_commit) != {
+            record["old_receipt_commit"],
+            record["receipt_commit"],
+        }:
+            return None
+        old = by_commit[record["old_receipt_commit"]]
+        replacement = by_commit[record["receipt_commit"]]
+        old_receipt = old.get("receipt")
+        new_receipt = replacement.get("receipt")
+        if not isinstance(old_receipt, Mapping) or not isinstance(new_receipt, Mapping):
+            return None
+        if digest_json(old_receipt) != record["old_receipt_payload_digest"]:
+            return None
+        if self._post_merge_receipt_issues(node_id, new_receipt, record):
+            return None
+        return [replacement]
 
     def _repair_record(self, node_id: str) -> Mapping[str, Any]:
         records = self._repair_records()
@@ -163,6 +497,7 @@ class SealedRecoveryMixin:
         if observed != set(REPAIR_AUTHORITY_MATERIAL_DIGESTS):
             issues.append("sealed repair authority registry omits an exact incident")
         issues.extend(self._builder_record_issues())
+        issues.extend(self._post_merge_repair_issues())
         return tuple(dict.fromkeys(issues))
 
     def _builder_document(self, relative: str) -> Mapping[str, Any] | None:
@@ -1292,6 +1627,9 @@ class SealedRecoveryMixin:
         node_id: str,
         records: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
+        post_merge = self._resolve_post_merge_repair_records(node_id, records)
+        if post_merge is not None:
+            return post_merge
         record = self._repair_records().get(node_id)
         if record is None or len(records) != 2:
             return records

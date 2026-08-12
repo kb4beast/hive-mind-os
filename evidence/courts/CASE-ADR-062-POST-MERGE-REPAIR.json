@@ -1,0 +1,46 @@
+{
+  "atomic_claims": [
+    {
+      "claim": "A public batch append primitive is required for atomic Orchestrator supersession and replacement.",
+      "control": "Validate the complete batch and append it in one transaction with rollback on any reducer or persistence failure.",
+      "decision": "ADAPT"
+    },
+    {
+      "claim": "Builder must bind its declared target and paths to the actual Git workspace state.",
+      "control": "Reject detached or mismatched branches and require the exact tracked, staged, and untracked change union.",
+      "decision": "ADOPT"
+    },
+    {
+      "claim": "The three historical duplicate receipt incidents may be reconciled without weakening generic receipt validation.",
+      "control": "Authenticate an immutable authority registry and recognize only each exact old/new pair after ordinary validation succeeds.",
+      "decision": "ADAPT"
+    }
+  ],
+  "case_id": "CASE-ADR-062-POST-MERGE-REPAIR",
+  "decision": "ADAPT_CANDIDATE",
+  "dissent": [
+    "The candidate is not promoted until exact-head CI and an independent reviewer reproduce the material acceptance evidence.",
+    "The repair does not claim hard operating-system or network isolation for Builder.",
+    "Historical adverse receipts and expired recovery evidence remain part of the permanent lineage."
+  ],
+  "evidence": [
+    "docs/architecture/ADR-062-POST-MERGE-RECONCILIATION-AND-ATOMIC-PLANNING.md",
+    ".autopilot/post-merge-repair-authorities.json",
+    ".autopilot/tests/test_post_merge_repair.py",
+    "tests/test_brain_kernel_store.py",
+    "tests/test_hive_cortex_orchestrator.py",
+    "tests/test_hive_cortex_builder.py",
+    "tests/test_hive_cortex_optimizer.py"
+  ],
+  "identities": {
+    "advocate": "role:architect:post-merge-repair",
+    "builder": "role:builder:post-merge-repair",
+    "cross_examiner": "role:curator:post-merge-repair",
+    "expert_witness": "role:steward:post-merge-repair",
+    "judge": "PENDING_INDEPENDENT_PROMOTION_REVIEW"
+  },
+  "kind": "hive-mind-court-case-v1",
+  "rollback": "Close the unmerged PR or revert the candidate while retaining all claims, receipts, tests, findings, and dissent.",
+  "schema_version": 1,
+  "status": "IMPLEMENTED_CANDIDATE_PENDING_INDEPENDENT_JUDGMENT"
+}

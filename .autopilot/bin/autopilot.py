@@ -251,7 +251,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             resolved = self._resolve_recon_receipt_records(recon)
             if resolved is not recon:
                 updated["RECON-010"] = resolved
-        for node_id in ("OPTIMIZER-370", "ORCH-300"):
+        for node_id in ("BUILDER-330", "OPTIMIZER-370", "ORCH-300"):
             node_records = updated.get(node_id)
             if isinstance(node_records, list):
                 resolved = self.resolve_sealed_repair_records(node_id, node_records)
