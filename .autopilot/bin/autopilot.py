@@ -26,6 +26,8 @@ from durable_controller import (
 )
 from healing import heal_round
 from host_execution import execute_contract
+from learning import commit_lessons
+from learning import summarize as summarize_lessons
 from orchestration import (
     OrchestrationError,
     bind_launch,
@@ -832,6 +834,20 @@ def parser() -> argparse.ArgumentParser:
     lift.add_argument("node_id")
     lift.add_argument("--actor", required=True)
 
+    lessons = commands.add_parser("lessons")
+    lessons.add_argument("--json", action="store_true", dest="json_output")
+    lessons.add_argument(
+        "--commit",
+        action="store_true",
+        help="Check newly recorded lessons into the current branch",
+    )
+    lessons.add_argument(
+        "--push",
+        action="store_true",
+        help="Publish committed lessons so other sessions and repositories get them",
+    )
+    lessons.add_argument("--actor", default="autopilot:learner")
+
     intent = commands.add_parser("infer-intent")
     intent.add_argument("request", nargs="?", default="")
     intent.add_argument("--json", action="store_true", dest="json_output")
@@ -1203,6 +1219,33 @@ def main(argv: list[str] | None = None) -> int:
                     sort_keys=True,
                 )
             )
+            return 0
+        if args.command == "lessons":
+            index = summarize_lessons(plane.ap_root, now=plane.clock())
+            if args.commit or args.push:
+                index["commit"] = commit_lessons(
+                    plane, actor=args.actor, push=args.push
+                )
+            if args.json_output:
+                print(json.dumps(index, indent=2, sort_keys=True))
+            else:
+                print(f"LESSONS: {index['total']}")
+                for name, count in index["by_confidence"].items():
+                    print(f"  {name}: {count}")
+                print(f"PENDING ATTEMPTS: {index['pending_attempts']}")
+                for row in index["lessons"]:
+                    counts = row["counts"]
+                    print(
+                        f"- [{row['confidence']}] {row['signature']} "
+                        f"(held {counts['UNBLOCKED']}, did-not-hold "
+                        f"{counts['NO_EFFECT']}, refused {counts['REFUSED']})"
+                    )
+                    if row.get("withdrawn"):
+                        print(f"    WITHDRAWN: {row['guidance']}")
+                if "commit" in index:
+                    print(f"COMMIT: {index['commit'].get('outcome')}")
+                    if "push" in index["commit"]:
+                        print(f"PUSH: {index['commit']['push']}")
             return 0
         if args.command == "lift-retry-quarantine":
             lifted = plane.lift_retry_quarantine(args.node_id, actor=args.actor)

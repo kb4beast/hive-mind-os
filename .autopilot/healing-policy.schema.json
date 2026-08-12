@@ -36,6 +36,18 @@
       "type": "integer",
       "minimum": 1,
       "description": "Upper bound on remote repairs a single heal pass may apply; the rest are reported as DEFERRED."
+    },
+    "learn": {
+      "type": "boolean",
+      "description": "Consult .autopilot/lessons before acting and record each repair's verified outcome after. A mechanism that has failed three times and never worked is withdrawn."
+    },
+    "commit_lessons": {
+      "type": "boolean",
+      "description": "Check newly recorded lessons into the current branch (never main; pathspec-limited to .autopilot/lessons)."
+    },
+    "push_lessons": {
+      "type": "boolean",
+      "description": "Publish committed lessons so other sessions and other repositories inherit them."
     }
   },
   "additionalProperties": false

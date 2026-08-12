@@ -27,6 +27,7 @@ def _load(name: str, filename: str):
 
 
 controller = _load("healing_controller", "controller.py")
+learning = _load("healing_learning", "learning.py")
 healing = _load("healing_module", "healing.py")
 attended = _load("healing_attended_host", "attended_host.py")
 
@@ -716,6 +717,313 @@ class HealRoundTests(HealingFixture):
         self.assertEqual(diagnosis.verdict, "CLAIM_LIVE")
         self.assertIn("suspended", diagnosis.detail)
         self.assertEqual(diagnosis.wake_at, FUTURE)  # lease expiry bounds the wait
+
+
+class LearningTests(HealingFixture):
+    """A lesson must be earned by outcomes, survive the session, and bite."""
+
+    RECONCILED_STATUS = {
+        "reconciliation_required": False,
+        "nodes": [],
+        "dispatch_release": {"valid": False, "verdicts": {}},
+    }
+
+    def setUp(self) -> None:
+        super().setUp()
+        # The fixture inherits this repository's committed lessons, which is the
+        # point of committing them (see test_committed_lessons_reach_a_fresh_checkout).
+        # Every other test here measures its own subject, so start from a clean slate.
+        self.inherited = dict(learning.load_lessons(self.plane.ap_root))
+        for path in learning.lessons_dir(self.plane.ap_root).glob("*.jsonl"):
+            path.unlink()
+
+    def use_release_branch(self) -> None:
+        """Lesson commits are refused on main; work where the DAG works."""
+
+        git(self.root, "checkout", "-q", "-B", "release/lessons-fixture")
+
+    def test_committed_lessons_reach_a_fresh_checkout(self) -> None:
+        """The whole reason lessons are committed: a new clone starts informed."""
+
+        self.assertTrue(
+            self.inherited,
+            "a fresh fixture inherited no lessons; committed lessons are not travelling",
+        )
+        for lesson in self.inherited.values():
+            self.assertNotIn("sha256:", lesson.signature)
+            for part in (NODE, BRANCH, "MISSION"):
+                self.assertNotIn(part, lesson.signature)
+
+    KEY = "CLAIM_STALLED|stalled-bare-claim|reap"
+
+    def observe(self, outcome: str, *, action: str = "reap", node: str = NODE) -> None:
+        learning.record_outcome(
+            self.plane.ap_root,
+            verdict="CLAIM_STALLED",
+            proof_kind="stalled-bare-claim",
+            action=action,
+            outcome=outcome,
+            node_id=node,
+            actor="test:healer",
+            observed_at=controller.format_time(controller.utc_now()),
+            guidance="inspect the claim commit by hand",
+        )
+
+    def test_signature_is_mechanism_not_instance(self) -> None:
+        self.assertEqual(
+            learning.signature("CLAIM_STALLED", "stalled-bare-claim", "reap"), self.KEY
+        )
+        self.observe("UNBLOCKED", node="MISSION-400")
+        self.observe("UNBLOCKED", node="ARCH-100")
+        lessons = learning.load_lessons(self.plane.ap_root)
+        # Two different nodes, one mechanism: the lesson is about the mechanism.
+        self.assertEqual(len(lessons), 1)
+        self.assertEqual(lessons[self.KEY].counts["UNBLOCKED"], 2)
+
+    def test_confidence_is_derived_from_settled_outcomes(self) -> None:
+        self.assertIsNone(
+            learning.consult(self.plane.ap_root, "CLAIM_STALLED", "stalled-bare-claim", "reap")
+        )
+        self.observe("UNBLOCKED")
+        self.assertEqual(
+            learning.load_lessons(self.plane.ap_root)[self.KEY].confidence, "PROVISIONAL"
+        )
+        self.observe("UNBLOCKED")
+        self.assertEqual(
+            learning.load_lessons(self.plane.ap_root)[self.KEY].confidence, "PROVEN"
+        )
+
+    def test_refusals_never_become_evidence_that_a_repair_fails(self) -> None:
+        for _ in range(5):
+            self.observe("REFUSED")
+        lesson = learning.load_lessons(self.plane.ap_root)[self.KEY]
+        # Refusals prove nothing about whether the repair holds...
+        self.assertEqual(lesson.confidence, "UNTRIED")
+        self.assertEqual(lesson.counts["NO_EFFECT"], 0)
+        # ...but a run of them against an unmoving head still stops the retry
+        # loop, under the separate refusal-stall rule.
+        self.assertTrue(lesson.refusal_stalled())
+
+    def test_three_failures_withdraw_the_repair(self) -> None:
+        for _ in range(3):
+            self.observe("NO_EFFECT")
+        lesson = learning.load_lessons(self.plane.ap_root)[self.KEY]
+        self.assertEqual(lesson.confidence, "DISPROVEN")
+        self.assertTrue(lesson.withdrawn(controller.utc_now(), cooldown_minutes=720))
+
+    def test_withdrawal_is_a_cooldown_not_a_life_sentence(self) -> None:
+        for _ in range(3):
+            self.observe("NO_EFFECT")
+        lesson = learning.load_lessons(self.plane.ap_root)[self.KEY]
+        later = controller.utc_now() + timedelta(minutes=721)
+        self.assertTrue(lesson.withdrawn(controller.utc_now(), cooldown_minutes=720))
+        self.assertFalse(lesson.withdrawn(later, cooldown_minutes=720))
+
+    def test_one_success_keeps_a_repair_alive(self) -> None:
+        self.observe("UNBLOCKED")
+        for _ in range(5):
+            self.observe("NO_EFFECT")
+        lesson = learning.load_lessons(self.plane.ap_root)[self.KEY]
+        self.assertEqual(lesson.confidence, "PROVISIONAL")
+        self.assertFalse(lesson.withdrawn(controller.utc_now(), cooldown_minutes=720))
+
+    def test_duplicate_records_from_a_union_merge_are_counted_once(self) -> None:
+        self.observe("NO_EFFECT")
+        path = next(learning.lessons_dir(self.plane.ap_root).glob("*.jsonl"))
+        line = path.read_text(encoding="utf-8").strip()
+        # A union merge can replay an identical record; it must not invent evidence.
+        path.write_text(line + "\n" + line + "\n", encoding="utf-8")
+        lesson = learning.load_lessons(self.plane.ap_root)[self.KEY]
+        self.assertEqual(lesson.counts["NO_EFFECT"], 1)
+
+    def test_lessons_live_outside_gitignored_state(self) -> None:
+        self.observe("UNBLOCKED")
+        directory = learning.lessons_dir(self.plane.ap_root)
+        self.assertTrue(directory.is_dir())
+        self.assertNotIn("state", directory.relative_to(self.plane.ap_root).parts)
+        self.assertTrue(list(directory.glob("*.jsonl")))
+        # The record survives a brand-new plane object (a fresh session).
+        reloaded = controller.ControlPlane(self.root)
+        self.assertEqual(len(learning.load_lessons(reloaded.ap_root)), 1)
+
+    def test_a_repair_is_settled_by_a_later_pass_not_by_itself(self) -> None:
+        """The heart of it: running is not holding."""
+
+        self.publish_claim(expires_at=PAST)
+        report = healing.heal_round(
+            self.plane,
+            actor="test:healer",
+            nodes=[NODE],
+            policy={**self.policy, "commit_lessons": False},
+            status=self.RECONCILED_STATUS,
+        )
+        self.assertEqual(report["disposition"], "HEALED")
+        # The repair is recorded as an attempt, deliberately unjudged.
+        self.assertEqual(len(learning.unsettled_attempts(self.plane.ap_root)), 1)
+        self.assertEqual(learning.load_lessons(self.plane.ap_root), {})
+
+        # A later pass sees the wedge is gone and settles it as having held.
+        later = controller.ControlPlane(
+            self.root, clock=lambda: controller.utc_now() + timedelta(minutes=5)
+        )
+        healing.heal_round(
+            later,
+            actor="test:healer",
+            nodes=[NODE],
+            policy={**self.policy, "commit_lessons": False},
+            status=self.RECONCILED_STATUS,
+        )
+        lesson = learning.consult(self.plane.ap_root, "CLAIM_DEFUNCT", "expired", "reap")
+        self.assertIsNotNone(lesson)
+        self.assertEqual(lesson.counts["UNBLOCKED"], 1)
+        self.assertEqual(learning.unsettled_attempts(self.plane.ap_root), ())
+
+    def test_a_wedge_that_returns_settles_as_did_not_hold(self) -> None:
+        """A repair that must be re-applied every round is not working."""
+
+        self.publish_claim(expires_at=PAST)
+        healing.heal_round(
+            self.plane,
+            actor="test:healer",
+            nodes=[NODE],
+            policy={**self.policy, "commit_lessons": False},
+            status=self.RECONCILED_STATUS,
+        )
+        # The same mechanism wedges the node again before the next pass.
+        self.publish_claim(expires_at=PAST)
+        later = controller.ControlPlane(
+            self.root, clock=lambda: controller.utc_now() + timedelta(minutes=5)
+        )
+        healing.heal_round(
+            later,
+            actor="test:healer",
+            nodes=[NODE],
+            policy={**self.policy, "commit_lessons": False},
+            status=self.RECONCILED_STATUS,
+        )
+        lesson = learning.consult(self.plane.ap_root, "CLAIM_DEFUNCT", "expired", "reap")
+        self.assertIsNotNone(lesson)
+        self.assertEqual(lesson.counts["NO_EFFECT"], 1)
+        self.assertEqual(lesson.counts["UNBLOCKED"], 0)
+
+    def test_healer_withdraws_a_disproven_repair_instead_of_retrying(self) -> None:
+        for _ in range(3):
+            learning.record_outcome(
+                self.plane.ap_root,
+                verdict="CLAIM_DEFUNCT",
+                proof_kind="expired",
+                action="reap",
+                outcome="NO_EFFECT",
+                node_id=NODE,
+                actor="test:healer",
+                observed_at=controller.format_time(controller.utc_now()),
+                guidance="retire this claim by hand; the automatic reap never holds here",
+            )
+        claim = self.publish_claim(expires_at=PAST)
+        report = healing.heal_round(
+            self.plane,
+            actor="test:healer",
+            nodes=[NODE],
+            policy={**self.policy, "commit_lessons": False},
+            status=self.RECONCILED_STATUS,
+        )
+        self.assertEqual(report["disposition"], "RESOLVE_BLOCKERS")
+        withdrawn = [a for a in report["actions"] if a["outcome"] == "WITHDRAWN"]
+        self.assertEqual(len(withdrawn), 1)
+        self.assertIn("by hand", report["stuck"][0]["instructions"])
+        # The claim it refused to reap is untouched.
+        self.assertEqual(self.remote_head(), claim)
+
+    def refuse(self, head: str | None) -> None:
+        learning.record_outcome(
+            self.plane.ap_root,
+            verdict="BRANCH_DEFUNCT",
+            proof_kind="expired",
+            action="quarantine",
+            outcome="REFUSED",
+            node_id=NODE,
+            actor="test:healer",
+            observed_at=controller.format_time(controller.utc_now()),
+            head=head,
+            guidance="the remote forbids deleting this ref; ask an admin",
+        )
+
+    def test_a_refused_repair_that_never_moves_the_head_is_withdrawn(self) -> None:
+        """Branch protection must not become an infinite retry loop."""
+
+        for _ in range(3):
+            self.refuse("a" * 40)
+        lesson = learning.load_lessons(self.plane.ap_root)[
+            "BRANCH_DEFUNCT|expired|quarantine"
+        ]
+        self.assertEqual(lesson.confidence, "UNTRIED")  # refusals prove nothing
+        self.assertTrue(lesson.refusal_stalled())
+        self.assertTrue(lesson.withdrawn(controller.utc_now(), cooldown_minutes=720))
+
+    def test_a_lost_race_keeps_its_retry(self) -> None:
+        """A refusal whose head moved is a worker winning; retry is correct."""
+
+        for head in ("a" * 40, "b" * 40, "c" * 40):
+            self.refuse(head)
+        lesson = learning.load_lessons(self.plane.ap_root)[
+            "BRANCH_DEFUNCT|expired|quarantine"
+        ]
+        self.assertEqual(lesson.stuck_refusals, 1)
+        self.assertFalse(lesson.refusal_stalled())
+        self.assertFalse(lesson.withdrawn(controller.utc_now(), cooldown_minutes=720))
+
+    def test_a_stall_reap_is_keyed_by_its_real_proof(self) -> None:
+        """The recorded key must be the documented one, not an empty proof."""
+
+        self.publish_claim(expires_at=FUTURE, committer_date=OLD_COMMIT_DATE)
+        diagnosis = healing.diagnose_node(
+            self.plane, NODE, policy=healing.DEFAULT_POLICY
+        )
+        self.assertEqual(diagnosis.verdict, "CLAIM_STALLED")
+        self.assertEqual(healing.proof_kind_of(diagnosis), "stalled-bare-claim")
+
+    def test_learning_disabled_records_nothing(self) -> None:
+        self.publish_claim(expires_at=PAST)
+        healing.heal_round(
+            self.plane,
+            actor="test:healer",
+            nodes=[NODE],
+            policy={**self.policy, "learn": False, "commit_lessons": False},
+            status=self.RECONCILED_STATUS,
+        )
+        self.assertEqual(learning.load_lessons(self.plane.ap_root), {})
+
+    def test_lessons_are_committed_to_the_branch(self) -> None:
+        self.use_release_branch()
+        self.observe("UNBLOCKED")
+        self.assertTrue(learning.uncommitted_lessons(self.plane))
+        result = learning.commit_lessons(self.plane, actor="test:healer")
+        self.assertEqual(result["outcome"], "committed")
+        self.assertEqual(learning.uncommitted_lessons(self.plane), ())
+        author = git(self.root, "show", "-s", "--format=%ae", "HEAD")
+        self.assertEqual(author, learning.LESSON_COMMIT_EMAIL)
+        self.assertNotEqual(author, controller.RECEIPT_COMMIT_EMAIL)
+        self.assertEqual(
+            learning.commit_lessons(self.plane, actor="test:healer")["outcome"],
+            "nothing-to-commit",
+        )
+
+    def test_a_lesson_commit_never_sweeps_unrelated_work(self) -> None:
+        self.use_release_branch()
+        self.observe("UNBLOCKED")
+        (self.root / "unrelated.txt").write_text("not a lesson\n", encoding="utf-8")
+        git(self.root, "add", "unrelated.txt")
+        learning.commit_lessons(self.plane, actor="test:healer")
+        committed = git(self.root, "show", "--name-only", "--format=", "HEAD")
+        self.assertIn("lessons", committed)
+        self.assertNotIn("unrelated.txt", committed)
+
+    def test_lessons_are_never_committed_to_main(self) -> None:
+        self.observe("UNBLOCKED")
+        git(self.root, "checkout", "-q", "-B", "main")
+        result = learning.commit_lessons(self.plane, actor="test:healer")
+        self.assertEqual(result["outcome"], "refused")
+        self.assertIn("main", result["reason"])
 
 
 class AttendedHostSurfaceTests(HealingFixture):

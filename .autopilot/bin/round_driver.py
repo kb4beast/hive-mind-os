@@ -389,7 +389,9 @@ def drive_round(
         )
         if not heal:
             return finish("PENDING")
-        healed = healing.heal_round(plane, actor=actor, nodes=round_.nodes)
+        healed = healing.heal_round(
+            plane, actor=actor, nodes=round_.nodes, allow_push=push
+        )
         for action in healed.get("actions", []):
             report.record(
                 "heal",

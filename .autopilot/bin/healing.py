@@ -34,6 +34,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+import learning
 from controller import (
     RECEIPT_COMMIT_EMAIL,
     append_jsonl,
@@ -51,6 +52,10 @@ DEFAULT_POLICY: Mapping[str, Any] = {
     "claim_stall_minutes": 30,
     "branch_stall_minutes": 45,
     "max_actions_per_run": 8,
+    "learn": True,
+    "commit_lessons": True,
+    "push_lessons": False,
+    "retry_disproven_after_minutes": 720,
 }
 
 # A blocker naming any of these needs sealed or external authority: healing it
@@ -191,7 +196,14 @@ def diagnose_node(plane: Any, node_id: str, *, policy: Mapping[str, Any]) -> Nod
                 f"{int(idle.total_seconds() // 60)} minutes (bound {effective_stall})",
                 evidence={
                     **evidence,
-                    "claimed_at": format_time(claimed_at),
+                    # The proof is what keys this mechanism's lesson; without it
+                    # every stall reap would be filed under the same empty key.
+                    "proof": {
+                        "kind": "stalled-bare-claim",
+                        "claimed_at": format_time(claimed_at),
+                        "idle_minutes": int(idle.total_seconds() // 60),
+                        "stall_minutes": effective_stall,
+                    },
                     "effective_stall_minutes": effective_stall,
                     "prior_stall_retirements": retirements,
                 },
@@ -285,6 +297,173 @@ def reconcile_with_snapshot(plane: Any, *, actor: str) -> tuple[bool, str]:
         return False, f"snapshot process could not start: {error}"
     tail = (completed.stderr or completed.stdout).strip().splitlines()
     return completed.returncode == 0, tail[-1] if tail else "no snapshot output"
+
+
+_MECHANISMS: Mapping[str, str] = {
+    "reap": "A remote claim commit is the only cross-session mutex, but a mutex "
+    "protects work that could still become an integrable receipt. When the claim "
+    "is proven defunct, retiring its ref is what frees the node for a lawful "
+    "re-claim; nothing is deleted but an empty claim commit.",
+    "quarantine": "An unsealed branch whose governing claim is defunct blocks "
+    "every lawful re-claim while no worker can still finish it. Archiving the "
+    "head under a quarantine ref preserves the work verbatim and frees the "
+    "branch name.",
+    "lift-quarantine": "A retry budget spent by a dead session keeps a node "
+    "unreachable after its recorded causes have been fixed. Lifting it once "
+    "every blocker carries a verified resolution reopens the node without "
+    "weakening the guard against blind retry loops.",
+}
+_GUIDANCE: Mapping[str, str] = {
+    "reap": "Read the claim commit (`git log -1 origin/<node-branch>`), confirm "
+    "the proof it records, then retire it with `autopilot reap-stale-remote-claim` "
+    "or let `autopilot heal` do it.",
+    "quarantine": "Confirm the head is unsealed and its governing claim defunct, "
+    "then let `autopilot heal` archive it; never delete a node branch by hand.",
+    "lift-quarantine": "Resolve every open blocker with `autopilot blocker-resolve` "
+    "(each needs a verified fix and a safe retry command), then heal.",
+}
+
+
+def proof_kind_of(diagnosis: NodeDiagnosis) -> str:
+    """Return the proof that keys this diagnosis's lesson."""
+
+    proof = diagnosis.evidence.get("proof")
+    return str(proof.get("kind", "")) if isinstance(proof, Mapping) else ""
+
+
+def _record_attempt(
+    plane: Any,
+    policy: Mapping[str, Any],
+    diagnosis: NodeDiagnosis,
+    *,
+    actor: str,
+) -> None:
+    """Note that a repair was applied; a later pass judges whether it held."""
+
+    if not policy.get("learn", True) or diagnosis.action is None:
+        return
+    try:
+        learning.record_attempt(
+            plane.ap_root,
+            verdict=diagnosis.verdict,
+            proof_kind=proof_kind_of(diagnosis),
+            action=diagnosis.action,
+            node_id=diagnosis.node_id,
+            actor=actor,
+            observed_at=format_time(plane.clock()),
+            head=diagnosis.evidence.get("head"),
+            mechanism=_MECHANISMS.get(diagnosis.action, ""),
+            guidance=_GUIDANCE.get(diagnosis.action, ""),
+        )
+    except Exception:
+        # Learning must never be able to fail a repair that already succeeded.
+        return
+
+
+def _record_refusal(
+    plane: Any,
+    policy: Mapping[str, Any],
+    diagnosis: NodeDiagnosis,
+    *,
+    actor: str,
+    detail: str,
+) -> None:
+    """Record a refusal, which counts toward neither success nor failure."""
+
+    if not policy.get("learn", True) or diagnosis.action is None:
+        return
+    try:
+        learning.record_outcome(
+            plane.ap_root,
+            verdict=diagnosis.verdict,
+            proof_kind=proof_kind_of(diagnosis),
+            action=diagnosis.action,
+            outcome="REFUSED",
+            node_id=diagnosis.node_id,
+            actor=actor,
+            observed_at=format_time(plane.clock()),
+            # The head distinguishes a lost race (it moved) from an environment
+            # that simply will not permit this repair (it never moves).
+            head=diagnosis.evidence.get("head"),
+            detail=detail,
+            mechanism=_MECHANISMS.get(diagnosis.action, ""),
+            guidance=_GUIDANCE.get(diagnosis.action, ""),
+        )
+    except Exception:
+        return
+
+
+def _consult(
+    plane: Any, policy: Mapping[str, Any], diagnosis: NodeDiagnosis
+) -> learning.Lesson | None:
+    if not policy.get("learn", True) or diagnosis.action is None:
+        return None
+    try:
+        return learning.consult(
+            plane.ap_root,
+            diagnosis.verdict,
+            proof_kind_of(diagnosis),
+            diagnosis.action,
+        )
+    except Exception:
+        return None
+
+
+def _withdrawn(plane: Any, policy: Mapping[str, Any], lesson: learning.Lesson) -> bool:
+    return lesson.withdrawn(
+        plane.clock(),
+        cooldown_minutes=int(policy.get("retry_disproven_after_minutes", 720)),
+    )
+
+
+def _report_withdrawn(
+    report: dict[str, Any],
+    record_action: Any,
+    diagnosis: NodeDiagnosis,
+    lesson: learning.Lesson,
+) -> None:
+    why = (
+        f"{diagnosis.detail}; the remote refused {diagnosis.action} "
+        f"{lesson.stuck_refusals} time(s) in a row without the head moving, so "
+        "this is a permission or protection rule, not a lost race"
+        if lesson.refusal_stalled()
+        else f"{diagnosis.detail}; {diagnosis.action} on this mechanism has "
+        f"failed to hold {lesson.counts.get('NO_EFFECT', 0)} time(s) and has "
+        "never once held"
+    )
+    report["stuck"].append(
+        {
+            "node_id": diagnosis.node_id,
+            "resolvable": True,
+            "why": why,
+            "instructions": lesson.guidance
+            or "diagnose this mechanism by hand; the automatic repair is "
+            "withdrawn by its own recorded outcomes",
+            "lesson": lesson.to_dict(),
+        }
+    )
+    record_action(
+        diagnosis.action, diagnosis.node_id, "WITHDRAWN", f"lesson {lesson.signature}"
+    )
+
+
+def current_wedge(plane: Any, node_id: str, policy: Mapping[str, Any]) -> str | None:
+    """Return the mechanism signature currently wedging a node, or None.
+
+    This is what settles an earlier repair: if the same mechanism is wedging
+    the same node on a later pass, that repair did not hold.
+    """
+
+    if (Path(plane.quarantine_dir) / f"{node_id}.json").is_file():
+        return learning.signature(
+            "RETRY_QUARANTINED", "blockers-resolved", "lift-quarantine"
+        )
+    diagnosis = diagnose_node(plane, node_id, policy=policy)
+    if diagnosis.action is None:
+        return None
+    return learning.signature(
+        diagnosis.verdict, proof_kind_of(diagnosis), diagnosis.action
+    )
 
 
 def _stall_retirements(plane: Any, node_id: str) -> int:
@@ -393,6 +572,7 @@ def heal_round(
     policy: Mapping[str, Any] | None = None,
     status: Mapping[str, Any] | None = None,
     apply: bool = True,
+    allow_push: bool = True,
 ) -> dict[str, Any]:
     """Diagnose every candidate node and apply each provable repair once.
 
@@ -451,6 +631,27 @@ def heal_round(
             if isinstance(row, Mapping) and row.get("state") != "COMPLETE"
         ]
 
+    if policy.get("learn", True):
+        # Judge earlier repairs before consulting the record, so this pass acts
+        # on what actually held rather than on what merely ran.
+        try:
+            settled = learning.settle_attempts(
+                plane.ap_root,
+                observe=lambda node: current_wedge(plane, node, policy),
+                actor=actor,
+                now=plane.clock(),
+            )
+        except Exception as error:
+            record_action("settle", None, "FAILED", str(error))
+            settled = ()
+        for record in settled:
+            record_action(
+                "settle",
+                str(record.get("node_id") or ""),
+                str(record.get("outcome") or ""),
+                f"{record.get('action')}: {record.get('detail')}",
+            )
+
     budget = int(policy["max_actions_per_run"])
     release = current.get("dispatch_release", {})
     release_valid = isinstance(release, Mapping) and release.get("valid") is True
@@ -459,7 +660,17 @@ def heal_round(
     diagnoses: list[NodeDiagnosis] = []
     for node_id in nodes:
         if _quarantine_liftable(plane, node_id):
-            if not acting:
+            lift = NodeDiagnosis(
+                node_id,
+                "RETRY_QUARANTINED",
+                "retry budget spent; every recorded cause carries a fix",
+                evidence={"proof": {"kind": "blockers-resolved"}},
+                action="lift-quarantine",
+            )
+            lift_lesson = _consult(plane, policy, lift)
+            if lift_lesson is not None and _withdrawn(plane, policy, lift_lesson):
+                _report_withdrawn(report, record_action, lift, lift_lesson)
+            elif not acting:
                 withheld += 1
                 record_action(
                     "lift-quarantine", node_id, "WITHHELD", "every blocker is resolved"
@@ -469,6 +680,9 @@ def heal_round(
                     lifted = plane.lift_retry_quarantine(node_id, actor=actor)
                 except Exception as error:
                     record_action("lift-quarantine", node_id, "REFUSED", str(error))
+                    _record_refusal(
+                        plane, policy, lift, actor=actor, detail=str(error)
+                    )
                 else:
                     if lifted is not None:
                         healed += 1
@@ -479,6 +693,7 @@ def heal_round(
                             "retry budget reopened; every recorded cause carries "
                             "a verified fix",
                         )
+                        _record_attempt(plane, policy, lift, actor=actor)
         try:
             diagnosis = diagnose_node(plane, node_id, policy=policy)
         except Exception as error:
@@ -548,6 +763,12 @@ def heal_round(
             ):
                 open_sessions.append(node_id)
             continue
+        lesson = _consult(plane, policy, diagnosis)
+        if lesson is not None and _withdrawn(plane, policy, lesson):
+            # The record says this repair has never once held. Repeating it
+            # would be the polling loop it was written to end.
+            _report_withdrawn(report, record_action, diagnosis, lesson)
+            continue
         if healed >= budget:
             record_action(diagnosis.action, node_id, "DEFERRED", "action budget exhausted")
             continue
@@ -579,11 +800,16 @@ def heal_round(
             # a push (force-with-lease) or the controller re-proved liveness.
             refused += 1
             record_action(diagnosis.action, node_id, "REFUSED", str(error))
+            _record_refusal(plane, policy, diagnosis, actor=actor, detail=str(error))
             continue
         healed += 1
         record_action(
             diagnosis.action, node_id, "APPLIED", str(result.get("outcome", "done"))
         )
+        # Whether this held is not knowable yet: the repair just removed the
+        # artifact it diagnosed. A later pass settles it by checking whether the
+        # same mechanism wedges this node again.
+        _record_attempt(plane, policy, diagnosis, actor=actor)
 
     if policy["break_expired_validation_lease"] and _expired_lease(plane):
         if acting:
@@ -648,6 +874,30 @@ def heal_round(
     fingerprint = _evidence_fingerprint(plane, diagnoses)
     report["evidence_fingerprint"] = fingerprint
     report["evidence_frozen_minutes"] = _record_observation(plane, fingerprint)
+
+    if acting and policy.get("learn", True) and policy.get("commit_lessons", True):
+        # Lessons are worthless to the next session, and to anyone else running
+        # this control plane, until they are in the repository.
+        try:
+            committed = learning.commit_lessons(
+                plane,
+                actor=actor,
+                # `run-round --no-push` means this session advances nothing on
+                # the remote; a lesson push would advance the target branch and
+                # invalidate the very release the round is working under.
+                push=bool(policy.get("push_lessons", False)) and allow_push,
+            )
+        except Exception as error:
+            record_action("commit-lessons", None, "FAILED", str(error))
+        else:
+            if committed.get("outcome") != "nothing-to-commit":
+                record_action(
+                    "commit-lessons",
+                    None,
+                    str(committed.get("outcome", "unknown")).upper(),
+                    f"{len(committed.get('paths', []))} lesson file(s)"
+                    + (f"; push {committed['push']}" if "push" in committed else ""),
+                )
 
     if healed:
         report["disposition"] = "HEALED"

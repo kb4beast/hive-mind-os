@@ -103,5 +103,37 @@ refusal reason, and every heal pass fingerprints the observed evidence into
 `state/heal/observations.jsonl`. `evidence_frozen_minutes` in the report says
 how long the world has been byte-identical — the difference between "workers
 are running" and "polling for no reason" is that number against `wake_at`.
-Blocker packets remain the durable lesson store (`state/blockers/*.jsonl`);
-healing never rewrites them, it only acts on what they prove.
+
+Those ledgers are session-local by design (`.autopilot/state/` is gitignored),
+so on their own they teach nobody. The durable memory is
+**`.autopilot/lessons/`, which is committed** — see its README for the format.
+
+**The feedback loop.** An applied repair is not a successful repair. After
+every action the healer *re-observes* the node: if the diagnosed wedge is gone
+the outcome is recorded `UNBLOCKED`, and if it survived its own repair,
+`NO_EFFECT`. Refusals record `REFUSED` and count toward neither, because losing
+a `--force-with-lease` race proves nothing about whether the repair works.
+
+**Withdrawal.** Lessons are keyed by mechanism — `<verdict>|<proof kind>|
+<action>`, containing no node id, branch, or SHA — so what is learned here
+transfers to any repository this control plane drives. Before acting, the
+healer consults that record. A mechanism tried at least three times that has
+**never once** worked is `DISPROVEN` and withdrawn: the healer stops attempting
+it and reports the recorded evidence under `RESOLVE_BLOCKERS` instead. That is
+the guarantee that an automatic repair can never become the loop it was written
+to end.
+
+**Checking in.** With `commit_lessons` (default on) each heal pass commits new
+lessons to the current branch — pathspec-limited to `.autopilot/lessons`, so it
+can never sweep in unrelated work, refused on `main`, and authored as
+`autopilot-lessons@hive-mind.invalid` so a lesson commit is never mistaken for
+a sealed receipt. `push_lessons` (default off) publishes them. Inspect the
+record with `autopilot lessons`; commit or publish by hand with
+`autopilot lessons --commit [--push]`.
+
+**What healing does not do.** It repairs control-plane *state*, not source
+code. A blocker whose repair is a semantic change to a runbook or to product
+code is reported, with its evidence and the exact `blocker-resolve` command —
+authoring that fix is worker and orchestrator judgement, and receipt validation
+is the boundary that keeps it honest. Blocker packets remain the record of
+those causes; healing never rewrites them, it only acts on what they prove.
