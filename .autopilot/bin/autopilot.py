@@ -1001,15 +1001,19 @@ def main(argv: list[str] | None = None) -> int:
             print(plane.install_github_snapshot(Path(args.file)))
             return 0
         if args.command == "render-prompt":
-            print(plane.render_worker_prompt(args.node_id))
+            # Prompt rendering is a pure observation; one snapshot cache keeps the
+            # durable receipt reconstruction from replaying thousands of Git calls.
+            with plane.snapshot_cache():
+                print(plane.render_worker_prompt(args.node_id))
             return 0
         if args.command == "verify-receipt":
             value = read_json(Path(args.receipt))
-            issues = plane.validate_receipt(
-                args.node_id,
-                value,
-                require_integrated=args.require_integrated,
-            )
+            with plane.snapshot_cache():
+                issues = plane.validate_receipt(
+                    args.node_id,
+                    value,
+                    require_integrated=args.require_integrated,
+                )
             if issues:
                 print("\n".join(issues), file=sys.stderr)
                 return 1

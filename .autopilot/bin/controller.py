@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -1955,11 +1956,17 @@ class ControlPlane:
             branch=str(node.get("branch")),
         )
 
-    def _status_document(self) -> dict[str, object]:
-        # Status is a point-in-time observation over a DAG with substantial fan-in.
-        # Keep every cache on the instance only for this call: dependency recursion,
-        # durable receipt reconstruction, state-file reads, and immutable Git facts
-        # can then be reused without leaking stale truth into the next snapshot.
+    @contextmanager
+    def snapshot_cache(self):
+        """Reuse immutable Git facts for one point-in-time observation.
+
+        Installs the same per-call caches ``_status_document`` has always used —
+        dependency recursion, durable receipt reconstruction, and read-only Git
+        facts — so other observation paths (prompt rendering, claim eligibility,
+        receipt verification) do not replay thousands of Git subprocesses. The
+        caches live on the instance only for the ``with`` body and must never
+        span a state mutation that could change the cached truth.
+        """
         missing = object()
         installed: list[tuple[str, object]] = []
 
@@ -2046,20 +2053,10 @@ class ControlPlane:
 
                     install("_commit_parents", cached_commit_parents)
 
-            changed = self.changed_paths_since_reconciliation()
             active_claims = self.active_claims()
             github_snapshot = self.github_snapshot()
             install("active_claims", lambda: dict(active_claims))
             install("github_snapshot", lambda: github_snapshot)
-
-            validation_lease: Mapping[str, Any] | None = None
-            if self.validation_lease_path.is_file():
-                candidate = read_json(self.validation_lease_path)
-                if (
-                    isinstance(candidate, Mapping)
-                    and parse_time(candidate.get("expires_at")) > self.clock()
-                ):
-                    validation_lease = candidate
 
             if hasattr(self, "_durable_receipt_records"):
                 uncached_durable_receipts = self._durable_receipt_records
@@ -2082,13 +2079,35 @@ class ControlPlane:
                 return view_cache[node_id]
 
             install("node_view", cached_node_view)
-            views = [cached_node_view(node_id) for node_id in sorted(self._nodes)]
+            yield
         finally:
             for name, prior in reversed(installed):
                 if prior is missing:
                     self.__dict__.pop(name, None)
                 else:
                     setattr(self, name, prior)
+
+    def _status_document(self) -> dict[str, object]:
+        # Status is a point-in-time observation over a DAG with substantial fan-in.
+        # Every expensive fact is scoped to this call through snapshot_cache so a
+        # stale truth can never leak into the next snapshot.
+        with self.snapshot_cache():
+            target = self.current_target_sha()
+            changed = self.changed_paths_since_reconciliation()
+            active_claims = self.active_claims()
+
+            validation_lease: Mapping[str, Any] | None = None
+            if self.validation_lease_path.is_file():
+                candidate = read_json(self.validation_lease_path)
+                if (
+                    isinstance(candidate, Mapping)
+                    and parse_time(candidate.get("expires_at")) > self.clock()
+                ):
+                    validation_lease = candidate
+
+            views = [self.node_view(node_id) for node_id in sorted(self._nodes)]
+            last_reconciled = self.reconciled_target_sha()
+            reconciliation_required = self.target_requires_reconciliation()
         counts: dict[str, int] = {state: 0 for state in LEGAL_STATES}
         for view in views:
             counts[view.state] = counts.get(view.state, 0) + 1
@@ -2103,8 +2122,8 @@ class ControlPlane:
             "plan_fingerprint": self.expected_plan_fingerprint,
             "target_branch": self.target_branch,
             "target_sha": target,
-            "last_reconciled_sha": self.reconciled_target_sha(),
-            "reconciliation_required": self.target_requires_reconciliation(),
+            "last_reconciled_sha": last_reconciled,
+            "reconciliation_required": reconciliation_required,
             "changed_paths_since_reconciliation": list(changed),
             "counts": {key: value for key, value in counts.items() if value},
             "ready": ready,
@@ -2146,7 +2165,10 @@ class ControlPlane:
         if lease_minutes < 1 or lease_minutes > 1_440:
             raise ClaimError("lease must be between 1 and 1440 minutes")
         self.clean_stale_claims()
-        view = self.node_view(node_id)
+        # Eligibility is a read-only observation; scope the snapshot cache to it
+        # so claim does not replay the durable receipt reconstruction per call.
+        with self.snapshot_cache():
+            view = self.node_view(node_id)
         if view.state not in {"READY", "INTEGRATION_READY", "PROMOTION_READY"}:
             raise ClaimError(f"node {node_id} is not claimable: {view.state}")
         claims = self.active_claims()

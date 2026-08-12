@@ -116,7 +116,9 @@ class StatusPerformanceRegressionTests(unittest.TestCase):
         self.assertEqual(first["target_sha"], TARGET_A)
         self.assertEqual(set(self.plane.node_evaluations), set(self.plane._nodes))
         self.assertTrue(all(count == 1 for count in self.plane.node_evaluations.values()))
-        self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 2, "log": 1}))
+        # One physical rev-parse per snapshot: the target is resolved once and
+        # pinned for the whole observation, including the reconciliation check.
+        self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 1, "log": 1}))
         self.assertEqual(self.plane.commit_tree_fallbacks, 0)
         self.assertEqual(self.plane.commit_parent_fallbacks, 0)
 
@@ -125,7 +127,18 @@ class StatusPerformanceRegressionTests(unittest.TestCase):
 
         self.assertEqual(second["target_sha"], TARGET_B)
         self.assertTrue(all(count == 2 for count in self.plane.node_evaluations.values()))
-        self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 4, "log": 2}))
+        self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 2, "log": 2}))
+        self.assertEqual(self.plane.commit_tree_fallbacks, 0)
+        self.assertEqual(self.plane.commit_parent_fallbacks, 0)
+
+    def test_prompt_rendering_reuses_one_snapshot(self) -> None:
+        # Rendering a worker prompt is a pure observation and must pay the same
+        # bounded Git cost as one status snapshot, not one uncached traversal
+        # per dependency (regression: 5,231 subprocesses / ~4 minutes per render).
+        with self.plane.snapshot_cache():
+            prompt = self.plane.render_worker_prompt("BOOT-000")
+        self.assertIn("BOOT-000", prompt)
+        self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 1, "log": 1}))
         self.assertEqual(self.plane.commit_tree_fallbacks, 0)
         self.assertEqual(self.plane.commit_parent_fallbacks, 0)
 

@@ -529,19 +529,22 @@ class ControlPlane(DurableControlPlane):
         )
 
     def assert_start_now(self, node_id: str) -> Mapping[str, Any]:
-        record = self.current_release()
-        issues = self._release_issues(record)
-        if issues:
-            raise ClaimError(
-                "worker release is stale or unavailable: " + "; ".join(issues)
-            )
-        assert record is not None
-        verdicts = record.get("verdicts")
-        if not isinstance(verdicts, Mapping) or verdicts.get(node_id) != "START NOW":
-            raise ClaimError(
-                f"node {node_id} is WAIT; explicit START NOW was not released"
-            )
-        view = self.node_view(node_id)
+        # Release revalidation is a pure observation; scope one snapshot cache to
+        # it so the durable receipt reconstruction is not replayed per node view.
+        with self.snapshot_cache():
+            record = self.current_release()
+            issues = self._release_issues(record)
+            if issues:
+                raise ClaimError(
+                    "worker release is stale or unavailable: " + "; ".join(issues)
+                )
+            assert record is not None
+            verdicts = record.get("verdicts")
+            if not isinstance(verdicts, Mapping) or verdicts.get(node_id) != "START NOW":
+                raise ClaimError(
+                    f"node {node_id} is WAIT; explicit START NOW was not released"
+                )
+            view = self.node_view(node_id)
         if view.state not in READY_STATES:
             raise ClaimError(
                 f"node {node_id} cannot start from current state {view.state}"
