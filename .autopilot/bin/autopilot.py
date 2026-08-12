@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Sequence
 
+from attended_host import AttendedCodexHost, EvidenceResolver
 from controller import FULL_SHA, format_time
 from dag_standard import add_dag_standard_arguments, run_dag_standard_command
 from durable_controller import (
@@ -23,6 +24,7 @@ from durable_controller import (
     digest_json,
     read_json,
 )
+from host_execution import execute_contract
 from orchestration import (
     OrchestrationError,
     bind_launch,
@@ -776,6 +778,21 @@ def parser() -> argparse.ArgumentParser:
     )
     orchestrate.add_argument("--json", action="store_true", dest="json_output")
 
+    wave = commands.add_parser("execute-wave")
+    wave.add_argument("--request", default="execute the dag")
+    wave.add_argument("--actor", default="autopilot:orchestrator")
+    wave.add_argument(
+        "--apply",
+        action="store_true",
+        help="Publish a safe release when inferred intent and live state allow it",
+    )
+    wave.add_argument(
+        "--wait-seconds",
+        type=int,
+        default=60,
+        help="Wall-clock bound on one evidence poll; the host is never waited on",
+    )
+
     intent = commands.add_parser("infer-intent")
     intent.add_argument("request", nargs="?", default="")
     intent.add_argument("--json", action="store_true", dest="json_output")
@@ -1117,6 +1134,28 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "launch-bindings":
             print(json.dumps(binding_events(plane.repo_root), indent=2, sort_keys=True))
+            return 0
+        if args.command == "execute-wave":
+            status, decision = select_orchestration_status(plane, args.request)
+            if args.apply and should_publish_release(decision, status):
+                plane.dispatch(actor=args.actor)
+                status = plane.status()
+            contract = build_orchestration_contract(plane, args.request, status=status)
+            print(f"INTENT: {contract['intent']['intent']}")
+            print(f"CONTRACT: {contract['contract_id']}")
+            if not contract["tasks"]:
+                print(f"NO RELEASED WAVE: {contract['dispatch_release']['action']}")
+                for issue in contract["dispatch_release"]["issues"]:
+                    print(f"  - {issue}")
+                return 0
+            host = AttendedCodexHost(plane, wait_seconds=args.wait_seconds)
+            host.bind_tasks(contract["tasks"])
+            result = execute_contract(
+                plane.repo_root, contract, host, EvidenceResolver()
+            )
+            print(json.dumps(result, indent=2, sort_keys=True))
+            for card in host.pending_cards():
+                print(f"OPEN SESSION: {card['title']} -> {card['card']}")
             return 0
         if args.command == "orchestrate":
             status, decision = select_orchestration_status(plane, args.request)
