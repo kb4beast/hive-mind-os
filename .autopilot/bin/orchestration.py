@@ -1017,7 +1017,17 @@ def build_orchestration_contract(
     request: str,
     *,
     status: Mapping[str, object] | None = None,
+    allow_sidecars: bool = True,
 ) -> dict[str, object]:
+    """Build the content-addressed wave contract for the current live state.
+
+    ``allow_sidecars=False`` builds the same wave without its optional sidecar
+    cohort.  Sidecars are token-optimization transports, never node authority,
+    so a host with no sidecar API (the attended host) executes the identical
+    wave rather than refusing it — the contract must be built this way because
+    ``contract_id`` authenticates the body and nothing may be stripped later.
+    """
+
     policy = load_policy(Path(plane.repo_root))
     current = dict(status or plane.status())
     decision = infer_intent(request, current)
@@ -1168,7 +1178,9 @@ def build_orchestration_contract(
         mode = str(task.get("authority_mode", "UNKNOWN"))
         authority_counts[mode] = authority_counts.get(mode, 0) + 1
 
-    sidecars = plan_sidecars(tasks, node_defs, policy["sidecars"])
+    sidecars = (
+        plan_sidecars(tasks, node_defs, policy["sidecars"]) if allow_sidecars else []
+    )
     sidecars_by_parent: dict[str, list[dict[str, object]]] = {}
     for sidecar in sidecars:
         sidecars_by_parent.setdefault(str(sidecar["parent_launch_instruction_id"]), []).append(sidecar)

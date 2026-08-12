@@ -24,6 +24,7 @@ from durable_controller import (
     digest_json,
     read_json,
 )
+from healing import heal_round
 from host_execution import execute_contract
 from orchestration import (
     OrchestrationError,
@@ -793,6 +794,11 @@ def parser() -> argparse.ArgumentParser:
         default=60,
         help="Wall-clock bound on one evidence poll; the host is never waited on",
     )
+    wave.add_argument(
+        "--no-heal",
+        action="store_true",
+        help="Do not repair a withheld wave; report the wedge and exit",
+    )
 
     drive = commands.add_parser("run-round")
     drive.add_argument("--actor", default="autopilot:round-driver")
@@ -807,6 +813,24 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Stop before the round's single leased repository-wide gate",
     )
+    drive.add_argument(
+        "--no-heal",
+        action="store_true",
+        help="Report wedges instead of repairing what evidence proves defunct",
+    )
+
+    heal = commands.add_parser("heal")
+    heal.add_argument("--actor", default="autopilot:healer")
+    heal.add_argument("--node", action="append", default=[])
+    heal.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Produce the same diagnosis and report with every action withheld",
+    )
+
+    lift = commands.add_parser("lift-retry-quarantine")
+    lift.add_argument("node_id")
+    lift.add_argument("--actor", required=True)
 
     intent = commands.add_parser("infer-intent")
     intent.add_argument("request", nargs="?", default="")
@@ -1159,7 +1183,34 @@ def main(argv: list[str] | None = None) -> int:
                         max_sessions=args.max_sessions,
                         push=not args.no_push,
                         validate=not args.skip_validation,
+                        heal=not args.no_heal,
                     ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "heal":
+            print(
+                json.dumps(
+                    heal_round(
+                        plane,
+                        actor=args.actor,
+                        nodes=args.node or None,
+                        apply=not args.dry_run,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "lift-retry-quarantine":
+            lifted = plane.lift_retry_quarantine(args.node_id, actor=args.actor)
+            print(
+                json.dumps(
+                    lifted
+                    if lifted is not None
+                    else {"node_id": args.node_id, "outcome": "not-quarantined"},
                     indent=2,
                     sort_keys=True,
                 )
@@ -1170,7 +1221,27 @@ def main(argv: list[str] | None = None) -> int:
             if args.apply and should_publish_release(decision, status):
                 plane.dispatch(actor=args.actor)
                 status = plane.status()
-            contract = build_orchestration_contract(plane, args.request, status=status)
+            # The attended host has no sidecar API; the wave runs without its
+            # optional sidecar cohort rather than refusing to run at all.
+            contract = build_orchestration_contract(
+                plane, args.request, status=status, allow_sidecars=False
+            )
+            if not contract["tasks"] and args.apply and not args.no_heal:
+                # A withheld wave is exactly what healing exists for: repair the
+                # defunct evidence, refresh authority, and rebuild the contract
+                # once before conceding.
+                healed = heal_round(plane, actor=args.actor, status=status)
+                print(f"HEAL: {healed['disposition']}")
+                for action in healed["actions"]:
+                    print(
+                        f"  - {action['kind']} {action['node_id'] or ''} "
+                        f"{action['outcome']}: {action['detail']}"
+                    )
+                if healed["disposition"] == "HEALED":
+                    status = plane.status()
+                    contract = build_orchestration_contract(
+                        plane, args.request, status=status, allow_sidecars=False
+                    )
             print(f"INTENT: {contract['intent']['intent']}")
             print(f"CONTRACT: {contract['contract_id']}")
             if not contract["tasks"]:

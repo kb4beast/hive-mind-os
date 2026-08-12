@@ -98,20 +98,53 @@ class AttendedCodexHost:
                 self._nodes[instruction] = node_id
 
     def pending_cards(self) -> tuple[Mapping[str, Any], ...]:
-        """Return the session cards the operator has not yet shown any evidence for."""
+        """Return the session cards the operator has not yet shown any evidence for.
 
-        pending = []
+        The ledger accumulates one entry per launch attempt, but the operator
+        opens one session per node, so entries are deduplicated by node.  Every
+        attempt for a node writes the same per-node card file, so whichever
+        entry survives points at identical instructions.
+        """
+
+        pending: dict[str, Mapping[str, Any]] = {}
         for entry in self._ledger().values():
             node_id = entry.get("node_id")
             if not isinstance(node_id, str) or self._observe(node_id) is None:
-                pending.append(entry)
-        return tuple(pending)
+                key = node_id if isinstance(node_id, str) else str(entry.get("task_id"))
+                pending[key] = entry
+        return tuple(pending.values())
 
     # ------------------------------------------------------------------ adapter
 
     def trusted_singleton_target(self, *, repo_root: Path) -> str:
         del repo_root
         return str(self.plane.target_branch)
+
+    def inspect_runtime_authority(self, *, repo_root: Path) -> Mapping[str, object]:
+        """Report live claim and lease authority from the control plane's state.
+
+        The attended host has no runtime of its own to inspect; the control
+        plane's session-local claim files and validation lease ARE the runtime
+        authority a wave must not trample.
+        """
+
+        del repo_root
+        claims = [dict(value) for value in self.plane.active_claims().values()]
+        lease: dict[str, Any] | None = None
+        lease_path = Path(self.plane.validation_lease_path)
+        if lease_path.is_file():
+            try:
+                value = json.loads(lease_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                value = None
+            if isinstance(value, Mapping):
+                lease = dict(value)
+        return {
+            "target_branch": str(self.plane.target_branch),
+            "active_claims": claims,
+            "active_validation_lease": lease,
+            "quiescent": not claims and lease is None,
+        }
 
     def lookup_thread(self, *, idempotency_key: str) -> Mapping[str, object] | None:
         entry = self._ledger().get(idempotency_key)
@@ -276,6 +309,10 @@ class AttendedCodexHost:
             return None
         lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         if not lines:
+            return None
+        if getattr(self.plane, "blockers_fully_resolved", lambda _node: False)(node_id):
+            # Every recorded cause carries a verified resolution; the ledger is
+            # a history of healed failures, not live failure evidence.
             return None
         return "blocker:" + _digest(lines[-1])[:32]
 

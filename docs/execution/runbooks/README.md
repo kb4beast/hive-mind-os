@@ -233,40 +233,56 @@ that is a sealed boundary wearing operational clothes.
 - Record every repair in the round report: node, class, `file:line` evidence,
   the replacement invariant, and the re-dispatch result.
 
-## Recovery (exact commands, no diagnosis needed)
+## Recovery (heal first; manual commands only when healing reports STUCK_HUMAN)
+
+Every mechanical wedge below is repaired automatically: `run-round` heals by
+default, `execute-wave --apply` heals a withheld wave once before conceding,
+and `python .autopilot/bin/autopilot.py --repo-root . heal [--dry-run]` runs
+the same pass standalone. Each action is proof-carrying, audited, and guarded
+by `--force-with-lease`; the laws and their limits live in
+`docs/execution/HEALING_DOCTRINE.md`. The heal report ends in a machine
+disposition — `HEALED` (loop again now), `WAITING` with the exact `wake_at`
+past which polling can matter again, `OPEN_SESSIONS` (open the named operator
+cards), or `STUCK_HUMAN` (genuine sealed/external authority, with evidence).
+What follows explains what the healer does, and remains runnable by hand.
 
 - **Fresh session shows `RECONCILIATION_REQUIRED` everywhere.** Normal: local
-  reconciliation state is deliberately session-local. Run Phase 0; it clears in
-  one command.
-- **Validation lease held by a dead session.** The lease file names the exact
-  identity. Release it verbatim:
-  `cat .autopilot/state/global-validation-lease.json` →
+  reconciliation state is deliberately session-local. Healed automatically
+  (the healer runs Phase 0 itself); or run Phase 0 by hand.
+- **Validation lease held by a dead session.** A *live* lease is released only
+  by its exact identity:
   `python .autopilot/bin/autopilot.py --repo-root . validation-lease-release <node_id> --owner <exact-owner>`.
-  An expired lease is *not* reacquirable without this exact-identity release.
+  An *expired* lease no longer wedges the round: the healer archives it as
+  `EXPIRED_BROKEN` (expiry is the bound the owner itself declared), and
+  `run-round` does the same before its validation phase.
 - **Worker died holding a local claim.** Safe to let lapse **only if it pushed
   nothing** (`git ls-remote origin <node-branch>` is empty). If it published a
-  branch, follow "Settling a stalled worker" above before the lease expires — a
-  mutated branch whose claim expired needs sealed recovery authority to undo.
-- **Worker died after publishing a remote claim branch.** `release` only reaches a
-  claim whose *local* file still exists, and claim state is session-local, so a
-  later session's `release` is a silent no-op while `publish_remote_claim` keeps
-  refusing with `remote branch already exists`. If the branch head is still the
-  bare claim commit, retire it once the claim has expired:
+  branch, see the next two bullets — the healer settles both cases.
+- **Worker died after publishing a remote claim branch.** The healer retires a
+  bare remote claim once any proof of defunctness holds: lease expired, plan
+  fingerprint superseded, or zero work commits within
+  `claim_stall_minutes` (`.autopilot/healing-policy.json`) — a dead session no
+  longer wedges the node until TTL. Manual equivalent:
 
   ```bash
   python .autopilot/bin/autopilot.py --repo-root . reap-stale-remote-claim <NODE> --owner <exact-owner-from-the-claim-commit-message> --reason "worker session ended"
   ```
 
-  Read the owner from the claim commit itself (`git log -1 origin/<node-branch>`),
-  which is a self-attesting JSON record. The command refuses a live claim, an
-  owner mismatch, and any branch that advanced past the claim — a branch carrying
-  real work is never deleted, only reconciled. For that case, follow the sealed
-  retirement in `.autopilot/README.md` (`retire-receipt-branch` /
-  `STALE_TARGET_RECOVERY_SEQUENCE`). Never delete remote refs by hand.
+  A branch carrying real unsealed work is never deleted: once its governing
+  claim is defunct and the head has been still for `branch_stall_minutes`, the
+  healer archives it verbatim under
+  `refs/hive-mind-autopilot/quarantine/<node>/<sha>` and retires the branch ref
+  in the same atomic push. Sealed receipts are never quarantined — they
+  integrate.
+- **Retry budget exhausted by a dead session's failures.** Quarantine-by-budget
+  lifts only on proof: record a `blocker-resolve` (verified fix + safe retry
+  command) for **every** open blocker, and the healer (or
+  `lift-retry-quarantine <NODE> --actor <you>`) archives the spent ledger and
+  reopens the node for dispatch. Unresolved causes keep the quarantine.
 - **Target advanced mid-wave (a sibling integrated first).** Only the
   *dispatcher release* goes stale, not running claims. Workers keep going;
-  integration re-reconciles between merges. Re-run Phase 0 before any *new*
-  claim or wave.
+  integration re-reconciles between merges, and the healer re-snapshots,
+  re-reconciles, and re-dispatches after every repair it applies.
 
 ## Token discipline
 

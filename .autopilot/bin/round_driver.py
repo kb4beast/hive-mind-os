@@ -21,23 +21,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import healing
 from attended_host import RECEIPT_IDENTITY
 from dag_standard import Round, compile_rounds, load_plan_graph
 
 # A blocker naming any of these is sealed or external: repairing it would rotate
 # the plan fingerprint or fabricate authority, so the driver never touches it.
-_SEALED_MARKERS = (
-    "acceptance_criteria",
-    "acceptance criterion",
-    "credential",
-    "consent",
-    "protected branch",
-    "protected-branch",
-    "production",
-    "legal",
-    "spending",
-    "sealed",
-)
+# The tuple lives in healing so triage and the healer never disagree about what
+# is untouchable.
+_SEALED_MARKERS = healing.SEALED_MARKERS
 # A blocker naming any of these is a stale artifact the control plane owns a verb
 # for. These are the only blockers the driver resolves without being asked.
 _STALE_MARKERS = (
@@ -266,11 +258,15 @@ def triage_round(
         packet = _last_blocker(plane, node_id)
         if packet is None:
             continue
+        if getattr(plane, "blockers_fully_resolved", lambda _node: False)(node_id):
+            # Every recorded cause carries a verified resolution; the ledger's
+            # last line is a resolution event, not a live blocker.
+            continue
         verdict = classify_blocker(packet)
         if verdict == "CLASS_B" and resolve_stale:
-            resolved = _resolve_stale_claim(plane, node_id)
+            outcome, resolved = _resolve_stale_claim(plane, node_id)
             if resolved is not None:
-                report.record("triage", node_id, "REPAIRED", resolved)
+                report.record("triage", node_id, outcome, resolved)
                 continue
         report.record(
             "triage",
@@ -286,27 +282,42 @@ def triage_round(
         )
 
 
-def _resolve_stale_claim(plane: Any, node_id: str) -> str | None:
-    """Retire a dead worker's bare claim ref, or explain why it must wait."""
+def _resolve_stale_claim(plane: Any, node_id: str) -> tuple[str, str | None]:
+    """Retire a dead worker's defunct claim ref, or explain why it must wait.
 
+    Returns ``(outcome, detail)`` so a refusal is reported as RETAINED — a
+    refusal used to be recorded as REPAIRED, which read as progress while the
+    node stayed wedged.
+    """
+
+    policy = healing.load_policy(plane.ap_root)
+    if not policy["enabled"]:
+        return ("RETAINED", None)
     branch = str(plane.node(node_id).get("branch"))
     head = plane.remote_branch_sha(branch)
     if head is None:
-        return None
+        return ("RETAINED", None)
     _git(plane, "fetch", "origin", f"refs/heads/{branch}")
     record = plane.remote_claim_record(head)
     if not isinstance(record, Mapping):
-        return None
-    owner = record.get("owner")
-    if not isinstance(owner, str):
-        return None
+        return ("RETAINED", None)
     try:
-        released = plane.reap_stale_remote_claim(
-            node_id, owner, reason="round driver retired a dead worker's claim"
+        released = plane.reap_defunct_remote_claim(
+            node_id,
+            actor="autopilot:round-driver",
+            reason="round driver retired a dead worker's defunct claim",
+            stall_minutes=int(policy["claim_stall_minutes"]),
         )
     except Exception as error:  # refusal is information, not a driver failure
-        return f"stale claim retained: {error}"
-    return f"retired {released.get('outcome')} claim {str(head)[:7]} for {owner}"
+        return ("RETAINED", f"claim retained: {error}")
+    if released.get("outcome") == "absent":
+        return ("RETAINED", None)
+    proof = released.get("proof", {})
+    return (
+        "REPAIRED",
+        f"retired defunct claim {str(head)[:7]} for {released.get('owner')} "
+        f"({proof.get('kind', 'expired')})",
+    )
 
 
 def drive_round(
@@ -316,44 +327,106 @@ def drive_round(
     max_sessions: int = 8,
     push: bool = True,
     validate: bool = True,
+    heal: bool = True,
     runner: Callable[[], tuple[bool, str]] | None = None,
 ) -> dict[str, Any]:
-    """Advance the current round as far as evidence allows, then report."""
+    """Advance the current round as far as evidence allows, then report.
+
+    With ``heal`` (the default) the driver repairs what a careful operator was
+    always entitled to repair by hand — a missing reconciliation, a defunct
+    claim, a dead worker's stalled branch, an expired validation lease — and
+    the result carries a ``disposition`` plus ``wake_at`` so the caller knows
+    whether looping again can change anything, and if not, until when.
+    """
 
     report = RoundReport()
+
+    def finish(disposition: str, wake_at: str | None = None, **extra: Any) -> dict[str, Any]:
+        result = report.to_dict()
+        result["disposition"] = disposition
+        result["wake_at"] = wake_at
+        result.update(extra)
+        return result
+
     status = plane.status()
     if status.get("reconciliation_required"):
         # Every verdict is untrustworthy until the session reconciles: nodes read
         # RECONCILIATION_REQUIRED rather than COMPLETE, so round selection would
         # walk back to rounds that were integrated long ago.
-        report.record(
-            "select",
-            None,
-            "RECONCILE_REQUIRED",
-            "run: python .autopilot/bin/github_snapshot.py --reconcile --actor "
-            f"{actor} — no round is selectable until then",
-        )
-        report.blocked = True
-        return report.to_dict()
+        if heal:
+            ok, detail = healing.reconcile_with_snapshot(plane, actor=actor)
+            report.record(
+                "heal", None, "RECONCILED" if ok else "FAILED", detail
+            )
+            if ok:
+                status = plane.status()
+        if status.get("reconciliation_required"):
+            report.record(
+                "select",
+                None,
+                "RECONCILE_REQUIRED",
+                "run: python .autopilot/bin/github_snapshot.py --reconcile --actor "
+                f"{actor} — no round is selectable until then",
+            )
+            report.blocked = True
+            return finish("RECONCILE_REQUIRED")
     round_ = select_round(plane, status, max_sessions=max_sessions)
     if round_ is None:
         report.record("select", None, "QUIESCENT", "every compiled round is complete")
-        return report.to_dict()
+        return finish("QUIESCENT")
     report.round_id = round_.round_id
     report.nodes = round_.nodes
     report.record(
         "select", None, "SELECTED", f"{round_.round_id} level {round_.level}: {round_.reason}"
     )
-    triage_round(plane, round_.nodes, report)
+    # --no-heal means observe-only everywhere: triage classification still runs,
+    # but its mechanical claim repairs are healing actions and obey the flag.
+    triage_round(plane, round_.nodes, report, resolve_stale=heal)
     whole = integrate_round(plane, round_, report, push=push)
     if not whole:
         report.record(
             "validate", None, "SKIPPED", "the wave is not whole; validation gates a full round"
         )
-        return report.to_dict()
+        if not heal:
+            return finish("PENDING")
+        healed = healing.heal_round(plane, actor=actor, nodes=round_.nodes)
+        for action in healed.get("actions", []):
+            report.record(
+                "heal",
+                action.get("node_id"),
+                str(action.get("outcome")),
+                f"{action.get('kind')}: {action.get('detail')}",
+            )
+        disposition = str(healed.get("disposition"))
+        if disposition == "QUIESCENT":
+            # The healer found nothing to repair, but this round is not whole:
+            # QUIESCENT here would read as plan-complete, which it is not.
+            disposition = "PENDING"
+        report.record(
+            "heal",
+            None,
+            disposition,
+            "state changed; run run-round again"
+            if disposition == "HEALED"
+            else "waiting is provably useful until "
+            + str(healed.get("wake_at") or "new evidence arrives"),
+        )
+        return finish(disposition, healed.get("wake_at"), healing=healed)
     if not validate:
         report.record("validate", None, "SKIPPED", "validation disabled by request")
-        return report.to_dict()
+        return finish("ROUND_INTEGRATED")
+    if heal:
+        try:
+            broken = plane.break_expired_validation_lease(actor=actor)
+        except Exception:  # a live lease is not the driver's to break
+            broken = None
+        if broken is not None:
+            report.record(
+                "heal",
+                None,
+                "REPAIRED",
+                f"archived expired validation lease of {broken.get('owner')}",
+            )
     validate_round(
         plane,
         round_,
@@ -361,4 +434,7 @@ def drive_round(
         owner=actor,
         runner=runner or default_validation_runner(Path(plane.repo_root)),
     )
-    return report.to_dict()
+    passed = any(
+        step.phase == "validate" and step.outcome == "PASSED" for step in report.steps
+    )
+    return finish("ROUND_COMPLETE" if passed else "VALIDATION_FAILED")

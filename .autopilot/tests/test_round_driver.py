@@ -203,11 +203,33 @@ class RoundDriverTests(unittest.TestCase):
             def status(self) -> dict[str, object]:
                 return {"reconciliation_required": True, "nodes": []}
 
-        result = driver.drive_round(UnreconciledPlane(), actor="test:driver", push=False)
+        result = driver.drive_round(
+            UnreconciledPlane(), actor="test:driver", push=False, heal=False
+        )
         self.assertTrue(result["blocked"])
         self.assertEqual(result["steps"][0]["outcome"], "RECONCILE_REQUIRED")
         self.assertIn("--reconcile", result["steps"][0]["detail"])
         self.assertIsNone(result["round_id"])
+        self.assertEqual(result["disposition"], "RECONCILE_REQUIRED")
+
+    def test_driver_attempts_reconciliation_before_conceding(self) -> None:
+        missing = Path(self.temporary.name) / "empty"
+
+        class UnreconciledPlane:
+            """No snapshot script exists, so the heal attempt must fail cleanly."""
+
+            ap_root = missing / ".autopilot"
+            repo_root = missing
+
+            def status(self) -> dict[str, object]:
+                return {"reconciliation_required": True, "nodes": []}
+
+        result = driver.drive_round(UnreconciledPlane(), actor="test:driver", push=False)
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["steps"][0]["phase"], "heal")
+        self.assertEqual(result["steps"][0]["outcome"], "FAILED")
+        self.assertEqual(result["steps"][1]["outcome"], "RECONCILE_REQUIRED")
+        self.assertEqual(result["disposition"], "RECONCILE_REQUIRED")
 
     def test_blocker_classification_follows_required_authority(self) -> None:
         self.assertEqual(

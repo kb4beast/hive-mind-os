@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "hive-mind-autopilot-healing-policy-v1",
+  "type": "object",
+  "required": ["kind", "schema_version"],
+  "properties": {
+    "kind": { "const": "hive-mind-autopilot-healing-policy-v1" },
+    "schema_version": { "const": 1 },
+    "enabled": {
+      "type": "boolean",
+      "description": "Master switch; when false every heal call reports DISABLED and takes no action."
+    },
+    "auto_reconcile": {
+      "type": "boolean",
+      "description": "Refresh the GitHub snapshot and reconciliation whenever they are stale, exactly as the operator's step 2 would."
+    },
+    "auto_redispatch": {
+      "type": "boolean",
+      "description": "Issue a fresh dispatcher release after healing actions invalidate the pinned one."
+    },
+    "break_expired_validation_lease": {
+      "type": "boolean",
+      "description": "Archive an EXPIRED global validation lease left by a dead session; a live lease is never touched."
+    },
+    "claim_stall_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "A live remote claim with zero work commits for this long is treated as a dead worker's and retired (force-with-lease guards the race)."
+    },
+    "branch_stall_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "An unsealed work branch idle this long, whose governing claim is expired or absent, is archived under refs/hive-mind-autopilot/quarantine/ and its branch ref retired."
+    },
+    "max_actions_per_run": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Upper bound on remote repairs a single heal pass may apply; the rest are reported as DEFERRED."
+    }
+  },
+  "additionalProperties": false
+}

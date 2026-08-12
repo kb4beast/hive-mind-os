@@ -1,0 +1,11 @@
+{
+  "kind": "hive-mind-autopilot-healing-policy-v1",
+  "schema_version": 1,
+  "enabled": true,
+  "auto_reconcile": true,
+  "auto_redispatch": true,
+  "break_expired_validation_lease": true,
+  "claim_stall_minutes": 30,
+  "branch_stall_minutes": 45,
+  "max_actions_per_run": 8
+}
