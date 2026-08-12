@@ -7,20 +7,20 @@ open-source Hive Mind product. It does **not** replace or edit the sealed
 ## Materialize and validate
 
 ```bash
-python docs/execution/dags/generic-hive-mind-product-v1/generate_plan.py \
-  --output /tmp/generic-hive-mind-product-v1.json
+python docs/execution/dags/generic-hive-mind-product-v1/generate_plan.py
 
 python .autopilot/bin/autopilot.py --repo-root . dag-lint \
-  --plan /tmp/generic-hive-mind-product-v1.json --strict --json
+  --plan .autopilot/state/generic-hive-mind-product-v1.json --strict --json
 
 python .autopilot/bin/autopilot.py --repo-root . dag-rounds \
-  --plan /tmp/generic-hive-mind-product-v1.json \
+  --plan .autopilot/state/generic-hive-mind-product-v1.json \
   --max-sessions 8 --actor codex:generic-product --json
 ```
 
 `generate_plan.py` is the deterministic materializer. `specs_a.py` and
 `specs_b.py` are the checked-in node contracts. The materialized JSON is written
-to temporary state so executing the DAG never dirties the source branch.
+under ignored `.autopilot/state/`, inside the repository, so the linter can
+inspect the real target tree without dirtying the source branch.
 
 ## Current execution boundary
 
