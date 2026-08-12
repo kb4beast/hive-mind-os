@@ -53,6 +53,22 @@ def verify() -> tuple[dict[str, Any], dict[str, Any]]:
                 f"overlay source {name} mismatch: expected {expected}, observed {observed}"
             )
 
+    standard = manifest.get("standard")
+    if not isinstance(standard, dict):
+        raise OverlayVerificationError("authoring-standard binding is missing")
+    standard_path = standard.get("path")
+    expected_standard_blob = standard.get("git_blob_sha")
+    if not isinstance(standard_path, str) or not isinstance(
+        expected_standard_blob, str
+    ):
+        raise OverlayVerificationError("authoring-standard binding is malformed")
+    observed_standard_blob = git_blob_sha(REPO_ROOT / standard_path)
+    if observed_standard_blob != expected_standard_blob:
+        raise OverlayVerificationError(
+            "authoring-standard bytes mismatch: "
+            f"expected {expected_standard_blob}, observed {observed_standard_blob}"
+        )
+
     plan = build_plan()
     expected_digest = manifest.get("expected_plan_digest")
     if plan.get("plan_digest") != expected_digest:
