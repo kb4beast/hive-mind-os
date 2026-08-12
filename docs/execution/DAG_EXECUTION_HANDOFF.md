@@ -274,9 +274,14 @@ Known open discrepancies for whoever does the remaining nodes:
 
 - `EVAL-520.md:301` says `__all__` lists twelve symbols; the section defines
   thirteen. All thirteen are exported.
-- EVAL-520 emits the holdout key `prediction_digest`; its runbook prose said
-  `prediction_digest_or_null`. **PROMOTE-530 consumes evaluation records —
-  bind to what the source emits and report the mismatch.**
+- EVAL-520 emits the holdout key `prediction_digest`
+  (`evaluation_runtime.py:532`, field declared at `:141`); its runbook prose
+  said `prediction_digest_or_null` (`EVAL-520.md:290`). Bind to what the source
+  emits. This entry previously named PROMOTE-530 as the consumer; that was
+  wrong. `PROMOTE-530.md:382` forbids importing `evaluation_runtime`, and the
+  sealed `promotion.py` imports no evaluation symbol, so the mismatch has no
+  surface in that node. It stays open for whichever node actually reads holdout
+  records.
 - MIGRATION-460 enqueue payloads now carry a `runtime` key, changing the
   payload digest, so a job pending from an older binary will not dedupe against
   a re-enqueue.
