@@ -182,14 +182,31 @@ the exact exit code in `receipts.json`.
    `pyright` is installed run it to `pyright.log`; if either tool is absent DO NOT
    install anything — record the gate row as `DEFERRED` to the draft PR's
    Constitutional CI `quality` job.
+
+   **"Absent" means not importable, not merely off PATH.** Both tools ship as
+   Python modules here: bare `ruff` and `pyright` are not on PATH, while
+   `python -m ruff` and `python -m pyright` run at the exact CI pins (0.16.0
+   and 1.1.411). Always probe with `python -m <tool> --version` before
+   concluding a tool is missing. Deferring on the PATH technicality would have
+   concealed a genuinely red quality job on this node's first execution —
+   15 ruff errors and 4 pyright errors, all real (repaired in `5ead055`).
 3. **Gate 1b — the single leased repo-wide pass.** Exactly per
    `docs/execution/runbooks/README.md` Phase 3, with this node as anchor and owner:
 
    ```
-   python .autopilot/bin/autopilot.py --repo-root . validation-lease-acquire QUALIFY-610 --owner codex:qualify-610
+   python .autopilot/bin/autopilot.py --repo-root . validation-lease-acquire QUALIFY-610 --owner codex:qualify-610 --lease-minutes 90
    python -m unittest discover -s tests -v > evidence/qualification/hive-cortex/q610-<sha8>/gate1-ci/unittest-full.log 2>&1
    python .autopilot/bin/autopilot.py --repo-root . validation-lease-release QUALIFY-610 --owner codex:qualify-610
    ```
+
+   `--lease-minutes 90` is not optional padding. The acquire default is 10
+   minutes, while this gate needs one repo-wide pass (~17 min) plus step 6's
+   extra interpreter run inside the same window. Measured on the first
+   execution: acquired 17:07:54Z, expired 17:17:54Z, released 17:41:32Z — the
+   lease was held 33m38s and released 23m38s AFTER it had expired. It only
+   appeared to work because `release_global_validation_lease`
+   (`.autopilot/bin/controller.py:1963`) checks the owner identity and never
+   the expiry, so an overrun fails silently instead of loudly.
 
    Always release the lease, even on failure. This log is the authoritative input
    for Gates 1, 2, and the role inventory. Commit:
@@ -229,7 +246,13 @@ the exact exit code in `receipts.json`.
    - retained Phase 12 assurance replay:
      `python -c "from hive_mind_os.brain_kernel.local_assurance import verify_local_assurance_artifact as v; import json; print(json.dumps(v('evidence/local_assurance/phase12-9efe64b/assurance.json','evidence/local_assurance/phase12-9efe64b/receipts.json'), default=str)[:2000])" > .../gate3-replay/assurance-verify.log 2>&1`
      — verify every `phase12-*` packet present under `evidence/local_assurance/`;
-     a raised `LocalAssuranceError` is a gate FAIL;
+     a raised `LocalAssuranceError` is a gate FAIL. Note that not every packet
+     can take this path: `verify_local_assurance_artifact` requires both a
+     report and a receipts manifest, and `phase12-54020b7.json` is a bare file
+     with no manifest. Re-derive that one's digest with `canonical_digest` and
+     compare it to the claimed value instead, recording the weaker coverage as
+     a residual blocker. Do not skip it silently and do not treat the
+     inapplicable call as a FAIL;
    - focused replay suites:
      `PYTHONPATH=src python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v > .../gate3-replay/replay-focused.log 2>&1`.
    Remove the worktree afterwards (`git worktree remove <scratch>/q610-clean`).

@@ -252,7 +252,7 @@ existing focused suites plus command receipts — never repo-wide discovery.
 
 | required_tests name | Concrete mapping | Exact command |
 |---|---|---|
-| `legacy-parity-tests` | `tests.test_mission.RepositoryMissionTests`; `tests.test_mission_loop.MissionStateReducerTests` + `OrchestratorTests` + `MissionLoopAdversarialTests`; `tests.test_autonomous_os.AutonomousBrainTests`; `tests.test_workers.WorkerTests` (all pre-existing, unchanged — passing proves retained behavior is byte-compatible after retirement) | `PYTHONPATH=src python -m unittest tests.test_mission tests.test_mission_loop tests.test_autonomous_os tests.test_workers -v` |
+| `legacy-parity-tests` | `tests.test_mission.RepositoryMissionTests`; `tests.test_mission_loop.MissionStateReducerTests` + `OrchestratorTests` + `MissionLoopAdversarialTests`; `tests.test_autonomous_os.AutonomousBrainTests`; `tests.test_workers.WorkerTests` (all pre-existing, unchanged — passing proves retained behavior is byte-compatible after retirement) | `PYTHONPATH="src;tests" python -m unittest tests.test_mission tests.test_mission_loop tests.test_autonomous_os tests.test_workers -v` (`PYTHONPATH=src:tests` on POSIX) |
 | `public-api-compatibility-tests` | `tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests` (registry blockers + rollback routing) and `tests.test_cli_enqueue.EnqueueCliTests` (CLI ingress unchanged); plus import-surface receipt: `python -c "import hive_mind_os; from hive_mind_os import AutonomousBrain, RepositoryMission, MissionLoop, Worker, serve; from hive_mind_os.mission import resolve_repository_pin; from hive_mind_os.autonomous_os import GitHubRestCommentGateway; print('public-api-ok')"` | `PYTHONPATH=src python -m unittest tests.test_hive_cortex_compatibility tests.test_cli_enqueue -v` + the `python -c` receipt |
 | `rollback-tag-test` | Command receipts (no unittest file is inside write scope — state this explicitly in the completion receipt): tag exists, is an ancestor, and matches every module notice | `git tag --list legacy-620-rollback` ; `git rev-parse legacy-620-rollback^{commit}` ; `git merge-base --is-ancestor legacy-620-rollback HEAD && echo ancestor-ok` ; `python -c "import hive_mind_os.mission as a, hive_mind_os.mission_loop as b, hive_mind_os.autonomous_os as c, hive_mind_os.workers as d; ns=[m.retirement_notice() for m in (a,b,c,d)]; assert all(n['rollback_tag']=='legacy-620-rollback' and n['rollback_ref']=='rollback:legacy-620' for n in ns); print('rollback-notice-ok')"` |
 
@@ -260,6 +260,18 @@ existing focused suites plus command receipts — never repo-wide discovery.
 - Warnings do not leak at import: `python -W error::DeprecationWarning -c "import hive_mind_os; print('import-clean')"` must succeed (warnings fire on construction, not import).
 - `retirement_notice()` returns a *copy* (mutating the return value must not mutate `LEGACY_RUNTIME_NOTICE`).
 - If §3.1 row 1 (expected kind-dispatch shape) applied: one `LEGACY_JOB_KIND` job through `route_job_executor` reaches `execute_mission_job` and emits the `DeprecationWarning`; one `CANONICAL_JOB_KIND` job (test invoker injected via `execute_canonical_mission_job`'s `invoker=` parameter) never touches legacy code. If row 2 applied: one legacy-route and one canonical-route receipt each identify their actual runtime and the legacy one carries `rollback:legacy-620`.
+
+**`tests` must be on `PYTHONPATH` for the parity command, and this is not a
+style preference.** `tests/test_workers.py:13` does
+`from fixtures.fixture_repo import build_fixture_repo`; only
+`discover -s tests` puts `tests/` on `sys.path`, so under a bare
+`PYTHONPATH=src` that module fails to import with
+`ModuleNotFoundError: No module named 'fixtures'`, 45 tests collect instead of
+48, and the command exits 1 while appearing to have run the suite. The defect
+is pre-existing and reproduces identically at the base commit; it is not
+evidence of a regression. It cannot be fixed from inside this node — `tests/`
+is read-only here and adding a `conftest.py` is forbidden — so the invocation
+carries the fix.
 
 Focused commands only. The single repo-wide `python -m unittest discover -s tests`
 run belongs to the R9 integrator under the validation lease — never run it here.
