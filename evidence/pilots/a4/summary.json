@@ -1,0 +1,179 @@
+{
+  "acceptance_self_check": {
+    "criterion_1_owner_supplies_scoped_credentials_and_repository": {
+      "escalated": true,
+      "faked": false,
+      "receipt": "owner-grant/gate-stop.json",
+      "status": "UNMET",
+      "status_is_not": "deferred, partially met, pending, satisfied-in-principle, or n/a",
+      "why": "No owner grant exists in this session. No scoped credential was supplied and no pilot repository was named. The most recent owner decision on record (HUMAN_AUTHORITY_GATES.md:50-53) withholds a GitHub credential by name and withholds remote delivery by name."
+    },
+    "criterion_2_only_non_protected_branch_and_draft_pr_operations": {
+      "status": "VACUOUSLY TRUE -- ZERO OPERATIONS OCCURRED",
+      "what_was_actually_exercisable_without_credentials": "The constraint was sealed into pilot-plan.json (allowed_operations / forbidden_operations / operation_scope) and its code enforcement was read and quoted: grants.py:23 pins PROTECTED_BRANCHES; grants.py:176-191 (require_push_branch) denies protected branches, the base branch, and any ref outside the granted prefix; rest_gateway.py:154-155 fails closed if GitHub returns a non-draft PR. Locally, tests.test_github_adapter.GitHubAdapterTests.test_lower_authority_denies_before_push_or_pr and test_protection_match_and_mismatch_are_evidenced passed.",
+      "what_was_not_demonstrated": "No live host operation of any kind. The claim 'only non-protected-branch and draft-PR operations occurred' is true only in the trivial sense that the operation count is zero. It is not evidence that the constraint holds against github.com."
+    },
+    "criterion_3_no_merge_and_no_production_deployment": {
+      "also_vacuous": "Nothing ran, so nothing was merged or deployed for that reason as well.",
+      "deployment": "No deployment surface was touched. HUMAN_AUTHORITY_GATES.md:36 (G5) withholds any production pilot regardless.",
+      "status": "HELD",
+      "structural_basis": "grants.py:26-28 closes VALID_DELIVERY_ACTIONS to {push, open_draft_pr, post_comment}; grants.py:25 records that 'merge' is deliberately absent and is not a spelling the package accepts. delivery_adapter.py:9-12: 'There is no fourth adapter. Merge, close, review, and protection writes are not implemented here and are not grantable.' Locally confirmed by tests.test_git_adapter.GitAdapterTests.test_api_has_no_merge_rebase_or_force_surface, which passed."
+    },
+    "criterion_4_pilot_can_be_stopped_and_rolled_back": {
+      "known_gap": "Risk R2 in pilot-plan.json: allowed_operations includes close-own-pr and delete-own-branch (mandated verbatim by A4-800.md:90-91) and the Path B stop procedure needs both, but ControlledRestGateway implements neither. Under Path B the rollback could not be executed through the governed surface as built.",
+      "status": "DOCUMENTED, NOT EXECUTED",
+      "what_exists": "pilot-plan.json -> stop_procedure (triggers, six ordered steps, revocation tolerance) and rollback_procedure (pilot-repository and this-repository), plus the owner revocation instructions in docs/execution/A4_DELIVERY_PILOT.md section 5. A4-800.md:200 accepts 'documented + revocation checklist' as the Path A receipt for this criterion.",
+      "what_was_not_demonstrated": "No live stop and no live rollback were executed, because no live pilot started. There is no executed stop receipt and this node does not claim one."
+    },
+    "criterion_5_evidence_boilerplate": {
+      "absent": "final_commit / final_tree (no commit was made) and the PR description (no PR was opened). Both require authority this worker does not hold.",
+      "present": [
+        "base_commit and base_tree",
+        "changed-path inventory, verified a subset of the write scope",
+        "per-file sha256 digests",
+        "command receipts with exit codes and transcript",
+        "role identity",
+        "rollback reference"
+      ],
+      "status": "PARTIAL"
+    }
+  },
+  "base_commit": "8041964bd8299871ad30f8b60fe7cc3f6b14b250",
+  "base_tree": "2bb4084e2e521ecaf2a179bc9283969fff4efec1",
+  "changed_paths": [
+    "evidence/pilots/a4/pilot-plan.json",
+    "evidence/pilots/a4/owner-grant/gate-stop.json",
+    "evidence/pilots/a4/tests/a4-focused-suite.txt",
+    "evidence/pilots/a4/tests/results.json",
+    "evidence/pilots/a4/summary.json",
+    "docs/execution/A4_DELIVERY_PILOT.md"
+  ],
+  "changed_paths_within_write_scope": true,
+  "dependency_check": {
+    "A3-700": {
+      "measurement": "Read a3/summary.json and a3/findings.json. Finding F3 is carried into pilot-plan.json as risk R1. Nothing under evidence/pilots/a3/** was modified.",
+      "requirement": "Integrated sibling evidence at evidence/pilots/a3/ is a read-only input.",
+      "satisfied": true
+    },
+    "DELIVERY-420": {
+      "measurement": "`git ls-tree -r --name-only HEAD -- src/hive_mind_os/cortex/github` at 8041964bd8299871ad30f8b60fe7cc3f6b14b250 returns __init__.py, delivery_adapter.py, grants.py, rest_gateway.py; all four are present on disk. No node-assumption contradiction; no DELIVERY-420 blocker.",
+      "requirement": "A4-800.md:38-41 -- src/hive_mind_os/cortex/github/** MUST exist on the release branch at R11.",
+      "satisfied": true
+    }
+  },
+  "escalation_record": "owner-grant/gate-stop.json",
+  "escalation_record_id": "ESC-A4-800-67ad9aad5d48",
+  "file_digests": {
+    "docs/execution/A4_DELIVERY_PILOT.md": "sha256:845f7095b3d07145c48026ef9fb0692e6a3de0708a1358e7e9bb50a08cf11dce",
+    "evidence/pilots/a4/owner-grant/gate-stop.json": "sha256:30ca890545cbd3741c45416ce3c1ba921a55799db226af489ebe569eef1fc87e",
+    "evidence/pilots/a4/pilot-plan.json": "sha256:ce0501e5083962132066828fe66bdc926844b78519f5fe72dfa7dd00f9a39d07",
+    "evidence/pilots/a4/tests/a4-focused-suite.txt": "sha256:bedc8ef9283a06bd5811243bb1f90b4a31ec4dd67c37bdb8cab03ed49635ac06",
+    "evidence/pilots/a4/tests/results.json": "sha256:df046ebc55e2c28d40986d08c800b2c174c8871d9d176449fa0e3f284762bcca"
+  },
+  "file_digests_note": "summary.json is not in file_digests: a file cannot contain its own digest. Same self-reference constraint as final_commit.",
+  "final_commit": null,
+  "final_commit_note": "Null and necessarily so. This worker performed no state-changing git command, so no node commit exists. Branch creation, commit, push and the draft PR for autopilot/a4-800 remain outstanding and require authority this worker does not hold. See runbook_contradictions[0].",
+  "grant_record_absent_by_design": "evidence/pilots/a4/owner-grant/grant-record.json does not exist. A4-800.md:76 creates it ONLY if the owner actually granted.",
+  "inherited_risk_from_a3": {
+    "carried_as": "pilot-plan.json risk R1",
+    "finding": "A3-700 F3",
+    "statement": "hive_mind_os.verify.verify_bundle (src/hive_mind_os/verify.py:266-379) re-derives file digests but never reads document['verdict']; 'verdict' occurs at verify.py:58, 179, 185, 194, 250, none inside verify_bundle. A bundle whose verdict is flipped from reject to adopt is ACCEPTED once integrity.json is recomputed, because integrity.json is an unkeyed in-bundle manifest attesting self-consistency rather than authenticity. Any delivery pilot that ships artifacts on the strength of a retained bundle inherits that weakness. This plan therefore gates no remote operation on a retained bundle's verdict field.",
+    "verified_by_this_node": "Line locations re-checked on the release branch at this base commit: grep for 'verdict' in src/hive_mind_os/verify.py returns 58, 179, 185, 194, 250, and verify_bundle begins at line 266. The forgery itself was not re-executed by this node; the measurement is A3-700's."
+  },
+  "no_remote_operation_proof": {
+    "how_it_was_ensured": [
+      "No push, fetch, pull, clone, ls-remote, or remote add/set-url was ever invoked.",
+      "No gh CLI invocation, no curl, no HTTP client, no GitHub API call, no WebFetch, no WebSearch, no browser tool.",
+      "The only remote-adjacent command was `git remote`, which prints remote NAMES from the local .git/config and opens no connection. Its output ('origin') was used for nothing.",
+      "The focused suites are network-free: test_github_adapter drives an in-process FakeGitHubTransport and ExplodingTransport, and the single test that constructs UrllibGitHubTransport (test_default_transport_keeps_tls_chain_and_hostname_validation) only reads attributes off the TLS context object and issues no request; test_git_adapter operates on local fixture repositories, and test_repository_urls_are_rejected asserts URLs are refused.",
+      "Stated precisely rather than sweepingly: the suite DOES perform one real `git push`, at tests/test_github_adapter.py:487-505, into a bare repository the test creates with `git init --bare` in its own temp directory (remote_url=Path('.git')/bare.name, allow_local_test_remote=True). That is a filesystem path, not a network host. The `git push origin ...` argv at tests/test_git_adapter.py:444 never executes -- the test asserts it is denied with GitPolicyDenied before any process spawns.",
+      "Every command run in this node was one of: read-only git plumbing (rev-parse, status, ls-tree, remote, --version), read-only filesystem inspection, or the one focused unittest invocation."
+    ],
+    "limits_of_this_proof": "This is a first-person account of the commands this worker issued, corroborated by the session transcript and by the absence of any remote/ evidence directory. It is not an independently captured network trace. No egress monitor was in place; an auditor wanting stronger assurance would need one. Stating that limit is part of the proof being honest.",
+    "no_credential_access": {
+      "encountered_a_credential_value": false,
+      "how_it_was_ensured": "The environment was never inspected for GITHUB_TOKEN or any other token, not even to test for existence -- rest_gateway.py:79 shows the gateway reads os.environ[token_env] at call time, so the worker knew where a token would live and deliberately did not look. No git credential helper, gh auth store, keyring, CI configuration, or .env file was read. This is not merely an omission: an existing credential is not a grant (pilot-plan.json risk R3), so checking would have produced nothing usable while itself being an unauthorized credential access.",
+      "read_a_credential": false,
+      "searched_for_a_credential": false
+    },
+    "no_state_changing_git_in_this_repository": "No commit, add, checkout, branch, tag, stash, reset, or push was run in C:\\Repos\\HiveMind\\hive-mind-os. All node output is uncommitted working-tree content.",
+    "remote_operations_performed": 0
+  },
+  "node": "A4-800",
+  "outstanding_work": [
+    "Owner grant (credential_or_secret + owner_value_choice) -- the only thing that can open the gate.",
+    "`autopilot fail` registration for A4-800 with the two reasons in gate-stop.json (blocked by C2).",
+    "Branch autopilot/a4-800, commit, push, and draft PR for this repository (blocked by C1).",
+    "Path B execution, including live idempotency replay and executed stop-and-rollback -- and R2/C3 must be resolved first, since the governed surface cannot close a PR or delete a branch.",
+    "A5-900 must NOT start: A4-800.md:44 forbids it, and this node terminated as an escalation."
+  ],
+  "path_a_meaning": "The owner-credential gate was checked and is CLOSED. The pilot is fully prepared and sealed, and it STOPPED at the gate. Per A4-800.md:5-10 this is the expected and honorable terminal state, not a partial success dressed up as one.",
+  "path_taken": "A",
+  "plan_digest": "sha256:1b19c027f58dd526058c3de9b0231e64b11e28fbea3003eac3f59b4e4c999776",
+  "remote_delivery_performed": false,
+  "remote_directory_absent_by_design": "evidence/pilots/a4/remote/ does not exist. A4-800.md:79 creates it ONLY if the pilot actually ran. Its absence is the evidence that no remote effect was created.",
+  "required_tests": [
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "evidence": "tests/a4-focused-suite.txt",
+      "evidence_sha256": "sha256:bedc8ef9283a06bd5811243bb1f90b4a31ec4dd67c37bdb8cab03ed49635ac06",
+      "exit_code": 0,
+      "name": "a4-delivery-pilot",
+      "outcome": "OK (Ran 31 tests)",
+      "path_a_pilot_receipts": [
+        "pilot-plan.json",
+        "owner-grant/gate-stop.json"
+      ]
+    },
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "evidence": "tests/a4-focused-suite.txt",
+      "evidence_sha256": "sha256:bedc8ef9283a06bd5811243bb1f90b4a31ec4dd67c37bdb8cab03ed49635ac06",
+      "exit_code": 0,
+      "live_replay_awaits_owner_grant": true,
+      "live_replay_statement": "LIVE REPLAY WAS NOT PERFORMED AND AWAITS THE OWNER GRANT. No push, no draft PR and no comment was issued against any remote host, so no live replay of any of them exists. What was demonstrated is the adapter's local idempotent convergence against an in-process fake transport: tests.test_github_adapter.GitHubAdapterTests.test_pr_creation_is_durable_and_idempotent issues two identical open_draft_pr calls, gets equal results, and produces exactly one POST. The mechanisms that would make the live replay converge are read and quoted in pilot-plan.json -> idempotency.mechanism_already_implemented_in_the_delivery_surface (find_open_draft_pr before create at delivery_adapter.py:147-149; the '<!-- hive-effect:{idempotency_key} -->' comment marker scan at delivery_adapter.py:173-179; the push postcondition_digest at delivery_adapter.py:116-134). Reading a mechanism is not running it. Nothing here is evidence about github.com's real behaviour.",
+      "name": "remote-idempotency-pilot",
+      "outcome": "OK (Ran 31 tests)",
+      "path_a_pilot_receipt": "pilot-plan.json -> idempotency"
+    }
+  ],
+  "role_identity": "claude:a4-800-worker",
+  "role_identity_note": "docs/execution/runbooks/A4-800.md:201 specifies actor 'codex:a4-800-worker'. This node was executed by an Anthropic Claude model through Claude Code, not by Codex. Recording the runbook's literal string would be a false provenance claim, so the true actor is recorded instead, matching A3-700's precedent 'claude:a3-700-worker'.",
+  "rollback_reference": "The node is additive and reversible. It writes only evidence/pilots/a4/** and docs/execution/A4_DELIVERY_PILOT.md, changes no runtime code, tests, or configuration, and creates no remote effect anywhere. Because no commit was made, rollback is `git checkout -- docs/execution/A4_DELIVERY_PILOT.md && rm -rf evidence/pilots/a4`; once committed it is `git revert` of the node commits.",
+  "runbook_contradictions": [
+    {
+      "id": "C1",
+      "location": "docs/execution/runbooks/A4-800.md:152 (also 43-44 and 176)",
+      "measurement": "Path A is entered precisely because credential authority is missing, yet its final step requires push and PR authority on THIS repository -- a distinct external authority that is equally ungranted. A worker on Path A cannot satisfy the stopping condition at A4-800.md:43-44 without the class of authority whose absence defined Path A. The runbook is internally inconsistent on this point.",
+      "resolution_taken": "Not performed. The node terminates as a prepared escalation in the working tree. Branch, commit, push and draft PR are outstanding and require the integrator's authority.",
+      "text": "Path A must 'still push the branch and open the draft PR carrying the plan + checklist + gate-stop evidence'."
+    },
+    {
+      "id": "C2",
+      "location": "docs/execution/runbooks/A4-800.md:150 and 176 versus A4-800.md:29 and 35",
+      "measurement": "`autopilot fail` records escalation state under .autopilot/**, which the same runbook forbids this worker from writing. The two instructions cannot both be obeyed.",
+      "resolution_taken": "The escalation is fully specified in owner-grant/gate-stop.json -> escalation (node_id, action, both authority classes, both reason strings, and the classes deliberately NOT named) so the orchestrator can invoke it. The escalation is recorded in evidence but is NOT yet registered in autopilot state.",
+      "text": "Path A must 'run autopilot fail for A4-800', while '.autopilot/**' is in the forbidden-write list."
+    },
+    {
+      "id": "C3",
+      "location": "docs/execution/runbooks/A4-800.md:90-91 and 161-162 versus src/hive_mind_os/cortex/github/rest_gateway.py:34-38",
+      "measurement": "ControlledRestGateway implements exactly four calls -- find_open_draft_pr, create_draft_pr, list_comments, post_comment -- and delivery_adapter.py:9-12 states close is not implemented and not grantable. Two of the six allowed operations have no implementation in the governed surface DELIVERY-420 built.",
+      "resolution_taken": "Recorded as risk R2 in pilot-plan.json and flagged in the document's Path B section. It does not block Path A (no remote effect exists to close or delete), but it would block Path B's stop-and-rollback step, and src/** is read-only for this node.",
+      "text": "allowed_operations includes close-own-pr and delete-own-branch, and the Path B stop procedure requires both."
+    },
+    {
+      "id": "C4",
+      "location": "docs/execution/runbooks/A4-800.md:201",
+      "measurement": "This node was executed by an Anthropic Claude model, not by Codex.",
+      "resolution_taken": "role_identity recorded as 'claude:a4-800-worker'. See role_identity_note.",
+      "text": "actor `codex:a4-800-worker`"
+    }
+  ],
+  "schema_version": 1,
+  "sealed_plan": "pilot-plan.json",
+  "write_scope": [
+    "evidence/pilots/a4/**",
+    "docs/execution/A4_DELIVERY_PILOT.md"
+  ]
+}

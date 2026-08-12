@@ -1,0 +1,68 @@
+{
+  "discovery_note": "No repo-wide `python -m unittest discover` was run. Only the two named modules were executed.",
+  "discovery_used": false,
+  "node": "A4-800",
+  "path_taken": "A",
+  "required_tests": [
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "discharged_by": [
+        "tests.test_github_adapter.GitHubAdapterTests (13 tests) -- local, credential-free delivery-client behaviour",
+        "tests.test_git_adapter.GitAdapterTests (18 tests) -- typed git authority and delivery export",
+        "evidence/pilots/a4/pilot-plan.json (the sealed plan, Path A receipt)",
+        "evidence/pilots/a4/owner-grant/gate-stop.json (the gate-stop, Path A receipt)"
+      ],
+      "mapping": "docs/execution/runbooks/A4-800.md:186",
+      "name": "a4-delivery-pilot",
+      "not_discharged": "The remote half. No push, draft PR, or comment was created on any repository, because criterion 1 is UNMET.",
+      "runbook_named_paths_exercised": {
+        "ExplodingTransport": "failure path exercised by test_token_never_persists_or_escapes_errors -- the transport raises and the assertion is that the token does not appear in the error or on disk.",
+        "LocalDeliveryClient": "tests/test_github_adapter.py subclasses GitHubClient as LocalDeliveryClient; exercised by test_repository_mission_delivers_after_curator_adoption and test_lower_authority_denies_before_push_or_pr."
+      },
+      "status": "passed"
+    },
+    {
+      "claims_checked_and_rejected": [
+        {
+          "candidate": "tests.test_git_adapter.GitAdapterTests.test_preexisting_delivery_root_is_rejected_before_any_write",
+          "proposed_as": "a local idempotent refusal path (a second delivery into an existing root)",
+          "rejected_because": "Source-checked at tests/test_git_adapter.py:363-376. It is not an idempotency test. It creates a delivery root whose 'evidence' entry is a symlink pointing outside the root and asserts export_delivery raises WorkspaceDirty without writing through the link. That is a path-escape guard. Citing it as idempotency evidence would have inflated this receipt, so it is recorded here as rejected instead."
+        }
+      ],
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "discharged_by": [
+        "evidence/pilots/a4/pilot-plan.json -> idempotency (the sealed plan's idempotency section)",
+        "tests.test_github_adapter.GitHubAdapterTests.test_pr_creation_is_durable_and_idempotent -- the direct one: two identical open_draft_pr calls return equal results and produce exactly one POST against the in-process fake transport (source-verified at tests/test_github_adapter.py:314-330)",
+        "tests.test_github_adapter.GitHubAdapterTests.test_draft_pr_request_and_response_are_head_bound -- the POST payload is pinned exactly (draft True, head, base, maintainer_can_modify False) and result.head_sha equals the supplied head, so a replay of the same inputs is byte-comparable (source-verified at tests/test_github_adapter.py:272-299)",
+        "tests.test_github_adapter.GitHubAdapterTests.test_check_polling_transitions_and_persists_external_receipts -- a read-only retry loop: two GETs of the same check-runs path converge pending -> success with one interval pause, so repeating the read is safe (source-verified at tests/test_github_adapter.py:335-359)"
+      ],
+      "live_replay_note": "Live replay against github.com awaits the owner grant. The local tests prove the adapter's convergence rule against a deterministic fake transport; they do not and cannot prove github.com's real behaviour under replay. Nothing in this node's evidence should be read as a claim about live remote idempotency.",
+      "live_replay_status": "NOT PERFORMED",
+      "mapping": "docs/execution/runbooks/A4-800.md:187",
+      "name": "remote-idempotency-pilot",
+      "status": "passed_for_the_path_a_scope_only"
+    }
+  ],
+  "runs": [
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+      "duration_s": 30.972,
+      "errors": 0,
+      "exit_code": 0,
+      "failures": 0,
+      "outcome": "OK",
+      "skipped": 0,
+      "tests_run": 31,
+      "transcript": "tests/a4-focused-suite.txt",
+      "transcript_sha256": "sha256:bedc8ef9283a06bd5811243bb1f90b4a31ec4dd67c37bdb8cab03ed49635ac06",
+      "warnings_observed": "One ResourceWarning (unclosed sqlite3 connection) during tests.test_git_adapter.GitAdapterTests.test_export_and_verify_delivery_with_resolvable_receipts. The test passed; the warning is pre-existing and unrelated to this node, which changes no code."
+    }
+  ],
+  "schema_version": 1,
+  "tool_versions": {
+    "git": "2.53.0.windows.3",
+    "platform": "Windows 11 Home 10.0.26200",
+    "python": "3.14.4"
+  }
+}
