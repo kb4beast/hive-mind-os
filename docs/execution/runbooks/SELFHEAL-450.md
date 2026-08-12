@@ -329,9 +329,37 @@ class HiveCortexSelfHealingTests(unittest.TestCase): ...
 
 Additional edge assertions folded into the above methods: empty provider
 chain raises `ValueError`; handler exception surfaces as `SelfHealingError`;
-`heal` with a `KernelStore(":memory:")` appends exactly one
-`self_healing.pass` event and a second identical pass with the same
-idempotency key does not append a duplicate.
+and the durable pass append **fails closed** — see below.
+
+**The durable pass event: assert fail-closed, not a successful append.**
+Do NOT assert that `heal` with a `KernelStore(":memory:")` appends a
+`self_healing.pass` event. That is unsatisfiable, and making it satisfiable
+would break a seal.
+
+`reduce_event` raises `ValueError(f"unknown kernel event type: {event_type}")`
+for anything outside its dispatch chain (`projection.py:271-272`), and
+`append`/`append_batch` rebuild inside the same transaction, converting that
+into `KernelIntegrityError("event sequence cannot be reduced")` and rolling the
+insert back (`store.py:320`, `store.py:628-630`). Measured:
+`KernelStore(':memory:').append(KernelEvent(event_type='self_healing.pass', …))`
+raises `KernelIntegrityError` with cause
+`ValueError('unknown kernel event type: self_healing.pass')`, and
+`store.events()` is still empty.
+
+Teaching the reducer this type is **not** an option for any node: `projection.py`
+is under the sealed `event-schema` lock (MISSION-400 §1 — "the reducer in
+`projection.py` is CLOSED … do NOT edit `projection.py`"), and CHEAT-440's
+anti-cheating evidence asserts precisely that the spine refuses invented event
+types. Adding one to make this node's own test pass would be the cheat that
+node exists to detect.
+
+Assert instead: the append fails closed with `KernelIntegrityError`, the cause
+message names the unknown type exactly, and no partial write survives. Build
+`_append_pass` exactly as §3.4 specifies (epoch `occurred_at`, chained
+`previous_digest`, `idempotency_key=receipt.digest`, `actor_role="steward"`) so
+the durable path is correct the moment a node that owns `projection.py` is
+authorized to admit the type; record that admission as an open obligation in
+`SELF_HEALING.md` rather than performing it here.
 
 **Exact focused commands (run from repo root; PowerShell and bash identical):**
 
