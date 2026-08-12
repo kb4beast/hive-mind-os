@@ -98,6 +98,12 @@ durable completion source.
 A dispatcher session does not implement product work. Until it completes the steps below,
 all not-yet-released workers are `WAIT`.
 
+For level-by-level execution of the current DAG, follow
+`docs/execution/runbooks/README.md`: it fixes the dispatch rounds, the explicit
+`--node` waves, the serial integration order, and bounded-wait supervision.
+`python .autopilot/bin/github_snapshot.py --reconcile --actor <id>` performs
+steps 2, 4, and 6 below deterministically in one command.
+
 1. Read this file, `workflow-policy.json`, `control-plane.json`,
    `authority-amendments.json`, and `plan.json`.
 2. Fetch the configured singleton release target branch and record its exact commit and tree.

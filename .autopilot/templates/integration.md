@@ -23,11 +23,15 @@ acquire the singleton lease with `validation-lease-acquire`; if another owner ho
 stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
 not retry. Release the lease after the one authoritative run.
 
-Read `.autopilot/README.md` and every dependency receipt. Claim the integration node
-remotely. Integrate only accepted immutable candidates in the declared order. Re-run
-contract, compatibility, security, and exact-candidate verification. Preserve dissent
-and failed integration attempts. Do not resolve semantic conflicts by silently choosing
-a winner; remand or replan.
+**This rendered prompt is the complete node contract.** Confirm every dependency is
+COMPLETE with `python .autopilot/bin/autopilot.py --repo-root . status` — the controller
+has already cryptographically validated each retained receipt, so do not re-read
+`.autopilot/plan.json`, `.autopilot/README.md`, or hunt receipt commits through Git log
+archaeology. Read your node runbook at `docs/execution/runbooks/{{NODE_ID}}.md` when
+present. Claim the integration node remotely. Integrate only accepted immutable
+candidates in the declared order. Re-run contract, compatibility, security, and
+exact-candidate verification. Preserve dissent and failed integration attempts. Do not
+resolve semantic conflicts by silently choosing a winner; remand or replan.
 
 Before opening the draft PR, finalize the implementation/evidence commit, create a
 receipt with exact base/final commit and tree identities, and run `autopilot complete`.

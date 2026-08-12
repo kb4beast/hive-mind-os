@@ -31,9 +31,28 @@ not retry. Release the lease after the one authoritative run.
 
 For a parallel wave, all released workers may begin claims and writes together only when the same current dispatcher release says `START TOGETHER NOW` and names the wave. Other eligible tasks may already be visible in `PREPARATION_ONLY` mode. Any target-branch advance/merge, conflicting claim, GitHub snapshot change, or reconciliation event makes the prior release stale. Re-run the dispatcher instead of reusing an old prompt. The `claim` command independently enforces this gate and fails closed on stale or absent release authority.
 
-Use a fresh, clean checkout with authenticated GitHub access. Read every applicable
-`AGENTS.md` and `CLAUDE.md`, then read `.autopilot/README.md` and the full contract for
-`{{NODE_ID}}` in `.autopilot/plan.json`.
+Use a fresh, clean checkout with authenticated GitHub access. **This rendered prompt is
+the complete node contract**: the objective, scopes, acceptance, tests, escalation, and
+routes below are generated from `.autopilot/plan.json` and are authoritative. Do not
+re-read `plan.json`, `.autopilot/README.md`, or the policy files — every gate they
+describe is enforced deterministically by the controller commands below, which fail
+closed. Read only: the root `AGENTS.md`, your node runbook at
+`docs/execution/runbooks/{{NODE_ID}}.md` (when present — it carries the file-by-file
+implementation plan and validation commands), and files inside your read scope.
+
+## Parallel-wave safety rules
+
+- Work only on `{{BRANCH}}`, created from your claim commit. Never commit to, push, or
+  merge `{{TARGET_BRANCH}}` — a single integrator merges finished node branches in a
+  deterministic order after the wave.
+- Never rebase, squash, or amend your node branch: the retained claim commit, exact
+  `final_commit`, and receipt commit must stay in its ancestry.
+- If `{{TARGET_BRANCH}}` advances while you work (a sibling integrated first), keep
+  going: your claim and branch remain valid, and integration ordering is the
+  integrator's job, not yours. Do not merge the new target into your branch.
+- Never wait on a sibling node's output. Waves are dependency-satisfied and
+  conflict-free by construction; if you discover a real dependency on a sibling,
+  stop and record a blocker with `autopilot fail` instead of polling.
 
 Run:
 

@@ -1,5 +1,11 @@
 # Parallel Execution
 
+For the remaining levels (6-15), execute by dispatch rounds as fixed in
+`docs/execution/runbooks/README.md` — it splits levels containing a
+`parallel_safe: false` node into separate rounds, names the explicit `--node`
+waves, and defines the serial integration order and bounded-wait supervision
+that keep parallel waves from hanging.
+
 The initial dependency waves are:
 
 | Level | Mode | Nodes | Minimum route tiers |
