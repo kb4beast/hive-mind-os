@@ -15,7 +15,9 @@ is reported with its evidence rather than guessed at.
 
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -213,12 +215,29 @@ def validate_round(
 
 
 def default_validation_runner(repo_root: Path) -> Callable[[], tuple[bool, str]]:
+    """Run the repository-wide gate against THIS checkout's sources.
+
+    An editable install elsewhere on the machine can otherwise win the import:
+    observed here resolving ``hive_mind_os`` to an unrelated worktree, which
+    would let the round's one authoritative gate pass or fail on source the
+    round never touched.  Putting this repository's ``src`` at the front of
+    ``PYTHONPATH`` makes the gate test what is actually being integrated.
+    """
+
     def run() -> tuple[bool, str]:
+        source = Path(repo_root) / "src"
+        environment = dict(os.environ)
+        if source.is_dir():
+            existing = environment.get("PYTHONPATH", "")
+            environment["PYTHONPATH"] = (
+                f"{source}{os.pathsep}{existing}" if existing else str(source)
+            )
         completed = subprocess.run(
-            ("python", "-m", "unittest", "discover", "-s", "tests"),
+            (sys.executable, "-m", "unittest", "discover", "-s", "tests"),
             cwd=str(repo_root),
             capture_output=True,
             text=True,
+            env=environment,
         )
         tail = (completed.stderr or completed.stdout).strip().splitlines()
         return completed.returncode == 0, tail[-1] if tail else "no test output"

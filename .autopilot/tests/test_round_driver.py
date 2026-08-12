@@ -231,6 +231,24 @@ class RoundDriverTests(unittest.TestCase):
         self.assertEqual(result["steps"][1]["outcome"], "RECONCILE_REQUIRED")
         self.assertEqual(result["disposition"], "RECONCILE_REQUIRED")
 
+    def test_validation_runs_against_this_checkouts_sources(self) -> None:
+        """An editable install elsewhere must not win the gate's imports."""
+
+        source = self.root / "src" / "probe_pkg"
+        source.mkdir(parents=True)
+        (source / "__init__.py").write_text("ORIGIN = 'this-checkout'\n", encoding="utf-8")
+        tests = self.root / "tests"
+        tests.mkdir(exist_ok=True)
+        (tests / "test_probe.py").write_text(
+            "import unittest, probe_pkg\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_origin(self):\n"
+            "        self.assertEqual(probe_pkg.ORIGIN, 'this-checkout')\n",
+            encoding="utf-8",
+        )
+        passed, summary = driver.default_validation_runner(self.root)()
+        self.assertTrue(passed, summary)
+
     def test_blocker_classification_follows_required_authority(self) -> None:
         self.assertEqual(
             driver.classify_blocker("remote branch already exists; reconcile it"), "CLASS_B"
