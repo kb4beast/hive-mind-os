@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 from .autonomy import AutonomyBudget
 from .ledger import EvidenceLedger
@@ -17,6 +17,12 @@ from .mission import (
 from .mission_store import MissionStore, resume_mission
 from .models import AutonomyLevel
 from .policy import PolicyEngine
+from .repository_compatibility import (
+    CANONICAL_JOB_KIND,
+    LEGACY_JOB_KIND,
+    RuntimeRouteError,
+    default_kernel_state_dir,
+)
 from .scheduler import Job, Scheduler, StaleLeaseError
 
 JobExecutor = Callable[[Job, Path], str]
@@ -81,13 +87,129 @@ def execute_mission_job(job: Job, state_dir: Path) -> str:
         store.close()
 
 
+CanonicalMissionInvoker = Callable[[Job, Path], str]
+CanonicalMissionBindingsProvider = Callable[[Mapping[str, Any], Path], tuple[Any, Any]]
+
+_CANONICAL_PAYLOAD_FIELDS = (
+    "mission_id",
+    "repository",
+    "objective",
+    "acceptance_criteria",
+    "acceptance_specifications",
+    "pin",
+)
+
+_canonical_bindings_provider: CanonicalMissionBindingsProvider | None = None
+
+
+def set_canonical_mission_bindings_provider(
+    provider: CanonicalMissionBindingsProvider | None,
+) -> CanonicalMissionBindingsProvider | None:
+    """Register the deployment seam that builds canonical mission run inputs.
+
+    ``MissionRuntime.run`` takes a ``MissionConfig`` and a ``MissionBindings``
+    (role executor, builder effect authority, per-role verification specs, and a
+    role-first consultation).  None of those can be derived from a scheduler
+    payload, so a deployment must supply them explicitly.  Until one is
+    registered the canonical route fails closed; it never falls back to legacy.
+    Returns the previously registered provider so callers can restore it.
+    """
+
+    global _canonical_bindings_provider
+    previous = _canonical_bindings_provider
+    _canonical_bindings_provider = provider
+    return previous
+
+
+def _default_canonical_invoker(job: Job, state_dir: Path) -> str:
+    """Bind lazily to :mod:`hive_mind_os.brain_kernel.mission_runtime`.
+
+    The import stays inside the function so legacy-only deployments never load
+    the canonical runtime.  Every missing precondition raises
+    :class:`RuntimeRouteError`; nothing here ever reaches the legacy runtime.
+    """
+
+    payload = job.payload
+    mission_id = payload.get("mission_id")
+    if not isinstance(mission_id, str) or not mission_id:
+        raise RuntimeRouteError("canonical mission job carries no mission id")
+    missing = [name for name in _CANONICAL_PAYLOAD_FIELDS if name not in payload]
+    if missing:
+        raise RuntimeRouteError(
+            "canonical mission job payload is incomplete: " + ", ".join(missing)
+        )
+    try:
+        from .brain_kernel import mission_runtime as canonical_runtime
+        from .brain_kernel.store import KernelStore
+    except ImportError as error:
+        raise RuntimeRouteError(
+            f"canonical mission runtime is unavailable: {error}"
+        ) from None
+    runtime_class = getattr(canonical_runtime, "MissionRuntime", None)
+    if runtime_class is None or not callable(getattr(runtime_class, "run", None)):
+        raise RuntimeRouteError(
+            "canonical mission runtime exposes no MissionRuntime.run entry point"
+        )
+    provider = _canonical_bindings_provider
+    if provider is None:
+        raise RuntimeRouteError(
+            "canonical mission runtime has no registered bindings provider: "
+            "MissionRuntime.run requires a MissionConfig and MissionBindings that "
+            "a scheduler payload cannot supply"
+        )
+    kernel_root = default_kernel_state_dir(state_dir)
+    kernel_root.mkdir(parents=True, exist_ok=True)
+    config, bindings = provider(dict(payload), kernel_root)
+    store = KernelStore(KernelStore.database_path(kernel_root))
+    try:
+        receipt = runtime_class(store).run(config, bindings)
+    finally:
+        store.close()
+    if getattr(receipt, "mission_id", None) is None:
+        raise RuntimeRouteError("canonical mission runtime returned no mission receipt")
+    return mission_id
+
+
+def execute_canonical_mission_job(
+    job: Job,
+    state_dir: Path,
+    *,
+    invoker: CanonicalMissionInvoker | None = None,
+) -> str:
+    """Execute one canonical request through the kernel runtime only.
+
+    This path never opens the legacy :class:`MissionStore`: a canonical request
+    has exactly one authoritative execution owner.
+    """
+
+    if job.kind != CANONICAL_JOB_KIND:
+        raise ValueError(f"unsupported job kind: {job.kind}")
+    mission_id = job.payload.get("mission_id")
+    if not isinstance(mission_id, str) or not mission_id:
+        raise ValueError("canonical mission job must carry a mission id")
+    returned = (invoker or _default_canonical_invoker)(job, Path(state_dir))
+    if not isinstance(returned, str) or not returned:
+        raise RuntimeRouteError("canonical mission invoker returned no mission id")
+    return returned
+
+
+def route_job_executor(job: Job, state_dir: Path) -> str:
+    """Select the one execution authority that owns this job kind."""
+
+    if job.kind == CANONICAL_JOB_KIND:
+        return execute_canonical_mission_job(job, state_dir)
+    if job.kind == LEGACY_JOB_KIND:
+        return execute_mission_job(job, state_dir)
+    raise ValueError(f"unsupported job kind: {job.kind}")
+
+
 class Worker:
     def __init__(
         self,
         scheduler: Scheduler,
         owner: str,
         *,
-        executor: JobExecutor = execute_mission_job,
+        executor: JobExecutor = route_job_executor,
         heartbeat_interval: float | None = None,
     ) -> None:
         if not owner.strip():
@@ -165,7 +287,7 @@ def serve(
     worker_count: int,
     once: bool,
     stop_event: threading.Event | None = None,
-    executor: JobExecutor = execute_mission_job,
+    executor: JobExecutor = route_job_executor,
 ) -> int:
     if worker_count < 1:
         raise ValueError("worker count must be positive")
