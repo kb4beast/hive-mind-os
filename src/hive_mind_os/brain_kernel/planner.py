@@ -47,7 +47,19 @@ def _budget_document(budget: Budget) -> dict[str, int]:
 
 def _budget_from_document(document: Mapping[str, object]) -> Budget:
     try:
-        return Budget(**{name: document[name] for name in Budget.__dataclass_fields__})
+        values = {name: document[name] for name in Budget.__dataclass_fields__}
+        if any(type(value) is not int for value in values.values()):
+            raise ValueError("scheduled budget fields must be integers")
+        return Budget(
+            max_wall_seconds=cast(int, values["max_wall_seconds"]),
+            max_model_calls=cast(int, values["max_model_calls"]),
+            max_input_tokens=cast(int, values["max_input_tokens"]),
+            max_output_tokens=cast(int, values["max_output_tokens"]),
+            max_cost_microunits=cast(int, values["max_cost_microunits"]),
+            max_tool_calls=cast(int, values["max_tool_calls"]),
+            max_work_items=cast(int, values["max_work_items"]),
+            max_depth=cast(int, values["max_depth"]),
+        )
     except (KeyError, TypeError, ValueError) as error:
         raise ValueError("scheduled budget is invalid") from error
 
