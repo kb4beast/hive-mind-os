@@ -1,0 +1,15 @@
+{
+  "command": {
+    "argv": [
+      "python",
+      "check_discount.py"
+    ],
+    "expected": "succeeded"
+  },
+  "criterion": "A nonprofit checkout receives the documented 20 percent discount without changing the standard checkout total.",
+  "declared_paths": [
+    "discounts.py"
+  ],
+  "id": "nonprofit-discount-is-applied",
+  "schema_version": 1
+}

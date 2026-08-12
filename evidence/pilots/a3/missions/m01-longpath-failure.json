@@ -1,0 +1,18 @@
+{
+  "error": "isolated Git clone failed: Cloning into 'C:\\Users\\beesp\\AppData\\Local\\Temp\\claude\\C--Repos-HiveMind-hive-mind-os\\7a67801b-465b-4082-948f-c38656749678\\scratchpad\\a3\\a3-mission-01\\.hive-mind-verify-ohqaslh5\\private-workspaces\\candidate'...\nfatal: cannot write keep file 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a3/a3-mission-01/.hive-mind-verify-ohqaslh5/private-workspaces/candidate/.git/objects/pack/pack-6f88f2bfe89369cd049a357a718b830a00dd05b2.keep': Filename too long\nfatal: fetch-pack: invalid index-pack output",
+  "error_type": "VerificationError",
+  "resolved_objects": {
+    "base_commit": "427b437de00f39afeca505a15279810115955b9d",
+    "base_tree": "2afc56d48c5926b8c9326f359907db97d34d5ff9",
+    "candidate_commit": "ab8070f9c03071cd9be816db7b1839b153670a2a",
+    "candidate_reference": "ab8070f9c03071cd9be816db7b1839b153670a2a",
+    "candidate_tree": "d17759bc7d4fb7d7168856cbc862657503e04f5b",
+    "repository": {
+      "origin": null,
+      "source_git_dir": "C:\\Users\\beesp\\AppData\\Local\\Temp\\claude\\C--Repos-HiveMind-hive-mind-os\\7a67801b-465b-4082-948f-c38656749678\\scratchpad\\a3\\a3-mission-01\\nonprofit-checkout\\.git"
+    }
+  },
+  "run_id": "VERIFY-7fb3d6f0-5138-448a-a8fd-322946b5353c",
+  "schema_version": 1,
+  "status": "failed"
+}
