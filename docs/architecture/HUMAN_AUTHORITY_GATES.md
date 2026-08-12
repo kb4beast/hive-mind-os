@@ -57,3 +57,31 @@ identity, hard isolation, and all other gates remain separate.
 The owner-owned, untracked `NEXT_SESSION_HANDOFF_OBSIDIAN_AGENT_REDESIGN.md` program
 is deferred in full. It does not authorize Obsidian, memory-plane, telemetry,
 federation, or host-extension work unless a user explicitly requests that program.
+
+## Owner decision amendment — 2026-08-12
+
+The repository owner authorizes one scoped GitHub credential and bounded
+draft-pull-request delivery for the A4-800 pilot, against exactly one disposable
+repository: `patencyhealth-lab/hive-mind-a4-pilot`.
+
+The credential is a fine-grained personal access token scoped to that repository
+alone, carrying only Contents read/write, Pull requests read/write, and the
+mandatory Metadata read-only, with a short expiry. The owner installs it. No agent
+may request, read, echo, log, or pass it to a subprocess, and its presence is not
+itself a grant.
+
+Within that one repository, this authority permits exactly: creating a branch under
+the pilot prefix, pushing that branch, opening one draft pull request, commenting
+once on it, closing that pull request, and deleting that branch.
+
+It authorizes nothing further. No merge. No push to a default or protected branch.
+No deployment and no production pilot. No spend of any kind. No repository creation,
+deletion, or settings change. No second repository. This amendment does not close
+`B-OPS-03` and does not alter G3, G4, G5, G6, G7, or G8. The real-provider evidence
+burden, independent reproduction, authenticated identity, and hard isolation remain
+separate gates.
+
+This amendment narrowly supersedes the 2026-08-06 amendment's withholding of a
+GitHub credential and of remote delivery, for this one repository and these six
+operations only. Every other withholding in that amendment, including the API-key
+and spend prohibitions, stands unchanged.
