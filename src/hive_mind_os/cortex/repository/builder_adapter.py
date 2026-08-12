@@ -232,11 +232,68 @@ class IsolatedBuilderAdapter:
         raw_paths = action.payload.get("paths")
         if not isinstance(raw_paths, (tuple, list)):
             raise BuilderAdapterError("validated commit paths are unavailable")
-        paths = [normalize_portable_path(str(path)) for path in raw_paths]
+        paths = tuple(normalize_portable_path(str(path)) for path in raw_paths)
+        if len(set(paths)) != len(paths):
+            raise BuilderAdapterError("declared commit paths must be unique")
+        for path in paths:
+            self._path(path)
+
+        branch = self._run_git(["symbolic-ref", "--quiet", "--short", "HEAD"])
+        if branch.returncode != 0:
+            raise BuilderAdapterError("Builder commit requires an attached branch")
+        actual_branch = branch.stdout.decode("utf-8", errors="strict").strip()
+        if actual_branch != action.target:
+            raise BuilderAdapterError("Builder commit target differs from the actual branch")
+
+        declared = set(paths)
+        observed = self._observed_change_paths()
+        if observed != declared:
+            raise BuilderAdapterError(
+                "declared commit paths differ from the complete workspace change set"
+            )
+
         staged = self._git(intent_digest, action, ["add", "--", *paths])
         if staged.status != "SUCCEEDED":
             return staged
-        return self._git(intent_digest, action, ["commit", "--no-gpg-sign", "-m", str(action.payload["message"])])
+        staged_paths = self._git_paths(["diff", "--cached", "--name-only", "-z", "--"])
+        if staged_paths != declared:
+            raise BuilderAdapterError("staged commit paths differ from declared paths")
+        return self._git(
+            intent_digest,
+            action,
+            [
+                "commit",
+                "--no-gpg-sign",
+                "-m",
+                str(action.payload["message"]),
+                "--",
+                *paths,
+            ],
+        )
+
+    def _observed_change_paths(self) -> set[str]:
+        return (
+            self._git_paths(["diff", "--name-only", "-z", "--"])
+            | self._git_paths(["diff", "--cached", "--name-only", "-z", "--"])
+            | self._git_paths(["ls-files", "--others", "--exclude-standard", "-z", "--"])
+        )
+
+    def _git_paths(self, args: list[str]) -> set[str]:
+        completed = self._run_git(args)
+        if completed.returncode != 0:
+            raise BuilderAdapterError("Builder could not inspect the workspace change set")
+        try:
+            values = completed.stdout.decode("utf-8", errors="strict").split("\0")
+        except UnicodeDecodeError as error:
+            raise BuilderAdapterError("Builder change path is not valid UTF-8") from error
+        result: set[str] = set()
+        for value in values:
+            if not value:
+                continue
+            normalized = normalize_portable_path(value)
+            self._path(normalized)
+            result.add(normalized)
+        return result
 
     def _path(self, target: str) -> Path:
         candidate = self.root.joinpath(*normalize_portable_path(target).split("/"))

@@ -6,7 +6,6 @@ repository-neutral and never imports the legacy scheduler or mission runtime.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 
 from .brain_kernel.canonical import canonical_digest
@@ -63,7 +62,7 @@ def record_legacy_enqueue(
                 event_type="mission.created",
                 actor_id="phase11-repository-compatibility",
                 actor_role="integrator",
-                occurred_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                occurred_at="1970-01-01T00:00:00Z",
                 payload={
                     "migration_route": LEGACY_ENQUEUE_ROUTE,
                     "legacy_mission_id": legacy_mission_id,

@@ -45,6 +45,7 @@ _PROTECTED_BRANCHES = {"main", "master", "release"}
 _SEALED_OR_DEPENDENCY_PREFIXES = (
     ".autopilot/",
     ".github/",
+    ".git/",
     "tests/acceptance/",
     "tests/sealed/",
 )
@@ -59,9 +60,14 @@ _DEPENDENCY_FILES = {
 }
 def _deny_target(target: str) -> str:
     normalized = normalize_portable_path(target)
-    if normalized in _DEPENDENCY_FILES or normalized.startswith("requirements/"):
+    folded = normalized.casefold()
+    if folded in {value.casefold() for value in _DEPENDENCY_FILES} or folded.startswith(
+        "requirements/"
+    ):
         raise BuilderActionDenied("dependency changes require a separate authority grant")
-    if normalized.startswith(_SEALED_OR_DEPENDENCY_PREFIXES):
+    if folded == ".git" or folded.startswith(
+        tuple(value.casefold() for value in _SEALED_OR_DEPENDENCY_PREFIXES)
+    ):
         raise BuilderActionDenied("sealed acceptance or control-plane path is not writable")
     return normalized
 

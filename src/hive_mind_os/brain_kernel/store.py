@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 from threading import RLock
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterable, Iterator, Mapping, cast
 
 from .canonical import canonical_bytes
 from .events import KernelEvent
@@ -192,60 +192,158 @@ class KernelStore:
         error aborts the entire transaction.
         """
 
+        return self.append_batch(
+            ((event, idempotency_key),),
+            expected_sequence=expected_sequence,
+            recorded_at=recorded_at,
+        )[0]
+
+    def append_batch(
+        self,
+        entries: Iterable[tuple[KernelEvent, str | None]],
+        *,
+        expected_sequence: int | None = None,
+        recorded_at: str = "1970-01-01T00:00:00Z",
+    ) -> tuple[int, ...]:
+        """Append a complete ordered event batch in one SQLite transaction.
+
+        The entire batch is validated before any durable mutation. A retry is
+        read-only only when every idempotency key is already bound to the exact
+        corresponding event. Partial retries, duplicate event ids, duplicate
+        idempotency keys, stale sequence expectations, broken digest chains, and
+        reducer failures all fail closed and roll back every event in the batch.
+        """
+
         self._require_writable()
+        batch = tuple(entries)
+        if not batch:
+            return ()
+        event_ids = [event.event_id for event, _ in batch]
+        if len(set(event_ids)) != len(event_ids):
+            raise KernelIntegrityError("batch event ids must be unique")
+        keys = [key for _, key in batch if key is not None]
+        if len(set(keys)) != len(keys):
+            raise KernelIntegrityError("batch idempotency keys must be unique")
+
         with self._lock, self.connection:
             last = self.connection.execute(
                 "SELECT sequence, digest FROM events ORDER BY sequence DESC LIMIT 1"
             ).fetchone()
-            sequence = 1 if last is None else int(last["sequence"]) + 1
-            previous = None if last is None else str(last["digest"])
-            if idempotency_key is not None:
-                existing = self.connection.execute(
-                    "SELECT event_id FROM idempotency WHERE idempotency_key=?",
-                    (idempotency_key,),
-                ).fetchone()
-                if existing is not None:
-                    if existing["event_id"] != event.event_id:
-                        raise KernelIntegrityError("idempotency key is already bound")
-                    return self._sequence_for_event(event.event_id)
-            if expected_sequence is not None and expected_sequence != sequence - 1:
+            current_sequence = 0 if last is None else int(last["sequence"])
+            current_digest = None if last is None else str(last["digest"])
+            if expected_sequence is not None and expected_sequence != current_sequence:
                 raise KernelIntegrityError("optimistic sequence check failed")
-            if event.previous_digest != previous:
-                raise KernelIntegrityError("event previous digest does not match chain head")
-            existing = self.connection.execute(
-                "SELECT sequence FROM events WHERE event_id=?", (event.event_id,)
-            ).fetchone()
-            if existing is not None:
-                raise KernelIntegrityError("event id is already bound")
-            digest = event.digest_for(previous)
-            self.connection.execute(
-                """
-                INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    sequence,
-                    event.event_id,
-                    event.mission_id,
-                    event.work_id,
-                    event.attempt_id,
-                    event.event_type,
-                    event.event_version,
-                    event.actor_id,
-                    event.actor_role,
-                    event.occurred_at,
-                    recorded_at,
-                    canonical_bytes(dict(event.payload)).decode("utf-8"),
-                    previous,
-                    digest,
-                ),
-            )
-            if idempotency_key is not None:
-                self.connection.execute(
-                    "INSERT INTO idempotency VALUES(?,?)",
-                    (idempotency_key, event.event_id),
+
+            existing_sequences: list[int | None] = []
+            for event, idempotency_key in batch:
+                bound_event_id: str | None = None
+                if idempotency_key is not None:
+                    row = self.connection.execute(
+                        "SELECT event_id FROM idempotency WHERE idempotency_key=?",
+                        (idempotency_key,),
+                    ).fetchone()
+                    if row is not None:
+                        bound_event_id = str(row["event_id"])
+                        if bound_event_id != event.event_id:
+                            raise KernelIntegrityError(
+                                "idempotency key is already bound"
+                            )
+                event_row = self.connection.execute(
+                    "SELECT * FROM events WHERE event_id=?", (event.event_id,)
+                ).fetchone()
+                if event_row is None:
+                    if bound_event_id is not None:
+                        raise KernelIntegrityError("idempotency record has no event")
+                    existing_sequences.append(None)
+                    continue
+                if idempotency_key is None or bound_event_id is None:
+                    raise KernelIntegrityError("event id is already bound")
+                if not self._stored_event_matches_locked(event_row, event):
+                    raise KernelIntegrityError(
+                        "idempotency key is bound to a different event"
+                    )
+                existing_sequences.append(int(event_row["sequence"]))
+
+            existing_count = sum(value is not None for value in existing_sequences)
+            if existing_count:
+                if existing_count != len(batch):
+                    raise KernelIntegrityError("partial batch retry is not permitted")
+                sequences = tuple(
+                    int(value) for value in existing_sequences if value is not None
                 )
+                if sequences != tuple(
+                    range(sequences[0], sequences[0] + len(sequences))
+                ):
+                    raise KernelIntegrityError(
+                        "idempotent batch events are not contiguous"
+                    )
+                return sequences
+
+            sequence = current_sequence
+            previous = current_digest
+            inserted: list[int] = []
+            for event, idempotency_key in batch:
+                sequence += 1
+                if event.previous_digest != previous:
+                    raise KernelIntegrityError(
+                        "event previous digest does not match batch chain head"
+                    )
+                digest = event.digest_for(previous)
+                self.connection.execute(
+                    """
+                    INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        sequence,
+                        event.event_id,
+                        event.mission_id,
+                        event.work_id,
+                        event.attempt_id,
+                        event.event_type,
+                        event.event_version,
+                        event.actor_id,
+                        event.actor_role,
+                        event.occurred_at,
+                        recorded_at,
+                        canonical_bytes(dict(event.payload)).decode("utf-8"),
+                        previous,
+                        digest,
+                    ),
+                )
+                if idempotency_key is not None:
+                    self.connection.execute(
+                        "INSERT INTO idempotency VALUES(?,?)",
+                        (idempotency_key, event.event_id),
+                    )
+                inserted.append(sequence)
+                previous = digest
             self._rebuild_locked()
-            return sequence
+            return tuple(inserted)
+
+    def _stored_event_matches_locked(
+        self, row: sqlite3.Row, event: KernelEvent
+    ) -> bool:
+        try:
+            payload = json.loads(str(row["payload_json"]))
+        except json.JSONDecodeError:
+            return False
+        fields = {
+            "event_id": event.event_id,
+            "mission_id": event.mission_id,
+            "work_id": event.work_id,
+            "attempt_id": event.attempt_id,
+            "event_type": event.event_type,
+            "event_version": event.event_version,
+            "actor_id": event.actor_id,
+            "actor_role": event.actor_role,
+            "occurred_at": event.occurred_at,
+        }
+        stored_previous = cast(str | None, row["previous_digest"])
+        return (
+            all(row[name] == value for name, value in fields.items())
+            and canonical_bytes(payload) == canonical_bytes(dict(event.payload))
+            and row["digest"] == event.digest_for(stored_previous)
+        )
 
     def enqueue_effect(
         self,

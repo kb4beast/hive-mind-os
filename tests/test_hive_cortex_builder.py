@@ -211,11 +211,166 @@ class HiveCortexBuilderTests(unittest.TestCase):
         head = subprocess.run(["git", "branch", "--show-current"], cwd=self.root, check=True, capture_output=True, text=True)
         self.assertEqual("autopilot/fixture", head.stdout.strip())
 
+    def _initialize_git_workspace(self, branch: str = "autopilot/fixture") -> None:
+        subprocess.run(["git", "init"], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "fixture@example.invalid"],
+            cwd=self.root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Builder fixture"],
+            cwd=self.root,
+            check=True,
+        )
+        baseline = self.root / "README.md"
+        baseline.write_text("baseline\n", encoding="utf-8")
+        subprocess.run(["git", "add", "README.md"], cwd=self.root, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "baseline"],
+            cwd=self.root,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "switch", "-c", branch],
+            cwd=self.root,
+            check=True,
+            capture_output=True,
+        )
+
+    def test_commit_rejects_target_branch_mismatch_and_detached_head(self) -> None:
+        self._initialize_git_workspace("autopilot/actual")
+        path = self.root / "src" / "change.txt"
+        path.parent.mkdir()
+        path.write_text("change\n", encoding="utf-8")
+        mismatched = BuilderAction(
+            "commit-mismatch",
+            BuilderActionKind.COMMIT,
+            "autopilot/declared",
+            {"paths": ["src/change.txt"], "message": "should fail"},
+            "none",
+        )
+        outcome = self.builder.execute_round("ATTEMPT-mismatch", (mismatched,))[0].outcome
+        self.assertEqual("FAILED", outcome.status)
+        self.assertEqual(
+            "autopilot/actual",
+            subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=self.root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+        )
+
+        subprocess.run(["git", "checkout", "--detach"], cwd=self.root, check=True, capture_output=True)
+        detached = BuilderAction(
+            "commit-detached",
+            BuilderActionKind.COMMIT,
+            "autopilot/actual",
+            {"paths": ["src/change.txt"], "message": "should fail"},
+            "none",
+        )
+        outcome = self.builder.execute_round("ATTEMPT-detached", (detached,))[0].outcome
+        self.assertEqual("FAILED", outcome.status)
+
+    def test_commit_rejects_undeclared_tracked_staged_and_untracked_changes(self) -> None:
+        for mode in ("tracked", "staged", "untracked"):
+            with self.subTest(mode=mode):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    adapter = IsolatedBuilderAdapter(root)
+                    gateway = EffectGateway()
+                    gateway.register_adapter(
+                        adapter.adapter_name,
+                        cast(Callable[[EffectIntent], None], adapter.apply),
+                    )
+                    builder = BuilderCoordinator(
+                        gateway,
+                        self.registry,
+                        adapter,
+                        mission_id="MISSION-builder",
+                        work_id="WORK-builder",
+                        actor_id="builder:fixture",
+                        authority_envelope_digest=DIGEST,
+                        policy_decision_ref="POLICY-builder",
+                        now=NOW,
+                    )
+                    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+                    subprocess.run(["git", "config", "user.email", "fixture@example.invalid"], cwd=root, check=True)
+                    subprocess.run(["git", "config", "user.name", "Builder fixture"], cwd=root, check=True)
+                    (root / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+                    subprocess.run(["git", "add", "tracked.txt"], cwd=root, check=True)
+                    subprocess.run(["git", "commit", "-m", "baseline"], cwd=root, check=True, capture_output=True)
+                    subprocess.run(["git", "switch", "-c", "autopilot/fixture"], cwd=root, check=True, capture_output=True)
+                    (root / "declared.txt").write_text("declared\n", encoding="utf-8")
+                    if mode == "tracked":
+                        (root / "tracked.txt").write_text("modified\n", encoding="utf-8")
+                    else:
+                        (root / "other.txt").write_text("other\n", encoding="utf-8")
+                        if mode == "staged":
+                            subprocess.run(["git", "add", "other.txt"], cwd=root, check=True)
+                    action = BuilderAction(
+                        f"commit-{mode}",
+                        BuilderActionKind.COMMIT,
+                        "autopilot/fixture",
+                        {"paths": ["declared.txt"], "message": "must fail"},
+                        "none",
+                    )
+                    self.assertEqual(
+                        "FAILED",
+                        builder.execute_round(f"ATTEMPT-{mode}", (action,))[0].outcome.status,
+                    )
+                    self.assertFalse(
+                        subprocess.run(
+                            ["git", "log", "-1", "--pretty=%s"],
+                            cwd=root,
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        ).stdout.strip()
+                        == "must fail"
+                    )
+
+    def test_commit_accepts_only_exact_complete_declared_change_set(self) -> None:
+        self._initialize_git_workspace("autopilot/fixture")
+        first = self.root / "src" / "first.txt"
+        second = self.root / "tests" / "second.txt"
+        first.parent.mkdir()
+        second.parent.mkdir()
+        first.write_text("one\n", encoding="utf-8")
+        second.write_text("two\n", encoding="utf-8")
+        action = BuilderAction(
+            "commit-exact",
+            BuilderActionKind.COMMIT,
+            "autopilot/fixture",
+            {
+                "paths": ["src/first.txt", "tests/second.txt"],
+                "message": "exact change set",
+            },
+            "revert exact change set",
+        )
+        outcome = self.builder.execute_round("ATTEMPT-exact", (action,))[0].outcome
+        self.assertEqual("SUCCEEDED", outcome.status)
+        names = subprocess.run(
+            ["git", "show", "--pretty=", "--name-only", "HEAD"],
+            cwd=self.root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        self.assertEqual({"src/first.txt", "tests/second.txt"}, set(names))
+
     def test_sealed_acceptance_denial_tests_fail_before_effect_execution(self) -> None:
         with self.assertRaises(BuilderActionDenied):
             BuilderAction("sealed", BuilderActionKind.WRITE, "tests/sealed/answer.py", {"content": "cheat"}, "revert")
         with self.assertRaises(BuilderActionDenied):
             BuilderAction("dependencies", BuilderActionKind.WRITE, "pyproject.toml", {"content": "cheat"}, "revert")
+        with self.assertRaises(BuilderActionDenied):
+            BuilderAction("casefold-git", BuilderActionKind.WRITE, ".Git/config", {"content": "cheat"}, "revert")
+        with self.assertRaises(BuilderActionDenied):
+            BuilderAction("casefold-control", BuilderActionKind.WRITE, ".AUTOPILOT/state.json", {"content": "cheat"}, "revert")
         with self.assertRaises(BuilderActionDenied):
             BuilderAction("push", BuilderActionKind.COMMAND, "isolated-workspace", {"argv": ["git", "push"]}, "none")
         with self.assertRaises(BuilderActionDenied):

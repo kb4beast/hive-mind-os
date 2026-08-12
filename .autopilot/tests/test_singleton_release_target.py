@@ -34,7 +34,7 @@ class SingletonReleaseTargetTests(unittest.TestCase):
 
     def test_execution_target_is_singleton_release_branch(self) -> None:
         self.assertEqual(self.plane.execution_mode, "singleton-release-branch")
-        self.assertEqual(self.plane.target_branch, "release/hive-mind-os-singleton-20260811-r4")
+        self.assertEqual(self.plane.target_branch, "release/hive-mind-os-singleton-20260812-r5")
         self.assertEqual(self.plane.final_integration_branch, "main")
         self.assertEqual(
             self.plane.control["target"]["protected_until_final_integration"],
