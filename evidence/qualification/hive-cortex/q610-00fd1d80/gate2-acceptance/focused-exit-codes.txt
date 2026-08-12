@@ -1,0 +1,5 @@
+module_inventory_exit: 0
+module_inventory_count: 97
+gate2_focused_exit: 0
+gate3_focused_exit: 0
+FOCUSED_DONE

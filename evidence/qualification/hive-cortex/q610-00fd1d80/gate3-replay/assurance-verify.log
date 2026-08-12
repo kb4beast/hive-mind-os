@@ -1,0 +1,28 @@
+retained phase12 packets discovered: ['phase12-54020b7.json', 'phase12-9efe64b']
+[
+  {
+    "packet": "phase12-54020b7.json",
+    "mode": "digest-only re-derivation (no adjacent receipts.json manifest exists; verify_local_assurance_artifact requires one)",
+    "claimed_report_digest": "sha256:af3f4600d0d64a250cfb78a2a016e2ba4e2cecf28a766785c393185f7ec59ab8",
+    "rederived_report_digest": "sha256:af3f4600d0d64a250cfb78a2a016e2ba4e2cecf28a766785c393185f7ec59ab8",
+    "outcome": "PASS",
+    "comparative_claim_authorized": false,
+    "real_provider_used": false,
+    "release_ready": false,
+    "production_ready": false,
+    "candidate_commit": "54020b72d2fff602b355c99924b01b5cfb5d8ec5"
+  },
+  {
+    "packet": "phase12-9efe64b",
+    "mode": "full verify_local_assurance_artifact(report, receipts)",
+    "outcome": "PASS",
+    "candidate_commit": "9efe64b80b4bf7b50c7bcf20e9aef5acb8fc55a7",
+    "candidate_tree": "25839e21173160052189044ba4b6be16214ff8e7",
+    "report_digest": "sha256:9e29c18eb906ec52ffcbe2fe8f7f49877958126f6358136f9e54757fd355073d",
+    "comparative_claim_authorized": false,
+    "real_provider_used": false,
+    "release_ready": false,
+    "production_ready": false
+  }
+]
+GATE3_ASSURANCE_OVERALL: PASS

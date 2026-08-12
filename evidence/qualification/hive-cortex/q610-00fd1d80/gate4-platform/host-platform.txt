@@ -1,0 +1,22 @@
+# QUALIFY-610 host platform identity (re-run against 00fd1d80)
+generated_utc: 2026-08-12T18:01:56.046793+00:00
+candidate_commit: 00fd1d80579a6bbaee35abd9288fddceb05c6ebe
+candidate_tree: b383e64f9c54bd4050136488243cd6cea383a66a
+branch: release/hive-mind-os-singleton-20260812-r5
+
+## host interpreter (default 'python')
+Windows-11-10.0.26200-SP0
+3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]
+
+## interpreters visible to the py launcher
+ -V:3.14 *        C:\Python314\python.exe
+ -V:3.12          C:\Users\beesp\AppData\Local\Programs\Python\Python312\python.exe
+
+## py -3.12
+Windows-11-10.0.26200-SP0
+3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]
+
+## quality toolchain (CI pins ruff 0.16.0 / pyright 1.1.411)
+ruff (python -m ruff): ruff 0.16.0
+pyright (python -m pyright): pyright 1.1.411
+bare 'ruff' on PATH: NOT ON PATH (module form used instead)

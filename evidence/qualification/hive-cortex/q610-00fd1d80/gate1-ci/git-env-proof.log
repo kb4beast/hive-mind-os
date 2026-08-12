@@ -1,0 +1,25 @@
+# QUALIFY-610 GIT_* environment proof (candidate 00fd1d80579a6bbaee35abd9288fddceb05c6ebe)
+# Root cause: src/hive_mind_os/brain_kernel/explorer.py:224-225 rejects ANY inherited GIT_* var.
+# This shell exports GIT_EDITOR=true; GitHub Actions runners do not.
+
+## env | grep '^GIT_'
+GIT_EDITOR=true
+
+## A) WITH GIT_EDITOR SET (environmental failure)
+$ PYTHONPATH=src python -m unittest tests.test_hive_cortex_explorer
+hive_mind_os.brain_kernel.explorer.ExplorerDenied: inherited Git environment injection is not allowed
+
+----------------------------------------------------------------------
+Ran 7 tests in 3.135s
+
+FAILED (errors=2)
+exit_code: 1
+
+## B) WITH GIT_EDITOR STRIPPED (CI-equivalent)
+$ env -u GIT_EDITOR PYTHONPATH=src python -m unittest tests.test_hive_cortex_explorer
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 2.601s
+
+OK
+exit_code: 0

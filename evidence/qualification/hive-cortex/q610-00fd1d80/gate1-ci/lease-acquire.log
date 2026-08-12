@@ -1,0 +1,10 @@
+{
+  "acquired_at": "2026-08-12T18:01:02.278622Z",
+  "expires_at": "2026-08-12T19:31:02.278622Z",
+  "lease_id": "sha256:b88185d3c093adc718ed08ddfd24cbab14aec70911a96865b47ac1547bcaef47",
+  "node_id": "QUALIFY-610",
+  "owner": "codex:qualify-610",
+  "schema_version": 1,
+  "status": "ACTIVE",
+  "target_sha": "00fd1d80579a6bbaee35abd9288fddceb05c6ebe"
+}
