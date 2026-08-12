@@ -548,11 +548,39 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 raise AutopilotError("dispatcher cannot release non-eligible nodes: " + ", ".join(unavailable))
             for index, first in enumerate(wave):
                 for second in wave[index + 1:]:
+                    if not bool(self.node(first).get("parallel_safe")) or not bool(
+                        self.node(second).get("parallel_safe")
+                    ):
+                        raise AutopilotError(
+                            f"requested parallel release contains a serial node: {first} vs {second}"
+                        )
                     if self._nodes_conflict(first, second):
                         raise AutopilotError(f"requested parallel release conflicts: {first} vs {second}")
         else:
+            # A node with parallel_safe=false is released ALONE. Selecting on
+            # lock-disjointness alone would seat it beside parallel siblings,
+            # and _release_issues rejects exactly that pairing — so the release
+            # would be invalid the moment it was written, `ready` would stay
+            # empty, and an auto-dispatching healer would rewrite the same
+            # invalid wave on every pass. Highest priority first, so a serial
+            # node still wins its own round instead of being starved.
             wave = []
-            for node_id in sorted(eligible):
+            ordered = sorted(
+                eligible,
+                key=lambda node_id: (
+                    -int(self.node(node_id).get("critical_path_importance", 0)),
+                    -int(self.node(node_id).get("downstream_unlock_value", 0)),
+                    node_id,
+                ),
+            )
+            for node_id in ordered:
+                if not wave:
+                    wave.append(node_id)
+                    continue
+                if not bool(self.node(node_id).get("parallel_safe")):
+                    continue
+                if any(not bool(self.node(chosen).get("parallel_safe")) for chosen in wave):
+                    continue
                 if all(not self._nodes_conflict(node_id, chosen) for chosen in wave):
                     wave.append(node_id)
         verdicts = self._candidate_verdicts(base_status, wave)
