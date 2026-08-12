@@ -1,9 +1,25 @@
-"""Lease-owning scheduler workers that execute durable P06 missions."""
+"""Retired legacy runtime surface: the legacy scheduler executor (LEGACY-620).
+
+Canonical ownership of mission execution belongs to
+``hive_mind_os.brain_kernel.mission_runtime``, reached through the
+MIGRATION-460 routing installed in ``hive_mind_os.cli``.  The legacy executor
+``execute_mission_job`` and its ``repository-mission`` job kind survive only as
+an explicitly marked rollback/compatibility surface: rollback tag
+``legacy-620-rollback``, migration receipts in
+``docs/execution/LEGACY_RUNTIME_RETIREMENT.md``.
+
+Lease-owning scheduler workers that execute durable P06 missions.  :class:`Worker`
+and :func:`serve` are *not* retired: they are runtime-neutral lease holders that
+dispatch through :func:`route_job_executor`, the MIGRATION-460 kind-based routing
+that owns canonical execution.  Only the legacy branch of that dispatch is a
+retired surface.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import threading
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -25,10 +41,47 @@ from .repository_compatibility import (
 )
 from .scheduler import Job, Scheduler, StaleLeaseError
 
+LEGACY_RUNTIME_NOTICE: dict[str, str] = {
+    "entry_point": "hive_mind_os.workers",
+    "status": "retired-legacy-rollback-only",
+    "canonical_owner": "hive_mind_os.brain_kernel.mission_runtime",
+    "canonical_ingress": "hive_mind_os.cli (MIGRATION-460 routing)",
+    "canonical_destination": "canonical leases and delivery workers",
+    "rollback_ref": "rollback:legacy-620",
+    "rollback_tag": "legacy-620-rollback",
+    "retired_by_node": "LEGACY-620",
+    "parity_evidence": "evidence/qualification/hive-cortex/",
+    "migration_receipts": "docs/execution/LEGACY_RUNTIME_RETIREMENT.md",
+}
+
+
+def retirement_notice() -> dict[str, str]:
+    """Machine-readable compatibility notice for this retired legacy entry point."""
+
+    return dict(LEGACY_RUNTIME_NOTICE)
+
+
+def _warn_retired(entry: str) -> None:
+    warnings.warn(
+        f"{entry} is a retired legacy runtime surface (LEGACY-620); the canonical "
+        "owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag "
+        "legacy-620-rollback",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
 JobExecutor = Callable[[Job, Path], str]
 
 
 def execute_mission_job(job: Job, state_dir: Path) -> str:
+    """Execute one legacy ``repository-mission`` job (retired rollback surface).
+
+    Retained deliberately: ``LEGACY_JOB_KIND`` dispatch is the contract-mandated
+    rollback mode for MIGRATION-460, so this executor is never hard-disabled.
+    """
+
+    _warn_retired("hive_mind_os.workers.execute_mission_job")
     if job.kind != "repository-mission":
         raise ValueError(f"unsupported job kind: {job.kind}")
     payload = job.payload

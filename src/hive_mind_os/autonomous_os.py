@@ -1,5 +1,13 @@
-"""Governed autonomous repository runs with durable memory and bounded learning.
+"""Retired legacy runtime surface: the autonomous repository brain (LEGACY-620).
 
+Canonical ownership of host/effect execution and outcome learning belongs to
+``hive_mind_os.brain_kernel.mission_runtime``, reached through the
+MIGRATION-460 routing installed in ``hive_mind_os.cli``.  :class:`AutonomousBrain`
+survives only as an explicitly marked rollback/compatibility surface: rollback tag
+``legacy-620-rollback``, migration receipts in
+``docs/execution/LEGACY_RUNTIME_RETIREMENT.md``.
+
+Governed autonomous repository runs with durable memory and bounded learning.
 The brain is deliberately small and append-only.  It retains a safe run charter,
 events, feedback decisions, and point-in-time grades; it does *not* retain model
 transcripts or raw GitHub comment bodies.  A coding host is replaceable and works
@@ -18,6 +26,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
@@ -28,6 +37,36 @@ from uuid import uuid4
 from .contracts import validate_contract
 from .pit_oracle import PointInTimeOracle
 from .receipts import sha256_digest
+
+LEGACY_RUNTIME_NOTICE: dict[str, str] = {
+    "entry_point": "hive_mind_os.autonomous_os",
+    "status": "retired-legacy-rollback-only",
+    "canonical_owner": "hive_mind_os.brain_kernel.mission_runtime",
+    "canonical_ingress": "hive_mind_os.cli (MIGRATION-460 routing)",
+    "canonical_destination": "canonical host/effect and outcome-learning adapters",
+    "rollback_ref": "rollback:legacy-620",
+    "rollback_tag": "legacy-620-rollback",
+    "retired_by_node": "LEGACY-620",
+    "parity_evidence": "evidence/qualification/hive-cortex/",
+    "migration_receipts": "docs/execution/LEGACY_RUNTIME_RETIREMENT.md",
+}
+
+
+def retirement_notice() -> dict[str, str]:
+    """Machine-readable compatibility notice for this retired legacy entry point."""
+
+    return dict(LEGACY_RUNTIME_NOTICE)
+
+
+def _warn_retired(entry: str) -> None:
+    warnings.warn(
+        f"{entry} is a retired legacy runtime surface (LEGACY-620); the canonical "
+        "owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag "
+        "legacy-620-rollback",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
 
 PROTECTED_BRANCHES = ("main", "master", "staging")
 _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -291,6 +330,7 @@ class AutonomousBrain:
     """Append-only, restartable brain for one or more local repository runs."""
 
     def __init__(self, state_dir: str | Path) -> None:
+        _warn_retired("hive_mind_os.autonomous_os.AutonomousBrain")
         self.state_dir = Path(state_dir).resolve()
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self._connection = sqlite3.connect(

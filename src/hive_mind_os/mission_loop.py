@@ -1,10 +1,18 @@
-"""Deterministic, bounded Phase 2 repository mission loop.
+"""Retired legacy runtime surface: the Phase 2 mission loop (LEGACY-620).
 
-This runtime deliberately separates model/role proposals from state transition,
+Canonical ownership of the role/action lifecycle belongs to
+``hive_mind_os.brain_kernel.mission_runtime``, reached through the
+MIGRATION-460 routing installed in ``hive_mind_os.cli``.  :class:`MissionLoop`
+survives only as an explicitly marked rollback/compatibility surface: rollback tag
+``legacy-620-rollback``, migration receipts in
+``docs/execution/LEGACY_RUNTIME_RETIREMENT.md``.
+
+Deterministic, bounded Phase 2 repository mission loop.  This runtime
+deliberately separates model/role proposals from state transition,
 policy, execution, receipts, and Curator verification.  It is local-only: it never
 pushes, opens pull requests, merges, or deploys.  The older ``RepositoryMission``
-remains available for its historical fixture and durable-store contracts; new callers
-use :class:`MissionLoop` for the iterative Phase 2 lifecycle.
+remains available for its historical fixture and durable-store contracts; both are
+now rollback surfaces, and new callers use the canonical owner named above.
 """
 
 from __future__ import annotations
@@ -16,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import warnings
 from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from hashlib import sha256
@@ -29,6 +38,35 @@ from .models import AutonomyLevel, RiskTier, Role
 from .policy import Action, PolicyEngine
 from .receipts import portable_path_parts, sha256_digest
 from .verify import VerificationError, VerificationReport, verify_repository
+
+LEGACY_RUNTIME_NOTICE: dict[str, str] = {
+    "entry_point": "hive_mind_os.mission_loop",
+    "status": "retired-legacy-rollback-only",
+    "canonical_owner": "hive_mind_os.brain_kernel.mission_runtime",
+    "canonical_ingress": "hive_mind_os.cli (MIGRATION-460 routing)",
+    "canonical_destination": "canonical role/action protocol",
+    "rollback_ref": "rollback:legacy-620",
+    "rollback_tag": "legacy-620-rollback",
+    "retired_by_node": "LEGACY-620",
+    "parity_evidence": "evidence/qualification/hive-cortex/",
+    "migration_receipts": "docs/execution/LEGACY_RUNTIME_RETIREMENT.md",
+}
+
+
+def retirement_notice() -> dict[str, str]:
+    """Machine-readable compatibility notice for this retired legacy entry point."""
+
+    return dict(LEGACY_RUNTIME_NOTICE)
+
+
+def _warn_retired(entry: str) -> None:
+    warnings.warn(
+        f"{entry} is a retired legacy runtime surface (LEGACY-620); the canonical "
+        "owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag "
+        "legacy-620-rollback",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 class MissionLoopError(RuntimeError):
@@ -808,6 +846,7 @@ class MissionLoop:
         budget: MissionBudget | None = None,
         policy: PolicyEngine | None = None,
     ) -> None:
+        _warn_retired("hive_mind_os.mission_loop.MissionLoop")
         self.repository = Path(repository).resolve()
         if not self.repository.is_dir() or not (self.repository / ".git").exists():
             raise ValueError("mission loop requires a local Git repository")
