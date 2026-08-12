@@ -18,7 +18,7 @@ from specs_a import SPECS as SPECS_A
 from specs_b import SPECS as SPECS_B
 
 DAG_DIR = "docs/execution/dags/generic-hive-mind-product-v1"
-OUTPUT_PATH = "/tmp/generic-hive-mind-product-v1.json"
+OUTPUT_PATH = ".autopilot/state/generic-hive-mind-product-v1.json"
 GENERATOR_COMMAND = (
     f"python {DAG_DIR}/generate_plan.py --output {OUTPUT_PATH}"
 )
