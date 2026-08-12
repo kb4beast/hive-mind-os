@@ -58,12 +58,56 @@ Phase 1 — supervise with bounded waits (never block indefinitely):
 - Check worker sessions on a timer, not a blocking wait. If a session shows no
   new output for 15 minutes, send one nudge ("continue; report WHAT I DID /
   NEXT STEPS / BLOCKS"). If it stays silent for another 15 minutes, treat it as
-  stalled: record the blocker, leave its claim to lapse (90-minute lease), and
-  plan a solo re-dispatch of that node. Never re-paste a stale prompt — a new
-  dispatch is required after any target advance.
+  stalled and **settle its claim explicitly — never let a claim lapse silently**
+  (procedure below). Never re-paste a stale prompt; a new dispatch is required
+  after any target advance.
 - A worker is terminal only at: draft PR opened + durable receipt commit pushed
   (success), or an `autopilot fail` blocker/escalation record (blocked). Chat
   prose alone is never completion.
+
+### Settling a stalled worker (never let a mutated claim expire)
+
+A claim may lapse on its own **only if the worker published nothing**. Once a
+worker has pushed anything, an expiring claim is a trap: `clean_stale_claims`
+reaps on expiry without checking the branch, but `publish_remote_claim` then
+refuses the re-claim with `remote branch <branch> already exists; reconcile it
+before claiming`, and `release_remote_claim` can only delete the ref while it
+still points at the exact claim commit. A silently expired claim on an advanced
+branch therefore needs sealed recovery authority to undo — this is precisely how
+the historical OPTIMIZER-370 recovery became necessary.
+
+First determine what the worker actually published:
+
+```bash
+git ls-remote origin <node-branch>
+```
+
+**No remote branch** — nothing was published. The local claim may lapse; a solo
+re-dispatch of the node works normally.
+
+**Remote branch exists, with a durable receipt commit at its head** — the
+candidate is already immutable. Treat it as sealed: do NOT re-claim and do NOT
+re-run the node. Validation and integration need no live claim, so integrate the
+receipt branch in the normal Phase 2 order. The stall was cosmetic.
+
+**Remote branch exists without a receipt** — settle it before the lease expires:
+
+```bash
+python .autopilot/bin/autopilot.py --repo-root . fail <NODE> --owner <exact-owner> \
+  --kind failure --error "worker stalled; settled by <round> orchestrator" \
+  --blocker-cause "no terminal evidence within supervision window" \
+  --blocker-fix "resume or repair the node from its retained branch" \
+  --retry-when "after the branch is reconciled"
+python .autopilot/bin/autopilot.py --repo-root . release <NODE> --owner <exact-owner> \
+  --reason "stalled worker settled; branch retained for repair"
+```
+
+`--owner` must be the stalled session's exact owner string (read it from
+`.autopilot/state/claims/<NODE>.json` before it is reaped). If `release` cannot
+delete the remote claim ref because the branch advanced past the claim commit,
+do not force it — the node's next round is a **repair**, not a fresh claim:
+re-dispatch it and use `.autopilot/templates/repair.md`, which resumes from the
+retained branch instead of demanding a new claim.
 
 Phase 2 — integrate serially, in deterministic order:
 
@@ -113,8 +157,10 @@ one-leased-run-per-round invariant is preserved; only the owner changes.
   `cat .autopilot/state/global-validation-lease.json` →
   `python .autopilot/bin/autopilot.py --repo-root . validation-lease-release <node_id> --owner <exact-owner>`.
   An expired lease is *not* reacquirable without this exact-identity release.
-- **Worker died holding a local claim.** Nothing to do: the claim lapses after
-  its 90-minute lease and the next `status`/`claim` reaps it.
+- **Worker died holding a local claim.** Safe to let lapse **only if it pushed
+  nothing** (`git ls-remote origin <node-branch>` is empty). If it published a
+  branch, follow "Settling a stalled worker" above before the lease expires — a
+  mutated branch whose claim expired needs sealed recovery authority to undo.
 - **Worker died after publishing a remote claim branch.** Follow the stale-claim
   retirement in `.autopilot/README.md` (`retire-receipt-branch` /
   `STALE_TARGET_RECOVERY_SEQUENCE`); do not delete remote refs by hand.
@@ -145,6 +191,10 @@ explicit dispatch rounds, per-node runbooks, a snapshot/reconcile helper, and
 the worker read-budget above. Author node contracts so that: write scopes are
 pairwise disjoint *including shared scaffold files* (package `__init__.py`,
 `conftest.py`, lockfiles — name an explicit owner node or forbid touching
-them); `read_scope` lists concrete paths, never `**`; and every level with a
-serial node is pre-split into rounds. Those five properties are what make
+them); `read_scope` starts from concrete paths plus a metadata-only repository
+index (paths, blob SHAs, symbols, imports, test map) rather than a bare `**`
+glob, while allowing budgeted, recorded cold expansion when a node proves its
+initial scope was incomplete — repositories that genuinely need a broad
+discovery pass get one, on the record, instead of every node reading the world
+by default; and every level with a serial node is pre-split into rounds. Those five properties are what make
 one-prompt-per-level parallel execution safe and cheap on any repository.
