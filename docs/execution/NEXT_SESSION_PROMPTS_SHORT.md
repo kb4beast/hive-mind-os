@@ -18,3 +18,8 @@ terminal evidence. Repository receipts—not task prose—establish node complet
 
 See `USER_GUIDE/02_ONE_PROMPT_FOREVER.md` and
 `docs/execution/PORTABLE_AUTOPILOT.md` for commands and recovery details.
+
+For the remaining DAG levels (6-15), the host must follow the dispatch rounds,
+explicit `--node` waves, serial integration order, and bounded-wait supervision
+in `docs/execution/runbooks/README.md`, and give each worker its
+`docs/execution/runbooks/<NODE-ID>.md` implementation runbook.
