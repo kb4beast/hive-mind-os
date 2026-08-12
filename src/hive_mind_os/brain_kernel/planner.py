@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, cast
+from typing import Iterable, Mapping, cast
 
 from ..contracts import ROLE_NAMES
 from .canonical import canonical_digest
