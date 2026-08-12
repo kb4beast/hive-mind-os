@@ -75,9 +75,9 @@ repo-relative; signatures are exact.
 | `tests/hive_cortex/test_acceptance_harness.py` | — | — | Naming/run convention for this package: plain `unittest.TestCase`, run via `python -m unittest tests.hive_cortex.<module> -v`. |
 
 **LEARN-500 surface (`src/hive_mind_os/brain_kernel/learning_runtime.py`).**
-This module is created by dependency LEARN-500 (round R2) and does not exist
+This module is created by dependency LEARN-500 (round R2B) and does not exist
 in the tree this runbook was authored from; its runbook was not yet present.
-At execution time it WILL exist (R2 merges before R3 dispatch). Read it and
+At execution time it WILL exist (R2B merges before R3 dispatch). Read it and
 `docs/execution/LEARNING_RUNTIME.md` (also LEARN-500 output) before writing
 suite 4 in section 3. Do not guess its API — quote real symbols from the file
 you read. Its contract guarantees: lessons bind source episode, outcome,

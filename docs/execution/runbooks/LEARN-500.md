@@ -28,7 +28,7 @@ or raw transcripts into policy.
 
 Additionally forbidden (hard rules): any `__init__.py`, any `conftest.py`,
 `pyproject.toml`, `.autopilot/**`, and every file owned by a sibling node.
-Round **R2** siblings running in parallel: `DURABLE-410`, `DELIVERY-420`,
+Round **R2B** siblings running in parallel: `DELIVERY-420`,
 `HUMANLESS-430`, `CHEAT-440`. Never touch their files; never wait or poll for
 them — if you discover a real dependency on a sibling, run `autopilot fail`
 with a blocker.

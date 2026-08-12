@@ -20,7 +20,8 @@ greedy selection, which can release a serial node first and cap the wave at 1.
 | Round | Level | `--node` wave (explicit) | Sessions |
 |---|---|---|---|
 | R1 | 6 | `MISSION-400` | 1 |
-| R2 | 7 | `DURABLE-410 DELIVERY-420 HUMANLESS-430 CHEAT-440 LEARN-500` | 5 parallel |
+| R2A | 7 | `DURABLE-410` (durability first — see below) | 1 |
+| R2B | 7 | `DELIVERY-420 HUMANLESS-430 CHEAT-440 LEARN-500` | 4 parallel |
 | R3 | 8 | `SELFHEAL-450 CHALLENGER-510 POISON-540` | 3 parallel |
 | R4 | 8 | `MIGRATION-460` (serial by contract) | 1 |
 | R5 | 9 | `EVAL-520` | 1 |
@@ -36,6 +37,19 @@ Order of finish inside a wave never matters: waves are dependency-satisfied and
 lock-disjoint by construction, and integration order is deterministic (below),
 not finish order. A worker that discovers a real dependency on a sibling must
 `autopilot fail` with a blocker — never poll or wait for a sibling.
+
+**Why level 7 splits into R2A and R2B.** The sealed plan puts all five level-7
+nodes at the same depth, but two of them cannot be honestly proven before
+durability exists. HUMANLESS-430's own acceptance criterion is "mission resumes
+after interruption without restating context" — unprovable without the crash and
+replay guarantees DURABLE-410 establishes. DELIVERY-420 performs external
+effects (push, draft PR, comment) where crash recovery is what prevents
+duplicate deliveries. Running DURABLE-410 alone first, integrating it, and then
+releasing the remaining four against that base costs one extra round and removes
+both hazards. This is enforced here as round order rather than as plan
+dependency edges, because adding edges would rotate the plan fingerprint and
+invalidate all completed receipts; once the controller supports plan-version
+lineage, these should become real dependency edges.
 
 ## Orchestrator procedure (one round)
 

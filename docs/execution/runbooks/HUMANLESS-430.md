@@ -1,7 +1,9 @@
 # HUMANLESS-430 — Humanless operation qualification runbook
 
 Worker instructions for node `HUMANLESS-430` on branch `autopilot/humanless-430`
-(round R2, wave `DURABLE-410 DELIVERY-420 HUMANLESS-430 CHEAT-440 LEARN-500`).
+(round R2B, wave `DELIVERY-420 HUMANLESS-430 CHEAT-440 LEARN-500`, released only
+after DURABLE-410 has integrated — your acceptance criterion "resumes after
+interruption without restating context" depends on it).
 This runbook plus the rendered prompt is your complete context; do not re-read
 `.autopilot/plan.json` or `.autopilot/README.md` — the controller enforces every
 gate deterministically and fails closed.
@@ -41,7 +43,7 @@ deterministic kernel surfaces plus retained evidence.
 - Never touch the release branch; never rebase/squash/amend the node branch;
   commit forward only.
 - Run ONLY the focused commands in section 5. Never run
-  `python -m unittest discover` or any repo-wide test pass — the R2 integrator
+  `python -m unittest discover` or any repo-wide test pass — the R2B integrator
   owns the single leased repo-wide run.
 - Do not weaken, skip, or fork `tests/hive_cortex/acceptance_harness.py`
   semantics; consume it as-is via relative import.
@@ -395,6 +397,6 @@ transient executor exception with `backoff_seconds=0` and `ManualClock`;
 - Do NOT import or wait for `hive_mind_os.brain_kernel.mission_runtime` (MISSION-400's file) or any other sibling deliverable; if you believe you need it, `autopilot fail` with a blocker instead.
 - Do NOT add fixtures under `tests/fixtures/**` — that is ACCEPT-240's completed scope; only read them.
 - Do NOT modify anything under `src/`, `.github/`, `.autopilot/`, `evidence/courts/**`, or `docs/architecture/**`.
-- Do NOT run `python -m unittest discover`, pytest, or any repo-wide pass; the R2 integrator owns the single leased run.
+- Do NOT run `python -m unittest discover`, pytest, or any repo-wide pass; the R2B integrator owns the single leased run.
 - Do NOT loosen assertions to pass (e.g. accepting `TRUE_AUTHORITY_REQUIRED` for a defect scenario) — that violates the no-authority-expansion assumption and the `humanless-qualification` semantic lock.
 - Do NOT hand-edit `humanless-qualification.json` (regenerate via `--write-evidence`), and do NOT rebase, squash, amend, force-push, or merge the PR; stop at the draft PR + receipt.

@@ -43,7 +43,7 @@ writes TESTS and EVIDENCE only — it adds no kernel code and changes no behavio
   condition — `autopilot fail` with the evidence; do not adjust the expectation.
 
 **Semantic locks:** `no-cheating-qualification`.
-**Round/siblings:** R2, dispatched with `DURABLE-410 DELIVERY-420 HUMANLESS-430 CHEAT-440 LEARN-500` (all scope-disjoint; never wait on a sibling).
+**Round/siblings:** R2B, dispatched with `DELIVERY-420 HUMANLESS-430 CHEAT-440 LEARN-500` (all scope-disjoint; never wait on a sibling). DURABLE-410 integrated in R2A.
 **Stopping condition:** draft PR to `main` with a validated node receipt; do not merge.
 
 ## 2. Existing-code map (verified signatures — build ONLY on these)

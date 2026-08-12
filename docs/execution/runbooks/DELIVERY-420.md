@@ -44,7 +44,8 @@ adapter behind the kernel, not a separate brain.
 - Run ONLY the focused required_tests command (section 5). Never run
   `python -m unittest discover` — the round integrator runs the single leased
   repo-wide pass.
-- Semantic lock: `github-delivery-adapter`. Round R2; siblings released in the
+- Semantic lock: `github-delivery-adapter`. Round R2B (runs after DURABLE-410 has
+integrated, so crash recovery exists before any external effect); siblings released in the
   same wave: `DURABLE-410`, `HUMANLESS-430`, `CHEAT-440`, `LEARN-500` — never
   read or wait on their files; a real dependency on a sibling means
   `autopilot fail` with a blocker.

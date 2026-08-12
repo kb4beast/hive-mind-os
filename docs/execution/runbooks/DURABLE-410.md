@@ -35,7 +35,8 @@ runs on: `KernelStore`, `DurableEffectOutbox`, `Scheduler`, `KernelWorker`.
 - Semantic lock: `durability-qualification`. Do not weaken acceptance to pass;
   a test that cannot be made honest is an escalation, not a skip.
 
-**Round.** R2, dispatched with siblings `DELIVERY-420 HUMANLESS-430 CHEAT-440
+**Round.** R2A, dispatched ALONE (durability must land before the level-7
+parallel wave). Formerly grouped with `DELIVERY-420 HUMANLESS-430 CHEAT-440
 LEARN-500` (all lock-disjoint). Depends on `MISSION-400` (R1, already
 integrated into the release branch when you start). If
 `src/hive_mind_os/brain_kernel/mission_runtime.py` does not exist on your base
@@ -380,7 +381,7 @@ reference (revert of the node commit).
   other test file (`tests/test_brain_kernel_store.py`,
   `tests/test_scheduler.py`, `tests/test_hive_cortex_effects.py`,
   `tests/test_hive_cortex_mission_runtime.py` are read-only references).
-- Do NOT touch sibling R2 scopes: delivery/packaging files (DELIVERY-420),
+- Do NOT touch the level-7 (R2B) sibling scopes: delivery/packaging files (DELIVERY-420),
   humanless-operation files (HUMANLESS-430), anti-cheat files (CHEAT-440),
   learning files (LEARN-500).
 - Do NOT touch `.autopilot/**`, `.github/CODEOWNERS`, `.github/governance/**`,
