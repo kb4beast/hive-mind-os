@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-post-merge-ruff-cleanup-v1",
+  "parent_commit": "8a3443507cad57c5c693751d8bf962a7e4a6d054",
+  "repair_commit": "8c5c32639cb896484d720d72a892247a87eedcc8",
+  "diagnostics": [
+    "src/hive_mind_os/brain_kernel/planner.py: unused typing.Any import",
+    "tests/test_hive_cortex_orchestrator.py: unused tempfile import",
+    "tests/test_hive_cortex_orchestrator.py: unused pathlib.Path import"
+  ],
+  "changed_paths": [
+    "src/hive_mind_os/brain_kernel/planner.py",
+    "tests/test_hive_cortex_orchestrator.py"
+  ],
+  "validation": [
+    {
+      "command": "ruff 0.16.0 check src tests",
+      "status": "passed"
+    },
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_hive_cortex_orchestrator -v",
+      "status": "passed",
+      "tests": 17
+    },
+    {
+      "command": "python -m compileall -q src tests",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ]
+}
