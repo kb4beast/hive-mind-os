@@ -328,7 +328,7 @@ a small file and returns a valid `path#sha256:<hex>` reference; helper
 Focused commands (the ONLY test commands this node runs):
 
 ```
-python -m unittest tests.test_hive_cortex_evaluation -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_evaluation -v
 ```
 
 | required_tests name | Test class | Key methods |
@@ -368,7 +368,7 @@ re-write accepted).
   `docs/architecture/HARDENED_VISION_CONTRACT.md`; do not write evidence
   anywhere except `evidence/experiments/hive-cortex/**`.
 - Do not run `python -m unittest discover`, pytest, or any other test target;
-  only `python -m unittest tests.test_hive_cortex_evaluation -v`.
+  only `PYTHONPATH=src python -m unittest tests.test_hive_cortex_evaluation -v`.
 - Do not add promotion logic: `KEEP` is a recommendation for a later court
   (PROMOTE-530), never a champion mutation. Do not let a missing-artifact case
   fall through to `RETEST`, and do not add clock- or uuid-based ids (records

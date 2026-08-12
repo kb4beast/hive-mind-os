@@ -289,13 +289,13 @@ denied `("push", "merge", "deploy")`, `Budget(1, 0, 0, 0, 0, 0, 1, 1)`, placehol
 
 | required_tests name | unittest class (all in `tests/hive_cortex/test_no_cheating.py`) | Focused command |
 |---|---|---|
-| `no-cheating-suite` | `NoCheatingSuiteTests` (9 methods, §3) | `python -m unittest tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests -v` |
-| `evaluator-leakage-suite` | `EvaluatorLeakageSuiteTests` (3 methods) | `python -m unittest tests.hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests -v` |
-| `authority-expansion-suite` | `AuthorityExpansionSuiteTests` (3 methods) | `python -m unittest tests.hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests -v` |
-| `friendly-consultation-suite` | `FriendlyConsultationSuiteTests` (5 methods) | `python -m unittest tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests -v` |
+| `no-cheating-suite` | `NoCheatingSuiteTests` (9 methods, §3) | `PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests -v` |
+| `evaluator-leakage-suite` | `EvaluatorLeakageSuiteTests` (3 methods) | `PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests -v` |
+| `authority-expansion-suite` | `AuthorityExpansionSuiteTests` (3 methods) | `PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests -v` |
+| `friendly-consultation-suite` | `FriendlyConsultationSuiteTests` (5 methods) | `PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests -v` |
 
 Whole-node run (from repo root; this invocation style is verified working in this repo):
-`python -m unittest tests.hive_cortex.test_no_cheating -v`
+`PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating -v`
 
 Edge cases baked into §3: every negative has an adjacent positive control so a fixture
 cannot pass by breaking the surface entirely; tamper tests restore state before the
@@ -314,7 +314,7 @@ tree); no network, no subprocesses, no git worktrees (deliberately avoid
 
 `evidence/autonomy/no-cheating/no_cheating_receipt.json` shape:
 `{"node": "CHEAT-440", "base_commit": <sha>, "final_commit": <sha>,
-"command": "python -m unittest tests.hive_cortex.test_no_cheating -v",
+"command": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating -v",
 "outcome": "passed", "transcript_path": "test-transcript.txt",
 "transcript_sha256": <hex>, "class_map": {<cheating class>: [<test ids>...]},
 "changed_paths": [exactly the write_scope files touched], "rollback": "revert <final_commit>"}`.

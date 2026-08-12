@@ -233,14 +233,14 @@ New file (write scope). Required sections:
    `docs/execution/LEGACY_RUNTIME_RETIREMENT.md` with sections 1–3, 5.
 3. **Commit 2** — `workers.py`: notice + `_warn_retired` in
    `execute_mission_job` + the selected decision-table change. Run
-   `python -m unittest tests.test_workers -v`.
+   `PYTHONPATH=src python -m unittest tests.test_workers -v`.
 4. **Commit 3** — `mission.py`: notice + warning in `RepositoryMission.__init__`
-   + docstring. Run `python -m unittest tests.test_mission -v`.
+   + docstring. Run `PYTHONPATH=src python -m unittest tests.test_mission -v`.
 5. **Commit 4** — `mission_loop.py`: notice + warning in `MissionLoop.__init__`
-   + docstring. Run `python -m unittest tests.test_mission_loop -v`.
+   + docstring. Run `PYTHONPATH=src python -m unittest tests.test_mission_loop -v`.
 6. **Commit 5** — `autonomous_os.py`: notice + warning in
    `AutonomousBrain.__init__` + docstring. Run
-   `python -m unittest tests.test_autonomous_os -v`.
+   `PYTHONPATH=src python -m unittest tests.test_autonomous_os -v`.
 7. **Commit 6** — run the full §5 focused set; paste command receipts into the
    doc (section 4) plus section 6 residual blockers; final commit; open draft
    PR against `main`; emit the node completion receipt. STOP.
@@ -252,8 +252,8 @@ existing focused suites plus command receipts — never repo-wide discovery.
 
 | required_tests name | Concrete mapping | Exact command |
 |---|---|---|
-| `legacy-parity-tests` | `tests.test_mission.RepositoryMissionTests`; `tests.test_mission_loop.MissionStateReducerTests` + `OrchestratorTests` + `MissionLoopAdversarialTests`; `tests.test_autonomous_os.AutonomousBrainTests`; `tests.test_workers.WorkerTests` (all pre-existing, unchanged — passing proves retained behavior is byte-compatible after retirement) | `python -m unittest tests.test_mission tests.test_mission_loop tests.test_autonomous_os tests.test_workers -v` |
-| `public-api-compatibility-tests` | `tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests` (registry blockers + rollback routing) and `tests.test_cli_enqueue.EnqueueCliTests` (CLI ingress unchanged); plus import-surface receipt: `python -c "import hive_mind_os; from hive_mind_os import AutonomousBrain, RepositoryMission, MissionLoop, Worker, serve; from hive_mind_os.mission import resolve_repository_pin; from hive_mind_os.autonomous_os import GitHubRestCommentGateway; print('public-api-ok')"` | `python -m unittest tests.test_hive_cortex_compatibility tests.test_cli_enqueue -v` + the `python -c` receipt |
+| `legacy-parity-tests` | `tests.test_mission.RepositoryMissionTests`; `tests.test_mission_loop.MissionStateReducerTests` + `OrchestratorTests` + `MissionLoopAdversarialTests`; `tests.test_autonomous_os.AutonomousBrainTests`; `tests.test_workers.WorkerTests` (all pre-existing, unchanged — passing proves retained behavior is byte-compatible after retirement) | `PYTHONPATH=src python -m unittest tests.test_mission tests.test_mission_loop tests.test_autonomous_os tests.test_workers -v` |
+| `public-api-compatibility-tests` | `tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests` (registry blockers + rollback routing) and `tests.test_cli_enqueue.EnqueueCliTests` (CLI ingress unchanged); plus import-surface receipt: `python -c "import hive_mind_os; from hive_mind_os import AutonomousBrain, RepositoryMission, MissionLoop, Worker, serve; from hive_mind_os.mission import resolve_repository_pin; from hive_mind_os.autonomous_os import GitHubRestCommentGateway; print('public-api-ok')"` | `PYTHONPATH=src python -m unittest tests.test_hive_cortex_compatibility tests.test_cli_enqueue -v` + the `python -c` receipt |
 | `rollback-tag-test` | Command receipts (no unittest file is inside write scope — state this explicitly in the completion receipt): tag exists, is an ancestor, and matches every module notice | `git tag --list legacy-620-rollback` ; `git rev-parse legacy-620-rollback^{commit}` ; `git merge-base --is-ancestor legacy-620-rollback HEAD && echo ancestor-ok` ; `python -c "import hive_mind_os.mission as a, hive_mind_os.mission_loop as b, hive_mind_os.autonomous_os as c, hive_mind_os.workers as d; ns=[m.retirement_notice() for m in (a,b,c,d)]; assert all(n['rollback_tag']=='legacy-620-rollback' and n['rollback_ref']=='rollback:legacy-620' for n in ns); print('rollback-notice-ok')"` |
 
 **Edge cases to verify by hand (receipts in the doc):**

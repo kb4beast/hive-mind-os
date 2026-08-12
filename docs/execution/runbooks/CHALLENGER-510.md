@@ -308,10 +308,10 @@ preserves lesson order; generation with zero lessons returns empty result.
 Exact focused commands (the ONLY test invocations this node may run):
 
 ```bash
-python -m unittest tests.test_hive_cortex_challengers -v
-python -m unittest tests.test_hive_cortex_challengers.ChallengerGenerationTests -v
-python -m unittest tests.test_hive_cortex_challengers.ChampionImmutabilityTests -v
-python -m unittest tests.test_hive_cortex_challengers.ScopeDenialTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_challengers -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_challengers.ChallengerGenerationTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_challengers.ChampionImmutabilityTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_challengers.ScopeDenialTests -v
 ```
 
 No `discover`, no other test modules; the R3 integrator runs the single leased

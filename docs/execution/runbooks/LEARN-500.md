@@ -300,7 +300,7 @@ Conventions: `unittest.TestCase`, module-level constants like
 Focused command (the ONLY test command this node runs):
 
 ```
-python -m unittest tests.test_hive_cortex_learning -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_learning -v
 ```
 
 | required_tests name | Test class | Methods (minimum) |
@@ -323,7 +323,7 @@ Do NOT run `python -m unittest discover`, pytest, or any other test module.
 | Lesson binds episode, outcome, error class, applicability, confidence, provenance, expiry | `Lesson` dataclass has all seven as required fields; `valid_to` non-optional; `__post_init__` rejects gaps | `test_lesson_binds_...` pass line in the focused-test receipt; file inventory shows only the three write-scope paths |
 | Counterexamples and dissent retained | `retain_counterexample`/`record_dissent` append-only on frozen dataclasses; birth counterexamples kept | `CounterexampleRetentionTests` pass lines |
 | No lesson mutates policy/prompt/champion | module imports only stdlib + `.canonical`/`.contracts`/`.memory`; no mutation-shaped methods; source-inspection test | `test_lesson_has_no_policy_prompt_or_champion_mutation_surface` pass line; grep of the new module in the receipt notes |
-| Evidence requirements | base + final commit SHAs, changed-path list ⊆ write_scope, exact `python -m unittest tests.test_hive_cortex_learning -v` output, role identities, rollback ref = revert of the node commit | attach to node completion receipt |
+| Evidence requirements | base + final commit SHAs, changed-path list ⊆ write_scope, exact `PYTHONPATH=src python -m unittest tests.test_hive_cortex_learning -v` output, role identities, rollback ref = revert of the node commit | attach to node completion receipt |
 
 ## 7. Out-of-scope traps (do NOT do these)
 

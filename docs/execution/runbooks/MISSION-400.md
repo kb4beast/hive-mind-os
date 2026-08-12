@@ -380,7 +380,7 @@ Conventions (match `tests/test_hive_cortex_orchestrator.py`):
 Focused command (the ONLY test command this node runs):
 
 ```
-python -m unittest tests.test_hive_cortex_mission_runtime -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_mission_runtime -v
 ```
 
 | required_tests name | Test class | Methods (minimum) |

@@ -290,9 +290,9 @@ Exact focused commands (repo root; if `hive_mind_os` resolves outside this
 worktree, prefix `PYTHONPATH=src `):
 
 ```bash
-python -m unittest tests.test_hive_cortex_cli_migration -v
-python -m unittest tests.test_cli_enqueue -v      # out-of-scope guard: must stay green unmodified
-python -m unittest tests.test_workers -v          # out-of-scope guard: default-executor flip must not break it
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_cli_migration -v
+PYTHONPATH=src python -m unittest tests.test_cli_enqueue -v      # out-of-scope guard: must stay green unmodified
+PYTHONPATH=src python -m unittest tests.test_workers -v          # out-of-scope guard: default-executor flip must not break it
 ```
 
 Do NOT run `python -m unittest discover` or any repo-wide pass — the R4

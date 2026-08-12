@@ -1000,7 +1000,7 @@ a `git init -b main` fixture repo with one commit, `initialize_repository` /
 Focused command (the only one this package runs):
 
 ```
-python -m unittest tests.test_autopilot_workflow -v
+PYTHONPATH=src python -m unittest tests.test_autopilot_workflow -v
 ```
 
 | required_tests name | Test class / method | Assertions |
@@ -1021,10 +1021,10 @@ Existing tests to update, not weaken: `test_initialize_and_inspect_uninstalled_r
 ### 6.2 Package B — two new test files
 
 ```
-python -m unittest tests.test_hive_cortex_role_applicability -v
-python -m unittest tests.test_hive_cortex_token_economy -v
-python -m unittest tests.test_hive_cortex_role_runtime -v   # out-of-scope guard, unmodified
-python -m unittest tests.test_model_backend -v              # out-of-scope guard, unmodified
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_role_applicability -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_token_economy -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_role_runtime -v   # out-of-scope guard, unmodified
+PYTHONPATH=src python -m unittest tests.test_model_backend -v              # out-of-scope guard, unmodified
 ```
 
 Conventions: copy `tests/test_hive_cortex_role_runtime.py:1-45` — a `_Provider`

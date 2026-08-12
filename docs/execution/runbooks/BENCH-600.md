@@ -55,7 +55,7 @@ All in `src/hive_mind_os/benchmark_harness.py` unless noted.
 | src/hive_mind_os/benchmark_harness.py | `render_results` | `def render_results(report: Mapping[str, object]) -> str` | Markdown-rendering pattern (table + mandatory no-claim paragraph) to mirror. |
 | benchmarks/founding-comparator-suite.json | (data) | JSON with `comparators: [{"source_id","name","pin_required":true}, ...]`, `required_controls`, `benchmark_families`, `minimum_safety_floors`, `"verdict": null` | Source of comparator names/`source_id`s (SRC-003/004/008/009/010/011/014/015) for the pinned registry. |
 | tests/fixtures/hive_cortex/*/fixture.json | (data) | `{"schema_version":1,"fixture_id","scenario","language","languages":[...],"tests_present":bool}` | Four scenario fixtures: `hidden-defect-python`, `misleading-readme-node`, `monorepo-cross-language`, `no-test-csharp`. |
-| tests/test_benchmark_harness.py | (conventions) | plain `unittest.TestCase` classes, run as `python -m unittest tests.test_x -v` | Test style to follow. |
+| tests/test_benchmark_harness.py | (conventions) | plain `unittest.TestCase` classes, run as `PYTHONPATH=src python -m unittest tests.test_x -v` | Test style to follow. |
 
 Fixture ground truth you will encode in scenario checkers (verified content):
 - `hidden-defect-python/app.py`: `discount_total(total, discount)` returns
@@ -303,7 +303,7 @@ Layout, reproduction command, loading convention, and the no-claims rule.
 Focused command (the ONLY test command this node runs):
 
 ```bash
-python -m unittest tests.test_hive_cortex_benchmark -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_benchmark -v
 ```
 
 | required_tests name | unittest class | key methods |

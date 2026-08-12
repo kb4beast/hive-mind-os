@@ -327,11 +327,11 @@ transport call.
 
 Exact focused commands (the ONLY test commands this node may run):
 ```
-python -m unittest tests.test_hive_cortex_delivery -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_delivery -v
 ```
 Optionally a single class while iterating:
 ```
-python -m unittest tests.test_hive_cortex_delivery.ProtectedBranchDenialTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_delivery.ProtectedBranchDenialTests -v
 ```
 
 ## 6. Acceptance self-check -> completion receipt evidence

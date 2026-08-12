@@ -185,7 +185,7 @@ the exact exit code in `receipts.json`.
    `gate2-acceptance/module-inventory.txt` (e.g.
    `python -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();print('\n'.join(sorted(set(re.findall(r'\((tests[.][\w.]+)[.]', t)))))" <log> > module-inventory.txt`).
    Then run the focused named suites:
-   `python -m unittest tests.test_acceptance tests.hive_cortex.test_acceptance_harness tests.test_autonomy tests.test_policy_invariants -v > gate2-acceptance/focused-suite.log 2>&1`.
+   `PYTHONPATH=src python -m unittest tests.test_acceptance tests.hive_cortex.test_acceptance_harness tests.test_autonomy tests.test_policy_invariants -v > gate2-acceptance/focused-suite.log 2>&1`.
    Map every acceptance-matrix suite to modules present in the inventory; any
    suite with no covering module is a FAIL row (not a silent omission). Commit:
    `docs(qualify): record autonomy acceptance receipts`.
@@ -200,7 +200,7 @@ the exact exit code in `receipts.json`.
      — verify every `phase12-*` packet present under `evidence/local_assurance/`;
      a raised `LocalAssuranceError` is a gate FAIL;
    - focused replay suites:
-     `python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v > .../gate3-replay/replay-focused.log 2>&1`.
+     `PYTHONPATH=src python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v > .../gate3-replay/replay-focused.log 2>&1`.
    Remove the worktree afterwards (`git worktree remove <scratch>/q610-clean`).
    Commit: `docs(qualify): record clean replay receipts`.
 6. **Gate 4 — cross-platform qualification.** Record host identity to
@@ -232,8 +232,8 @@ to executed commands over EXISTING suites, not to new test files:
 | required_tests name | Concrete backing | Exact command |
 |---|---|---|
 | `full-constitutional-ci` | local reproduction of `.github/workflows/ci.yml` deterministic jobs incl. `tests.test_ci_contract.CIContractTests`; GitHub-only jobs listed as DEFERRED residuals | `python -m compileall -q src tests` then leased `python -m unittest discover -s tests -v` (step 3); optional `ruff check src tests` |
-| `complete-autonomy-acceptance` | acceptance-matrix suite checklist backed by the discovery log + focused `tests.test_acceptance.AcceptanceSpecificationTests`, `tests.hive_cortex.test_acceptance_harness.AcceptanceHarnessTests`, `tests.test_autonomy.AutonomyTests`, `tests.test_policy_invariants.PolicyInvariantTests` | `python -m unittest tests.test_acceptance tests.hive_cortex.test_acceptance_harness tests.test_autonomy tests.test_policy_invariants -v` |
-| `clean-replay-verification` | fresh-worktree verification: `verify_local_assurance_artifact` over every retained `evidence/local_assurance/phase12-*` packet, `snapshot_tree` identity, plus `tests.test_brain_kernel_verification.ExactCandidateVerificationTests`, `tests.test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests`, `tests.test_brain_kernel_local_assurance_evidence.LocalAssuranceEvidenceTests`, `tests.test_kernel.KernelTests` | `python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v` (in the clean worktree) |
+| `complete-autonomy-acceptance` | acceptance-matrix suite checklist backed by the discovery log + focused `tests.test_acceptance.AcceptanceSpecificationTests`, `tests.hive_cortex.test_acceptance_harness.AcceptanceHarnessTests`, `tests.test_autonomy.AutonomyTests`, `tests.test_policy_invariants.PolicyInvariantTests` | `PYTHONPATH=src python -m unittest tests.test_acceptance tests.hive_cortex.test_acceptance_harness tests.test_autonomy tests.test_policy_invariants -v` |
+| `clean-replay-verification` | fresh-worktree verification: `verify_local_assurance_artifact` over every retained `evidence/local_assurance/phase12-*` packet, `snapshot_tree` identity, plus `tests.test_brain_kernel_verification.ExactCandidateVerificationTests`, `tests.test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests`, `tests.test_brain_kernel_local_assurance_evidence.LocalAssuranceEvidenceTests`, `tests.test_kernel.KernelTests` | `PYTHONPATH=src python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v` (in the clean worktree) |
 | `cross-platform-qualification` | per-interpreter matrix runs inside the lease window; unavailable cells DEFERRED to the CI matrix on the draft PR; `tests.test_ci_contract.CIContractTests.test_workflow_exercises_windows_with_python_3_12` guards the contract | `<interpreter> -m unittest discover -s tests -v` per available interpreter |
 
 Edge cases the procedure must handle honestly: missing ruff/pyright (DEFERRED, no

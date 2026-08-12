@@ -72,7 +72,7 @@ repo-relative; signatures are exact.
 | ″ | `MemoryState` | StrEnum: `ACTIVE, SUPERSEDED, CONTRADICTED, RETRACTED, EXPIRED, QUARANTINED` | Lifecycle states. |
 | `src/hive_mind_os/contracts.py` | `ROLE_NAMES` | frozenset: orchestrator, explorer, architect, builder, curator, integrator, steward, optimizer | Valid roles for access/requests. |
 | `tests/test_brain_kernel_memory_context.py` | `KernelMemoryContextTests.record(...)` helper | — | The fixture pattern to copy (do NOT import it; replicate locally). |
-| `tests/hive_cortex/test_acceptance_harness.py` | — | — | Naming/run convention for this package: plain `unittest.TestCase`, run via `python -m unittest tests.hive_cortex.<module> -v`. |
+| `tests/hive_cortex/test_acceptance_harness.py` | — | — | Naming/run convention for this package: plain `unittest.TestCase`, run via `PYTHONPATH=src python -m unittest tests.hive_cortex.<module> -v`. |
 
 **LEARN-500 surface (`src/hive_mind_os/brain_kernel/learning_runtime.py`).**
 This module is created by dependency LEARN-500 (round R2B) and does not exist
@@ -285,7 +285,7 @@ Exact focused command (matches `tests/hive_cortex/` conventions — the
 package has an `__init__.py`, modules run by dotted path):
 
 ```
-python -m unittest tests.hive_cortex.test_learning_poisoning -v
+PYTHONPATH=src python -m unittest tests.hive_cortex.test_learning_poisoning -v
 ```
 
 Never run `python -m unittest discover`. Edge cases already embedded above:

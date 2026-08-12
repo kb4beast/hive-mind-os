@@ -336,8 +336,8 @@ idempotency key does not append a duplicate.
 **Exact focused commands (run from repo root; PowerShell and bash identical):**
 
 ```
-python -m unittest tests.test_hive_cortex_self_healing -v
-python -m unittest tests.test_hive_cortex_reconciler -v   # composition regression guard (read-only neighbor check)
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_self_healing -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_reconciler -v   # composition regression guard (read-only neighbor check)
 ```
 
 NEVER run `python -m unittest discover -s tests` — integrator-only.

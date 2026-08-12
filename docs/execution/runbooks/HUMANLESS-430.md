@@ -365,13 +365,13 @@ byte-identical file). Keep under ~120 lines; no promises about future nodes.
 may run).**
 
 ```
-A: python -m unittest tests.hive_cortex.test_humanless_operation -v
-B: python -m unittest tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests -v
-C: python -m unittest tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests -v
+A: PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation -v
+B: PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests -v
+C: PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests -v
 ```
 
 (`tests` is a namespace package — this invocation is proven by the existing
-`python -m unittest tests.hive_cortex.test_acceptance_harness -v`.)
+`PYTHONPATH=src python -m unittest tests.hive_cortex.test_acceptance_harness -v`.)
 
 **Edge cases that must be covered (already embedded in 3.2):** all eight
 authority classes individually; unknown class rejected; authority claim minus

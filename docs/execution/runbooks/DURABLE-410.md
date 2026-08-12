@@ -263,13 +263,38 @@ canonical runtime (criterion 1 end-to-end).
   1. Run one mission to completion through the mission-runtime entry point
      against an on-disk `KernelStore`; capture `store.events()` and
      `store.status(mission_id)`.
-  2. Close everything; reopen the same database file; assert
-     `projection()`, `rebuild_projections()`, and `load_snapshot()` all agree,
-     and `status(mission_id)` equals the pre-crash value (restart/resume from
+  2. Close everything; reopen the same database file; assert the two
+     *event-derived* views agree — `rebuild_projections()` equals
+     `load_snapshot()` — and that the materialized read model `projection()`
+     agrees with them on every mission and work **status**, and that
+     `status(mission_id)` equals the pre-crash value (restart/resume from
      append-only state alone).
   3. Deterministic replay: fold `reduce_event` from `empty_state()` over the
-     reopened `events()`; `state_digest(replayed)` equals
-     `status(mission_id)["state_digest"]`.
+     reopened `events()`; the fold equals `rebuild_projections()`, and
+     `canonical_digest(projection())` equals its pre-crash value.
+
+     **Do not assert `projection() == rebuild_projections()`, and do not
+     compare `state_digest(fold)` with `status(...)["state_digest"]`.**
+     `rebuild_projections()` / `load_snapshot()` return the full reduced
+     state, whose work entries accumulate `evaluation_plan_digest`,
+     `passed_evaluation_digest`, and `evaluation_bundle_digest`
+     (`projection.py` `reduce_event`), while `projection()` rehydrates only
+     `mission_id`/`status` from the flat `work_projection` table
+     (`store.py:604-668`). Any mission that seals an evaluation plan and
+     records a passed evaluation — which the canonical run requires before
+     ACCEPTED — makes those unequal by construction, and nothing inside this
+     node's write scope can reconcile them. MISSION-400 records the same
+     boundary at `mission_runtime.py:367-370`.
+
+     Measured on the level-7 target after a canonical mission run:
+     `projection() == rebuild_projections()` → False;
+     `rebuild_projections() == load_snapshot()` → True; rebuilt work keys
+     `{evaluation_bundle_digest, evaluation_plan_digest, mission_id,
+     passed_evaluation_digest, status}` vs projection work keys
+     `{mission_id, status}`. The invariants above are satisfiable and are the
+     stronger claim: they prove the read model survives a full replay on the
+     fields it actually materializes, rather than asserting an equality
+     between two deliberately different shapes.
   4. No duplication on resume: re-invoking the runtime's resume/replay path
      (or re-appending its recorded events with their idempotency keys, if the
      runtime exposes them) leaves `len(store.events())` unchanged.
@@ -331,16 +356,16 @@ A qualification record (not marketing). Required sections:
 **Exact focused commands (the ONLY test commands this node runs):**
 
 ```bash
-python -m unittest tests.test_hive_cortex_durability -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_durability -v
 ```
 
 Optionally per-class while iterating:
 
 ```bash
-python -m unittest tests.test_hive_cortex_durability.CrashMatrixTests -v
-python -m unittest tests.test_hive_cortex_durability.LeaseRecoveryTests -v
-python -m unittest tests.test_hive_cortex_durability.SnapshotCorruptionTests -v
-python -m unittest tests.test_hive_cortex_durability.MissionRuntimeReplayTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_durability.CrashMatrixTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_durability.LeaseRecoveryTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_durability.SnapshotCorruptionTests -v
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_durability.MissionRuntimeReplayTests -v
 ```
 
 Never run `python -m unittest discover` or `pytest`.

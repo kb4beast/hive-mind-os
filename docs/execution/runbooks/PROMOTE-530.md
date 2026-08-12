@@ -348,7 +348,7 @@ one-decision-per-court-case, verdict/disposition mismatch, KEEP requiring
 ```bash
 PYTHONPATH=src python -m unittest tests.test_hive_cortex_promotion -v
 ```
-PowerShell equivalent: `$env:PYTHONPATH="src"; python -m unittest tests.test_hive_cortex_promotion -v`.
+PowerShell equivalent: `$env:PYTHONPATH="src"; PYTHONPATH=src python -m unittest tests.test_hive_cortex_promotion -v`.
 (`PYTHONPATH=src` is required: the repo is a src-layout package and a stale
 editable install may shadow it. Verified working for
 `tests.test_hive_cortex_court` on this branch.) Never run
