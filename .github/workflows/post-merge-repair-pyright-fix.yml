@@ -1,0 +1,64 @@
+name: Apply exact PR 144 Pyright cleanup
+
+on:
+  push:
+    branches:
+      - agent/post-merge-repair-import-20260812
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, '[run-r5-pyright-fix]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Fetch exact repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin \
+            '+refs/heads/release/hive-mind-os-singleton-20260812-r5:refs/remotes/origin/release/hive-mind-os-singleton-20260812-r5'
+          test "$(git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260812-r5)" = \
+            "371b00e900faaf315a6656216308d30670b9d51a"
+          git checkout -B release/hive-mind-os-singleton-20260812-r5 \
+            refs/remotes/origin/release/hive-mind-os-singleton-20260812-r5
+      - name: Apply typed budget reconstruction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/hive_mind_os/brain_kernel/planner.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''def _budget_from_document(document: Mapping[str, object]) -> Budget:\n    try:\n        return Budget(**{name: document[name] for name in Budget.__dataclass_fields__})\n    except (KeyError, TypeError, ValueError) as error:\n        raise ValueError("scheduled budget is invalid") from error\n'''
+          new = '''def _budget_from_document(document: Mapping[str, object]) -> Budget:\n    try:\n        values = {name: document[name] for name in Budget.__dataclass_fields__}\n        if any(type(value) is not int for value in values.values()):\n            raise ValueError("scheduled budget fields must be integers")\n        return Budget(\n            max_wall_seconds=cast(int, values["max_wall_seconds"]),\n            max_model_calls=cast(int, values["max_model_calls"]),\n            max_input_tokens=cast(int, values["max_input_tokens"]),\n            max_output_tokens=cast(int, values["max_output_tokens"]),\n            max_cost_microunits=cast(int, values["max_cost_microunits"]),\n            max_tool_calls=cast(int, values["max_tool_calls"]),\n            max_work_items=cast(int, values["max_work_items"]),\n            max_depth=cast(int, values["max_depth"]),\n        )\n    except (KeyError, TypeError, ValueError) as error:\n        raise ValueError("scheduled budget is invalid") from error\n'''
+          if text.count(old) != 1:
+              raise SystemExit('unexpected budget reconstruction block')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+      - name: Validate typed reconstruction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.16.0 pyright==1.1.411
+          ruff check src tests
+          pyright
+          PYTHONPATH=src python -m unittest tests.test_hive_cortex_orchestrator -v
+          python -m compileall -q src tests
+          git diff --check
+      - name: Commit and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Hive Mind Repair Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/hive_mind_os/brain_kernel/planner.py
+          git commit -m "fix: type budget document reconstruction"
+          git push origin HEAD:refs/heads/release/hive-mind-os-singleton-20260812-r5
