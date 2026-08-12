@@ -9,6 +9,42 @@ Branch: `release/hive-mind-os-singleton-20260812-r5` (PR #144). Never touch
 
 ---
 
+## 0. Start here — the prompt that actually works
+
+Pointing an agent at this file with "complete this handoff" **does not work**.
+It was tried; the session oriented itself and stopped after three minutes
+without writing a line, because subagents need explicit authorization and the
+ask reads as "read this doc" rather than "execute seven engineering nodes."
+
+Paste this instead:
+
+> Finish the Hive Mind OS DAG on branch `release/hive-mind-os-singleton-20260812-r5`.
+> Never touch `main`. Read `docs/execution/DAG_EXECUTION_HANDOFF.md` first — it
+> has the state, the ceremony, and the traps.
+>
+> **You have my explicit authorization to spawn parallel subagents** (the Agent
+> tool), one per DAG node, for every node whose `file_locks` are disjoint. That
+> is the only way this finishes; do not implement seven nodes serially yourself.
+>
+> Work autonomously to quiescence. Do not stop to ask whether to proceed. For
+> each node: spawn a worker with its runbook and write scope → verify its output
+> yourself (focused suite green, no tautologies, mandated test count matches the
+> runbook, changed paths inside the write scope) → claim → branch from the claim
+> commit → commit → seal the receipt → push → integrate with `run-round`.
+>
+> If a runbook mandates something provably unsatisfiable, do not fake it and do
+> not weaken the test: report the `file:line` contradiction, repair the runbook
+> in a separate orchestrator commit, and continue. Four runbooks in this plan
+> already needed exactly that.
+>
+> Remaining: BENCH-600, PROMOTE-530, QUALIFY-610, LEGACY-620, A3-700, A4-800,
+> A5-900.
+
+Expect this to take hours and many worker sessions. That is the size of the
+work, not a symptom of something wrong.
+
+---
+
 ## 1. Where the DAG actually is
 
 **32 of 39 nodes COMPLETE and integrated**, all pushed. Integrated this
@@ -28,8 +64,20 @@ LEARN-500, SELFHEAL-450, CHALLENGER-510, POISON-540, MIGRATION-460, EVAL-520 —
 | R20 | `A4-800` | A3-700 | false | |
 | R21 | `A5-900` | A4-800 | false | |
 
-BENCH-600 and PROMOTE-530 can be implemented in parallel. Everything after is
-strictly sequential — no fan-out will change that.
+**Implementation parallelism and dispatch parallelism are different things —
+do not confuse them.** A previous session did, and stalled on it.
+
+- *Dispatch* (who may hold a claim at once) is governed by `parallel_safe`.
+  `PROMOTE-530` is `parallel_safe: false`, so the dispatcher gives it its own
+  round. BENCH-600 lands in R15, PROMOTE-530 in R16. **That is correct
+  behaviour, not a bug** — see the serial-node rule in §5.
+- *Implementation* (who may write files at once) is governed by `file_locks`.
+  BENCH-600 and PROMOTE-530 have disjoint locks, so two workers can write their
+  code simultaneously in one tree.
+
+So: implement BENCH-600 and PROMOTE-530 concurrently, then seal and integrate
+them one at a time in separate rounds. Everything after them is sequential in
+both senses — no fan-out changes that.
 
 Two workers for BENCH-600 and PROMOTE-530 were launched and deliberately
 stopped before they wrote any file, so the tree is clean. Nothing is
