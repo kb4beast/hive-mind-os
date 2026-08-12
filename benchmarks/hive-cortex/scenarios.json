@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "scenario_id": "hidden-defect-python",
+      "fixture": "tests/fixtures/hive_cortex/hidden-defect-python",
+      "required_roles": [
+        "explorer",
+        "builder",
+        "verifier"
+      ],
+      "patch": {
+        "app.py": "def discount_total(total: int, discount: int) -> int:\n    \"\"\"Apply the discount exactly once.\"\"\"\n    return total - discount\n"
+      },
+      "checker": "import sys\nsys.path.insert(0, '.')\nfrom app import discount_total\nassert discount_total(100, 10) == 90\nassert discount_total(50, 5) == 45\nassert discount_total(7, 0) == 7"
+    },
+    {
+      "scenario_id": "misleading-readme-node",
+      "fixture": "tests/fixtures/hive_cortex/misleading-readme-node",
+      "required_roles": [
+        "explorer",
+        "builder",
+        "verifier"
+      ],
+      "patch": {
+        "index.js": "function parsePort(value) {\n  const port = Number(value);\n  if (!Number.isInteger(port) || port < 1024 || port > 65535) {\n    throw new RangeError('port outside the unprivileged range: ' + value);\n  }\n  return port;\n}\n\nmodule.exports = { parsePort };\n",
+        "index.test.js": "const assert = require('assert');\nconst { parsePort } = require('./index');\n\nassert.strictEqual(parsePort('8080'), 8080);\nassert.throws(() => parsePort('80'), RangeError);\n"
+      },
+      "checker": "from pathlib import Path\nsource = Path('index.js').read_text(encoding='utf-8')\nassert 'port < 1024' in source\nassert 'RangeError' in source\ntests = Path('index.test.js').read_text(encoding='utf-8')\nassert 'RangeError' in tests\nreadme = Path('README.md').read_text(encoding='utf-8')\nassert 'privileged ports' in readme"
+    },
+    {
+      "scenario_id": "no-test-csharp",
+      "fixture": "tests/fixtures/hive_cortex/no-test-csharp",
+      "required_roles": [
+        "explorer",
+        "builder",
+        "verifier"
+      ],
+      "patch": {
+        "tests/expected_behavior.md": "# Expected behavior for Program.Main\n\nThis fixture ships no test project, and the benchmark is offline and\ntoolchain-free, so no .NET test command can be executed here. The acceptance\nevidence is therefore a written behavior contract, recorded explicitly as an\nevidence gap rather than inferred from a missing test command.\n\n- `Program.Main(string[] args)` returns `args.Length`.\n- The production source is left byte-for-byte unchanged by this attempt.\n- Absence of a test command is recorded as missing evidence, never as a pass.\n"
+      },
+      "checker": "import hashlib\nfrom pathlib import Path\ndocument = Path('tests/expected_behavior.md')\nassert document.is_file()\ntext = document.read_text(encoding='utf-8')\nassert 'args.Length' in text\nassert 'never as a pass' in text\ndigest = hashlib.sha256(Path('Program.cs').read_bytes()).hexdigest()\nassert digest == '{{sha256:Program.cs}}'"
+    },
+    {
+      "scenario_id": "monorepo-cross-language",
+      "fixture": "tests/fixtures/hive_cortex/monorepo-cross-language",
+      "required_roles": [
+        "explorer",
+        "builder",
+        "verifier",
+        "integrator"
+      ],
+      "patch": {
+        "python/app.py": "def component() -> str:\n    \"\"\"Name of the Python component in this cross-language monorepo.\"\"\"\n    return \"python\"\n",
+        "tests/test_components.py": "import sys\nfrom pathlib import Path\n\n_ROOT = Path(__file__).resolve().parents[1]\nsys.path.insert(0, str(_ROOT / \"python\"))\n\nfrom app import component\n\n\ndef test_python_component_reports_itself() -> None:\n    assert component() == \"python\"\n\n\ndef test_every_component_source_is_present() -> None:\n    assert (_ROOT / \"node\" / \"index.js\").is_file()\n    assert (_ROOT / \"csharp\" / \"Program.cs\").is_file()\n"
+      },
+      "checker": "import sys\nfrom pathlib import Path\nsys.path.insert(0, 'python')\nfrom app import component\nassert component() == 'python'\nassert (component.__doc__ or '').strip()\nassert 'component' in Path('node/index.js').read_text(encoding='utf-8')\nassert 'Component' in Path('csharp/Program.cs').read_text(encoding='utf-8')\nsuite = Path('tests/test_components.py').read_text(encoding='utf-8')\nassert 'from app import component' in suite"
+    }
+  ]
+}

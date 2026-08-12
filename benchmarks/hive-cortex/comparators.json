@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "note": "Seeded from benchmarks/founding-comparator-suite.json. External systems are NOT executed by this benchmark: no pinned commit, no license review, and no offline harness integration exists for them here, so each is recorded as unavailable with a reason. Only the two in-repository lanes are pinned. Inventing pins or licenses for systems that were never run is exactly what the acceptance criteria forbid.",
+  "local_pin_meaning": "For in-repository lanes, 'pin' is the repository commit at which the lane implementation under benchmarks/hive-cortex/ was authored.",
+  "comparators": [
+    {
+      "source_id": "LOCAL-000",
+      "name": "pinned-null-baseline-v1",
+      "pin": "dc136172d1392edd9f10dfad0c4a4db3faec96cc",
+      "license": "repository-internal",
+      "availability": "pinned",
+      "reason": null
+    },
+    {
+      "source_id": "LOCAL-001",
+      "name": "hive-cortex-scripted-lane-v1",
+      "pin": "dc136172d1392edd9f10dfad0c4a4db3faec96cc",
+      "license": "repository-internal",
+      "availability": "pinned",
+      "reason": null
+    },
+    {
+      "source_id": "SRC-003",
+      "name": "Operator OS",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    },
+    {
+      "source_id": "SRC-004",
+      "name": "Hermes Agent",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    },
+    {
+      "source_id": "SRC-008",
+      "name": "AIOS",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    },
+    {
+      "source_id": "SRC-009",
+      "name": "OpenHands",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    },
+    {
+      "source_id": "SRC-010",
+      "name": "Rivet Agent OS",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    },
+    {
+      "source_id": "SRC-011",
+      "name": "Microsoft Agent Framework",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    },
+    {
+      "source_id": "SRC-014",
+      "name": "OpenFang",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    },
+    {
+      "source_id": "SRC-015",
+      "name": "iii AgentOS",
+      "pin": null,
+      "license": null,
+      "availability": "unavailable",
+      "reason": "not executed in this repository; no pinned offline harness integration yet"
+    }
+  ]
+}
