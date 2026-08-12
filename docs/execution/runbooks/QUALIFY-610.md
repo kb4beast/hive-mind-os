@@ -124,6 +124,20 @@ The qualification report. Required structure:
    node still completes honestly with the failure receipts retained — do not
    weaken any gate to pass (node assumption: "No node may expand its own
    authority or weaken acceptance to pass").
+
+   **A `NOT QUALIFIED` verdict cannot be sealed as a COMPLETE node, and the
+   runbook cannot make it one.** `controller.py:2291-2298` rejects any receipt
+   whose `required_tests` are not all `status: "passed"` and rejects any
+   non-passing test entry outright, so a receipt honestly recording a failed
+   gate is invalid, and one recording it as passed is a false claim. The two
+   legitimate exits are therefore: repair the underlying defect so the gate
+   genuinely passes and re-run it, or `autopilot fail` the node with a blocker
+   naming the failing gate. Choosing between them is an orchestrator decision,
+   not a worker one — a worker that hits a red gate reports it and stops.
+   Measured on the first execution of this node: ruff 0.16.0 returned 15
+   errors and pyright 1.1.411 returned 4, all in files predating R17 and
+   outside every remaining node's write scope, so the repair had to be an
+   orchestrator commit (`5ead055`).
 6. **Rollback reference** — the exact candidate commit and the revert command
    (`git revert <commit>`), per the node contract.
 
@@ -186,9 +200,26 @@ the exact exit code in `receipts.json`.
    `python -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();print('\n'.join(sorted(set(re.findall(r'\((tests[.][\w.]+)[.]', t)))))" <log> > module-inventory.txt`).
    Then run the focused named suites:
    `PYTHONPATH=src python -m unittest tests.test_acceptance tests.hive_cortex.test_acceptance_harness tests.test_autonomy tests.test_policy_invariants -v > gate2-acceptance/focused-suite.log 2>&1`.
-   Map every acceptance-matrix suite to modules present in the inventory; any
-   suite with no covering module is a FAIL row (not a silent omission). Commit:
-   `docs(qualify): record autonomy acceptance receipts`.
+   Map every acceptance-matrix suite to modules present in the inventory. A
+   suite with no covering module is never a silent omission, but the row it
+   earns depends on WHY it is uncovered — read the suite's `required_nodes`
+   before classifying it:
+   - `required_nodes` all COMPLETE, still no covering module → **FAIL**. The
+     evidence was supposed to exist and does not.
+   - any `required_node` not yet complete → **DEFERRED**, naming the blocking
+     nodes, plus a residual-blocker row. The evidence cannot exist yet.
+
+   This distinction is load-bearing, not a softening. `staged_autonomy`
+   declares `required_nodes: [A3-700, A4-800, A5-900]`
+   (`.autopilot/acceptance-matrix.json`), and all three are downstream of this
+   node — A3-700 is R18, A4-800 R19, A5-900 R20, while QUALIFY-610 is R17. A
+   flat FAIL rule therefore pins this node's verdict to `NOT QUALIFIED` at
+   every possible execution, regardless of repository health, and makes the
+   `LOCAL-QUALIFIED (pre-A3)` maturity level that §3.1 item 5 mandates
+   unreachable by construction. DEFERRED-with-named-blockers preserves the
+   sealed criterion's intent — no suite disappears quietly — while leaving the
+   verdict able to reflect what was actually measured.
+   Commit: `docs(qualify): record autonomy acceptance receipts`.
 5. **Gate 3 — clean replay verification.** In a scratch directory (never inside
    the repo): `git worktree add <scratch>/q610-clean <candidate-sha>` — a clean,
    uncommitted-change-free tree. Inside it, verify:
