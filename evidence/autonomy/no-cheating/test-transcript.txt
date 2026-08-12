@@ -1,0 +1,25 @@
+test_child_envelope_cannot_broaden_parent (tests.hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests.test_child_envelope_cannot_broaden_parent) ... ok
+test_orphan_child_cannot_self_register (tests.hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests.test_orphan_child_cannot_self_register) ... ok
+test_registry_denies_scope_expansion_expiry_and_revocation (tests.hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests.test_registry_denies_scope_expansion_expiry_and_revocation) ... ok
+test_evaluator_mode_excludes_generator_material (tests.hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests.test_evaluator_mode_excludes_generator_material) ... ok
+test_future_dated_memory_is_invisible_to_every_context (tests.hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests.test_future_dated_memory_is_invisible_to_every_context) ... ok
+test_generator_manifest_never_claims_separation (tests.hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests.test_generator_manifest_never_claims_separation) ... ok
+test_echo_chamber_testimony_is_rejected (tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_echo_chamber_testimony_is_rejected) ... ok
+test_friendly_court_is_structurally_impossible (tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_friendly_court_is_structurally_impossible) ... ok
+test_harness_flags_friendly_consultation (tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_harness_flags_friendly_consultation) ... ok
+test_requester_cannot_pack_its_own_council (tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_requester_cannot_pack_its_own_council) ... ok
+test_role_labels_are_never_independent_humans (tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_role_labels_are_never_independent_humans) ... ok
+test_confirmed_cheating_quarantines_and_disproved_cites_retained_evidence (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_confirmed_cheating_quarantines_and_disproved_cites_retained_evidence) ... ok
+test_fake_receipts_fail_closed_in_report_builder (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_fake_receipts_fail_closed_in_report_builder) ... ok
+test_fake_receipts_tampered_report_or_transcript_is_rejected (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_fake_receipts_tampered_report_or_transcript_is_rejected) ... ok
+test_future_access_observed_commits_must_be_sealed (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_future_access_observed_commits_must_be_sealed) ... ok
+test_stale_evidence_appeal_without_new_evidence_is_rejected (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_stale_evidence_appeal_without_new_evidence_is_rejected) ... ok
+test_stale_evidence_rewritten_artifact_is_denied (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_stale_evidence_rewritten_artifact_is_denied) ... ok
+test_suspected_cheating_triggers_role_council_before_continuation (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_suspected_cheating_triggers_role_council_before_continuation) ... ok
+test_test_weakening_cannot_convert_failure_into_adoption (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_test_weakening_cannot_convert_failure_into_adoption) ... ok
+test_test_weakening_tampered_seal_fails_closed (tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_test_weakening_tampered_seal_fails_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.048s
+
+OK
