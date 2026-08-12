@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from controller import FULL_SHA, format_time
+from dag_standard import add_dag_standard_arguments, run_dag_standard_command
 from durable_controller import (
     AutopilotError,
     ClaimError,
@@ -792,6 +793,8 @@ def parser() -> argparse.ArgumentParser:
 
     commands.add_parser("launch-bindings")
 
+    add_dag_standard_arguments(commands)
+
     return root
 
 
@@ -863,6 +866,10 @@ def select_orchestration_status(
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.command in {"dag-rounds", "dag-lint"}:
+            # Plan-only analysis: deliberately does not construct a live control
+            # plane so any repository's plan.json can be compiled and linted.
+            return run_dag_standard_command(args)
         plane = ControlPlane(Path(args.repo_root))
         if args.command == "doctor":
             result = plane.doctor(

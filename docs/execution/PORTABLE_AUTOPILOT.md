@@ -35,6 +35,21 @@ that repository-specific DAG from actual code, constraints, acceptance, risks, r
 and evidence. Abstract source patterns may be used; unlicensed source wording/code may
 not be copied.
 
+[`DAG_AUTHORING_STANDARD.md`](DAG_AUTHORING_STANDARD.md) is the repository-neutral
+normative standard for node contracts, scaffold ownership, ordering rules beyond raw
+dependencies, round compilation, execution invariants, and token economy. `autopilot
+dag-lint` is written against it and enforces the mechanizable subset — the standard's §8
+states per requirement which rules are machine-checked and which are author-verified. Lint
+errors block; lint warnings require a recorded justification.
+
+The standard is **not yet bound to the `BUILD_DAG` flow.** Binding the DAG-build task to
+the standard by digest — pinning it at `init`, materializing it in the target repository,
+and forbidding the task from reporting success without a zero-error `dag-lint` receipt — is
+specified in [`runbooks/PRODUCT-GENERIC-DAG.md`](runbooks/PRODUCT-GENERIC-DAG.md) §3.1-3.4
+and is **not implemented**. The `DAG-BUILD-<digest>` task prompt emitted today does not
+name the standard. Until that change lands, conformance for a DAG built by that task is an
+authoring discipline plus a separately run `dag-lint`, not a product gate.
+
 Before the portable wrapper executes an installed target controller, a separate Curator
 reviews its clean tracked `.autopilot/bin/*.py` bundle. A distinct host authority then
 issues a short-lived `hive-mind-controller-trust-authorization-v1` capability. The

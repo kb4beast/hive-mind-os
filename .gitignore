@@ -53,6 +53,7 @@ bld/
 !.autopilot/bin/sidecar_execution.py
 !/.autopilot/bin/sealed_recovery.py
 !.autopilot/bin/github_snapshot.py
+!.autopilot/bin/dag_standard.py
 # Uncomment if you have tasks that rely on *.refresh files to move binaries
 # (https://github.com/github/gitignore/pull/3736)
 #!**/[Bb]in/*.refresh
