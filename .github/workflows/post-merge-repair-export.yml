@@ -1,0 +1,47 @@
+name: Export exact post-merge repository bundle
+
+on:
+  push:
+    branches:
+      - agent/post-merge-repair-export-20260812
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch all repository refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git fetch --tags --force origin '+refs/tags/*:refs/tags/*'
+          git show-ref | sort > /tmp/show-ref.txt
+          git rev-parse HEAD > /tmp/export-head.txt
+          git rev-parse refs/remotes/origin/main > /tmp/main-head.txt
+          git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260810-r2 > /tmp/release-head.txt
+      - name: Create exact Git bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git bundle create /tmp/hive-mind-os-current.bundle --all
+          git bundle verify /tmp/hive-mind-os-current.bundle > /tmp/bundle-verification.txt
+      - name: Upload repository bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: hive-mind-os-current-bundle
+          path: |
+            /tmp/hive-mind-os-current.bundle
+            /tmp/show-ref.txt
+            /tmp/export-head.txt
+            /tmp/main-head.txt
+            /tmp/release-head.txt
+            /tmp/bundle-verification.txt
+          if-no-files-found: error
+          retention-days: 1
