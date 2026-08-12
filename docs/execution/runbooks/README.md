@@ -161,6 +161,56 @@ NOT run a second Phase 3 pass; it verifies the lease was released and consumes
 the worker's retained `gate1-ci/unittest-full.log` receipts instead. The
 one-leased-run-per-round invariant is preserved; only the owner changes.
 
+## Self-healing blocker triage (repair and continue; do not halt the DAG)
+
+A worker blocker ends that worker, not the round and not the run. The
+orchestrator classifies every blocker, repairs what it owns, re-dispatches, and
+keeps going. Class A and B are never escalated to the human; class C is never
+self-healed.
+
+| Class | Signature | Why it is or is not repairable |
+|---|---|---|
+| **A — runbook defect** | the blocker names a requirement that lives in `docs/execution/runbooks/<NODE>.md`, and real source contradicts it | runbooks are unsealed operational detail; the orchestrator owns them outright |
+| **B — scope or ordering defect** | the required change is real but falls outside the node's `file_locks`, or a dependency is not materially satisfied despite a satisfied edge | node assignment and round order are operational, not sealed |
+| **C — sealed or external** | the blocker is an `acceptance_criteria` entry in `plan.json`, or a genuine credential, consent, protected-branch, spending, legal, or production gate | repairing it would rotate the plan fingerprint or fabricate authority; both invalidate every receipt the DAG has earned |
+
+**Preflight — cheapest possible fix.** Before dispatching a node, check each
+concrete symbol its runbook asserts against real source
+(`grep -n "def <symbol>" <path>`). A runbook assertion that no longer matches
+source is a class A repair *before* a worker session is ever opened. One grep
+per asserted symbol beats a 6-minute worker that fails closed.
+
+**Class A repair (evidence-producing, never a weakening):**
+
+1. Read the exact symbols the blocker names in real source. If source does not
+   actually contradict the runbook, it is not class A — reclassify.
+2. Correct the runbook to the satisfiable invariant that *preserves the sealed
+   acceptance criterion's intent*. Never delete a `required_tests` entry, never
+   replace a check with a tautology. If the only honest repair reduces real
+   coverage, it is class C.
+3. Commit to the release branch: `fix(runbooks): <NODE> <what was unsatisfiable>`,
+   citing the `file:line` contradiction and naming the replacement invariant.
+4. Settle the node's claim (§ Settling a stalled worker), re-dispatch, and hand
+   the worker the corrected runbook.
+
+**Class B repair:** reassign the change to the node whose `file_locks` already
+own the path, or dispatch that owner first and re-order the round. Never widen a
+node's `file_locks`, and never let a node write outside its declared scope —
+that is a sealed boundary wearing operational clothes.
+
+**Guards against thrash:**
+
+- Two self-heal repairs per node per run. A third blocker on the same node is
+  class C by definition: stop that node, record it, continue other rounds.
+- A repair that cannot cite a `file:line` contradiction is not a repair. Stop.
+- Never edit `plan.json`, `authority-amendments.json`, `.github/governance/**`,
+  or any node's `forbidden_scope`, under any classification.
+- A class C node blocks only its own descendants. Continue every other round,
+  and report class C nodes as a batch at the end rather than one interruption
+  each.
+- Record every repair in the round report: node, class, `file:line` evidence,
+  the replacement invariant, and the re-dispatch result.
+
 ## Recovery (exact commands, no diagnosis needed)
 
 - **Fresh session shows `RECONCILIATION_REQUIRED` everywhere.** Normal: local

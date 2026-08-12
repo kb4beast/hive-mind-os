@@ -247,10 +247,25 @@ actor_role=None, work_id=None, attempt_id=None, idempotency_key=None)` reads
 and returns `DesiredStateReconciler(policy).reconcile(document, now=now)`. It
 executes nothing; callers apply handlers via `ReconciliationResult.apply`.
 
-**`replay()`** recomputes `store.rebuild_projections()`, compares its
-`canonical_digest` with the live `projection()` digest (mismatch →
-`MissionRuntimeError`), re-derives `derive_technical_closeout(...)` and
-returns the four digests as `MissionReplayEvidence`.
+**`replay()`** captures `before = canonical_digest(store.projection())`, calls
+`store.rebuild_projections()` to discard the derived views and re-materialize
+them from sequence one, then compares `after = canonical_digest(store.projection())`
+against `before` (mismatch → `MissionRuntimeError`), re-derives
+`derive_technical_closeout(...)` and returns the four digests as
+`MissionReplayEvidence`, with `rebuilt_projection_digest = after`.
+
+Do **not** digest the value `rebuild_projections()` returns. It returns the full
+reduced state, whose work entries accumulate `evaluation_plan_digest` and
+`passed_evaluation_digest` (`projection.py` `reduce_event`), while `projection()`
+rehydrates only `mission_id`/`status` from the `work_projection` table
+(`store.py:650`). After any mission that seals an evaluation plan and records a
+passed evaluation — which this node's own `run()` flow requires before ACCEPTED —
+those two digests differ by construction, and nothing inside this node's write
+scope can reconcile them. Reading the digest off `projection()` on both sides is
+both satisfiable and the stronger claim: it proves the materialized read model
+survives a full replay byte-identically. `append()` already ends in a full
+rebuild (`store.py:320`), so `before` is itself a replay product and the equality
+is a genuine determinism check, not a tautology.
 
 ### 3.2 `src/hive_mind_os/cortex/repository/mission_adapter.py` (new)
 
@@ -351,7 +366,7 @@ python -m unittest tests.test_hive_cortex_mission_runtime -v
 |---|---|---|
 | `canonical-eight-role-e2e-tests` | `CanonicalEightRoleEndToEndTests` | `test_single_objective_runs_all_eight_roles_with_typed_outputs_and_receipts` (roles of `receipt.role_results` == `KERNEL_IMPLEMENTED_ROLES`; every `result_digest` re-verifies via `roles.result_digest`; builder result has a non-empty `effect_receipt_refs`; projection shows mission COMPLETED and all eight work items INTEGRATED; `receipt.closeout.state is TechnicalCloseoutState.TECHNICALLY_VERIFIED`); `test_consultation_resolves_before_any_escalation` (`receipt.consultation.decision is RESOLVED`, `human_escalation is False`, and the builder `role.result` event payload's evidence includes `receipt.consultation_digest` ref); `test_genuine_authority_escalates_instead_of_self_approving` (bindings with `ConsultationReason.MISSING_EXTERNAL_AUTHORITY`, `authority_class="credential_or_secret"`, assessments with `authority_required=True` and evidence → `MissionEscalationRequired`; afterwards the store contains ZERO `evaluation.result` and ZERO ACCEPTED transitions); `test_builder_effect_is_durable_and_idempotent` (`store.effect_entry(intent_digest=…)["state"] == "receipt_recorded"`; re-`execute` of the same intent+token returns the identical `receipt_digest`); `test_failed_candidate_never_accepts` (check_runner returning False → `MissionRuntimeError`; no ACCEPTED transition recorded) |
 | `humanless-repair-tests` | `HumanlessRepairTests` | `test_missing_candidate_workspace_is_rebuilt_without_human_answers` (delete `root/candidate` before `run`; `repair_pass` with `observed_overrides={"workspaces": [{"workspace_id": "candidate", "exists": False, "work_id": builder_work_id}]}` proposes `REBUILD_WORKSPACE`; `result.apply(repair_handlers(env))` re-materializes; mission then completes; assert NO `WAITING_HUMAN` status anywhere in `store.events()` and `result.quarantined is False`); `test_stale_lease_is_released_and_work_marked_ready` (override with an expired lease → `RELEASE_STALE_LEASE` action and `desired_status == "READY"` for that work record); `test_exhausted_retry_budget_quarantines_not_escalates` (provider failure override with `attempts >= max_retries` → a `QUARANTINE` action, `quarantined is True`, and `apply` with the adapter handlers executes nothing for it); `test_no_progress_bound_quarantines` (`no_progress_count=3` → quarantine of the mission id) |
-| `mission-replay-tests` | `MissionReplayTests` | `test_projection_rebuild_matches_live_projection` (`replay()` returns equal `projection_digest`/`rebuilt_projection_digest`); `test_two_runs_from_identical_inputs_reproduce_the_event_head` (two fresh roots, same `mission_suffix` → identical `event_head_digest`, identical `closeout.report_digest`, identical `receipt.receipt_digest`); `test_orchestration_plan_rehydrates_exactly` (`orchestration_plan_from_events(charter, store.events()).digest == receipt.plan_digest`); `test_closeout_rederivation_is_deterministic` (call `derive_technical_closeout` twice with the environment's `bundle_directories`; equal `report_digest`) |
+| `mission-replay-tests` | `MissionReplayTests` | `test_projection_rebuild_matches_live_projection` (`replay()` returns equal `projection_digest`/`rebuilt_projection_digest`, both read from `projection()` on either side of `rebuild_projections()` — never from that call's return value; see §3.1); `test_two_runs_from_identical_inputs_reproduce_the_event_head` (two fresh roots, same `mission_suffix` → identical `event_head_digest`, identical `closeout.report_digest`, identical `receipt.receipt_digest`); `test_orchestration_plan_rehydrates_exactly` (`orchestration_plan_from_events(charter, store.events()).digest == receipt.plan_digest`); `test_closeout_rederivation_is_deterministic` (call `derive_technical_closeout` twice with the environment's `bundle_directories`; equal `report_digest`) |
 | `authority-boundary-tests` | `AuthorityBoundaryTests` | `test_effect_outside_write_scope_is_denied` (`registry.authorize(_Z, "write", "base/app.txt", now=…)` → `AuthorityDenied`); `test_capability_token_must_bind_the_exact_intent` (authorize a DIFFERENT allowed target, present it with the builder intent → `AuthorityDenied` from `validate_capability_token` inside `gateway.execute`); `test_builder_cannot_evaluate_its_own_candidate` (`verify_exact_candidate` with `builder_id == evaluator_id` → `ExactCandidateVerificationError`); `test_acceptance_requires_the_recorded_passed_result` (`accept_verified_work` with a FAILED or unrecorded `EvaluationResult` → `ExactCandidateVerificationError`); `test_curator_requires_evaluator_isolated_context` (curator `RoleInvocation` with `evaluator_mode=False` → `RoleProtocolError` from `RepositoryRoleHandlers.execute`); `test_requesting_role_cannot_consult_itself` (`ConsultationRequest(..., requesting_role="builder", applicable_roles=("builder","curator"))` → `ValueError`); `test_unknown_event_types_are_rejected_by_the_spine` (`store.append` of a `KernelEvent` with `event_type="mission.self_approved"` raises — the reducer schema is closed) |
 
 Edge cases folded into the above: `MissionBindings.verification` missing a
