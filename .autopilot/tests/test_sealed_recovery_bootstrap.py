@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -488,6 +489,86 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             "rollback_ref": "revert:repair",
         }
 
+    def _install_terminal_optimizer_cut(
+        self,
+        *,
+        claim_present: bool,
+        continuation_status: str = "CONSUMED",
+    ) -> tuple[dict, dict, str, Path]:
+        node_id = "OPTIMIZER-370"
+        owner = "test:continuation"
+        record = self._record(node_id)
+        receipt = self._receipt(node_id)
+        receipt_commit = "f" * 40
+        claimed = {
+            "kind": sealed_recovery.REPAIR_CLAIM_KIND,
+            "node_id": node_id,
+            "owner": owner,
+            "status": "CLAIMED",
+            "grant_id": record["grant_id"],
+            "expires_at": "2026-08-11T21:13:07.231123Z",
+            "authority_digest": autopilot.digest_json(record),
+            "target_sha": "d" * 40,
+        }
+        claim = {**claimed, "status": "COMPLETING"}
+        if claim_present:
+            autopilot.atomic_write_json(self.plane.claim_path(node_id), claim)
+        consuming = {
+            "kind": sealed_recovery.OPTIMIZER_CONTINUATION_KIND,
+            "status": "CONSUMING",
+            "target_sha": "9" * 40,
+            "grant_id": record["grant_id"],
+            "claim_digest": autopilot.digest_json(claimed),
+        }
+        continuation = dict(consuming)
+        continuation["status"] = continuation_status
+        if continuation_status == "CONSUMED":
+            continuation.update({
+                "previous_digest": autopilot.digest_json(consuming),
+                "receipt_commit": receipt_commit,
+            })
+        autopilot.atomic_write_json(self.plane.optimizer_continuation_path, continuation)
+        intent_path = (
+            self.plane.state_dir / "sealed-repair-completion-optimizer-370.json"
+        )
+        autopilot.atomic_write_json(intent_path, {
+            "schema_version": 1,
+            "kind": "hive-mind-autopilot-sealed-repair-completion-v1",
+            "status": "PREPARED",
+            "node_id": node_id,
+            "owner": owner,
+            "target_sha": claimed["target_sha"],
+            "remote_expected_final": receipt["final_commit"],
+            "receipt_digest": autopilot.digest_json(receipt),
+            "receipt_commit": receipt_commit,
+            "active_claim_digest": autopilot.digest_json(claimed),
+            "prepared_at": "2026-08-11T20:00:00Z",
+            "continuation_digest": autopilot.digest_json(consuming),
+            "continuation_target_sha": consuming["target_sha"],
+            "continuation_grant_id": consuming["grant_id"],
+        })
+        autopilot.atomic_write_json(self.plane.receipt_path(node_id), receipt)
+        autopilot.append_jsonl(self.plane.state_dir / "receipt-index.jsonl", {
+            "node_id": node_id,
+            "receipt_commit": receipt_commit,
+            "receipt_digest": autopilot.digest_json(receipt),
+            "final_commit": receipt["final_commit"],
+            "supersedes_receipt_commit": record["old_receipt_commit"],
+            "timestamp": receipt["timestamp"],
+        })
+        self.plane.remote_branch_sha = lambda _branch: receipt_commit  # type: ignore[method-assign]
+        self.plane._commit_parents = lambda _sha: (receipt["final_commit"],)  # type: ignore[method-assign]
+        self.plane._commit_tree = lambda _sha: receipt["final_tree"]  # type: ignore[method-assign]
+        self.plane._git = lambda args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+            args,
+            0,
+            self.plane._receipt_message(receipt)
+            if tuple(args[:3]) == ("show", "-s", "--format=%B")
+            else "",
+            "",
+        )
+        return record, receipt, receipt_commit, intent_path
+
     @staticmethod
     def _consultation() -> dict:
         return {
@@ -764,6 +845,285 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             view = self.plane.node_view(node_id)
         self.assertEqual(view.state, "COMPLETE", view.reasons)
 
+    def test_live_cfe_not_g_optimizer_receipt_exact_topology_and_negatives(self) -> None:
+        repository = Path(__file__).resolve().parents[2]
+        plane = autopilot.ControlPlane(repository)
+        receipt = json.loads(
+            (repository / ".autopilot" / "optimizer-370-intended-receipt.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertNotEqual(receipt["base_commit"], receipt["authority"]["execution_target_sha"])
+        self.assertEqual(
+            plane._diff_paths(
+                receipt["authority"]["execution_target_sha"], receipt["final_commit"]
+            ),
+            tuple(receipt["changed_paths"]),
+        )
+        self.assertEqual(plane._replacement_receipt_issues("OPTIMIZER-370", receipt), ())
+
+        mutations = {
+            "one_path_omission": lambda value: value.__setitem__(
+                "changed_paths", value["changed_paths"][:1]
+            ),
+            "g_as_base": lambda value: value.update({
+                "base_commit": value["authority"]["execution_target_sha"],
+                "base_tree": "2a5b94489c368c0e3798c2d38d85f7631adb8604",
+            }),
+            "incident_wide_paths": lambda value: value.__setitem__(
+                "changed_paths", list(plane._diff_paths(value["base_commit"], value["final_commit"]))
+            ),
+            "wrong_candidate": lambda value: value.__setitem__(
+                "final_commit", value["authority"]["execution_merge_commit"]
+            ),
+            "wrong_grant": lambda value: value["authority"].__setitem__("grant_id", "other"),
+        }
+        for label, mutate in mutations.items():
+            changed = copy.deepcopy(receipt)
+            mutate(changed)
+            with self.subTest(label=label):
+                self.assertTrue(plane._replacement_receipt_issues("OPTIMIZER-370", changed))
+
+        plane.control["verify_git_objects"] = False
+        self.assertIn(
+            "Git object verification",
+            "; ".join(plane._replacement_receipt_issues("OPTIMIZER-370", receipt)),
+        )
+
+    def test_real_bare_live_cfe_not_g_prearmed_h_crash_receipt_and_integration(self) -> None:
+        source = Path(__file__).resolve().parents[2]
+        remote = self.root / "optimizer-live-post-h.git"
+        repository = self.root / "optimizer-live-post-h"
+        integrated_repository = self.root / "optimizer-live-integrated"
+        g = "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+        claim_commit = "8fa51243327ae928e46df180bfd81fbf90062cf5"
+        execution_merge = "88f2962b64f7cc9f88284c5dd30106de5313da7b"
+        candidate = "948368b77ba8de920369f416970e83b909bd50ba"
+        main = "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8"
+        capability_commit = sealed_recovery.OPTIMIZER_COMPLETION_CAPABILITY_COMMIT
+        checkout = subprocess.run(
+            ("git", "rev-parse", "HEAD"), cwd=source, text=True,
+            capture_output=True, check=True,
+        ).stdout.strip()
+        checkout_parents = subprocess.run(
+            ("git", "show", "-s", "--format=%P", checkout), cwd=source,
+            text=True, capture_output=True, check=True,
+        ).stdout.strip().split()
+        candidates = [checkout, *checkout_parents]
+        h_matches = []
+        for candidate_head in candidates:
+            parents = subprocess.run(
+                ("git", "show", "-s", "--format=%P", candidate_head), cwd=source,
+                text=True, capture_output=True, check=True,
+            ).stdout.strip().split()
+            if parents == [capability_commit]:
+                h_matches.append(candidate_head)
+        self.assertEqual(len(set(h_matches)), 1, h_matches)
+        h = h_matches[0]
+        self.assertEqual(
+            subprocess.run(
+                ("git", "rev-parse", f"{h}^"), cwd=source, text=True,
+                capture_output=True, check=True,
+            ).stdout.strip(),
+            capability_commit,
+        )
+
+        def run(*args: str, cwd: Path = repository) -> str:
+            completed = subprocess.run(
+                args, cwd=cwd, text=True, capture_output=True, check=False
+            )
+            if completed.returncode != 0:
+                self.fail(f"{' '.join(args)} failed: {completed.stderr}")
+            return completed.stdout.strip()
+
+        subprocess.run(("git", "init", "--bare", str(remote)), check=True, capture_output=True)
+        run(
+            "git", "push", str(remote),
+            f"{g}:refs/heads/release/hive-mind-os-singleton-20260810-r2",
+            f"{candidate}:refs/heads/autopilot/optimizer-370",
+            f"{main}:refs/heads/main", f"{h}:refs/heads/overlay-h", cwd=source,
+        )
+        run("git", "clone", str(remote), str(repository), cwd=self.root)
+        run("git", "config", "user.name", "Optimizer Live Fixture")
+        run("git", "config", "user.email", "optimizer-live@example.invalid")
+        run("git", "checkout", "-B", "autopilot/optimizer-370", candidate)
+        shutil.rmtree(repository / ".autopilot")
+        copy_autopilot_fixture(source / ".autopilot", repository / ".autopilot")
+        plane = autopilot.ControlPlane(
+            repository,
+            clock=lambda: sealed_recovery.parse_time("2026-08-11T20:00:00Z"),
+        )
+        record = plane._repair_record("OPTIMIZER-370")
+        receipt = json.loads(
+            (repository / ".autopilot/optimizer-370-intended-receipt.json").read_text()
+        )
+        message = plane._repair_claim_message(claim_commit)
+        assert isinstance(message, dict)
+        claim = {
+            "schema_version": 1,
+            "kind": sealed_recovery.REPAIR_CLAIM_KIND,
+            "node_id": "OPTIMIZER-370",
+            "owner": "codex:optimizer-370-repair",
+            "status": "CLAIMED",
+            "claimed_at": "2026-08-11T18:13:07.231123Z",
+            "heartbeat_at": "2026-08-11T18:13:07.231123Z",
+            "expires_at": message["expires_at"],
+            "plan_fingerprint": message["plan_fingerprint"],
+            "remote": "origin",
+            "remote_claim_commit": claim_commit,
+            "execution_merge_commit": execution_merge,
+            "remote_head_commit": execution_merge,
+            "target_sha": g,
+            "branch": "autopilot/optimizer-370",
+            "old_receipt_commit": record["old_receipt_commit"],
+            "repair_id": record["repair_id"],
+            "grant_id": record["grant_id"],
+            "authority_digest": autopilot.digest_json(record),
+            "release_id": message["release_id"],
+            "github_snapshot_digest": message["github_snapshot_digest"],
+            "reconciliation_digest": message["reconciliation_digest"],
+            "doctor_evidence_digest": message["doctor_evidence_digest"],
+        }
+        autopilot.atomic_write_json(plane.claim_path("OPTIMIZER-370"), claim)
+        target_release = {
+            "target_sha": h,
+            "release_id": "sha256:" + "1" * 64,
+            "github_snapshot_digest": "sha256:" + "2" * 64,
+            "reconciliation_digest": "sha256:" + "3" * 64,
+            "doctor_evidence_digest": "sha256:" + "4" * 64,
+        }
+
+        def configure(value) -> None:
+            value._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
+            value.github_snapshot = lambda: {  # type: ignore[method-assign]
+                "target_sha": value.current_target_sha(),
+                "pull_requests": [{
+                    "node_id": "OPTIMIZER-370", "number": 135, "state": "open",
+                    "merged": False, "ci": "success", "base": value.target_branch,
+                    "head": "autopilot/optimizer-370", "head_sha": candidate,
+                    "draft": True,
+                }],
+            }
+            value.current_release = lambda: dict(target_release)  # type: ignore[method-assign]
+            value._release_issues = lambda _release: ()  # type: ignore[method-assign]
+            value._doctor_evidence_digest = lambda: target_release["doctor_evidence_digest"]  # type: ignore[method-assign]
+            value.acquire_global_validation_lease = lambda *_args, **_kwargs: {"lease_id": "fixture"}  # type: ignore[method-assign]
+            value.release_global_validation_lease = lambda *_args, **_kwargs: None  # type: ignore[method-assign]
+
+        configure(plane)
+        armed = plane.arm_optimizer_completion_continuation(
+            "codex:optimizer-370-repair", h
+        )
+        self.assertEqual(armed["target_sha"], h)
+        self.assertEqual(armed["status"], "ARMED")
+
+        h_tree = run("git", "rev-parse", f"{h}^{{tree}}")
+        wrong_h = run(
+            "git", "commit-tree", h_tree, "-p", capability_commit,
+            "-m", "wrong sibling H",
+        )
+        run(
+            "git", "push", "--force", "origin",
+            f"{wrong_h}:refs/heads/release/hive-mind-os-singleton-20260810-r2",
+        )
+        run("git", "fetch", "origin", "release/hive-mind-os-singleton-20260810-r2")
+        with self.assertRaisesRegex(autopilot.ClaimError, "pin current H exactly"):
+            plane.complete("OPTIMIZER-370", "codex:optimizer-370-repair", receipt)
+        run(
+            "git", "push", "--force", "origin",
+            f"{g}:refs/heads/release/hive-mind-os-singleton-20260810-r2",
+        )
+        run("git", "fetch", "origin", "release/hive-mind-os-singleton-20260810-r2")
+        run(
+            "git", "push", "origin",
+            f"{h}:refs/heads/release/hive-mind-os-singleton-20260810-r2",
+        )
+        run("git", "fetch", "origin", "release/hive-mind-os-singleton-20260810-r2")
+
+        original_write = sealed_recovery.atomic_write_json
+
+        def crash_after_remote_receipt(path, value):
+            if path == plane.receipt_path("OPTIMIZER-370"):
+                raise SystemExit("restart after exact remote receipt CAS")
+            return original_write(path, value)
+
+        try:
+            sealed_recovery.atomic_write_json = crash_after_remote_receipt
+            with self.assertRaises(SystemExit):
+                plane.complete("OPTIMIZER-370", "codex:optimizer-370-repair", receipt)
+        finally:
+            sealed_recovery.atomic_write_json = original_write
+        receipt_commit = plane.remote_branch_sha("autopilot/optimizer-370")
+        assert isinstance(receipt_commit, str)
+        restarted = autopilot.ControlPlane(
+            repository,
+            clock=lambda: sealed_recovery.parse_time("2026-08-11T20:05:00Z"),
+        )
+        configure(restarted)
+        self.assertEqual(
+            restarted.complete("OPTIMIZER-370", "codex:optimizer-370-repair", receipt),
+            receipt_commit,
+        )
+        with self.assertRaisesRegex(autopilot.ClaimError, "binding differs"):
+            restarted.complete("OPTIMIZER-370", "codex:unrelated", receipt)
+        run(
+            "git", "push", "--force", "origin",
+            f"{candidate}:refs/heads/autopilot/optimizer-370",
+        )
+        with self.assertRaisesRegex(autopilot.ClaimError, "binding differs"):
+            restarted.complete("OPTIMIZER-370", "codex:optimizer-370-repair", receipt)
+        run(
+            "git", "push", "--force", "origin",
+            f"{receipt_commit}:refs/heads/autopilot/optimizer-370",
+        )
+        index_path = restarted.state_dir / "receipt-index.jsonl"
+        exact_index = index_path.read_text(encoding="utf-8")
+        with index_path.open("a", encoding="utf-8") as stream:
+            stream.write(exact_index)
+        with self.assertRaisesRegex(autopilot.ClaimError, "evidence differs"):
+            restarted.complete("OPTIMIZER-370", "codex:optimizer-370-repair", receipt)
+        index_path.write_text(exact_index, encoding="utf-8")
+        self.assertEqual(
+            restarted.complete("OPTIMIZER-370", "codex:optimizer-370-repair", receipt),
+            receipt_commit,
+        )
+
+        merge_tree = run("git", "merge-tree", "--write-tree", h, receipt_commit)
+        integration = run(
+            "git", "commit-tree", merge_tree, "-p", h, "-p", receipt_commit,
+            "-m", "integrate exact Optimizer receipt after H",
+        )
+        run(
+            "git", "push", "origin",
+            f"{integration}:refs/heads/release/hive-mind-os-singleton-20260810-r2",
+        )
+        run("git", "fetch", "origin", "release/hive-mind-os-singleton-20260810-r2")
+        self.assertEqual(
+            restarted.complete("OPTIMIZER-370", "codex:optimizer-370-repair", receipt),
+            receipt_commit,
+        )
+        run(
+            "git", "clone", "--branch",
+            "release/hive-mind-os-singleton-20260810-r2",
+            str(remote), str(integrated_repository), cwd=self.root,
+        )
+        source_authority = source / ".autopilot/optimizer-370-completion-overlay-authority.json"
+        integrated_authority = (
+            integrated_repository
+            / ".autopilot/optimizer-370-completion-overlay-authority.json"
+        )
+        if integrated_authority.read_bytes() != source_authority.read_bytes():
+            # Before the final reseal commit exists, exercise the prospective H
+            # control-plane bytes.  On the sealed H path this branch is not taken.
+            shutil.rmtree(integrated_repository / ".autopilot")
+            copy_autopilot_fixture(source / ".autopilot", integrated_repository / ".autopilot")
+        integrated = autopilot.ControlPlane(integrated_repository)
+        durable_records = integrated._durable_receipt_records().get("OPTIMIZER-370", [])
+        self.assertEqual(len(durable_records), 1, durable_records)
+        self.assertEqual(durable_records[0]["receipt"], receipt)
+        view = integrated.node_view("OPTIMIZER-370")
+        self.assertEqual(view.state, "COMPLETE", view.reasons)
+
     def test_real_bare_optimizer_claim_restart_receipt_and_integrated_complete(self) -> None:
         repository = self.root / "sealed-real-flow"
         remote = self.root / "sealed-real-flow.git"
@@ -856,6 +1216,8 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             plane._reconciliation_digest = lambda: "reconciliation"  # type: ignore[method-assign]
             plane._doctor_evidence_digest = lambda: "doctor"  # type: ignore[method-assign]
             plane._release_binding_issues = lambda _claim=None: ()  # type: ignore[method-assign]
+            # This legacy synthetic flow predates the immutable live Optimizer tuple.
+            plane._exact_optimizer_completion_issues = lambda _receipt: ()  # type: ignore[method-assign]
 
         plane = autopilot.ControlPlane(repository)
         configure(plane)
@@ -992,6 +1354,203 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.assertEqual(state["head"], committed)
         self.assertFalse(self.plane.claim_path(node_id).exists())
         self.assertTrue(self.plane.receipt_path(node_id).is_file())
+
+    def test_prepared_intent_with_claimed_claim_recovers_before_active_rejection(self) -> None:
+        node_id = "OPTIMIZER-370"
+        owner = "test:prepared-cut"
+        record = self._record(node_id)
+        receipt = self._receipt(node_id)
+        claim = {
+            "kind": sealed_recovery.REPAIR_CLAIM_KIND,
+            "node_id": node_id,
+            "owner": owner,
+            "status": "CLAIMED",
+            "expires_at": "2030-01-01T00:00:00Z",
+            "authority_digest": autopilot.digest_json(record),
+            "target_sha": "d" * 40,
+        }
+        claim_path = self.plane.claim_path(node_id)
+        autopilot.atomic_write_json(claim_path, claim)
+        intent_path = self.plane.state_dir / "sealed-repair-completion-optimizer-370.json"
+        autopilot.atomic_write_json(intent_path, {
+            "schema_version": 1,
+            "kind": "hive-mind-autopilot-sealed-repair-completion-v1",
+            "status": "PREPARED",
+            "node_id": node_id,
+            "owner": owner,
+            "target_sha": claim["target_sha"],
+            "remote_expected_final": receipt["final_commit"],
+            "receipt_digest": autopilot.digest_json(receipt),
+            "receipt_commit": None,
+            "active_claim_digest": autopilot.digest_json(claim),
+            "prepared_at": "2026-08-11T20:00:00Z",
+        })
+        self.plane.remote_branch_sha = lambda _branch: receipt["final_commit"]  # type: ignore[method-assign]
+        self.plane._git = lambda args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+            args, 0, receipt["final_commit"] + "\n", ""
+        )
+        self.assertIsNone(
+            self.plane._recover_interrupted_repair_completion(
+                node_id, owner, receipt, claim, record
+            )
+        )
+        self.assertEqual(json.loads(claim_path.read_text())["status"], "CLAIMED")
+        self.assertFalse(intent_path.exists())
+
+    def test_consumed_cut_finishes_cleanup_after_expiry_and_h_advance(self) -> None:
+        record, receipt, receipt_commit, intent_path = self._install_terminal_optimizer_cut(
+            claim_present=True
+        )
+        self.plane.clock = lambda: autopilot.parse_time("2031-01-01T00:00:00Z")  # type: ignore[method-assign]
+        self.plane.current_target_sha = lambda: "a" * 40  # type: ignore[method-assign]
+        claim = json.loads(self.plane.claim_path("OPTIMIZER-370").read_text())
+        self.assertEqual(
+            self.plane._recover_interrupted_repair_completion(
+                "OPTIMIZER-370", "test:continuation", receipt, claim, record
+            ),
+            receipt_commit,
+        )
+        self.assertFalse(self.plane.claim_path("OPTIMIZER-370").exists())
+        self.assertFalse(intent_path.exists())
+        self.assertEqual(
+            json.loads(self.plane.optimizer_continuation_path.read_text())["status"],
+            "CONSUMED",
+        )
+
+    def test_terminal_missing_claim_reconciles_consumed_continuation(self) -> None:
+        _record, receipt, receipt_commit, intent_path = self._install_terminal_optimizer_cut(
+            claim_present=False
+        )
+        self.plane.clock = lambda: autopilot.parse_time("2031-01-01T00:00:00Z")  # type: ignore[method-assign]
+        self.plane.current_target_sha = lambda: "a" * 40  # type: ignore[method-assign]
+        self.assertEqual(
+            self.plane.complete("OPTIMIZER-370", "test:continuation", receipt),
+            receipt_commit,
+        )
+        self.assertFalse(intent_path.exists())
+
+    def test_durable_continuation_transition_marker_recovers_after_process_death(self) -> None:
+        path = self.plane.optimizer_continuation_path
+        current = {
+            "kind": sealed_recovery.OPTIMIZER_CONTINUATION_KIND,
+            "status": "ACTIVE",
+            "target_sha": "9" * 40,
+        }
+        autopilot.atomic_write_json(path, current)
+        marker = path.with_suffix(path.suffix + ".transition")
+        autopilot.atomic_write_json(marker, {
+            "schema_version": 1,
+            "kind": sealed_recovery.OPTIMIZER_CONTINUATION_KIND + "-transition",
+            "expected_status": "ACTIVE",
+            "next_status": "CONSUMING",
+            "expected_digest": autopilot.digest_json(current),
+            "receipt_commit": None,
+            "bindings": None,
+        })
+        transitioned = self.plane._transition_optimizer_continuation(
+            "ACTIVE", "CONSUMING"
+        )
+        self.assertEqual(transitioned["status"], "CONSUMING")
+        self.assertFalse(marker.exists())
+        self.assertEqual(
+            self.plane._transition_optimizer_continuation("ACTIVE", "CONSUMING")["status"],
+            "CONSUMING",
+        )
+        autopilot.atomic_write_json(marker, {
+            "schema_version": 1,
+            "kind": sealed_recovery.OPTIMIZER_CONTINUATION_KIND + "-transition",
+            "expected_status": "ACTIVE",
+            "next_status": "CONSUMING",
+            "expected_digest": transitioned["previous_digest"],
+            "receipt_commit": None,
+            "bindings": None,
+        })
+        consumed = self.plane._transition_optimizer_continuation(
+            "CONSUMING", "CONSUMED", receipt_commit="f" * 40
+        )
+        self.assertEqual(consumed["status"], "CONSUMED")
+        self.assertFalse(marker.exists())
+
+    def test_post_consumed_claim_and_intent_unlink_failures_never_compensate(self) -> None:
+        for cut in ("claim", "intent"):
+            with self.subTest(cut=cut):
+                repository = self.root / f"post-consumed-{cut}"
+                copy_autopilot_fixture(
+                    Path(__file__).resolve().parents[1], repository / ".autopilot"
+                )
+                control_path = repository / ".autopilot/control-plane.json"
+                control = json.loads(control_path.read_text())
+                control["verify_git_objects"] = False
+                control_path.write_text(json.dumps(control))
+                plane = autopilot.ControlPlane(repository)
+                node_id = "OPTIMIZER-370"
+                owner = "test:consumed-cut"
+                record = plane._repair_record(node_id)
+                receipt = self._receipt(node_id)
+                claim = {
+                    "kind": sealed_recovery.REPAIR_CLAIM_KIND,
+                    "node_id": node_id, "owner": owner, "status": "CLAIMED",
+                    "expires_at": "2030-01-01T00:00:00Z",
+                    "authority_digest": autopilot.digest_json(record),
+                    "target_sha": "d" * 40, "grant_id": record["grant_id"],
+                }
+                claim_path = plane.claim_path(node_id)
+                autopilot.atomic_write_json(claim_path, claim)
+                continuation = {
+                    "kind": sealed_recovery.OPTIMIZER_CONTINUATION_KIND,
+                    "status": "ACTIVE", "node_id": node_id, "owner": owner,
+                    "target_sha": "9" * 40, "grant_id": record["grant_id"],
+                    "claim_digest": autopilot.digest_json(claim),
+                    "receipt_digest": autopilot.digest_json(receipt),
+                }
+                autopilot.atomic_write_json(plane.optimizer_continuation_path, continuation)
+                state = {"remote": receipt["final_commit"], "local": receipt["final_commit"]}
+                plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
+                plane.remote_branch_sha = lambda _branch: state["remote"]  # type: ignore[method-assign]
+                plane._arm_optimizer_continuation = lambda *_args: json.loads(plane.optimizer_continuation_path.read_text())  # type: ignore[method-assign]
+                plane._optimizer_continuation_issues = lambda *_args, **_kwargs: ()  # type: ignore[method-assign]
+                plane._replacement_receipt_issues = lambda *_args, **_kwargs: ()  # type: ignore[method-assign]
+                plane.acquire_global_validation_lease = lambda *_args, **_kwargs: {"lease_id": "fixture"}  # type: ignore[method-assign]
+                plane.release_global_validation_lease = lambda *_args, **_kwargs: None  # type: ignore[method-assign]
+                plane._create_receipt_commit = lambda *_args: "f" * 40  # type: ignore[method-assign]
+                plane._commit_parents = lambda _sha: (receipt["final_commit"],)  # type: ignore[method-assign]
+                plane._commit_tree = lambda _sha: receipt["final_tree"]  # type: ignore[method-assign]
+
+                def cas(_branch: str, expected: str, new: str) -> None:
+                    self.assertEqual(state["remote"], expected)
+                    state["remote"] = new
+
+                plane._cas_update_branch = cas  # type: ignore[method-assign]
+                plane._git = lambda args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+                    args, 0,
+                    plane._receipt_message(receipt)
+                    if tuple(args[:3]) == ("show", "-s", "--format=%B")
+                    else state["local"] + "\n",
+                    "",
+                )
+                intent_path = plane.state_dir / "sealed-repair-completion-optimizer-370.json"
+                original_unlink = Path.unlink
+                failed = False
+
+                def fail_terminal_unlink(path: Path, *args, **kwargs):
+                    nonlocal failed
+                    target = claim_path if cut == "claim" else intent_path
+                    if path == target and not failed:
+                        failed = True
+                        raise OSError(f"process death at {cut} unlink")
+                    return original_unlink(path, *args, **kwargs)
+
+                with mock.patch.object(Path, "unlink", fail_terminal_unlink):
+                    with self.assertRaises(OSError):
+                        plane.complete(node_id, owner, receipt)
+                self.assertEqual(state["remote"], "f" * 40)
+                self.assertTrue(plane.receipt_path(node_id).is_file())
+                self.assertTrue(plane._receipt_index_contains(node_id, "f" * 40))
+                self.assertEqual(
+                    json.loads(plane.optimizer_continuation_path.read_text())["status"],
+                    "CONSUMED",
+                )
+                self.assertEqual(plane.complete(node_id, owner, receipt), "f" * 40)
 
     def test_receipt_cas_failure_restores_claimed_state_without_completion_evidence(self) -> None:
         node_id = "OPTIMIZER-370"

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "case_id": "court-optimizer-370-completion-overlay-20260811",
+  "disposition": "ADAPT",
+  "clerk_identity": "clerk:optimizer-370-completion-overlay",
+  "advocate_identity": "optimizer:optimizer-370-completion-advocate",
+  "cross_examiner_identity": "curator:optimizer-370-completion-cross-examiner",
+  "expert_witness_identity": "steward:optimizer-370-completion-expert",
+  "judge_identity": "judge:optimizer-370-completion-independent",
+  "atomic_claims": [
+    {"claim": "The generic incident-base changed-path equality is impossible after the ordered claim/G merge.", "decision": "ADAPT", "control": "Suppress only that exact diagnostic for the exact sealed grant after all other generic checks run."},
+    {"claim": "The adopted candidate is still bounded.", "decision": "ADOPT", "control": "Require exact nonempty G..948 paths equal both authorized Optimizer paths."},
+    {"claim": "A release advance can strand an otherwise valid completion.", "decision": "ADAPT", "control": "Permit one CAS-pinned H only while the exact unexpired CLAIMED lease remains valid."},
+    {"claim": "Completion is not crash-safe at two ordering cuts.", "decision": "ADAPT", "control": "Reconcile PREPARED+CLAIMED and terminal receipt state before ordinary active-claim rejection."},
+    {"claim": "Git configuration can redirect or weaken authenticated transport.", "decision": "ADAPT", "control": "Isolate global/system config, reject case-folded includes and local rewrite/helper overrides, and preserve TLS verification."}
+  ],
+  "adverse_findings": [
+    "A broad base/path exception would weaken every durable receipt.",
+    "A dynamically accepted descendant H would expand continuation authority.",
+    "An includeIf chain can load http.sslVerify=false while a literal origin string still appears correct.",
+    "A stale intent without exact terminal evidence must remain fail closed."
+  ],
+  "acceptance_conditions": [
+    "Exact cfe/G/old-receipt/claim/merge/candidate/tree/PR/receipt topology is required.",
+    "H is pinned once under O_EXCL while the exact claim is CLAIMED and unexpired.",
+    "Every later check requires that exact H and transitions ACTIVE to CONSUMING to CONSUMED.",
+    "Generic and nonsealed receipts retain all ordinary checks."
+  ],
+  "dissent": [
+    "The continuation is intentionally unavailable after the original claim or its bounded continuation expires."
+  ]
+}

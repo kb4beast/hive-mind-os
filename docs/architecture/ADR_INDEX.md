@@ -30,9 +30,10 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-055`     | [Exact Explorer receipt-branch retirement](ADR-055-EXACT-EXPLORER-RECEIPT-RETIREMENT.md)                                    | Singleton L2 recovery      | adopted only for the sealed rejected receipt branch                                  |
 | `ADR-056`     | [Singleton release-branch execution](ADR-056-SINGLETON-RELEASE-BRANCH-EXECUTION.md)                                        | Singleton execution       | accepted for the current release program                                               |
 | `ADR-057`     | [Sealed L2 recovery bootstrap](ADR-057-SEALED-L2-RECOVERY-BOOTSTRAP.md)                                                     | Singleton L2 recovery     | adapted only for OPTIMIZER-370, ORCH-300, and BUILDER-330                              |
+| `ADR-058`     | [Exact OPTIMIZER-370 completion overlay](ADR-058-OPTIMIZER-370-COMPLETION-OVERLAY.md)                                    | Singleton L2 recovery     | adapted only for exact sealed Optimizer receipt completion                             |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-058; it must be unique at creation time.
+is ADR-059; it must be unique at creation time.
