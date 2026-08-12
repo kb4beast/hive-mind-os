@@ -79,7 +79,14 @@ from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .projection import build_projection, projection_json, write_projection_html
-from .repository_compatibility import record_legacy_enqueue
+from .repository_compatibility import (
+    COMPATIBILITY_MODES,
+    RuntimeRouteError,
+    record_canonical_enqueue,
+    record_legacy_enqueue,
+    resolve_runtime_route,
+    runtime_identity,
+)
 from .runtime import HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
@@ -601,9 +608,15 @@ def build_enqueue_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--compatibility-mode",
-        choices=("kernel-v1", "legacy"),
-        default="kernel-v1",
-        help="Use the versioned kernel ingress record or retain legacy-only dispatch for rollback.",
+        choices=COMPATIBILITY_MODES,
+        default="canonical",
+        help=(
+            "Runtime routing for this request. 'canonical' (default) runs new "
+            "missions on the canonical mission runtime. 'kernel-v1' and 'legacy' "
+            "are explicit, reversible rollback modes during qualification: both "
+            "keep legacy execution, and 'legacy' additionally writes no kernel "
+            "ingress record."
+        ),
     )
     return parser
 
@@ -1216,12 +1229,19 @@ def _run_enqueue(args: argparse.Namespace) -> int:
         allow_nan=False,
     ).encode("utf-8")
     mission_id = f"M-{sha256(encoded).hexdigest()[:32]}"
+    try:
+        route = resolve_runtime_route(
+            getattr(args, "compatibility_mode", "canonical")
+        )
+    except RuntimeRouteError as error:
+        raise SystemExit(f"compatibility mode is invalid: {error}") from None
     scheduler = Scheduler(args.state_dir)
     try:
         job = scheduler.enqueue(
-            "repository-mission",
+            route.job_kind,
             {
                 "mission_id": mission_id,
+                "runtime": route.runtime,
                 **semantic_payload,
             },
             max_attempts=args.max_attempts,
@@ -1229,7 +1249,13 @@ def _run_enqueue(args: argparse.Namespace) -> int:
         )
     finally:
         scheduler.close()
-    if getattr(args, "compatibility_mode", "kernel-v1") == "kernel-v1":
+    if route.mode == "canonical":
+        record_canonical_enqueue(
+            job,
+            legacy_state_dir=args.state_dir,
+            kernel_state_dir=getattr(args, "kernel_state_dir", None),
+        )
+    elif route.mode == "kernel-v1":
         record_legacy_enqueue(
             job,
             legacy_state_dir=args.state_dir,
@@ -1241,6 +1267,7 @@ def _run_enqueue(args: argparse.Namespace) -> int:
                 "status": "enqueued",
                 "job_id": job.id,
                 "mission_id": mission_id,
+                "runtime": route.runtime,
                 "deduplication_digest": job.payload_digest,
             },
             indent=2,
@@ -1270,6 +1297,14 @@ def _run_serve(args: argparse.Namespace) -> int:
 
 def _run_status(args: argparse.Namespace) -> int:
     model = build_projection(args.state_dir)
+    scheduler = Scheduler(args.state_dir)
+    try:
+        model["runtime_routes"] = {
+            job.mission_id or job.id: runtime_identity(job.kind)
+            for job in scheduler.jobs()
+        }
+    finally:
+        scheduler.close()
     if args.html:
         output = write_projection_html(model, args.html)
         print(json.dumps({"status": "written", "html": str(output)}, indent=2))
