@@ -694,6 +694,11 @@ def parser() -> argparse.ArgumentParser:
     release.add_argument("--owner", required=True)
     release.add_argument("--reason", required=True)
 
+    reap = commands.add_parser("reap-stale-remote-claim")
+    reap.add_argument("node_id")
+    reap.add_argument("--owner", required=True)
+    reap.add_argument("--reason", required=True)
+
     complete = commands.add_parser("complete")
     complete.add_argument("node_id")
     complete.add_argument("--owner", required=True)
@@ -951,6 +956,17 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "release":
             plane.release(args.node_id, args.owner, reason=args.reason)
+            return 0
+        if args.command == "reap-stale-remote-claim":
+            print(
+                json.dumps(
+                    plane.reap_stale_remote_claim(
+                        args.node_id, args.owner, reason=args.reason
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
             return 0
         if args.command == "complete":
             receipt = read_json(Path(args.receipt))

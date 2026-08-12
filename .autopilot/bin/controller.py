@@ -1004,6 +1004,110 @@ class ControlPlane:
                 + deleted.stderr.strip()
             )
 
+    def remote_claim_record(self, commit: str) -> Mapping[str, Any] | None:
+        """Return the self-attesting claim record a claim commit carries, if any."""
+
+        shown = self._git(("show", "-s", "--format=%B", commit), check=False)
+        if shown.returncode != 0:
+            return None
+        try:
+            value = json.loads(shown.stdout.strip())
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(value, Mapping):
+            return None
+        if value.get("kind") != "hive-mind-autopilot-remote-claim-v1":
+            return None
+        return value
+
+    def reap_stale_remote_claim(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        reason: str,
+        remote: str = "origin",
+    ) -> Mapping[str, Any]:
+        """Delete an expired remote claim ref whose branch carries no published work.
+
+        ``release`` can only reach a claim whose local file still exists, and claim
+        state is session-local by design, so a worker session that ends leaves a
+        remote claim ref no later session can retire — permanently wedging the node
+        against ``publish_remote_claim``.  The claim commit is itself the record:
+        identity is read back from the remote object, and the ref is deleted only
+        while the branch still carries nothing except that claim.  A live claim is
+        never reaped; it is the only real cross-session mutex.
+        """
+
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
+        if not owner.strip():
+            raise ClaimError("stale remote claim release requires the exact claim owner")
+        branch = str(self.node(node_id).get("branch"))
+        head = self.remote_branch_sha(branch, remote=remote)
+        if head is None:
+            return {"node_id": node_id, "branch": branch, "outcome": "absent"}
+        fetched = self._git(
+            ("fetch", remote, f"refs/heads/{branch}"),
+            check=False,
+        )
+        if fetched.returncode != 0:
+            raise ClaimError(
+                f"cannot inspect remote claim branch {branch!r}: {fetched.stderr.strip()}"
+            )
+        record = self.remote_claim_record(head)
+        if record is None:
+            raise ClaimError(
+                f"remote branch {branch!r} head is not a claim commit; it carries "
+                "published work and must be reconciled, never deleted"
+            )
+        if record.get("node_id") != node_id:
+            raise ClaimError("remote claim identifies a different node")
+        if record.get("owner") != owner:
+            raise ClaimError("claim owner does not match")
+        parents = self._git(
+            ("rev-list", "--parents", "-n", "1", head), check=True
+        ).stdout.split()
+        if len(parents) != 2:
+            raise ClaimError("claim commit must have exactly one parent")
+        claim_tree = self._git(("rev-parse", f"{head}^{{tree}}"), check=True).stdout.strip()
+        parent_tree = self._git(("rev-parse", f"{head}^^{{tree}}"), check=True).stdout.strip()
+        if claim_tree != parent_tree:
+            raise ClaimError(
+                "claim commit changes the target tree; it is not an untouched claim"
+            )
+        expires_at = record.get("expires_at")
+        try:
+            expires = parse_time(expires_at)
+        except (TypeError, ValueError) as error:
+            raise ClaimError("claim record has no readable expiry") from error
+        now = self.clock()
+        if expires > now:
+            raise ClaimError(
+                f"claim on {branch!r} is live until {expires_at}; a live claim is the "
+                "only cross-session mutex and is never reaped"
+            )
+        deleted = self._git(
+            ("push", remote, f":refs/heads/{branch}"),
+            check=False,
+        )
+        if deleted.returncode != 0:
+            raise ClaimError(
+                "failed to retire stale remote claim branch: " + deleted.stderr.strip()
+            )
+        released = {
+            "node_id": node_id,
+            "branch": branch,
+            "owner": owner,
+            "reason": reason,
+            "claim_commit": head,
+            "expired_at": expires_at,
+            "released_at": format_time(now),
+            "outcome": "retired",
+        }
+        append_jsonl(self.state_dir / "releases.jsonl", released)
+        return released
+
     def claim_path(self, node_id: str) -> Path:
         return self.claims_dir / f"{node_id}.json"
 

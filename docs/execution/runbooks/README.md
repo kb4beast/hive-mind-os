@@ -225,9 +225,22 @@ that is a sealed boundary wearing operational clothes.
   nothing** (`git ls-remote origin <node-branch>` is empty). If it published a
   branch, follow "Settling a stalled worker" above before the lease expires — a
   mutated branch whose claim expired needs sealed recovery authority to undo.
-- **Worker died after publishing a remote claim branch.** Follow the stale-claim
+- **Worker died after publishing a remote claim branch.** `release` only reaches a
+  claim whose *local* file still exists, and claim state is session-local, so a
+  later session's `release` is a silent no-op while `publish_remote_claim` keeps
+  refusing with `remote branch already exists`. If the branch head is still the
+  bare claim commit, retire it once the claim has expired:
+
+  ```bash
+  python .autopilot/bin/autopilot.py --repo-root . reap-stale-remote-claim <NODE> --owner <exact-owner-from-the-claim-commit-message> --reason "worker session ended"
+  ```
+
+  Read the owner from the claim commit itself (`git log -1 origin/<node-branch>`),
+  which is a self-attesting JSON record. The command refuses a live claim, an
+  owner mismatch, and any branch that advanced past the claim — a branch carrying
+  real work is never deleted, only reconciled. For that case, follow the sealed
   retirement in `.autopilot/README.md` (`retire-receipt-branch` /
-  `STALE_TARGET_RECOVERY_SEQUENCE`); do not delete remote refs by hand.
+  `STALE_TARGET_RECOVERY_SEQUENCE`). Never delete remote refs by hand.
 - **Target advanced mid-wave (a sibling integrated first).** Only the
   *dispatcher release* goes stale, not running claims. Workers keep going;
   integration re-reconciles between merges. Re-run Phase 0 before any *new*
