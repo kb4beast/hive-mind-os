@@ -25,12 +25,6 @@ REPAIR_AUTHORITY_DOCUMENT = ".autopilot/sealed-repair-authorities.json"
 REPAIR_CLAIM_KIND = "hive-mind-autopilot-sealed-repair-claim-v1"
 REPAIR_DOCTOR_KIND = "hive-mind-autopilot-full-doctor-evidence-v1"
 REPAIR_DOCTOR_FILE = "sealed-repair-doctor.json"
-OPTIMIZER_COMPLETION_AUTHORITY_DOCUMENT = ".autopilot/optimizer-370-completion-overlay-authority.json"
-OPTIMIZER_COMPLETION_AUTHORITY_DIGEST = "sha256:dd33d10191e7c03dea8bcd0959b58c0c8ea14da9b42c29ef386c503b2c07aab7"
-OPTIMIZER_COMPLETION_CAPABILITY_COMMIT = "5c6243b2beb06aa9b9087dd1aec05b340af59c02"
-OPTIMIZER_GENERIC_DIFF_ISSUE = "receipt changed_paths do not match the exact base..final diff"
-OPTIMIZER_CONTINUATION_KIND = "hive-mind-autopilot-optimizer-completion-continuation-v1"
-OPTIMIZER_CONTINUATION_FILE = "optimizer-370-completion-continuation.json"
 DIGEST_SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 REPAIR_AUTHORITY_MATERIAL_DIGESTS = {
     "OPTIMIZER-370": "sha256:380b642ffbc32892eee60fab8b9a23f3b1fdd9e5c66a5309f97c2d9a842ab4dd",
@@ -72,62 +66,6 @@ class SealedRecoveryMixin:
     @property
     def repair_authority_path(self) -> Path:
         return self.repo_root / REPAIR_AUTHORITY_DOCUMENT
-
-    @property
-    def optimizer_completion_authority_path(self) -> Path:
-        return self.repo_root / OPTIMIZER_COMPLETION_AUTHORITY_DOCUMENT
-
-    @property
-    def optimizer_continuation_path(self) -> Path:
-        if self._has_git_repository() and self.verify_git_objects:
-            common = self._git(("rev-parse", "--path-format=absolute", "--git-common-dir"), check=False)
-            value = common.stdout.strip()
-            if common.returncode != 0 or not value:
-                raise ClaimError("Optimizer continuation Git common directory is unavailable")
-            return Path(value).resolve() / "hive-mind-autopilot" / OPTIMIZER_CONTINUATION_FILE
-        return self.state_dir / OPTIMIZER_CONTINUATION_FILE
-
-    def _optimizer_completion_authority(self) -> Mapping[str, Any] | None:
-        if not self.optimizer_completion_authority_path.is_file():
-            return None
-        value = read_json(self.optimizer_completion_authority_path)
-        return value if isinstance(value, Mapping) else None
-
-    def _optimizer_completion_authority_issues(self) -> tuple[str, ...]:
-        value = self._optimizer_completion_authority()
-        if not isinstance(value, Mapping):
-            return ("Optimizer completion authority is unavailable",)
-        material = dict(value)
-        capability = material.pop("capability_commit", None)
-        issues: list[str] = []
-        if digest_json(material) != OPTIMIZER_COMPLETION_AUTHORITY_DIGEST:
-            issues.append("Optimizer completion authority material was altered")
-        for key, relative in (
-            ("court_digest", ".autopilot/optimizer-370-completion-overlay-court.json"),
-            ("appeals_digest", ".autopilot/optimizer-370-completion-overlay-appeals.json"),
-            ("evidence_digest", ".autopilot/optimizer-370-completion-overlay-evidence.json"),
-        ):
-            path = self.repo_root / relative
-            document = read_json(path) if path.is_file() else None
-            if not isinstance(document, Mapping) or digest_json(document) != value.get(key):
-                issues.append(f"Optimizer completion {key} evidence differs")
-        appeals_path = self.repo_root / ".autopilot/optimizer-370-completion-overlay-appeals.json"
-        appeals = read_json(appeals_path) if appeals_path.is_file() else None
-        if (
-            not isinstance(appeals, Mapping)
-            or appeals.get("court_digest") != value.get("court_digest")
-            or appeals.get("court_disposition") != "ADAPT"
-        ):
-            issues.append("Optimizer Appeals record does not bind the Court disposition")
-        if capability != OPTIMIZER_COMPLETION_CAPABILITY_COMMIT:
-            issues.append("Optimizer completion capability differs from compiled pin")
-        if capability == "0" * 40 or not isinstance(capability, str):
-            issues.append("Optimizer completion capability is zero or invalid")
-        if self._has_git_repository() and not self.verify_git_objects:
-            issues.append("Optimizer completion requires Git object verification in a Git repository")
-        if self.verify_git_objects and isinstance(capability, str) and not self.git_object_exists(capability):
-            issues.append("Optimizer completion capability object is unavailable")
-        return tuple(dict.fromkeys(issues))
 
     def _repair_authority_document(self) -> Mapping[str, Any] | None:
         if not self.repair_authority_path.is_file():
@@ -224,7 +162,6 @@ class SealedRecoveryMixin:
                 issues.append(f"{node_id}: sealed prior state is invalid")
         if observed != set(REPAIR_AUTHORITY_MATERIAL_DIGESTS):
             issues.append("sealed repair authority registry omits an exact incident")
-        issues.extend(self._optimizer_completion_authority_issues())
         issues.extend(self._builder_record_issues())
         return tuple(dict.fromkeys(issues))
 
@@ -1134,90 +1071,15 @@ class SealedRecoveryMixin:
             issues.append("sealed replacement acceptance_decision must be ADAPT")
         return tuple(dict.fromkeys(issues))
 
-    def _exact_optimizer_completion_issues(
-        self,
-        receipt: Mapping[str, Any],
-    ) -> tuple[str, ...]:
-        capability = self._optimizer_completion_authority()
-        if not isinstance(capability, Mapping):
-            return ("exact Optimizer completion authority is unavailable",)
-        issues = list(self._optimizer_completion_authority_issues())
-        authority = receipt.get("authority")
-        if not isinstance(authority, Mapping):
-            return tuple((*issues, "exact Optimizer receipt authority is invalid"))
-        exact = {
-            "base_commit": capability["incident_base_sha"],
-            "base_tree": capability["incident_base_tree"],
-            "final_commit": capability["candidate_commit"],
-            "final_tree": capability["candidate_tree"],
-            "pr": capability["pr"],
-        }
-        for key, expected in exact.items():
-            if receipt.get(key) != expected:
-                issues.append(f"exact Optimizer receipt {key} differs")
-        authority_exact = {
-            "grant_id": capability["grant_id"],
-            "supersedes_receipt_commit": capability["old_receipt_commit"],
-            "repair_claim_commit": capability["repair_claim_commit"],
-            "execution_merge_commit": capability["execution_merge_commit"],
-            "execution_target_sha": capability["execution_target_sha"],
-        }
-        for key, expected in authority_exact.items():
-            if authority.get(key) != expected:
-                issues.append(f"exact Optimizer receipt authority {key} differs")
-        if receipt.get("changed_paths") != capability["authorized_optimizer_paths"]:
-            issues.append("exact Optimizer receipt must declare both authorized paths in order")
-        if digest_json(receipt) != capability["receipt_digest"]:
-            issues.append("exact Optimizer receipt digest differs")
-        if self._has_git_repository() and not self.verify_git_objects:
-            issues.append("exact Optimizer receipt cannot disable Git object verification")
-        if self.verify_git_objects:
-            old = str(capability["old_receipt_commit"])
-            claim = str(capability["repair_claim_commit"])
-            execution = str(capability["execution_merge_commit"])
-            target = str(capability["execution_target_sha"])
-            final = str(capability["candidate_commit"])
-            required = (old, claim, execution, target, final)
-            if any(not self.git_object_exists(commit) for commit in required):
-                issues.append("exact Optimizer topology object is unavailable")
-            else:
-                if self._commit_parents(claim) != (old,) or self._commit_tree(claim) != self._commit_tree(old):
-                    issues.append("exact Optimizer repair claim is not the pinned zero-path child")
-                if self._commit_parents(execution) != (claim, target):
-                    issues.append("exact Optimizer execution merge parent ordering differs")
-                if not self.is_ancestor(execution, final) or not self.is_ancestor(target, final):
-                    issues.append("exact Optimizer candidate ancestry differs")
-                if self._commit_tree(target) != capability["execution_target_tree"]:
-                    issues.append("exact Optimizer execution target tree differs")
-                if self._commit_tree(final) != capability["candidate_tree"]:
-                    issues.append("exact Optimizer candidate tree differs")
-                if self._diff_paths(target, final) != tuple(capability["authorized_optimizer_paths"]):
-                    issues.append("exact Optimizer execution diff must equal both authorized paths")
-        return tuple(dict.fromkeys(issues))
-
     def _replacement_receipt_issues(
         self,
         node_id: str,
         receipt: Mapping[str, Any],
         *,
         active_claim: Mapping[str, Any] | None = None,
-        continuation: Mapping[str, Any] | None = None,
     ) -> tuple[str, ...]:
         issues = list(self._sealed_receipt_shape_issues(node_id, receipt))
-        generic_issues = list(super().validate_receipt(node_id, receipt, require_integrated=False))
-        exact_optimizer_issues: tuple[str, ...] = ()
-        authority_value = receipt.get("authority")
-        exact_optimizer = (
-            node_id == "OPTIMIZER-370"
-            and isinstance(authority_value, Mapping)
-            and authority_value.get("grant_id") == "optimizer-370-invalid-receipt-supersession-v1"
-        )
-        if exact_optimizer and self._has_git_repository():
-            exact_optimizer_issues = self._exact_optimizer_completion_issues(receipt)
-            if not exact_optimizer_issues:
-                generic_issues = [issue for issue in generic_issues if issue != OPTIMIZER_GENERIC_DIFF_ISSUE]
-        issues.extend(generic_issues)
-        issues.extend(exact_optimizer_issues)
+        issues.extend(super().validate_receipt(node_id, receipt, require_integrated=False))
         record = self._repair_records().get(node_id)
         if record is None:
             return ("sealed replacement authority is unavailable",)
@@ -1275,10 +1137,7 @@ class SealedRecoveryMixin:
                 issues.append("active sealed repair lease authority digest is invalid")
             if authority.get("execution_merge_commit") != active_claim.get("execution_merge_commit"):
                 issues.append("sealed replacement execution merge differs from active lease")
-            if (
-                self.current_target_sha() != active_claim.get("target_sha")
-                and continuation is None
-            ):
+            if self.current_target_sha() != active_claim.get("target_sha"):
                 issues.append("sealed replacement completion target moved after claim")
         if self.verify_git_objects and isinstance(claim_commit, str) and FULL_SHA.fullmatch(claim_commit):
             old = str(record["old_receipt_commit"])
@@ -1365,10 +1224,7 @@ class SealedRecoveryMixin:
                 declared = receipt.get("changed_paths")
                 if not isinstance(declared, list) or tuple(sorted(declared)) != observed:
                     issues.append("sealed replacement changed_paths differ from execution release diff")
-                if node_id == "OPTIMIZER-370":
-                    if observed != tuple(sorted(record["allowed_paths"])):
-                        issues.append("sealed replacement diff must equal the complete exact repair scope")
-                elif not observed or set(observed) - set(record["allowed_paths"]):
+                if not observed or set(observed) - set(record["allowed_paths"]):
                     issues.append("sealed replacement diff expands or omits exact repair scope")
         return tuple(dict.fromkeys(issues))
 
@@ -1431,33 +1287,6 @@ class SealedRecoveryMixin:
             issues.append("sealed replacement receipt is not integrated")
         return tuple(dict.fromkeys(issues))
 
-    def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
-        records = super()._durable_receipt_records()
-        if not self._has_git_repository():
-            return records
-        target = self.current_target_sha()
-        for node_id, authority in self._repair_records().items():
-            old = str(authority["old_receipt_commit"])
-            node_records = records.setdefault(node_id, [])
-            if any(item.get("commit") == old for item in node_records):
-                continue
-            if not self.git_object_exists(old) or not self.is_ancestor(old, target):
-                continue
-            shown = self._git(
-                ("show", "-s", "--format=%H%x1f%P%x1f%T%x1f%B", old),
-                check=False,
-            )
-            parts = shown.stdout.split("\x1f", 3) if shown.returncode == 0 else []
-            receipt = self._parse_receipt_message(parts[3]) if len(parts) == 4 else None
-            if isinstance(receipt, Mapping):
-                node_records.append({
-                    "commit": parts[0].strip(),
-                    "parents": tuple(parts[1].split()),
-                    "tree": parts[2].strip(),
-                    "receipt": receipt,
-                })
-        return records
-
     def resolve_sealed_repair_records(
         self,
         node_id: str,
@@ -1497,586 +1326,6 @@ class SealedRecoveryMixin:
                 return True
         return False
 
-    def _exact_receipt_index_entry(
-        self,
-        node_id: str,
-        receipt_commit: str,
-        receipt: Mapping[str, Any],
-        record: Mapping[str, Any],
-    ) -> bool:
-        path = self.state_dir / "receipt-index.jsonl"
-        if not path.is_file():
-            return False
-        matches: list[Mapping[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, Mapping) and value.get("node_id") == node_id:
-                matches.append(value)
-        expected = {
-            "node_id": node_id,
-            "receipt_commit": receipt_commit,
-            "receipt_digest": digest_json(receipt),
-            "final_commit": receipt.get("final_commit"),
-            "supersedes_receipt_commit": record["old_receipt_commit"],
-            "timestamp": receipt.get("timestamp"),
-        }
-        return len(matches) == 1 and dict(matches[0]) == expected
-
-    def _recover_consumed_optimizer_completion_without_intent(
-        self,
-        node_id: str,
-        owner: str,
-        receipt: Mapping[str, Any],
-        record: Mapping[str, Any],
-    ) -> str | None:
-        intent_path = self.state_dir / f"sealed-repair-completion-{node_id.lower()}.json"
-        if (
-            node_id != "OPTIMIZER-370"
-            or self.claim_path(node_id).is_file()
-            or intent_path.is_file()
-            or not self.optimizer_continuation_path.is_file()
-        ):
-            return None
-        continuation = self._reconcile_optimizer_continuation_transition()
-        if not isinstance(continuation, Mapping) or continuation.get("status") != "CONSUMED":
-            return None
-        authority = self._optimizer_completion_authority()
-        issues = self._optimizer_completion_authority_issues()
-        if not isinstance(authority, Mapping) or issues:
-            raise ClaimError("; ".join(issues or ("Optimizer authority is unavailable",)))
-        receipt_commit = continuation.get("receipt_commit")
-        final = receipt.get("final_commit")
-        if (
-            owner != authority.get("claim_owner")
-            or continuation.get("owner") != owner
-            or continuation.get("node_id") != node_id
-            or continuation.get("capability_digest") != digest_json(authority)
-            or continuation.get("capability_commit") != authority.get("capability_commit")
-            or continuation.get("receipt_digest") != digest_json(receipt)
-            or continuation.get("receipt_digest") != authority.get("receipt_digest")
-            or not isinstance(receipt_commit, str)
-            or FULL_SHA.fullmatch(receipt_commit) is None
-            or self.remote_branch_sha(str(record["branch"])) != receipt_commit
-        ):
-            raise ClaimError("consumed Optimizer response-recovery binding differs")
-        target = continuation.get("target_sha")
-        capability_commit = str(authority["capability_commit"])
-        if (
-            not isinstance(target, str)
-            or FULL_SHA.fullmatch(target) is None
-            or self._commit_parents(target) != (capability_commit,)
-            or self._commit_tree(target) != continuation.get("target_tree")
-            or self._optimizer_reseal_content_issues(capability_commit, target)
-        ):
-            raise ClaimError("consumed Optimizer exact H evidence differs")
-        local_path = self.receipt_path(node_id)
-        if (
-            not local_path.is_file()
-            or digest_json(read_json(local_path)) != digest_json(receipt)
-            or not self._exact_receipt_index_entry(node_id, receipt_commit, receipt, record)
-        ):
-            raise ClaimError("consumed Optimizer response-recovery evidence differs")
-        if (
-            self._commit_parents(receipt_commit) != (final,)
-            or self._commit_tree(receipt_commit) != receipt.get("final_tree")
-        ):
-            raise ReceiptError("consumed Optimizer response-recovery topology differs")
-        shown = self._git(("show", "-s", "--format=%B", receipt_commit), check=False)
-        parsed = self._parse_receipt_message(shown.stdout) if shown.returncode == 0 else None
-        if not isinstance(parsed, Mapping) or digest_json(parsed) != digest_json(receipt):
-            raise ReceiptError("consumed Optimizer response-recovery payload differs")
-        return receipt_commit
-
-    def _recover_terminal_repair_completion_without_claim(
-        self,
-        node_id: str,
-        owner: str,
-        receipt: Mapping[str, Any],
-        record: Mapping[str, Any],
-    ) -> str | None:
-        intent_path = self.state_dir / f"sealed-repair-completion-{node_id.lower()}.json"
-        if self.claim_path(node_id).is_file() or not intent_path.is_file():
-            return None
-        intent = read_json(intent_path)
-        base_required = {
-            "schema_version", "kind", "status", "node_id", "owner", "target_sha",
-            "remote_expected_final", "receipt_digest", "receipt_commit",
-            "active_claim_digest", "prepared_at",
-        }
-        continuation_required = {
-            "continuation_digest", "continuation_target_sha", "continuation_grant_id",
-        }
-        intent_keys = frozenset(intent) if isinstance(intent, Mapping) else frozenset()
-        if not isinstance(intent, Mapping) or intent_keys not in {
-            frozenset(base_required), frozenset(base_required | continuation_required)
-        }:
-            raise ClaimError("terminal sealed repair intent is foreign or malformed")
-        if (
-            intent.get("kind") != "hive-mind-autopilot-sealed-repair-completion-v1"
-            or intent.get("status") != "PREPARED"
-            or intent.get("node_id") != node_id
-            or intent.get("owner") != owner
-            or intent.get("receipt_digest") != digest_json(receipt)
-        ):
-            raise ClaimError("terminal sealed repair intent identity is invalid")
-        receipt_commit = intent.get("receipt_commit")
-        final = receipt.get("final_commit")
-        if not isinstance(receipt_commit, str) or FULL_SHA.fullmatch(receipt_commit) is None:
-            raise ClaimError("terminal sealed repair receipt commit is invalid")
-        if self.remote_branch_sha(str(record["branch"])) != receipt_commit:
-            raise ClaimError("terminal sealed repair remote head differs")
-        local_path = self.receipt_path(node_id)
-        if not local_path.is_file() or digest_json(read_json(local_path)) != digest_json(receipt):
-            raise ClaimError("terminal sealed repair local receipt differs")
-        if not self._exact_receipt_index_entry(node_id, receipt_commit, receipt, record):
-            raise ClaimError("terminal sealed repair index is absent, duplicate, or conflicting")
-        if (
-            self._commit_parents(receipt_commit) != (final,)
-            or self._commit_tree(receipt_commit) != receipt.get("final_tree")
-        ):
-            raise ReceiptError("terminal sealed repair receipt topology differs")
-        shown = self._git(("show", "-s", "--format=%B", receipt_commit), check=False)
-        parsed = self._parse_receipt_message(shown.stdout) if shown.returncode == 0 else None
-        if not isinstance(parsed, Mapping) or digest_json(parsed) != digest_json(receipt):
-            raise ReceiptError("terminal sealed repair receipt payload differs")
-        if continuation_required.issubset(intent):
-            continuation = read_json(self.optimizer_continuation_path)
-            continuation_digest_matches = (
-                isinstance(continuation, Mapping)
-                and digest_json(continuation) == intent.get("continuation_digest")
-            )
-            if isinstance(continuation, Mapping) and continuation.get("status") == "CONSUMED":
-                continuation_digest_matches = (
-                    continuation.get("previous_digest") == intent.get("continuation_digest")
-                    and continuation.get("receipt_commit") == receipt_commit
-                )
-            if (
-                not isinstance(continuation, Mapping)
-                or continuation.get("status") not in {"CONSUMING", "CONSUMED"}
-                or not continuation_digest_matches
-                or continuation.get("target_sha") != intent.get("continuation_target_sha")
-                or continuation.get("grant_id") != intent.get("continuation_grant_id")
-                or continuation.get("claim_digest") != intent.get("active_claim_digest")
-            ):
-                raise ClaimError("terminal Optimizer continuation binding differs")
-            if continuation.get("status") == "CONSUMING":
-                self._transition_optimizer_continuation(
-                    "CONSUMING", "CONSUMED", receipt_commit=receipt_commit
-                )
-        intent_path.unlink()
-        append_jsonl(self.state_dir / "sealed-repair-adverse.jsonl", {
-            "event": "terminal_receipt_reconciled_without_claim",
-            "node_id": node_id,
-            "receipt_commit": receipt_commit,
-        })
-        return receipt_commit
-
-    @staticmethod
-    def _exclusive_write_json(path: Path, value: Mapping[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
-        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        try:
-            os.write(descriptor, data)
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-
-    def _transition_optimizer_continuation(
-        self,
-        expected_status: str,
-        status: str,
-        *,
-        receipt_commit: str | None = None,
-        bindings: Mapping[str, Any] | None = None,
-    ) -> Mapping[str, Any]:
-        path = self.optimizer_continuation_path
-        lock = path.with_suffix(path.suffix + ".transition")
-        self._reconcile_optimizer_continuation_transition()
-        current = read_json(path)
-        if not isinstance(current, Mapping):
-            raise ClaimError("Optimizer continuation CAS state is unavailable")
-        if current.get("status") == status:
-            return current
-        transition = {
-            "schema_version": 1,
-            "kind": OPTIMIZER_CONTINUATION_KIND + "-transition",
-            "expected_status": expected_status,
-            "next_status": status,
-            "expected_digest": digest_json(current),
-            "receipt_commit": receipt_commit,
-            "bindings": dict(bindings) if bindings is not None else None,
-        }
-        try:
-            self._exclusive_write_json(lock, transition)
-        except FileExistsError:
-            existing = read_json(lock)
-            if (
-                not isinstance(existing, Mapping)
-                or existing.get("kind") != OPTIMIZER_CONTINUATION_KIND + "-transition"
-                or existing.get("expected_status") != expected_status
-                or existing.get("next_status") != status
-                or existing.get("receipt_commit") != receipt_commit
-                or existing.get("bindings") != (
-                    dict(bindings) if bindings is not None else None
-                )
-            ):
-                raise ClaimError("Optimizer continuation has a foreign durable transition")
-            transition = dict(existing)
-        try:
-            current = read_json(path)
-            if isinstance(current, Mapping) and current.get("status") == status:
-                lock.unlink()
-                return current
-            if (
-                not isinstance(current, Mapping)
-                or current.get("status") != expected_status
-                or digest_json(current) != transition["expected_digest"]
-            ):
-                raise ClaimError("Optimizer continuation CAS state differs")
-            updated = dict(current)
-            updated["status"] = status
-            updated["previous_digest"] = digest_json(current)
-            updated["transitioned_at"] = format_time(self.clock())
-            if receipt_commit is not None:
-                updated["receipt_commit"] = receipt_commit
-            if bindings is not None:
-                updated.update(bindings)
-            atomic_write_json(path, updated)
-            lock.unlink()
-            return updated
-        except Exception:
-            # The durable transition remains for exact restart reconciliation.
-            raise
-
-    def _reconcile_optimizer_continuation_transition(self) -> Mapping[str, Any] | None:
-        path = self.optimizer_continuation_path
-        marker = path.with_suffix(path.suffix + ".transition")
-        if not marker.is_file():
-            value = read_json(path) if path.is_file() else None
-            return value if isinstance(value, Mapping) else None
-        transition = read_json(marker)
-        required = {
-            "schema_version", "kind", "expected_status", "next_status",
-            "expected_digest", "receipt_commit", "bindings",
-        }
-        if (
-            not isinstance(transition, Mapping)
-            or set(transition) != required
-            or transition.get("schema_version") != 1
-            or transition.get("kind") != OPTIMIZER_CONTINUATION_KIND + "-transition"
-        ):
-            raise ClaimError("Optimizer continuation has a foreign durable transition")
-        current = read_json(path)
-        if not isinstance(current, Mapping):
-            raise ClaimError("Optimizer continuation durable transition lost its state")
-        if current.get("status") == transition.get("next_status"):
-            marker.unlink()
-            return current
-        if (
-            current.get("status") != transition.get("expected_status")
-            or digest_json(current) != transition.get("expected_digest")
-        ):
-            raise ClaimError("Optimizer continuation durable transition state differs")
-        updated = dict(current)
-        updated["status"] = transition["next_status"]
-        updated["previous_digest"] = digest_json(current)
-        updated["transitioned_at"] = format_time(self.clock())
-        if transition.get("receipt_commit") is not None:
-            updated["receipt_commit"] = transition["receipt_commit"]
-        bindings = transition.get("bindings")
-        if bindings is not None:
-            if not isinstance(bindings, Mapping):
-                raise ClaimError("Optimizer continuation transition bindings are invalid")
-            updated.update(bindings)
-        atomic_write_json(path, updated)
-        marker.unlink()
-        return updated
-
-    def _optimizer_continuation_issues(
-        self,
-        continuation: object,
-        claim: Mapping[str, Any],
-        receipt: Mapping[str, Any],
-        *,
-        statuses: tuple[str, ...] = ("ACTIVE", "CONSUMING"),
-        live: bool = True,
-        check_expiry: bool = True,
-    ) -> tuple[str, ...]:
-        if not isinstance(continuation, Mapping):
-            return ("Optimizer continuation is unavailable",)
-        capability = self._optimizer_completion_authority()
-        if not isinstance(capability, Mapping):
-            return ("Optimizer continuation authority is unavailable",)
-        issues = list(self._optimizer_completion_authority_issues())
-        required = {
-            "schema_version", "kind", "status", "node_id", "grant_id", "owner",
-            "claim_digest", "capability_digest", "capability_commit", "target_sha",
-            "target_tree", "release_id", "github_snapshot_digest",
-            "reconciliation_digest", "doctor_evidence_digest", "main_sha", "pr",
-            "receipt_digest", "expires_at", "created_at",
-        }
-        optional = {"previous_digest", "transitioned_at", "receipt_commit"}
-        if set(continuation) - required - optional or required - set(continuation):
-            issues.append("Optimizer continuation shape is foreign or incomplete")
-        expected = {
-            "schema_version": 1,
-            "kind": OPTIMIZER_CONTINUATION_KIND,
-            "node_id": "OPTIMIZER-370",
-            "grant_id": capability["grant_id"],
-            "owner": capability["claim_owner"],
-            "capability_digest": digest_json(capability),
-            "capability_commit": capability["capability_commit"],
-            "main_sha": capability["main_sha"],
-            "pr": capability["pr"],
-            "receipt_digest": capability["receipt_digest"],
-        }
-        for key, value in expected.items():
-            if continuation.get(key) != value:
-                issues.append(f"Optimizer continuation {key} differs")
-        if continuation.get("status") not in statuses:
-            issues.append("Optimizer continuation state is not active for completion")
-        claimed_material = dict(claim)
-        claimed_material["status"] = "CLAIMED"
-        claimed_material.pop("adverse_reason", None)
-        if continuation.get("claim_digest") != digest_json(claimed_material):
-            issues.append("Optimizer continuation claim digest differs")
-        if claim.get("status") not in {"CLAIMED", "COMPLETING"}:
-            issues.append("Optimizer continuation requires CLAIMED or crash-resuming COMPLETING state")
-        if claim.get("owner") != capability["claim_owner"] or claim.get("grant_id") != capability["grant_id"]:
-            issues.append("Optimizer continuation claim owner or grant differs")
-        if claim.get("target_sha") != capability["execution_target_sha"]:
-            issues.append("Optimizer continuation claim execution target differs")
-        if check_expiry:
-            try:
-                if parse_time(claim.get("expires_at")) <= self.clock():
-                    issues.append("Optimizer continuation cannot waive claim expiry")
-                if parse_time(continuation.get("expires_at")) <= self.clock():
-                    issues.append("Optimizer continuation lease expired")
-            except (TypeError, ValueError):
-                issues.append("Optimizer continuation expiry is invalid")
-        if digest_json(receipt) != capability["receipt_digest"]:
-            issues.append("Optimizer continuation receipt digest differs")
-        target = continuation.get("target_sha")
-        if not isinstance(target, str) or FULL_SHA.fullmatch(target) is None:
-            issues.append("Optimizer continuation H is invalid")
-            return tuple(dict.fromkeys(issues))
-        if self.verify_git_objects:
-            capability_commit = str(capability["capability_commit"])
-            g = str(capability["execution_target_sha"])
-            if self._commit_parents(capability_commit) != (g,):
-                issues.append("Optimizer capability is not a direct child of G")
-            if self._commit_parents(target) != (capability_commit,):
-                issues.append("Optimizer H is not the exact direct reseal child")
-            if self._commit_tree(target) != continuation.get("target_tree"):
-                issues.append("Optimizer continuation H tree differs")
-            if self._diff_paths(g, target) != tuple(capability["overlay_paths"]):
-                issues.append("Optimizer G-to-H overlay path set differs")
-            if self._diff_paths(capability_commit, target) != tuple(capability["reseal_paths"]):
-                issues.append("Optimizer capability-to-H reseal path set differs")
-            issues.extend(self._optimizer_reseal_content_issues(capability_commit, target))
-        if live:
-            if self.current_target_sha() != target:
-                issues.append("Optimizer continuation does not pin current H exactly")
-            release = self.current_release()
-            if not isinstance(release, Mapping) or self._release_issues(release):
-                issues.append("Optimizer continuation H release is invalid")
-            else:
-                bindings = {
-                    "target_sha": target,
-                    "release_id": continuation.get("release_id"),
-                    "github_snapshot_digest": continuation.get("github_snapshot_digest"),
-                    "reconciliation_digest": continuation.get("reconciliation_digest"),
-                }
-                for key, value in bindings.items():
-                    if release.get(key) != value:
-                        issues.append(f"Optimizer continuation H release {key} differs")
-            if continuation.get("doctor_evidence_digest") != self._doctor_evidence_digest():
-                issues.append("Optimizer continuation doctor binding differs")
-            if self._remote_ref_sha(f"refs/heads/{self.target_branch}") != target:
-                issues.append("Optimizer literal-origin release is not exact H")
-            if self._remote_ref_sha("refs/heads/main") != capability["main_sha"]:
-                issues.append("Optimizer continuation observed main movement")
-        return tuple(dict.fromkeys(issues))
-
-    def _optimizer_reseal_content_issues(
-        self, capability_commit: str, target_sha: str
-    ) -> tuple[str, ...]:
-        authority_path = OPTIMIZER_COMPLETION_AUTHORITY_DOCUMENT
-        code_path = ".autopilot/bin/sealed_recovery.py"
-        capability_authority = self._git(
-            ("show", f"{capability_commit}:{authority_path}"), check=False
-        )
-        target_authority = self._git(("show", f"{target_sha}:{authority_path}"), check=False)
-        capability_code = self._git(("show", f"{capability_commit}:{code_path}"), check=False)
-        target_code = self._git(("show", f"{target_sha}:{code_path}"), check=False)
-        if any(
-            result.returncode != 0
-            for result in (capability_authority, target_authority, capability_code, target_code)
-        ):
-            return ("Optimizer exact reseal blobs are unavailable",)
-        try:
-            before_authority = json.loads(capability_authority.stdout)
-            after_authority = json.loads(target_authority.stdout)
-        except json.JSONDecodeError:
-            return ("Optimizer exact reseal authority blob is invalid",)
-        expected_authority = dict(before_authority)
-        expected_authority["capability_commit"] = capability_commit
-        issues: list[str] = []
-        if after_authority != expected_authority:
-            issues.append("Optimizer H authority is not the exact capability substitution")
-        old_line = (
-            f'OPTIMIZER_COMPLETION_CAPABILITY_COMMIT = '
-            f'"{before_authority.get("capability_commit")}"'
-        )
-        new_line = f'OPTIMIZER_COMPLETION_CAPABILITY_COMMIT = "{capability_commit}"'
-        before_code = capability_code.stdout
-        if before_code.count(old_line) != 1:
-            issues.append("Optimizer capability source substitution site is not unique")
-        elif target_code.stdout != before_code.replace(old_line, new_line, 1):
-            issues.append("Optimizer H source is not the exact capability substitution")
-        return tuple(issues)
-
-    def _arm_optimizer_continuation(
-        self,
-        claim: Mapping[str, Any],
-        receipt: Mapping[str, Any],
-    ) -> Mapping[str, Any] | None:
-        capability = self._optimizer_completion_authority()
-        if not isinstance(capability, Mapping):
-            return None
-        if (
-            not self._has_git_repository()
-            or digest_json(receipt) != capability["receipt_digest"]
-            or claim.get("target_sha") != capability["execution_target_sha"]
-            or claim.get("grant_id") != capability["grant_id"]
-        ):
-            return None
-        if self.optimizer_continuation_path.is_file():
-            existing = self._reconcile_optimizer_continuation_transition()
-            if self.current_target_sha() == capability["execution_target_sha"]:
-                raise ClaimError("pre-armed Optimizer continuation is awaiting exact H")
-            if isinstance(existing, Mapping) and existing.get("status") == "ARMED":
-                if self.current_target_sha() != existing.get("target_sha"):
-                    raise ClaimError("Optimizer continuation does not pin current H exactly")
-                armed_issues = self._optimizer_continuation_issues(
-                    existing,
-                    claim,
-                    receipt,
-                    statuses=("ARMED",),
-                    live=False,
-                )
-                if armed_issues:
-                    raise ClaimError("; ".join(armed_issues))
-                release = self.current_release()
-                if not isinstance(release, Mapping) or self._release_issues(release):
-                    raise ClaimError("Optimizer continuation requires the actual H release")
-                existing = self._transition_optimizer_continuation(
-                    "ARMED",
-                    "ACTIVE",
-                    bindings={
-                        "release_id": release.get("release_id"),
-                        "github_snapshot_digest": release.get("github_snapshot_digest"),
-                        "reconciliation_digest": release.get("reconciliation_digest"),
-                        "doctor_evidence_digest": self._doctor_evidence_digest(),
-                    },
-                )
-            issues = self._optimizer_continuation_issues(existing, claim, receipt)
-            if issues:
-                raise ClaimError("; ".join(issues))
-            return existing if isinstance(existing, Mapping) else None
-        if self.current_target_sha() == capability["execution_target_sha"]:
-            return None
-        raise ClaimError("post-H Optimizer completion requires a pre-armed exact continuation")
-
-    def arm_optimizer_completion_continuation(
-        self,
-        owner: str,
-        target_sha: str,
-    ) -> Mapping[str, Any]:
-        """O_EXCL-bind one exact H while release is still G and the claim is live."""
-
-        capability = self._optimizer_completion_authority()
-        if not isinstance(capability, Mapping) or self._optimizer_completion_authority_issues():
-            raise ClaimError("Optimizer continuation authority is unavailable or invalid")
-        record = self._repair_record("OPTIMIZER-370")
-        if not self._origin_is_configured_repository(record):
-            raise ClaimError("Optimizer continuation requires literal configured origin")
-        if (
-            self.current_target_sha() != capability["execution_target_sha"]
-            or self._remote_ref_sha(f"refs/heads/{self.target_branch}")
-            != capability["execution_target_sha"]
-            or self._remote_ref_sha("refs/heads/main") != capability["main_sha"]
-        ):
-            raise ClaimError("Optimizer continuation can arm only while release is exact G")
-        claim_path = self.claim_path("OPTIMIZER-370")
-        claim = read_json(claim_path) if claim_path.is_file() else None
-        if (
-            not isinstance(claim, Mapping)
-            or claim.get("status") != "CLAIMED"
-            or claim.get("owner") != owner
-            or owner != capability["claim_owner"]
-            or claim.get("grant_id") != capability["grant_id"]
-            or claim.get("target_sha") != capability["execution_target_sha"]
-            or parse_time(claim.get("expires_at")) <= self.clock()
-        ):
-            raise ClaimError("Optimizer continuation requires the exact live CLAIMED lease")
-        receipt = read_json(self.repo_root / ".autopilot/optimizer-370-intended-receipt.json")
-        if not isinstance(receipt, Mapping) or digest_json(receipt) != capability["receipt_digest"]:
-            raise ClaimError("Optimizer continuation intended receipt differs")
-        prs = self._snapshot_rows("pull_requests", "node_id", "OPTIMIZER-370")
-        if len(prs) != 1:
-            raise ClaimError("Optimizer continuation requires exactly PR 135")
-        pr = prs[0]
-        expected_pr = {
-            "number": capability["pr"], "state": "open", "merged": False,
-            "ci": "success", "base": self.target_branch,
-            "head": capability["pr_head_branch"], "head_sha": capability["pr_head_sha"],
-            "draft": True,
-        }
-        if any(pr.get(key) != value for key, value in expected_pr.items()):
-            raise ClaimError("Optimizer continuation PR 135 metadata differs")
-        now = self.clock()
-        bounded_expiry = min(
-            parse_time(claim["expires_at"]),
-            now + timedelta(minutes=int(capability["continuation_minutes"])),
-        )
-        continuation = {
-            "schema_version": 1,
-            "kind": OPTIMIZER_CONTINUATION_KIND,
-            "status": "ARMED",
-            "node_id": "OPTIMIZER-370",
-            "grant_id": capability["grant_id"],
-            "owner": capability["claim_owner"],
-            "claim_digest": digest_json(claim),
-            "capability_digest": digest_json(capability),
-            "capability_commit": capability["capability_commit"],
-            "target_sha": target_sha,
-            "target_tree": self._commit_tree(target_sha),
-            "release_id": None,
-            "github_snapshot_digest": None,
-            "reconciliation_digest": None,
-            "doctor_evidence_digest": None,
-            "main_sha": capability["main_sha"],
-            "pr": capability["pr"],
-            "receipt_digest": capability["receipt_digest"],
-            "expires_at": format_time(bounded_expiry),
-            "created_at": format_time(now),
-        }
-        issues = self._optimizer_continuation_issues(
-            continuation, claim, receipt, statuses=("ARMED",), live=False
-        )
-        if issues:
-            raise ClaimError("; ".join(issues))
-        try:
-            self._exclusive_write_json(self.optimizer_continuation_path, continuation)
-        except FileExistsError as error:
-            raise ClaimError("Optimizer continuation CAS create raced") from error
-        return continuation
-
     def _recover_interrupted_repair_completion(
         self,
         node_id: str,
@@ -2094,13 +1343,7 @@ class SealedRecoveryMixin:
             "remote_expected_final", "receipt_digest", "receipt_commit",
             "active_claim_digest", "prepared_at",
         }
-        continuation_required = {
-            "continuation_digest", "continuation_target_sha", "continuation_grant_id",
-        }
-        if not isinstance(intent, Mapping) or set(intent) not in (
-            required,
-            required | continuation_required,
-        ):
+        if not isinstance(intent, Mapping) or set(intent) != required:
             raise ClaimError("sealed repair completion intent is foreign or malformed")
         if (
             intent.get("kind") != "hive-mind-autopilot-sealed-repair-completion-v1"
@@ -2115,64 +1358,11 @@ class SealedRecoveryMixin:
         claimed_material.pop("adverse_reason", None)
         if intent.get("active_claim_digest") != digest_json(claimed_material):
             raise ClaimError("sealed repair completion intent claim binding is invalid")
-        if claim.get("status") not in {"CLAIMED", "COMPLETING"} or intent.get("target_sha") != claim.get("target_sha"):
+        if claim.get("status") != "COMPLETING" or intent.get("target_sha") != claim.get("target_sha"):
             raise ClaimError("sealed repair completion recovery target or state is invalid")
-        continuation: Mapping[str, Any] | None = None
-        if continuation_required.issubset(intent):
-            value = read_json(self.optimizer_continuation_path)
-            if not isinstance(value, Mapping):
-                raise ClaimError("sealed repair completion continuation is unavailable")
-            continuation = value
-            bound_digest = digest_json(value) == intent.get("continuation_digest")
-            if value.get("status") == "CONSUMED":
-                bound_digest = (
-                    value.get("previous_digest") == intent.get("continuation_digest")
-                    and value.get("receipt_commit") == intent.get("receipt_commit")
-                )
-            if (
-                not bound_digest
-                or value.get("target_sha") != intent.get("continuation_target_sha")
-                or value.get("grant_id") != intent.get("continuation_grant_id")
-            ):
-                raise ClaimError("sealed repair completion continuation binding differs")
-            if value.get("status") != "CONSUMED":
-                continuation_issues = self._optimizer_continuation_issues(
-                    value,
-                    claim,
-                    receipt,
-                    statuses=("CONSUMING",),
-                    live=False,
-                    check_expiry=False,
-                )
-                if continuation_issues:
-                    raise ClaimError("; ".join(continuation_issues))
         final = str(intent["remote_expected_final"])
         receipt_commit = intent.get("receipt_commit")
         remote = self.remote_branch_sha(str(record["branch"]))
-
-        if continuation is not None and continuation.get("status") == "CONSUMED":
-            if (
-                not isinstance(receipt_commit, str)
-                or remote != receipt_commit
-                or not self.receipt_path(node_id).is_file()
-                or digest_json(read_json(self.receipt_path(node_id))) != digest_json(receipt)
-                or not self._exact_receipt_index_entry(
-                    node_id, receipt_commit, receipt, record
-                )
-            ):
-                raise ClaimError("consumed Optimizer continuation terminal evidence differs")
-            if (
-                self._commit_parents(receipt_commit) != (final,)
-                or self._commit_tree(receipt_commit) != receipt.get("final_tree")
-            ):
-                raise ReceiptError("consumed Optimizer receipt topology or tree differs")
-            shown = self._git(("show", "-s", "--format=%B", receipt_commit), check=False)
-            parsed = self._parse_receipt_message(shown.stdout) if shown.returncode == 0 else None
-            if not isinstance(parsed, Mapping) or digest_json(parsed) != digest_json(receipt):
-                raise ReceiptError("consumed Optimizer receipt payload differs")
-            self.claim_path(node_id).unlink(missing_ok=True)
-            intent_path.unlink()
-            return receipt_commit
 
         def adverse(error: Exception) -> None:
             retained = dict(claim)
@@ -2216,8 +1406,6 @@ class SealedRecoveryMixin:
             restored = dict(claim)
             restored["status"] = "CLAIMED"
             atomic_write_json(self.claim_path(node_id), restored)
-            if continuation is not None:
-                self._transition_optimizer_continuation("CONSUMING", "ACTIVE")
             intent_path.unlink()
             return None
         if not isinstance(receipt_commit, str) or FULL_SHA.fullmatch(receipt_commit) is None:
@@ -2241,8 +1429,6 @@ class SealedRecoveryMixin:
             restored = dict(claim)
             restored["status"] = "CLAIMED"
             atomic_write_json(self.claim_path(node_id), restored)
-            if continuation is not None:
-                self._transition_optimizer_continuation("CONSUMING", "ACTIVE")
             intent_path.unlink()
             return None
         if remote != receipt_commit:
@@ -2280,10 +1466,6 @@ class SealedRecoveryMixin:
                         "timestamp": receipt.get("timestamp"),
                     },
                 )
-            if continuation is not None:
-                self._transition_optimizer_continuation(
-                    "CONSUMING", "CONSUMED", receipt_commit=str(receipt_commit)
-                )
             self.claim_path(node_id).unlink()
             intent_path.unlink()
             append_jsonl(self.state_dir / "sealed-repair-adverse.jsonl", {
@@ -2297,21 +1479,6 @@ class SealedRecoveryMixin:
     def complete(self, node_id: str, owner: str, receipt: Mapping[str, Any]) -> str:
         if node_id not in REPAIR_AUTHORITY_MATERIAL_DIGESTS:
             return super().complete(node_id, owner, receipt)
-        record = self._repair_record(node_id)
-        if self._has_git_repository() and not self.verify_git_objects:
-            raise ClaimError("sealed repair completion requires Git object verification")
-        if not self._origin_is_configured_repository(record):
-            raise ClaimError("sealed repair completion requires literal configured origin")
-        consumed = self._recover_consumed_optimizer_completion_without_intent(
-            node_id, owner, receipt, record
-        )
-        if consumed is not None:
-            return consumed
-        terminal = self._recover_terminal_repair_completion_without_claim(
-            node_id, owner, receipt, record
-        )
-        if terminal is not None:
-            return terminal
         claim_path = self.claim_path(node_id)
         if not claim_path.is_file():
             raise ClaimError("sealed repair completion requires an active claim")
@@ -2320,6 +1487,9 @@ class SealedRecoveryMixin:
             raise ClaimError("sealed repair completion claim is invalid")
         if claim.get("owner") != owner:
             raise ClaimError("sealed repair completion owner differs")
+        record = self._repair_record(node_id)
+        if not self._origin_is_configured_repository(record):
+            raise ClaimError("sealed repair completion requires literal configured origin")
         if claim.get("authority_digest") != digest_json(record):
             raise ClaimError("sealed repair completion claim authority is stale")
         recovered = self._recover_interrupted_repair_completion(
@@ -2330,33 +1500,21 @@ class SealedRecoveryMixin:
         claim = read_json(claim_path)
         if not isinstance(claim, Mapping):
             raise ClaimError("sealed repair completion claim disappeared during recovery")
-        if claim.get("status") not in {"CLAIMED", "COMPLETING"}:
-            raise ClaimError("sealed repair completion claim status is not executable")
+        live_issues = self._live_release_issues(record, str(claim.get("target_sha")))
+        if live_issues:
+            raise ClaimError("; ".join(live_issues))
         if parse_time(claim.get("expires_at")) <= self.clock():
             raise ClaimError("sealed repair completion lease expired")
-        continuation = self._arm_optimizer_continuation(claim, receipt) if node_id == "OPTIMIZER-370" else None
-        if continuation is None:
-            live_issues = self._live_release_issues(record, str(claim.get("target_sha")))
-            if live_issues:
-                raise ClaimError("; ".join(live_issues))
-            binding_issues = self._release_binding_issues(claim)
-            if binding_issues:
-                raise ClaimError("; ".join(binding_issues))
-        else:
-            continuation_issues = self._optimizer_continuation_issues(
-                continuation, claim, receipt, statuses=("ACTIVE", "CONSUMING")
-            )
-            if continuation_issues:
-                raise ClaimError("; ".join(continuation_issues))
+        binding_issues = self._release_binding_issues(claim)
+        if binding_issues:
+            raise ClaimError("; ".join(binding_issues))
         local_path = self.receipt_path(node_id)
         if local_path.exists():
             raise ReceiptError("sealed repair cannot overwrite a local receipt")
         final = receipt.get("final_commit")
         if not isinstance(final, str) or self.remote_branch_sha(str(record["branch"])) != final:
             raise ReceiptError("sealed repair remote branch must equal the exact final candidate")
-        issues = self._replacement_receipt_issues(
-            node_id, receipt, active_claim=claim, continuation=continuation
-        )
+        issues = self._replacement_receipt_issues(node_id, receipt, active_claim=claim)
         if issues:
             raise ReceiptError("; ".join(issues))
         validation_owner = f"sealed-repair-completion:{owner}"
@@ -2366,12 +1524,10 @@ class SealedRecoveryMixin:
         intent_path = self.state_dir / f"sealed-repair-completion-{node_id.lower()}.json"
         claim_state = dict(claim)
         try:
-            if continuation is None and self._release_binding_issues(claim):
+            if self._release_binding_issues(claim):
                 raise ClaimError("sealed repair release changed before receipt publication")
             if self.remote_branch_sha(str(record["branch"])) != final:
                 raise ReceiptError("sealed repair remote final moved before receipt publication")
-            if continuation is not None and continuation.get("status") == "ACTIVE":
-                continuation = self._transition_optimizer_continuation("ACTIVE", "CONSUMING")
             intent = {
                 "schema_version": 1,
                 "kind": "hive-mind-autopilot-sealed-repair-completion-v1",
@@ -2385,12 +1541,6 @@ class SealedRecoveryMixin:
                 "active_claim_digest": digest_json(claim),
                 "prepared_at": format_time(self.clock()),
             }
-            if continuation is not None:
-                intent.update({
-                    "continuation_digest": digest_json(continuation),
-                    "continuation_target_sha": continuation["target_sha"],
-                    "continuation_grant_id": continuation["grant_id"],
-                })
             atomic_write_json(intent_path, intent)
             claim_state["status"] = "COMPLETING"
             atomic_write_json(claim_path, claim_state)
@@ -2401,18 +1551,11 @@ class SealedRecoveryMixin:
             remote_published = self.remote_branch_sha(str(record["branch"])) == receipt_commit
             if not remote_published:
                 raise ReceiptError("sealed repair receipt remote CAS verification failed")
-            if continuation is None and self._release_binding_issues(claim):
+            if self._release_binding_issues(claim):
                 raise ClaimError("sealed repair release changed during receipt publication")
-            if continuation is None:
-                live_issues = self._live_release_issues(record, str(claim["target_sha"]))
-                if live_issues:
-                    raise ClaimError("; ".join(live_issues))
-            else:
-                continuation_issues = self._optimizer_continuation_issues(
-                    continuation, claim_state, receipt, statuses=("CONSUMING",)
-                )
-                if continuation_issues:
-                    raise ClaimError("; ".join(continuation_issues))
+            live_issues = self._live_release_issues(record, str(claim["target_sha"]))
+            if live_issues:
+                raise ClaimError("; ".join(live_issues))
             atomic_write_json(local_path, receipt)
             append_jsonl(
                 self.state_dir / "receipt-index.jsonl",
@@ -2425,23 +1568,10 @@ class SealedRecoveryMixin:
                     "timestamp": receipt.get("timestamp"),
                 },
             )
-            if continuation is not None:
-                continuation = self._transition_optimizer_continuation(
-                    "CONSUMING", "CONSUMED", receipt_commit=str(receipt_commit)
-                )
-            claim_path.unlink(missing_ok=True)
+            claim_path.unlink()
             intent_path.unlink(missing_ok=True)
             return receipt_commit
         except Exception:
-            if continuation is not None:
-                durable_continuation = self._reconcile_optimizer_continuation_transition()
-                if (
-                    isinstance(durable_continuation, Mapping)
-                    and durable_continuation.get("status") == "CONSUMED"
-                ):
-                    # CONSUMED is the durable commit point.  Receipt publication and
-                    # evidence must never be compensated after this transition.
-                    raise
             compensated = not remote_published
             if receipt_commit is not None and self.remote_branch_sha(str(record["branch"])) == receipt_commit:
                 try:
@@ -2459,8 +1589,6 @@ class SealedRecoveryMixin:
             if compensated and local_rolled_back:
                 claim_state["status"] = "CLAIMED"
                 atomic_write_json(claim_path, claim_state)
-                if continuation is not None and continuation.get("status") == "CONSUMING":
-                    self._transition_optimizer_continuation("CONSUMING", "ACTIVE")
                 intent_path.unlink(missing_ok=True)
             else:
                 claim_state["status"] = "ADVERSE"

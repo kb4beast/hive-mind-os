@@ -99,6 +99,30 @@ independent evidence and reproducible evaluation.
 
 ## More commands and development details
 
+## Portable intent-driven Autopilot
+
+Hive Mind OS can now initialize an Autopilot request in another Git repository and emit
+the next host-neutral orchestration contract:
+
+```bash
+hive-mind autopilot init --repository /path/to/repo \
+  --target-branch release/hive-mind-autopilot
+hive-mind autopilot inspect --repository /path/to/repo \
+  --request "finish the current DAG" --apply
+```
+
+Before that repository has a controller, the contract requests one durable DAG-build
+task. Once installed, the target repository's own plan, policy, Git history, claims,
+receipts, PR/CI snapshot, and release branch become authoritative. The CLI emits task
+effects; the active host executes them. It does not itself create Codex/ChatGPT UI tasks
+or merge a protected branch.
+
+Print the reusable operator prompt with:
+
+```bash
+hive-mind autopilot prompt
+```
+
 `hive-mind deliver --backend fixture-demo` runs the same limited fixture backend
 against its expected fixture layout. `hive-mind deliver --backend model` is opt-in,
 but remains experimental; its provider configuration is documented in the

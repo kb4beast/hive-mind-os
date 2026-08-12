@@ -1,0 +1,38 @@
+{
+  "capture_status": "metadata-only-quarantine",
+  "captured_at": "2026-08-11T13:36:00Z",
+  "capturer": "codex:portable-autopilot-adr-055",
+  "exhibits": [
+    {
+      "bytes": 30114,
+      "content_copy": "omitted_due_to_unresolved_license",
+      "git_blob_sha1": "0fce4315bdaaaf0e1cf4ed5b57dfd15efacd4717",
+      "license": "unresolved-no-repository-license-declared",
+      "media_type": "text/plain",
+      "mutable_locator": "https://github.com/kb4beast/Junk/blob/main/Generic%20prompt",
+      "pinned_locator": "https://raw.githubusercontent.com/kb4beast/Junk/760d5e2468484924cbdd077a78584f570a67bd2c/Generic%20prompt",
+      "repository_commit": "760d5e2468484924cbdd077a78584f570a67bd2c",
+      "sha256": "f810b17311cebae09413abcfbb1c2155a4934d8ebefa483aadb512e36eed2c5b",
+      "source_id": "SRC-024",
+      "supply_method": "agent-retrieved-from-user-supplied-url",
+      "title": "Live subject-neutral GenericPrompt"
+    },
+    {
+      "content_path": "docs/plan/genericprompt-execution-2026-08-09/SOURCE_GENERICPROMPT.txt",
+      "license": "unresolved-user-supplied",
+      "relationship_to_src_024": "unknown-no-derivation-or-supersession-claimed",
+      "sha256": "9535faf5031411829ea3b940e059c6c7f22d38aec638c917ca8b6d7766ab250a",
+      "source_id": "SRC-025",
+      "supply_method": "historical-user-supplied-file",
+      "title": "Archived specialized GenericPrompt"
+    }
+  ],
+  "kind": "hive-mind-source-lineage-manifest-v1",
+  "open_obligations": [
+    "Resolve SRC-024 and SRC-025 authorship and license before copying or redistributing source wording.",
+    "Do not infer lineage, derivation, or supersession between the two exhibits without custody evidence.",
+    "Complete content-level ingestion only after a separately reviewed source-governance amendment resolves reuse authority."
+  ],
+  "receipt": "evidence/sources/SRC-024-genericprompt-lineage/ingestion-receipt.json",
+  "schema_version": 1
+}

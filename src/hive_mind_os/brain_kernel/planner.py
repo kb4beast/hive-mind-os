@@ -103,7 +103,7 @@ class OrchestrationPlan:
         revising = self.replaces_digest is not None
         if revising != (self.replan_reason is not None):
             raise ValueError("replan digest and reason must be supplied together")
-        if revising:
+        if self.replaces_digest is not None:
             if not self.replaces_digest.startswith("sha256:"):
                 raise ValueError("replan digest is invalid")
             if not self.replan_reason or not self.replan_reason.strip():
@@ -289,9 +289,9 @@ def persist_plan(store: KernelStore, plan: FixturePlan | OrchestrationPlan) -> t
             "work_item": item.to_document(),
             "plan_digest": plan.digest,
         }
-        if replaces_digest is not None:
+        if isinstance(plan, OrchestrationPlan) and plan.replaces_digest is not None:
             payload["replan"] = {
-                "from_plan_digest": replaces_digest,
+                "from_plan_digest": plan.replaces_digest,
                 "reason": plan.replan_reason,
                 "evidence_refs": list(plan.replan_evidence_refs),
             }

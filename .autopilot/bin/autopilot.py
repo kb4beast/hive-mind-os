@@ -22,6 +22,17 @@ from durable_controller import (
     digest_json,
     read_json,
 )
+from orchestration import (
+    OrchestrationError,
+    bind_launch,
+    binding_events,
+    build_orchestration_contract,
+    infer_intent,
+    load_policy,
+    prepare_launch,
+    should_publish_release,
+    simple_prompt,
+)
 from release_barrier import (
     RELEASE_HISTORY,
     RELEASE_KIND,
@@ -32,6 +43,8 @@ from release_barrier import (
 from sealed_recovery import SealedRecoveryMixin
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
+RECON_ANCESTRY_DUPLICATE_RECEIPT = "4191ebfd571c9852f5f6faaa43cea0f48f3e0fe8"
+RECON_CANONICAL_RECEIPT = "369f956817ff10231c06d09c7c802f47f76d57b0"
 RETIREMENT_KIND = "hive-mind-autopilot-receipt-branch-retirement-v1"
 RETIREMENT_DOCUMENT = ".autopilot/receipt-branch-retirements.json"
 RETIREMENT_COURT_DOCUMENT = ".autopilot/receipt-branch-retirement-court.json"
@@ -87,19 +100,98 @@ EXPLORER_RETIREMENT = {
 
 
 class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
-    """CLI plane with one fail-closed RECON receipt supersession repair.
+    """CLI plane with sealed, fail-closed RECON receipt repairs.
 
     RECON-010 published a durable receipt before the merged PR #120 release-barrier
     amendment was fully implemented. The historical receipt must remain in Git history,
     but the replacement receipt required by the amended contract must become the only
     active RECON completion record. This repair recognizes only that exact historical
     receipt and only when the replacement explicitly binds it in receipt authority.
-    Every other duplicate-receipt situation remains fail-closed.
+    PR #124 later integrated a second receipt for the same candidate alongside the
+    already-expanded canonical receipt. The exact sibling pair is also sealed here:
+    the expanded receipt is accepted only when all immutable candidate fields match,
+    its scope and grants strictly contain the older receipt, and Git confirms both
+    receipt commits are direct children of the candidate on the current target.
+
+    The sealed recovery mixin additionally admits only the exact retained recovery
+    authorities for OPTIMIZER-370, ORCH-300, and BUILDER-330. All unrelated duplicate
+    receipts and branch-recovery attempts remain fail-closed.
     """
+
+    def _resolve_integrated_recon_ancestry_duplicate(
+        self, records: list[dict[str, Any]]
+    ) -> list[dict[str, Any]] | None:
+        by_commit = {
+            record.get("commit"): record
+            for record in records
+            if isinstance(record.get("commit"), str)
+        }
+        if set(by_commit) != {
+            RECON_ANCESTRY_DUPLICATE_RECEIPT,
+            RECON_CANONICAL_RECEIPT,
+        }:
+            return None
+        duplicate = by_commit[RECON_ANCESTRY_DUPLICATE_RECEIPT]
+        canonical = by_commit[RECON_CANONICAL_RECEIPT]
+        old_receipt = duplicate.get("receipt")
+        new_receipt = canonical.get("receipt")
+        if not isinstance(old_receipt, Mapping) or not isinstance(new_receipt, Mapping):
+            return None
+        for key in (
+            "schema_version",
+            "plan_fingerprint",
+            "node_id",
+            "contract_version",
+            "base_commit",
+            "base_tree",
+            "branch",
+            "pr",
+            "final_commit",
+            "final_tree",
+        ):
+            if new_receipt.get(key) != old_receipt.get(key):
+                return None
+        final = new_receipt.get("final_commit")
+        if new_receipt.get("node_id") != "RECON-010" or not isinstance(final, str):
+            return None
+        old_paths = old_receipt.get("changed_paths")
+        new_paths = new_receipt.get("changed_paths")
+        old_authority = old_receipt.get("authority")
+        new_authority = new_receipt.get("authority")
+        old_grants = old_authority.get("grants") if isinstance(old_authority, Mapping) else None
+        new_grants = new_authority.get("grants") if isinstance(new_authority, Mapping) else None
+        evidence_refs = new_receipt.get("evidence_refs")
+        if not (
+            isinstance(old_paths, list)
+            and isinstance(new_paths, list)
+            and set(old_paths) < set(new_paths)
+            and isinstance(old_grants, list)
+            and isinstance(new_grants, list)
+            and set(old_grants) < set(new_grants)
+            and "dispatcher-release-barrier" in new_grants
+            and isinstance(evidence_refs, list)
+            and f"historical-receipt:{RECON_PREMATURE_RECEIPT}" in evidence_refs
+        ):
+            return None
+        if self._has_git_repository():
+            target = self.current_target_sha()
+            for receipt_commit in (
+                RECON_ANCESTRY_DUPLICATE_RECEIPT,
+                RECON_CANONICAL_RECEIPT,
+            ):
+                parent = self._git(
+                    ("rev-parse", f"{receipt_commit}^"), check=True
+                ).stdout.strip()
+                if parent != final or not self.is_ancestor(receipt_commit, target):
+                    return None
+        return [canonical]
 
     def _resolve_recon_receipt_records(
         self, records: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
+        integrated = self._resolve_integrated_recon_ancestry_duplicate(records)
+        if integrated is not None:
+            return integrated
         if len(records) != 2:
             return records
         historical = next(
@@ -153,8 +245,8 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
 
     def _durable_receipt_records(self) -> dict[str, list[dict[str, Any]]]:
         records = super()._durable_receipt_records()
-        recon = records.get("RECON-010")
         updated = dict(records)
+        recon = updated.get("RECON-010")
         if isinstance(recon, list):
             resolved = self._resolve_recon_receipt_records(recon)
             if resolved is not recon:
@@ -224,15 +316,14 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         return tuple(dict.fromkeys(issues))
 
     def validate_configuration(self) -> tuple[str, ...]:
-        return tuple(
-            dict.fromkeys(
-                (
-                    *super().validate_configuration(),
-                    *self.receipt_retirement_issues(),
-                    *self.sealed_recovery_issues(),
-                )
-            )
-        )
+        issues = list(super().validate_configuration())
+        issues.extend(self.receipt_retirement_issues())
+        issues.extend(self.sealed_recovery_issues())
+        try:
+            load_policy(self.repo_root)
+        except OrchestrationError as error:
+            issues.append(str(error))
+        return tuple(dict.fromkeys(issues))
 
     def _retirement_record(self, retirement_id: str) -> Mapping[str, Any]:
         issues = self.receipt_retirement_issues()
@@ -262,43 +353,19 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             for name in os.environ
         ):
             return False
-        local_config = self._git(
-            ("config", "--local", "--no-includes", "--get-regexp", r".*"),
-            check=False,
-        )
-        if local_config.returncode not in {0, 1}:
-            return False
-        for line in local_config.stdout.splitlines():
-            key = line.split(None, 1)[0].casefold() if line.strip() else ""
-            if (
-                key.startswith(("include.", "includeif.", "protocol.", "http."))
-                or (key.startswith("url.") and key.endswith((".insteadof", ".pushinsteadof")))
-                or (
-                    key.startswith("remote.")
-                    and key.endswith((".vcs", ".proxy", ".uploadpack", ".receivepack"))
-                )
-            ):
-                return False
-        urls = self._git(("config", "--local", "--no-includes", "--get-all", "remote.origin.url"), check=False)
+        urls = self._git(("config", "--get-all", "remote.origin.url"), check=False)
         if urls.returncode != 0:
             return False
         configured_urls = [line.strip() for line in urls.stdout.splitlines() if line.strip()]
         if configured_urls != [record["origin_url"]]:
             return False
-        push_urls = self._git(("config", "--local", "--no-includes", "--get-all", "remote.origin.pushurl"), check=False)
+        push_urls = self._git(("config", "--get-all", "remote.origin.pushurl"), check=False)
         if push_urls.returncode not in {0, 1} or push_urls.stdout.strip():
             return False
-        effective_fetch = self._git(("remote", "get-url", "--all", "origin"), check=False)
-        effective_push = self._git(("remote", "get-url", "--push", "--all", "origin"), check=False)
-        expected = f"https://github.com/{record['repository']}.git"
-        if (
-            effective_fetch.returncode != 0
-            or effective_push.returncode != 0
-            or effective_fetch.stdout.splitlines() != [expected]
-            or effective_push.stdout.splitlines() != [expected]
-        ):
+        rewrites = self._git(("config", "--get-regexp", r"^url\..*\.(insteadOf|pushInsteadOf)$"), check=False)
+        if rewrites.returncode not in {0, 1} or rewrites.stdout.strip():
             return False
-        return record["origin_url"] == expected
+        return record["origin_url"] == f"https://github.com/{record['repository']}.git"
 
     def _remote_ref_sha(self, reference: str) -> str | None:
         completed = self._git(("ls-remote", "origin", reference), check=False)
@@ -429,7 +496,6 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 "snapshot_digest": self._snapshot_digest(), "reconciliation_digest": None,
                 "target_sha": self.current_target_sha(), "recorded_at": format_time(self.clock()),
             })
-        self.after_install_github_snapshot()
         return path
 
     def reconcile(self, target_sha: str, *, actor: str, reason: str, changed_paths: Sequence[str] = ()) -> Path:
@@ -442,7 +508,6 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             updated["target_sha"] = self.current_target_sha()
             updated["recorded_at"] = format_time(self.clock())
             atomic_write_json(self.retirement_recovery_path, updated)
-        self.after_reconcile()
         return path
 
     def _release_issues(self, record: object) -> tuple[str, ...]:
@@ -452,20 +517,12 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             expected = digest_json(execution)
             if not isinstance(record, Mapping) or record.get("receipt_retirement_execution_digest") != expected:
                 issues.append("dispatcher release was issued before receipt retirement recovery")
-        builder_execution = self._builder_execution()
-        if builder_execution is not None:
-            expected = digest_json(builder_execution)
-            if not isinstance(record, Mapping) or record.get("builder_retirement_execution_digest") != expected:
-                issues.append("dispatcher release was issued before Builder retirement recovery")
         return tuple(dict.fromkeys(issues))
 
     def dispatch(self, *, actor: str, requested_nodes: Sequence[str] = ()) -> Mapping[str, Any]:
         recovery_issues = self._recovery_issues()
         if recovery_issues:
             raise AutopilotError("; ".join(recovery_issues))
-        builder_recovery_issues = self._builder_recovery_issues()
-        if builder_recovery_issues:
-            raise AutopilotError("; ".join(builder_recovery_issues))
         if not actor.strip():
             raise AutopilotError("dispatcher actor is required")
         if self.target_requires_reconciliation():
@@ -500,7 +557,6 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             "released_wave": wave, "directive": directive, "action": action, "verdicts": verdicts,
             "issued_at": format_time(self.clock()),
             "receipt_retirement_execution_digest": digest_json(self._execution()) if self._execution() is not None else None,
-            "builder_retirement_execution_digest": digest_json(self._builder_execution()) if self._builder_execution() is not None else None,
         }
         record["release_id"] = digest_json(record)
         atomic_write_json(self.current_release_path, record)
@@ -600,7 +656,6 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         append_jsonl(self.state_dir / RETIREMENT_AUDIT, {"event": "receipt_branch_retired", **execution})
         return execution
 
-
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="autopilot")
     root.add_argument("--repo-root", default=".")
@@ -643,10 +698,6 @@ def parser() -> argparse.ArgumentParser:
     complete.add_argument("--owner", required=True)
     complete.add_argument("--receipt", required=True)
 
-    arm_optimizer = commands.add_parser("arm-optimizer-370-continuation")
-    arm_optimizer.add_argument("--owner", required=True)
-    arm_optimizer.add_argument("--target-sha", required=True)
-
     fail = commands.add_parser("fail")
     fail.add_argument("node_id")
     fail.add_argument("--owner", required=True)
@@ -658,6 +709,14 @@ def parser() -> argparse.ArgumentParser:
     fail.add_argument("--retry-when")
     fail.add_argument("--attempted-command", action="append", default=[])
     fail.add_argument("--blocker-category", default="execution")
+
+    blocker_resolve = commands.add_parser("blocker-resolve")
+    blocker_resolve.add_argument("node_id")
+    blocker_resolve.add_argument("blocker_id")
+    blocker_resolve.add_argument("--actor", required=True)
+    blocker_resolve.add_argument("--fix", required=True)
+    blocker_resolve.add_argument("--retry-command", action="append", required=True)
+    blocker_resolve.add_argument("--evidence-ref", action="append", default=[])
 
     reconcile = commands.add_parser("reconcile")
     reconcile.add_argument("--target-sha", required=True)
@@ -700,6 +759,38 @@ def parser() -> argparse.ArgumentParser:
 
     builder_retirement = commands.add_parser("retire-builder-330-branch")
     builder_retirement.add_argument("--actor", required=True)
+
+    orchestrate = commands.add_parser("orchestrate")
+    orchestrate.add_argument("--request", default="")
+    orchestrate.add_argument("--actor", default="autopilot:orchestrator")
+    orchestrate.add_argument(
+        "--apply",
+        action="store_true",
+        help="Publish a safe release when inferred intent and live state allow it",
+    )
+    orchestrate.add_argument("--json", action="store_true", dest="json_output")
+
+    intent = commands.add_parser("infer-intent")
+    intent.add_argument("request", nargs="?", default="")
+    intent.add_argument("--json", action="store_true", dest="json_output")
+
+    commands.add_parser("simple-prompt")
+
+    prepare = commands.add_parser("prepare-launch")
+    prepare.add_argument("instruction_id")
+    prepare.add_argument("--host", required=True)
+    prepare.add_argument("--attempt", type=int, default=1)
+    prepare.add_argument("--retry-of")
+
+    bind = commands.add_parser("bind-launch")
+    bind.add_argument("instruction_id")
+    bind.add_argument("--host", required=True)
+    bind.add_argument("--task-id", required=True)
+    bind.add_argument("--host-id")
+    bind.add_argument("--cursor")
+    bind.add_argument("--capability", required=True)
+
+    commands.add_parser("launch-bindings")
 
     return root
 
@@ -755,6 +846,18 @@ def print_dispatch(result: Mapping[str, object]) -> None:
             print(f"{node_id}: {verdicts[node_id]}")
     print(str(result.get("directive", "WAIT")))
     print(str(result.get("action", "Do not open any worker sessions yet")))
+
+
+def select_orchestration_status(
+    plane: ControlPlane,
+    request: str,
+) -> tuple[Mapping[str, object], object]:
+    """Select mutating recovery status only after a pure state-aware intent decision."""
+
+    observed = plane.observe_status()
+    decision = infer_intent(request, observed)
+    status = observed if decision.intent == "CHECK" else plane.status()
+    return status, decision
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -848,17 +951,6 @@ def main(argv: list[str] | None = None) -> int:
                 raise ReceiptError("receipt file must contain an object")
             print(plane.complete(args.node_id, args.owner, receipt))
             return 0
-        if args.command == "arm-optimizer-370-continuation":
-            print(
-                json.dumps(
-                    plane.arm_optimizer_completion_continuation(
-                        args.owner, args.target_sha
-                    ),
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 0
         if args.command == "fail":
             print(
                 json.dumps(
@@ -873,6 +965,22 @@ def main(argv: list[str] | None = None) -> int:
                         retry_when=args.retry_when,
                         attempted_command=args.attempted_command,
                         blocker_category=args.blocker_category,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "blocker-resolve":
+            print(
+                json.dumps(
+                    plane.resolve_blocker(
+                        args.node_id,
+                        args.blocker_id,
+                        actor=args.actor,
+                        fix=args.fix,
+                        retry_command=args.retry_command,
+                        evidence_refs=args.evidence_ref,
                     ),
                     indent=2,
                     sort_keys=True,
@@ -938,8 +1046,82 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "retire-builder-330-branch":
             print(json.dumps(plane.retire_builder_branch(actor=args.actor), indent=2, sort_keys=True))
             return 0
+        if args.command == "infer-intent":
+            result = infer_intent(args.request, plane.observe_status()).to_dict()
+            if args.json_output:
+                print(json.dumps(result, indent=2, sort_keys=True))
+            else:
+                print(result["intent"])
+            return 0
+        if args.command == "simple-prompt":
+            print(simple_prompt())
+            return 0
+        if args.command == "prepare-launch":
+            print(
+                json.dumps(
+                    prepare_launch(
+                        plane.repo_root,
+                        args.instruction_id,
+                        args.host,
+                        attempt=args.attempt,
+                        retry_of=args.retry_of,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "bind-launch":
+            print(
+                json.dumps(
+                    bind_launch(
+                        plane.repo_root,
+                        args.instruction_id,
+                        args.host,
+                        args.task_id,
+                        host_id=args.host_id,
+                        cursor=args.cursor,
+                        capability=args.capability,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "launch-bindings":
+            print(json.dumps(binding_events(plane.repo_root), indent=2, sort_keys=True))
+            return 0
+        if args.command == "orchestrate":
+            status, decision = select_orchestration_status(plane, args.request)
+            if args.apply and should_publish_release(decision, status):
+                plane.dispatch(actor=args.actor)
+                status = plane.status()
+            result = build_orchestration_contract(
+                plane,
+                args.request,
+                status=status,
+            )
+            if args.json_output:
+                print(json.dumps(result, indent=2, sort_keys=True))
+            else:
+                print(f"INTENT: {result['intent']['intent']}")
+                print(f"CONTRACT: {result['contract_id']}")
+                print(f"CLOSURE TARGET: {result['closure_target'] or 'none'}")
+                print(f"QUIESCENT: {'yes' if result['quiescent'] else 'no'}")
+                for task in result["tasks"]:
+                    print(
+                        f"{task['action']}: {task['title']} "
+                        f"[{task['transport']}]"
+                    )
+            return 0
         raise AssertionError(args.command)
-    except (AutopilotError, ClaimError, ConfigurationError, ReceiptError) as error:
+    except (
+        AutopilotError,
+        ClaimError,
+        ConfigurationError,
+        OrchestrationError,
+        ReceiptError,
+    ) as error:
         print(f"autopilot: {error}", file=sys.stderr)
         return 2
 

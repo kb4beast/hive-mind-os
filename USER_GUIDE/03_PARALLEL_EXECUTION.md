@@ -23,13 +23,30 @@ The initial dependency waves are:
 
 ## Rules
 
-- Start only nodes emitted by `autopilot ready` after live GitHub reconciliation.
+- Use `autopilot orchestrate --request "actual user message" --apply --json` as the
+  normal entrypoint; start only its current release-bound tasks.
+- Primary nodes run as durable user-owned tasks. On Codex, use `create_thread`, record
+  thread/host IDs, poll with `wait_threads`, and resume with
+  `send_message_to_thread`. Nested subagents are bounded sidecars only.
+- Create the complete visible cohort before the first wait. Existing recovery work does
+  not suppress newly released tasks. Eligible but unreleased nodes receive clearly
+  titled `PREPARATION_ONLY` tasks, which may inspect and prepare but cannot claim, write,
+  commit, push, or publish completion.
+- Treat closure-first as polling priority, not task-creation exclusivity. Every created
+  primary task is polled to a terminal result and receives recovery answers in the same
+  task; the parent does not stop merely because one task finished.
+- Prioritize active, receipt-pending, PR, CI-failed, and repair-required nodes for
+  closure while concurrently creating all safe execution and preparation tasks.
+- Select and finish at least one closure target before optional audit expansion. Do not
+  return a parent final while required primary tasks remain active.
+- Automatic multi-node releases require every co-released node to declare
+  `parallel_safe: true` in addition to disjoint file and semantic locks.
 - Every worker must win its remote claim before product work.
 - Do not run two nodes with overlapping file or semantic locks.
 - A worker stops after opening its draft PR and publishing its receipt; it does not merge.
 - Downstream nodes start only after dependencies are merged into target and their receipts validate.
 - Integration and promotion nodes remain serial even when all inputs are ready.
-- When main advances outside the plan, stop new claims and run reconciliation.
+- When the configured target advances outside the plan, stop new claims and run reconciliation.
 - On CI failure, start a repair session for the same node/branch rather than a downstream node.
 
 The longest dependency chain contains 16 nodes:

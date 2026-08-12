@@ -11,8 +11,8 @@ class SourceDocketTests(unittest.TestCase):
     def test_every_source_has_claims_and_every_claim_has_a_verdict(self):
         audit = self.docket.audit()
         self.assertTrue(audit.inventory_complete)
-        self.assertEqual(self.docket.source_count, 23)
-        self.assertEqual(self.docket.claim_count, 84)
+        self.assertEqual(self.docket.source_count, 25)
+        self.assertEqual(self.docket.claim_count, 88)
         self.assertEqual(len(self.docket.decisions), self.docket.claim_count)
         self.assertRegex(
             self.docket.inventory_digest,
@@ -87,6 +87,22 @@ class SourceDocketTests(unittest.TestCase):
         decisions = {decision.claim_id: decision for decision in self.docket.decisions}
         for claim_id in ("CLM-081", "CLM-082", "CLM-083", "CLM-084"):
             self.assertEqual(decisions[claim_id].disposition, Disposition.DEFER)
+
+    def test_generic_prompt_sources_are_registered_and_fail_closed(self):
+        sources = {source.id: source for source in self.docket.sources}
+        self.assertEqual(
+            sources["SRC-024"].content_digest,
+            "sha256:f810b17311cebae09413abcfbb1c2155a4934d8ebefa483aadb512e36eed2c5b",
+        )
+        decisions = {decision.claim_id: decision for decision in self.docket.decisions}
+        self.assertEqual(decisions["CLM-085"].disposition, Disposition.QUARANTINE)
+        for claim_id in ("CLM-086", "CLM-087", "CLM-088"):
+            self.assertEqual(decisions[claim_id].disposition, Disposition.DEFER)
+        self.assertTrue(
+            {"CLM-085", "CLM-086", "CLM-087", "CLM-088"}.issubset(
+                self.docket.audit().machine_blocked_claim_ids
+            )
+        )
 
     def test_capability_maturity_never_exceeds_structural_prototype(self):
         maturity = {claim.capability_maturity.value for claim in self.docket.claims}

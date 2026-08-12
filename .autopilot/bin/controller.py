@@ -11,10 +11,10 @@ import fnmatch
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -45,6 +45,19 @@ UNSAFE_REMEDIATION_MARKERS = (
     "verify=false",
     "ignore certificate",
 )
+UNSAFE_RETRY_ARGUMENT_MARKERS = (
+    "git_ssl_no_verify",
+    "curl_insecure",
+    "sslverify=false",
+    "sslverify=0",
+    "http.sslverify=false",
+    "http.sslverify=0",
+    "schannel.checkrevoke=false",
+    "schannel.checkrevoke=0",
+    "gnutlsverify=false",
+    "--insecure",
+    "-k",
+)
 SUBTASK_EXECUTION_SEQUENCE = (
     "fetch_current_singleton_release",
     "install_current_github_snapshot",
@@ -71,6 +84,23 @@ SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
     "http_proxy",
     "https_proxy",
     "no_proxy",
+)
+SAFE_GIT_RUNTIME_ENVIRONMENT_KEYS = (
+    "PATH",
+    "PATHEXT",
+    "SystemRoot",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "LOCALAPPDATA",
+    "APPDATA",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "LANG",
+    "LC_ALL",
 )
 SUBTASK_STATES = frozenset(
     {
@@ -130,6 +160,9 @@ CONSULTATION_DECISIONS = {
     "QUARANTINE",
 }
 CHEATING_DISPOSITIONS = {"NOT_APPLICABLE", "CONFIRMED", "DISPROVED", "UNRESOLVED"}
+_STATUS_READ_ONLY_GIT_COMMANDS = frozenset(
+    {"cat-file", "diff", "log", "merge-base", "rev-parse", "show"}
+)
 
 
 class AutopilotError(RuntimeError):
@@ -160,6 +193,54 @@ class NodeView:
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class _StatusCommitGraph:
+    """Commit facts proven by one immutable target-history observation."""
+
+    parents: dict[str, tuple[str, ...]]
+    trees: dict[str, str]
+    ancestor_cache: dict[str, frozenset[str]]
+
+    @classmethod
+    def from_log(cls, output: str) -> _StatusCommitGraph:
+        parents: dict[str, tuple[str, ...]] = {}
+        trees: dict[str, str] = {}
+        for raw_record in output.split("\x1e"):
+            parts = raw_record.strip("\n").split("\x1f", 3)
+            if len(parts) != 4:
+                continue
+            commit, parents_text, tree, _ = parts
+            commit_parents = tuple(parents_text.split())
+            if (
+                FULL_SHA.fullmatch(commit) is None
+                or FULL_SHA.fullmatch(tree) is None
+                or any(FULL_SHA.fullmatch(parent) is None for parent in commit_parents)
+            ):
+                continue
+            parents[commit] = commit_parents
+            trees[commit] = tree
+        return cls(parents, trees, {})
+
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool | None:
+        """Return graph truth, or ``None`` when the descendant was not observed."""
+
+        if descendant not in self.parents:
+            return None
+        cached = self.ancestor_cache.get(descendant)
+        if cached is None:
+            observed: set[str] = set()
+            pending = [descendant]
+            while pending:
+                commit = pending.pop()
+                if commit in observed:
+                    continue
+                observed.add(commit)
+                pending.extend(self.parents.get(commit, ()))
+            cached = frozenset(observed)
+            self.ancestor_cache[descendant] = cached
+        return ancestor in cached
 
 
 def utc_now() -> datetime:
@@ -199,6 +280,12 @@ def read_json(path: Path) -> Any:
         raise ConfigurationError(f"cannot parse JSON file {path}: {error}") from error
 
 
+def windows_replace_retry_enabled() -> bool:
+    """Return whether atomic replacement needs the bounded Windows retry."""
+
+    return os.name == "nt"
+
+
 def atomic_write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
@@ -213,7 +300,16 @@ def atomic_write_json(path: Path, value: object) -> None:
         temporary.flush()
         os.fsync(temporary.fileno())
         temporary_path = Path(temporary.name)
-    os.replace(temporary_path, path)
+    # Windows cannot reliably replace an open NamedTemporaryFile. Close the
+    # handle first, then retain a bounded retry for transient scanner/indexer locks.
+    for attempt in range(5):
+        try:
+            os.replace(temporary_path, path)
+            break
+        except PermissionError:
+            if not windows_replace_retry_enabled() or attempt == 4:
+                raise
+            time.sleep(0.01 * (2**attempt))
 
 
 def append_jsonl(path: Path, value: Mapping[str, object]) -> None:
@@ -314,6 +410,10 @@ class ControlPlane:
         ".autopilot/receipt.schema.json",
         ".autopilot/consultation.schema.json",
         ".autopilot/role-wiring.schema.json",
+        ".autopilot/orchestration-policy.json",
+        ".autopilot/orchestration-policy.schema.json",
+        ".autopilot/bin/orchestration.py",
+        ".autopilot/task-bindings.lock",
         ".autopilot/acceptance-matrix.json",
         ".autopilot/templates/worker.md",
         ".autopilot/templates/repair.md",
@@ -369,7 +469,6 @@ class ControlPlane:
             for node in _require_list(self.plan.get("nodes"), "plan.nodes")
             if isinstance(node, Mapping) and "id" in node
         }
-        self._trusted_git_path: str | None = None
 
     @property
     def plan_fingerprint(self) -> str:
@@ -424,12 +523,17 @@ class ControlPlane:
 
     def node(self, node_id: str) -> Mapping[str, Any]:
         try:
-            return self._nodes[node_id]
+            node = self._nodes[node_id]
         except KeyError as error:
             raise AutopilotError(f"unknown node: {node_id}") from error
+        # Historical plans named the final integration branch in ``pr_target``.
+        # In singleton mode that field is legacy plan provenance, never live
+        # authority.  The control-plane target is the only executable target and
+        # is overlaid without rewriting the fingerprinted historical plan.
+        return {**node, "pr_target": self.target_branch}
 
     def nodes(self) -> tuple[Mapping[str, Any], ...]:
-        return tuple(self._nodes[node_id] for node_id in sorted(self._nodes))
+        return tuple(self.node(node_id) for node_id in sorted(self._nodes))
 
     def validate_configuration(self) -> tuple[str, ...]:
         issues: list[str] = []
@@ -464,7 +568,8 @@ class ControlPlane:
         if len(self._nodes) != len(raw_nodes):
             issues.append("every node must be an object with an id")
         dependencies: dict[str, tuple[str, ...]] = {}
-        for node_id, node in self._nodes.items():
+        for node_id in self._nodes:
+            node = self.node(node_id)
             issues.extend(self._validate_node(node_id, node))
             deps = node.get("dependencies", [])
             if not isinstance(deps, list) or any(not isinstance(item, str) for item in deps):
@@ -543,6 +648,8 @@ class ControlPlane:
         for key in required_text:
             if not isinstance(node.get(key), str) or not str(node.get(key)).strip():
                 issues.append(f"{node_id}: {key} must be non-empty text")
+        if node.get("pr_target") != self.target_branch:
+            issues.append(f"{node_id}: effective pr_target must equal the singleton target branch")
         if node.get("contract_version") != 1:
             issues.append(f"{node_id}: contract_version must be 1")
         list_fields = (
@@ -647,24 +754,16 @@ class ControlPlane:
         check: bool = False,
         environment: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        # Preserve the host runtime environment in memory. Windows Git and
-        # Schannel need variables such as SystemRoot, TEMP, USERPROFILE, and
-        # LOCALAPPDATA; reducing this to PATH makes getaddrinfo/credential
-        # helpers fail even when standalone Git succeeds. Nothing here is
-        # persisted or printed, and prompts remain disabled.
-        base_environment = dict(os.environ)
+        # Git gets only the runtime locations needed by Windows/Schannel and the
+        # explicitly validated transport path. Credentials and GIT_CONFIG_*
+        # injection variables are never inherited by the child process.
+        base_environment = {
+            key: value
+            for key in SAFE_GIT_RUNTIME_ENVIRONMENT_KEYS
+            if (value := os.environ.get(key))
+            and not any(character in value for character in "\r\n")
+        }
         base_environment["GIT_TERMINAL_PROMPT"] = "0"
-        # Transport-capable Git commands must not inherit host URL rewrites,
-        # include chains, remote helpers, or TLS overrides. Repository-local
-        # transport configuration is inspected separately before any mutation.
-        for key in tuple(base_environment):
-            if key.startswith(("GIT_CONFIG", "GIT_EXEC", "GIT_SSH")) or key in {
-                "GIT_PROXY_COMMAND",
-                "GIT_SSL_NO_VERIFY",
-            }:
-                base_environment.pop(key, None)
-        base_environment["GIT_CONFIG_GLOBAL"] = os.devnull
-        base_environment["GIT_CONFIG_NOSYSTEM"] = "1"
         # Keep the controller deterministic while allowing a trusted local
         # proxy/network path to reach GitHub. These values exist only in the
         # child process environment; they are never persisted or printed.
@@ -680,22 +779,12 @@ class ControlPlane:
                     continue
             base_environment[key] = value
         if environment is not None:
-            if any(
-                key.startswith(("GIT_CONFIG", "GIT_EXEC", "GIT_SSH"))
-                or key in {"GIT_PROXY_COMMAND", "GIT_SSL_NO_VERIFY"}
-                for key in environment
-            ):
-                raise AutopilotError("unsafe Git environment override is forbidden")
-            base_environment.update(environment)
-        sealed_options: tuple[str, ...] = ()
-        if os.name == "nt":
-            sealed_options = (
-                "-c", "http.sslBackend=schannel",
-                "-c", "http.schannelCheckRevoke=true",
-                "-c", "credential.helper=manager",
-            )
+            for key, value in environment.items():
+                if key.startswith("GIT_CONFIG_"):
+                    raise AutopilotError("Git config injection variables are forbidden")
+                base_environment[key] = value
         completed = subprocess.run(
-            (self._trusted_git_executable(), *sealed_options, "-C", str(self.repo_root), *args),
+            ("git", "-C", str(self.repo_root), *args),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -711,75 +800,6 @@ class ControlPlane:
                 f"git {' '.join(args)} failed: {completed.stderr.strip()}"
             )
         return completed
-
-    def _trusted_git_executable(self) -> str:
-        """Resolve Git outside caller-controlled PATH on Windows.
-
-        Git for Windows publishes its install directory in HKLM.  Both that
-        directory and git.exe must be ordinary paths whose ACL does not grant
-        modification to broad unprivileged principals.  Unix retains the
-        platform executable lookup while excluding repository/temp paths.
-        """
-
-        if self._trusted_git_path is not None:
-            return self._trusted_git_path
-        if os.name != "nt":
-            resolved = shutil.which("git")
-            if not resolved:
-                raise AutopilotError("trusted Git executable is unavailable")
-            candidate = Path(resolved).resolve()
-            if candidate.is_relative_to(self.repo_root) or candidate.is_relative_to(
-                Path(tempfile.gettempdir()).resolve()
-            ):
-                raise AutopilotError("trusted Git executable is in a mutable workspace")
-            self._trusted_git_path = str(candidate)
-            return self._trusted_git_path
-
-        try:
-            import winreg
-
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\GitForWindows") as key:
-                install_path = Path(str(winreg.QueryValueEx(key, "InstallPath")[0]))
-            with winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-            ) as key:
-                system_root = Path(str(winreg.QueryValueEx(key, "SystemRoot")[0]))
-        except (OSError, ValueError) as error:
-            raise AutopilotError("trusted Git registry identity is unavailable") from error
-        candidates = (install_path / "cmd" / "git.exe", install_path / "bin" / "git.exe")
-        candidate = next((path for path in candidates if path.is_file()), None)
-        if candidate is None:
-            raise AutopilotError("registry-bound Git executable is unavailable")
-        candidate = candidate.resolve()
-        for path in (install_path.resolve(), candidate):
-            stat = path.lstat()
-            if path.is_symlink() or bool(getattr(stat, "st_file_attributes", 0) & 0x400):
-                raise AutopilotError("trusted Git path is a link or reparse point")
-            icacls = system_root / "System32" / "icacls.exe"
-            inspected = subprocess.run(
-                (str(icacls), str(path)),
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False,
-                timeout=10,
-                env={"SystemRoot": str(system_root)},
-            )
-            acl = inspected.stdout.casefold()
-            broad = ("everyone", "authenticated users", "builtin\\users")
-            writable = ("(f)", "(m)", "(w)")
-            if inspected.returncode != 0 or any(
-                principal in line and any(marker in line for marker in writable)
-                for line in acl.splitlines()
-                for principal in broad
-            ):
-                raise AutopilotError("trusted Git ACL permits unprivileged mutation")
-        self._trusted_git_path = str(candidate)
-        return self._trusted_git_path
 
     def git_object_exists(self, sha: str) -> bool:
         if FULL_SHA.fullmatch(sha) is None:
@@ -873,6 +893,8 @@ class ControlPlane:
         return None
 
     def remote_branch_sha(self, branch: str, *, remote: str = "origin") -> str | None:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         completed = self._git(
             ("ls-remote", "--heads", remote, f"refs/heads/{branch}"),
             check=False,
@@ -897,6 +919,8 @@ class ControlPlane:
         *,
         remote: str = "origin",
     ) -> str:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         node = self.node(node_id)
         branch = str(node.get("branch"))
         if self.remote_branch_sha(branch, remote=remote) is not None:
@@ -960,6 +984,8 @@ class ControlPlane:
         *,
         remote: str = "origin",
     ) -> None:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         branch = str(self.node(node_id).get("branch"))
         observed = self.remote_branch_sha(branch, remote=remote)
         if observed is None:
@@ -1120,6 +1146,69 @@ class ControlPlane:
         append_jsonl(self.questions_dir / f"{node_id}.jsonl", record)
         return record
 
+    def resolve_blocker(
+        self,
+        node_id: str,
+        blocker_id: str,
+        *,
+        actor: str,
+        fix: str,
+        retry_command: Sequence[str],
+        evidence_refs: Sequence[str] = (),
+    ) -> Mapping[str, Any]:
+        """Close one exact runtime blocker and make its verified retry actionable."""
+
+        if not actor.strip() or not fix.strip() or not retry_command:
+            raise AutopilotError("blocker resolution requires actor, fix, and retry command")
+        path = self.blockers_dir / f"{node_id}.jsonl"
+        records = (
+            [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+            if path.is_file()
+            else []
+        )
+        opened = next(
+            (
+                record
+                for record in records
+                if record.get("blocker_id") == blocker_id
+                and record.get("status") == "OPEN"
+            ),
+            None,
+        )
+        if not isinstance(opened, Mapping):
+            raise AutopilotError("blocker resolution must name an exact open blocker")
+        if any(
+            record.get("event") == "BLOCKER_RESOLVED"
+            and record.get("blocker_id") == blocker_id
+            for record in records
+        ):
+            raise AutopilotError("blocker is already resolved")
+        normalized_retry = self.validate_retry_command(retry_command)
+        candidate = {**opened, "fix": fix, "retry_when": "retry command is now executable"}
+        if not self.safe_retry_allowed(candidate):
+            raise AutopilotError("blocker resolution would weaken a security control")
+        resolution = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "BLOCKER_RESOLVED",
+            "node_id": node_id,
+            "blocker_id": blocker_id,
+            "actor": actor,
+            "fix": fix,
+            "retry_command": list(normalized_retry),
+            "evidence_refs": [str(item) for item in evidence_refs],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "RESOLVED",
+            "recovery_action": {"action": "RETRY_NOW", "reason": "verified_fix_recorded"},
+            "lesson": {
+                "trigger_category": opened.get("category"),
+                "policy": "spawn a bounded repair task, verify the fix, record the result, and resume the same task",
+            },
+        }
+        resolution["resolution_id"] = digest_json(resolution)
+        append_jsonl(path, resolution)
+        return resolution
+
     def resolve_human_question(
         self,
         node_id: str,
@@ -1140,6 +1229,7 @@ class ControlPlane:
                 raise AutopilotError(f"question resolution {label} is required")
         if not retry_command:
             raise AutopilotError("question resolution retry_command is required")
+        normalized_retry = self.validate_retry_command(retry_command)
         result = {
             "schema_version": SCHEMA_VERSION,
             "event": "QUESTION_RESOLVED",
@@ -1147,7 +1237,7 @@ class ControlPlane:
             "question_id": question_id,
             "answer_digest": digest_json({"answer": answer}),
             "fix": fix,
-            "retry_command": [str(item) for item in retry_command],
+            "retry_command": list(normalized_retry),
             "plan_fingerprint": self.expected_plan_fingerprint,
             "timestamp": format_time(self.clock()),
             "status": "RESOLVED",
@@ -1349,6 +1439,27 @@ class ControlPlane:
                 "required_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
                 "stop_if": "remote SHA cannot be verified normally or recovery would weaken provenance/security controls",
             }
+        category = str(packet.get("category", "")).casefold()
+        if not category.endswith("authority") and category not in {
+            "external-authority",
+            "human-authority",
+            "credential-authority",
+            "destructive-authority",
+        } and ControlPlane.safe_retry_allowed(packet):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "steward",
+                "objective": "diagnose the exact failure, implement the bounded safe fix, verify it, record the blocker resolution and lesson, then resume the same task",
+                "required_sequence": [
+                    "inspect_exact_failure_evidence",
+                    "verify_current_target_and_authority",
+                    "apply_bounded_safe_fix",
+                    "rerun_failed_operation",
+                    "record_blocker_resolution_and_lesson",
+                    "resume_same_task",
+                ],
+                "stop_if": "the fix requires new external authority, secrets, destructive action, or weaker security/evidence controls",
+            }
         return {
             "action": "REPORT_BLOCKER",
             "role": "orchestrator",
@@ -1364,6 +1475,43 @@ class ControlPlane:
             str(packet.get(key, "")) for key in ("fix", "retry_when")
         ).lower()
         return not any(marker in remediation for marker in UNSAFE_REMEDIATION_MARKERS)
+
+    @staticmethod
+    def validate_retry_command(command: Sequence[str]) -> tuple[str, ...]:
+        """Validate a tokenized retry without weakening transport or evidence controls."""
+
+        if isinstance(command, (str, bytes)) or not command:
+            raise AutopilotError("retry command must be a non-empty argv sequence")
+        normalized: list[str] = []
+        for item in command:
+            if not isinstance(item, str) or not item or len(item) > 4_096:
+                raise AutopilotError("retry command contains an invalid argument")
+            if any(character in item for character in "\x00\r\n"):
+                raise AutopilotError("retry command arguments must be single-line text")
+            normalized.append(item)
+        if len(normalized) > 128:
+            raise AutopilotError("retry command has too many arguments")
+
+        folded = " ".join(normalized).casefold()
+        compact = re.sub(r"[\s_-]+", "", folded)
+        unsafe = any(marker in folded for marker in UNSAFE_RETRY_ARGUMENT_MARKERS)
+        unsafe = unsafe or any(
+            marker in compact
+            for marker in (
+                "gitsslnoverify",
+                "curlinsecure",
+                "sslverify=false",
+                "sslverify=0",
+                "schannel.checkrevoke=false",
+                "schannel.checkrevoke=0",
+            )
+        )
+        if unsafe or any(
+            item.casefold().startswith(("git_config_", "git_config_count="))
+            for item in normalized
+        ):
+            raise AutopilotError("retry command would weaken a security control")
+        return tuple(normalized)
 
     def is_quarantined(self, node_id: str) -> bool:
         return (self.quarantine_dir / f"{node_id}.json").is_file()
@@ -1807,28 +1955,140 @@ class ControlPlane:
             branch=str(node.get("branch")),
         )
 
-    def status(self) -> dict[str, object]:
-        self.clean_stale_claims()
-        target = self.current_target_sha()
-        changed = self.changed_paths_since_reconciliation()
-        # The plan is a DAG with substantial fan-in.  Re-evaluating every
-        # dependency recursively for every node turns status into exponential
-        # work and can make the dispatcher appear hung on a full plan.  Keep
-        # this cache scoped to one status snapshot so all consumers observe a
-        # consistent view without retaining stale receipt or claim state.
-        uncached_node_view = self.node_view
-        view_cache: dict[str, NodeView] = {}
+    def _status_document(self) -> dict[str, object]:
+        # Status is a point-in-time observation over a DAG with substantial fan-in.
+        # Keep every cache on the instance only for this call: dependency recursion,
+        # durable receipt reconstruction, state-file reads, and immutable Git facts
+        # can then be reused without leaking stale truth into the next snapshot.
+        missing = object()
+        installed: list[tuple[str, object]] = []
 
-        def cached_node_view(node_id: str) -> NodeView:
-            if node_id not in view_cache:
-                view_cache[node_id] = uncached_node_view(node_id)
-            return view_cache[node_id]
+        def install(name: str, value: object) -> None:
+            installed.append((name, self.__dict__.get(name, missing)))
+            setattr(self, name, value)
 
-        self.node_view = cached_node_view  # type: ignore[method-assign]
+        uncached_git = self._git
+        git_cache: dict[
+            tuple[tuple[str, ...], bool, tuple[tuple[str, str], ...]],
+            subprocess.CompletedProcess[str],
+        ] = {}
+
+        def cached_git(
+            args: Sequence[str],
+            *,
+            check: bool = False,
+            environment: Mapping[str, str] | None = None,
+        ) -> subprocess.CompletedProcess[str]:
+            if not args or args[0] not in _STATUS_READ_ONLY_GIT_COMMANDS:
+                return uncached_git(args, check=check, environment=environment)
+            key = (tuple(args), check, tuple(sorted((environment or {}).items())))
+            if key not in git_cache:
+                git_cache[key] = uncached_git(
+                    args,
+                    check=check,
+                    environment=environment,
+                )
+            return git_cache[key]
+
+        install("_git", cached_git)
         try:
+            target = self.current_target_sha()
+            reconciled_target = self.reconciled_target_sha()
+            install("current_target_sha", lambda: target)
+            install("reconciled_target_sha", lambda: reconciled_target)
+
+            graph: _StatusCommitGraph | None = None
+            if self.verify_git_objects and FULL_SHA.fullmatch(target):
+                history = self._git(
+                    ("log", "--format=%H%x1f%P%x1f%T%x1f%B%x1e", target),
+                    check=False,
+                )
+                if history.returncode == 0:
+                    candidate_graph = _StatusCommitGraph.from_log(history.stdout)
+                    if target in candidate_graph.parents:
+                        graph = candidate_graph
+            if graph is not None:
+                uncached_object_exists = self.git_object_exists
+                uncached_is_ancestor = self.is_ancestor
+
+                def cached_object_exists(sha: str) -> bool:
+                    if sha in graph.trees:
+                        return True
+                    return uncached_object_exists(sha)
+
+                def cached_is_ancestor(ancestor: str, descendant: str) -> bool:
+                    observed = graph.is_ancestor(ancestor, descendant)
+                    if observed is not None:
+                        return observed
+                    return uncached_is_ancestor(ancestor, descendant)
+
+                install("git_object_exists", cached_object_exists)
+                install("is_ancestor", cached_is_ancestor)
+
+                if hasattr(self, "_commit_tree"):
+                    uncached_commit_tree = self._commit_tree
+
+                    def cached_commit_tree(commit: str) -> str | None:
+                        tree = graph.trees.get(commit)
+                        return tree if tree is not None else uncached_commit_tree(commit)
+
+                    install("_commit_tree", cached_commit_tree)
+                if hasattr(self, "_commit_parents"):
+                    uncached_commit_parents = self._commit_parents
+
+                    def cached_commit_parents(commit: str) -> tuple[str, ...]:
+                        parents = graph.parents.get(commit)
+                        return (
+                            parents
+                            if parents is not None
+                            else uncached_commit_parents(commit)
+                        )
+
+                    install("_commit_parents", cached_commit_parents)
+
+            changed = self.changed_paths_since_reconciliation()
+            active_claims = self.active_claims()
+            github_snapshot = self.github_snapshot()
+            install("active_claims", lambda: dict(active_claims))
+            install("github_snapshot", lambda: github_snapshot)
+
+            validation_lease: Mapping[str, Any] | None = None
+            if self.validation_lease_path.is_file():
+                candidate = read_json(self.validation_lease_path)
+                if (
+                    isinstance(candidate, Mapping)
+                    and parse_time(candidate.get("expires_at")) > self.clock()
+                ):
+                    validation_lease = candidate
+
+            if hasattr(self, "_durable_receipt_records"):
+                uncached_durable_receipts = self._durable_receipt_records
+                durable_receipts: dict[str, list[dict[str, Any]]] | None = None
+
+                def cached_durable_receipts() -> dict[str, list[dict[str, Any]]]:
+                    nonlocal durable_receipts
+                    if durable_receipts is None:
+                        durable_receipts = uncached_durable_receipts()
+                    return durable_receipts
+
+                install("_durable_receipt_records", cached_durable_receipts)
+
+            uncached_node_view = self.node_view
+            view_cache: dict[str, NodeView] = {}
+
+            def cached_node_view(node_id: str) -> NodeView:
+                if node_id not in view_cache:
+                    view_cache[node_id] = uncached_node_view(node_id)
+                return view_cache[node_id]
+
+            install("node_view", cached_node_view)
             views = [cached_node_view(node_id) for node_id in sorted(self._nodes)]
         finally:
-            self.node_view = uncached_node_view  # type: ignore[method-assign]
+            for name, prior in reversed(installed):
+                if prior is missing:
+                    self.__dict__.pop(name, None)
+                else:
+                    setattr(self, name, prior)
         counts: dict[str, int] = {state: 0 for state in LEGAL_STATES}
         for view in views:
             counts[view.state] = counts.get(view.state, 0) + 1
@@ -1850,8 +2110,21 @@ class ControlPlane:
             "ready": ready,
             "nodes": [view.to_dict() for view in views],
             "complete": all(view.state in TERMINAL_STATES for view in views),
+            "active_claims": sorted(active_claims),
+            "active_validation_lease": (
+                dict(validation_lease) if validation_lease is not None else None
+            ),
             "generated_at": format_time(self.clock()),
         }
+
+    def observe_status(self) -> dict[str, object]:
+        """Return controller truth without reaping or otherwise mutating state."""
+
+        return self._status_document()
+
+    def status(self) -> dict[str, object]:
+        self.clean_stale_claims()
+        return self._status_document()
 
     def ready_nodes(self) -> tuple[str, ...]:
         status = self.status()
@@ -2123,6 +2396,12 @@ class ControlPlane:
             routes.get("anthropic"), f"{node_id}.routes.anthropic"
         )
         values = {
+            "REPOSITORY": str(
+                _require_mapping(self.control.get("target"), "control-plane.target").get(
+                    "repository", "local-repository"
+                )
+            ),
+            "TARGET_BRANCH": self.target_branch,
             "NODE_ID": node_id,
             "NODE_STATE": view.state,
             "OBJECTIVE": str(node.get("objective")),

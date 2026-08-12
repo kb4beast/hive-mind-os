@@ -2,14 +2,18 @@
 
 Status: Accepted for the current Hive Mind OS execution program
 
-Date: 2026-08-10
+Date: 2026-08-10; target amendment 2026-08-11
 
 ## Decision
 
 All Autopilot nodes execute, validate, reconcile, claim, publish receipts, and open
 node PRs against one configured singleton release branch:
 
-`release/hive-mind-os-singleton-20260810-r2`
+`release/hive-mind-os-singleton-20260811-r4`
+
+The r3 target is an ancestry-preserving successor to r2 that integrates all then-open
+PR heads before the portable orchestration change. This target amendment changes no
+authority: `main` remains outside the execution path.
 
 The protected `main` branch is not an execution target and must not receive node
 merges. It is reserved for one final integration after L0–L15 completion has been
