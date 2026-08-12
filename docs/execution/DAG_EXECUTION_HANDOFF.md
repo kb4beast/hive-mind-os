@@ -177,6 +177,26 @@ Run it only when no worker is writing — discovery otherwise picks up
 in-progress files and the verdict is meaningless. `run-round` runs it
 automatically unless `--skip-validation` is passed.
 
+**Last full run on this branch: `Ran 958 tests`, 2 errors, 7 skipped — and both
+errors were environmental, not regressions.** `tests/test_hive_cortex_explorer`
+fails whenever ANY `GIT_*` variable is exported, because `explorer.py`
+`_git_environment` rejects inherited Git environment outright. Agent harnesses
+commonly export `GIT_EDITOR`. Proof:
+
+```
+PYTHONPATH=src python -m unittest tests.test_hive_cortex_explorer          # FAILED (errors=2)
+env -u GIT_EDITOR PYTHONPATH=src python -m unittest tests.test_hive_cortex_explorer   # OK
+```
+
+`default_validation_runner` now strips `GIT_*` from the environment it hands
+the gate, so the automated round validation no longer reports these. If you run
+the suite by hand from a shell that exports `GIT_EDITOR`, unset it first or you
+will chase a phantom failure.
+
+**Do not run the gate through `| tail`** — the pipe buffers everything until
+exit, so a 21-minute run is indistinguishable from a hang. Redirect to a file
+and inspect it instead.
+
 ---
 
 ## 7. Expect runbook defects, and repair them as the orchestrator

@@ -249,6 +249,29 @@ class RoundDriverTests(unittest.TestCase):
         passed, summary = driver.default_validation_runner(self.root)()
         self.assertTrue(passed, summary)
 
+    def test_validation_does_not_inherit_git_environment_variables(self) -> None:
+        """An exported GIT_* must not make the gate fail for environmental reasons."""
+
+        tests = self.root / "tests"
+        tests.mkdir(exist_ok=True)
+        (tests / "test_probe_env.py").write_text(
+            "import os, unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_no_inherited_git_vars(self):\n"
+            "        self.assertEqual([k for k in os.environ if k.upper().startswith('GIT_')], [])\n",
+            encoding="utf-8",
+        )
+        previous = os.environ.get("GIT_EDITOR")
+        os.environ["GIT_EDITOR"] = "true"
+        try:
+            passed, summary = driver.default_validation_runner(self.root)()
+        finally:
+            if previous is None:
+                os.environ.pop("GIT_EDITOR", None)
+            else:
+                os.environ["GIT_EDITOR"] = previous
+        self.assertTrue(passed, summary)
+
     def test_blocker_classification_follows_required_authority(self) -> None:
         self.assertEqual(
             driver.classify_blocker("remote branch already exists; reconcile it"), "CLASS_B"

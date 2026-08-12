@@ -226,7 +226,16 @@ def default_validation_runner(repo_root: Path) -> Callable[[], tuple[bool, str]]
 
     def run() -> tuple[bool, str]:
         source = Path(repo_root) / "src"
-        environment = dict(os.environ)
+        # The explorer refuses to run with ANY inherited GIT_* variable
+        # (explorer.py `_git_environment`), and agent harnesses routinely export
+        # GIT_EDITOR. Inheriting it makes the gate report failures that are
+        # purely environmental — the worst kind, because they look like the
+        # round broke something.
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.upper().startswith("GIT_")
+        }
         if source.is_dir():
             existing = environment.get("PYTHONPATH", "")
             environment["PYTHONPATH"] = (
