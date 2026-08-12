@@ -1,14 +1,17 @@
 """Bind controlled GitHub delivery to the canonical kernel effect path.
 
-Three adapters — branch push, draft pull request, and pull-request comment —
+Five adapters — branch push, draft pull request, pull-request comment, and the
+two retractions that undo them (close own pull request, delete own branch) —
 register with :class:`hive_mind_os.brain_kernel.effects.EffectGateway`.  Every
 one of them starts from an immutable :class:`DeliveryGrant`, resolves its
 parameters from a pre-bound digest, and returns the mapping shape that
 ``DurableEffectOutbox.execute`` folds into an ``EffectReceipt``.
 
-There is no fourth adapter.  Merge, close, review, and protection writes are
-not implemented here and are not grantable, so no routine mission can reach
-them through this boundary.
+There is no sixth adapter.  The two retractions are strictly self-scoped: each
+one refuses any target the grant could not itself have created, so they can only
+ever undo this pilot's own work.  Integrating a pull request, reviewing, and
+protection writes are not implemented here and are not grantable, so no routine
+mission can reach them through this boundary.
 """
 
 from __future__ import annotations
@@ -47,12 +50,23 @@ def _required_text(parameters: Mapping[str, Any], field: str) -> str:
     return value
 
 
+def _required_pull_number(parameters: Mapping[str, Any]) -> int:
+    pull_number = parameters.get("pull_number")
+    if type(pull_number) is not int or pull_number < 1:
+        raise DeliveryGrantError(
+            "delivery parameter pull_number must be a positive integer"
+        )
+    return pull_number
+
+
 class ControlledGitHubDelivery:
     """The whole remote authority surface of a routine mission, and no more."""
 
     PUSH_ADAPTER = "github-push"
     DRAFT_PR_ADAPTER = "github-draft-pr"
     COMMENT_ADAPTER = "github-comment"
+    CLOSE_PR_ADAPTER = "github-close-own-pr"
+    DELETE_BRANCH_ADAPTER = "github-delete-own-branch"
     adapter_version = "1"
 
     def __init__(
@@ -99,7 +113,7 @@ class ControlledGitHubDelivery:
     # -- registration ------------------------------------------------------
 
     def register_with(self, gateway: EffectGateway) -> None:
-        """Register exactly the three delivery adapters on a kernel gateway."""
+        """Register exactly the five delivery adapters on a kernel gateway."""
 
         gateway.register_adapter(
             self.PUSH_ADAPTER, self.push_adapter, version=self.adapter_version
@@ -109,6 +123,14 @@ class ControlledGitHubDelivery:
         )
         gateway.register_adapter(
             self.COMMENT_ADAPTER, self.comment_adapter, version=self.adapter_version
+        )
+        gateway.register_adapter(
+            self.CLOSE_PR_ADAPTER, self.close_pr_adapter, version=self.adapter_version
+        )
+        gateway.register_adapter(
+            self.DELETE_BRANCH_ADAPTER,
+            self.delete_branch_adapter,
+            version=self.adapter_version,
         )
 
     # -- adapters ----------------------------------------------------------
@@ -164,11 +186,7 @@ class ControlledGitHubDelivery:
         self.grant.require("post_comment")
         self._require_target(intent)
         parameters = self._parameters(intent)
-        pull_number = parameters.get("pull_number")
-        if type(pull_number) is not int or pull_number < 1:
-            raise DeliveryGrantError(
-                "delivery parameter pull_number must be a positive integer"
-            )
+        pull_number = _required_pull_number(parameters)
         body = _required_text(parameters, "body")
         marker = f"{COMMENT_MARKER_PREFIX}{intent.idempotency_key} -->"
         for comment in self.rest.list_comments(pull_number):
@@ -177,6 +195,93 @@ class ControlledGitHubDelivery:
                 return self._comment_result(comment, pull_number)
         document = self.rest.post_comment(pull_number, f"{body}\n\n{marker}")
         return self._comment_result(document, pull_number)
+
+    def close_pr_adapter(self, intent: EffectIntent) -> dict[str, Any]:
+        """Close one draft pull request this grant opened, and nothing else."""
+
+        self.grant.require("close_own_pr")
+        self._require_target(intent)
+        parameters = self._parameters(intent)
+        pull_number = _required_pull_number(parameters)
+        # Read first: every ownership denial happens before the state change.
+        head_branch = self._own_open_draft_head(
+            self.rest.get_pull_request(pull_number), pull_number
+        )
+        document = self.rest.close_pull_request(pull_number)
+        if document.get("number") != pull_number:
+            raise DeliveryRestError("close response is for a different pull request")
+        return {
+            "produced_identifiers": (f"pr:{pull_number}", f"branch:{head_branch}"),
+            "postcondition_digest": canonical_digest(
+                {"pr": pull_number, "state": "closed"}
+            ),
+        }
+
+    def delete_branch_adapter(self, intent: EffectIntent) -> dict[str, Any]:
+        """Delete one branch this grant could have created, and nothing else."""
+
+        self.grant.require("delete_own_branch")
+        self._require_target(intent)
+        parameters = self._parameters(intent)
+        branch = _required_text(parameters, "branch")
+        # Static denial first, so a protected, base, or foreign branch never
+        # reaches the network at all.
+        self.grant.require_own_run_branch(branch, "delete_own_branch")
+        # Then the live default branch, which a static list cannot know for an
+        # owner-chosen pilot repository.  An unreadable default branch denies.
+        if branch == self.rest.default_branch():
+            raise DeliveryGrantError(
+                f"delete_own_branch on repository default branch {branch!r} is denied"
+            )
+        self.rest.delete_branch(branch)
+        return {
+            "produced_identifiers": (f"branch:{branch}",),
+            "postcondition_digest": canonical_digest({"deleted": branch}),
+        }
+
+    def _own_open_draft_head(
+        self, document: Mapping[str, Any], pull_number: int
+    ) -> str:
+        """Return the head branch, having proven this grant opened this pull request.
+
+        ``draft_pr_adapter`` is the only way this boundary can open a pull
+        request, and it always opens an untouched draft from a branch under the
+        granted prefix in the granted repository against the granted base.  A
+        pull request that does not still match that description in every part
+        was not opened here, so closing it is refused.
+        """
+
+        if document.get("state") != "open":
+            raise DeliveryGrantError(
+                f"pull request {pull_number} is not open, so it will not be closed"
+            )
+        if document.get("draft") is not True:
+            raise DeliveryGrantError(
+                f"pull request {pull_number} is not a draft, so it was not opened here"
+            )
+        base = document.get("base")
+        if not isinstance(base, Mapping) or base.get("ref") != self.grant.base_branch:
+            raise DeliveryGrantError(
+                f"pull request {pull_number} does not target the granted base branch"
+            )
+        head = document.get("head")
+        if not isinstance(head, Mapping):
+            raise DeliveryGrantError(
+                f"pull request {pull_number} has no readable head reference"
+            )
+        repository = head.get("repo")
+        expected = f"{self.grant.owner}/{self.grant.repository}"
+        if not isinstance(repository, Mapping) or repository.get("full_name") != expected:
+            raise DeliveryGrantError(
+                f"pull request {pull_number} head is not in the granted repository"
+            )
+        head_branch = head.get("ref")
+        if not isinstance(head_branch, str):
+            raise DeliveryGrantError(
+                f"pull request {pull_number} has no readable head branch"
+            )
+        self.grant.require_own_run_branch(head_branch, "close_own_pr")
+        return head_branch
 
     @staticmethod
     def _comment_result(

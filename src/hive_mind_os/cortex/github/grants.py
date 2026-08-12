@@ -23,8 +23,11 @@ _SIMPLE_NAME = re.compile(r"[A-Za-z0-9_.-]+\Z")
 PROTECTED_BRANCHES: frozenset[str] = frozenset({"main", "master", "staging"})
 
 # "merge" is deliberately absent and is not a spelling this package accepts.
+# Every action here is additive and self-scoped: "close_own_pr" and
+# "delete_own_branch" exist so a pilot can retract exactly what it created, and
+# neither is implied by any other action -- a grant must name it to hold it.
 VALID_DELIVERY_ACTIONS: frozenset[str] = frozenset(
-    {"push", "open_draft_pr", "post_comment"}
+    {"push", "open_draft_pr", "post_comment", "close_own_pr", "delete_own_branch"}
 )
 
 
@@ -187,5 +190,31 @@ class DeliveryGrant:
         if not branch.startswith(self.branch_prefix):
             raise DeliveryGrantError(
                 f"push branch {branch!r} is outside the granted prefix "
+                f"{self.branch_prefix!r}"
+            )
+
+    def require_own_run_branch(self, branch: Any, operation: str) -> None:
+        """Deny every ref this grant could not itself have created.
+
+        The retraction operations (``close_own_pr``, ``delete_own_branch``) are
+        allowed to touch exactly the branches ``require_push_branch`` would have
+        allowed them to create, and nothing else.  ``operation`` only names the
+        caller in the refusal so an audit trail records what was refused; it
+        never relaxes a check.
+        """
+
+        if not isinstance(branch, str) or not branch.strip():
+            raise DeliveryGrantError(f"{operation} requires a branch name")
+        if branch in PROTECTED_BRANCHES:
+            raise DeliveryGrantError(
+                f"{operation} on protected branch {branch!r} is denied"
+            )
+        if branch == self.base_branch:
+            raise DeliveryGrantError(
+                f"{operation} on grant base branch {branch!r} is denied"
+            )
+        if not branch.startswith(self.branch_prefix):
+            raise DeliveryGrantError(
+                f"{operation} on branch {branch!r} is outside the granted prefix "
                 f"{self.branch_prefix!r}"
             )

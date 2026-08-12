@@ -1,9 +1,12 @@
 """A deliberately narrow GitHub REST surface for controlled delivery.
 
-Only four calls exist: look up an open draft pull request, create one, list
-issue comments, and post one comment.  There is no method for merging,
-closing, reviewing, or writing branch protection, and none can be added
-without changing this file.  The HTTP seam is the existing
+Eight calls exist: look up an open draft pull request, create one, read one,
+close one, list issue comments, post one comment, read the repository default
+branch, and delete one branch ref.  Closing and branch deletion exist only so a
+pilot can retract exactly what it created; the two reads that precede them exist
+only to enforce that refusal.  There is still no method for integrating a pull
+request, reviewing, or writing branch protection, and none can be added without
+changing this file.  The HTTP seam is the existing
 :class:`hive_mind_os.github_adapter.GitHubTransport` protocol so tests can
 supply a deterministic in-process fake.
 """
@@ -23,6 +26,9 @@ from hive_mind_os.github_adapter import (
 )
 
 _SIMPLE_NAME = re.compile(r"[A-Za-z0-9_.-]+\Z")
+# A branch ref is slash-separated simple segments and nothing else, so a branch
+# name can never smuggle a traversal, a query string, or a fragment into a path.
+_BRANCH_REF = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\Z")
 _API_VERSION = "2022-11-28"
 _USER_AGENT = "hive-mind-os-delivery-420"
 
@@ -32,9 +38,9 @@ class DeliveryRestError(RuntimeError):
 
 
 class ControlledRestGateway:
-    """Draft-PR and comment REST calls only.
+    """Draft-PR, comment, self-retraction, and the reads that gate them.
 
-    No merge, close, review, or protection-write method exists on this class.
+    No integration, review, or protection-write method exists on this class.
     """
 
     def __init__(
@@ -68,14 +74,16 @@ class ControlledRestGateway:
     def repository_path(self) -> str:
         return f"/repos/{self.owner}/{self.repository}"
 
-    def _request_json(
+    def _request(
         self,
         method: str,
         path: str,
         *,
         body: Mapping[str, Any] | None = None,
         accepted: tuple[int, ...] = (200,),
-    ) -> dict[str, Any] | list[Any]:
+    ) -> GitHubResponse:
+        """Issue one authorized call; a status outside ``accepted`` fails closed."""
+
         token = os.environ.get(self.token_env, "")
         if not token:
             raise DeliveryRestError(
@@ -104,6 +112,17 @@ class ControlledRestGateway:
             raise DeliveryRestError(
                 f"GitHub API returned unexpected HTTP {response.status} for {method}"
             )
+        return response
+
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        body: Mapping[str, Any] | None = None,
+        accepted: tuple[int, ...] = (200,),
+    ) -> dict[str, Any] | list[Any]:
+        response = self._request(method, path, body=body, accepted=accepted)
         try:
             document = json.loads(response.body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -117,6 +136,18 @@ class ControlledRestGateway:
         if type(pull_number) is not int or pull_number < 1:
             raise DeliveryRestError("pull request number must be a positive integer")
         return pull_number
+
+    @staticmethod
+    def _branch_ref(branch: Any) -> str:
+        """Accept only a plain slash-separated branch ref; anything else fails closed."""
+
+        if not isinstance(branch, str) or _BRANCH_REF.fullmatch(branch) is None:
+            raise DeliveryRestError(
+                "branch ref must be slash-separated simple segments"
+            )
+        if any(segment.startswith(".") for segment in branch.split("/")):
+            raise DeliveryRestError("branch ref segments must not start with '.'")
+        return branch
 
     def find_open_draft_pr(self, branch: str, base: str) -> Mapping[str, Any] | None:
         """Return an existing open draft PR for the branch, or ``None``."""
@@ -175,3 +206,56 @@ class ControlledRestGateway:
         if not isinstance(document, Mapping):
             raise DeliveryRestError("comment response must be an object")
         return document
+
+    def get_pull_request(self, pull_number: int) -> Mapping[str, Any]:
+        """Read one pull request so a caller can prove it is the one it opened."""
+
+        document = self._request_json(
+            "GET",
+            f"{self.repository_path}/pulls/{self._pull_number(pull_number)}",
+        )
+        if not isinstance(document, Mapping):
+            raise DeliveryRestError("pull request response must be an object")
+        return document
+
+    def close_pull_request(self, pull_number: int) -> Mapping[str, Any]:
+        """Set one pull request to ``closed``; an integrated result fails closed.
+
+        The only field ever sent is ``state``.  There is no code path on this
+        class that can integrate a pull request into a branch, and a response
+        claiming the pull request was integrated is treated as an error rather
+        than as success.
+        """
+
+        document = self._request_json(
+            "PATCH",
+            f"{self.repository_path}/pulls/{self._pull_number(pull_number)}",
+            body={"state": "closed"},
+        )
+        if not isinstance(document, Mapping):
+            raise DeliveryRestError("pull request response must be an object")
+        if document.get("state") != "closed":
+            raise DeliveryRestError("GitHub did not close the pull request")
+        if document.get("merged") is True or document.get("merged_at") is not None:
+            raise DeliveryRestError("pull request was integrated, not closed")
+        return document
+
+    def default_branch(self) -> str:
+        """Return the repository default branch; an unreadable one fails closed."""
+
+        document = self._request_json("GET", self.repository_path)
+        if not isinstance(document, Mapping):
+            raise DeliveryRestError("repository response must be an object")
+        name = document.get("default_branch")
+        if not isinstance(name, str) or not name.strip():
+            raise DeliveryRestError("repository response has no default_branch")
+        return name
+
+    def delete_branch(self, branch: str) -> None:
+        """Delete exactly one branch ref; only HTTP 204 counts as deleted."""
+
+        self._request(
+            "DELETE",
+            f"{self.repository_path}/git/refs/heads/{self._branch_ref(branch)}",
+            accepted=(204,),
+        )
