@@ -9,12 +9,24 @@ import tempfile
 import unittest
 
 from hive_mind_os.brain_kernel.authority import AuthorityDenied
+from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.consultation import ConsultationReason, ConsultationRequest, RoleAssessment
-from hive_mind_os.brain_kernel.contracts import EvaluationState, TechnicalCloseoutState
+from hive_mind_os.brain_kernel.context import CompiledContext, ContextRequest
+from hive_mind_os.brain_kernel.contracts import (
+    ContextManifest, EvaluationResult, EvaluationState, TechnicalCloseoutState,
+)
+from hive_mind_os.brain_kernel.events import KernelEvent
+from hive_mind_os.brain_kernel.store import KernelIntegrityError
 from hive_mind_os.brain_kernel.mission_runtime import MissionEscalationRequired, MissionRuntime, MissionRuntimeError
 from hive_mind_os.brain_kernel.planner import orchestration_plan_from_events
 from hive_mind_os.brain_kernel.reconciler import RepairKind
-from hive_mind_os.brain_kernel.roles import KERNEL_IMPLEMENTED_ROLES, result_digest
+from hive_mind_os.brain_kernel.roles import (
+    KERNEL_IMPLEMENTED_ROLES, RoleInvocation, RoleProtocolError, result_digest,
+)
+from hive_mind_os.brain_kernel.verification import (
+    ExactCandidateVerificationError, accept_verified_work, create_evaluation_plan, verify_exact_candidate,
+)
+from hive_mind_os.cortex.repository.role_handlers import RepositoryRoleHandlers
 from hive_mind_os.cortex.repository.mission_adapter import (
     build_local_mission_environment, repair_handlers, run_local_mission,
 )
@@ -122,7 +134,18 @@ class HumanlessRepairTests(_EnvironmentCase):
         # The reconciler itself is separately exercised after a mission has been safely created above.
 
     def test_no_progress_bound_quarantines(self):
-        self.assertTrue(True)
+        environment = self.environment()
+        runtime = MissionRuntime(environment.store)
+        request = ConsultationRequest("CONSULT-local-noprogress", environment.config.mission_id, "Need authority", ConsultationReason.MISSING_EXTERNAL_AUTHORITY, "builder", ("curator", "integrator"), authority_class="credential_or_secret")
+        assessments = (RoleAssessment("curator", "curator:noprogress", evidence_refs=("e",), authority_required=True), RoleAssessment("integrator", "integrator:noprogress", evidence_refs=("e",), authority_required=True))
+        with self.assertRaises(MissionEscalationRequired):
+            runtime.run(environment.config, replace(environment.bindings, consultation_request=request, consultation_assessments=assessments))
+        # A no-progress bound must quarantine for a human decision, never invent
+        # one: the runner has no QUARANTINE handler, so the action survives apply.
+        result = runtime.repair_pass(environment.config.mission_id, now=3.0, observed_overrides={"no_progress_count": 3})
+        self.assertTrue(any(action.kind is RepairKind.QUARANTINE for action in result.actions))
+        result.apply(repair_handlers(environment))
+        self.assertTrue(any(action.kind is RepairKind.QUARANTINE for action in result.actions))
 
 
 class MissionReplayTests(_EnvironmentCase):
@@ -159,6 +182,34 @@ class MissionReplayTests(_EnvironmentCase):
         self.assertEqual(MissionRuntime(environment.store).replay(receipt.mission_id, bundle_directories=environment.bundle_directories).closeout_report_digest, receipt.closeout.report_digest)
 
 
+_Z = "sha256:" + "0" * 64
+
+
+def _curator_invocation(environment, *, evaluator_mode: bool) -> RoleInvocation:
+    """Build a curator invocation, copying the runtime's context idiom.
+
+    The runbook forbids importing the private `_context` helpers, so the small
+    construction is reproduced here rather than reached into.
+    """
+
+    mission_id, work_id, attempt_id = environment.config.mission_id, "WORK-local-curator", "ATTEMPT-local-curator"
+    request = ContextRequest(
+        mission_id, work_id, attempt_id, "curator", _Z, _Z, 0,
+        "canonical local mission", environment.config.occurred_at, ("repository",), (),
+        evaluator_mode=evaluator_mode,
+    )
+    manifest = ContextManifest(
+        mission_id, work_id, attempt_id, "curator", _Z, _Z, 0, 0, (), (), (), (),
+        {"budget": 0}, (), evaluator_mode,
+        canonical_digest({"role": "curator", "attempt": attempt_id}),
+    )
+    return RoleInvocation(
+        mission_id, work_id, attempt_id, "curator", "mission:curator",
+        CompiledContext(request, manifest, (), ()), _Z,
+        ("charter:" + _Z,), ("workspace:base",), ("workspace:candidate",),
+    )
+
+
 class AuthorityBoundaryTests(_EnvironmentCase):
     def test_effect_outside_write_scope_is_denied(self):
         environment = self.environment()
@@ -167,4 +218,43 @@ class AuthorityBoundaryTests(_EnvironmentCase):
     def test_capability_token_must_bind_the_exact_intent(self):
         environment = self.environment(); effect = environment.bindings.builder_effect
         with self.assertRaises(AuthorityDenied): environment.gateway.execute(effect.intent, effect.registry.authorize(effect.envelope_digest, "write", "candidate/other.txt", now=effect.authorization_time))
+
+    def test_builder_cannot_evaluate_its_own_candidate(self):
+        environment = self.environment()
+        spec = environment.bindings.verification["builder"]
+        plan = create_evaluation_plan("PLAN-self-eval", spec.base_root, acceptance_commands=spec.acceptance_commands, allowed_paths=spec.allowed_paths)
+        with self.assertRaises(ExactCandidateVerificationError):
+            verify_exact_candidate(environment.store, "WORK-local-builder", plan, spec.candidate_root,
+                                   builder_id="mission:builder", evaluator_id="mission:builder",
+                                   check_runner=spec.check_runner, bundle_directory=spec.bundle_directory)
+
+    def test_acceptance_requires_the_recorded_passed_result(self):
+        environment = self.environment()
+        # An evaluation result the spine never recorded as PASSED can never be
+        # the basis of an acceptance, however well-formed it looks.
+        unrecorded = EvaluationResult(_Z, _Z, "mission:curator:evaluator", EvaluationState.FAILED, (), (), _Z)
+        with self.assertRaises(ExactCandidateVerificationError):
+            accept_verified_work(environment.store, "WORK-local-builder", unrecorded, actor_id="mission:integrator")
+
+    def test_curator_requires_evaluator_isolated_context(self):
+        environment = self.environment()
+        invocation = _curator_invocation(environment, evaluator_mode=False)
+        with self.assertRaises(RoleProtocolError):
+            RepositoryRoleHandlers().execute(invocation)
+
+    def test_requesting_role_cannot_consult_itself(self):
+        with self.assertRaises(ValueError):
+            ConsultationRequest("CONSULT-self", "MISSION-local", "May I approve myself?",
+                                ConsultationReason.AMBIGUOUS_DESIGN, "builder", ("builder", "curator"))
+
+    def test_unknown_event_types_are_rejected_by_the_spine(self):
+        environment = self.environment()
+        events = environment.store.events()
+        event = KernelEvent("self-approval-1", environment.config.mission_id, "mission.self_approved",
+                            "mission:builder", "2026-08-11T00:00:00Z", {"status": "ACCEPTED"},
+                            previous_digest=events[-1]["digest"] if events else None)
+        # The reducer refuses the unknown type; the store surfaces it as an
+        # integrity failure rather than persisting an unreducible event.
+        with self.assertRaises(KernelIntegrityError):
+            environment.store.append(event)
 
