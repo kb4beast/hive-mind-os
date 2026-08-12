@@ -522,7 +522,13 @@ class ProtectedBranchDenialTests(_DeliveryFixture):
         forbidden = ("--force", "force_push", "/merge", "merge_method", "/merges")
         modules = sorted(PACKAGE_ROOT.glob("*.py"))
         self.assertEqual(
-            ["__init__.py", "delivery_adapter.py", "grants.py", "rest_gateway.py"],
+            [
+                "__init__.py",
+                "delivery_adapter.py",
+                "grants.py",
+                "push_executor.py",
+                "rest_gateway.py",
+            ],
             [module.name for module in modules],
         )
         for module in modules:

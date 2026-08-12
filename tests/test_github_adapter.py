@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import os
 import ssl
@@ -30,6 +31,7 @@ from hive_mind_os.cortex.github.grants import (
     DeliveryGrant,
     DeliveryGrantError,
 )
+from hive_mind_os.cortex.github.push_executor import WorkspacePushExecutor
 from hive_mind_os.cortex.github.rest_gateway import (
     ControlledRestGateway,
     DeliveryRestError,
@@ -39,10 +41,13 @@ from hive_mind_os.github_adapter import (
     CheckPollingTimeout,
     CheckRunFailed,
     GitHubClient,
+    GitHubDeliveryError,
     GitHubDeliveryTarget,
     GitHubPolicyDenied,
     GitHubResponse,
     GitHubTransportError,
+    MissingGitHubCredential,
+    PushResult,
     UrllibGitHubTransport,
     validate_github_receipt,
 )
@@ -1318,6 +1323,266 @@ class ControlledRetractionTests(unittest.TestCase):
                     adapter_callable(foreign)
 
                 self.assertEqual([], transport.calls)
+
+
+class ScriptedHeadClient(GitHubClient):
+    """Answers a push with a scripted head; it runs no Git and opens no socket."""
+
+    def __init__(
+        self,
+        *args: object,
+        head_sha: object,
+        transport: FakeGitHubTransport,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(*args, transport=transport, **kwargs)  # type: ignore[arg-type]
+        self.scripted_head = head_sha
+        self.calls = 0
+
+    def push_branch(
+        self,
+        workspace: GitWorkspace,
+        *,
+        branch: str | None = None,
+        remote_url: str | Path | None = None,
+        allow_local_test_remote: bool = False,
+    ) -> PushResult:
+        self.calls += 1
+        return PushResult(branch or "", self.scripted_head, {})  # type: ignore[arg-type]
+
+
+class WorkspacePushExecutorTests(unittest.TestCase):
+    """A4-800 Path B: the production binding from ``PushExecutor`` to a real push.
+
+    Every push below lands in a bare repository created by ``git init --bare``
+    inside the workspace and reached through ``allow_local_test_remote``,
+    exactly as ``test_token_never_persists_or_escapes_errors`` does.  Nothing
+    here opens a socket: the REST transport is the same in-process fake the
+    rest of this module uses and it raises on any request, and the credential
+    is a dummy value in an environment variable this class owns and restores.
+    """
+
+    TOKEN_ENV = "HIVE_PUSH_EXECUTOR_TEST_TOKEN"
+
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.environment = patch.dict(
+            os.environ,
+            {self.TOKEN_ENV: "fixture-push-executor-token"},
+            clear=False,
+        )
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        self.store = MissionStore(self.root / "state")
+        self.addCleanup(self.store.close)
+        self.mission_id = "mission-push-executor"
+        self.store.register_mission(
+            self.mission_id,
+            {
+                "objective": "push one granted run branch",
+                "source_pack_fingerprint": f"sha256:{'2' * 64}",
+            },
+            AutonomyBudget(100, 100, 100.0),
+        )
+        fixture = build_fixture_repo(self.root / "parent")
+        self.workspace = GitWorkspace.materialize(
+            fixture.root,
+            COMMIT_TWO_SHA,
+            self.root / "work",
+            self.root / "ev",
+        )
+        self.workspace.create_branch(R2_BRANCH)
+        self.workspace.write_file(
+            "tiny_pkg/maths.py",
+            b"def increment(value: int) -> int:\n    return value + 1\n",
+        )
+        self.workspace.commit("fix: restore increment")
+        self.bare = self.workspace.root / ".git" / "push-executor-remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", str(self.bare)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    # -- fixtures ----------------------------------------------------------
+
+    def client(self, *, token_env: str | None = None) -> GitHubClient:
+        return GitHubClient(
+            R2_OWNER,
+            R2_REPOSITORY,
+            self.root / "gh",
+            transport=FakeGitHubTransport(),
+            token_env=token_env or self.TOKEN_ENV,
+            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+            mission_store=self.store,
+            mission_id=self.mission_id,
+            sleep=lambda _seconds: None,
+            clock=lambda: "2026-07-27T20:03:00Z",
+        )
+
+    def scripted_client(self, head_sha: object) -> ScriptedHeadClient:
+        return ScriptedHeadClient(
+            R2_OWNER,
+            R2_REPOSITORY,
+            self.root / "gh",
+            head_sha=head_sha,
+            transport=FakeGitHubTransport(),
+            token_env=self.TOKEN_ENV,
+            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+            mission_store=self.store,
+            mission_id=self.mission_id,
+        )
+
+    def executor(self, client: GitHubClient | None = None) -> WorkspacePushExecutor:
+        return WorkspacePushExecutor(
+            client or self.client(),
+            self.workspace,
+            remote_url=Path(".git") / self.bare.name,
+            allow_local_test_remote=True,
+        )
+
+    def workspace_head(self) -> str:
+        return subprocess.run(
+            ["git", "-C", str(self.workspace.root), "rev-parse", "HEAD"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ).stdout.strip()
+
+    def remote_head(self) -> str:
+        return subprocess.run(
+            ["git", "--git-dir", str(self.bare), "rev-parse", f"refs/heads/{R2_BRANCH}"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ).stdout.strip()
+
+    # -- the seam ----------------------------------------------------------
+
+    def test_push_returns_the_committed_head_it_actually_wrote(self) -> None:
+        head = self.executor().push(R2_BRANCH)
+
+        self.assertEqual(self.workspace_head(), head)
+        self.assertEqual(self.remote_head(), head)
+
+    def test_returned_head_is_a_lowercase_full_hex_sha(self) -> None:
+        head = self.executor().push(R2_BRANCH)
+
+        self.assertRegex(head, r"\A[0-9a-f]{40}\Z")
+        self.assertEqual(head.lower(), head)
+        # An uppercase head from a delegate is normalized, not rejected.
+        upper = self.workspace_head().upper()
+        self.assertEqual(
+            upper.lower(),
+            self.executor(self.scripted_client(upper)).push(R2_BRANCH),
+        )
+
+    def test_a_head_that_is_not_a_full_sha_raises_instead_of_returning(self) -> None:
+        for head in (
+            "",
+            "abc123",
+            "z" * 40,
+            "a" * 39,
+            "a" * 41,
+            " " + "a" * 39,
+            "a" * 40 + "\n",
+            None,
+            b"a" * 40,
+        ):
+            with self.subTest(head=head):
+                executor = self.executor(self.scripted_client(head))
+
+                with self.assertRaisesRegex(
+                    GitHubDeliveryError, "full 40-hex head SHA"
+                ):
+                    executor.push(R2_BRANCH)
+
+    def test_a_blank_branch_never_falls_back_to_the_workspace_branch(self) -> None:
+        client = self.scripted_client("b" * 40)
+
+        for branch in ("", "   "):
+            with self.subTest(branch=branch):
+                with self.assertRaisesRegex(
+                    GitHubDeliveryError, "requires a mission branch"
+                ):
+                    self.executor(client).push(branch)
+
+        self.assertEqual(0, client.calls)
+
+    def test_a_missing_credential_propagates_unweakened(self) -> None:
+        absent = f"{self.TOKEN_ENV}_ABSENT"
+        self.assertNotIn(absent, os.environ)
+        executor = self.executor(self.client(token_env=absent))
+
+        with self.assertRaises(MissingGitHubCredential) as captured:
+            executor.push(R2_BRANCH)
+
+        self.assertIs(MissingGitHubCredential, type(captured.exception))
+        self.assertIn(absent, str(captured.exception))
+        # The denial preceded the push: the remote has no such ref.
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.remote_head()
+
+    def test_executor_matches_the_push_executor_protocol_signature(self) -> None:
+        # Imported here so this addition leaves the module's import block as it
+        # was; only this test needs the protocol object itself.
+        from hive_mind_os.cortex.github.delivery_adapter import PushExecutor
+
+        self.assertEqual(
+            inspect.signature(PushExecutor.push),
+            inspect.signature(WorkspacePushExecutor.push),
+        )
+
+    def test_controlled_delivery_accepts_the_executor_and_pushes_through_it(
+        self,
+    ) -> None:
+        registry = AuthorityRegistry()
+        registry.register(ControlledRetractionTests.envelope())
+        transport = FakeGitHubTransport()
+        delivery = ControlledGitHubDelivery(
+            ControlledRetractionTests.grant(),
+            rest=ControlledRestGateway(
+                R2_OWNER,
+                R2_REPOSITORY,
+                transport=transport,  # type: ignore[arg-type]
+            ),
+            push_executor=self.executor(),
+        )
+        gateway = EffectGateway()
+        delivery.register_with(gateway)
+        intent = ControlledRetractionTests.intent(
+            action="push",
+            adapter=ControlledGitHubDelivery.PUSH_ADAPTER,
+            parameters_digest=delivery.bind_parameters({"branch": R2_BRANCH}),
+        )
+
+        result = gateway.execute(
+            intent,
+            registry.authorize(R2_DIGEST, "push", R2_TARGET, now=R2_TIME),
+        )
+
+        head = self.workspace_head()
+        self.assertEqual("SUCCEEDED", result.status)
+        self.assertEqual(head, self.remote_head())
+        # The gateway result carries digests only, so read the identifiers the
+        # push adapter produced by replaying the same bound intent; the mission
+        # store answers that from its effect receipt without pushing again.
+        self.assertEqual(
+            {
+                "produced_identifiers": (f"branch:{R2_BRANCH}", f"sha:{head}"),
+                "postcondition_digest": canonical_digest(
+                    {"pushed": R2_BRANCH, "head": head}
+                ),
+            },
+            delivery.push_adapter(intent),
+        )
+        # The push adapter is Git only; it reached no REST endpoint.
+        self.assertEqual([], transport.calls)
 
 
 if __name__ == "__main__":
