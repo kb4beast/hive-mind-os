@@ -218,6 +218,20 @@ class IsolatedBuilderAdapter:
                     "protocol.ext.allow=never",
                     "-c",
                     "core.fsmonitor=false",
+                    # System and global configuration are neutralized above, so
+                    # line-ending conversion would otherwise silently fall back
+                    # to Git's built-in ``core.autocrlf=false``.  A working tree
+                    # materialized by a host Git that ships ``core.autocrlf=true``
+                    # (the Git for Windows default) stores LF blobs next to CRLF
+                    # files, and this adapter would then re-hash those files and
+                    # report unmodified paths as workspace changes whenever the
+                    # index stat cache does not short-circuit the comparison.
+                    # Pinning the conversion keeps the observed change set, the
+                    # staged set, and the recorded blobs identical on every host.
+                    "-c",
+                    "core.autocrlf=input",
+                    "-c",
+                    "core.eol=lf",
                     *args,
                 ],
                 cwd=self.root,
