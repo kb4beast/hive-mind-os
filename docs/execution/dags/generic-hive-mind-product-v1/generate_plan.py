@@ -17,10 +17,18 @@ from typing import Any
 from specs_a import SPECS as SPECS_A
 from specs_b import SPECS as SPECS_B
 
-PLAN_RELPATH = "docs/execution/dags/generic-hive-mind-product-v1/plan.json"
+DAG_DIR = "docs/execution/dags/generic-hive-mind-product-v1"
+OUTPUT_PATH = "/tmp/generic-hive-mind-product-v1.json"
+GENERATOR_COMMAND = (
+    f"python {DAG_DIR}/generate_plan.py --output {OUTPUT_PATH}"
+)
+LINT_COMMAND = (
+    "python .autopilot/bin/autopilot.py --repo-root . dag-lint "
+    f"--plan {OUTPUT_PATH} --strict --json"
+)
 COMMON_FORBIDDEN = [
     ".autopilot/plan.json",
-    PLAN_RELPATH,
+    f"{DAG_DIR}/**",
     ".github/CODEOWNERS",
     ".github/governance/**",
     "docs/architecture/HARDENED_VISION_CONTRACT.md",
@@ -54,6 +62,18 @@ def build_plan() -> dict[str, Any]:
             "Revert only this node's integration commit; preserve ancestry, receipts, "
             "adverse evidence, and the sealed v1 plan."
         )
+        if node["id"] == "BASELINE-000":
+            node["required_tests"] = [
+                GENERATOR_COMMAND,
+                LINT_COMMAND,
+                "python .autopilot/bin/autopilot.py --repo-root . doctor --json",
+            ]
+        elif node["id"] == "HANDOFF-700":
+            node["required_tests"] = [
+                GENERATOR_COMMAND,
+                LINT_COMMAND,
+                "python -m unittest discover -s tests -v",
+            ]
         node["contract_digest"] = digest(node)
         nodes.append(node)
 
@@ -73,15 +93,18 @@ def build_plan() -> dict[str, Any]:
             "source_commit": "cc349bef0aad0f288ba7db6ee7ffd4ea911906fb",
             "git_blob_sha": "70e43b0a8078a303d44c0109b8dd218a948258c2",
         },
+        "source": {
+            "directory": DAG_DIR,
+            "generator": f"{DAG_DIR}/generate_plan.py",
+            "specifications": [f"{DAG_DIR}/specs_a.py", f"{DAG_DIR}/specs_b.py"],
+        },
         "execution": {
             "max_sessions": 8,
-            "lint": (
-                "python .autopilot/bin/autopilot.py --repo-root . dag-lint "
-                "--plan /tmp/generic-hive-mind-product-v1.json --strict --json"
-            ),
+            "generate": GENERATOR_COMMAND,
+            "lint": LINT_COMMAND,
             "rounds": (
                 "python .autopilot/bin/autopilot.py --repo-root . dag-rounds "
-                "--plan /tmp/generic-hive-mind-product-v1.json --max-sessions 8 "
+                f"--plan {OUTPUT_PATH} --max-sessions 8 "
                 "--actor codex:generic-product --json"
             ),
             "mode": (
@@ -99,6 +122,7 @@ def build_plan() -> dict[str, Any]:
         "invariants": [
             "Never edit .autopilot/plan.json or invalidate existing receipts.",
             "Never undo code already implemented on PR #144.",
+            "Never edit the overlay DAG from a worker node.",
             "Settle mutated claims before expiry; sealed candidates survive long verification.",
             "Deterministic operations do not consume model calls; model context is direct-dependency and budgeted.",
         ],
@@ -112,7 +136,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--output",
-        default="/tmp/generic-hive-mind-product-v1.json",
+        default=OUTPUT_PATH,
         help="Output path for the materialized plan.",
     )
     parser.add_argument("--stdout", action="store_true")
