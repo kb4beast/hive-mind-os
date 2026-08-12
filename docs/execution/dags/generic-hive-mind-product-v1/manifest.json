@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-generic-product-overlay-manifest-v1",
+  "plan_id": "generic-hive-mind-product-v1",
+  "baseline_commit": "cc349bef0aad0f288ba7db6ee7ffd4ea911906fb",
+  "standard": {
+    "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+    "source_commit": "cc349bef0aad0f288ba7db6ee7ffd4ea911906fb",
+    "git_blob_sha": "70e43b0a8078a303d44c0109b8dd218a948258c2"
+  },
+  "sources": {
+    "generate_plan.py": "b61407bb871e17e07da060ee4796bae05957afa6",
+    "specs_a.py": "0adb16c3de4b7f78739aed2d00b64eb8a549f4f8",
+    "specs_b.py": "0ed6d109bdf09037c41db56f25ca155b4179b2d4"
+  },
+  "expected_plan_digest": "sha256:b8879d09c5a42b0feeeec19b9c8f6a7523e4ef69b117eea1a18ef6dfaf35f977",
+  "expected_node_count": 16,
+  "expected_node_ids": [
+    "BASELINE-000",
+    "FOUNDATION-010",
+    "PLAN-CORE-100",
+    "BUILD-SYSTEM-200",
+    "ADAPTER-INDEX-210",
+    "WAVE-HOST-300",
+    "TASK-REUSE-310",
+    "RUNTIME-TOKEN-320",
+    "GENERIC-EXECUTOR-400",
+    "CONTROL-TOKEN-410",
+    "PUBLIC-RUNTIME-500",
+    "GENERIC-FIXTURES-600",
+    "FAILURE-QUALIFICATION-610",
+    "TOKEN-BENCHMARK-620",
+    "GENERIC-QUALIFICATION-630",
+    "HANDOFF-700"
+  ],
+  "materialized_path": ".autopilot/state/generic-hive-mind-product-v1.json",
+  "sealed_plan_unchanged": ".autopilot/plan.json"
+}
