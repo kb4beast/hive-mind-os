@@ -51,6 +51,28 @@ dependency edges, because adding edges would rotate the plan fingerprint and
 invalidate all completed receipts; once the controller supports plan-version
 lineage, these should become real dependency edges.
 
+## Running a round as code
+
+The procedure below is also implemented as `.autopilot/bin/round_driver.py`.
+Prefer the command; the prose exists so the behaviour is auditable and so a
+human can take over at any phase.
+
+```bash
+python .autopilot/bin/github_snapshot.py --reconcile --actor codex:orchestrator
+python .autopilot/bin/autopilot.py --repo-root . run-round --actor codex:round-driver
+```
+
+`run-round` selects the first incomplete compiled round, triages any recorded
+blockers, integrates every node branch sealed by a receipt commit in the wave's
+declared order, and runs the round's single leased repository-wide gate once the
+wave is whole. It refuses to select anything while reconciliation is required,
+because every verdict is untrustworthy until then. Each phase is idempotent, so
+re-running after a stall resumes rather than repeats.
+
+`autopilot execute-wave` covers the worker half: it renders the released wave
+into session cards under `.autopilot/state/host/cards/` and supervises them by
+polling repository evidence, never by waiting on a chat session.
+
 ## Orchestrator procedure (one round)
 
 Phase 0 — release the wave (~2 minutes, all deterministic):

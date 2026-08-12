@@ -43,6 +43,7 @@ from release_barrier import (
 from release_barrier import (
     ControlPlane as ReleaseBarrierControlPlane,
 )
+from round_driver import drive_round
 from sealed_recovery import SealedRecoveryMixin
 
 RECON_PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
@@ -793,6 +794,20 @@ def parser() -> argparse.ArgumentParser:
         help="Wall-clock bound on one evidence poll; the host is never waited on",
     )
 
+    drive = commands.add_parser("run-round")
+    drive.add_argument("--actor", default="autopilot:round-driver")
+    drive.add_argument("--max-sessions", type=int, default=8)
+    drive.add_argument(
+        "--no-push",
+        action="store_true",
+        help="Integrate locally without advancing the remote singleton target",
+    )
+    drive.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Stop before the round's single leased repository-wide gate",
+    )
+
     intent = commands.add_parser("infer-intent")
     intent.add_argument("request", nargs="?", default="")
     intent.add_argument("--json", action="store_true", dest="json_output")
@@ -1134,6 +1149,21 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "launch-bindings":
             print(json.dumps(binding_events(plane.repo_root), indent=2, sort_keys=True))
+            return 0
+        if args.command == "run-round":
+            print(
+                json.dumps(
+                    drive_round(
+                        plane,
+                        actor=args.actor,
+                        max_sessions=args.max_sessions,
+                        push=not args.no_push,
+                        validate=not args.skip_validation,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
             return 0
         if args.command == "execute-wave":
             status, decision = select_orchestration_status(plane, args.request)
