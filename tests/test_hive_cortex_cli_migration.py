@@ -36,7 +36,11 @@ from hive_mind_os.repository_compatibility import (
     runtime_identity,
 )
 from hive_mind_os.scheduler import Scheduler
-from hive_mind_os.workers import Worker, execute_canonical_mission_job, route_job_executor
+from hive_mind_os.workers import (
+    Worker,
+    execute_canonical_mission_job,
+    route_job_executor,
+)
 from tests.fixtures.fixture_repo import build_fixture_repo
 
 

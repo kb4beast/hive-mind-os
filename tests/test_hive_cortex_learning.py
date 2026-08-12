@@ -18,10 +18,9 @@ import unittest
 from dataclasses import dataclass, fields, replace
 from pathlib import Path
 
+import hive_mind_os.brain_kernel.learning_runtime as learning_runtime
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.contracts import MemoryRecord, MemoryState
-from hive_mind_os.brain_kernel.memory import ConsolidationPolicy, MemoryArtifactStore
-import hive_mind_os.brain_kernel.learning_runtime as learning_runtime
 from hive_mind_os.brain_kernel.learning_runtime import (
     Counterexample,
     DissentRecord,
@@ -37,6 +36,7 @@ from hive_mind_os.brain_kernel.learning_runtime import (
     record_dissent,
     retain_counterexample,
 )
+from hive_mind_os.brain_kernel.memory import ConsolidationPolicy, MemoryArtifactStore
 
 NOW = "2026-08-12T15:00:00Z"
 EXPIRY_AT_DEFAULT_TTL = "2026-11-10T15:00:00Z"

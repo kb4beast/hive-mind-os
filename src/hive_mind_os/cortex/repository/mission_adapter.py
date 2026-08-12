@@ -153,13 +153,16 @@ def build_local_mission_environment(
         bundle_ref = f"bundle:{work_id}"
         bundle_directory = root_path / "bundles" / work_id
         directories[bundle_ref] = bundle_directory
+        check_runner: Callable[..., bool]
         if role == "builder":
-            def check_runner(command: str, _candidate: Path, expected: Path = candidate) -> bool:
+            def _builder_check(command: str, _candidate: Path, expected: Path = candidate) -> bool:
                 return command == "local-check" and (expected / "app.txt").read_text(encoding="utf-8") == "after\n"
+            check_runner = _builder_check
             base_root = str(base)
         else:
-            def check_runner(command: str, _candidate: Path) -> bool:
+            def _default_check(command: str, _candidate: Path) -> bool:
                 return command == "local-check"
+            check_runner = _default_check
             base_root = str(candidate)
         specs[role] = WorkVerificationSpec(
             base_root, str(candidate), ("local-check",), ("app.txt",), check_runner,

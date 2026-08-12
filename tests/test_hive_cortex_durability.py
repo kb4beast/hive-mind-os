@@ -31,7 +31,9 @@ from hive_mind_os.brain_kernel.store import (
     KernelStore,
 )
 from hive_mind_os.brain_kernel.workers import KernelWorker, ScopeLockStore
-from hive_mind_os.cortex.repository.mission_adapter import build_local_mission_environment
+from hive_mind_os.cortex.repository.mission_adapter import (
+    build_local_mission_environment,
+)
 from hive_mind_os.scheduler import ManualClock, Scheduler, StaleLeaseError
 
 DIGEST = "sha256:" + "0" * 64

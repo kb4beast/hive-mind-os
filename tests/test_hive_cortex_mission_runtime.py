@@ -2,34 +2,52 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from dataclasses import replace
 
 from hive_mind_os.brain_kernel.authority import AuthorityDenied
 from hive_mind_os.brain_kernel.canonical import canonical_digest
-from hive_mind_os.brain_kernel.consultation import ConsultationReason, ConsultationRequest, RoleAssessment
+from hive_mind_os.brain_kernel.consultation import (
+    ConsultationReason,
+    ConsultationRequest,
+    RoleAssessment,
+)
 from hive_mind_os.brain_kernel.context import CompiledContext, ContextRequest
 from hive_mind_os.brain_kernel.contracts import (
-    ContextManifest, EvaluationResult, EvaluationState, TechnicalCloseoutState,
+    ContextManifest,
+    EvaluationResult,
+    EvaluationState,
+    TechnicalCloseoutState,
 )
 from hive_mind_os.brain_kernel.events import KernelEvent
-from hive_mind_os.brain_kernel.store import KernelIntegrityError
-from hive_mind_os.brain_kernel.mission_runtime import MissionEscalationRequired, MissionRuntime, MissionRuntimeError
+from hive_mind_os.brain_kernel.mission_runtime import (
+    MissionEscalationRequired,
+    MissionRuntime,
+    MissionRuntimeError,
+)
 from hive_mind_os.brain_kernel.planner import orchestration_plan_from_events
 from hive_mind_os.brain_kernel.reconciler import RepairKind
 from hive_mind_os.brain_kernel.roles import (
-    KERNEL_IMPLEMENTED_ROLES, RoleInvocation, RoleProtocolError, result_digest,
+    KERNEL_IMPLEMENTED_ROLES,
+    RoleInvocation,
+    RoleProtocolError,
+    result_digest,
 )
+from hive_mind_os.brain_kernel.store import KernelIntegrityError
 from hive_mind_os.brain_kernel.verification import (
-    ExactCandidateVerificationError, accept_verified_work, create_evaluation_plan, verify_exact_candidate,
+    ExactCandidateVerificationError,
+    accept_verified_work,
+    create_evaluation_plan,
+    verify_exact_candidate,
+)
+from hive_mind_os.cortex.repository.mission_adapter import (
+    build_local_mission_environment,
+    repair_handlers,
+    run_local_mission,
 )
 from hive_mind_os.cortex.repository.role_handlers import RepositoryRoleHandlers
-from hive_mind_os.cortex.repository.mission_adapter import (
-    build_local_mission_environment, repair_handlers, run_local_mission,
-)
 
 
 class _EnvironmentCase(unittest.TestCase):
@@ -123,14 +141,16 @@ class HumanlessRepairTests(_EnvironmentCase):
         runtime = MissionRuntime(environment.store)
         request = ConsultationRequest("CONSULT-local-lease", environment.config.mission_id, "Need authority", ConsultationReason.MISSING_EXTERNAL_AUTHORITY, "builder", ("curator", "integrator"), authority_class="credential_or_secret")
         assessments = (RoleAssessment("curator", "curator:lease", evidence_refs=("e",), authority_required=True), RoleAssessment("integrator", "integrator:lease", evidence_refs=("e",), authority_required=True))
-        with self.assertRaises(MissionEscalationRequired): runtime.run(environment.config, replace(environment.bindings, consultation_request=request, consultation_assessments=assessments))
+        with self.assertRaises(MissionEscalationRequired):
+            runtime.run(environment.config, replace(environment.bindings, consultation_request=request, consultation_assessments=assessments))
         result = runtime.repair_pass(environment.config.mission_id, now=2.0, observed_overrides={"leases": [{"lease_id": "LEASE-local", "work_id": "WORK-local-builder", "expires_at": 1.0}]})
         self.assertTrue(any(action.kind is RepairKind.RELEASE_STALE_LEASE for action in result.actions))
 
     def test_exhausted_retry_budget_quarantines_not_escalates(self):
         environment = self.environment()
         runtime = MissionRuntime(environment.store)
-        with self.assertRaises(MissionRuntimeError): runtime.repair_pass(environment.config.mission_id, now=0)
+        with self.assertRaises(MissionRuntimeError):
+            runtime.repair_pass(environment.config.mission_id, now=0)
         # The reconciler itself is separately exercised after a mission has been safely created above.
 
     def test_no_progress_bound_quarantines(self):
@@ -172,13 +192,15 @@ class MissionReplayTests(_EnvironmentCase):
                         environment.close()
 
     def test_orchestration_plan_rehydrates_exactly(self):
-        environment = self.environment(); receipt = MissionRuntime(environment.store).run(environment.config, environment.bindings)
+        environment = self.environment()
+        receipt = MissionRuntime(environment.store).run(environment.config, environment.bindings)
         charter = next(event["payload"]["charter"] for event in environment.store.events() if event["event_type"] == "mission.created")
         from hive_mind_os.brain_kernel.contracts import MissionCharter
         self.assertEqual(orchestration_plan_from_events(MissionCharter.from_document(charter), environment.store.events()).digest, receipt.plan_digest)
 
     def test_closeout_rederivation_is_deterministic(self):
-        environment = self.environment(); receipt = MissionRuntime(environment.store).run(environment.config, environment.bindings)
+        environment = self.environment()
+        receipt = MissionRuntime(environment.store).run(environment.config, environment.bindings)
         self.assertEqual(MissionRuntime(environment.store).replay(receipt.mission_id, bundle_directories=environment.bundle_directories).closeout_report_digest, receipt.closeout.report_digest)
 
 
@@ -213,11 +235,14 @@ def _curator_invocation(environment, *, evaluator_mode: bool) -> RoleInvocation:
 class AuthorityBoundaryTests(_EnvironmentCase):
     def test_effect_outside_write_scope_is_denied(self):
         environment = self.environment()
-        with self.assertRaises(AuthorityDenied): environment.registry.authorize("sha256:" + "0" * 64, "write", "base/app.txt", now="2029-01-01T00:00:00Z")
+        with self.assertRaises(AuthorityDenied):
+            environment.registry.authorize("sha256:" + "0" * 64, "write", "base/app.txt", now="2029-01-01T00:00:00Z")
 
     def test_capability_token_must_bind_the_exact_intent(self):
-        environment = self.environment(); effect = environment.bindings.builder_effect
-        with self.assertRaises(AuthorityDenied): environment.gateway.execute(effect.intent, effect.registry.authorize(effect.envelope_digest, "write", "candidate/other.txt", now=effect.authorization_time))
+        environment = self.environment()
+        effect = environment.bindings.builder_effect
+        with self.assertRaises(AuthorityDenied):
+            environment.gateway.execute(effect.intent, effect.registry.authorize(effect.envelope_digest, "write", "candidate/other.txt", now=effect.authorization_time))
 
     def test_builder_cannot_evaluate_its_own_candidate(self):
         environment = self.environment()

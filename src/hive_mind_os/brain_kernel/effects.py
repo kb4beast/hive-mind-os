@@ -78,7 +78,7 @@ class EffectGateway:
     """An adapter registry; duplicate intents return their prior local receipt."""
 
     def __init__(self, store: KernelStore | None = None) -> None:
-        self._adapters: dict[str, Callable[[EffectIntent], None]] = {}
+        self._adapters: dict[str, Callable[[EffectIntent], object]] = {}
         self._adapter_versions: dict[str, str] = {}
         self._receipts: dict[str, EffectResult] = {}
         self._store = store
@@ -86,7 +86,7 @@ class EffectGateway:
     def register_adapter(
         self,
         name: str,
-        adapter: Callable[[EffectIntent], None],
+        adapter: Callable[[EffectIntent], object],
         *,
         version: str = "1",
     ) -> None:

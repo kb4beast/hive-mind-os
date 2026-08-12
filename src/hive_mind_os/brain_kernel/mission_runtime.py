@@ -47,11 +47,16 @@ from .reconciler import (
     ReconciliationPolicy,
     ReconciliationResult,
 )
-from .roles import KERNEL_IMPLEMENTED_ROLES, RoleInvocation, append_role_result, result_digest
+from .roles import (
+    KERNEL_IMPLEMENTED_ROLES,
+    RoleInvocation,
+    append_role_result,
+    result_digest,
+)
 from .store import KernelStore
 from .verification import (
-    create_evaluation_plan,
     accept_verified_work,
+    create_evaluation_plan,
     seal_evaluation_plan,
     verify_exact_candidate,
 )

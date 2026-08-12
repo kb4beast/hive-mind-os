@@ -16,6 +16,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
+from ..model_provider import (
+    MissingModelCredential,
+    ModelRequest,
+    ModelResponse,
+    ModelTransportError,
+)
 from .canonical import canonical_digest
 from .events import KernelEvent
 from .reconciler import (
@@ -27,13 +33,6 @@ from .reconciler import (
     RepairKind,
 )
 from .store import KernelStore
-from ..model_provider import (
-    MissingModelCredential,
-    ModelRequest,
-    ModelResponse,
-    ModelResponseError,
-    ModelTransportError,
-)
 
 _EPOCH = "1970-01-01T00:00:00Z"
 _SELF_HEALING_EVENT_TYPE = "self_healing.pass"
