@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "node": "A3-700",
+  "discharge_note": "This node's write scope contains no tests/ directory, so the two logical required_tests names are discharged the way QUALIFY-610 and LEGACY-620 discharged theirs: with the existing focused suites mapped by docs/execution/runbooks/A3-700.md:158-161, plus the pilot's own command receipts. No test file was created or modified. `python -m unittest discover` was never run.",
+  "working_directory": "C:\\Repos\\HiveMind\\hive-mind-os",
+  "interpreter": "Python 3.14.4 (C:\\Python314\\python.exe)",
+  "required_tests": [
+    {
+      "name": "a3-pilot-suite",
+      "command": "PYTHONPATH=src python -m unittest tests.test_verify_example tests.test_brain_kernel_local_execution tests.test_brain_kernel_local_assurance_artifact -v",
+      "exit_code": 0,
+      "tests_run": 5,
+      "outcome": "OK",
+      "duration_seconds": 2.741,
+      "tail": "Ran 5 tests in 2.741s\n\nOK",
+      "transcript": "evidence/pilots/a3/tests/a3-pilot-suite.txt",
+      "sha256": "bd6814733c8d010516a89afe7760adfc169aadfc24c3004b6e66df42cb3b4258",
+      "cases": [
+        "tests.test_verify_example.VerificationExampleTests.test_runner_creates_an_adopted_sealed_verification",
+        "tests.test_brain_kernel_local_execution.LocalKernelExecutionTests.test_builder_uses_an_isolated_gateway_write_and_curator_verifies_after_seal",
+        "tests.test_brain_kernel_local_execution.LocalKernelExecutionTests.test_workspace_adapter_refuses_path_escape_before_writing",
+        "tests.test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests.test_rejects_mutated_transcript_and_unsafe_receipt_path",
+        "tests.test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests.test_verifies_report_and_content_addressed_receipts"
+      ],
+      "pilot_receipts_component": [
+        "evidence/pilots/a3/missions/mission-01-example-verify/verification.json",
+        "evidence/pilots/a3/missions/mission-02-enqueue-loop/verification.json"
+      ]
+    },
+    {
+      "name": "real-repository-compatibility-suite",
+      "command": "PYTHONPATH=src python -m unittest tests.test_hive_cortex_compatibility tests.test_brain_kernel_compatibility tests.test_git_adapter -v",
+      "exit_code": 0,
+      "tests_run": 25,
+      "outcome": "OK",
+      "duration_seconds": 19.857,
+      "tail": "Ran 25 tests in 19.857s\n\nOK",
+      "transcript": "evidence/pilots/a3/tests/real-repository-compatibility-suite.txt",
+      "sha256": "0f785051adf1445317571028970701bac8e6e1a7f974ccbb3b59537348030075",
+      "classes": [
+        "tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests (4)",
+        "tests.test_brain_kernel_compatibility.LocalCompatibilityFirewallTests (3)",
+        "tests.test_git_adapter.GitAdapterTests (18)"
+      ]
+    }
+  ],
+  "edge_cases_required_by_runbook_section_5": {
+    "wrong_candidate_rejection": {
+      "covered": true,
+      "evidence": "evidence/pilots/a3/cheating/tamper-rejection.json demonstrations T1 and T2"
+    },
+    "post_mission_rollback": {
+      "covered": true,
+      "evidence": "evidence/pilots/a3/recovery/rollback.json"
+    },
+    "second_repository_independent_of_example_fixtures": {
+      "covered": true,
+      "evidence": "Mission 2 uses <scratch>/a3/m2r, a repository authored for this pilot with its own domain (shipping rates), its own sealed specification, and no dependency on examples/verify-an-agent-change/."
+    }
+  }
+}

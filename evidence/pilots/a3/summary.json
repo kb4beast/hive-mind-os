@@ -1,0 +1,134 @@
+{
+  "acceptance_self_check": {
+    "cheating_rejection_demonstrated": true,
+    "no_discretionary_human_answer_for_routine_reversible_work": true,
+    "receipts_verifiable": true,
+    "receipts_verifiable_caveat": "Tamper-evident against edits; NOT authenticated against an attacker who can rewrite and re-seal a whole bundle. See finding F3.",
+    "rollback_demonstrated": true,
+    "two_or_more_real_disposable_missions_end_to_end": true
+  },
+  "base_commit": "7700e88a7d1ba3ce95a54f8847dfe0749fac27f0",
+  "changed_paths": [
+    "evidence/pilots/a3/summary.json",
+    "evidence/pilots/a3/manifest.json",
+    "evidence/pilots/a3/findings.json",
+    "evidence/pilots/a3/cheating/tamper-rejection.json",
+    "evidence/pilots/a3/cheating/rejected-verification.json",
+    "evidence/pilots/a3/cheating/rejected-integrity.json",
+    "evidence/pilots/a3/recovery/rollback.json",
+    "evidence/pilots/a3/missions/m01-longpath-failure.json",
+    "evidence/pilots/a3/missions/mission-01-example-verify/*.json",
+    "evidence/pilots/a3/missions/mission-02-enqueue-loop/*.json",
+    "evidence/pilots/a3/tests/results.json",
+    "evidence/pilots/a3/tests/a3-pilot-suite.txt",
+    "evidence/pilots/a3/tests/real-repository-compatibility-suite.txt",
+    "docs/execution/A3_REPOSITORY_AUTONOMY.md"
+  ],
+  "cheating_evidence": "cheating/tamper-rejection.json",
+  "final_commit": null,
+  "final_commit_note": "Deliberately null, and it cannot be otherwise: a tracked file cannot contain the digest of the commit that introduces it. The worker was correct to refuse to guess. The node's final_commit and final_tree are carried in the HIVE-MIND-AUTOPILOT-COMPLETION-V1 receipt, which is a commit message rather than a tracked file and can therefore bind the final SHA without self-reference. base_commit above pins the candidate this pilot ran against.",
+  "findings": "findings.json",
+  "human_answer_accounting": {
+    "escalation_mechanism_checked": "src/hive_mind_os/brain_kernel/consultation.py sets human_escalation only for ConsultationDecision.TRUE_AUTHORITY_REQUIRED and forbids it before two roles evaluate the question (consultation.py:337); src/hive_mind_os/brain_kernel/mission_runtime.py:265 blocks a mission on human_escalation. No consultation record with human_escalation=true was produced during this pilot.",
+    "operator_interventions_that_were_required": [
+      {
+        "honest_characterisation": "The runtime never asked a question. It failed closed and published failure evidence. But an unattended run would have stopped there: proceeding required an out-of-band environment change chosen by the operator. This is an environment-fragility limit on A3 autonomy, not a governance escape, and it is recorded as finding F1 rather than suppressed.",
+        "was_it_a_discretionary_mission_answer": false,
+        "what": "Shortening the Mission 1 output path after the MAX_PATH failure."
+      }
+    ],
+    "total_discretionary_human_answers_required_by_the_missions": 0,
+    "total_escalations_fired": 0
+  },
+  "missions": [
+    {
+      "acceptance_sealed_before_candidate_read": true,
+      "base": "8b10151a2b3341025a639497be70d156152ecaa4",
+      "bundle_reverified": "hive_mind_os.verify.verify_bundle() -> OK",
+      "candidate": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+      "candidate_tree": "d17759bc7d4fb7d7168856cbc862657503e04f5b",
+      "changed_paths": [
+        "discounts.py"
+      ],
+      "command": "PYTHONPATH=src python examples/verify-an-agent-change/run_example.py --output <scratch>/a3/m1",
+      "escalations_fired": 0,
+      "exit_code": 0,
+      "human_answers_required": 0,
+      "id": "mission-01-example-verify",
+      "note": "The first attempt failed on a Windows MAX_PATH limit and was re-run at a shorter output path. See finding F1; the failure evidence is retained at missions/m01-longpath-failure.json.",
+      "receipts": [
+        "missions/mission-01-example-verify/verification.json",
+        "missions/mission-01-example-verify/integrity.json",
+        "missions/mission-01-example-verify/objects.json",
+        "missions/mission-01-example-verify/acceptance.json",
+        "missions/mission-01-example-verify/changed-paths.json",
+        "missions/mission-01-example-verify/tool-versions.json",
+        "missions/mission-01-example-verify/receipt.json"
+      ],
+      "remote_configured": null,
+      "repository": "<scratch>/a3/m1/nonprofit-checkout",
+      "repository_kind": "real disposable git repository created by examples/verify-an-agent-change/run_example.py",
+      "repository_read_sequence": 2,
+      "run_id": "VERIFY-af3ab5f9-9ae7-4710-9770-784abc9cc8b8",
+      "seal_sequence": 1,
+      "undeclared_paths": [],
+      "verdict": "adopt",
+      "weakened_tests": []
+    },
+    {
+      "acceptance_sealed_before_candidate_read": true,
+      "base": "1e774c8cc45ec867c2625fde4f59f63c4b21ca38",
+      "bundle_reverified": "hive_mind_os.verify.verify_bundle() -> OK",
+      "candidate": "cd27327e6bf82daa39ce60a6c467bec718279400",
+      "candidate_tree": "dcb744f6411c2dd15b82248631c827db28a47512",
+      "changed_paths": [
+        "rates.py"
+      ],
+      "command": "PYTHONPATH=src python -m hive_mind_os.cli verify --repository <scratch>/a3/m2r --spec <scratch>/a3/m2-spec.json --candidate cd27327e6bf82daa39ce60a6c467bec718279400 --output <scratch>/a3/m2o",
+      "escalations_fired": 0,
+      "exit_code": 0,
+      "human_answers_required": 0,
+      "id": "mission-02-enqueue-loop",
+      "note": "The additional enqueue -> serve probe on this same repository did NOT complete; it dead-lettered on both the canonical and legacy routes. See findings F2 and F4. The mission recorded here is the `hive-mind verify` mission that docs/execution/runbooks/A3-700.md:113-120 actually specifies, and it completed end-to-end.",
+      "receipts": [
+        "missions/mission-02-enqueue-loop/verification.json",
+        "missions/mission-02-enqueue-loop/integrity.json",
+        "missions/mission-02-enqueue-loop/objects.json",
+        "missions/mission-02-enqueue-loop/acceptance.json",
+        "missions/mission-02-enqueue-loop/acceptance-spec.json",
+        "missions/mission-02-enqueue-loop/changed-paths.json",
+        "missions/mission-02-enqueue-loop/tool-versions.json",
+        "missions/mission-02-enqueue-loop/receipt.json"
+      ],
+      "remote_configured": null,
+      "repository": "<scratch>/a3/m2r",
+      "repository_contents": "rates.py (free-shipping threshold rule, seeded with an off-by-one bug at the boundary) and check_rates.py (executable acceptance check that fails at baseline and passes after the fix)",
+      "repository_kind": "real disposable git repository authored for this pilot; not derived from any shipped example fixture",
+      "repository_read_sequence": 2,
+      "run_id": "VERIFY-fe7622fc-f465-4cce-9221-f39285a65f44",
+      "seal_sequence": 1,
+      "undeclared_paths": [],
+      "verdict": "adopt",
+      "weakened_tests": []
+    }
+  ],
+  "missions_completed_end_to_end": 2,
+  "no_remote_delivery_proof": {
+    "disposable_repositories_have_no_remote": "git remote -v is empty in both <scratch>/a3/m1/nonprofit-checkout and <scratch>/a3/m2r; with no remote configured there is no push or fetch target.",
+    "git_transport_restricted": "GIT_ALLOW_PROTOCOL=file was exported in every shell that touched a disposable repository, which permits only local file transport and blocks http, https and ssh git transports.",
+    "no_remote_commands_issued": "No push, fetch, pull, ls-remote, clone-from-network, gh CLI, curl, or GitHub API call was issued at any point in this node.",
+    "runtime_recorded_the_same_fact": "Both verification bundles record repository.origin = null in objects.json, written by src/hive_mind_os/verify.py:570 reading remote.origin.url from the repository under test.",
+    "this_repository_untouched_by_git_writes": "No state-changing git command (commit, add, checkout, branch, tag, stash, reset, push) was run in C:\\Repos\\HiveMind\\hive-mind-os.",
+    "verifier_clones_are_local_only": "src/hive_mind_os/verify.py:745 builds the clone source as a file:// URI of the local .git directory; the isolated workspaces are local clones.",
+    "verifier_forbids_credential_inheritance": "The sealed contract records environment.credential_inheritance = \"disabled\" and sandbox.network = \"none\" (src/hive_mind_os/verify.py:441-463)."
+  },
+  "node": "A3-700",
+  "recovery_evidence": "recovery/rollback.json",
+  "remote_delivery_performed": false,
+  "retained_evidence_scope_note": "Each verification bundle also contains a ledger.sqlite3 and a receipts/ tree. Those were deliberately NOT copied into evidence/pilots/a3/: this node's evidence is restricted to short, flat JSON and text. Because ledger.sqlite3 is absent, verify_bundle() cannot be re-run against the retained copies; it was instead run against the complete bundles in scratch and passed for both missions. The retained integrity.json pins the sha256 of every file in the original bundle, and the retained verification.json embeds the full ledger event list, so the omitted bytes remain auditable.",
+  "role_identity": "claude:a3-700-worker",
+  "rollback_reference": "Within this repository the node is additive and reversible by `git revert` of the node commits; the node writes only evidence/pilots/a3/** and docs/execution/A3_REPOSITORY_AUTONOMY.md and changes no runtime code. Within the disposable repository, rollback was demonstrated by execution: git revert --no-edit cd27327e6bf82daa39ce60a6c467bec718279400 restored tree d95c38fada32a161413843e973bff580e914eb26, identical to the pre-mission baseline tree.",
+  "schema_version": 1,
+  "test_results": "tests/results.json",
+  "verdict_vocabulary_note": "The runbook's summary schema example uses \"verdict\": \"accepted\". The runtime emits \"adopt\" (src/hive_mind_os/verify.py:179). The runtime's own word is recorded below."
+}

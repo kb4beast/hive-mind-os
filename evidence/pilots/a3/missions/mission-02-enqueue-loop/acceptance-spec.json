@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "free-shipping-threshold-is-inclusive",
+  "criterion": "An order exactly at the documented free-shipping threshold ships free, and orders below it keep the flat rate.",
+  "command": {
+    "argv": [
+      "python",
+      "check_rates.py"
+    ],
+    "expected": "succeeded"
+  },
+  "declared_paths": [
+    "rates.py"
+  ]
+}

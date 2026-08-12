@@ -1,0 +1,13 @@
+{
+  "changed_paths": [
+    "discounts.py"
+  ],
+  "changes": [
+    {
+      "paths": [
+        "discounts.py"
+      ],
+      "status": "M"
+    }
+  ]
+}

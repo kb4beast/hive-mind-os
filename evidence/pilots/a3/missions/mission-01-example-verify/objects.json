@@ -1,0 +1,11 @@
+{
+  "base_commit": "8b10151a2b3341025a639497be70d156152ecaa4",
+  "base_tree": "2afc56d48c5926b8c9326f359907db97d34d5ff9",
+  "candidate_commit": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+  "candidate_reference": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+  "candidate_tree": "d17759bc7d4fb7d7168856cbc862657503e04f5b",
+  "repository": {
+    "origin": null,
+    "source_git_dir": "C:\\Users\\beesp\\AppData\\Local\\Temp\\claude\\C--Repos-HiveMind-hive-mind-os\\7a67801b-465b-4082-948f-c38656749678\\scratchpad\\a3\\m1\\nonprofit-checkout\\.git"
+  }
+}
