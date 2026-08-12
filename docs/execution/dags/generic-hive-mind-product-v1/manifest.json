@@ -11,7 +11,8 @@
   "sources": {
     "generate_plan.py": "b61407bb871e17e07da060ee4796bae05957afa6",
     "specs_a.py": "0adb16c3de4b7f78739aed2d00b64eb8a549f4f8",
-    "specs_b.py": "0ed6d109bdf09037c41db56f25ca155b4179b2d4"
+    "specs_b.py": "0ed6d109bdf09037c41db56f25ca155b4179b2d4",
+    "verify_plan.py": "4078803e652ca3be1a38baafb0b186be9420d848"
   },
   "expected_plan_digest": "sha256:b8879d09c5a42b0feeeec19b9c8f6a7523e4ef69b117eea1a18ef6dfaf35f977",
   "expected_node_count": 16,
