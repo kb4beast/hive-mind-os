@@ -1,0 +1,4 @@
+# Lesson ledgers are append-only: concurrent sessions must union, never conflict.
+# LF is pinned so a checkout under core.autocrlf=true cannot rewrite every line
+# and turn an append into a whole-file diff.
+*.jsonl merge=union text eol=lf
