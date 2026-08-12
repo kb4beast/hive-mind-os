@@ -486,6 +486,28 @@ class SelfPromotionDenialTests(unittest.TestCase):
         with self.assertRaisesRegex(OptimizerError, "does not match its bindings"):
             optimizer.validate_recommendation(bypassed)
 
+    def test_self_promotion_denial_tests_reject_tuple_bypassed_non_boolean_evidence(self) -> None:
+        optimizer = Optimizer()
+        proposal = optimizer.propose_challenger(
+            optimizer.attribute_outcome(_attribution()),
+            challenger_id="candidate:v2",
+            champion_id="champion:v1",
+            change_ref="prompt:sha256:change",
+            author_id="optimizer:author",
+        )
+        bypassed = tuple.__new__(
+            CourtRecommendation,
+            (
+                proposal,
+                "curator:reviewer",
+                1,
+                PromotionRecommendation.REQUEST_INDEPENDENT_REVIEW,
+                "independent court must evaluate before any promotion",
+            ),
+        )
+        with self.assertRaisesRegex(OptimizerError, "must be a boolean"):
+            optimizer.validate_recommendation(bypassed)
+
     def test_self_promotion_denial_tests_reject_proposal_type_impersonation(self) -> None:
         @dataclass(frozen=True)
         class FakeProposal:
