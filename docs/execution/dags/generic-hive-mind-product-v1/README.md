@@ -4,10 +4,10 @@ This directory contains an additive executable DAG for completing the generic
 open-source Hive Mind product. It does **not** replace or edit the sealed
 `.autopilot/plan.json`, and worker nodes are forbidden from modifying this DAG.
 
-## Materialize and validate
+## Verify, materialize, lint, and compile
 
 ```bash
-python docs/execution/dags/generic-hive-mind-product-v1/generate_plan.py
+python docs/execution/dags/generic-hive-mind-product-v1/verify_plan.py --write
 
 python .autopilot/bin/autopilot.py --repo-root . dag-lint \
   --plan .autopilot/state/generic-hive-mind-product-v1.json --strict --json
@@ -17,10 +17,13 @@ python .autopilot/bin/autopilot.py --repo-root . dag-rounds \
   --max-sessions 8 --actor codex:generic-product --json
 ```
 
-`generate_plan.py` is the deterministic materializer. `specs_a.py` and
-`specs_b.py` are the checked-in node contracts. The materialized JSON is written
-under ignored `.autopilot/state/`, inside the repository, so the linter can
-inspect the real target tree without dirtying the source branch.
+`manifest.json` seals the expected source Git-blob SHAs, node order/count, and
+materialized plan digest. `verify_plan.py` checks those bindings and every node
+contract digest before writing the plan. `generate_plan.py` is the deterministic
+materializer; `specs_a.py` and `specs_b.py` are the checked-in node contracts.
+The materialized JSON is written under ignored `.autopilot/state/`, inside the
+repository, so the linter can inspect the real target tree without dirtying the
+source branch.
 
 ## Current execution boundary
 
