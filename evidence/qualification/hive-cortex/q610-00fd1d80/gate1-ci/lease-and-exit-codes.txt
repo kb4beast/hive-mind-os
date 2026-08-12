@@ -1,0 +1,11 @@
+candidate_commit: 00fd1d80579a6bbaee35abd9288fddceb05c6ebe
+host_git_env_before_strip: GIT_EDITOR=true 
+started_utc: 2026-08-12T18:01:02Z
+lease_acquire_exit: 0
+gate1b_start_utc: 2026-08-12T18:01:02Z
+unittest_full_host_py314_exit: 0
+py312_start_utc: 2026-08-12T18:17:49Z
+unittest_full_py312_exit: 0
+runs_finished_utc: 2026-08-12T18:33:47Z
+lease_release_exit: 0
+DONE

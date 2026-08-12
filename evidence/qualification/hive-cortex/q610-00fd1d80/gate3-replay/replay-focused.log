@@ -1,0 +1,18 @@
+test_candidate_mutation_or_direct_acceptance_fails_closed (tests.test_brain_kernel_verification.ExactCandidateVerificationTests.test_candidate_mutation_or_direct_acceptance_fails_closed) ... ok
+test_passed_exact_candidate_can_be_accepted_only_with_its_verdict (tests.test_brain_kernel_verification.ExactCandidateVerificationTests.test_passed_exact_candidate_can_be_accepted_only_with_its_verdict) ... ok
+test_same_identity_and_out_of_scope_candidate_fail_closed (tests.test_brain_kernel_verification.ExactCandidateVerificationTests.test_same_identity_and_out_of_scope_candidate_fail_closed) ... ok
+test_seal_rejects_a_base_that_changed_after_plan_creation (tests.test_brain_kernel_verification.ExactCandidateVerificationTests.test_seal_rejects_a_base_that_changed_after_plan_creation) ... ok
+test_rejects_mutated_transcript_and_unsafe_receipt_path (tests.test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests.test_rejects_mutated_transcript_and_unsafe_receipt_path) ... ok
+test_verifies_report_and_content_addressed_receipts (tests.test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests.test_verifies_report_and_content_addressed_receipts) ... ok
+test_retained_phase12_packet_is_content_addressable (tests.test_brain_kernel_local_assurance_evidence.LocalAssuranceEvidenceTests.test_retained_phase12_packet_is_content_addressable) ... ok
+test_complete_lifecycle_produces_evidence (tests.test_kernel.KernelTests.test_complete_lifecycle_produces_evidence) ... ok
+test_learning_candidate_must_beat_champion (tests.test_kernel.KernelTests.test_learning_candidate_must_beat_champion) ... ok
+test_ledger_is_append_only (tests.test_kernel.KernelTests.test_ledger_is_append_only) ... ok
+test_non_delegable_invariant_cannot_be_overridden_by_full_autonomy (tests.test_kernel.KernelTests.test_non_delegable_invariant_cannot_be_overridden_by_full_autonomy) ... ok
+test_point_in_time_replay_never_exposes_target_or_future (tests.test_kernel.KernelTests.test_point_in_time_replay_never_exposes_target_or_future) ... ok
+test_policy_denies_merge_at_sandbox_level (tests.test_kernel.KernelTests.test_policy_denies_merge_at_sandbox_level) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.085s
+
+OK

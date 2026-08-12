@@ -1,0 +1,31 @@
+test_cli_loader_rejects_non_object_documents (tests.test_acceptance.AcceptanceSpecificationTests.test_cli_loader_rejects_non_object_documents) ... ok
+test_curator_requires_an_exact_specification_bound_check (tests.test_acceptance.AcceptanceSpecificationTests.test_curator_requires_an_exact_specification_bound_check) ... ok
+test_normalization_is_canonical_by_identifier (tests.test_acceptance.AcceptanceSpecificationTests.test_normalization_is_canonical_by_identifier) ... ok
+test_receipt_must_bind_the_specification_and_requested_argv (tests.test_acceptance.AcceptanceSpecificationTests.test_receipt_must_bind_the_specification_and_requested_argv) ... ok
+test_schema_limits_are_enforced_at_construction (tests.test_acceptance.AcceptanceSpecificationTests.test_schema_limits_are_enforced_at_construction) ... ok
+test_untyped_criterion_cannot_start_a_delivery (tests.test_acceptance.AcceptanceSpecificationTests.test_untyped_criterion_cannot_start_a_delivery) ... ok
+test_acceptance_harness_self_tests (tests.hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_acceptance_harness_self_tests) ... ok
+test_cross_language_fixture_tests (tests.hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_cross_language_fixture_tests) ... ok
+test_humanless_gate_distinguishes_real_authority (tests.hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_humanless_gate_distinguishes_real_authority) ... ok
+test_negative_control_tests (tests.hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_negative_control_tests) ... ok
+test_autonomous_loop_stops_at_budget (tests.test_autonomy.AutonomyTests.test_autonomous_loop_stops_at_budget) ... ok
+test_challenger_requires_evidence_and_better_fitness (tests.test_autonomy.AutonomyTests.test_challenger_requires_evidence_and_better_fitness) ... ok
+test_charter_mutation_is_detected (tests.test_autonomy.AutonomyTests.test_charter_mutation_is_detected) ... ok
+test_episode_cannot_exceed_issued_allowance (tests.test_autonomy.AutonomyTests.test_episode_cannot_exceed_issued_allowance) ... ok
+test_high_value_unsafe_variant_is_quarantined (tests.test_autonomy.AutonomyTests.test_high_value_unsafe_variant_is_quarantined) ... ok
+test_teaching_packet_requires_repeated_support (tests.test_autonomy.AutonomyTests.test_teaching_packet_requires_repeated_support) ... ok
+test_actions_are_denied_below_their_required_authority (tests.test_policy_invariants.PolicyInvariantTests.test_actions_are_denied_below_their_required_authority) ... ok
+test_autonomy_cannot_be_mutated_after_construction (tests.test_policy_invariants.PolicyInvariantTests.test_autonomy_cannot_be_mutated_after_construction) ... ok
+test_blank_or_mismatched_charter_binding_is_ineligible_and_quarantined (tests.test_policy_invariants.PolicyInvariantTests.test_blank_or_mismatched_charter_binding_is_ineligible_and_quarantined) ... ok
+test_every_action_has_an_explicit_policy_mapping (tests.test_policy_invariants.PolicyInvariantTests.test_every_action_has_an_explicit_policy_mapping) ... ok
+test_every_charter_forbidden_capability_is_a_hard_disqualifier (tests.test_policy_invariants.PolicyInvariantTests.test_every_charter_forbidden_capability_is_a_hard_disqualifier) ... ok
+test_explorer_remains_nonmutating_at_every_authority_level (tests.test_policy_invariants.PolicyInvariantTests.test_explorer_remains_nonmutating_at_every_authority_level) ... ok
+test_external_grant_actions_default_to_denied_without_a_grant_model (tests.test_policy_invariants.PolicyInvariantTests.test_external_grant_actions_default_to_denied_without_a_grant_model) ... ok
+test_known_low_risk_actions_are_not_accidentally_denied (tests.test_policy_invariants.PolicyInvariantTests.test_known_low_risk_actions_are_not_accidentally_denied) ... ok
+test_malformed_runtime_inputs_fail_closed (tests.test_policy_invariants.PolicyInvariantTests.test_malformed_runtime_inputs_fail_closed) ... ok
+test_non_delegable_actions_are_denied_for_every_actor_risk_and_authority (tests.test_policy_invariants.PolicyInvariantTests.test_non_delegable_actions_are_denied_for_every_actor_risk_and_authority) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 3.564s
+
+OK

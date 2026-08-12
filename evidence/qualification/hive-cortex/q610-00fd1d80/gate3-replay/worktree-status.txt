@@ -1,0 +1,7 @@
+# Gate 3 clean-worktree provenance
+worktree_path: C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/q610/clean2
+git rev-parse HEAD: 00fd1d80579a6bbaee35abd9288fddceb05c6ebe
+git rev-parse HEAD^{tree}: b383e64f9c54bd4050136488243cd6cea383a66a
+git status --porcelain output follows (empty == clean):
+<<END-OF-PORCELAIN>>
+porcelain_line_count: 0
