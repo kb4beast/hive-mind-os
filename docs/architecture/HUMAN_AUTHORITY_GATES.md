@@ -85,3 +85,16 @@ This amendment narrowly supersedes the 2026-08-06 amendment's withholding of a
 GitHub credential and of remote delivery, for this one repository and these six
 operations only. Every other withholding in that amendment, including the API-key
 and spend prohibitions, stands unchanged.
+
+### Amendment addendum — 2026-08-12, credential delivery mechanism
+
+The owner cannot restart the host process, whose environment block predates the
+token and therefore cannot inherit it. The owner authorizes an agent-written
+wrapper that hoists the pilot token from the user-scope registry into the pilot
+subprocess's environment by variable reference.
+
+This narrowly relaxes the preceding amendment's "pass it to a subprocess"
+prohibition, for this mechanism only. Every other handling prohibition stands
+unchanged: no agent may request, read, echo, log, or display the value, and the
+token is never written to a file, a command line, a commit, or an evidence
+artifact. The mechanism moves the secret by reference only; it is never rendered.
