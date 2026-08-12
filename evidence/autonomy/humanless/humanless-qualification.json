@@ -1,0 +1,84 @@
+{
+  "genuine_authority_classes": [
+    "credential_or_secret",
+    "external_contractual_commitment",
+    "financial_spend",
+    "legal_or_regulatory",
+    "owner_value_choice",
+    "personal_consent",
+    "production_access",
+    "protected_branch_merge"
+  ],
+  "harness_authority_classes": [
+    "consent",
+    "credential",
+    "external-contract",
+    "financial",
+    "legal",
+    "owner-value",
+    "production-access",
+    "protected-branch"
+  ],
+  "node_id": "HUMANLESS-430",
+  "packet_id": "humanless-qualification-v1",
+  "scenario_digest": "sha256:be7ce31e6bbaa820eb5ded19b1e3140c05c4394cc4b8684fefb59b31aa85e46b",
+  "scenarios": [
+    {
+      "answered": true,
+      "decision": "RESOLVED",
+      "dissent_recorded": false,
+      "human_escalation": false,
+      "mechanism": "evaluate_consultation",
+      "reason": "AMBIGUOUS_DESIGN",
+      "repairs": [],
+      "scenario_id": "ambiguity"
+    },
+    {
+      "answered": false,
+      "decision": "",
+      "dissent_recorded": false,
+      "human_escalation": false,
+      "mechanism": "DesiredStateReconciler.reconcile",
+      "reason": "",
+      "repairs": [
+        "retry:WORK-ci"
+      ],
+      "scenario_id": "ci-repair"
+    },
+    {
+      "answered": true,
+      "decision": "REPLAN",
+      "dissent_recorded": true,
+      "human_escalation": false,
+      "mechanism": "evaluate_consultation",
+      "reason": "AMBIGUOUS_DESIGN",
+      "repairs": [],
+      "scenario_id": "design-tradeoff"
+    },
+    {
+      "answered": false,
+      "decision": "REMAND",
+      "dissent_recorded": false,
+      "human_escalation": false,
+      "mechanism": "evaluate_consultation",
+      "reason": "MISSING_EVIDENCE",
+      "repairs": [],
+      "scenario_id": "missing-tests"
+    },
+    {
+      "answered": false,
+      "decision": "",
+      "dissent_recorded": false,
+      "human_escalation": false,
+      "mechanism": "DesiredStateReconciler.reconcile",
+      "reason": "",
+      "repairs": [
+        "release-stale-lease:LEASE-resume",
+        "rebuild-workspace:WS-resume",
+        "remand:WORK-resume"
+      ],
+      "scenario_id": "recoverable-interruption"
+    }
+  ],
+  "semantic_lock": "humanless-qualification"
+}
