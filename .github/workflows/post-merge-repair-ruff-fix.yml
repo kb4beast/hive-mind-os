@@ -1,0 +1,71 @@
+name: Apply exact PR 144 Ruff cleanup
+
+on:
+  push:
+    branches:
+      - agent/post-merge-repair-import-20260812
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, '[run-r5-ruff-fix]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Fetch exact repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin \
+            release/hive-mind-os-singleton-20260812-r5:refs/remotes/origin/release/hive-mind-os-singleton-20260812-r5
+          test "$(git rev-parse refs/remotes/origin/release/hive-mind-os-singleton-20260812-r5)" = \
+            "8a3443507cad57c5c693751d8bf962a7e4a6d054"
+          git checkout -B release/hive-mind-os-singleton-20260812-r5 \
+            refs/remotes/origin/release/hive-mind-os-singleton-20260812-r5
+      - name: Apply exact import cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          planner = Path('src/hive_mind_os/brain_kernel/planner.py')
+          text = planner.read_text(encoding='utf-8')
+          old = 'from typing import Any, Iterable, Mapping, cast\n'
+          new = 'from typing import Iterable, Mapping, cast\n'
+          if text.count(old) != 1:
+              raise SystemExit('unexpected planner typing import')
+          planner.write_text(text.replace(old, new), encoding='utf-8')
+
+          tests = Path('tests/test_hive_cortex_orchestrator.py')
+          text = tests.read_text(encoding='utf-8')
+          for old in ('import tempfile\n', 'from pathlib import Path\n'):
+              if text.count(old) != 1:
+                  raise SystemExit(f'unexpected test import: {old!r}')
+              text = text.replace(old, '')
+          tests.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.16.0
+          ruff check src tests
+          PYTHONPATH=src python -m unittest tests.test_hive_cortex_orchestrator -v
+          python -m compileall -q src tests
+          git diff --check
+      - name: Commit and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Hive Mind Repair Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/hive_mind_os/brain_kernel/planner.py tests/test_hive_cortex_orchestrator.py
+          git commit -m "fix: remove stale ORCH imports"
+          git push origin HEAD:release/hive-mind-os-singleton-20260812-r5
