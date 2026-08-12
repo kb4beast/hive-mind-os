@@ -1,0 +1,26 @@
+[
+  {
+    "command": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation -v",
+    "exit_code": 0,
+    "started_branch": "release/hive-mind-os-singleton-20260812-r5",
+    "base_commit": "7ec26c540e211dfe06007259df90c2091c04034d"
+  },
+  {
+    "command": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests -v",
+    "exit_code": 0,
+    "started_branch": "release/hive-mind-os-singleton-20260812-r5",
+    "base_commit": "7ec26c540e211dfe06007259df90c2091c04034d"
+  },
+  {
+    "command": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests -v",
+    "exit_code": 0,
+    "started_branch": "release/hive-mind-os-singleton-20260812-r5",
+    "base_commit": "7ec26c540e211dfe06007259df90c2091c04034d"
+  },
+  {
+    "command": "PYTHONPATH=src python -m tests.hive_cortex.test_humanless_operation --write-evidence",
+    "exit_code": 0,
+    "started_branch": "release/hive-mind-os-singleton-20260812-r5",
+    "base_commit": "7ec26c540e211dfe06007259df90c2091c04034d"
+  }
+]
