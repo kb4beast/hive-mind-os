@@ -1,0 +1,216 @@
+# transcript: authority-boundary-probe-2
+# node: A5-900
+# base_commit: 7a2e19e769cbeb1b3f3a515037c1173af28c9893
+# why this exists: the blind security review reported that probe 1 located its
+#   findings one layer too high -- it tested AuthorityRegistry, not the effect
+#   boundary. This probe tests the effect boundary and four further claims the
+#   review raised. Every claim below was re-derived here, not adopted on trust.
+# command: PYTHONPATH=src python <scratch>/a5/probe2.py
+# python: Python 3.14.4
+# started_utc: 2026-08-13T05:30:27Z
+# effects: one in-memory list append. network: none. credential: none.
+----- BEGIN OUTPUT -----
+== P3  the EFFECT boundary: does it consult the AuthorityRegistry at all? ==
+
+[baseline    ] AuthorityRegistry.authorize refuses an out-of-scope write: target is outside write scope
+[FINDING     ] P3.1 validate_capability_token ACCEPTED a token that no
+               AuthorityRegistry ever issued, for a target the registered
+               envelope explicitly refuses. No registry lookup, no envelope
+               lookup, no expiry check, no revocation check, no scope check.
+               token=CapabilityToken(envelope_digest='sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', action='write', target='secrets/keys.txt', token_digest='sha256:2add7083ded7a3b3cd3bbee0169f58b138243e7af189ff0e4f00114b6ce6c6bb')
+[FINDING     ] P3.2 EffectGateway.execute ran the adapter on that token.
+               adapter_calls=['adapter ran'] status=SUCCEEDED
+[baseline    ] after revoke, authorize refuses: authority envelope is unavailable
+[FINDING     ] P3.3 the effect boundary accepted a token whose envelope
+               digest is REVOKED in the registry. Revocation is not
+               consulted at the effect boundary under any circumstances.
+
+== P4  authorize() scope-checks only the 'write' action ==
+[as-expected ] 'write' outside the scope is refused: target is outside write scope
+[FINDING     ] P4.1 'push' to the SAME out-of-scope target is ALLOWED.
+               CapabilityToken(envelope_digest='sha256:4444444444444444444444444444444444444444444444444444444444444444', action='push', target='somewhere/else.txt', token_digest='sha256:33baba40e19a2c83dc4f918be77eaffc6d34297089701e47ac843ccdb9a01a65')
+               authority.py:58 gates the target check on action == 'write';
+               every other action gets an unscoped target.
+
+== P5  is_no_broader_than omits the spend ceiling ==
+               parent max_cost_microunits=100
+               child  max_cost_microunits=999999999
+               child.is_no_broader_than(parent) -> True
+[FINDING     ] P5.1 a child raising max_cost_microunits from 100 to 999999999,
+               max_input_tokens, max_output_tokens, max_work_items and max_depth
+               was ACCEPTED as 'no broader than' its parent.
+               contracts.py:352-360 compares only 3 of Budget's 8 fields.
+
+== P6  intersect_envelopes trusts a caller-supplied parent that is not registered ==
+               is the wide parent registered? False
+[FINDING     ] P6.1 a child was registered against a parent object the
+               registry has never seen. authority.py:39-41 takes the parent
+               as a caller argument and never looks it up.
+               and it authorizes: CapabilityToken(envelope_digest='sha256:8888888888888888888888888888888888888888888888888888888888888888', action='push', target='docs/x.md', token_digest='sha256:da995d9d619bffef955b11c5406557cd7f47f35b31db9ca9f3c55cf995ea6c7c')
+
+== probe 2 complete; no effect outside an in-memory list, no network, no credential ==
+----- END OUTPUT -----
+# exit_code: 0
+# finished_utc: 2026-08-13T05:30:27Z
+----- BEGIN PROBE SOURCE -----
+"""A5-900 authority-boundary probe, part 2.
+
+Written after the blind security review reported that the part-1 probe located its
+findings one layer too high. Part 2 tests the EFFECT boundary itself, plus three
+further claims the review raised. Nothing here creates an effect: every adapter is a
+local list-append, no network is used, and no credential is read or referenced.
+"""
+
+from __future__ import annotations
+
+from hive_mind_os.brain_kernel.authority import AuthorityDenied, AuthorityRegistry, CapabilityToken
+from hive_mind_os.brain_kernel.canonical import canonical_digest
+from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope, EffectIntent
+from hive_mind_os.brain_kernel.effects import EffectGateway, validate_capability_token
+
+D = "sha256:" + "d" * 64
+POLICY = "sha256:" + "0" * 64
+
+
+def envelope(digest, parent, allowed, write_scope, budget):
+    return ConstraintEnvelope(
+        "AUTH-probe2", "MISSION-probe2", "WORK-probe2", parent, "builder", "R1",
+        allowed, (), write_scope, write_scope, (), (), (), (),
+        budget, "2030-01-01T00:00:00Z", POLICY, digest,
+    )
+
+
+def intent(action, target, envelope_digest):
+    return EffectIntent(
+        "MISSION-probe2", "WORK-probe2", "ATTEMPT-probe2", "builder", "builder",
+        action, "R1", "local-noop", target,
+        D, D, envelope_digest, (), "revert", "policy", D,
+    )
+
+
+print("== P3  the EFFECT boundary: does it consult the AuthorityRegistry at all? ==")
+print()
+
+registry = AuthorityRegistry()
+narrow = envelope(D, None, ("write",), ("src",), Budget(1, 0, 0, 0, 0, 0, 1, 1))
+registry.register(narrow)
+try:
+    registry.authorize(D, "write", "secrets/keys.txt", now="2029-01-01T00:00:00Z")
+except AuthorityDenied as error:
+    print(f"[baseline    ] AuthorityRegistry.authorize refuses an out-of-scope write: {error}")
+
+# Now build the same token by hand, with no registry involved at all.
+forged = CapabilityToken(
+    D, "write", "secrets/keys.txt",
+    canonical_digest({"envelope": D, "action": "write", "target": "secrets/keys.txt"}),
+)
+target_intent = intent("write", "secrets/keys.txt", D)
+try:
+    validate_capability_token(target_intent, forged)
+except AuthorityDenied as error:
+    print(f"[as-expected ] validate_capability_token refused the hand-built token: {error}")
+else:
+    print("[FINDING     ] P3.1 validate_capability_token ACCEPTED a token that no")
+    print("               AuthorityRegistry ever issued, for a target the registered")
+    print("               envelope explicitly refuses. No registry lookup, no envelope")
+    print("               lookup, no expiry check, no revocation check, no scope check.")
+    print(f"               token={forged}")
+
+calls: list[str] = []
+gateway = EffectGateway()
+gateway.register_adapter("local-noop", lambda _: calls.append("adapter ran"))
+try:
+    result = gateway.execute(target_intent, forged)
+except AuthorityDenied as error:
+    print(f"[as-expected ] EffectGateway.execute refused it: {error}")
+else:
+    print("[FINDING     ] P3.2 EffectGateway.execute ran the adapter on that token.")
+    print(f"               adapter_calls={calls} status={result.status}")
+
+# Revocation, at the effect boundary.
+registry.revoke(D)
+try:
+    registry.authorize(D, "write", "src/one.py", now="2029-01-01T00:00:00Z")
+except AuthorityDenied as error:
+    print(f"[baseline    ] after revoke, authorize refuses: {error}")
+revoked_target = intent("write", "src/two.py", D)
+revoked_token = CapabilityToken(
+    D, "write", "src/two.py",
+    canonical_digest({"envelope": D, "action": "write", "target": "src/two.py"}),
+)
+try:
+    validate_capability_token(revoked_target, revoked_token)
+except AuthorityDenied as error:
+    print(f"[as-expected ] the effect boundary honours the revocation: {error}")
+else:
+    print("[FINDING     ] P3.3 the effect boundary accepted a token whose envelope")
+    print("               digest is REVOKED in the registry. Revocation is not")
+    print("               consulted at the effect boundary under any circumstances.")
+
+print()
+print("== P4  authorize() scope-checks only the 'write' action ==")
+reg4 = AuthorityRegistry()
+D4 = "sha256:" + "4" * 64
+reg4.register(envelope(D4, None, ("write", "push"), ("src",), Budget(1, 0, 0, 0, 0, 0, 1, 1)))
+try:
+    reg4.authorize(D4, "write", "somewhere/else.txt", now="2029-01-01T00:00:00Z")
+except AuthorityDenied as error:
+    print(f"[as-expected ] 'write' outside the scope is refused: {error}")
+try:
+    token = reg4.authorize(D4, "push", "somewhere/else.txt", now="2029-01-01T00:00:00Z")
+except AuthorityDenied as error:
+    print(f"[as-expected ] 'push' outside the scope is refused: {error}")
+else:
+    print("[FINDING     ] P4.1 'push' to the SAME out-of-scope target is ALLOWED.")
+    print(f"               {token}")
+    print("               authority.py:58 gates the target check on action == 'write';")
+    print("               every other action gets an unscoped target.")
+
+print()
+print("== P5  is_no_broader_than omits the spend ceiling ==")
+parent_budget = Budget(10, 10, 10, 10, 100, 10, 10, 10)
+child_budget = Budget(10, 10, 999999, 999999, 999999999, 10, 999999, 999999)
+D5p = "sha256:" + "5" * 64
+D5c = "sha256:" + "6" * 64
+parent = envelope(D5p, None, ("write",), ("src",), parent_budget)
+child = envelope(D5c, D5p, ("write",), ("src",), child_budget)
+print(f"               parent max_cost_microunits={parent_budget.max_cost_microunits}")
+print(f"               child  max_cost_microunits={child_budget.max_cost_microunits}")
+print(f"               child.is_no_broader_than(parent) -> {child.is_no_broader_than(parent)}")
+reg5 = AuthorityRegistry()
+reg5.register(parent)
+try:
+    reg5.register(child, parent)
+except AuthorityDenied as error:
+    print(f"[as-expected ] the broadening child was refused: {error}")
+else:
+    print("[FINDING     ] P5.1 a child raising max_cost_microunits from 100 to 999999999,")
+    print("               max_input_tokens, max_output_tokens, max_work_items and max_depth")
+    print("               was ACCEPTED as 'no broader than' its parent.")
+    print("               contracts.py:352-360 compares only 3 of Budget's 8 fields.")
+
+print()
+print("== P6  intersect_envelopes trusts a caller-supplied parent that is not registered ==")
+reg6 = AuthorityRegistry()
+D6p = "sha256:" + "7" * 64
+D6c = "sha256:" + "8" * 64
+unregistered_wide_parent = envelope(
+    D6p, None, ("write", "push", "deploy"), ("src", "docs", "evidence"),
+    Budget(999, 999, 999, 999, 999, 999, 999, 999),
+)
+child6 = envelope(D6c, D6p, ("write", "push"), ("src", "docs"), Budget(1, 1, 1, 1, 1, 1, 1, 1))
+print(f"               is the wide parent registered? {D6p in getattr(reg6, '_envelopes', {})}")
+try:
+    reg6.register(child6, unregistered_wide_parent)
+except AuthorityDenied as error:
+    print(f"[as-expected ] refused: {error}")
+else:
+    print("[FINDING     ] P6.1 a child was registered against a parent object the")
+    print("               registry has never seen. authority.py:39-41 takes the parent")
+    print("               as a caller argument and never looks it up.")
+    tok = reg6.authorize(D6c, "push", "docs/x.md", now="2029-01-01T00:00:00Z")
+    print(f"               and it authorizes: {tok}")
+
+print()
+print("== probe 2 complete; no effect outside an in-memory list, no network, no credential ==")
+----- END PROBE SOURCE -----

@@ -1,0 +1,363 @@
+===== A5-900 stop-mechanism exercise =====
+node: A5-900
+utc_start: 2026-08-13T05:09:10Z
+python: Python 3.14.4
+procedure: 4 read-only digest steps over RETAINED A4 evidence, receipt-ledgered
+network: NONE. credential: NONE. effects outside the ledger directory: NONE.
+
+### A. run 1 -- the stop trigger fires after step 2
+$ python stepped.py --run r1 --stop-after 2
+-- run r1: ledger holds 0 receipt(s): []
+  [S1] EXECUTED digest evidence/pilots/a4/pilot-plan.json -> 324151468418014e...
+  [S2] EXECUTED digest evidence/pilots/a4/summary.json -> d660b2043383a53d...
+  STOP: trigger fired after S2. Wrote stop-record-r1.json
+  executed_this_run=['S1', 'S2']
+[exit_code=0]
+--- ledger after run 1 ---
+{"digest": "324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc", "label": "digest evidence/pilots/a4/pilot-plan.json", "path": "evidence/pilots/a4/pilot-plan.json", "run": "r1", "step": "S1"}
+{"digest": "d660b2043383a53d1075e7cf95a57c1da9ce1b04c42a232821519314c377953e", "label": "digest evidence/pilots/a4/summary.json", "path": "evidence/pilots/a4/summary.json", "run": "r1", "step": "S2"}
+receipt_count=2
+--- stop record ---
+{
+  "reason": "stop trigger fired: issue no further step",
+  "receipts_at_stop": [
+    "S1",
+    "S2"
+  ],
+  "run": "r1",
+  "stopped_after": "S2"
+}
+ledger_digest_after_r1=8a13cb51dc810d0aaa070471295f94485ab058e27a6fc3eb3f3134131def0421
+digest_of_first_two_receipts=8a13cb51dc810d0aaa070471295f94485ab058e27a6fc3eb3f3134131def0421
+
+### B. run 2 -- HARD KILL during step 3, after its effect and before its receipt
+$ python stepped.py --run r2 --kill-before-receipt 3
+-- run r2: ledger holds 2 receipt(s): ['S1', 'S2']
+  [S1] ADOPTED from ledger (not re-executed): 324151468418014e...
+  [S2] ADOPTED from ledger (not re-executed): d660b2043383a53d...
+  [S3] EXECUTED digest evidence/pilots/a4/owner-grant/gate-stop.json -> 88dfe740ed5919ed...
+  [S3] HARD KILL before the receipt is appended (open defect D1 shape)
+[exit_code=9 (9 = the hard kill)]
+--- ledger after the hard kill ---
+{"digest": "324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc", "label": "digest evidence/pilots/a4/pilot-plan.json", "path": "evidence/pilots/a4/pilot-plan.json", "run": "r1", "step": "S1"}
+{"digest": "d660b2043383a53d1075e7cf95a57c1da9ce1b04c42a232821519314c377953e", "label": "digest evidence/pilots/a4/summary.json", "path": "evidence/pilots/a4/summary.json", "run": "r1", "step": "S2"}
+receipt_count=2
+ledger_digest_after_r2=8a13cb51dc810d0aaa070471295f94485ab058e27a6fc3eb3f3134131def0421
+unchanged_by_the_kill=YES
+note: step 3's effect HAD happened when the process died; no receipt records it.
+note: that is survivable here ONLY because the step is an idempotent read.
+note: open defect D1 is the same shape with an IRREVERSIBLE remote push in place of the read.
+
+### C. run 3 -- resume
+$ python stepped.py --run r3
+-- run r3: ledger holds 2 receipt(s): ['S1', 'S2']
+  [S1] ADOPTED from ledger (not re-executed): 324151468418014e...
+  [S2] ADOPTED from ledger (not re-executed): d660b2043383a53d...
+  [S3] EXECUTED digest evidence/pilots/a4/owner-grant/gate-stop.json -> 88dfe740ed5919ed...
+  [S4] EXECUTED digest evidence/pilots/a4/owner-grant/grant-record.json -> e4753255f1a10a7b...
+  executed_this_run=['S3', 'S4']
+  completed: 4/4 steps have receipts
+[exit_code=0]
+--- ledger after run 3 ---
+{"digest": "324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc", "label": "digest evidence/pilots/a4/pilot-plan.json", "path": "evidence/pilots/a4/pilot-plan.json", "run": "r1", "step": "S1"}
+{"digest": "d660b2043383a53d1075e7cf95a57c1da9ce1b04c42a232821519314c377953e", "label": "digest evidence/pilots/a4/summary.json", "path": "evidence/pilots/a4/summary.json", "run": "r1", "step": "S2"}
+{"digest": "88dfe740ed5919ed1f47c6d94657500e2153ac826cf3be49a441482c6be38bea", "label": "digest evidence/pilots/a4/owner-grant/gate-stop.json", "path": "evidence/pilots/a4/owner-grant/gate-stop.json", "run": "r3", "step": "S3"}
+{"digest": "e4753255f1a10a7b696933bd48fbe0225a280ffda12f0654b0d03108b4e82735", "label": "digest evidence/pilots/a4/owner-grant/grant-record.json", "path": "evidence/pilots/a4/owner-grant/grant-record.json", "run": "r3", "step": "S4"}
+receipt_count=4
+
+### D. run 4 -- resume again (replay safety)
+$ python stepped.py --run r4
+-- run r4: ledger holds 4 receipt(s): ['S1', 'S2', 'S3', 'S4']
+  [S1] ADOPTED from ledger (not re-executed): 324151468418014e...
+  [S2] ADOPTED from ledger (not re-executed): d660b2043383a53d...
+  [S3] ADOPTED from ledger (not re-executed): 88dfe740ed5919ed...
+  [S4] ADOPTED from ledger (not re-executed): e4753255f1a10a7b...
+  executed_this_run=[]
+  completed: 4/4 steps have receipts
+[exit_code=0]
+--- ledger after run 4 ---
+{"digest": "324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc", "label": "digest evidence/pilots/a4/pilot-plan.json", "path": "evidence/pilots/a4/pilot-plan.json", "run": "r1", "step": "S1"}
+{"digest": "d660b2043383a53d1075e7cf95a57c1da9ce1b04c42a232821519314c377953e", "label": "digest evidence/pilots/a4/summary.json", "path": "evidence/pilots/a4/summary.json", "run": "r1", "step": "S2"}
+{"digest": "88dfe740ed5919ed1f47c6d94657500e2153ac826cf3be49a441482c6be38bea", "label": "digest evidence/pilots/a4/owner-grant/gate-stop.json", "path": "evidence/pilots/a4/owner-grant/gate-stop.json", "run": "r3", "step": "S3"}
+{"digest": "e4753255f1a10a7b696933bd48fbe0225a280ffda12f0654b0d03108b4e82735", "label": "digest evidence/pilots/a4/owner-grant/grant-record.json", "path": "evidence/pilots/a4/owner-grant/grant-record.json", "run": "r3", "step": "S4"}
+receipt_count=4
+
+### E. assertions
+E1 exactly one receipt per step (no duplicate effect):
+      1 S1
+      1 S2
+      1 S3
+      1 S4
+E2 no step is lost: all four steps present ->
+YES (4/4)
+E3 the receipts written before the stop are byte-unchanged after resume:
+   digest_of_first_two_receipts_now=8a13cb51dc810d0aaa070471295f94485ab058e27a6fc3eb3f3134131def0421
+   UNCHANGED
+E4 which run executed which step (S1,S2 from r1; S3,S4 from r3; r4 executed nothing):
+    S1 executed_by_run r1
+    S2 executed_by_run r1
+    S3 executed_by_run r3
+    S4 executed_by_run r3
+E5 the digests recorded across the interruption match the retained originals:
+    S1 MATCH evidence/pilots/a4/pilot-plan.json 324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc
+    S2 MATCH evidence/pilots/a4/summary.json d660b2043383a53d1075e7cf95a57c1da9ce1b04c42a232821519314c377953e
+    S3 MATCH evidence/pilots/a4/owner-grant/gate-stop.json 88dfe740ed5919ed1f47c6d94657500e2153ac826cf3be49a441482c6be38bea
+    S4 MATCH evidence/pilots/a4/owner-grant/grant-record.json e4753255f1a10a7b696933bd48fbe0225a280ffda12f0654b0d03108b4e82735
+    all_match: True
+
+### F. what this exercise does NOT prove
+- it exercises THIS procedure's ledger, not hive_mind_os.brain_kernel.effect_outbox
+- every step is an idempotent local read; no irreversible effect was interrupted
+- open defect D1 (mission_store.py _atomic_write, receipt after the irreversible effect,
+  no Windows long-path handling) is UNFIXED and is not remediated by anything shown here
+- no production incident, rollback of a live system, or paging path was exercised
+utc_end: 2026-08-13T05:09:12Z
+
+----- BEGIN DRIVER SOURCE (stepped.py) -----
+"""A5-900 stop-mechanism exercise driver.
+
+A four-step, receipt-ledgered procedure over RETAINED A4 evidence. Every step is
+a read-only digest measurement -- the procedure creates no effect outside its own
+ledger directory and touches no network and no credential.
+
+Modes:
+  --stop-after N          the stop trigger fires after step N: issue no further
+                          step, write the stop record, exit 0
+  --kill-before-receipt N perform step N's effect, then die HARD (os._exit) before
+                          the receipt is appended -- the shape of open defect D1
+  (default)               resume: adopt every step that already has a receipt,
+                          execute only the rest
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import sys
+from pathlib import Path
+
+REPO = Path(r"C:/Repos/HiveMind/hive-mind-os")
+
+STEPS = [
+    ("S1", "digest evidence/pilots/a4/pilot-plan.json", "evidence/pilots/a4/pilot-plan.json"),
+    ("S2", "digest evidence/pilots/a4/summary.json", "evidence/pilots/a4/summary.json"),
+    ("S3", "digest evidence/pilots/a4/owner-grant/gate-stop.json", "evidence/pilots/a4/owner-grant/gate-stop.json"),
+    ("S4", "digest evidence/pilots/a4/owner-grant/grant-record.json", "evidence/pilots/a4/owner-grant/grant-record.json"),
+]
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_ledger(ledger: Path) -> dict[str, dict]:
+    if not ledger.exists():
+        return {}
+    adopted: dict[str, dict] = {}
+    for line in ledger.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        record = json.loads(line)
+        if record["step"] in adopted:
+            print(f"  !! DUPLICATE RECEIPT for {record['step']} -- this would be a defect")
+        adopted[record["step"]] = record
+    return adopted
+
+
+def append_receipt(ledger: Path, record: dict) -> None:
+    with ledger.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dir", required=True)
+    parser.add_argument("--run", required=True)
+    parser.add_argument("--stop-after", type=int, default=0)
+    parser.add_argument("--kill-before-receipt", type=int, default=0)
+    args = parser.parse_args()
+
+    root = Path(args.dir)
+    root.mkdir(parents=True, exist_ok=True)
+    ledger = root / "ledger.jsonl"
+
+    adopted = load_ledger(ledger)
+    print(f"-- run {args.run}: ledger holds {len(adopted)} receipt(s): {sorted(adopted)}")
+
+    executed: list[str] = []
+    for index, (step, label, relative) in enumerate(STEPS, start=1):
+        if step in adopted:
+            print(f"  [{step}] ADOPTED from ledger (not re-executed): {adopted[step]['digest'][:16]}...")
+            continue
+
+        digest = sha256(REPO / relative)
+        print(f"  [{step}] EXECUTED {label} -> {digest[:16]}...")
+
+        if args.kill_before_receipt == index:
+            print(f"  [{step}] HARD KILL before the receipt is appended (open defect D1 shape)")
+            sys.stdout.flush()
+            os._exit(9)
+
+        append_receipt(ledger, {"step": step, "label": label, "path": relative,
+                                "digest": digest, "run": args.run})
+        executed.append(step)
+
+        if args.stop_after == index:
+            stop = {"stopped_after": step, "run": args.run,
+                    "reason": "stop trigger fired: issue no further step",
+                    "receipts_at_stop": sorted(load_ledger(ledger))}
+            (root / f"stop-record-{args.run}.json").write_text(
+                json.dumps(stop, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            print(f"  STOP: trigger fired after {step}. Wrote stop-record-{args.run}.json")
+            print(f"  executed_this_run={executed}")
+            return 0
+
+    print(f"  executed_this_run={executed}")
+    print(f"  completed: {len(load_ledger(ledger))}/{len(STEPS)} steps have receipts")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+----- END DRIVER SOURCE -----
+----- BEGIN HARNESS SOURCE (stop.sh) -----
+#!/usr/bin/env bash
+# A5-900 stop-mechanism exercise. Local only. No network, no credential.
+set -u
+SCR="C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5"
+D="$SCR/stopex"
+PY="$SCR/stepped.py"
+
+rm -rf "$D"; mkdir -p "$D"
+
+echo "===== A5-900 stop-mechanism exercise ====="
+echo "node: A5-900"
+echo "utc_start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "python: $(python --version 2>&1)"
+echo "procedure: 4 read-only digest steps over RETAINED A4 evidence, receipt-ledgered"
+echo "network: NONE. credential: NONE. effects outside the ledger directory: NONE."
+
+echo
+echo "### A. run 1 -- the stop trigger fires after step 2"
+echo "\$ python stepped.py --run r1 --stop-after 2"
+python "$PY" --dir "$D" --run r1 --stop-after 2; echo "[exit_code=$?]"
+echo "--- ledger after run 1 ---"; cat "$D/ledger.jsonl"; echo "receipt_count=$(wc -l < "$D/ledger.jsonl")"
+echo "--- stop record ---"; cat "$D/stop-record-r1.json"
+LEDGER_AFTER_R1=$(sha256sum "$D/ledger.jsonl" | cut -d' ' -f1)
+S1S2=$(head -2 "$D/ledger.jsonl" | sha256sum | cut -d' ' -f1)
+echo "ledger_digest_after_r1=$LEDGER_AFTER_R1"
+echo "digest_of_first_two_receipts=$S1S2"
+
+echo
+echo "### B. run 2 -- HARD KILL during step 3, after its effect and before its receipt"
+echo "\$ python stepped.py --run r2 --kill-before-receipt 3"
+python "$PY" --dir "$D" --run r2 --kill-before-receipt 3; echo "[exit_code=$? (9 = the hard kill)]"
+echo "--- ledger after the hard kill ---"; cat "$D/ledger.jsonl"; echo "receipt_count=$(wc -l < "$D/ledger.jsonl")"
+echo "ledger_digest_after_r2=$(sha256sum "$D/ledger.jsonl" | cut -d' ' -f1)"
+echo "unchanged_by_the_kill=$([ "$(sha256sum "$D/ledger.jsonl" | cut -d' ' -f1)" = "$LEDGER_AFTER_R1" ] && echo YES || echo NO)"
+echo "note: step 3's effect HAD happened when the process died; no receipt records it."
+echo "note: that is survivable here ONLY because the step is an idempotent read."
+echo "note: open defect D1 is the same shape with an IRREVERSIBLE remote push in place of the read."
+
+echo
+echo "### C. run 3 -- resume"
+echo "\$ python stepped.py --run r3"
+python "$PY" --dir "$D" --run r3; echo "[exit_code=$?]"
+echo "--- ledger after run 3 ---"; cat "$D/ledger.jsonl"; echo "receipt_count=$(wc -l < "$D/ledger.jsonl")"
+
+echo
+echo "### D. run 4 -- resume again (replay safety)"
+echo "\$ python stepped.py --run r4"
+python "$PY" --dir "$D" --run r4; echo "[exit_code=$?]"
+echo "--- ledger after run 4 ---"; cat "$D/ledger.jsonl"; echo "receipt_count=$(wc -l < "$D/ledger.jsonl")"
+
+echo
+echo "### E. assertions"
+echo "E1 exactly one receipt per step (no duplicate effect):"
+awk -F'"step": "' '{split($2,a,"\""); print a[1]}' "$D/ledger.jsonl" | sort | uniq -c
+echo "E2 no step is lost: all four steps present ->"
+test "$(awk -F'"step": "' '{split($2,a,"\""); print a[1]}' "$D/ledger.jsonl" | sort -u | wc -l)" = "4" && echo "YES (4/4)" || echo "NO"
+echo "E3 the receipts written before the stop are byte-unchanged after resume:"
+echo "   digest_of_first_two_receipts_now=$(head -2 "$D/ledger.jsonl" | sha256sum | cut -d' ' -f1)"
+test "$(head -2 "$D/ledger.jsonl" | sha256sum | cut -d' ' -f1)" = "$S1S2" && echo "   UNCHANGED" || echo "   CHANGED - defect"
+echo "E4 which run executed which step (S1,S2 from r1; S3,S4 from r3; r4 executed nothing):"
+cat "$D/ledger.jsonl" | python -c "import sys,json; [print('   ',json.loads(l)['step'],'executed_by_run',json.loads(l)['run']) for l in sys.stdin if l.strip()]"
+echo "E5 the digests recorded across the interruption match the retained originals:"
+python - <<'PYEOF'
+import hashlib, json, pathlib
+repo = pathlib.Path(r"C:/Repos/HiveMind/hive-mind-os")
+led = pathlib.Path(r"C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/stopex/ledger.jsonl")
+ok = True
+for line in led.read_text().splitlines():
+    if not line.strip():
+        continue
+    r = json.loads(line)
+    live = hashlib.sha256((repo / r["path"]).read_bytes()).hexdigest()
+    match = live == r["digest"]
+    ok &= match
+    print(f"    {r['step']} {'MATCH' if match else 'MISMATCH'} {r['path']} {r['digest']}")
+print("    all_match:", ok)
+PYEOF
+
+echo
+echo "### F. what this exercise does NOT prove"
+echo "- it exercises THIS procedure's ledger, not hive_mind_os.brain_kernel.effect_outbox"
+echo "- every step is an idempotent local read; no irreversible effect was interrupted"
+echo "- open defect D1 (mission_store.py _atomic_write, receipt after the irreversible effect,"
+echo "  no Windows long-path handling) is UNFIXED and is not remediated by anything shown here"
+echo "- no production incident, rollback of a live system, or paging path was exercised"
+echo "utc_end: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+----- END HARNESS SOURCE -----
+
+================================================================
+ADDENDUM 1 -- post-review correction run
+utc: 2026-08-13T05:31:22Z
+reason: the blind operational review reported that EVERY kill in this exercise
+  was placed BEFORE append_receipt -- the safe placement -- so the torn-append
+  case was never tested. It also reported that load_ledger calls json.loads with
+  no error handling. Both are correct. Measured directly below.
+  NOTE: the reproduction commands in the main transcript omit the required --dir
+  argument; the full form is 'python stepped.py --dir <ledger-dir> --run rN ...'.
+================================================================
+$ python stepped.py --dir <t> --run t1 --stop-after 2
+-- run t1: ledger holds 0 receipt(s): []
+  [S1] EXECUTED digest evidence/pilots/a4/pilot-plan.json -> 324151468418014e...
+  [S2] EXECUTED digest evidence/pilots/a4/summary.json -> d660b2043383a53d...
+  STOP: trigger fired after S2. Wrote stop-record-t1.json
+  executed_this_run=['S1', 'S2']
+[exit_code=0] receipts=2
+$ # simulate a crash DURING append_receipt: append a truncated JSON line
+last 80 bytes of the ledger now:
+": "S2"}
+{"digest": "88dfe740ed5919ed1f47c6d94657500e2153ac826cf3be49a441482c6be
+$ python stepped.py --dir <t> --run t2   # resume after the torn append
+Traceback (most recent call last):
+  File "C:\Users\beesp\AppData\Local\Temp\claude\C--Repos-HiveMind-hive-mind-os\7a67801b-465b-4082-948f-c38656749678\scratchpad\a5\stepped.py", line 110, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "C:\Users\beesp\AppData\Local\Temp\claude\C--Repos-HiveMind-hive-mind-os\7a67801b-465b-4082-948f-c38656749678\scratchpad\a5\stepped.py", line 73, in main
+    adopted = load_ledger(ledger)
+  File "C:\Users\beesp\AppData\Local\Temp\claude\C--Repos-HiveMind-hive-mind-os\7a67801b-465b-4082-948f-c38656749678\scratchpad\a5\stepped.py", line 47, in load_ledger
+    record = json.loads(line)
+  File "C:\Python314\Lib\json\__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+json.decoder.JSONDecodeError: Unterminated string starting at: line 1 column 12 (char 11)
+[exit_code=1]
+
+CONCLUSION: a crash inside the receipt-append window renders the ENTIRE ledger
+unreadable and the procedure unrecoverable. load_ledger (stepped.py) calls
+json.loads(line) with no error handling, so one partial line destroys every
+prior receipt as well. The exercise's original claim of 'no lost evidence'
+holds only for interruptions OUTSIDE the write window. Recorded as A5-F8.

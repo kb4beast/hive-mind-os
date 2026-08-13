@@ -1,0 +1,272 @@
+{
+  "schema_version": 1,
+  "node": "A5-900",
+  "base_commit": "7a2e19e769cbeb1b3f3a515037c1173af28c9893",
+  "generated_utc": "2026-08-13T05:15:00Z",
+  "semantics": {
+    "status_closed": "The gate BLOCKS. No step whose prerequisite is this gate may be performed. A closed row is escalated, never argued around.",
+    "status_open": "The gate does not block, and a named human authority record exists for it. A row may be open ONLY on an authenticated external authority record -- an owner statement in the live session, or a receipt committed by the owner. Agent reasoning never opens a row.",
+    "authenticated": "TRUE only if the authority record is cryptographically verifiable on this host. Every authority record in this repository is a git commit; see authority_chain_strength below. Every row in this matrix therefore carries authenticated=false.",
+    "kind": "The escalation class the row belongs to. The five contract escalation conditions of A5-900.md:47-52 are themselves rows at the end of this matrix."
+  },
+  "authority_chain_strength": {
+    "statement": "This is the weakest link in the entire A5 authority chain and it is measured, not asserted.",
+    "measurement": "git log --format='%G?' -- docs/architecture/HUMAN_AUTHORITY_GATES.md over its complete history returns 4 x 'N' (no signature) and 1 x 'E' (a signature that cannot be checked on this host).",
+    "commits": [
+      {"commit": "fb534ce", "date": "2026-08-03T22:42:24-05:00", "author": "Brian Espinosa", "signature": "N (none)", "subject": "docs: withdraw post-P13 program"},
+      {"commit": "f5c148b", "date": "2026-08-04T08:50:56-05:00", "author": "Brian Espinosa", "signature": "N (none)", "subject": "docs: record owner authority decisions"},
+      {"commit": "56cdf8b", "date": "2026-08-05T23:49:37-05:00", "author": "kb4beast", "committer": "GitHub <noreply@github.com>", "signature": "E (present, key B5690EEEBB952194, cannot be verified on this host)", "subject": "feat: add Codex subscription model transport (#116)"},
+      {"commit": "db34487", "date": "2026-08-12T15:53:44-05:00", "author": "Brian Espinosa", "signature": "N (none)", "subject": "docs(authority): owner grants a scoped credential and draft-PR delivery for A4"},
+      {"commit": "c78adf4", "date": "2026-08-12T15:59:08-05:00", "author": "Brian Espinosa", "signature": "N (none)", "subject": "docs(authority): owner authorizes a by-reference credential hoist"}
+    ],
+    "consequence": "'The owner said so' rests on repository write access, not on a signature. Anyone who can write to this repository can add a line to HUMAN_AUTHORITY_GATES.md that reads exactly like an owner grant. B-GOV-02 is the blocker that names this and it is open.",
+    "what_would_fix_it": "G3 / B-GOV-02: an externally issued, non-self-issued, revocable signing identity, plus a check that refuses an authority record whose signature does not verify."
+  },
+  "rows": [
+    {
+      "gate": "G1-branch-fork-resolution",
+      "kind": "owner_decision",
+      "status": "open",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:32 -- owner decision 2026-08-04: 'Resolved without a merge: P0.4 heads are already represented in main; preserve their refs as history.' Commit f5c148b, unsigned.",
+      "escalation": null,
+      "blocks_a5_step": "none",
+      "what_would_open_it": "Already decided. It grants no authority; it records that a fork question was settled."
+    },
+    {
+      "gate": "G2-first-real-model-mission",
+      "kind": "financial_spend",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:33 -- owner decision 2026-08-04: 'No real model API key, spend, or mission is authorized. P1.5 remains closed.'",
+      "narrow_authorization_granted": "HUMAN_AUTHORITY_GATES.md:41-53 -- 2026-08-06 amendment authorizes local real-model calls through the already signed-in Codex ChatGPT subscription ONLY. 'No API key may be requested, read, passed to a subprocess, or used for this authority path, and no API usage-based spend is authorized.' The amendment states it 'does not close B-OPS-03'.",
+      "escalation": "financial_spend required",
+      "blocks_a5_step": "Any A5 step that would consume a metered provider, buy a service, or run a paid comparator. No such step was performed.",
+      "what_would_open_it": "The owner supplies an API key with an explicit spend limit and states the permission in the live session, or declares a budget. Neither exists."
+    },
+    {
+      "gate": "G3-external-identity-and-signing",
+      "kind": "security",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:34 -- owner decision 2026-08-04: 'No stable or production-positioned release until an externally controlled signing identity exists.'",
+      "escalation": "legal_or_regulatory_signoff required (a signing identity is issued by an external authority, not by this project)",
+      "blocks_a5_step": "Authenticating this readiness record itself. Measured directly: see authority_chain_strength -- 4 of the 5 authority commits carry no signature and the fifth cannot be verified here.",
+      "what_would_open_it": "Non-agent-controlled credentials issued by an external authority, plus a verifier that refuses unsigned or unverifiable authority records. Tracked as B-GOV-02."
+    },
+    {
+      "gate": "G4-external-append-only-retention",
+      "kind": "operational",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:35 -- owner decision 2026-08-04: 'No external append-only evidence store is authorized.'",
+      "escalation": "production_access required (a storage account and a recovery authority are production resources)",
+      "blocks_a5_step": "The retention half of acceptance criterion 3. The recovery exercise recovered from a LOCAL clone on the SAME host (evidence/pilots/a5/exercises/recovery-exercise.json R3, R4). Durability against loss of this host is NOT demonstrated and cannot be demonstrated behind this gate.",
+      "what_would_open_it": "The owner provisions a storage account and names a recovery authority; B-GOV-04's exit condition then requires independent recovery of the complete append-only chain after local state loss."
+    },
+    {
+      "gate": "G5-production-pilot",
+      "kind": "production_access",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:36 -- owner decision 2026-08-04: 'No production pilot is authorized.' Restated on 2026-08-12: the A4 delivery amendment explicitly leaves G5 unaltered (HUMAN_AUTHORITY_GATES.md:77-82, 'No deployment and no production pilot').",
+      "escalation": "production_access required",
+      "blocks_a5_step": "Every production-facing element of A5: production autonomy, production incident response, production rollback, customer-outcome measurement. None was performed or rehearsed against any production system.",
+      "what_would_open_it": "A deployment account, an approved scope, named users, and a rollback authority -- supplied by the owner, in the live session or as a committed owner receipt."
+    },
+    {
+      "gate": "G6-comparator-access",
+      "kind": "external_contractual_commitment",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:37 -- owner decision 2026-08-04: 'Read-only intake is authorized for the three pinned MIT comparator records in ADR-043; executing them and a qualifying court remain blocked.'",
+      "escalation": "external_contractual_commitment required",
+      "blocks_a5_step": "Any comparative or superiority statement anywhere in this node's output. None is made.",
+      "what_would_open_it": "Licensing and access for benchmark comparators, then B-OPS-05's reproducible multi-comparator verdict before any comparative language."
+    },
+    {
+      "gate": "G7-founding-source-licensing",
+      "kind": "legal_or_regulatory_signoff",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:38 -- owner decision 2026-08-04: 'Existing unresolved source and license obligations remain non-promoting deferrals.'",
+      "escalation": "legal_or_regulatory_signoff required",
+      "blocks_a5_step": "Any promotion of a claim resting on an unlicensed source. A5 promotes no claim.",
+      "what_would_open_it": "Video ingestions and source-license resolutions; see the B-SRC family row."
+    },
+    {
+      "gate": "G8-independent-human-review",
+      "kind": "security",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:39 -- 'No decision recorded; independent human review remains open.' HUMAN_AUTHORITY_GATES.md:21-23 -- 'G8 is a truth boundary: separately prompted agent identities are procedural separation, not authenticated independent human review.'",
+      "escalation": "legal_or_regulatory_signoff required (a second person, or an explicit solo-project declaration, is a human act)",
+      "blocks_a5_step": "ACCEPTANCE CRITERION 1 IN FULL. The two reviews in readiness-court.json are separately prompted agent identities. Per this gate they are procedural separation only. No agent -- including the author of this record -- may claim to satisfy criterion 1.",
+      "what_would_open_it": "A second person reviews and signs, or the owner records an explicit solo-project declaration that redefines what independent review means for this project. Only the owner can do either."
+    },
+    {
+      "gate": "A4-delivery-grant-2026-08-12",
+      "kind": "owner_decision",
+      "status": "open",
+      "authenticated": false,
+      "authority": "HUMAN_AUTHORITY_GATES.md:61-100 -- amendment db34487 plus addendum c78adf4, both authored and committed by Brian Espinosa <Beespinosa04@gmail.com>, both UNSIGNED (%G? = N).",
+      "escalation": null,
+      "scope": "Exactly one disposable repository (patencyhealth-lab/hive-mind-a4-pilot) and exactly six operations: create a branch under the pilot prefix, push it, open one draft pull request, comment once, close that pull request, delete that branch.",
+      "spent": "YES. A4-800 executed all six and rolled back. evidence/pilots/a4/summary.json independent_verification: git ls-remote returns ONLY refs/heads/main at 288610d48a10d8162fc45727c5a2ba81c55d5d05 (the pre-pilot SHA), and get_pull_request(1) reports state=closed, merged=False, merged_at=None.",
+      "authorizes_nothing_for_a5": "The amendment states it 'authorizes nothing further. No merge. No push to a default or protected branch. No deployment and no production pilot. No spend of any kind. No repository creation, deletion, or settings change. No second repository.' It does not close B-OPS-03 and does not alter G3-G8.",
+      "what_would_open_it_further": "Nothing in this record. A wider grant is a new owner act, in the live session or as a new committed owner receipt.",
+      "unverifiable_here": "Whether the owner has since deleted the token and the disposable repository. A5 holds no network authority and did not check."
+    },
+    {
+      "gate": "B-GOV-02-authenticated-identities",
+      "kind": "security",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:53 -- status 'open'. 'Local identity labels and unsigned audit envelopes do not prove authorship or independent execution.'",
+      "escalation": "legal_or_regulatory_signoff required",
+      "blocks_a5_step": "Authenticating every role identity in readiness-court.json, and authenticating the owner grants themselves. Measured: authority_chain_strength.",
+      "exit_condition_quoted": "'Signed identity receipts are independently verifiable, revocable, non-self-issued, and required at the applicable evidence burden through an ADR and regression tests.'",
+      "what_would_open_it": "The exit condition above, which requires a human to issue credentials outside agent control."
+    },
+    {
+      "gate": "B-GOV-03-provider-mediation",
+      "kind": "security",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:54 -- status 'open'. 'Provider-style labels and TLS-fetched JSON alone do not authenticate execution; local gates remain partial in-process enforcement.'",
+      "escalation": "production_access required (complete mediation implies a non-bypassable boundary outside the agent process)",
+      "blocks_a5_step": "Any claim that the A4 REST call list is an egress record. evidence/pilots/a4/summary.json honest_limits.socket_guard_was_absent: 'no unexpected outbound connection occurred is NOT independently proven for this run. The only evidence of what went out is the REST call list, which is the driver's own record of the calls it issued -- not an egress trace.'",
+      "exit_condition_quoted": "'External receipts bind authenticated provider identity, exact action, result, policy, lease, and verifier, and bypass attempts fail closed under independent reproduction.'",
+      "what_would_open_it": "The exit condition above."
+    },
+    {
+      "gate": "B-GOV-04-external-retention",
+      "kind": "operational",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:55 -- status 'open'. 'Repository-local files and SQLite prototypes do not prove durable retention against host loss or privileged rewrite.'",
+      "escalation": "production_access required",
+      "blocks_a5_step": "The production retention claim in acceptance criterion 3. The local exercise proves the PROCEDURE; this row owns the PRODUCTION CLAIM.",
+      "exit_condition_quoted": "'Independent recovery reproduces the complete append-only evidence chain after local state loss, and mutation/deletion attempts are detected and fail closed.'",
+      "what_would_open_it": "G4 opens first (storage account + recovery authority), then the exit condition above."
+    },
+    {
+      "gate": "B-OPS-03-verified-e2e-delivery",
+      "kind": "operational",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:60 -- status 'open'. 'The authoritative maturity audit still reports zero executed_in_isolation and zero independently_verified_e2e claims.' HUMAN_AUTHORITY_GATES.md:80 restates that the 2026-08-12 amendment 'does not close B-OPS-03'.",
+      "escalation": "production_access required",
+      "blocks_a5_step": "Any statement that A4's pilot constitutes verified end-to-end delivery. It does not: the amendment that authorized it says so in terms.",
+      "exit_condition_quoted": "'A P05 appeal audit and receipts independently reproduce one real, reversible delivery artifact with all lifecycle stages and no deterministic-backend substitution for the real capability under test.'",
+      "partial_progress_honestly_stated": "A4-800 DID execute a real, reversible delivery against a real host and DID roll it back, orchestrator-verified. That is genuine progress against this blocker's substance. It is not the exit condition: there was no independent reproduction, no socket-level egress evidence, and the blocker row is unchanged (BLOCKERS.md is read-only to this node and was not touched).",
+      "what_would_open_it": "Independent reproduction by a party other than the executing agent, plus the full exit condition."
+    },
+    {
+      "gate": "B-OPS-04-production-operation",
+      "kind": "production_access",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:61 -- status 'open'. 'release_ready=false; no production readiness, production operation, or verified customer value may be claimed.'",
+      "escalation": "production_access required",
+      "blocks_a5_step": "Governed-full production autonomy itself -- the thing A5 is named for. Also the production halves of incident response and rollback.",
+      "exit_condition_quoted": "'Independent receipts demonstrate bounded production operation, recovery, safety/regression budgets, and customer outcomes under approved authority; release readiness is adjudicated separately.'",
+      "what_would_open_it": "G5 opens first, then bounded production trials under explicit owner authority, then the exit condition. Deployment authority is recorded as human in the blocker's own owner column."
+    },
+    {
+      "gate": "B-OPS-05-no-superiority-claims",
+      "kind": "external_contractual_commitment",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:62 -- status 'open (read-only comparator intake authorized; no benchmark court)'. 'No superiority statement is permitted.'",
+      "escalation": "external_contractual_commitment required",
+      "blocks_a5_step": "Any comparative language in this node's document or evidence. A deliberate check for such language is part of the security review.",
+      "exit_condition_quoted": "'A reproducible multi-comparator verdict satisfies safety floors and the highest burden; absent that verdict, superiority language remains prohibited.'",
+      "what_would_open_it": "G6 opens first, then the exit condition."
+    },
+    {
+      "gate": "B-OPS-06-hard-isolation",
+      "kind": "security",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:63 -- status 'open'. 'P03 does not block network syscalls, impose filesystem ACLs or mounts, pin executable bytes, or enforce CPU/memory limits on Windows; its typed path and environment checks are not a container/VM security boundary.'",
+      "escalation": "production_access required (a container/VM adapter is infrastructure the owner must provide)",
+      "blocks_a5_step": "Any claim that a governed-full agent is contained. It is not. This row is the reason the A4 pilot could reach github.com at all once a sandbox path check was corrected (evidence/pilots/a4/summary.json fixed_defects.F3fix).",
+      "exit_condition_quoted": "'Adversarial cross-platform tests independently prove denied filesystem and network access, pinned executable identity, bounded descendants/resources, protected receipt storage, and fail-closed fallback without weakening P03 receipts.'",
+      "what_would_open_it": "A replaceable container, VM, or equivalent sandbox adapter, plus the exit condition."
+    },
+    {
+      "gate": "B-SRC-01..B-SRC-11-source-and-licence-obligations",
+      "kind": "legal_or_regulatory_signoff",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "BLOCKERS.md:41-51 -- all eleven rows are 'deferred', with review dates 2026-10-31 and 2026-11-30, under G7. BLOCKERS.md:71: 'A missed review date keeps the blocker open; it does not waive or silently resolve it.'",
+      "escalation": "legal_or_regulatory_signoff required",
+      "blocks_a5_step": "Promotion of any claim sourced from an unlicensed or unverified source. A5 promotes none.",
+      "not_yet_open": "As of 2026-08-13 none of the review dates has passed, so these rows are deferred rather than open. They are listed because G7 is closed and because a deferral is not a resolution.",
+      "what_would_open_it": "Per-source license/reuse evidence and a courtroom disposition, several of which name a human source custodian (B-SRC-11)."
+    },
+    {
+      "gate": "ESC-legal_or_regulatory_signoff",
+      "kind": "legal_or_regulatory_signoff",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "A5-900.md:47-52 names this an escalation condition. No legal or regulatory sign-off record exists anywhere in this repository. Searched by this node and independently searched by the blind security reviewer, who confirmed the absence. (The first version of this row asserted that search in the past tense before the review had happened; the reviewer flagged the tense and then performed the search, which is why the claim now stands on a real measurement.)",
+      "escalation": "legal_or_regulatory_signoff required",
+      "blocks_a5_step": "Any A5 step that would rest on legal review: license commitments, terms acceptance, regulatory posture, and the G8 independent-review question.",
+      "what_would_open_it": "A named human with legal authority produces a sign-off artifact and it is committed to the repository. No agent may author it, and no agent may treat its absence as satisfied."
+    },
+    {
+      "gate": "ESC-production_access",
+      "kind": "production_access",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "G5 (HUMAN_AUTHORITY_GATES.md:36, restated 2026-08-12 at :77-82) and B-OPS-04 (BLOCKERS.md:61).",
+      "escalation": "production_access required",
+      "blocks_a5_step": "All of them that touch production. Recorded as gate-blocked; none performed.",
+      "what_would_open_it": "Deployment account, approved scope, users, rollback authority -- an owner act."
+    },
+    {
+      "gate": "ESC-financial_spend",
+      "kind": "financial_spend",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "G2 (HUMAN_AUTHORITY_GATES.md:33) and the 2026-08-06 amendment (HUMAN_AUTHORITY_GATES.md:41-53), whose spend prohibition the 2026-08-12 amendment leaves standing (HUMAN_AUTHORITY_GATES.md:78, 'No spend of any kind'; :84-87, 'Every other withholding in that amendment, including the API-key and spend prohibitions, stands unchanged').",
+      "escalation": "financial_spend required",
+      "blocks_a5_step": "Any purchase, metered call, or paid service. None was made; this node made no network call of any kind.",
+      "what_would_open_it": "The owner authorizes a budget with a limit. Only the owner can."
+    },
+    {
+      "gate": "ESC-protected_branch_merge",
+      "kind": "protected_branch_merge",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "The 2026-08-12 amendment (HUMAN_AUTHORITY_GATES.md:77, 'No merge. No push to a default or protected branch'); B-GOV-01 (BLOCKERS.md:52) records active host-side protection on main including required approval, code-owner review and linear history; src/hive_mind_os/cortex/github/grants.py:29-31 closes the grantable vocabulary and grants.py:25 states merge 'is not a spelling this package accepts'.",
+      "escalation": "protected_branch_merge required",
+      "blocks_a5_step": "A5's own stopping condition is a DRAFT pull request that is not merged; the node opens no PR itself because it holds no push authority for this repository.",
+      "measured": "evidence/pilots/a5/tests/authority-boundary-probe.txt P2.2 -- DeliveryGrant.issue(allowed_actions=('merge',)) raises DeliveryGrantError 'delivery grant action is not grantable: merge'. P2.3 -- require_push_branch('main') raises 'push to protected branch main is denied'.",
+      "what_would_open_it": "A human with merge authority merges, subject to host-side protection. No agent path exists, by construction."
+    },
+    {
+      "gate": "ESC-external_contractual_commitment",
+      "kind": "external_contractual_commitment",
+      "status": "closed",
+      "authenticated": false,
+      "authority": "G6 (HUMAN_AUTHORITY_GATES.md:37) and G7 (HUMAN_AUTHORITY_GATES.md:38); B-OPS-05 (BLOCKERS.md:62) and the B-SRC family (BLOCKERS.md:41-51).",
+      "escalation": "external_contractual_commitment required",
+      "blocks_a5_step": "Accepting terms, entering licensing agreements, or making any commitment binding outside this repository. None was made.",
+      "what_would_open_it": "A named human with authority to bind the project signs the commitment. No agent may accept terms on the owner's behalf."
+    }
+  ],
+  "tally": {
+    "rows_total": 22,
+    "open": 2,
+    "closed": 20,
+    "open_rows": [
+      "G1-branch-fork-resolution (a settled question; grants no authority)",
+      "A4-delivery-grant-2026-08-12 (spent, narrowly scoped, rolled back; authorizes nothing for A5)"
+    ],
+    "authenticated_rows": 0,
+    "statement": "No row in this matrix is authenticated. Two rows are open and neither grants A5 any authority. Every production-facing row is closed by the owner's own recorded decisions."
+  }
+}

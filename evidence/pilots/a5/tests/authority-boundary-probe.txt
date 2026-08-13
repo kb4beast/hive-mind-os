@@ -1,0 +1,230 @@
+# transcript: authority-boundary-probe
+# node: A5-900
+# base_commit: 7a2e19e769cbeb1b3f3a515037c1173af28c9893
+# command: PYTHONPATH=src python <scratch>/a5/authority_probe.py
+# probe source retained verbatim at the end of this file
+# python: Python 3.14.4
+# started_utc: 2026-08-13T05:11:06Z
+# effects: none. network: none. credential: none read or referenced.
+----- BEGIN OUTPUT -----
+== P1  ConstraintEnvelope / AuthorityRegistry ==
+[as-expected ] P1.1 narrow envelope authorizes write inside its scope
+               expected=ALLOWED observed=ALLOWED
+               detail=CapabilityToken(envelope_digest='sha256:1111111111111111111111111111111111111111111111111111111111111111', action='write', target='src/one.py', token_digest='sha256:80d49135a23e8fe61959c9048e6fc7c27242f2010f84629ec5117b023a594f64')
+[as-expected ] P1.2 narrow envelope denies a denied action
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: action is not granted
+[as-expected ] P1.3 narrow envelope denies a target outside write scope
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: target is outside write scope
+[as-expected ] P1.4 a CHILD that broadens its parent is rejected
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: child envelope broadens or is not bound to its parent
+[FINDING     ] P1.5 a FRESH ROOT envelope with broader authority registers with no parent
+               expected=DENIED observed=ALLOWED
+               detail=None
+[FINDING     ] P1.6 the fresh root authorizes 'push', which P1.2 had denied
+               expected=DENIED observed=ALLOWED
+               detail=CapabilityToken(envelope_digest='sha256:2222222222222222222222222222222222222222222222222222222222222222', action='push', target='src/one.py', token_digest='sha256:9498581b49340f5f6ca5b215cb1b4f78077ea1a62e88dda9abe83eda8154c897')
+[as-expected ] P1.7 after revoke(D2) the same digest is denied
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority envelope is unavailable
+[FINDING     ] P1.8 the SAME authority re-minted under a new digest survives the revocation
+               expected=DENIED observed=ALLOWED
+               detail=CapabilityToken(envelope_digest='sha256:3333333333333333333333333333333333333333333333333333333333333333', action='push', target='src/one.py', token_digest='sha256:f54eaab9961d01613cb7f4abb7325aa5546646695dc7a494cb22dcc73b9d5c7c')
+
+-- P1.9 does ConstraintEnvelope.digest_value seal the envelope's contents? --
+               two envelopes, identical digest_value=sha256:1111111111111111111111111111111111111111111111111111111111111111
+               a.allowed_actions=('write',) a.path_write_scope=('src',)
+               b.allowed_actions=('write', 'push', 'deploy') b.path_write_scope=('src', 'docs', 'evidence')
+               both constructed without error: True
+               after register(a) then register(b) under the same digest,
+               authorize(D1,'push','docs/x.md') -> CapabilityToken(envelope_digest='sha256:1111111111111111111111111111111111111111111111111111111111111111', action='push', target='docs/x.md', token_digest='sha256:c612be0cb88bfb97bafdee2f818dfd0e2d88c3b0f211fef1314c97ed6f991489')
+[FINDING     ] P1.9 digest_value is format-checked only; it does not seal contents
+
+== P2  DeliveryGrant ==
+[FINDING     ] P2.1 an in-process caller can self-issue a complete grant
+               grant_id=GRANT-probe-self-issued
+               owner=some-owner-the-repository-owner-never-named repository=some-repository-the-repository-owner-never-named
+               allowed_actions=('push', 'open_draft_pr', 'post_comment', 'close_own_pr', 'delete_own_branch')
+               grant_digest=sha256:b8dbd8b1f5ec7647df6640821a9b1e7a5bd43686a308e8f64201875e9be5a8a4
+               the digest recomputes from the payload, so it is tamper-evident,
+               but it is unkeyed: it cannot distinguish owner-issued from self-issued
+[as-expected ] P2.2 'merge' is not a grantable spelling
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delivery grant action is not grantable: merge
+[as-expected ] P2.3 a push to a protected branch is denied
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: push to protected branch 'main' is denied
+[as-expected ] P2.4 a push outside the granted prefix is denied
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: push branch 'other/x' is outside the granted prefix 'probe/'
+[as-expected ] P2.5 retraction outside the granted prefix is denied
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delete_own_branch on branch 'other/x' is outside the granted prefix 'probe/'
+[as-expected ] P2.6 a mutated copy cannot be reconstructed (digest no longer seals)
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delivery grant digest does not seal its fields
+
+== probe complete; no effect was created, no credential was read, no network was used ==
+----- END OUTPUT -----
+# exit_code: 0
+# finished_utc: 2026-08-13T05:11:06Z
+----- BEGIN PROBE SOURCE -----
+"""A5-900 authority-boundary probe.
+
+Read-only measurement of the in-process authority objects. It creates NO effect,
+reads NO credential, and touches NO network. Every check prints OBSERVED/EXPECTED
+so the transcript is self-describing.
+"""
+
+from __future__ import annotations
+
+from hive_mind_os.brain_kernel.authority import AuthorityDenied, AuthorityRegistry
+from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope
+from hive_mind_os.cortex.github.grants import DeliveryGrant, DeliveryGrantError
+
+D1 = "sha256:" + "1" * 64
+D2 = "sha256:" + "2" * 64
+POLICY = "sha256:" + "0" * 64
+
+
+def envelope(digest, parent, allowed, denied, write_scope):
+    return ConstraintEnvelope(
+        "AUTH-probe",
+        "MISSION-probe",
+        "WORK-probe",
+        parent,
+        "builder",
+        "R1",
+        allowed,
+        denied,
+        write_scope,
+        write_scope,
+        (),
+        (),
+        (),
+        (),
+        Budget(1, 0, 0, 0, 0, 0, 1, 1),
+        "2030-01-01T00:00:00Z",
+        POLICY,
+        digest,
+    )
+
+
+def check(label, fn, expect_denied):
+    try:
+        result = fn()
+    except (AuthorityDenied, DeliveryGrantError) as error:
+        outcome = "DENIED"
+        detail = f"{type(error).__name__}: {error}"
+    else:
+        outcome = "ALLOWED"
+        detail = repr(result)
+    verdict = "as-expected" if (outcome == "DENIED") == expect_denied else "FINDING"
+    print(f"[{verdict:12}] {label}")
+    print(f"               expected={'DENIED' if expect_denied else 'ALLOWED'} observed={outcome}")
+    print(f"               detail={detail}")
+    return outcome
+
+
+print("== P1  ConstraintEnvelope / AuthorityRegistry ==")
+
+registry = AuthorityRegistry()
+narrow = envelope(D1, None, ("write",), ("push", "merge", "deploy"), ("src",))
+registry.register(narrow)
+check("P1.1 narrow envelope authorizes write inside its scope",
+      lambda: registry.authorize(D1, "write", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=False)
+check("P1.2 narrow envelope denies a denied action",
+      lambda: registry.authorize(D1, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+check("P1.3 narrow envelope denies a target outside write scope",
+      lambda: registry.authorize(D1, "write", "docs/one.md", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+broadening_child = envelope(D2, D1, ("write", "push"), (), ("src", "docs"))
+check("P1.4 a CHILD that broadens its parent is rejected",
+      lambda: registry.register(broadening_child, narrow),
+      expect_denied=True)
+
+fresh_root = envelope(D2, None, ("write", "push", "deploy"), (), ("src", "docs", "evidence"))
+check("P1.5 a FRESH ROOT envelope with broader authority registers with no parent",
+      lambda: registry.register(fresh_root),
+      expect_denied=True)
+check("P1.6 the fresh root authorizes 'push', which P1.2 had denied",
+      lambda: registry.authorize(D2, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+registry.revoke(D2)
+check("P1.7 after revoke(D2) the same digest is denied",
+      lambda: registry.authorize(D2, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+D3 = "sha256:" + "3" * 64
+registry.register(envelope(D3, None, ("write", "push", "deploy"), (), ("src",)))
+check("P1.8 the SAME authority re-minted under a new digest survives the revocation",
+      lambda: registry.authorize(D3, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+print()
+print("-- P1.9 does ConstraintEnvelope.digest_value seal the envelope's contents? --")
+a = envelope(D1, None, ("write",), (), ("src",))
+b = envelope(D1, None, ("write", "push", "deploy"), (), ("src", "docs", "evidence"))
+print(f"               two envelopes, identical digest_value={D1}")
+print(f"               a.allowed_actions={a.allowed_actions} a.path_write_scope={a.path_write_scope}")
+print(f"               b.allowed_actions={b.allowed_actions} b.path_write_scope={b.path_write_scope}")
+print(f"               both constructed without error: {isinstance(a, ConstraintEnvelope) and isinstance(b, ConstraintEnvelope)}")
+overwrite = AuthorityRegistry()
+overwrite.register(a)
+overwrite.register(b)
+tok = overwrite.authorize(D1, "push", "docs/x.md", now="2029-01-01T00:00:00Z")
+print(f"               after register(a) then register(b) under the same digest,")
+print(f"               authorize(D1,'push','docs/x.md') -> {tok}")
+print("[FINDING     ] P1.9 digest_value is format-checked only; it does not seal contents")
+
+print()
+print("== P2  DeliveryGrant ==")
+
+self_issued = DeliveryGrant.issue(
+    grant_id="GRANT-probe-self-issued",
+    owner="some-owner-the-repository-owner-never-named",
+    repository="some-repository-the-repository-owner-never-named",
+    base_branch="main",
+    branch_prefix="probe/",
+    allowed_actions=("push", "open_draft_pr", "post_comment", "close_own_pr", "delete_own_branch"),
+    issued_at="2026-08-13T00:00:00Z",
+)
+print(f"[FINDING     ] P2.1 an in-process caller can self-issue a complete grant")
+print(f"               grant_id={self_issued.grant_id}")
+print(f"               owner={self_issued.owner} repository={self_issued.repository}")
+print(f"               allowed_actions={self_issued.allowed_actions}")
+print(f"               grant_digest={self_issued.grant_digest}")
+print(f"               the digest recomputes from the payload, so it is tamper-evident,")
+print(f"               but it is unkeyed: it cannot distinguish owner-issued from self-issued")
+
+check("P2.2 'merge' is not a grantable spelling",
+      lambda: DeliveryGrant.issue(
+          grant_id="GRANT-probe-merge",
+          owner="o", repository="r", base_branch="main", branch_prefix="probe/",
+          allowed_actions=("merge",), issued_at="2026-08-13T00:00:00Z"),
+      expect_denied=True)
+check("P2.3 a push to a protected branch is denied",
+      lambda: self_issued.require_push_branch("main"),
+      expect_denied=True)
+check("P2.4 a push outside the granted prefix is denied",
+      lambda: self_issued.require_push_branch("other/x"),
+      expect_denied=True)
+check("P2.5 retraction outside the granted prefix is denied",
+      lambda: self_issued.require_own_run_branch("other/x", "delete_own_branch"),
+      expect_denied=True)
+check("P2.6 a mutated copy cannot be reconstructed (digest no longer seals)",
+      lambda: DeliveryGrant(
+          self_issued.grant_id, self_issued.owner, self_issued.repository,
+          self_issued.base_branch, self_issued.branch_prefix,
+          ("push", "open_draft_pr", "post_comment", "close_own_pr", "delete_own_branch"),
+          "2026-01-01T00:00:00Z", self_issued.grant_digest),
+      expect_denied=True)
+
+print()
+print("== probe complete; no effect was created, no credential was read, no network was used ==")
+----- END PROBE SOURCE -----
