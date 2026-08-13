@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-FIXTURE-PREREQUISITE-OPENING",
+  "node_id": "FPP-SEAL-000",
+  "recorded_at": "2026-08-13",
+  "subject": "Hermetic ephemeral fixture support as the sole remaining root-CI prerequisite",
+  "disposition": "adapt",
+  "authority": {"granted_now":"seal this DAG only", "implementation":false, "gco_promotion":false, "performance_claim":false, "knowledge_baseline_retry":false, "remote_authority":false},
+  "baseline": {"commit":"b789b68e7d6a741e0b85a3ac33cbce846e1e32c9", "tree":"b909b7b7e374bff22912059387ef0fe639498af6"},
+  "causal_predicate": {"venv_install":"<venv>/Scripts/python.exe -E -s -m pip install --disable-pip-version-check --no-deps -e .", "ci_command":"<venv>/Scripts/python.exe -E -s -m unittest discover -s tests -v", "environment":{"PYTHONNOUSERSITE":"1","PYTHONPATH":"cleared"}, "import_origin":"repository src/hive_mind_os", "tests_run":1050, "skips":8, "sole_failure":"test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available", "missing_api":["ContentAddressedFixtureSeed","FixtureIntegrityError","FixturePolicyError"], "fail_closed":"any other failure or error stops and splits the DAG"},
+  "adverse_comparators": {"rejected_fixture":{"commit":"41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378","tree":"b02326bf108de2fbaa2f174975f937979c02bf90","court":"CASE-DOCTOR-PERFORMANCE-PROMOTION","reuse_forbidden":true}, "gco_candidate":{"commit":"d02c2d206246c11939d1c9bde7714d46c02c26ec","promotion_authority":false}},
+  "required_nodes":["FPP-SEAL-000","FPP-CAUSALITY-010","FPP-TEST-020","FPP-ARCH-030","FPP-BUILD-040","FPP-CURATE-050","FPP-INTEGRATE-060","FPP-JUDGE-070"],
+  "mandatory_qualification":["tamper and torn seed fail closed","symlink/junction/hardlink/alternates/promisor/shared objects rejected","concurrent process seeds","no network","forced interruption cleanup","source/tree/blob identity","cross-worktree isolation","existing fixture suite"],
+  "global_forbidden":[".autopilot/plan.json","controller/durable_controller","GCO artifacts/tests/plan/recovery/release","doctor performance courts/receipts","test_healing.py","frozen doctor vector/timeout/p95 burden","production src","main/remotes","persistent mutable fixture cache/daemon/shared objects/alternates/--shared/hardlinks/symlinks/junctions/ambient HEAD/branch/remotes","reuse/cherry-pick/byte or receipt reuse/relabel of 41950b7"],
+  "rollback":"one revert of a fresh fixture commit only; retain all adverse evidence append-only",
+  "completion_claim": false,
+  "superiority_claim": false
+}

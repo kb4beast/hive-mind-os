@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-fixture-prerequisite-manifest-v1",
+  "plan_id": "fixture-prerequisite-v1",
+  "baseline": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "standard": {
+    "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+    "git_blob_sha": "70e43b0a8078a303d44c0109b8dd218a948258c2"
+  },
+  "sources": {
+    "docs/execution/dags/fixture-prerequisite-v1/.gitignore": "61152428e3dccb8d04bd9596ac7e0dadc7f0be4e",
+    "docs/execution/dags/fixture-prerequisite-v1/README.md": "8cd378e6a5af28443343abd91a83af0defce81a0",
+    "docs/execution/dags/fixture-prerequisite-v1/benchmark.py": "1eb4d135da1ae3c8c3b43ee5538cef9f4b1db562",
+    "docs/execution/dags/fixture-prerequisite-v1/generate_plan.py": "6cd94771d785c6e9480c0ffddf49bcd4b340f227",
+    "docs/execution/dags/fixture-prerequisite-v1/specs.py": "8a1f86b69dfbfb0b4609e4e42faf9cbba87b6561",
+    "docs/execution/dags/fixture-prerequisite-v1/verify_plan.py": "bd9874a19e644f1412a03511d4193bfc4d61785c",
+    "evidence/courts/CASE-FIXTURE-PREREQUISITE-OPENING.json": "9ed586d87597c63edddec37996fd298b5c8ba2a8"
+  },
+  "expected_plan_digest": "sha256:c7d583ad19c968eb2a0c9fe894366d5557e89386248ea27d1186ab6e14c55876",
+  "expected_node_ids": ["FPP-SEAL-000", "FPP-CAUSALITY-010", "FPP-TEST-020", "FPP-ARCH-030", "FPP-BUILD-040", "FPP-CURATE-050", "FPP-INTEGRATE-060", "FPP-JUDGE-070"],
+  "expected_dependencies": {
+    "FPP-SEAL-000": [],
+    "FPP-CAUSALITY-010": ["FPP-SEAL-000"],
+    "FPP-TEST-020": ["FPP-SEAL-000"],
+    "FPP-ARCH-030": ["FPP-CAUSALITY-010", "FPP-TEST-020"],
+    "FPP-BUILD-040": ["FPP-ARCH-030", "FPP-TEST-020"],
+    "FPP-CURATE-050": ["FPP-BUILD-040"],
+    "FPP-INTEGRATE-060": ["FPP-CAUSALITY-010", "FPP-BUILD-040", "FPP-CURATE-050"],
+    "FPP-JUDGE-070": ["FPP-INTEGRATE-060"]
+  },
+  "expected_round_count": 7,
+  "materialized_path": ".autopilot/state/fixture-prerequisite-v1.json",
+  "sealed_plan_unchanged": ".autopilot/plan.json",
+  "sealed_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+  "rejected_fixture": {"commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378", "tree": "b02326bf108de2fbaa2f174975f937979c02bf90", "reuse_forbidden": true},
+  "gco_candidate": {"commit": "d02c2d206246c11939d1c9bde7714d46c02c26ec", "promotion_authority": false},
+  "frozen_ci_predicate": {"tests_run": 1050, "skips": 8, "sole_failure": "test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available", "missing_api": ["ContentAddressedFixtureSeed", "FixtureIntegrityError", "FixturePolicyError"]},
+  "author_verified": {"narrow_write_scopes": true, "concrete_read_scopes": true, "parallel_causality_and_tests_only": true, "causality_fail_closed": true, "adverse_evidence_append_only": true, "no_implementation_authority_outside_sealed_scope": true}
+}
