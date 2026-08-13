@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "fixture-prerequisite-causality-reseal-v2-seal",
+  "baseline": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "rejected_tuples": [
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"},
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "4f20bd2"}
+  ],
+  "expected_node_ids": ["FPCR-SEAL-000", "FPCR-DISCOVERY-010", "FPCR-EXECUTE-020", "FPCR-CROSS-030", "FPCR-INTEGRATE-040", "FPCR-JUDGE-050"],
+  "expected_dependencies": {
+    "FPCR-SEAL-000": [],
+    "FPCR-DISCOVERY-010": ["FPCR-SEAL-000"],
+    "FPCR-EXECUTE-020": ["FPCR-DISCOVERY-010"],
+    "FPCR-CROSS-030": ["FPCR-DISCOVERY-010"],
+    "FPCR-INTEGRATE-040": ["FPCR-EXECUTE-020", "FPCR-CROSS-030"],
+    "FPCR-JUDGE-050": ["FPCR-INTEGRATE-040"]
+  },
+  "expected_plan_digest": "sha256:df0ec52106a425306b7590d61c03a77186b79e320daf9d895e0cd12ad05674fe",
+  "sealed_autopilot_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+  "sources": {
+    "docs/execution/dags/fixture-prerequisite-causality-reseal-v2/.gitignore": "997308ee7ea7f7761742e07903eb00e250e1796b",
+    "docs/execution/dags/fixture-prerequisite-causality-reseal-v2/README.md": "a6febd5f9cabf425a352be80dd9f4f3d41c1868e",
+    "docs/execution/dags/fixture-prerequisite-causality-reseal-v2/generate_plan.py": "478f0b6d3209d99b1f42cd743cbc39645f3b7f8d",
+    "docs/execution/dags/fixture-prerequisite-causality-reseal-v2/runner.py": "21380f442a857575cfed2b8eab8203590df7620f",
+    "docs/execution/dags/fixture-prerequisite-causality-reseal-v2/specs.py": "ed01cf99501f649ac7c6b3b6e2ac826b1e22f679",
+    "docs/execution/dags/fixture-prerequisite-causality-reseal-v2/verify_plan.py": "124c8e2eaae330df5b08634ef6bd3ac05e8ac6b3",
+    "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-DEFECT.json": "c436df517f622cec8418848fe33a669f3cebd45c"
+  },
+  "prohibitions": ["implementation", "qualification/candidate receipts during seal", ".autopilot/plan.json mutation", "main or remote effects", "original FPC node unlock", "fixture/GCO promotion", "performance conclusion", "knowledge BASELINE-000 retry"]
+}
