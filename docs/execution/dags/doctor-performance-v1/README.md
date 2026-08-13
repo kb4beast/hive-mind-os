@@ -35,8 +35,11 @@ postcondition and intentionally is not a seventh node in this predecessor.
 ## Frozen boundary
 
 The program preserves the exact doctor command, controller timeout, unittest discovery,
-382-execution vector (381 pass and the same one skip), test IDs, order, methods,
-assertions, subtests, behavior constants, and skip decorators. Production code,
+and complete unittest ID set with SHA-256
+`7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4`.
+On the cited host that is 381 total executions: 380 passes, the same one conditional skip,
+zero failures, and zero errors. It also preserves test IDs, order, methods, assertions,
+subtests, behavior constants, and skip decorators. Production code,
 controller code, protected refs, `.autopilot/plan.json`, the knowledge DAG, and its
 tournament bundle are forbidden.
 

@@ -12,16 +12,16 @@
     "git_blob_sha": "70e43b0a8078a303d44c0109b8dd218a948258c2"
   },
   "sources": {
-    "docs/architecture/ADR-063-INVOCATION-SCOPED-TEST-FIXTURES.md": "b7b709188b1aeea6dabd93b80c71c58521646899",
+    "docs/architecture/ADR-063-INVOCATION-SCOPED-TEST-FIXTURES.md": "2b8209f7cf28e5363edd8e5da4fe2522cb34fabd",
     "docs/execution/dags/doctor-performance-v1/.gitignore": "c18dd8d83ceed1806b50b0aaa46beb7e335fff13",
-    "docs/execution/dags/doctor-performance-v1/README.md": "9d9afd7c05cdf2f77d8bfab3e2e1b79eee83ce09",
+    "docs/execution/dags/doctor-performance-v1/README.md": "d12d277f7ff533a7f082dc09046e5149a0c62a3a",
     "docs/execution/dags/doctor-performance-v1/benchmark.py": "de2d6a7dc494c47aff0af61c3bcfe2d7dabdbb0f",
-    "docs/execution/dags/doctor-performance-v1/generate_plan.py": "b65a6e100866ceff08ed6b864debfc214c671add",
-    "docs/execution/dags/doctor-performance-v1/specs.py": "82093edf9adc2d06800bdc380207b7944e91db2e",
+    "docs/execution/dags/doctor-performance-v1/generate_plan.py": "f8cc0ff4a573b9cee30d894d1547c0e5e97e91cf",
+    "docs/execution/dags/doctor-performance-v1/specs.py": "9b5c510212a56c556b8b29c2dc340c7d2acf77b8",
     "docs/execution/dags/doctor-performance-v1/verify_plan.py": "0180d6d9b8083938e88d45b222cd2e553f9b7464",
-    "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json": "8978e2fbed0676c4467d5288bfc24ad221974912"
+    "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json": "c0e2ebfeb1f438ff5a00091f636b31de6153bfca"
   },
-  "expected_plan_digest": "sha256:997bcbb34bec49b4286759e8d054b23bc84b6c1f6e8382074bd6611aee7989a4",
+  "expected_plan_digest": "sha256:36147e0917292a7dcb4f77e10633fdb66bfd1b1fd0ca31bb10e9d10cd05f720d",
   "expected_node_count": 6,
   "expected_node_ids": [
     "DP-CONTRACT-000",
