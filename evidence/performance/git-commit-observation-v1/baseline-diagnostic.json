@@ -1,0 +1,83 @@
+{
+  "command": [
+    "C:\\Python314\\python.exe",
+    ".autopilot/bin/autopilot.py",
+    "--repo-root",
+    ".",
+    "doctor",
+    "--json"
+  ],
+  "comparators": {
+    "doctor_baseline": "evidence/performance/doctor-performance-v1/baseline-summary.json",
+    "rejected_fixture_candidate": {
+      "commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+      "disposition": "reject",
+      "tree": "b02326bf108de2fbaa2f174975f937979c02bf90"
+    }
+  },
+  "diagnostic_only": true,
+  "doctor_internal_timeout_seconds": 180,
+  "environment": {
+    "cpu_count": 24,
+    "machine": "AMD64",
+    "network_policy": "no-network",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "process_environment_omission_reason": "credential-safety",
+    "process_environment_values_retained": false,
+    "processor": "Intel64 Family 6 Model 198 Stepping 2, GenuineIntel",
+    "runtime": {
+      "executable": "C:\\Python314\\python.exe",
+      "implementation": "CPython",
+      "version": "3.14.4"
+    },
+    "working_directory": "C:\\Repos\\HiveMind\\hive-mind-os-gco-baseline-010"
+  },
+  "frozen_behavior_contract": {
+    "complete_unittest_id_set_sha256": "sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4",
+    "conditional_skip_id": "test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected",
+    "passed": 380,
+    "skipped": 1,
+    "total": 381
+  },
+  "kind": "git-commit-observation-benchmark-receipt-v1",
+  "metrics": {
+    "all_below_doctor_timeout": false,
+    "all_doctor_passed": false,
+    "nearest_rank_p95_seconds": 186.231892,
+    "qualification_limit_seconds": 135.0
+  },
+  "outer_timeout_seconds": 240,
+  "phase": "baseline-diagnostic",
+  "promotion_authority": false,
+  "receipt_digest": "sha256:04e99f6bb255a7bf724df296d6937c9f8796a7f6ac8e8482a90182ba64f8a1cd",
+  "runtime_id": "python-3.14-system",
+  "schema_version": 1,
+  "source": {
+    "commit": "8e516cf2169d10b2c505c03020848629d5fbfd1e",
+    "index_tree": "670e7b501d1052fd36fd8dfdd59254cdf48c3a0a",
+    "tracked_entry_count": "91",
+    "tracked_surface_digest": "sha256:eff5ac09330688fdb600993c441f0434f5f3cadb9ec83f069497e7dda63e5ced",
+    "tree": "670e7b501d1052fd36fd8dfdd59254cdf48c3a0a"
+  },
+  "superiority_claim": false,
+  "trial_policy": {
+    "actual_trials": 1,
+    "cold_warm_is_declared_not_an_os_cache_eviction_claim": true,
+    "fresh_process_every_trial": true,
+    "modes": [
+      "diagnostic"
+    ]
+  },
+  "trials": [
+    {
+      "doctor_passed": false,
+      "elapsed_seconds": 186.231892,
+      "exit_code": 1,
+      "fresh_process": true,
+      "index": 1,
+      "mode": "diagnostic",
+      "outer_timeout": false,
+      "stdout_sha256": "sha256:cfa7446e67e14566b6899df141f219b9512fb50fc9324e3ca4ca6610ed9c8a14"
+    }
+  ]
+}
