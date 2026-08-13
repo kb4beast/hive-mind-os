@@ -647,7 +647,10 @@ class GitHubAdapterTests(unittest.TestCase):
 
         receipt = deep / Path(*result.receipt["path"].split("/"))
         self.assertGreater(len(str(receipt)), 260)
-        self.assertFalse(receipt.is_file())
+        if os.name == "nt":
+            # The defect this pins is a plain Path.is_file() gate, which only
+            # fails where MAX_PATH applies; POSIX has no such limit.
+            self.assertFalse(receipt.is_file())
         self.assertTrue(validate_github_receipt(deep, result.receipt))
 
     def test_a_receipt_temporary_name_never_outgrows_its_final_name(self) -> None:

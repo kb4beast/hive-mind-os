@@ -9,4 +9,10 @@ regexTarget = "line"
 regexes = [
   '''IDEMPOTENCY-P06-test''',
   '''ConstraintEnvelope\("AUTH-(?:one|parent|child)", "MISSION-phase-1"''',
+  # generic-api-key matches the literal text `policy_decision_ref=` because the
+  # `auth` in `authority_envelope_digest` precedes it. AUTH is a computed sha256
+  # of a test envelope and POLICY-builder is a fixture label; neither is a credential.
+  '''authority_envelope_digest=AUTH, policy_decision_ref="POLICY-builder"''',
+  # Synthetic identifiers inside a retained probe transcript, kept verbatim as evidence.
+  '''"AUTH-probe2", "MISSION-probe2", "WORK-probe2"''',
 ]
