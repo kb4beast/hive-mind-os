@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "kind": "doctor-performance-qualification-v1",
+  "node_id": "DP-QUALIFY-040",
+  "actor": "codex:dp-qualify-040",
+  "role": "independent_curator",
+  "candidate": {
+    "commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+    "tree": "b02326bf108de2fbaa2f174975f937979c02bf90",
+    "parent": "635dfa51fe0caebb09e9b283ccf21574b65e0258",
+    "subject": "invocation-scoped content-addressed healing fixtures"
+  },
+  "independence": {
+    "builder_identity": "different_from_qualification_curator",
+    "test_curator_identity": "different_from_qualification_curator",
+    "qualification_curator_identity": "codex:dp-qualify-040",
+    "judge_identity_required_separately": true,
+    "promotion_decision_made": false
+  },
+  "sealed_contract": {
+    "doctor_plan_verified": true,
+    "doctor_plan_digest": "sha256:4b3dec3b24fee6b8a5e1be3ac0a8eec69882922a69143bda259c308990a190d6",
+    "doctor_plan_node_count": 6,
+    "knowledge_plan_verified": true,
+    "knowledge_plan_digest": "sha256:e61a9b79651871d8d4b8a71e2ed1f540964a9fdc9c4343f5e2f14b73589184ec",
+    "knowledge_plan_node_count": 31,
+    "complete_unittest_id_set_sha256": "sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4",
+    "doctor_internal_timeout_seconds": 180,
+    "qualification_p95_limit_seconds": 135.0
+  },
+  "byte_seals": {
+    ".autopilot/tests/fixture_support.py": {
+      "git_blob": "44ab23f56914877fbe518c06dbd4b207db46cbf5",
+      "sha256": "sha256:cda625264cebbe7c3ff9d8b712ee7ebc87014284d80e9e39d363b7bb872a6a71"
+    },
+    ".autopilot/tests/test_healing.py": {
+      "git_blob": "b357492e38fb89644978b17470644defc624045e",
+      "sha256": "sha256:4b12c25a53f2225383ea2b55243b199a657db82d90c6178e5ac0e9a4297963ec"
+    },
+    "tests/test_autopilot_fixture_seed.py": {
+      "git_blob": "c352b4f87a678787111850fb598e4d849a20fdd7",
+      "sha256": "sha256:1a1ea8b0966e71e1593dfff9e999cd0bb0006389ba5ebd5720f1605c93c487f3"
+    },
+    "tests/test_doctor_performance_contract.py": {
+      "git_blob": "06a6fd320897738c21a82a3695941aa8abe3c891",
+      "sha256": "sha256:ebc597507e5bdc529a45e07e012c1873d0aceded61066f648dc77ae3ab3a997b"
+    },
+    "docs/architecture/ADR-063-INVOCATION-SCOPED-TEST-FIXTURES.md": {
+      "git_blob": "2b8209f7cf28e5363edd8e5da4fe2522cb34fabd",
+      "sha256": "sha256:da6a17065d5ad0299af5a7df13d47aef9aa5060b27d4daffc58342b6a81dc838"
+    },
+    "docs/execution/dags/doctor-performance-v1/manifest.json": {
+      "git_blob": "61e57137b31fdf35d1f96a1f5704ae27a257a778",
+      "sha256": "sha256:e6c3af668e3b1f730542feb347d62949eb5eaceb851728eb6d3f525d9b31520a"
+    }
+  },
+  "focused_validation": [
+    {
+      "command": "C:\\Python314\\python.exe -m unittest -v tests.test_doctor_performance_contract tests.test_autopilot_fixture_seed",
+      "result": "passed",
+      "tests_run": 15,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 25.673,
+      "note": "Two ResourceWarning notices were emitted by the forced-child-termination test; the suite passed."
+    },
+    {
+      "command": "C:\\Python314\\python.exe -m unittest discover -s .autopilot/tests -p test_fixture_isolation.py -v",
+      "result": "passed",
+      "tests_run": 1,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 10.468
+    },
+    {
+      "command": "C:\\Python314\\python.exe -m unittest discover -s .autopilot/tests -p test_healing.py -v",
+      "result": "passed",
+      "tests_run": 65,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 116.44
+    }
+  ],
+  "behavior_vector": {
+    "required": {
+      "total": 381,
+      "passed": 380,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "conditional_skip": "test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected"
+    },
+    "contract_seals_reproduced": true,
+    "full_vector_reproduced_in_qualification": false,
+    "reason": "Both exact doctor matrices reached the unchanged internal timeout before completing the full unittest vector."
+  },
+  "candidate_runtime_receipts": [
+    {
+      "runtime_id": "python-3.14-system",
+      "runtime_version": "3.14.4",
+      "receipt": "evidence/performance/doctor-performance-v1/candidate-python-3.14.json",
+      "receipt_digest": "sha256:b5795ece72223af7980fd6095b66ac1159719dcab928c6296a4a67ee3a5c1e99",
+      "file_sha256": "sha256:0ed8235aaf6f50deed54e43cfc4f1d0c8abd264a3609b21bf0ae550a1030509e",
+      "trial_seconds": [187.051918, 186.495149, 186.851545, 186.740816, 186.545991, 186.669888],
+      "trial_modes": ["cold", "warm", "cold", "warm", "cold", "warm"],
+      "doctor_passed_trials": 0,
+      "doctor_failed_trials": 6,
+      "outer_timeout_trials": 0,
+      "all_below_180_seconds": false,
+      "nearest_rank_p95_seconds": 187.051918,
+      "p95_at_or_below_135_seconds": false,
+      "qualification_gate": "failed"
+    },
+    {
+      "runtime_id": "python-3.12-bundled",
+      "runtime_version": "3.12.13",
+      "receipt": "evidence/performance/doctor-performance-v1/candidate-python-3.12.json",
+      "receipt_digest": "sha256:50b56618f815497db5400db2e2d24f0773454a673100e0219498aaf27e40ad62",
+      "file_sha256": "sha256:0be65bbb42ef5915ee580340011a0564770d37c3672b6a16ebad7e9390f1ba52",
+      "trial_seconds": [187.290851, 186.712117, 186.893996, 186.917883, 186.48562, 185.98613],
+      "trial_modes": ["cold", "warm", "cold", "warm", "cold", "warm"],
+      "doctor_passed_trials": 0,
+      "doctor_failed_trials": 6,
+      "outer_timeout_trials": 0,
+      "all_below_180_seconds": false,
+      "nearest_rank_p95_seconds": 187.290851,
+      "p95_at_or_below_135_seconds": false,
+      "qualification_gate": "failed"
+    }
+  ],
+  "deferred_validation": [
+    {
+      "command": "C:\\Python314\\python.exe -m unittest discover -s .autopilot/tests -v",
+      "result": "not_run_fail_fast",
+      "reason": "Both required exact-doctor runtime matrices conclusively failed the unchanged 180-second and p95 gates."
+    },
+    {
+      "command": "C:\\Python314\\python.exe -m unittest discover -s tests -v",
+      "result": "not_run_fail_fast",
+      "reason": "Both required exact-doctor runtime matrices conclusively failed the unchanged 180-second and p95 gates."
+    }
+  ],
+  "acceptance_gates": {
+    "sealed_plans": true,
+    "focused_contract_and_isolation_tests": true,
+    "six_alternating_fresh_trials_python_3_14": true,
+    "six_alternating_fresh_trials_python_3_12": true,
+    "all_exact_doctor_trials_passed": false,
+    "all_exact_doctor_trials_below_180_seconds": false,
+    "p95_at_or_below_135_seconds_both_runtimes": false,
+    "full_behavior_vector_reproduced": false,
+    "full_autopilot_suite_passed": false,
+    "full_repository_ci_passed": false,
+    "confinement_and_byte_seals": true
+  },
+  "qualification_success": false,
+  "completion_claim": false,
+  "promotion_authorized": false,
+  "knowledge_baseline_retry_authorized": false,
+  "superiority_claimed": false,
+  "result": "fail_closed_not_qualified",
+  "material_findings": [
+    "Every candidate exact-doctor trial returned exit code 1 after exceeding the controller's unchanged 180-second internal timeout.",
+    "Nearest-rank p95 was 187.051918 seconds on Python 3.14 and 187.290851 seconds on Python 3.12, above the 135-second qualification limit.",
+    "The candidate therefore cannot reproduce the required completed 381-execution behavior vector through the exact doctor command.",
+    "Focused fixture and healing validation passed, so the retained adverse evidence is specifically a failure of the mandatory end-to-end qualification burden, not a claim that every candidate property failed."
+  ],
+  "next_authority": "A distinct DP-JUDGE-050 identity may consider this adverse evidence, but this receipt grants no adoption, retry, production, policy, or remote authority."
+}
