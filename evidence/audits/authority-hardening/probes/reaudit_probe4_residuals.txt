@@ -1,0 +1,334 @@
+# transcript: reaudit_probe4_residuals
+# node: REAUDIT-1900
+# measures: every residual the implementing nodes DECLARED, plus A3-F2,
+#   A4 D7 and DAG_EXECUTION_HANDOFF.md section 11.6.
+# what it touches: reads src/**, tests/**, evidence/pilots/**, and runs
+#   `git log` and one `python -m unittest tests.test_workers`. Writes NO
+#   repository file and edits nothing.
+# base_commit: 4c85ebee7a590d1ea2649457f0fa301bd2d1cda2
+# command: PYTHONPATH=src python <scratch>/reaudit_probe4_residuals.py
+# python: 3.14.4
+# started_utc: 2026-08-13T16:23:46.501980Z
+# finished_utc: 2026-08-13T16:23:47.422062Z
+# probe source retained verbatim at the end of this file
+----- BEGIN OUTPUT -----
+
+== RESIDUAL 1: grants.LEDGER is a module-level singleton no PRODUCTION path anchors ==
+  on a bare import, grants.LEDGER.anchor_digest = ''
+  '.anchor(' call sites in src/**   : 0
+  '.anchor(' call sites in tests/** : 10
+    tests\test_delivery_grants.py:257: grants.LEDGER.anchor(_minted_root())
+    tests\test_delivery_grants.py:270: grants.LEDGER.anchor(root)
+    tests\test_delivery_grants.py:277: grants.LEDGER.anchor(_minted_root())
+    tests\test_delivery_grants.py:285: grants.LEDGER.anchor(_minted_root())
+    tests\test_delivery_grants.py:310: grants.LEDGER.anchor(candidate)  # type: ignore[arg-type]
+    tests\test_delivery_grants.py:318: grants.LEDGER.anchor(root)
+    tests\test_delivery_grants.py:319: grants.LEDGER.anchor(_minted_root())
+    tests\test_delivery_grants.py:322: grants.LEDGER.anchor(
+    tests\test_github_adapter.py:1169: return grants.LEDGER.anchor(_r2_owner_authority())
+    tests\test_hive_cortex_delivery.py:223: self.owner_authority = grants.LEDGER.anchor(_owner_authority())
+  VERDICT: A5-F6 is closed in the fixtures and OPEN in a real run
+
+== RESIDUAL 2: effect_outbox.py still makes reconciliation_required terminal ==
+  execute()+ 17: if state == "reconciliation_required":
+  execute()+ 18: raise EffectReconciliationRequired(
+  execute()+ 22: self.store.mark_effect_reconciliation_required(
+  execute()+ 27: raise EffectReconciliationRequired(
+  execute()+ 36: raise EffectReconciliationRequired(
+  execute()+ 44: self.store.mark_effect_reconciliation_required(
+  execute()+ 50: raise EffectReconciliationRequired(
+  execute()+ 86: self.store.mark_effect_reconciliation_required(
+  execute()+ 92: raise EffectReconciliationRequired(
+  no branch clears the state; every later attempt re-raises.
+
+== RESIDUAL 3: GATEWAY-1040 liveness trade-off: a claimed effect can never re-fire ==
+      def _reconcile_interrupted_effect(
+          self,
+          checkpoint: StepCheckpoint,
+          observe: Callable[
+              [],
+              tuple[dict[str, Any], tuple[dict[str, Any], ...]] | None,
+          ]
+          | None,
+      ) -> dict[str, Any]:
+          """Adopt the observed outcome of a claimed effect; never fire it twice."""
+          assert self.mission_store is not None
+          record = self.mission_store.find_effect_intent(checkpoint)
+          if record is None:
+              raise GitHubEffectReconciliationRequired(
+                  "GitHub effect was claimed with no write-ahead record at "
+                  f"{checkpoint.mission_id} step {checkpoint.step_index}"
+              )
+          observed = observe() if observe is not None else None
+          if observed is None:
+              raise GitHubEffectReconciliationRequired(
+                  "interrupted GitHub effect "
+                  f"{record['idempotency_key']} has no witnessed outcome; "
+                  f"reconcile {checkpoint.mission_id} step {checkpoint.step_index} "
+                  "before it can proceed"
+              )
+          value, records = observed
+          outcome = {"value": value, "records": [dict(item) for item in records]}
+          self.mission_store.reconcile_effect(checkpoint, outcome, records)
+          return value
+
+== RESIDUAL 4: VERDICT-1100: the digest chain is unkeyed and unanchored ==
+  verify.py mentions 'hmac'  : False
+  verify.py mentions 'sign'  : False
+  ledger.py mentions 'hmac'  : False
+  ledger.py sha256 uses      : 3
+  => integrity relative to the bundle's own evidence; NOT authorship.
+
+== RESIDUAL 5: SANDBOX-1300's containment proof rests on a single test ==
+  measured separately in probes/reaudit_probe3_sandbox.txt:
+  the refusal branch is reached by exactly 1 test on this host.
+
+== RESIDUAL 6: the two retained A3 bundles have never been self-verifiable ==
+  mission-01-example-verify: schema_version=1 files=10 absent=5
+      ABSENT environment.json
+      ABSENT ledger.sqlite3
+      ABSENT receipts/artifacts/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.stderr
+      ABSENT receipts/artifacts/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.stdout
+      ABSENT receipts/r/45329ddfb4c3d335ede8139b73432c6c7c8a43cb5851767cdc6d1eecc5edbf51.json
+      verify_bundle -> VerificationError: integrity manifest schema is unsupported
+  mission-02-enqueue-loop: schema_version=1 files=10 absent=5
+      ABSENT environment.json
+      ABSENT ledger.sqlite3
+      ABSENT receipts/artifacts/95f0a424da58f82b3a4c42b06e443c20e218c95ea2462196468b38b8ba9d41cb.stdout
+      ABSENT receipts/artifacts/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.stderr
+      ABSENT receipts/r/872d5b9d7adde1961cb59a1fb55a8ea5705c61f2f8ca10e8c4cf3adaf8469c6a.json
+      verify_bundle -> VerificationError: integrity manifest schema is unsupported
+  pre-existing A3 evidence defect; nothing in this plan caused or fixed it.
+
+== RESIDUAL 7: tests/test_workers cannot be imported under plain unittest ==
+  exit_code=1
+  test_workers (unittest.loader._FailedTest.test_workers) ... ERROR
+  ======================================================================
+  ERROR: test_workers (unittest.loader._FailedTest.test_workers)
+  ----------------------------------------------------------------------
+  ImportError: Failed to import test module: test_workers
+  Traceback (most recent call last):
+    File "C:\Python314\Lib\unittest\loader.py", line 137, in loadTestsFromName
+      module = __import__(module_name)
+    File "C:\Repos\HiveMind\hive-mind-os\tests\test_workers.py", line 13, in <module>
+      from fixtures.fixture_repo import build_fixture_repo
+  ModuleNotFoundError: No module named 'fixtures'
+  ----------------------------------------------------------------------
+  Ran 1 test in 0.000s
+  FAILED (errors=1)
+
+== A3-F2: workers.py canonical bindings provider ==
+  workers._canonical_bindings_provider on a bare import = None
+  references in src/** (1):
+    src\hive_mind_os\workers.py:158: def set_canonical_mission_bindings_provider(
+  the only reference is the definition itself: no production registration.
+  effect: the canonical mission route raises RuntimeRouteError. Verified:
+    workers.py:209: "canonical mission runtime has no registered bindings provider: "
+
+== A4 D7: no remote receipt cites the sealed plan digest ==
+  files in evidence/pilots/a4/remote: 7
+  files citing plan_digest          : 0 []
+  pilot-plan.json pilot_repository  : 'UNGRANTED'
+  pilot-plan.json authority_gate    : 'CLOSED'
+
+== HANDOFF section 11.6: the authority chain is unsigned (DELIBERATELY out of scope) ==
+  c78adf4 N Brian Espinosa docs(authority): owner authorizes a by-reference credential hoist
+  db34487 N Brian Espinosa docs(authority): owner grants a scoped credential and draft-PR delivery for A4
+  56cdf8b E kb4beast feat: add Codex subscription model transport (#116)
+  f5c148b N Brian Espinosa docs: record owner authority decisions
+  fb534ce N Brian Espinosa docs: withdraw post-P13 program
+  this plan's own commits:
+  4c85ebe N fix(effects): close the four residuals BIND-1030 named but could not reach
+  edc21f8 N fix(authority): bind the hardened surfaces to the paths production uses
+  bb579dc N fix(github): reconcile interrupted effects and complete the delivery read surface
+  329f80e N plan(extend): BIND-1030 closes the residuals TOKEN-1010 and GRANT-1020 reported
+  1535a9a N fix(grants): anchor delivery-grant issuance and give every grant an expiry
+  f89b24f N fix(effects): make the effect boundary consult the authority registry
+  ece7d62 N fix(mission-store): write the effect record ahead of the effect, and survive MAX_PATH
+  868d321 N plan(repair): GATEWAY-1040 must close A4 D1 in the production delivery path
+  540f980 N fix(authority): anchor the authority chain in the registry
+  N = no signature. Recorded as an owner decision, not as a failure of this plan.
+
+== production effect gateways and their root provenance ==
+  cortex/repository/local_execution.py:215: issuer="phase7:local:fixture-owner",
+  cortex/repository/local_execution.py:216: authority_ref="local-fixture-policy",
+  cortex/repository/local_execution.py:219: gateway = EffectGateway(authority=registry, clock=lambda: _AUTH_TIME)
+  cortex/repository/mission_adapter.py:45: class _DeterministicEffectGateway(EffectGateway):
+  cortex/repository/mission_adapter.py:151: issuer=f"mission:{mission_suffix}:fixture-owner",
+  cortex/repository/mission_adapter.py:152: authority_ref="local-mission-policy",
+  cortex/repository/mission_adapter.py:155: gateway = _DeterministicEffectGateway(
+
+== residual verification complete; no repository file was written ==
+----- END OUTPUT -----
+# exit_code: 0
+
+----- BEGIN PROBE SOURCE -----
+"""REAUDIT-1900 residual verification.
+
+Each of the seven residuals the implementing nodes DECLARED is re-derived here by
+measurement rather than taken on trust, together with A3-F2, A4 D7 and
+DAG_EXECUTION_HANDOFF.md section 11.6. Read-only: no repository file is written.
+"""
+
+from __future__ import annotations
+
+import inspect
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(r"C:\Repos\HiveMind\hive-mind-os")
+sys.path.insert(0, str(REPO))
+SRC = REPO / "src"
+
+
+def head(n, title):
+    print()
+    print(f"== RESIDUAL {n}: {title} ==")
+
+
+def sh(*args, **kw):
+    return subprocess.run(args, cwd=REPO, capture_output=True, text=True, **kw)
+
+
+head(1, "grants.LEDGER is a module-level singleton no PRODUCTION path anchors")
+from hive_mind_os.cortex.github import grants as grants_module
+
+print(f"  on a bare import, grants.LEDGER.anchor_digest = "
+      f"{grants_module.LEDGER.anchor_digest!r}")
+hits_src, hits_tests = [], []
+for base, bucket in ((SRC, hits_src), (REPO / "tests", hits_tests)):
+    for path in base.rglob("*.py"):
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if "LEDGER.anchor(" in line or re.search(r"\.anchor\(", line):
+                bucket.append(f"{path.relative_to(REPO)}:{i}: {line.strip()}")
+print(f"  '.anchor(' call sites in src/**   : {len(hits_src)}")
+for h in hits_src:
+    print("    " + h)
+print(f"  '.anchor(' call sites in tests/** : {len(hits_tests)}")
+for h in hits_tests[:12]:
+    print("    " + h)
+print("  VERDICT: A5-F6 is closed in the fixtures and OPEN in a real run"
+      if not hits_src else "  VERDICT: a production path anchors the ledger")
+
+head(2, "effect_outbox.py still makes reconciliation_required terminal")
+from hive_mind_os.brain_kernel import effect_outbox
+
+source = inspect.getsource(effect_outbox.DurableEffectOutbox.execute)
+for i, line in enumerate(source.splitlines()):
+    if "reconciliation_required" in line or "EffectReconciliationRequired" in line:
+        print(f"  execute()+{i:>3}: {line.strip()}")
+print("  no branch clears the state; every later attempt re-raises.")
+
+head(3, "GATEWAY-1040 liveness trade-off: a claimed effect can never re-fire")
+from hive_mind_os import github_adapter
+
+rec = inspect.getsource(github_adapter.GitHubClient._reconcile_interrupted_effect)
+for line in rec.splitlines():
+    if line.strip():
+        print("  " + line.rstrip())
+
+head(4, "VERDICT-1100: the digest chain is unkeyed and unanchored")
+from hive_mind_os import verify
+
+vsrc = (SRC / "hive_mind_os" / "verify.py").read_text(encoding="utf-8")
+print(f"  verify.py mentions 'hmac'  : {'hmac' in vsrc}")
+print(f"  verify.py mentions 'sign'  : {bool(re.search(r'\\bsign(ature)?\\b', vsrc))}")
+ledger_src = (SRC / "hive_mind_os" / "ledger.py").read_text(encoding="utf-8")
+print(f"  ledger.py mentions 'hmac'  : {'hmac' in ledger_src}")
+print(f"  ledger.py sha256 uses      : {ledger_src.count('sha256')}")
+print("  => integrity relative to the bundle's own evidence; NOT authorship.")
+
+head(5, "SANDBOX-1300's containment proof rests on a single test")
+print("  measured separately in probes/reaudit_probe3_sandbox.txt:")
+print("  the refusal branch is reached by exactly 1 test on this host.")
+
+head(6, "the two retained A3 bundles have never been self-verifiable")
+for name in ("mission-01-example-verify", "mission-02-enqueue-loop"):
+    p = REPO / "evidence" / "pilots" / "a3" / "missions" / name
+    m = json.loads((p / "integrity.json").read_text(encoding="utf-8"))
+    files = m.get("files", {})
+    absent = sorted(f for f in files if not (p / f).exists())
+    print(f"  {name}: schema_version={m.get('schema_version')} "
+          f"files={len(files)} absent={len(absent)}")
+    for f in absent:
+        print(f"      ABSENT {f}")
+    try:
+        verify.verify_bundle(p)
+        print("      verify_bundle -> PASSED")
+    except Exception as error:  # noqa: BLE001
+        print(f"      verify_bundle -> {type(error).__name__}: {error}")
+print("  pre-existing A3 evidence defect; nothing in this plan caused or fixed it.")
+
+head(7, "tests/test_workers cannot be imported under plain unittest")
+r = sh(sys.executable, "-m", "unittest", "tests.test_workers", "-v",
+       env={**os.environ, "PYTHONPATH": "src"})
+print(f"  exit_code={r.returncode}")
+for line in (r.stderr or r.stdout).splitlines():
+    if line.strip():
+        print("  " + line.rstrip())
+
+print()
+print("== A3-F2: workers.py canonical bindings provider ==")
+from hive_mind_os import workers
+
+print(f"  workers._canonical_bindings_provider on a bare import = "
+      f"{workers._canonical_bindings_provider!r}")
+callers = []
+for path in SRC.rglob("*.py"):
+    for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if "set_canonical_mission_bindings_provider" in line:
+            callers.append(f"{path.relative_to(REPO)}:{i}: {line.strip()}")
+print(f"  references in src/** ({len(callers)}):")
+for c in callers:
+    print("    " + c)
+print("  the only reference is the definition itself: no production registration.")
+print("  effect: the canonical mission route raises RuntimeRouteError. Verified:")
+try:
+    workers._run_canonical_mission  # noqa: B018
+    print("    _run_canonical_mission exists")
+except AttributeError:
+    pass
+for i, line in enumerate(inspect.getsource(workers).splitlines(), 1):
+    if "has no registered bindings provider" in line:
+        print(f"    workers.py:{i}: {line.strip()}")
+
+print()
+print("== A4 D7: no remote receipt cites the sealed plan digest ==")
+remote = REPO / "evidence" / "pilots" / "a4" / "remote"
+cites = [p.name for p in sorted(remote.glob("*.json"))
+         if "plan_digest" in p.read_text(encoding="utf-8")]
+print(f"  files in evidence/pilots/a4/remote: {len(list(remote.glob('*.json')))}")
+print(f"  files citing plan_digest          : {len(cites)} {cites}")
+plan = json.loads((REPO / "evidence" / "pilots" / "a4" / "pilot-plan.json")
+                  .read_text(encoding="utf-8"))
+print(f"  pilot-plan.json pilot_repository  : {plan.get('pilot_repository')!r}")
+print(f"  pilot-plan.json authority_gate    : "
+      f"{plan.get('authority_gate', {}).get('status')!r}")
+
+print()
+print("== HANDOFF section 11.6: the authority chain is unsigned (DELIBERATELY out of scope) ==")
+g = sh("git", "log", "--format=%h %G? %an %s", "--",
+       "docs/architecture/HUMAN_AUTHORITY_GATES.md")
+for line in g.stdout.strip().splitlines():
+    print("  " + line)
+print("  this plan's own commits:")
+g2 = sh("git", "log", "--format=%h %G? %s", "-n", "9")
+for line in g2.stdout.strip().splitlines():
+    print("  " + line)
+print("  N = no signature. Recorded as an owner decision, not as a failure of this plan.")
+
+print()
+print("== production effect gateways and their root provenance ==")
+for rel in ("cortex/repository/local_execution.py", "cortex/repository/mission_adapter.py"):
+    text = (SRC / "hive_mind_os" / rel).read_text(encoding="utf-8").splitlines()
+    for i, line in enumerate(text, 1):
+        if "EffectGateway(" in line or "issuer=" in line or "authority_ref=" in line:
+            print(f"  {rel}:{i}: {line.strip()}")
+
+print()
+print("== residual verification complete; no repository file was written ==")
+----- END PROBE SOURCE -----

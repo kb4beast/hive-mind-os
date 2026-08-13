@@ -1,0 +1,530 @@
+# transcript: reaudit_probe1
+# node: REAUDIT-1900
+# re-runs: evidence/pilots/a5/tests/authority-boundary-probe.txt (A5-900)
+# what it touches: in-process ConstraintEnvelope / AuthorityRegistry /
+#   DeliveryGrant objects only. NO effect, NO credential, NO network, NO
+#   repository file written. The module-level grants.LEDGER is swapped for a
+#   throwaway in two blocks and restored in a finally.
+# adaptation: ATTACK payloads byte-identical; SETUP lines changed are marked
+#   `SETUP CHANGE n` in the source below. Blocks marked `NEW n` are additional
+#   measurements added by this node to isolate the control an attack targeted
+#   when a NEW precondition now masks it.
+# base_commit: 4c85ebee7a590d1ea2649457f0fa301bd2d1cda2
+# command: PYTHONPATH=src python <scratch>/reaudit_probe1.py
+# python: 3.14.4
+# started_utc: 2026-08-13T16:23:45.554670Z
+# finished_utc: 2026-08-13T16:23:45.983597Z
+# probe source retained verbatim at the end of this file
+----- BEGIN OUTPUT -----
+== P1  ConstraintEnvelope / AuthorityRegistry ==
+               [setup] admitted narrow root D1=sha256:2c63165cf3ae8cf6af6fed9182da19024d4f1811076139baf5f81ee931bea712
+[as-expected ] P1.1 narrow envelope authorizes write inside its scope
+               expected=ALLOWED observed=ALLOWED
+               detail=CapabilityToken(envelope_digest='sha256:2c63165cf3ae8cf6af6fed9182da19024d4f1811076139baf5f81ee931bea712', action='write', target='src/one.py', token_digest='sha256:bd7af3e419c6d03fc7d9ad09b1c00e7401fca32f81df488ed3dde31cb0e759ac', issuance_witness='sha256:feba49d230ff26ea24e187335eb1a85312156c8634ed84b1e7be5f09eb342e6a')
+[as-expected ] P1.2 narrow envelope denies a denied action
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: action is not granted
+[as-expected ] P1.3 narrow envelope denies a target outside write scope
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: target is outside write scope
+[as-expected ] P1.4 a CHILD that broadens its parent is rejected
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: child envelope broadens or is not bound to its parent
+[as-expected ] P1.5 a FRESH ROOT envelope with broader authority registers with no parent
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: root envelope requires an explicit mint ceremony
+[as-expected ] P1.6 the fresh root authorizes 'push', which P1.2 had denied
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority envelope is unavailable
+[as-expected ] P1.7 after revoke(D2) the same digest is denied
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority envelope is unavailable
+[as-expected ] P1.8-setup re-registering the same authority under a new digest string
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: root envelope requires an explicit mint ceremony
+[as-expected ] P1.8 the SAME authority re-minted under a new digest survives the revocation
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority envelope is unavailable
+
+-- NEW 1: P1.8b does revocation now bind the AUTHORITY, not the digest string? --
+   P1.8 above is refused by the root-ceremony rule, not by revocation, so it no
+   longer measures A5-F5. This does: mint a root, revoke it, then re-mint the
+   SAME authority under a different envelope_id -- a different digest, identical
+   authority_key -- through the one admission route that now exists.
+               revoked digest = sha256:f135bc1591ead4df424e2db7f53184d75efb6ce1f74623fa69a607752cae236d
+               re-mint digest = sha256:ed1992c02282e8faae66ba8d6e4df2c40e7a0523c61b306a2abb5f41b2147d91  (differs: True)
+               authority_key identical: True
+[as-expected ] P1.8b the same authority re-minted under a new digest after revocation
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority is revoked
+               [NEW] a DESCENDANT of a revoked authority:
+[as-expected ] P1.8c a child of a revoked parent still authorizes
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority envelope is unavailable
+
+-- P1.9 does ConstraintEnvelope.digest_value seal the envelope's contents? --
+               two envelopes, identical digest_value=sha256:2c63165cf3ae8cf6af6fed9182da19024d4f1811076139baf5f81ee931bea712
+               a.allowed_actions=('write',) a.path_write_scope=('src',)
+               both constructed without error: True
+[as-expected ] P1.9 register(a) under a digest that does not seal a's contents
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: root envelope requires an explicit mint ceremony
+[as-expected ] P1.9 register(b) under the SAME digest, overwriting a
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: root envelope requires an explicit mint ceremony
+[as-expected ] P1.9 authorize(D1,'push','docs/x.md') after the overwrite
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority envelope is unavailable
+
+-- NEW 2: P1.9b does the SEAL itself bite, through the route that now exists? --
+   P1.9 above is refused by the root-ceremony rule. This isolates the seal.
+               a sealed digest = sha256:a48288d2a1eab03986851ad66d36b9ed9036b5dab91b923bf3a290e88b319911
+               b claims the same digest while carrying allowed_actions=('write', 'push', 'deploy')
+[as-expected ] P1.9b mint_root(b) under a's digest (contradictory authority, one key)
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: envelope digest does not seal its contents
+[as-expected ] P1.9b authorize(a's digest,'push','docs/x.md') is still a's narrow authority
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: action is not granted
+
+-- NEW 3: P4.1 does authorize() scope EVERY action, or only 'write'? (A5-F11) --
+[as-expected ] P4.1 'write' outside the scope
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: target is outside write scope
+[as-expected ] P4.1 'push' to the SAME out-of-scope target
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: target is outside write scope
+
+-- NEW 4: P5.1 does is_no_broader_than compare the spend ceiling? (A5-F12) --
+               parent max_cost_microunits=100
+               child  max_cost_microunits=999999999
+               child.is_no_broader_than(parent) -> False
+[as-expected ] P5.1 a child raising max_cost_microunits 100 -> 999999999 is admitted
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: child envelope broadens or is not bound to its parent
+
+-- NEW 5: P6.1 does register() resolve the parent from the registry? (A5-F13) --
+               is the wide parent registered? False
+[as-expected ] P6.1 register a child against a parent the registry has never seen
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: parent envelope is required
+[as-expected ] P6.1 and does the unregistered-parent child authorize?
+               expected=DENIED observed=DENIED
+               detail=AuthorityDenied: authority envelope is unavailable
+
+== P2  DeliveryGrant ==
+               [production state] grants.LEDGER.anchor_digest = ''  (empty means UNANCHORED)
+[FINDING?    ] P2.1 an in-process caller can self-issue a complete grant
+               grant_id=GRANT-probe-self-issued
+               owner=some-owner-the-repository-owner-never-named repository=some-repository-the-repository-owner-never-named
+               allowed_actions=('push', 'open_draft_pr', 'post_comment', 'close_own_pr', 'delete_own_branch')
+               grant_digest=sha256:7347005e950bce4aa55836ea6d25f3c548d35d3ab6586ac98f348e5eb8435f68
+               issuer='self-issued' authority_ref='self-issued'
+               expires_at='2026-08-14T00:00:00Z'
+               ledger issuance recorded: True
+
+-- NEW 6: P2.1b the same self-issuance against an ANCHORED ledger --
+               anchored: sha256:a083850a7135a5a81078dc89a55659b12b353bd31dff5d2126929e1ffcecc569
+[as-expected ] P2.1b self-issuance (no provenance) against an anchored ledger
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delivery grant issuance is not anchored to the recorded owner authority
+[as-expected ] P2.1c issuance presenting a FABRICATED owner provenance
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: owner authority record digest does not seal its fields
+
+[as-expected ] P2.2 'merge' is not a grantable spelling
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delivery grant action is not grantable: merge
+[as-expected ] P2.3 a push to a protected branch is denied
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: push to protected branch 'main' is denied
+[as-expected ] P2.4 a push outside the granted prefix is denied
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: push branch 'other/x' is outside the granted prefix 'probe/'
+[as-expected ] P2.5 retraction outside the granted prefix is denied
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delete_own_branch on branch 'other/x' is outside the granted prefix 'probe/'
+[as-expected ] P2.6 a mutated copy cannot be reconstructed (digest no longer seals)
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delivery grant digest does not seal its fields
+
+-- NEW 7: P2.7 does a grant expire? (A4 D4) --
+               issued_at=2026-08-13T00:00:00Z expires_at=2026-08-14T00:00:00Z
+[as-expected ] P2.7 a use one second past expires_at
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delivery grant GRANT-probe-self-issued expired at 2026-08-14T00:00:00Z
+[as-expected ] P2.7 a use before expires_at
+               expected=ALLOWED observed=ALLOWED
+               detail=None
+               orphan grant seals correctly: True (unrecorded here)
+[as-expected ] P2.8 a properly sealed grant the LIVE ledger never admitted
+               expected=DENIED observed=DENIED
+               detail=DeliveryGrantError: delivery grant GRANT-probe-orphan has no recorded issuance
+
+== probe complete; no effect was created, no credential was read, no network was used ==
+----- END OUTPUT -----
+# exit_code: 0
+
+----- BEGIN PROBE SOURCE -----
+"""REAUDIT-1900 re-run of the A5-900 authority-boundary probe, part 1.
+
+The ATTACK payloads are byte-identical to
+evidence/pilots/a5/tests/authority-boundary-probe.txt. Only SETUP lines were
+changed, each marked `# SETUP CHANGE n` and explained in the transcript header.
+Lines marked `# NEW n` are additional measurements this node added to tell
+"the attack is refused by the control it targets" apart from "the attack is
+refused by an unrelated new precondition".
+
+Read-only. Creates NO effect, reads NO credential, touches NO network.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+
+from hive_mind_os.cortex.github import grants as grants_module
+from hive_mind_os.brain_kernel.authority import AuthorityDenied, AuthorityRegistry
+from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope
+from hive_mind_os.cortex.github.grants import (
+    DeliveryGrant,
+    DeliveryGrantError,
+    DeliveryGrantLedger,
+)
+
+D1 = "sha256:" + "1" * 64
+D2 = "sha256:" + "2" * 64
+POLICY = "sha256:" + "0" * 64
+
+# SETUP CHANGE 0: mint_root now requires a recorded provenance ceremony.
+MINT = dict(
+    issuer="reaudit:REAUDIT-1900",
+    authority_ref="evidence/pilots/a5/tests/authority-boundary-probe.txt",
+    recorded_at="2026-08-13T00:00:00Z",
+)
+
+
+def envelope(digest, parent, allowed, denied, write_scope):
+    return ConstraintEnvelope(
+        "AUTH-probe",
+        "MISSION-probe",
+        "WORK-probe",
+        parent,
+        "builder",
+        "R1",
+        allowed,
+        denied,
+        write_scope,
+        write_scope,
+        (),
+        (),
+        (),
+        (),
+        Budget(1, 0, 0, 0, 0, 0, 1, 1),
+        "2030-01-01T00:00:00Z",
+        POLICY,
+        digest,
+    )
+
+
+def check(label, fn, expect_denied):
+    try:
+        result = fn()
+    except (AuthorityDenied, DeliveryGrantError) as error:
+        outcome = "DENIED"
+        detail = f"{type(error).__name__}: {error}"
+    else:
+        outcome = "ALLOWED"
+        detail = repr(result)
+    verdict = "as-expected" if (outcome == "DENIED") == expect_denied else "FINDING"
+    print(f"[{verdict:12}] {label}")
+    print(f"               expected={'DENIED' if expect_denied else 'ALLOWED'} observed={outcome}")
+    print(f"               detail={detail}")
+    return outcome
+
+
+print("== P1  ConstraintEnvelope / AuthorityRegistry ==")
+
+registry = AuthorityRegistry()
+narrow = envelope(D1, None, ("write",), ("push", "merge", "deploy"), ("src",))
+# SETUP CHANGE 1: the envelope must now seal its own contents (A5-F3 fix), and a
+# root may only enter through mint_root (A5-F4 fix). D1 is rebound to the sealed
+# digest so every ATTACK line below is textually unchanged.
+narrow = narrow.sealed()
+D1 = narrow.digest_value
+registry.mint_root(narrow, **MINT)
+print(f"               [setup] admitted narrow root D1={D1}")
+
+check("P1.1 narrow envelope authorizes write inside its scope",
+      lambda: registry.authorize(D1, "write", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=False)
+check("P1.2 narrow envelope denies a denied action",
+      lambda: registry.authorize(D1, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+check("P1.3 narrow envelope denies a target outside write scope",
+      lambda: registry.authorize(D1, "write", "docs/one.md", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+broadening_child = envelope(D2, D1, ("write", "push"), (), ("src", "docs"))
+check("P1.4 a CHILD that broadens its parent is rejected",
+      lambda: registry.register(broadening_child, narrow),
+      expect_denied=True)
+
+fresh_root = envelope(D2, None, ("write", "push", "deploy"), (), ("src", "docs", "evidence"))
+check("P1.5 a FRESH ROOT envelope with broader authority registers with no parent",
+      lambda: registry.register(fresh_root),
+      expect_denied=True)
+check("P1.6 the fresh root authorizes 'push', which P1.2 had denied",
+      lambda: registry.authorize(D2, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+registry.revoke(D2)
+check("P1.7 after revoke(D2) the same digest is denied",
+      lambda: registry.authorize(D2, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+D3 = "sha256:" + "3" * 64
+# SETUP CHANGE 2: the original probe called this register() bare, so under the
+# hardened tree it would abort the probe. The payload is unchanged; it is only
+# routed through check() so the refusal is recorded instead of crashing.
+check("P1.8-setup re-registering the same authority under a new digest string",
+      lambda: registry.register(envelope(D3, None, ("write", "push", "deploy"), (), ("src",))),
+      expect_denied=True)
+check("P1.8 the SAME authority re-minted under a new digest survives the revocation",
+      lambda: registry.authorize(D3, "push", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+print()
+print("-- NEW 1: P1.8b does revocation now bind the AUTHORITY, not the digest string? --")
+print("   P1.8 above is refused by the root-ceremony rule, not by revocation, so it no")
+print("   longer measures A5-F5. This does: mint a root, revoke it, then re-mint the")
+print("   SAME authority under a different envelope_id -- a different digest, identical")
+print("   authority_key -- through the one admission route that now exists.")
+reg8 = AuthorityRegistry()
+base8 = envelope("sha256:" + "a" * 64, None, ("write", "push", "deploy"), (), ("src",)).sealed()
+reg8.mint_root(base8, **MINT)
+reg8.revoke(base8.digest_value)
+remint = replace(base8, envelope_id="AUTH-probe-remint").sealed()
+print(f"               revoked digest = {base8.digest_value}")
+print(f"               re-mint digest = {remint.digest_value}  (differs: "
+      f"{base8.digest_value != remint.digest_value})")
+print(f"               authority_key identical: "
+      f"{base8.authority_key() == remint.authority_key()}")
+check("P1.8b the same authority re-minted under a new digest after revocation",
+      lambda: reg8.mint_root(remint, **MINT),
+      expect_denied=True)
+print("               [NEW] a DESCENDANT of a revoked authority:")
+reg8b = AuthorityRegistry()
+parent8 = envelope("sha256:" + "b" * 64, None, ("write", "push"), (), ("src",)).sealed()
+reg8b.mint_root(parent8, **MINT)
+child8 = replace(
+    envelope("sha256:" + "c" * 64, parent8.digest_value, ("write",), (), ("src",)),
+    envelope_id="AUTH-probe-child",
+).sealed()
+reg8b.register(child8)
+reg8b.revoke(parent8.digest_value)
+check("P1.8c a child of a revoked parent still authorizes",
+      lambda: reg8b.authorize(child8.digest_value, "write", "src/one.py", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+print()
+print("-- P1.9 does ConstraintEnvelope.digest_value seal the envelope's contents? --")
+a = envelope(D1, None, ("write",), (), ("src",))
+b = envelope(D1, None, ("write", "push", "deploy"), (), ("src", "docs", "evidence"))
+print(f"               two envelopes, identical digest_value={D1}")
+print(f"               a.allowed_actions={a.allowed_actions} a.path_write_scope={a.path_write_scope}")
+print(f"               both constructed without error: {isinstance(a, ConstraintEnvelope) and isinstance(b, ConstraintEnvelope)}")
+overwrite = AuthorityRegistry()
+# SETUP CHANGE 3: routed through check() for the same reason as SETUP CHANGE 2.
+check("P1.9 register(a) under a digest that does not seal a's contents",
+      lambda: overwrite.register(a), expect_denied=True)
+check("P1.9 register(b) under the SAME digest, overwriting a",
+      lambda: overwrite.register(b), expect_denied=True)
+check("P1.9 authorize(D1,'push','docs/x.md') after the overwrite",
+      lambda: overwrite.authorize(D1, "push", "docs/x.md", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+print()
+print("-- NEW 2: P1.9b does the SEAL itself bite, through the route that now exists? --")
+print("   P1.9 above is refused by the root-ceremony rule. This isolates the seal.")
+ow2 = AuthorityRegistry()
+a_sealed = a.sealed()
+ow2.mint_root(a_sealed, **MINT)
+b_wearing_a_digest = replace(b, digest_value=a_sealed.digest_value)
+print(f"               a sealed digest = {a_sealed.digest_value}")
+print(f"               b claims the same digest while carrying "
+      f"allowed_actions={b_wearing_a_digest.allowed_actions}")
+check("P1.9b mint_root(b) under a's digest (contradictory authority, one key)",
+      lambda: ow2.mint_root(b_wearing_a_digest, **MINT),
+      expect_denied=True)
+check("P1.9b authorize(a's digest,'push','docs/x.md') is still a's narrow authority",
+      lambda: ow2.authorize(a_sealed.digest_value, "push", "docs/x.md", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+print()
+print("-- NEW 3: P4.1 does authorize() scope EVERY action, or only 'write'? (A5-F11) --")
+reg4 = AuthorityRegistry()
+env4 = envelope("sha256:" + "4" * 64, None, ("write", "push"), (), ("src",)).sealed()
+reg4.mint_root(env4, **MINT)
+D4 = env4.digest_value
+check("P4.1 'write' outside the scope",
+      lambda: reg4.authorize(D4, "write", "somewhere/else.txt", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+check("P4.1 'push' to the SAME out-of-scope target",
+      lambda: reg4.authorize(D4, "push", "somewhere/else.txt", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+print()
+print("-- NEW 4: P5.1 does is_no_broader_than compare the spend ceiling? (A5-F12) --")
+parent_budget = Budget(10, 10, 10, 10, 100, 10, 10, 10)
+child_budget = Budget(10, 10, 999999, 999999, 999999999, 10, 999999, 999999)
+p5 = envelope("sha256:" + "5" * 64, None, ("write",), (), ("src",))
+p5 = replace(p5, budgets=parent_budget).sealed()
+reg5 = AuthorityRegistry()
+reg5.mint_root(p5, **MINT)
+c5 = replace(
+    envelope("sha256:" + "6" * 64, p5.digest_value, ("write",), (), ("src",)),
+    budgets=child_budget,
+    envelope_id="AUTH-probe-child5",
+).sealed()
+print(f"               parent max_cost_microunits={parent_budget.max_cost_microunits}")
+print(f"               child  max_cost_microunits={child_budget.max_cost_microunits}")
+print(f"               child.is_no_broader_than(parent) -> {c5.is_no_broader_than(p5)}")
+check("P5.1 a child raising max_cost_microunits 100 -> 999999999 is admitted",
+      lambda: reg5.register(c5, p5),
+      expect_denied=True)
+
+print()
+print("-- NEW 5: P6.1 does register() resolve the parent from the registry? (A5-F13) --")
+reg6 = AuthorityRegistry()
+wide = envelope("sha256:" + "7" * 64, None, ("write", "push", "deploy"), (), ("src", "docs", "evidence"))
+wide = replace(wide, budgets=Budget(999, 999, 999, 999, 999, 999, 999, 999)).sealed()
+child6 = replace(
+    envelope("sha256:" + "8" * 64, wide.digest_value, ("write", "push"), (), ("src", "docs")),
+    envelope_id="AUTH-probe-child6",
+).sealed()
+print(f"               is the wide parent registered? "
+      f"{wide.digest_value in getattr(reg6, '_envelopes', {})}")
+check("P6.1 register a child against a parent the registry has never seen",
+      lambda: reg6.register(child6, wide),
+      expect_denied=True)
+check("P6.1 and does the unregistered-parent child authorize?",
+      lambda: reg6.authorize(child6.digest_value, "push", "docs/x.md", now="2029-01-01T00:00:00Z"),
+      expect_denied=True)
+
+print()
+print("== P2  DeliveryGrant ==")
+print(f"               [production state] grants.LEDGER.anchor_digest = "
+      f"{grants_module.LEDGER.anchor_digest!r}  (empty means UNANCHORED)")
+
+self_issued = DeliveryGrant.issue(
+    grant_id="GRANT-probe-self-issued",
+    owner="some-owner-the-repository-owner-never-named",
+    repository="some-repository-the-repository-owner-never-named",
+    base_branch="main",
+    branch_prefix="probe/",
+    allowed_actions=("push", "open_draft_pr", "post_comment", "close_own_pr", "delete_own_branch"),
+    issued_at="2026-08-13T00:00:00Z",
+)
+print(f"[FINDING?    ] P2.1 an in-process caller can self-issue a complete grant")
+print(f"               grant_id={self_issued.grant_id}")
+print(f"               owner={self_issued.owner} repository={self_issued.repository}")
+print(f"               allowed_actions={self_issued.allowed_actions}")
+print(f"               grant_digest={self_issued.grant_digest}")
+print(f"               issuer={self_issued.issuer!r} authority_ref={self_issued.authority_ref!r}")
+print(f"               expires_at={self_issued.expires_at!r}")
+print(f"               ledger issuance recorded: "
+      f"{grants_module.LEDGER.issuance(self_issued.grant_digest) is not None}")
+
+print()
+print("-- NEW 6: P2.1b the same self-issuance against an ANCHORED ledger --")
+saved_ledger = grants_module.LEDGER
+try:
+    grants_module.LEDGER = DeliveryGrantLedger()
+    anchor_registry = AuthorityRegistry()
+    owner_env = envelope("sha256:" + "e" * 64, None, ("push",), (), ("src",)).sealed()
+    owner_root = anchor_registry.mint_root(
+        owner_env,
+        issuer="owner:Brian Espinosa",
+        authority_ref="docs/architecture/HUMAN_AUTHORITY_GATES.md",
+        recorded_at="2026-08-12T15:53:44-05:00",
+    )
+    grants_module.LEDGER.anchor(owner_root)
+    print(f"               anchored: {grants_module.LEDGER.anchor_digest}")
+    check("P2.1b self-issuance (no provenance) against an anchored ledger",
+          lambda: DeliveryGrant.issue(
+              grant_id="GRANT-probe-self-issued",
+              owner="some-owner-the-repository-owner-never-named",
+              repository="some-repository-the-repository-owner-never-named",
+              base_branch="main",
+              branch_prefix="probe/",
+              allowed_actions=("push", "open_draft_pr", "post_comment",
+                               "close_own_pr", "delete_own_branch"),
+              issued_at="2026-08-13T00:00:00Z"),
+          expect_denied=True)
+    check("P2.1c issuance presenting a FABRICATED owner provenance",
+          lambda: DeliveryGrant.issue(
+              grant_id="GRANT-probe-fabricated",
+              owner="o", repository="r", base_branch="main", branch_prefix="probe/",
+              allowed_actions=("push",), issued_at="2026-08-13T00:00:00Z",
+              provenance=replace(owner_root, record_digest="sha256:" + "f" * 64)),
+          expect_denied=True)
+finally:
+    grants_module.LEDGER = saved_ledger
+
+print()
+check("P2.2 'merge' is not a grantable spelling",
+      lambda: DeliveryGrant.issue(
+          grant_id="GRANT-probe-merge",
+          owner="o", repository="r", base_branch="main", branch_prefix="probe/",
+          allowed_actions=("merge",), issued_at="2026-08-13T00:00:00Z"),
+      expect_denied=True)
+check("P2.3 a push to a protected branch is denied",
+      lambda: self_issued.require_push_branch("main"),
+      expect_denied=True)
+check("P2.4 a push outside the granted prefix is denied",
+      lambda: self_issued.require_push_branch("other/x"),
+      expect_denied=True)
+check("P2.5 retraction outside the granted prefix is denied",
+      lambda: self_issued.require_own_run_branch("other/x", "delete_own_branch"),
+      expect_denied=True)
+# SETUP CHANGE 4: DeliveryGrant gained three sealed fields (expires_at, issuer,
+# authority_ref). The original 8-argument constructor would now raise TypeError,
+# which is a crash, not a refusal. The three new fields are copied verbatim from
+# the grant under test; the MUTATION -- issued_at "2026-01-01T00:00:00Z" -- and
+# every other argument are byte-identical to the retained probe.
+check("P2.6 a mutated copy cannot be reconstructed (digest no longer seals)",
+      lambda: DeliveryGrant(
+          self_issued.grant_id, self_issued.owner, self_issued.repository,
+          self_issued.base_branch, self_issued.branch_prefix,
+          ("push", "open_draft_pr", "post_comment", "close_own_pr", "delete_own_branch"),
+          "2026-01-01T00:00:00Z", self_issued.grant_digest,
+          self_issued.expires_at, self_issued.issuer, self_issued.authority_ref),
+      expect_denied=True)
+
+print()
+print("-- NEW 7: P2.7 does a grant expire? (A4 D4) --")
+print(f"               issued_at={self_issued.issued_at} expires_at={self_issued.expires_at}")
+check("P2.7 a use one second past expires_at",
+      lambda: self_issued.require("push", now="2026-08-14T00:00:01Z"),
+      expect_denied=True)
+check("P2.7 a use before expires_at",
+      lambda: self_issued.require("push", now="2026-08-13T00:00:01Z"),
+      expect_denied=False)
+# A grant that is PROPERLY SEALED but that the live ledger never admitted. Built
+# by issuing into a throwaway ledger, then restoring the production one, so the
+# refusal cannot come from the seal check (which is what a naive `replace` would
+# trip) and must come from require_issued.
+_scratch = grants_module.LEDGER
+grants_module.LEDGER = DeliveryGrantLedger()
+orphan = DeliveryGrant.issue(
+    grant_id="GRANT-probe-orphan", owner="o", repository="r", base_branch="main",
+    branch_prefix="probe/", allowed_actions=("push",), issued_at="2026-08-13T00:00:00Z")
+grants_module.LEDGER = _scratch
+print(f"               orphan grant seals correctly: "
+      f"{grants_module.LEDGER.issuance(orphan.grant_digest) is None} (unrecorded here)")
+check("P2.8 a properly sealed grant the LIVE ledger never admitted",
+      lambda: orphan.require("push", now="2026-08-13T00:00:01Z"),
+      expect_denied=True)
+
+print()
+print("== probe complete; no effect was created, no credential was read, no network was used ==")
+----- END PROBE SOURCE -----

@@ -1,0 +1,461 @@
+{
+  "schema_version": 1,
+  "node": "REAUDIT-1900",
+  "audit": "re-run the retained A5 probes against the hardened tree and adjudicate each finding CLOSED / PARTIALLY CLOSED / OPEN",
+  "branch": "plan/authority-hardening-v1",
+  "base_commit": "4c85ebee7a590d1ea2649457f0fa301bd2d1cda2",
+  "predecessor": "A5-900, verdict not-ready, evidence/pilots/a5/audits/authority-boundary.json",
+  "generated_utc": "2026-08-13T16:30:00Z",
+  "host": "Windows 11 Home 10.0.26200, Python 3.14.4",
+  "verdict": "HARDENED, NOT AUTHENTICATED -- still not-ready",
+  "verdict_statement": "Every forgery the A5 probes demonstrated is now refused, and the refusals were re-derived by execution rather than read out of a commit message: 13 of 18 tracked rows are CLOSED, 3 are PARTIALLY CLOSED and 2 are OPEN and untouched. What the plan did NOT do is give authority an origin outside the process. AuthorityRegistry.mint_root accepts any issuer string an in-process caller types; this node minted a root declaring issuer='owner:Brian Espinosa' and authority_ref='docs/architecture/HUMAN_AUTHORITY_GATES.md', received a genuinely issued CapabilityToken for 'secrets/keys.txt', and the adapter ran. The two production paths mint their roots exactly that way. The plan raised the bar from 'construct a dataclass' to 'call the mint ceremony', which is a real and measurable improvement, and it is not the audited boundary acceptance criterion 4 asks for.",
+  "counts": {
+    "tracked_rows": 18,
+    "closed": 13,
+    "partially_closed": 3,
+    "open": 2,
+    "out_of_scope_by_owner_decision": 1,
+    "original_probe_finding_rows": 11,
+    "original_probe_finding_rows_now_refused": 10,
+    "original_probe_finding_rows_still_reproducing": [
+      "P2.1 -- self-issuing a delivery grant against the unanchored module-level ledger"
+    ]
+  },
+  "how_this_was_measured": {
+    "principle": "Nothing here is adopted from a commit message. Every row cites a command this node ran on this host at this commit.",
+    "probes": [
+      "probes/reaudit_probe1.txt -- the retained A5 probe 1, adapted setup, ATTACK payloads byte-identical",
+      "probes/reaudit_probe2.txt -- the retained A5 probe 2 at the effect boundary, plus the P7 residual block",
+      "probes/reaudit_probe3_sandbox.txt -- traced coverage of the Windows containment guard",
+      "probes/reaudit_probe4_residuals.txt -- the seven declared residuals, A3-F2, A4 D7, handoff section 11.6",
+      "probes/orch_probe_token.txt -- the orchestrator's own probe, run unmodified"
+    ],
+    "tests": "tests/mandated-suite.txt -- one run of the nine mandated modules: Ran 273 tests in 567.457s, OK (skipped=2), exit 0",
+    "a_refusal_is_not_a_refusal_unless_it_is_the_right_one": "REG-1000 added two new preconditions -- envelopes must seal their own contents, and roots may only enter through mint_root -- that fire BEFORE most of the retained attacks reach the control they were written to test. Where that happened, the verbatim attack is recorded as refused-by-an-unrelated-precondition and a NEW measurement isolates the original control. P1.9 vs P1.9b and P1.8 vs P1.8b are the two clearest cases. Probe 2's report() helper reports CRASHED as a third outcome distinct from DENIED for the same reason."
+  },
+  "probe_adaptations": {
+    "policy": "Only SETUP was changed. Every ATTACK payload is byte-identical unless the constructor signature itself changed, in which case the change is stated below.",
+    "reaudit_probe1": [
+      {
+        "id": "SETUP CHANGE 0",
+        "change": "added a MINT dict supplying issuer / authority_ref / recorded_at",
+        "why": "AuthorityRegistry.mint_root did not exist at the A5 base commit and now requires all three"
+      },
+      {
+        "id": "SETUP CHANGE 1",
+        "change": "narrow = envelope(D1, ...).sealed(); D1 = narrow.digest_value; registry.register(narrow) -> registry.mint_root(narrow, **MINT)",
+        "why": "_admit refuses a digest that is not the content digest (the A5-F3 fix) and register refuses a parentless envelope (the A5-F4 fix), so the original setup no longer constructs. D1 is REBOUND rather than the attack lines rewritten, so every later ATTACK line is textually unchanged."
+      },
+      {
+        "id": "SETUP CHANGE 2",
+        "change": "the bare `registry.register(envelope(D3, None, ...))` statement was routed through check()",
+        "why": "it now raises, and a bare raise aborts the probe. The payload is unchanged; only the recorder around it is new."
+      },
+      {
+        "id": "SETUP CHANGE 3",
+        "change": "P1.9's bare overwrite.register(a) / register(b) / authorize were routed through check()",
+        "why": "same as SETUP CHANGE 2"
+      },
+      {
+        "id": "SETUP CHANGE 4",
+        "change": "P2.6's DeliveryGrant(...) call grew from 8 positional arguments to 11, the three new ones (expires_at, issuer, authority_ref) copied verbatim from the grant under test",
+        "why": "GRANT-1020 added three sealed fields. The original 8-argument call is now a TypeError, which is a CRASH and must not be recorded as a refusal. The mutation under test -- issued_at rewritten to 2026-01-01T00:00:00Z -- is unchanged."
+      }
+    ],
+    "reaudit_probe2": [
+      {
+        "id": "SETUP CHANGE 1",
+        "change": "envelope(...).sealed() and registry.mint_root(narrow, **MINT); SEALED_D introduced for the real digest",
+        "why": "identical to probe 1 SETUP CHANGE 1"
+      },
+      {
+        "id": "reorganisation",
+        "change": "the retained probe 2's P4 / P5 / P6 sections were re-homed into reaudit_probe1 as NEW 3 / NEW 4 / NEW 5",
+        "why": "they are AuthorityRegistry-level, and probe 1 already carries the registry setup. Their attack payloads are unchanged. A reader looking for P4.1 finds it in probes/reaudit_probe1.txt."
+      },
+      {
+        "id": "report() helper",
+        "change": "outcomes are DENIED / ALLOWED / CRASHED rather than DENIED / ALLOWED",
+        "why": "so an unrelated exception can never be scored as a refusal"
+      }
+    ],
+    "new_measurements_added_by_this_node": [
+      "P1.8b / P1.8c -- revocation by authority_key, and the descendant of a revoked parent (isolates A5-F5)",
+      "P1.9b -- the envelope content seal through mint_root (isolates A5-F3)",
+      "P2.1b / P2.1c -- self-issuance and a fabricated provenance against an ANCHORED ledger",
+      "P2.7 / P2.8 -- grant expiry in both directions, and a correctly sealed grant the live ledger never admitted",
+      "P3.1b / P3.1c -- the same forgery built at the SLOT level so the effect boundary must refuse it",
+      "P3.3-pre / P3.3b / P3.3c -- a genuinely issued token spent before and after revocation, on both gateway shapes",
+      "P3.4 / P3.4b, P3.5 / P3.5b, P3.6 / P3.6b -- intent seal, expiry and network allowlist on both gateway shapes",
+      "P3.7 -- DurableEffectOutbox constructed directly, the second reachable boundary",
+      "P7.1 / P7.2 -- a self-minted root claiming the owner's name, spent to completion",
+      "P7.3 -- a token derived from the module-level issuance key",
+      "P7.4 -- whether the two production gateways are authority-bound"
+    ]
+  },
+  "findings": [
+    {
+      "id": "A5-F3",
+      "title": "ConstraintEnvelope.digest_value is format-checked but never recomputed, and AuthorityRegistry keys on it",
+      "status": "CLOSED",
+      "fixed_by": "540f980 REG-1000",
+      "measurement_before": "A5 probe 1 P1.9: two envelopes with contradictory authority both registered under one digest; the second overwrote the first and authorize(D1,'push','docs/x.md') returned a token.",
+      "measurement_after": "probes/reaudit_probe1.txt. P1.9b: mint_root(b) while b carries a's digest -> AuthorityDenied 'envelope digest does not seal its contents'. authorize(a's digest,'push','docs/x.md') -> 'action is not granted', i.e. still a's narrow authority. The verbatim P1.9 is also refused, but by the root-ceremony rule, which is why P1.9b exists.",
+      "mandated_test_that_bites": [
+        "tests.test_brain_kernel_authority.test_registry_refuses_an_envelope_whose_digest_is_not_its_content_digest",
+        "tests.test_brain_kernel_authority.test_two_authorities_cannot_share_one_digest"
+      ],
+      "residual": "The seal is a plain sha256 over the envelope document. It proves the envelope has not been edited; it says nothing about who wrote it."
+    },
+    {
+      "id": "A5-F4",
+      "title": "A fresh ROOT envelope can be minted in-process with any authority",
+      "status": "PARTIALLY CLOSED",
+      "fixed_by": "540f980 REG-1000",
+      "measurement_before": "A5 probe 1 P1.5/P1.6: register(fresh_root) accepted, then authorize('push') returned a token.",
+      "measurement_after": "probes/reaudit_probe1.txt P1.5 -> AuthorityDenied 'root envelope requires an explicit mint ceremony'. P1.6 -> 'authority envelope is unavailable'. BUT probes/reaudit_probe2.txt P7.1: mint_root accepts any caller-supplied issuer string. This node minted a root declaring issuer='owner:Brian Espinosa' and authority_ref='docs/architecture/HUMAN_AUTHORITY_GATES.md', with allowed_actions ('write','push','deploy') over path scope ('secrets',), received a genuine CapabilityToken for 'secrets/keys.txt', and EffectGateway.execute RAN THE ADAPTER. adapter_calls=['adapter ran'].",
+      "mandated_test_that_bites": [
+        "tests.test_brain_kernel_authority.test_bare_root_registration_is_refused_and_the_ceremony_records_provenance",
+        "tests.test_brain_kernel_authority.test_ceremony_refuses_an_unattributed_or_undated_mint"
+      ],
+      "why_not_closed": "The audit's own remediation text says a root 'must originate from an externally authenticated record rather than an in-process constructor'. mint_root records a provenance; it authenticates nothing. Both production paths mint their own root this way: local_execution.py:215 issuer='phase7:local:fixture-owner', mission_adapter.py:151 issuer=f'mission:{suffix}:fixture-owner'. The bar moved from 'construct a dataclass' to 'call one method with a string'."
+    },
+    {
+      "id": "A5-F5",
+      "title": "Revocation is keyed by digest, so re-minting the same authority under a different digest defeats it",
+      "status": "PARTIALLY CLOSED",
+      "fixed_by": "540f980 REG-1000, f89b24f TOKEN-1010",
+      "measurement_before": "A5 probe 1 P1.8: re-mint under a new digest string authorized 'push' immediately. A5 probe 2 P3.3: the effect boundary accepted a token bearing a revoked digest.",
+      "measurement_after": "probes/reaudit_probe1.txt P1.8b: re-mint of the revoked authority under a different envelope_id -- different digest, identical authority_key -- refused 'authority is revoked'. P1.8c: an already-admitted child of a revoked parent refused. probes/reaudit_probe2.txt P3.3: bound gateway refuses a revoked envelope. P3.3b: bound gateway refuses a token issued BEFORE revocation.",
+      "still_open": "probes/reaudit_probe2.txt P3.3c -- an UNBOUND EffectGateway executed that same pre-revocation token AFTER revocation. status=SUCCEEDED, adapter_calls=['adapter ran (unbound)']. An unbound gateway checks only that SOME registry in this process issued the token, never which one or whether it still stands. Same shape at P3.5b for expiry.",
+      "mitigating_measurement": "No production path builds an unbound gateway: the only two EffectGateway construction sites in src/** (local_execution.py:219, mission_adapter.py:155) both pass authority=. Measured at probes/reaudit_probe2.txt P7.4 and probes/orch_probe_token.txt CASE 3. The unbound path is a supported public API, so this is latent rather than absent.",
+      "mandated_test_that_bites": [
+        "tests.test_brain_kernel_authority.test_revoked_authority_cannot_be_reminted_under_a_new_digest",
+        "tests.test_brain_kernel_authority.test_revoking_a_parent_refuses_its_already_admitted_descendant",
+        "tests.test_hive_cortex_effects.test_revoked_envelope_is_refused_after_a_legitimate_issue"
+      ]
+    },
+    {
+      "id": "A5-F6",
+      "title": "DeliveryGrant is self-issuable: its digest is unkeyed, so a grant cannot distinguish owner-issued from agent-issued",
+      "status": "PARTIALLY CLOSED -- closed in the fixtures, OPEN in a real run",
+      "fixed_by": "1535a9a GRANT-1020, edc21f8 BIND-1030 (fixtures only)",
+      "measurement_before": "A5 probe 1 P2.1: an in-process caller issued a complete grant naming an owner and repository the repository owner never named.",
+      "measurement_after": "probes/reaudit_probe1.txt. On a bare import grants.LEDGER.anchor_digest == '' -- UNANCHORED. The identical P2.1 payload still succeeded: grant_id GRANT-probe-self-issued, owner 'some-owner-the-repository-owner-never-named', all five grantable actions, recorded in the ledger with issuer='self-issued'. Against an ANCHORED ledger the same call is refused: P2.1b 'delivery grant issuance is not anchored to the recorded owner authority'; P2.1c, presenting a fabricated provenance, 'owner authority record digest does not seal its fields'.",
+      "residual_verification": "probes/reaudit_probe4_residuals.txt RESIDUAL 1: '.anchor(' call sites in src/** = 0; in tests/** = 10 (test_delivery_grants x8, test_github_adapter:1169, test_hive_cortex_delivery:223). BIND-1030 declared this itself and was right.",
+      "mandated_test_that_bites": [
+        "tests.test_delivery_grants.test_a_self_issued_grant_is_refused_once_the_owner_authority_is_anchored",
+        "tests.test_delivery_grants.test_self_issuance_is_refused_outright_while_an_anchor_stands",
+        "tests.test_delivery_grants.test_a_fabricated_owner_authority_record_is_refused",
+        "tests.test_delivery_grants.test_a_grant_the_ledger_never_admitted_authorizes_nothing"
+      ],
+      "what_would_close_it": "A deployment step that anchors grants.LEDGER to a RootProvenance the owner actually recorded, before any delivery adapter runs. Nothing in src/** does this today, so a real run reaches the self-issued path.",
+      "second_residual": "The ledger is process-local and in-memory. Nothing survives a restart and nothing is auditable afterwards."
+    },
+    {
+      "id": "A5-F10",
+      "title": "The effect boundary never consults the AuthorityRegistry: a capability token validates against its own contents",
+      "status": "CLOSED",
+      "fixed_by": "f89b24f TOKEN-1010, edc21f8 BIND-1030, 4c85ebe orchestrator repair",
+      "measurement_before": "A5 probe 2 P3.1/P3.2: a hand-built token for 'secrets/keys.txt' was accepted and EffectGateway.execute ran the adapter, status=SUCCEEDED.",
+      "measurement_after": "probes/reaudit_probe2.txt. P3.1, the retained payload byte-identical, is refused at CapabilityToken construction: 'capability token was not issued by an authority registry'. P3.1b/P3.1c, the same forgery rebuilt at the slot level so construction cannot catch it, are refused by the boundary on both gateway shapes. P3.2/P3.2b: adapter_calls unbound=[] bound=[]. P3.7: DurableEffectOutbox built directly also refuses. probes/orch_probe_token.txt: CASE 1 REFUSED, CASE 2 REFUSED, adapter invocations: [].",
+      "production_binding": "P7.4 and orch CASE 3: local_execution and mission_adapter both construct EffectGateway WITH authority=. At A5 baseline both were WITHOUT.",
+      "mandated_test_that_bites": [
+        "tests.test_hive_cortex_effects.test_hand_built_token_for_an_unissued_envelope_is_refused",
+        "tests.test_hive_cortex_effects.test_token_outside_the_envelope_scope_is_refused",
+        "tests.test_hive_cortex_effects.test_durable_gateway_refuses_a_forged_token_before_it_is_recorded",
+        "tests.test_hive_cortex_effects.test_a_token_no_registry_issued_cannot_be_constructed",
+        "tests.test_hive_cortex_effects.test_an_issued_token_carries_a_witness_bound_to_its_own_fields"
+      ],
+      "residual": "The issuance witness is a sha256 over the token's three fields plus a module-level secrets.token_hex(32) held in the same process. probes/reaudit_probe2.txt P7.3: reading authority._ISSUANCE_KEY and computing the witness by hand produced a token that CONSTRUCTED and then EXECUTED on an unbound gateway, status=SUCCEEDED. This is attribution by record within one process, not a signature. It stops a forged token crossing a module boundary; it does not stop code already running in the process."
+    },
+    {
+      "id": "A5-F11",
+      "title": "authorize() target-scopes only the 'write' action, and path_read_scope is enforced nowhere",
+      "status": "CLOSED",
+      "fixed_by": "540f980 REG-1000",
+      "measurement_before": "A5 probe 2 P4.1: authorize('push','somewhere/else.txt') returned a token for an out-of-scope target.",
+      "measurement_after": "probes/reaudit_probe1.txt NEW 3: 'write' refused 'target is outside write scope' AND 'push' to the same target refused with the same message.",
+      "mandated_test_that_bites": [
+        "tests.test_brain_kernel_authority.test_a_non_write_action_is_refused_outside_the_write_scope",
+        "tests.test_brain_kernel_authority.test_a_read_action_is_bound_to_the_read_scope"
+      ]
+    },
+    {
+      "id": "A5-F12",
+      "title": "is_no_broader_than omits five fields including the spend ceiling",
+      "status": "CLOSED",
+      "fixed_by": "540f980 REG-1000",
+      "measurement_before": "A5 probe 2 P5.1: a child raising max_cost_microunits 100 -> 999999999 returned is_no_broader_than -> True and was registered.",
+      "measurement_after": "probes/reaudit_probe1.txt NEW 4: is_no_broader_than -> False; register refused 'child envelope broadens or is not bound to its parent'.",
+      "mandated_test_that_bites": [
+        "tests.test_brain_kernel_authority.test_registry_resolved_parent_still_refuses_a_broadening_child"
+      ],
+      "declared_deviation_verified": "risk_tier is deliberately NOT compared, because the kernel's derivation spec states child.risk_tier = max(parent, task). Recorded as the implementing node declared it. Severity of the original finding was LATENT and remains so: nothing in src/** spends against max_cost_microunits."
+    },
+    {
+      "id": "A5-F13",
+      "title": "intersect_envelopes trusts a caller-supplied parent the registry has never seen",
+      "status": "CLOSED",
+      "fixed_by": "540f980 REG-1000",
+      "measurement_before": "A5 probe 2 P6.1: a child registered against an unregistered wide parent, and then authorized 'push' on 'docs/x.md'.",
+      "measurement_after": "probes/reaudit_probe1.txt NEW 5: register refused 'parent envelope is required'; the child does not authorize.",
+      "mandated_test_that_bites": [
+        "tests.test_brain_kernel_authority.test_caller_supplied_parent_the_registry_never_admitted_is_refused"
+      ]
+    },
+    {
+      "id": "A5-F14",
+      "title": "The kernel's declared network_allowlist is compared but enforced nowhere",
+      "status": "CLOSED at the effect boundary",
+      "fixed_by": "f89b24f TOKEN-1010, 4c85ebe orchestrator repair",
+      "measurement_before": "network_allowlist appeared exactly twice in src/**, declared and compared, consulted by nothing.",
+      "measurement_after": "probes/reaudit_probe2.txt NEW 5: P3.6, a bound gateway whose adapter declares api.github.com against an envelope allowing only example.invalid -> 'effect reaches a host outside the network allowlist: api.github.com'. P3.6b, an unbound gateway refuses any network-declaring adapter outright -> 'a network effect requires an authority-bound gateway'.",
+      "mandated_test_that_bites": [
+        "tests.test_hive_cortex_effects.test_effect_reaching_a_host_outside_the_allowlist_is_refused",
+        "tests.test_hive_cortex_effects.test_network_effect_requires_an_authority_bound_gateway"
+      ],
+      "residual": "This governs the host an adapter DECLARES, not the host a process can reach. It is a declaration check, not a syscall block. B-OPS-06 (hard isolation) is unchanged by this plan."
+    },
+    {
+      "id": "A4-D1",
+      "title": "The effect receipt is written AFTER the irreversible remote effect, through a longer temporary filename, with no Windows long-path handling",
+      "status": "CLOSED (both halves)",
+      "fixed_by": "ece7d62 WAL-1200 (store half), bb579dc GATEWAY-1040 (production half)",
+      "measurement_after": "tests/mandated-suite.txt. tests.test_mission_store ran 66 tests OK, including test_effect_interrupted_before_receipt_reconciles_from_write_ahead_record, test_receipt_persists_when_the_legacy_temporary_name_exceeds_max_path, test_durable_write_survives_a_name_at_the_component_limit and test_raw_effect_receipt_is_adopted_without_reexecution. tests.test_github_adapter ran 51 tests OK, including test_an_interrupted_draft_pr_is_reconciled_not_reissued, test_an_interrupted_push_is_reconciled_from_the_observed_ref, test_an_unwitnessed_interrupted_effect_refuses_to_fire_again, test_receipts_are_written_beyond_max_path and test_a_receipt_written_beyond_max_path_still_validates.",
+      "residual": "Deliberate liveness trade-off, verified at probes/reaudit_probe4_residuals.txt RESIDUAL 3. github_adapter.GitHubClient._reconcile_interrupted_effect raises GitHubEffectReconciliationRequired when there is no write-ahead record, and again when observe() returns None or is absent. It never calls operation() again. An effect that provably never reached the remote therefore wedges the mission permanently. That is the safe direction for an irreversible remote effect and it is still a liveness defect; clearing it needs an observer contract that can prove absence.",
+      "second_residual": "brain_kernel/effect_outbox.py still makes reconciliation_required terminal -- RESIDUAL 2 lists nine raise/mark sites inside DurableEffectOutbox.execute and no branch that clears the state. mission_store has its own non-terminal route; the outbox does not."
+    },
+    {
+      "id": "A4-D2",
+      "title": "find_open_draft_pr interpolates the branch and base into the query string without encoding",
+      "status": "CLOSED",
+      "fixed_by": "bb579dc GATEWAY-1040",
+      "measurement_after": "rest_gateway.py:160 now builds the query with urllib.parse.urlencode. tests/mandated-suite.txt: tests.test_github_adapter.test_find_open_draft_pr_encodes_its_query_parameters passed inside the 51-test module run.",
+      "mandated_test_that_bites": [
+        "tests.test_github_adapter.test_find_open_draft_pr_encodes_its_query_parameters"
+      ]
+    },
+    {
+      "id": "A4-D3",
+      "title": "list_comments never follows Link, so comment idempotency silently breaks past 100 comments",
+      "status": "CLOSED",
+      "fixed_by": "bb579dc GATEWAY-1040",
+      "measurement_after": "rest_gateway.py:196-205 paginates and stops on a short page, bounded at 50 pages.",
+      "mandated_test_that_bites": [
+        "tests.test_github_adapter.test_a_comment_marker_beyond_page_one_is_found_and_not_reposted",
+        "tests.test_github_adapter.test_a_short_first_comment_page_ends_the_read"
+      ]
+    },
+    {
+      "id": "A4-D4",
+      "title": "DeliveryGrant has issued_at but no expiry",
+      "status": "CLOSED",
+      "fixed_by": "1535a9a GRANT-1020",
+      "measurement_after": "probes/reaudit_probe1.txt NEW 7: the self-issued grant carries expires_at 2026-08-14T00:00:00Z, derived as a 24h default from issued_at. A use one second past it is refused 'delivery grant GRANT-probe-self-issued expired at 2026-08-14T00:00:00Z'; a use before it is ALLOWED. Both directions measured, so the check is not vacuous.",
+      "mandated_test_that_bites": [
+        "tests.test_delivery_grants.test_an_expired_grant_is_refused_at_every_use",
+        "tests.test_delivery_grants.test_expiry_is_refused_at_its_own_instant",
+        "tests.test_delivery_grants.test_a_grant_that_names_no_expiry_gets_a_finite_default",
+        "tests.test_delivery_grants.test_a_lifetime_beyond_the_maximum_is_refused_at_issuance"
+      ]
+    },
+    {
+      "id": "A4-D5",
+      "title": "EffectIntent.intent_digest is format-checked but never verified to seal its fields",
+      "status": "CLOSED",
+      "fixed_by": "f89b24f TOKEN-1010, 4c85ebe orchestrator repair (moved the check above the authority-is-None early return)",
+      "measurement_after": "probes/reaudit_probe2.txt NEW 3: an intent whose digest is the placeholder sha256:dd..dd, presented with a GENUINELY ISSUED token, is refused 'intent digest does not seal this intent' on the bound gateway AND on the unbound gateway. The second half is what the orchestrator repair added; measured here rather than assumed.",
+      "mandated_test_that_bites": [
+        "tests.test_hive_cortex_effects.test_intent_digest_that_does_not_seal_its_fields_is_refused"
+      ]
+    },
+    {
+      "id": "A4-D6",
+      "title": "The gateway has no ref-read method, so replay snapshots are null",
+      "status": "CLOSED",
+      "fixed_by": "bb579dc GATEWAY-1040",
+      "measurement_after": "rest_gateway.py:269 read_branch_ref exists and carries the same _branch_ref guard the delete path has.",
+      "mandated_test_that_bites": [
+        "tests.test_github_adapter.test_a_branch_ref_read_snapshots_the_head_it_points_at",
+        "tests.test_github_adapter.test_a_missing_branch_ref_reads_as_absent_not_as_an_error",
+        "tests.test_github_adapter.test_a_branch_ref_read_without_a_full_head_sha_fails_closed",
+        "tests.test_github_adapter.test_a_branch_name_cannot_smuggle_a_path_into_the_ref_read"
+      ],
+      "note": "This restores the CAPABILITY the A4 driver lacked. It does not retroactively fill the null snapshots in evidence/pilots/a4/remote/idempotency-replay.json; that evidence is unchanged and still weak."
+    },
+    {
+      "id": "A4-D7",
+      "title": "No remote receipt cites the sealed plan digest, and the plan was never re-sealed for Path B",
+      "status": "OPEN -- untouched by this plan",
+      "fixed_by": null,
+      "measurement_after": "probes/reaudit_probe4_residuals.txt: 7 JSON files in evidence/pilots/a4/remote, 0 of them contain the string plan_digest. pilot-plan.json still reads pilot_repository 'UNGRANTED' and authority_gate.status 'CLOSED'.",
+      "note": "Evidence-chain defect, not a code defect. No node in this plan had scope over evidence/pilots/**, and re-sealing the plan now would be back-dating a seal. Recorded, not repaired."
+    },
+    {
+      "id": "A3-F3",
+      "title": "verify_bundle never reads the recorded verdict",
+      "status": "CLOSED for schema-v2 bundles",
+      "fixed_by": "1e47d32 VERDICT-1100",
+      "measurement_before": "flip a bundle from reject to adopt, recompute integrity.json, and it verified clean.",
+      "measurement_after": "_verify_verdict is called at verify.py:324 and defined at :1031. tests/mandated-suite.txt: tests.test_verify ran 22 tests, OK (skipped=1, symlink privilege unavailable on this host).",
+      "mandated_test_that_bites": [
+        "tests.test_verify.test_flipping_a_retained_verdict_from_reject_to_adopt_is_refused",
+        "tests.test_verify.test_forged_adoption_of_a_timed_out_check_is_refused",
+        "tests.test_verify.test_recorded_check_outcome_that_contradicts_its_receipt_is_refused",
+        "tests.test_verify.test_integrity_manifest_that_drops_the_verdict_binding_is_refused"
+      ],
+      "residual": "probes/reaudit_probe4_residuals.txt RESIDUAL 4: verify.py contains no 'hmac' and no 'sign'/'signature'; ledger.py contains no 'hmac' and uses plain sha256 in 3 places. A retained bundle proves integrity relative to its own evidence, NOT authorship. Whole-bundle reconstruction by anyone with write access to the directory is still possible. Same class as handoff section 11.6.",
+      "second_residual": "The manifest is now schema_version 2 and v1 is refused outright. The two retained A3 bundles are v1, so verify_bundle now refuses them with 'integrity manifest schema is unsupported' before it can even reach the missing-file problem."
+    },
+    {
+      "id": "A3-F2",
+      "title": "workers.py _canonical_bindings_provider is None, so canonical-route jobs dead-letter",
+      "status": "OPEN -- untouched by this plan, verified still open",
+      "fixed_by": null,
+      "measurement_after": "probes/reaudit_probe4_residuals.txt: workers._canonical_bindings_provider on a bare import is None. The string set_canonical_mission_bindings_provider appears exactly ONCE in src/** -- workers.py:158, its own definition. The only callers anywhere are tests/test_hive_cortex_cli_migration.py:357,358,383,384. workers.py:209 is the refusal the canonical route raises: 'canonical mission runtime has no registered bindings provider'.",
+      "note": "Nothing in this plan touched it, and nothing in this plan was supposed to. Confirmed by execution rather than by reading the commit list."
+    }
+  ],
+  "handoff_section_11_mapping": {
+    "item_1_validate_capability_token_authenticates_nothing": "A5-F10 -- CLOSED, with the in-process key residual named",
+    "item_2_verify_bundle_never_reads_the_verdict": "A3-F3 -- CLOSED for schema-v2 bundles, unkeyed",
+    "item_3_receipt_written_after_the_irreversible_effect": "A4-D1 -- CLOSED both halves, liveness trade-off named",
+    "item_4_the_lower_severity_list": "A5-F11 CLOSED, A5-F12 CLOSED, A5-F14 CLOSED, A4-D4 CLOSED, A4-D5 CLOSED, A4-D6 CLOSED, A4-D2 CLOSED, A4-D3 CLOSED",
+    "item_5_containment_unproven_on_windows": {
+      "status": "CLOSED, and load-bearing on exactly one test",
+      "measurement": "probes/reaudit_probe3_sandbox.txt. tests.test_sandbox Ran 40, OK (skipped=1). Traced: sandbox.py:487 (resolved.relative_to) is executed by 2 tests; sandbox.py:491, the 'path argument escapes sandbox root' refusal, is executed by exactly ONE -- test_windows_junction_escape_is_rejected. The POSIX case test_symlink_escape_is_rejected skipped with 'POSIX-only symlink confinement case'.",
+      "consequence": "Delete that one test and the original Windows blind spot returns silently, with a green suite. SANDBOX-1300 declared this and the measurement confirms it."
+    },
+    "item_6_the_authority_chain_is_unsigned": {
+      "status": "OUT OF SCOPE -- an owner decision, not a failure of this plan",
+      "measurement": "probes/reaudit_probe4_residuals.txt. git log --format='%G?' over docs/architecture/HUMAN_AUTHORITY_GATES.md returns four N and one E, unchanged. This plan's own nine commits are all N.",
+      "note": "Recorded as declared out of scope. It is also the reason A5-F4 could not close: an unsigned chain and an unauthenticated mint_root are the same missing thing seen from two directions."
+    }
+  },
+  "declared_residuals_verified": [
+    {
+      "n": 1,
+      "claim": "grants.LEDGER is anchored by no production path",
+      "verified": true,
+      "evidence": "probes/reaudit_probe4_residuals.txt RESIDUAL 1 -- 0 anchor sites in src/**, 10 in tests/**; bare-import anchor_digest is ''"
+    },
+    {
+      "n": 2,
+      "claim": "effect_outbox.py still makes reconciliation_required terminal",
+      "verified": true,
+      "evidence": "RESIDUAL 2 -- the state raises EffectReconciliationRequired on every later attempt; no branch clears it"
+    },
+    {
+      "n": 3,
+      "claim": "once an effect is claimed it can never re-fire, so a mission can wedge",
+      "verified": true,
+      "evidence": "RESIDUAL 3 -- _reconcile_interrupted_effect raises rather than re-executing on a missing record and on an absent or None observer"
+    },
+    {
+      "n": 4,
+      "claim": "the verify digest chain is unkeyed and unanchored",
+      "verified": true,
+      "evidence": "RESIDUAL 4 -- no hmac and no signature anywhere in verify.py or ledger.py"
+    },
+    {
+      "n": 5,
+      "claim": "the containment proof rests on a single test",
+      "verified": true,
+      "evidence": "probes/reaudit_probe3_sandbox.txt -- refusal branch reached by exactly 1 of 40 tests"
+    },
+    {
+      "n": 6,
+      "claim": "the two retained A3 bundles list 10 files each of which 5 are absent",
+      "verified": true,
+      "evidence": "RESIDUAL 6 -- both bundles: schema_version 1, files 10, absent 5, including ledger.sqlite3; verify_bundle refuses both"
+    },
+    {
+      "n": 7,
+      "claim": "tests/test_workers fails to import under plain unittest",
+      "verified": true,
+      "evidence": "RESIDUAL 7 -- exit 1, ModuleNotFoundError: No module named 'fixtures'"
+    }
+  ],
+  "what_this_does_not_establish": [
+    "That authority originates outside the process. mint_root records an issuer string; it authenticates nobody. P7.1 minted a root in the owner's name and spent it to completion.",
+    "Any cryptographic property. There is no key that an attacker does not also hold, and no signature anywhere in this plan. The envelope seal, the grant digest, the intent seal, the bundle manifest and the ledger chain are all plain sha256 over their own contents. They detect edits. They do not attribute authorship. The one 'keyed' construct -- the CapabilityToken issuance witness -- uses a module-level key any in-process caller can read, measured at P7.3.",
+    "That an in-process caller cannot get authority. It can: mint its own root (P7.1), or read the issuance key (P7.3), or issue its own delivery grant while the ledger is unanchored (P2.1).",
+    "That the delivery grant boundary holds in a real run. It holds in the fixtures. No production path anchors the ledger.",
+    "That containment on Windows is robustly covered. It is covered by one test.",
+    "That the retained A3 and A4 evidence is sound. Both A3 bundles fail verification, and no A4 remote receipt cites the sealed plan digest.",
+    "That the repo-wide suite passes. This node ran nine modules; the orchestrator ran the repository-wide suite separately.",
+    "Anything about behaviour under a real remote. Every measurement here is in-process, with fake adapters and no network."
+  ],
+  "not_measurable_in_this_environment": [
+    "Whether an owner-anchored grant ledger would hold in a real deployment: no deployment path exists to anchor it, so there is nothing to run.",
+    "Whether the reconciliation wedge (residual 3) occurs in practice: it needs a real interrupted remote effect, which needs a credential and a network, neither of which this node may use.",
+    "Whether the two retained A3 bundles ever verified: the five absent files, including ledger.sqlite3, are not recoverable from what is committed.",
+    "Cross-process or post-restart behaviour of the issuance key and the grant ledger: both are process-local by construction, so a single-process probe cannot exercise the boundary they lack.",
+    "GPG signature validity beyond git's own %G? report: no keyring is configured on this host, so 'N' means 'no signature recorded', which is the fact being reported."
+  ],
+  "tests": [
+    {
+      "name": "mandated-suite",
+      "command": [
+        "PYTHONPATH=src",
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_brain_kernel_authority",
+        "tests.test_hive_cortex_effects",
+        "tests.test_delivery_grants",
+        "tests.test_github_adapter",
+        "tests.test_verify",
+        "tests.test_mission_store",
+        "tests.test_sandbox",
+        "tests.test_hive_cortex_delivery",
+        "tests.test_hive_cortex_durability",
+        "-v"
+      ],
+      "status": "passed",
+      "tests_run": 273,
+      "wall_seconds": 567.457,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "skipped_detail": [
+        "tests.test_verify.StandaloneVerificationTests.test_rejects_symlink_candidate_layout_when_supported -- symlink creation unavailable: [WinError 1314] A required privilege is not held by the client",
+        "tests.test_sandbox.SandboxTests.test_symlink_escape_is_rejected -- POSIX-only symlink confinement case"
+      ],
+      "exit_code": 0,
+      "receipt_ref": "tests/mandated-suite.txt"
+    },
+    {
+      "name": "test_workers-import-check",
+      "command": [
+        "PYTHONPATH=src",
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_workers",
+        "-v"
+      ],
+      "status": "failed",
+      "exit_code": 1,
+      "note": "PRE-EXISTING and expected. Recorded as a measurement of residual 7, not as a regression. ModuleNotFoundError: No module named 'fixtures'.",
+      "receipt_ref": "probes/reaudit_probe4_residuals.txt"
+    }
+  ],
+  "write_scope_honoured": {
+    "written": [
+      "evidence/audits/authority-hardening/**",
+      "docs/execution/AUTHORITY_HARDENING_RESULTS.md"
+    ],
+    "not_written": [
+      "src/**",
+      "tests/**",
+      "evidence/pilots/**",
+      ".autopilot/**",
+      "every other doc"
+    ],
+    "probes_location": "all probe sources were written to this session's scratchpad, never into the repository; they are retained verbatim inside each transcript",
+    "defects_repaired_by_this_node": 0,
+    "state_changing_git_run_by_this_node": "none"
+  }
+}
