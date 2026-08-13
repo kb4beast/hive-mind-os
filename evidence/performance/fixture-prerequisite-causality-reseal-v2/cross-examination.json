@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "kind": "fpcr-cross-examination-v2",
+  "node_id": "FPCR-CROSS-030",
+  "phase": "cross",
+  "source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "scope": {
+    "code_changes": false,
+    "root_ci_execution": false,
+    "fixture_promotion": false,
+    "gco_promotion": false,
+    "performance_claim": false,
+    "knowledge_baseline_retry": false,
+    "original_fpc_unlock": false
+  },
+  "independent_checks": {
+    "source_tuple": {
+      "command": "git rev-parse b789b68e7d6a741e0b85a3ac33cbce846e1e32c9^{tree}",
+      "observed_tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+      "result": "passed",
+      "adverse_finding": "The two historical 20e26e3 tuples are correctly retained as rejected. Their prior receipts cannot be repaired, normalized, or used as this court's source evidence."
+    },
+    "discovery_receipt": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e",
+      "runner_verification": "passed",
+      "claimed_tests_discovered": 1059,
+      "claimed_ordered_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+      "adverse_finding": "runner.py verify accepts only the receipt digest, phase, source tuple, count (or null), and conclusion. It does not independently recompute or bind the ordered-ID digest, worktree projection, interpreter, import origin, usersite, or PYTHONPATH fields. The 1,059 count is therefore recorded discovery evidence, not a runner-proven causal predicate."
+    },
+    "environment_and_import_provenance": {
+      "discovery_receipt_claim": "fresh editable venv with -E -s, PYTHONNOUSERSITE=1, PYTHONPATH cleared, and import under the b789 source worktree",
+      "runner_gap": "discover_ids() performs unittest discovery in the runner process without constructing that hermetic environment; verify() does not validate the discovery environment or import file.",
+      "risk": "A contaminated interpreter, import path, or usersite can change discovered modules and IDs without the current verifier detecting it.",
+      "conclusion": "Do not treat the discovery receipt alone as proof that a root-CI execution or any fixture prerequisite is causal. FPCR-EXECUTE-020 remains the sole authority for the hermetic execution observation."
+    },
+    "execution_budget_and_transcript": {
+      "authorized_execution": "exactly one FPCR-EXECUTE-020 invocation with 2700 seconds",
+      "runner_gaps": [
+        "execute_once applies 2700 seconds independently to venv creation, editable install, and root CI rather than enforcing one wall-clock budget across the complete operation.",
+        "The execution verifier requires only a nonempty transcript_digest; it does not load the transcript, recompute its digest, or parse an inventory, final unittest summary, timeout record, failures, errors, or skips.",
+        "On timeout subprocess output may be bytes, while write_receipt serializes JSON text; a timeout path is not demonstrated by self-test."
+      ],
+      "conclusion": "The future execution receipt must preserve and independently review the complete transcript. No causal conclusion may be inferred from the runner's shallow receipt verification."
+    },
+    "no_code_and_fixture_causality": {
+      "observed_boundary": "The v2 plan forbids implementation, test edits, fixture promotion, original-FPC unlock, GCO work, performance conclusions, and knowledge BASELINE retry.",
+      "adverse_finding": "A no-code discovery count cannot distinguish a missing fixture API from unrelated import, collection, infrastructure, or runtime failures. Earlier FPP evidence had an incomplete timed-out root-CI inventory, and the superseded FPC discovery seal had a source-identity defect.",
+      "conclusion": "Fixture-only causality is unproven and must remain deferred absent the single corrected-source execution, complete inventory, independent integration, and distinct judicial disposition."
+    },
+    "strict_lint": {
+      "command": "python .autopilot/bin/autopilot.py --repo-root . dag-lint --plan <freshly-generated-FPCR-v2-plan> --strict --json",
+      "observed": {
+        "errors": 0,
+        "warnings": 2,
+        "exit_code": 1
+      },
+      "findings": [
+        "FPCR-SEAL-000 implies docs/execution/__init__.py outside declared write_scope",
+        "FPCR-SEAL-000 implies docs/execution/dags/__init__.py outside declared write_scope"
+      ],
+      "conclusion": "The requested strict-lint 0/0 criterion is not met. This Cross-Examiner has no authority to alter the sealed plan or scaffold scopes; the warning is an inherited fail-closed planning defect, not a waived result."
+    }
+  },
+  "conclusion": "DEFER: corrected commit/tree identity and the existence of a 1,059-ID discovery receipt are confirmed, but discovery hermeticity and ordered-vector provenance are not independently enforced by the receipt verifier, the sole execution has not yet occurred, its 2700-second and transcript checks have material gaps, strict DAG lint is 0 errors/2 warnings with exit 1, and fixture-only causality is unproven. Preserve all adverse evidence; authorize no code, promotion, performance claim, original-FPC work, GCO work, or knowledge BASELINE retry.",
+  "receipt_digest": "sha256:bfc7a6f293131183fec323bdb9a94914ac0d4f28ad4f1ecf0a9300ebae503cf2"
+}
