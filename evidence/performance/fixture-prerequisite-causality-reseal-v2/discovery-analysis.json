@@ -1,0 +1,71 @@
+{
+  "authority": {
+    "code_changes": false,
+    "fixture_promotion": false,
+    "gco_promotion": false,
+    "implementation": false,
+    "knowledge_baseline_retry": false,
+    "performance_claim": false,
+    "root_ci_execution": false,
+    "test_changes": false
+  },
+  "conclusion": "The claimed 1,059-test discovery count and the runner exact ordered-ID digest were independently reproduced against only the valid b789 source tuple. The FPCR runner verifies this receipt. Strict DAG lint nevertheless remains fail-closed with two inherited FPCR-SEAL-000 scaffold-scope warnings; this discovery node has no authority to alter the seal. No root-CI execution or code/test change occurred.",
+  "discovery": {
+    "claim_reproduced": true,
+    "claimed_count": 1059,
+    "digest_algorithm": "sha256(UTF-8 bytes of test IDs joined by one LF, in unittest discovery order)",
+    "first_id": "hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_acceptance_harness_self_tests",
+    "last_id": "test_workers.WorkerTests.test_worker_executes_real_durable_mission_with_unique_effect_adoption",
+    "test_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+    "tests_discovered": 1059
+  },
+  "environment": {
+    "PYTHONNOUSERSITE": "1",
+    "PYTHONPATH": null,
+    "fresh_hermetic_editable_venv": true,
+    "import_file": "C:/Repos/HiveMind/hive-mind-os-fpcr-discovery-source-b789/src/hive_mind_os/__init__.py",
+    "import_under_source_src": true,
+    "interpreter": "C:/Repos/HiveMind/.fpcrdiscovery010-venv/Scripts/python.exe",
+    "isolated_flags": [
+      "-E",
+      "-s"
+    ]
+  },
+  "kind": "fpcr-discovery-v2",
+  "node_id": "FPCR-DISCOVERY-010",
+  "phase": "discovery",
+  "protocol_checks": {
+    "dag_plan_digest": "sha256:df0ec52106a425306b7590d61c03a77186b79e320daf9d895e0cd12ad05674fe",
+    "round_compilation": "observed; FPCR-DISCOVERY-010 is serialized and FPCR-EXECUTE-020 plus FPCR-CROSS-030 form the next parallel round",
+    "runner_self_test": "passed",
+    "runner_source_check": "passed",
+    "seal_verifier": "passed",
+    "strict_dag_lint": {
+      "errors": 0,
+      "exit_code": 1,
+      "findings": [
+        "FPCR-SEAL-000 implied docs/execution/__init__.py outside declared write_scope",
+        "FPCR-SEAL-000 implied docs/execution/dags/__init__.py outside declared write_scope"
+      ],
+      "passed": false,
+      "warnings": 2
+    }
+  },
+  "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e",
+  "root_ci": {
+    "executed": false,
+    "reason": "FPCR-DISCOVERY-010 authorizes discovery only; FPCR-EXECUTE-020 exclusively owns the one root-CI invocation"
+  },
+  "schema_version": 1,
+  "source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "source_observation": {
+    "detached_head": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "immutable_tree_command": "git rev-parse b789b68e7d6a741e0b85a3ac33cbce846e1e32c9^{tree}",
+    "rejected_tuples_rejected_before_discovery": true,
+    "tuple_allowed": true,
+    "worktree": "C:/Repos/HiveMind/hive-mind-os-fpcr-discovery-source-b789"
+  }
+}
