@@ -217,6 +217,13 @@ _INTERPRETER_FLAGS = {
     "bash": frozenset({"-c"}),
 }
 _SIMPLE_PATH_TOKEN = re.compile(r"[^/\\\s]+\.[A-Za-z0-9]{1,10}\Z")
+# An unambiguous ``https://`` URL: a credential-free host, an optional numeric
+# port, and an optional path. Userinfo (``@``), whitespace and backslashes are
+# excluded on purpose so that anything ambiguous keeps its path treatment.
+_HTTPS_URL = re.compile(
+    r"https://[A-Za-z0-9._~%!$&'()*+,;=-]+(?::[0-9]{1,5})?(?P<path>/[^\s\\]*)?",
+    re.IGNORECASE,
+)
 
 
 def _interpreter_flags(executable: str) -> frozenset[str]:
@@ -462,7 +469,7 @@ class SandboxRunner:
         path_indexes.update(
             index
             for index, argument in enumerate(argv[1:], start=1)
-            if self._is_path_like(argument)
+            if not self._is_https_url(argument) and self._is_path_like(argument)
         )
         for index in sorted(path_indexes):
             if index < 1 or index >= len(argv):
@@ -485,6 +492,24 @@ class SandboxRunner:
                     ConfinementViolation,
                 )
             argv[index] = str(resolved)
+
+    @staticmethod
+    def _is_https_url(argument: str) -> bool:
+        """Return whether the argument is unambiguously an ``https://`` URL.
+
+        This only suppresses the path-like auto-detection in
+        :meth:`_validate_paths` so that a remote URL is not parsed as a workspace
+        path. It never relaxes a confinement check: an index declared in
+        ``path_args`` is still validated as a path, every other scheme keeps its
+        existing treatment, and any argument carrying userinfo, whitespace, a
+        backslash or an empty/``.``/``..`` segment stays on the path route.
+        """
+
+        match = _HTTPS_URL.fullmatch(argument)
+        if match is None:
+            return False
+        segments = (match.group("path") or "").split("/")[1:]
+        return not any(segment in {"", ".", ".."} for segment in segments)
 
     @staticmethod
     def _is_path_like(argument: str) -> bool:
