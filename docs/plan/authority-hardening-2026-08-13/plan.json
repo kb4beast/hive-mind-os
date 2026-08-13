@@ -1,0 +1,896 @@
+{
+ "baseline": {
+  "branch": "main",
+  "commit": "BASELINE-BOUND-AT-SEAL",
+  "tree": "BASELINE-BOUND-AT-SEAL"
+ },
+ "created_at": "2026-08-13T00:00:00-05:00",
+ "nodes": [
+  {
+   "acceptance_criteria": [
+    "ConstraintEnvelope's digest is recomputed from field contents on construction and on registry admission; a mismatched digest_value is rejected (closes A5-F3).",
+    "EffectIntent recomputes intent_digest over its own fields exactly as DeliveryGrant.__post_init__ seals its grant, raising on mismatch (closes A4 D5).",
+    "Minting a ROOT envelope requires an explicit registry ceremony recording provenance; a bare in-process root mint is refused by the registry (closes A5-F4).",
+    "A revoked authority re-minted under a fresh digest string is still refused: revocation keys on authority content, not the digest string (closes A5-F5).",
+    "intersect_envelopes resolves the parent from the registry by digest and rejects a caller-supplied parent the registry has never admitted (closes A5-F13).",
+    "AuthorityRegistry.authorize scope-checks every declared action, and path_read_scope is enforced (closes A5-F11).",
+    "is_no_broader_than compares every authority-bearing field, including max_cost_microunits; no child may exceed its parent on any of them (closes A5-F12).",
+    "Each closed finding has a mandated test proven to fail when that fix is reverted."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/reg-1000",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 90,
+   "dependencies": [],
+   "downstream_unlock_value": 80,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "src/hive_mind_os/brain_kernel/contracts.py",
+    "tests/test_brain_kernel_authority.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml",
+    "src/hive_mind_os/brain_kernel/effects.py",
+    "src/hive_mind_os/cortex/github/grants.py"
+   ],
+   "id": "REG-1000",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Anchor the authority chain in the registry: recompute envelope and intent digests from contents, control root minting, make revocation survive re-minting, resolve parents from the registry, scope-check every action, and close the is_no_broader_than field gaps.",
+   "parallel_safe": true,
+   "pr_target": "main",
+   "rationale": "A5's audit showed the chain is self-referential: digests are format-checked, roots are free to mint, revocation keys on the digest string, and intersect_envelopes trusts caller-supplied parents. TOKEN-1010 and GRANT-1020 consume the registry surface this node fixes, so it lands first. This node must not touch effects.py or grants.py; those belong to its dependents.",
+   "read_scope": [
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "src/hive_mind_os/brain_kernel/contracts.py",
+    "src/hive_mind_os/brain_kernel/effects.py",
+    "src/hive_mind_os/cortex/github/grants.py",
+    "evidence/pilots/a5/audits/authority-boundary.json",
+    "evidence/pilots/a5/tests/authority-boundary-probe.txt",
+    "evidence/pilots/a5/tests/authority-boundary-probe-2.txt"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "critical",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "iface:authority-registry",
+    "schema:constraint-envelope"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "src/hive_mind_os/brain_kernel/contracts.py",
+    "tests/test_brain_kernel_authority.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
+    "A bundle whose verdict is flipped from reject to adopt with integrity.json recomputed FAILS verification (closes A3-F3).",
+    "The verdict participates in the integrity digest chain and is cross-checked against the adjudication evidence the bundle already carries.",
+    "A mandated test constructs the flipped bundle and asserts rejection; reverting the fix makes that test fail.",
+    "Verification of legitimate bundles is unchanged; existing tests stay green."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/verdict-1100",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 70,
+   "dependencies": [],
+   "downstream_unlock_value": 30,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/verify.py",
+    "tests/test_verify.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml"
+   ],
+   "id": "VERDICT-1100",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Make retained-bundle verdicts authenticated, not merely tamper-evident: verify_bundle must read the recorded verdict, bind it into the integrity digest chain, and cross-check it against the bundle's own adjudication evidence.",
+   "parallel_safe": true,
+   "pr_target": "main",
+   "rationale": "A3-F3, carried through A5: flip a bundle from reject to adopt, recompute integrity.json, and it verifies, because verify_bundle re-derives every digest but never reads document['verdict']. No delivery decision can rest on a retained bundle's verdict until this is closed.",
+   "read_scope": [
+    "src/hive_mind_os/verify.py",
+    "tests/test_verify.py",
+    "evidence/pilots/a5/audits/authority-boundary.json"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_verify -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "high",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "schema:retained-bundle"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/verify.py",
+    "tests/test_verify.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
+    "An intent record is durably written BEFORE the effect executes; a crash between effect and receipt resumes into reconciliation against that record instead of a permanent EffectReconciliationRequired (closes A4 D1, first half).",
+    "Receipt persistence succeeds under a repository root long enough that the previous temp naming exceeded MAX_PATH; a regression test constructs that path length (closes A4 D1, second half).",
+    "Replay after the crash does not duplicate the effect: the write-ahead record carries the idempotency key consulted on resume.",
+    "Reverting either fix makes its mandated test fail."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/wal-1200",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 80,
+   "dependencies": [],
+   "downstream_unlock_value": 50,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/mission_store.py",
+    "tests/test_mission_store.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml"
+   ],
+   "id": "WAL-1200",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Write the effect record ahead of the irreversible remote effect, reconcile from it on resume, and make receipt persistence immune to Windows MAX_PATH.",
+   "parallel_safe": true,
+   "pr_target": "main",
+   "rationale": "Handoff §11.3 / A4 D1: the receipt is written after the remote effect (mission_store.py:81-92), and a temp filename over 260 characters turned a successful push into a permanent EffectReconciliationRequired -- the push happened and the system could not record that it had. This node is the durability provider GATEWAY-1040 depends on (DAG standard §4: durability before external-effect surface).",
+   "read_scope": [
+    "src/hive_mind_os/mission_store.py",
+    "tests/test_mission_store.py",
+    "evidence/pilots/a4/summary.json"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_mission_store -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "high",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "iface:mission-store"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/mission_store.py",
+    "tests/test_mission_store.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
+    "A mandated test creates an NTFS junction inside the sandbox pointing outside it and asserts the containment check refuses the escape; the test runs on Windows (no nt skip).",
+    "Deleting the containment check makes the suite fail on Windows; the mutation evidence is retained.",
+    "The existing POSIX symlink case still passes unchanged."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/sandbox-1300",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 50,
+   "dependencies": [],
+   "downstream_unlock_value": 20,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/sandbox.py",
+    "tests/test_sandbox.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml"
+   ],
+   "id": "SANDBOX-1300",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Prove sandbox containment on Windows: reach the containment branch through an NTFS junction fixture and assert the escape is refused.",
+   "parallel_safe": true,
+   "pr_target": "main",
+   "rationale": "Handoff §11.5: deleting the sandbox-root containment check passes the whole suite on Windows, because the branch is only reachable via symlink/junction and its one test is skipIf(os.name == 'nt') (tests/test_sandbox.py:284). Containment that is only proven on POSIX is unproven where this repository actually runs.",
+   "read_scope": [
+    "src/hive_mind_os/sandbox.py",
+    "tests/test_sandbox.py"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_sandbox -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "high",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "iface:sandbox-containment"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/sandbox.py",
+    "tests/test_sandbox.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
+    "The exact forgery from A5 probe 2 -- a hand-built token with an envelope digest never registered and never issued -- is REJECTED by EffectGateway.execute (closes A5-F10).",
+    "Tokens bound to expired or revoked envelopes are rejected; tokens whose scope does not cover the requested effect are rejected.",
+    "EffectIntent.intent_digest is verified at the boundary before execution.",
+    "An effect naming a host outside the kernel's declared network_allowlist is refused at the boundary (closes A5-F14).",
+    "Each closed finding has a mandated test proven to fail when its fix is reverted."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/token-1010",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 85,
+   "dependencies": [
+    "REG-1000"
+   ],
+   "downstream_unlock_value": 40,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/brain_kernel/effects.py",
+    "tests/test_hive_cortex_effects.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml",
+    "src/hive_mind_os/brain_kernel/authority.py"
+   ],
+   "id": "TOKEN-1010",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Close the effect boundary: EffectGateway validates capability tokens against the registry (registered envelope, expiry, revocation, scope), verifies intent digests before execution, and enforces the declared network_allowlist.",
+   "parallel_safe": true,
+   "pr_target": "main",
+   "rationale": "A5-F10, the highest-impact finding in the plan: validate_capability_token (effects.py:23-39) recomputes an unkeyed digest over the token's own three fields and EffectGateway.execute calls nothing else, so a hand-built token carrying an invented envelope digest is ACCEPTED for secrets/keys.txt. Depends on REG-1000 for the registry lookup surface it must consult.",
+   "read_scope": [
+    "src/hive_mind_os/brain_kernel/effects.py",
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "src/hive_mind_os/brain_kernel/contracts.py",
+    "evidence/pilots/a5/audits/authority-boundary.json",
+    "evidence/pilots/a5/tests/authority-boundary-probe-2.txt"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_hive_cortex_effects -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "critical",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "iface:effect-gateway"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/brain_kernel/effects.py",
+    "tests/test_hive_cortex_effects.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
+    "A grant minted outside the owner-side issuance path is rejected by every consumer of the grant (closes A5-F6).",
+    "DeliveryGrant carries an expiry; an expired grant is refused at use (closes A4 D4).",
+    "The grant digest still seals every field, including the new issuance and expiry fields.",
+    "Each closed finding has a mandated test proven to fail when its fix is reverted."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/grant-1020",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 60,
+   "dependencies": [
+    "REG-1000"
+   ],
+   "downstream_unlock_value": 25,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/cortex/github/grants.py",
+    "tests/test_delivery_grants.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml",
+    "src/hive_mind_os/brain_kernel/authority.py"
+   ],
+   "id": "GRANT-1020",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Make delivery grants attributable and finite: issuance is registry-anchored so an owner-issued grant is distinguishable from an agent-issued one, and every grant carries and enforces its own expiry.",
+   "parallel_safe": true,
+   "pr_target": "main",
+   "rationale": "A5-F6: DeliveryGrant's digest is unkeyed, so a grant cannot prove who issued it -- self-issuance is undetectable. A4 D4: a grant never goes stale on its own; only the token's expiry ends it, putting grant lifetime outside the governance object. Depends on REG-1000 for issuance attribution.",
+   "read_scope": [
+    "src/hive_mind_os/cortex/github/grants.py",
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "evidence/pilots/a5/audits/authority-boundary.json",
+    "evidence/pilots/a4/summary.json"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_delivery_grants -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "high",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "iface:delivery-grant"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/cortex/github/grants.py",
+    "tests/test_delivery_grants.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
+    "A ref-read method exists with the same ref sanitisation the delete path already has; idempotency replay snapshots are no longer null (closes A4 D2 and D6).",
+    "find_open_draft_pr URL-encodes its query parameters (closes the unencoded-query defect).",
+    "list_comments paginates; the idempotency marker is found beyond 100 comments and no double-post occurs (closes A4 D3).",
+    "All tests run against recorded fakes; the node performs no live remote effect.",
+    "Each closed defect has a mandated test proven to fail when its fix is reverted."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/gateway-1040",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 65,
+   "dependencies": [
+    "WAL-1200"
+   ],
+   "downstream_unlock_value": 25,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "any live-host validation: the owner credential gate (HUMAN_AUTHORITY_GATES.md) governs it and is explicitly out of this node's scope"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/cortex/github/rest_gateway.py",
+    "src/hive_mind_os/cortex/github/delivery_adapter.py",
+    "tests/test_github_adapter.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml"
+   ],
+   "id": "GATEWAY-1040",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Complete the remote gateway's read and idempotency surface: a guarded ref-read method, encoded queries in find_open_draft_pr, and pagination in list_comments.",
+   "parallel_safe": true,
+   "pr_target": "main",
+   "rationale": "A4 D2/D3/D6: the delete path sanitises refs but the read path does not exist at all -- which is why the idempotency replay's branch snapshots were null and the driver's 'branch head unchanged' verdict was worthless; past 100 comments the idempotency marker falls off page one and the adapter double-posts. Unit tests run against recorded fakes only; no live remote effect and no credential. Ordered behind WAL-1200 per DAG standard §4 (durability before external-effect surface).",
+   "read_scope": [
+    "src/hive_mind_os/cortex/github/rest_gateway.py",
+    "src/hive_mind_os/cortex/github/delivery_adapter.py",
+    "tests/test_github_adapter.py",
+    "evidence/pilots/a4/summary.json"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_github_adapter -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "high",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "iface:github-gateway"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/cortex/github/rest_gateway.py",
+    "src/hive_mind_os/cortex/github/delivery_adapter.py",
+    "tests/test_github_adapter.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
+    "A5 probe 2's forged capability token, re-run verbatim from the retained transcript source, is now rejected.",
+    "A5 probe 1's registry and grant findings are re-measured with the retained probe source; results recorded per finding.",
+    "A findings matrix maps each of A5-F3/F4/F5/F6/F10/F11/F12/F13/F14, A4 D1-D7, A3-F3, and handoff §11.5 to closed or open, each closed row naming the mandated test that bites and its mutation evidence.",
+    "Any finding the probes still reproduce is recorded OPEN; nothing is forced closed to finish the plan.",
+    "The full focused-suite union passes on the integrated tree."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/reaudit-1900",
+   "category": "audit",
+   "consultation_routes": [
+    "orchestrator",
+    "curator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 75,
+   "dependencies": [
+    "REG-1000",
+    "VERDICT-1100",
+    "WAL-1200",
+    "SANDBOX-1300",
+    "TOKEN-1010",
+    "GRANT-1020",
+    "GATEWAY-1040"
+   ],
+   "downstream_unlock_value": 0,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "evidence/audits/authority-hardening/**",
+    "docs/execution/AUTHORITY_HARDENING_RESULTS.md"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml",
+    "src/**",
+    "tests/**"
+   ],
+   "id": "REAUDIT-1900",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Re-run the A5 authority-boundary probes verbatim against the hardened tree and adjudicate, finding by finding, what is closed and what remains open.",
+   "parallel_safe": false,
+   "pr_target": "main",
+   "rationale": "A readiness record produced without executing anything found none of the six production defects; execution did. The same discipline applies to closure: the probes that measured the holes are re-run unmodified, and any finding they still reproduce is recorded open. This node repairs nothing -- an open finding stays open in the record.",
+   "read_scope": [
+    "evidence/pilots/a5/audits/authority-boundary.json",
+    "evidence/pilots/a5/tests/authority-boundary-probe.txt",
+    "evidence/pilots/a5/tests/authority-boundary-probe-2.txt",
+    "evidence/pilots/a4/summary.json",
+    "docs/execution/DAG_EXECUTION_HANDOFF.md"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority tests.test_hive_cortex_effects tests.test_delivery_grants tests.test_github_adapter tests.test_verify tests.test_mission_store tests.test_sandbox -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "high",
+   "roles": [
+    "orchestrator",
+    "curator",
+    "steward",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "highest available"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "max"
+    },
+    "rationale": "Adversarial re-audit adjudicating closure of every prior finding; honesty over completion.",
+    "tier": "T3"
+   },
+   "semantic_locks": [
+    "audit:authority-hardening"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "evidence/audits/authority-hardening/**",
+    "docs/execution/AUTHORITY_HARDENING_RESULTS.md"
+   ]
+  }
+ ],
+ "plan_fingerprint": null,
+ "plan_id": "hive-mind-os-authority-hardening-v1",
+ "schema_version": 1,
+ "state_machine": [
+  "BOOTSTRAP_REQUIRED",
+  "BOOTSTRAP_INVALID",
+  "READY",
+  "CLAIMED",
+  "RUNNING",
+  "WAITING_FOR_RECEIPT",
+  "PR_OPEN",
+  "CI_FAILED",
+  "REPAIR_REQUIRED",
+  "RECONCILIATION_REQUIRED",
+  "INTEGRATION_READY",
+  "INTEGRATING",
+  "PROMOTION_READY",
+  "BLOCKED",
+  "ESCALATION_REQUIRED",
+  "QUARANTINED",
+  "COMPLETE",
+  "SUPERSEDED",
+  "CANCELLED",
+  "REPLAN_REQUIRED"
+ ],
+ "status": "DRAFT-UNSEALED",
+ "subject": "Close the locally satisfiable findings recorded open by the A5-900 governed-full readiness verdict (DAG_EXECUTION_HANDOFF.md §11 items 1-5): the unauthenticated effect boundary, unauthenticated bundle verdicts, receipt-after-effect durability, the lower-severity authority and gateway gaps, and unproven Windows containment. Deliberately out of scope: §11.6 (unsigned authority chain) and every human authority gate -- those are owner decisions no node may make.",
+ "title": "Authority Hardening — closing the A5 not-ready residue (findings 1-5)"
+}
