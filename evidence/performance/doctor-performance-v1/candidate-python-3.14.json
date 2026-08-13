@@ -1,0 +1,114 @@
+{
+  "command": [
+    "C:\\Python314\\python.exe",
+    ".autopilot/bin/autopilot.py",
+    "--repo-root",
+    ".",
+    "doctor",
+    "--json"
+  ],
+  "doctor_internal_timeout_seconds": 180,
+  "environment": {
+    "cpu_count": 24,
+    "machine": "AMD64",
+    "network_policy": "no-network",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "process_environment_omission_reason": "credential-safety",
+    "process_environment_values_retained": false,
+    "processor": "Intel64 Family 6 Model 198 Stepping 2, GenuineIntel",
+    "runtime": {
+      "executable": "C:\\Python314\\python.exe",
+      "implementation": "CPython",
+      "version": "3.14.4"
+    },
+    "working_directory": "C:\\Repos\\HiveMind\\hive-mind-os-dp-qualify-040"
+  },
+  "kind": "doctor-performance-benchmark-receipt-v1",
+  "metrics": {
+    "all_below_doctor_timeout": false,
+    "all_doctor_passed": false,
+    "nearest_rank_p95_seconds": 187.051918,
+    "qualification_limit_seconds": 135.0
+  },
+  "phase": "candidate",
+  "receipt_digest": "sha256:b5795ece72223af7980fd6095b66ac1159719dcab928c6296a4a67ee3a5c1e99",
+  "runtime_id": "python-3.14-system",
+  "schema_version": 1,
+  "source": {
+    "autopilot_index_digest": "sha256:ac99521a8ababb51f897510e923a21f49eedc7c3e6643b7ece6abcd57b264000",
+    "autopilot_tracked_entry_count": "91",
+    "commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+    "index_tree": "b02326bf108de2fbaa2f174975f937979c02bf90",
+    "tree": "b02326bf108de2fbaa2f174975f937979c02bf90"
+  },
+  "trial_policy": {
+    "actual_trials": 6,
+    "alternation": "cold-first-then-warm",
+    "cold_trials": 3,
+    "cold_warm_is_declared_not_an_os-cache-eviction-claim": true,
+    "fresh_process_every_trial": true,
+    "minimum_trials": 6
+  },
+  "trials": [
+    {
+      "doctor_passed": false,
+      "elapsed_seconds": 187.051918,
+      "exit_code": 1,
+      "fresh_process": true,
+      "index": 1,
+      "mode": "cold",
+      "outer_timeout": false,
+      "stdout_sha256": "sha256:3e5a80698e1a4fbb91897c5984fdd962ce2f2811e0b38347d5896a331482b06f"
+    },
+    {
+      "doctor_passed": false,
+      "elapsed_seconds": 186.495149,
+      "exit_code": 1,
+      "fresh_process": true,
+      "index": 2,
+      "mode": "warm",
+      "outer_timeout": false,
+      "stdout_sha256": "sha256:3e5a80698e1a4fbb91897c5984fdd962ce2f2811e0b38347d5896a331482b06f"
+    },
+    {
+      "doctor_passed": false,
+      "elapsed_seconds": 186.851545,
+      "exit_code": 1,
+      "fresh_process": true,
+      "index": 3,
+      "mode": "cold",
+      "outer_timeout": false,
+      "stdout_sha256": "sha256:3e5a80698e1a4fbb91897c5984fdd962ce2f2811e0b38347d5896a331482b06f"
+    },
+    {
+      "doctor_passed": false,
+      "elapsed_seconds": 186.740816,
+      "exit_code": 1,
+      "fresh_process": true,
+      "index": 4,
+      "mode": "warm",
+      "outer_timeout": false,
+      "stdout_sha256": "sha256:3e5a80698e1a4fbb91897c5984fdd962ce2f2811e0b38347d5896a331482b06f"
+    },
+    {
+      "doctor_passed": false,
+      "elapsed_seconds": 186.545991,
+      "exit_code": 1,
+      "fresh_process": true,
+      "index": 5,
+      "mode": "cold",
+      "outer_timeout": false,
+      "stdout_sha256": "sha256:3e5a80698e1a4fbb91897c5984fdd962ce2f2811e0b38347d5896a331482b06f"
+    },
+    {
+      "doctor_passed": false,
+      "elapsed_seconds": 186.669888,
+      "exit_code": 1,
+      "fresh_process": true,
+      "index": 6,
+      "mode": "warm",
+      "outer_timeout": false,
+      "stdout_sha256": "sha256:3e5a80698e1a4fbb91897c5984fdd962ce2f2811e0b38347d5896a331482b06f"
+    }
+  ]
+}
