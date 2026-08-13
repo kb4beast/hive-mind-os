@@ -97,7 +97,7 @@ SPECS = [
         "id": "DP-TESTS-010",
         "title": "Freeze the behavioral and isolation test contract",
         "objective": (
-            "Add independent tests that freeze the 382-execution vector and adversarially "
+            "Add independent tests that freeze the complete unittest ID set and adversarially "
             "prove seed integrity, derivation isolation, confinement, and cleanup."
         ),
         "rationale": (
@@ -132,7 +132,8 @@ SPECS = [
             "python -m unittest tests.test_doctor_performance_contract -v",
         ],
         "acceptance_criteria": [
-            "The frozen and candidate suites each discover exactly 382 executions: 381 pass and the same one skip, with identical IDs, assertion bodies, subtests, behavior constants, skip decorators, and discovery order.",
+            "The frozen and candidate suites have the identical complete unittest ID set digest sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4, with identical IDs, assertion bodies, subtests, behavior constants, skip decorators, and discovery order.",
+            "On the cited host the frozen suite has 381 total executions: 380 pass, zero fail, zero error, and the same conditional skip test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected only when directory symlink creation raises OSError.",
             "Adversarial cases cover source tree, commit, index mode, blob identity, source mutation fail-closed/rebuild, and exclusion of untracked, ignored, state, bytecode, credential-shaped, and outside-snapshot material.",
             "Tests prove ref, branch, receipt, index, worktree, concurrent-invocation, network, and cleanup isolation on success, test-body failure, and forced child-process termination.",
             "Tests reject alternates, shared object stores, hardlinks, symlinks, persistent caches, cached verdicts, and prior-result reuse.",
@@ -284,7 +285,8 @@ SPECS = [
             "python -m unittest discover -s tests -v",
         ],
         "acceptance_criteria": [
-            "The candidate preserves exactly 382 executions: 381 pass and the same one skip, with unchanged discovery order, IDs, methods, assertions, subtests, behavior constants, and skip decorators.",
+            "The candidate preserves the complete unittest ID set digest sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4 with unchanged discovery order, IDs, methods, assertions, subtests, behavior constants, and skip decorators.",
+            "On the cited host qualification reproduces 381 total executions: 380 pass, zero fail, zero error, and the same conditional skip test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected only when directory symlink creation raises OSError.",
             "Both exact doctor commands retain the controller's 180-second timeout, complete every trial below 180 seconds, and achieve nearest-rank p95 at or below 135 seconds.",
             "Each runtime has at least six fresh alternating cold/warm trials with at least three cold trials and complete digest-bound environment receipts.",
             "The two independent contract tests, focused fixture-isolation and healing suites, full .autopilot suite, full repository suite, confinement checks, and byte seals all pass.",

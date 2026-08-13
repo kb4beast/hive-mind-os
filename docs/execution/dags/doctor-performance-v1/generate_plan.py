@@ -133,7 +133,8 @@ def build_plan() -> dict[str, Any]:
         },
         "invariants": [
             "The doctor command, controller timeout, test discovery, test IDs, test bodies, assertions, subtests, behavior constants, order, and skip remain unchanged.",
-            "The frozen and candidate suites each execute 382 tests: 381 pass and the same one skips.",
+            "The frozen and candidate suites have the identical complete unittest ID set digest sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4.",
+            "On the cited host the frozen suite has 381 total executions: 380 pass, zero fail, zero error, and the same conditional skip test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected only when directory symlink creation raises OSError.",
             "Every candidate doctor trial is below 180 seconds and nearest-rank p95 is at most 135 seconds on both pinned runtimes.",
             "A seed is content-addressed from a pinned tracked .autopilot snapshot and revalidated before each derivation.",
             "Every invocation receives a fresh isolated writable repository and object database with no sharing, alternates, hardlinks, symlinks, persistent cache, cached verdict, prior result, or network.",

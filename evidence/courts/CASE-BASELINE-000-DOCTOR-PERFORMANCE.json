@@ -39,9 +39,14 @@
     "python_3_12_doctor": {"status": "timeout", "elapsed_seconds": 190.4},
     "direct_suite": {
       "status": "passed",
-      "executions": 382,
-      "passed": 381,
+      "executions": 381,
+      "passed": 380,
       "skipped": 1,
+      "failures": 0,
+      "errors": 0,
+      "complete_unittest_id_set_sha256": "7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4",
+      "conditional_skip_id": "test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected",
+      "conditional_skip_condition": "directory symlink creation raises OSError",
       "elapsed_seconds": 259.64
     },
     "causal_claim_status": "hypothesis_only"
@@ -86,6 +91,20 @@
     "promotion_authority": "distinct DP-JUDGE-050 only",
     "retry_condition": "DP-JUDGE-050 issues ADOPT with no material unresolved finding after every sealed qualification gate passes"
   },
+  "errata": [
+    {
+      "erratum_id": "CASE-BASELINE-000-DOCTOR-PERFORMANCE-ERRATUM-001",
+      "recorded_at": "2026-08-13",
+      "disposition": "adopt",
+      "judge_identity": "role:doctor-performance-judge",
+      "provenance": "Judge comparison of the contract wording with the retained unittest receipt from evidence commit 6bc343f079be6f2d5fd6953d92099a8d5de872b1",
+      "superseded_claim": "382 executions: 381 pass and one skip",
+      "corrected_claim": "Identical complete unittest ID set digest 7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4; on the cited host 381 total executions = 380 pass, the same one conditional skip, zero failures, and zero errors.",
+      "conditional_skip_id": "test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected",
+      "conditional_skip_condition": "directory symlink creation raises OSError",
+      "scope": "factual correction only; no gate, scope, command, timeout, p95, role, or rollback change"
+    }
+  ],
   "required_dag": {
     "nodes": ["DP-CONTRACT-000", "DP-TESTS-010", "DP-BENCH-020", "DP-FIXTURE-030", "DP-QUALIFY-040", "DP-JUDGE-050"],
     "edges": [

@@ -10,8 +10,9 @@
 
 The unchanged doctor gate launches the complete `.autopilot/tests` discovery command with
 an internal 180-second subprocess timeout. The retained baseline evidence reports 381
-passing tests and one skip in 259.640 seconds on Python 3.14.4; the same doctor command
-timed out on both Python 3.14.4 and the bundled Python 3.12.13 runtime. The knowledge
+total executions in 259.640 seconds on Python 3.14.4: 380 passes, the same one conditional
+skip, and zero failures or errors. The same doctor command timed out on both Python 3.14.4
+and the bundled Python 3.12.13 runtime. The knowledge
 projection `BASELINE-000` contract cannot change controller code or weaken its required
 doctor gate, so it remains blocked.
 
@@ -45,9 +46,14 @@ rebuild produces a new validated content address.
 ## Immutable behavioral contract
 
 The doctor command, its internal 180-second timeout, and unittest discovery do not
-change. Frozen and candidate suites must each execute 382 tests: 381 pass and the same
-one skips. Test IDs, discovery order, test methods, assertion bodies, subtests, behavior
-constants, and skip decorators remain identical.
+change. Frozen and candidate suites must have an identical complete unittest ID set with
+SHA-256 `7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4`.
+On the cited host the frozen suite has 381 total executions: 380 passes, zero failures,
+zero errors, and the same one conditional skip. That skip is
+`test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected`
+and occurs only when directory symlink creation raises `OSError`. Test IDs, discovery
+order, test methods, assertion bodies, subtests, behavior constants, and skip decorators
+remain identical.
 
 Within `.autopilot/tests/test_healing.py`, the only allowed edits are fixture imports and
 `HealingFixture.setUp`/`tearDown`. The only new fixture implementation file is
@@ -92,3 +98,12 @@ lifecycle edit. Production/controller Git caching is deferred to another court.
 Each node is one retained unsquashed integration commit. Revert only the failing node,
 restore the frozen suite, and retain its benchmark and court evidence marked superseded.
 No rollback may rewrite adverse evidence or unwind an independent sibling.
+
+## Adopted factual erratum
+
+The Judge issued a narrow `ADOPT` erratum after comparing the contract wording with the
+retained unittest receipt. It corrects the unsupported claim of 382 executions / 381
+passes plus one skip. The authoritative frozen evidence is the complete ID-set digest
+above and the cited-host result of 381 total executions: 380 passes, the same conditional
+skip, zero failures, and zero errors. This erratum changes no scope, command, performance
+threshold, role, gate, or rollback requirement.
