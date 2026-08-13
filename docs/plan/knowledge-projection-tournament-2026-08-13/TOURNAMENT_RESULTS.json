@@ -1,0 +1,469 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-architecture-tournament-v1",
+  "tournament_id": "knowledge-projection-tournament-2026-08-13",
+  "captured_at": "2026-08-13",
+  "baseline": {
+    "branch": "main",
+    "commit": "a93df2632f259f4b63f7a4f27eb0b163b5a47204",
+    "tree": "a9ba24f17974b1992298f3bc9a85e8f878b7bc5d"
+  },
+  "subject_source": "docs/plan/knowledge-projection-tournament-2026-08-13/USER_OBJECTIVE.md",
+  "source_register": "docs/plan/knowledge-projection-tournament-2026-08-13/SOURCE_REGISTER.md",
+  "overall_disposition": "adapt",
+  "selected_topology": "protected canonical knowledge -> one-shot private projection -> offline release court -> local sanitized registry -> read-only prior art",
+  "claim_boundary": "This is an architecture-suitability judgment, not an empirical superiority claim and not evidence that the planned product exists.",
+  "independence_boundary": "The participants were separate agent turns with distinct assigned identities. This establishes procedural separation only, not authenticated independent-human, organizational, legal, privacy, or licensing approval.",
+  "participants": [
+    {
+      "seat": "clerk_orchestrator",
+      "identity": "codex:orchestrator",
+      "function": "preserve the user source, schedule the court, and author the implementation DAG"
+    },
+    {
+      "seat": "scout_explorer",
+      "identity": "codex:knowledge-scout",
+      "function": "inspect current-main code, tests, history, and implementation status without edits"
+    },
+    {
+      "seat": "advocate",
+      "identity": "codex:knowledge-advocate",
+      "function": "make the strongest evidence-bounded case for the proposed product"
+    },
+    {
+      "seat": "cross_examiner",
+      "identity": "codex:knowledge-cross-examiner",
+      "function": "search for contradictions, authority gaps, leakage, poisoning, lock-in, and failure modes without edits"
+    },
+    {
+      "seat": "expert_witness",
+      "identity": "codex:knowledge-expert",
+      "function": "assess architecture fit, current reusable primitives, and the divergent Phase 3 prototype without edits"
+    },
+    {
+      "seat": "judge",
+      "identity": "codex:knowledge-judge",
+      "function": "adjudicate candidate topologies, claims, adverse evidence, amendments, dissent, and appeal conditions without edits"
+    },
+    {
+      "seat": "plan_curator",
+      "identity": "codex:knowledge-plan-curator",
+      "function": "independently lint the authored DAG and cross-check scopes, tests, dependencies, seals, and claims without authoring the plan"
+    }
+  ],
+  "briefs": {
+    "scout": {
+      "position": "Current main has valuable append-only events, bounded memory, court, learning, and challenger machinery, but no implemented Obsidian projector, stable Idea/IdeaPass model, private/shared knowledge registry, or safe-release gateway.",
+      "verified_test_receipt": "92 focused memory, learning, court, challenger, and projection tests passed in the Scout's read-only workspace.",
+      "adverse_finding": "Committed .autopilot/lessons are an existing cross-repository portability path for node, head, actor, and detail fields without the proposed release court."
+    },
+    "advocate": {
+      "position": "Adapt current primitives into a staged local product: canonical private knowledge, immutable repeated passes, complete typed lifecycle edges, rebuildable private views, offline release bundles, and a local sanitized registry.",
+      "strongest_value_case": "The design can reduce forgotten alternatives and repeated ideation while preserving why work returned to an earlier stage; that outcome remains a hypothesis until controlled evaluation."
+    },
+    "cross_examiner": {
+      "position": "The credible first release stops at a private projector unless authority, disclosure, retention, and independent release evidence close the demonstrated gaps.",
+      "adverse_findings": [
+        "ConstraintEnvelope narrowing omits sensitive scope and budget dimensions.",
+        "Authority registration and use are not sufficiently content-bound, collision-safe, or registry-backed at the actual effect boundary.",
+        "Lesson intake can admit weak provenance and active free text into challenger construction.",
+        "Secret scanning is not an IP, privacy, or nondisclosure proof.",
+        "Current JSON/HTML projection is direct-writing and can expose objectives or hypotheses without the planned classification boundary.",
+        "Existing appeal and replan limits do not implement unlimited stable idea passes."
+      ]
+    },
+    "expert": {
+      "position": "Use current-main contracts as the authority and treat the Phase 3 branch as a pattern donor only.",
+      "prototype_assessment": "The divergent prototype contains useful transactional projection, conflict, public/private, and federation mechanics, but it lacks the required stable IdeaPass lifecycle and its Canvas evidence omits relationship edges. It is not merge-ready.",
+      "safety_warning": "No generic scanner can prove that an abstraction discloses no proprietary or private information; structural minimization, provenance/taint, adversarial tests, and an independent release decision are all required."
+    }
+  },
+  "candidate_topologies": [
+    {
+      "id": "T1",
+      "topology": "repository Markdown or Obsidian vault is canonical authority",
+      "disposition": "reject",
+      "reason": "Mutable files, titles, paths, links, and plugins cannot supply the append-only typed authority, deterministic replay, or point-in-time evidence contract."
+    },
+    {
+      "id": "T2",
+      "topology": "direct projector over the current mixed stores",
+      "disposition": "reject",
+      "reason": "Mission, court, memory, prompt, scheduler, and lesson records do not yet share one reducible authority; a direct merge would conceal contradictions and sensitivity boundaries."
+    },
+    {
+      "id": "T3",
+      "topology": "protected canonical knowledge plus one-shot private projector",
+      "disposition": "adopt",
+      "scope": "first useful release slice",
+      "reason": "It provides the requested history and graph with the smallest authority and disclosure surface and works without Obsidian."
+    },
+    {
+      "id": "T4",
+      "topology": "private canonical knowledge, offline release court, local sanitized registry, and inert read-only prior art",
+      "disposition": "adapt",
+      "scope": "selected complete local program",
+      "reason": "It tests cross-repository learning while keeping publication, activation, and private source material outside the authorized path."
+    },
+    {
+      "id": "T5",
+      "topology": "automatic remote or public shared registry",
+      "disposition": "quarantine",
+      "reason": "Authenticated external identity, durable retention/takedown, transport threats, revocation, and exact-candidate nondisclosure evidence are unresolved."
+    },
+    {
+      "id": "T6",
+      "topology": "wholesale merge of the Phase 3 prototype",
+      "disposition": "reject",
+      "reason": "The branch is divergent prior art and does not satisfy current-main authority, lifecycle, or evidence contracts."
+    },
+    {
+      "id": "T7",
+      "topology": "required external SaaS, Obsidian plugin, Sync, embedding, or watcher",
+      "disposition": "defer",
+      "reason": "These dependencies are unnecessary for the local product and lack admitted product, security, license, retention, and lock-in evidence."
+    }
+  ],
+  "atomic_claims": [
+    {
+      "id": "K-C01",
+      "claim": "The tool must operate across repositories without raw remote URLs, local paths, or repository names becoming portable identity.",
+      "disposition": "adopt",
+      "dag_nodes": ["IDENTITY-100", "FEDERATION-410", "QUALIFY-500"],
+      "verification": "rename, clone-path, Unicode, Windows, tenant-canary, and subject-commit tests",
+      "rollback": "disable the federation and identity adapter while preserving opaque record history"
+    },
+    {
+      "id": "K-C02",
+      "claim": "Current append-only event and memory primitives may be adapted into one protected canonical knowledge authority.",
+      "disposition": "adapt",
+      "dag_nodes": ["SOURCE-010", "RETENTION-170", "STORE-200", "MIGRATION-420"],
+      "verification": "authority inventory, chain corruption, concurrency, replay, backup, restore, and dual-owner rejection",
+      "rollback": "disable the new store adapter and retain events plus migration receipts"
+    },
+    {
+      "id": "K-C03",
+      "claim": "A private Obsidian-compatible graph should cover all permitted material lifecycle records and relationships.",
+      "disposition": "adapt",
+      "dag_nodes": ["OBSIDIAN-SOURCE-160", "PRIVATE-PROJECTOR-230", "OBSIDIAN-VIEWS-300"],
+      "verification": "official-source admission, required-record coverage, byte-identical rebuild, typed-link, and Obsidian-absent tests",
+      "rollback": "delete and rebuild the derived vault with the previous renderer"
+    },
+    {
+      "id": "K-C04",
+      "claim": "Obsidian, Markdown, Bases, Canvas, dashboards, and generated indices must remain disposable non-authoritative views.",
+      "disposition": "adopt",
+      "dag_nodes": ["PROJECT-CONTRACT-130", "PRIVATE-PROJECTOR-230"],
+      "verification": "source-head binding, stale-cursor, human-edit conflict, staging, crash, and rebuild tests",
+      "rollback": "discard staging/output and regenerate from verified canonical state"
+    },
+    {
+      "id": "K-C05",
+      "claim": "One stable Idea must have immutable, ordered IdeaPass records.",
+      "disposition": "adopt",
+      "dag_nodes": ["IDEA-110", "IDEA-RUNTIME-210"],
+      "verification": "three-pass identity, immutability, ordinal, collision, and replay fixtures",
+      "rollback": "disable the runtime version without rewriting prior passes"
+    },
+    {
+      "id": "K-C06",
+      "claim": "An idea may re-enter the workflow any number of times.",
+      "disposition": "adapt",
+      "qualification": "There is no fixed semantic pass limit, but every new pass remains subject to authority, evidence, resource leases, duplicate-failure detection, and stopping conditions.",
+      "dag_nodes": ["IDEA-110", "IDEA-RUNTIME-210", "TRACE-310"],
+      "verification": "multiple remand, appeal, incident, regression, deferred-trigger, and later-evidence paths",
+      "rollback": "stop creating successor passes while preserving every prior return fact"
+    },
+    {
+      "id": "K-C07",
+      "claim": "Every semantic return to an earlier stage must retain its source gate, requested destination, reason, evidence, actor, prior pass, and successor.",
+      "disposition": "adopt",
+      "dag_nodes": ["IDEA-110", "TRACE-310"],
+      "verification": "point-in-time path reconstruction with zero missing mandatory backward reasons",
+      "rollback": "quarantine incomplete traces; never infer or fabricate a reason"
+    },
+    {
+      "id": "K-C08",
+      "claim": "Idea, work, candidate, verified deliverable, delivery, outcome, signal, lesson, challenger, evaluation, and promotion are distinct append-only record types.",
+      "disposition": "adopt",
+      "dag_nodes": ["COVERAGE-120", "GRAPH-ADAPTERS-220"],
+      "verification": "schema and mandatory-edge coverage with explicit not-applicable dispositions",
+      "rollback": "disable a faulty adapter while retaining the source record and adverse evidence"
+    },
+    {
+      "id": "K-C09",
+      "claim": "All eight specialist roles and all temporary court seats must be attributable in the graph.",
+      "disposition": "adapt",
+      "qualification": "A record must label whether evidence is merely declared, a fixture, a model turn, a real read/effect, independently reproduced, or externally authenticated.",
+      "dag_nodes": ["COVERAGE-120", "GRAPH-ADAPTERS-220", "DASHBOARDS-430"],
+      "verification": "role/seat coverage and evidence-maturity tests",
+      "rollback": "downgrade the maturity label; never delete an episode to improve coverage"
+    },
+    {
+      "id": "K-C10",
+      "claim": "Champion, challenger, losing evaluation, counterexample, rejection, promotion, and rollback evidence should be linked so proposals are not needlessly repeated.",
+      "disposition": "adapt",
+      "dag_nodes": ["LEARNING-030", "GRAPH-ADAPTERS-220", "PRIOR-ART-400"],
+      "verification": "inert intake, provenance, conflict, held-out evaluation, rollback, and negative-result retrieval tests",
+      "rollback": "remove prior-art lookup from decision context while retaining citations and evaluation history"
+    },
+    {
+      "id": "K-C11",
+      "claim": "Cross-repository learning may enter a local shared registry only after a separate offline release decision.",
+      "disposition": "adapt",
+      "dag_nodes": ["RELEASE-GATE-320", "SHARED-REGISTRY-330"],
+      "verification": "synthetic license-clean bundle, independent disposition, revocation, tombstone, and cross-tenant tests",
+      "rollback": "revoke or tombstone the bundle and disable the registry adapter"
+    },
+    {
+      "id": "K-C12",
+      "claim": "Shared records must be newly composed structural allowlists rather than redacted copies of private records.",
+      "disposition": "adopt",
+      "dag_nodes": ["RELEASE-CONTRACT-140", "RELEASE-CANDIDATE-240"],
+      "verification": "unknown-field rejection, provenance allowlist, body/link absence, determinism, and non-reversibility tests",
+      "rollback": "quarantine the candidate before registry admission"
+    },
+    {
+      "id": "K-C13",
+      "claim": "Secrets, private/customer data, proprietary expression, incompatible-license material, identity linkage, topology leakage, and prompt injection must fail closed at the release boundary.",
+      "disposition": "adopt",
+      "dag_nodes": ["CLASSIFY-050", "ADVERSARY-150", "RELEASE-GATE-320"],
+      "verification": "direct, encoded, split-field, filename, count/timing, graph-neighbor, pseudonym-linkage, and poisoning fixtures with zero known bypass",
+      "rollback": "deny all release, preserve the private decision, and open a takedown case for any exposure"
+    },
+    {
+      "id": "K-C14",
+      "claim": "A release Curator and Judge must be distinct from the candidate author, affected champion, and each other.",
+      "disposition": "adapt",
+      "qualification": "Agent identities establish procedural separation only; authenticated legal, privacy, licensing, or external-human authority remains a separate obligation.",
+      "dag_nodes": ["RELEASE-GATE-320", "RELEASE-COURT-510"],
+      "verification": "identity-separation and authority-receipt checks",
+      "rollback": "invalidate the disposition and return the candidate to private quarantine"
+    },
+    {
+      "id": "K-C15",
+      "claim": "Approved shared learning may be consulted only as inert, read-only prior art by Explorer and Optimizer.",
+      "disposition": "adapt",
+      "qualification": "Reduced repeated ideation is an evaluation hypothesis, not an assumed outcome.",
+      "dag_nodes": ["PRIOR-ART-400", "DASHBOARDS-430"],
+      "verification": "citation, local applicability, false-merge, duplicate-escape, no-execution, no-authority, and no-prompt-concatenation tests",
+      "rollback": "disable lookup while retaining the local evaluation record"
+    },
+    {
+      "id": "K-C16",
+      "claim": "Projection and registry updates must be deterministic, staged, cursor-bound, conflict-aware, reversible, and interruption-safe.",
+      "disposition": "adapt",
+      "dag_nodes": ["PROJECT-CONTRACT-130", "PRIVATE-PROJECTOR-230", "MIGRATION-420"],
+      "verification": "partial-write, stale-head, drift, conflict, tombstone, backup/restore, downgrade, and byte-identical rebuild tests",
+      "rollback": "disable the new renderer or registry version and rebuild from retained authority"
+    },
+    {
+      "id": "K-C17",
+      "claim": "Local portfolio use requires tenant, project-lineage, repository, pseudonym, and self-host recursion isolation.",
+      "disposition": "adapt",
+      "dag_nodes": ["FEDERATION-410", "QUALIFY-500"],
+      "verification": "tenant canaries, inference/count/linkage tests, source-tree validation, hop/depth/origin guards, and generated-output re-ingestion tests",
+      "rollback": "disable federation and cross-repository reads"
+    },
+    {
+      "id": "K-C18",
+      "claim": "The local product must work without Obsidian, an Obsidian account, Sync, a plugin, a watcher, or a network service.",
+      "disposition": "adopt",
+      "dag_nodes": ["PRIVATE-PROJECTOR-230", "CLI-340", "QUALIFY-500"],
+      "verification": "offline generic Markdown/YAML/JSON operation and missing-Obsidian tests",
+      "rollback": "retain the canonical and CLI surfaces while disabling optional view adapters"
+    }
+  ],
+  "adverse_findings_adopted": [
+    {
+      "id": "AF-01",
+      "finding": "Current main does not implement the requested Obsidian/IdeaPass/shared-registry product.",
+      "evidence": [
+        "docs/plan/knowledge-projection-tournament-2026-08-13/SOURCE_REGISTER.md",
+        "repository-wide tracked source and test search at the sealed baseline"
+      ]
+    },
+    {
+      "id": "AF-02",
+      "finding": "Authority narrowing and the actual effect boundary require repair before any projector or release authority is safe.",
+      "evidence": [
+        "src/hive_mind_os/brain_kernel/contracts.py",
+        "src/hive_mind_os/brain_kernel/authority.py",
+        "src/hive_mind_os/brain_kernel/effects.py",
+        "src/hive_mind_os/brain_kernel/effect_outbox.py"
+      ]
+    },
+    {
+      "id": "AF-03",
+      "finding": "Existing Autopilot lessons are a committed portability path for repository/run details and must be quarantined without rewriting history.",
+      "evidence": [
+        ".autopilot/bin/learning.py",
+        ".autopilot/lessons/README.md"
+      ]
+    },
+    {
+      "id": "AF-04",
+      "finding": "Append-only provenance must not force retention of credentials, customer data, or legally erasable bodies.",
+      "evidence": [
+        "judge retention/takedown amendment",
+        "RETENTION-170"
+      ]
+    },
+    {
+      "id": "AF-05",
+      "finding": "Current Obsidian compatibility claims lack newly retained pinned official-source evidence in this tournament.",
+      "evidence": [
+        "docs/NEXT_SESSION_HANDOFF_OBSIDIAN_AGENT_REDESIGN.md",
+        "OBSIDIAN-SOURCE-160"
+      ]
+    }
+  ],
+  "blocking_amendments_and_resolutions": [
+    {
+      "id": "AM-01",
+      "amendment": "Seal the full tournament and plan bundle.",
+      "resolution": "The manifest and verifier enumerate and verify the tournament README, objective, source register, results, architecture decision, implementation program, DAG, and executable-DAG README."
+    },
+    {
+      "id": "AM-02",
+      "amendment": "Extend authority work through the actual effect boundary and outbox.",
+      "resolution": "AUTHORITY-020 owns the relevant authority, contract, effect, outbox, test, and evidence paths and requires registry-backed use-time validation."
+    },
+    {
+      "id": "AM-03",
+      "amendment": "Close the existing Autopilot lesson-export path.",
+      "resolution": "LEARNING-030 inventories and quarantines existing details without rewriting history, blocks new unapproved instance export, and requires separate exposure/takedown receipts."
+    },
+    {
+      "id": "AM-04",
+      "amendment": "Admit current official Obsidian product evidence before compatibility claims.",
+      "resolution": "OBSIDIAN-SOURCE-160 is an explicit predecessor of OBSIDIAN-VIEWS-300; unavailable evidence narrows the product to generic Markdown/YAML/JSON."
+    },
+    {
+      "id": "AM-05",
+      "amendment": "Resolve retention, deletion, and takedown before canonical storage.",
+      "resolution": "RETENTION-170 separates immutable metadata and receipts from protected or erasable bodies and blocks STORE-200 until the policy and expert obligations are resolved."
+    },
+    {
+      "id": "AM-06",
+      "amendment": "Use only synthetic, license-clean records before the exact release court.",
+      "resolution": "Release-candidate, gateway, registry, and qualification contracts forbid real private records before RELEASE-COURT-510."
+    },
+    {
+      "id": "AM-07",
+      "amendment": "Keep independence and remote-publication claims honest.",
+      "resolution": "RELEASE-COURT-510 requires distinct procedural identities and retains docs/plan/BLOCKERS.md obligations; remote publication remains quarantined."
+    },
+    {
+      "id": "AM-08",
+      "amendment": "Do not mark planning complete until judgment, documents, amendments, and seals exist.",
+      "resolution": "Planning becomes complete only when the final manifest verification passes; all implementation nodes remain not_started."
+    }
+  ],
+  "accepted_evidence_contracts": [
+    {
+      "family": "canonical_authority",
+      "owner": "architect_builder",
+      "independent_check": "curator",
+      "evidence": "authority, effect, store, reducer, corruption, concurrency, point-in-time, backup, and restore tests",
+      "metrics": ["unresolved_dual_authorities=0", "corrupt_chain_acceptance=0", "unauthorized_effect_acceptance=0"],
+      "rollback": "disable the adapter, preserve canonical history and receipts"
+    },
+    {
+      "family": "idea_pass_trace",
+      "owner": "explorer_builder_steward",
+      "independent_check": "curator",
+      "evidence": "three-pass and multi-return fixtures, immutable history, typed-edge coverage, point-in-time trace",
+      "metrics": ["missing_backward_reasons=0", "mandatory_edge_orphans=0"],
+      "rollback": "disable runtime version and preserve every pass"
+    },
+    {
+      "family": "private_projection",
+      "owner": "builder_integrator",
+      "independent_check": "curator",
+      "evidence": "byte-identical rebuild, crash staging, stale cursor, drift, human-edit conflict, and Obsidian-absent tests",
+      "metrics": ["partial_publications=0", "silent_overwrites=0"],
+      "rollback": "delete and rebuild the derived view using a prior renderer"
+    },
+    {
+      "family": "safe_learning",
+      "owner": "builder_integrator",
+      "independent_check": "privacy_and_license_experts_curator_judge",
+      "evidence": "structural allowlist, taint/linkage, poisoning, license, revocation, and cross-tenant synthetic corpus",
+      "metrics": ["known_leakage=0", "release_gate_bypass=0"],
+      "rollback": "revoke/tombstone bundle and disable registry"
+    },
+    {
+      "family": "prior_art_challengers",
+      "owner": "optimizer_explorer",
+      "independent_check": "evaluation_court",
+      "evidence": "inert lookup, no prompt concatenation, citation, held-out evaluation, false-merge and duplicate-escape results",
+      "metrics": ["duplicate_escape_measured", "false_merge_measured", "poisoning_outcomes_measured"],
+      "rollback": "remove lookup from the live decision context and retain citations"
+    },
+    {
+      "family": "federation_portability",
+      "owner": "integrator_steward",
+      "independent_check": "curator",
+      "evidence": "rename, path, Unicode, Windows, tenant-canary, linkage, source-tree, and recursion tests",
+      "metrics": ["cross_tenant_disclosure=0", "generated_output_reingestion=0"],
+      "rollback": "disable federation and shared-read adapters"
+    }
+  ],
+  "preserved_dissent": [
+    "The Cross-Examiner's preferred MVP stops after private projection; even the local shared registry stays disabled until every authority, disclosure, retention, and release-court contract passes.",
+    "The Advocate considers a local sanitized registry necessary to test whether cross-repository prior art is useful.",
+    "The Expert warns that scanners cannot prove nondisclosure and that the Phase 3 branch is only a pattern donor.",
+    "The Scout identifies committed Autopilot lessons as an existing unsanitized portability risk requiring immediate predecessor work."
+  ],
+  "appeal_conditions": [
+    {
+      "subject": "automatic_remote_publication",
+      "condition": "Materially new evidence closes authenticated identity, external retention/takedown, transport threats, disclosure qualification, revocation, and exact-candidate authority."
+    },
+    {
+      "subject": "shared_prior_art_reduces_repeated_ideation",
+      "condition": "Controlled outcome evaluation reports duplicate escape, false merge, poisoning, and downstream customer-value effects against pinned comparators."
+    },
+    {
+      "subject": "adverse_or_deferred_idea",
+      "condition": "A later immutable IdeaPass cites new evidence and a distinct appeals judge; no prior record is rewritten."
+    }
+  ],
+  "current_truth": {
+    "implemented_foundations": [
+      "local append-only mission/work event spine",
+      "bounded content-addressed memory with sensitivity, supersession, and conflict",
+      "court records and five dispositions",
+      "remand learning signals, counterexamples, and dissent",
+      "immutable challengers, held-out evaluation, prompt-oriented promotion, and rollback",
+      "acyclic objective DAGs",
+      "JSON/HTML operational projection"
+    ],
+    "partial_or_unsafe_for_this_objective": [
+      "authority mediation",
+      "lesson/challenger admission",
+      "privacy and proprietary classification",
+      "role effect maturity",
+      "portable repository identity",
+      "committed Autopilot lesson sharing"
+    ],
+    "not_implemented": [
+      "stable Idea and IdeaPass runtime",
+      "complete typed knowledge graph",
+      "protected canonical knowledge store for this product",
+      "transactional private Obsidian-compatible projection",
+      "offline safe-release bundle",
+      "sanitized local registry",
+      "inert shared prior-art lookup",
+      "qualified local federation",
+      "remote or public publication"
+    ],
+    "implementation_progress": {
+      "completed_nodes": 0,
+      "in_progress_nodes": 0,
+      "not_started_nodes": 31,
+      "percent_complete": 0
+    }
+  }
+}
