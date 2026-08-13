@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-GIT-COMMIT-OBSERVATION-SEQUENCING-APPEAL",
+  "node_id": "GCO-ERRATUM-SEAL-035",
+  "recorded_at": "2026-08-13",
+  "subject": "Repair the executable sequencing contradiction between controller-only production and durable-controller consumption without changing the sealed implementation contract",
+  "adjudicated_commit": "794723765fc4755d7a371cfa54c8877d1037f048",
+  "participants": [
+    {
+      "seat": "orchestrator",
+      "identity": "/root",
+      "action": "opened the narrow sequencing appeal"
+    },
+    {
+      "seat": "independent-cross-examiner-and-curator",
+      "identity": "/root/gco_contract_cross_exam",
+      "action": "identified and bounded the executable contract contradiction"
+    },
+    {
+      "seat": "appeals-judge",
+      "identity": "/root/gco_contract_judge",
+      "action": "issued the additive ADAPT sequencing verdict"
+    },
+    {
+      "seat": "affected-builder",
+      "identity": "/root/gco_build_040",
+      "action": "implementation merit not adjudicated"
+    },
+    {
+      "seat": "clerk",
+      "identity": "/root/gco_erratum_seal_035",
+      "action": "sealed the verdict without self-approval"
+    }
+  ],
+  "unseated_roles": {
+    "advocate": "No separate Advocate was seated for this narrow sequencing appeal.",
+    "expert_witness": "No separate Expert Witness was seated for this narrow sequencing appeal.",
+    "limitation": "The judgment is bounded to the executable contract contradiction and does not adjudicate implementation merit or performance."
+  },
+  "governing_inputs": {
+    "original_plan_digest": "sha256:6d14f5dee38d15cb9608b7fb8092c4c1f28150961b70737def2fd4ede7f5a90d",
+    "autopilot_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+    "original_manifest_blob": "4b12501a7b0b7a61477697892e040d5458468c13",
+    "specs_blob": "2946e786a14ac18b4805a0f5dab62b6380c88eb7",
+    "original_verifier_blob": "2d348a48616992eca2fca9b3c6bf63f50fc4cdbf",
+    "independent_test_blob": "37782c3282cbb23d54cef12c90c0a6ab9ffab63f",
+    "adr_064_blob": "59d003bad3f5eefdd4319444995cc347c52f8ee1",
+    "baseline_diagnostic_blob": "5a01f59514a31d6338ff0a4c57d0639741e6b4b5",
+    "opening_court_blob": "d3af08903e9f0a6a7eae8345562a9090e48d8843"
+  },
+  "finding": {
+    "contradiction": "The original GCO-BUILD-040 controller-only node required the complete focused suite to pass even though test_24 requires the later durable_controller-only integration node.",
+    "effect": "The original sequence made a conforming Builder unable to satisfy its stopping condition without crossing its one-file authority boundary.",
+    "scope": "sequencing and provisional integration authority only"
+  },
+  "carried_forward_completion": [
+    "GCO-SEAL-000",
+    "GCO-BASELINE-010",
+    "GCO-TEST-020",
+    "GCO-ARCH-030"
+  ],
+  "verdict": {
+    "disposition": "adapt",
+    "authorized_node": "GCO-ERRATUM-SEAL-035",
+    "original_v1_status": "permanently-historical-and-quarantined",
+    "authority": "Seal an additive execution overlay, provisionally integrate a controller-only Builder candidate when the sole focused failure is exactly test_24, then start a distinct durable_controller-only Integrator.",
+    "implementation_merit_adjudicated": false,
+    "performance_adjudicated": false,
+    "promotion_authorized": false,
+    "superiority_claim_authorized": false,
+    "baseline_retry_authorized": false,
+    "remote_authority_granted": false
+  },
+  "superseded_sequence": {
+    "GCO-ERRATUM-SEAL-035": {
+      "dependencies": ["GCO-TEST-020", "GCO-ARCH-030"],
+      "output_count": 4,
+      "commit_count": 1
+    },
+    "GCO-BUILD-040": {
+      "dependencies": ["GCO-ERRATUM-SEAL-035"],
+      "write_scope": [".autopilot/bin/controller.py"],
+      "provisional_gate": "All GitCommitObservationContract methods pass except exactly test_24_durable_consumption_is_explicit_pure_and_never_retained; tests 25 through 27 remain passing; the frozen .autopilot 381-execution vector remains green.",
+      "provisional_authority": "may be integrated only to start GCO-INTEGRATE-050",
+      "quarantined": true
+    },
+    "GCO-INTEGRATE-050": {
+      "dependencies": ["exact-provisional-GCO-BUILD-040-commit-and-digest-receipt"],
+      "write_scope": [".autopilot/bin/durable_controller.py"],
+      "green_gate": "All 28 focused methods, durable completion, the frozen .autopilot 381-execution vector, and full repository CI pass; recovery and release surfaces remain byte-identical; fresh-effect boundaries hold.",
+      "commit_count": 1
+    }
+  },
+  "later_nodes": {
+    "status": "unchanged-and-blocked",
+    "release_condition": "GCO-INTEGRATE-050 satisfies every green gate",
+    "nodes": ["GCO-SAFETY-060", "GCO-SMOKE-070", "GCO-QUALIFY-080", "GCO-JUDGE-090"]
+  },
+  "rollback": "On integration failure, revert the Integrator commit first and the provisional Builder commit second; retain this appeal, all adverse evidence, the independent tests, ADR, and baseline diagnostic.",
+  "quarantine": "The provisional Builder and original v1 sequence remain non-promotable. No later node may run until the Integrator green gate passes.",
+  "release_criteria": "Only the unchanged GCO-SAFETY-060 through GCO-JUDGE-090 chain may consider release after green integration; its original final ADOPT burden remains unchanged.",
+  "forbidden": [
+    "main mutation",
+    "push or other remote effect",
+    ".autopilot/plan.json mutation",
+    "test weakening or mutation",
+    "original GCO seal, ADR, baseline, or opening-court mutation",
+    "recovery.py or release_barrier.py mutation",
+    "promotion, superiority, or knowledge BASELINE-000 retry"
+  ],
+  "completion_claim": false,
+  "superiority_claim": false
+}

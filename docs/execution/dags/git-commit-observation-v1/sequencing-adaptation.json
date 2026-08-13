@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-dag-sequencing-adaptation-v1",
+  "adaptation_id": "git-commit-observation-v1-sequencing-adaptation",
+  "court": "evidence/courts/CASE-GIT-COMMIT-OBSERVATION-SEQUENCING-APPEAL.json",
+  "adjudicated_commit": "794723765fc4755d7a371cfa54c8877d1037f048",
+  "original_plan": {
+    "status": "permanently-historical-and-quarantined",
+    "digest": "sha256:6d14f5dee38d15cb9608b7fb8092c4c1f28150961b70737def2fd4ede7f5a90d",
+    "manifest_blob": "4b12501a7b0b7a61477697892e040d5458468c13",
+    "autopilot_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef"
+  },
+  "completed_nodes": [
+    {
+      "id": "GCO-SEAL-000",
+      "commit": "8e516cf2169d10b2c505c03020848629d5fbfd1e",
+      "tree": "670e7b501d1052fd36fd8dfdd59254cdf48c3a0a"
+    },
+    {
+      "id": "GCO-BASELINE-010",
+      "commit": "76b7d4ef5a9be3a72f8e246e72628a6609fc8ddb",
+      "tree": "ba9f0eee6ef61e7ac6182bb12b61594d6d1e776e"
+    },
+    {
+      "id": "GCO-TEST-020",
+      "commit": "8182cd433386d225aba72d0a6f39e3737d579c4a",
+      "tree": "e5327ab3d30571a86c38e7baa6e0730912fceb35"
+    },
+    {
+      "id": "GCO-ARCH-030",
+      "commit": "794723765fc4755d7a371cfa54c8877d1037f048",
+      "tree": "dff7ccb1bcc74fa709e4b0e5b2f17cd4615591b4"
+    }
+  ],
+  "adapted_nodes": [
+    {
+      "id": "GCO-ERRATUM-SEAL-035",
+      "role": "orchestrator",
+      "court_seat": "clerk",
+      "identity": "/root/gco_erratum_seal_035",
+      "dependencies": ["GCO-TEST-020", "GCO-ARCH-030"],
+      "write_scope": [
+        "evidence/courts/CASE-GIT-COMMIT-OBSERVATION-SEQUENCING-APPEAL.json",
+        "docs/execution/dags/git-commit-observation-v1/sequencing-adaptation.json",
+        "docs/execution/dags/git-commit-observation-v1/verify_sequencing_adaptation.py",
+        "docs/execution/dags/git-commit-observation-v1/sequencing-adaptation.manifest.json"
+      ],
+      "required_tests": [
+        "python docs/execution/dags/git-commit-observation-v1/verify_sequencing_adaptation.py",
+        "python docs/execution/dags/git-commit-observation-v1/verify_plan.py",
+        "python .autopilot/bin/autopilot.py --repo-root . dag-lint --plan .autopilot/state/git-commit-observation-v1.json --strict --json",
+        "python .autopilot/bin/autopilot.py --repo-root . dag-rounds --plan .autopilot/state/git-commit-observation-v1.json --max-sessions 4 --actor codex:git-commit-observation --json"
+      ],
+      "stopping_condition": "Exactly four added files in one retained unsquashed commit; every pinned byte identity, original seal, predecessor seal, lint, round, syntax, and scope check passes.",
+      "rollback": "Revert this one four-file erratum commit; retain the original historical/quarantined v1 evidence."
+    },
+    {
+      "id": "GCO-BUILD-040",
+      "supersedes_original_execution_contract": true,
+      "role": "builder",
+      "identity": "/root/gco_build_040",
+      "dependencies": ["GCO-ERRATUM-SEAL-035"],
+      "write_scope": [".autopilot/bin/controller.py"],
+      "commit_contract": "exactly one retained unsquashed commit changing exactly .autopilot/bin/controller.py",
+      "producer_test_contract": {
+        "class": "GitCommitObservationContract",
+        "must_pass_count": 27,
+        "must_fail_count": 1,
+        "sole_expected_failure": "test_24_durable_consumption_is_explicit_pure_and_never_retained",
+        "must_pass_methods": [
+          "test_01_observation_is_frozen_finite_and_non_serializable",
+          "test_02_only_full_lowercase_deduplicated_commit_oids_are_accepted",
+          "test_03_commit_message_delimiters_cannot_forge_facts",
+          "test_04_duplicate_delimiter_records_cannot_overwrite_requested_commit",
+          "test_05_ref_move_create_delete_never_changes_frozen_facts",
+          "test_06_partial_false_negative_after_missing_object_is_not_reused_after_fetch",
+          "test_07_replace_refs_are_rejected_even_when_replacements_are_disabled_for_batch",
+          "test_08_shallow_repository_is_rejected",
+          "test_09_grafts_are_rejected",
+          "test_10_alternate_object_store_is_rejected",
+          "test_11_promisor_or_partial_clone_configuration_is_rejected",
+          "test_12_ordinary_repository_and_linked_worktree_bind_distinct_git_dirs",
+          "test_13_repository_identity_mismatch_fails_closed",
+          "test_14_object_format_mismatch_fails_closed",
+          "test_15_parser_accepts_exact_framing_and_recomputes_hash",
+          "test_16_missing_duplicate_extra_and_truncated_responses_are_fatal",
+          "test_17_reordered_response_is_fatal",
+          "test_18_wrong_type_and_hash_mismatch_are_fatal",
+          "test_19_commit_grammar_requires_one_tree_then_only_parents_before_blank_line",
+          "test_20_nested_and_concurrent_observations_never_share_instances",
+          "test_21_observation_is_invalidated_after_success_or_exception",
+          "test_22_timeout_and_cancellation_kill_and_reap_batch_process",
+          "test_23_observation_cannot_capture_mutable_authority_or_effect_state",
+          "test_23b_one_replacement_disabled_binary_batch_process_is_used",
+          "test_25_effect_boundaries_keep_fresh_cas_and_force_with_lease_reads",
+          "test_26_sealed_recovery_and_release_barrier_cannot_consume_observation",
+          "test_27_existing_autopilot_test_tree_is_frozen_by_scope"
+        ],
+        "must_pass_after_expected_failure": [
+          "test_25_effect_boundaries_keep_fresh_cas_and_force_with_lease_reads",
+          "test_26_sealed_recovery_and_release_barrier_cannot_consume_observation",
+          "test_27_existing_autopilot_test_tree_is_frozen_by_scope"
+        ],
+        "any_other_failure_blocks": true
+      },
+      "autopilot_gate": {
+        "total": 381,
+        "passed": 380,
+        "skipped": 1,
+        "failures": 0,
+        "errors": 0,
+        "id_set_sha256": "sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4"
+      },
+      "provisional_disposition": "quarantine",
+      "provisional_authority": "The exact controller-only commit may be integrated solely to start GCO-INTEGRATE-050; it grants no other execution, release, promotion, superiority, baseline-retry, or remote authority.",
+      "required_receipt": [
+        "commit_oid",
+        "parent_oid",
+        "tree_oid",
+        "controller_blob_oid",
+        "controller_sha256",
+        "focused_test_method_results",
+        "autopilot_frozen_vector",
+        "changed_paths"
+      ],
+      "rollback": "Revert the one provisional Builder commit after reverting any dependent Integrator commit; retain its failed and passing evidence."
+    },
+    {
+      "id": "GCO-INTEGRATE-050",
+      "supersedes_original_execution_contract": true,
+      "role": "integrator",
+      "identity_constraint": "distinct from /root/gco_build_040",
+      "dependencies": ["exact-provisional-GCO-BUILD-040-commit-and-digest-receipt"],
+      "write_scope": [".autopilot/bin/durable_controller.py"],
+      "commit_contract": "exactly one retained unsquashed commit changing exactly .autopilot/bin/durable_controller.py",
+      "required_gates": {
+        "focused": "all 28 GitCommitObservationContract methods pass",
+        "durable_completion": "python -m unittest discover -s .autopilot/tests -p test_durable_completion.py -v passes",
+        "autopilot": "the frozen 381-execution vector passes unchanged",
+        "repository_ci": "python -m unittest discover -s tests -v passes",
+        "immutable_surfaces": [
+          ".autopilot/bin/sealed_recovery.py",
+          ".autopilot/bin/release_barrier.py"
+        ],
+        "effect_boundary": "Every mutable fact and authority is freshly read before effects; existing CAS and force-with-lease checks and fresh post-effect verification remain."
+      },
+      "stopping_condition": "All gates pass, changed paths equal the one-file write scope, and the exact provisional Builder commit and digest receipt are bound.",
+      "rollback": "Revert the one Integrator commit first; if integration remains invalid, then revert the one provisional Builder commit. Retain all evidence."
+    }
+  ],
+  "unchanged_blocked_tail": [
+    "GCO-SAFETY-060",
+    "GCO-SMOKE-070",
+    "GCO-QUALIFY-080",
+    "GCO-JUDGE-090"
+  ],
+  "tail_release_condition": "GCO-INTEGRATE-050 passes every required gate with zero unresolved findings.",
+  "global_forbidden": [
+    "main mutation",
+    "push or remote effects",
+    ".autopilot/plan.json mutation",
+    "tests/test_doctor_git_fact_batching.py mutation or weakening",
+    ".autopilot/tests mutation",
+    "existing GCO v1 seal, ADR, opening court, or baseline diagnostic mutation",
+    ".autopilot/bin/sealed_recovery.py mutation",
+    ".autopilot/bin/release_barrier.py mutation",
+    "promotion or superiority claims",
+    "knowledge BASELINE-000 retry"
+  ],
+  "rollback_order": ["GCO-INTEGRATE-050", "GCO-BUILD-040", "GCO-ERRATUM-SEAL-035"],
+  "completion_claim": false,
+  "superiority_claim": false
+}

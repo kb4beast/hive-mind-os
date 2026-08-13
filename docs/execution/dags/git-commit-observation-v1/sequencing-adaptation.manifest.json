@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-dag-sequencing-adaptation-manifest-v1",
+  "adaptation_id": "git-commit-observation-v1-sequencing-adaptation",
+  "adjudicated_commit": "794723765fc4755d7a371cfa54c8877d1037f048",
+  "original_plan_digest": "sha256:6d14f5dee38d15cb9608b7fb8092c4c1f28150961b70737def2fd4ede7f5a90d",
+  "autopilot_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+  "pinned_inputs": {
+    "docs/execution/dags/git-commit-observation-v1/manifest.json": "4b12501a7b0b7a61477697892e040d5458468c13",
+    "docs/execution/dags/git-commit-observation-v1/specs.py": "2946e786a14ac18b4805a0f5dab62b6380c88eb7",
+    "docs/execution/dags/git-commit-observation-v1/verify_plan.py": "2d348a48616992eca2fca9b3c6bf63f50fc4cdbf",
+    "tests/test_doctor_git_fact_batching.py": "37782c3282cbb23d54cef12c90c0a6ab9ffab63f",
+    "docs/architecture/ADR-064-ONE-SHOT-RAW-GIT-COMMIT-OBSERVATIONS.md": "59d003bad3f5eefdd4319444995cc347c52f8ee1",
+    "evidence/performance/git-commit-observation-v1/baseline-diagnostic.json": "5a01f59514a31d6338ff0a4c57d0639741e6b4b5",
+    "evidence/courts/CASE-GIT-COMMIT-OBSERVATION-OPENING.json": "d3af08903e9f0a6a7eae8345562a9090e48d8843"
+  },
+  "sources": {
+    "docs/execution/dags/git-commit-observation-v1/sequencing-adaptation.json": "1fd6055becd4e23680e79d0aff33777310ad6e1b",
+    "docs/execution/dags/git-commit-observation-v1/verify_sequencing_adaptation.py": "e27ca30337fb487fc36fb076ab8ab5c3e7b90012",
+    "evidence/courts/CASE-GIT-COMMIT-OBSERVATION-SEQUENCING-APPEAL.json": "843f5abd1a587959d1696ef16a1078c87f495304"
+  },
+  "manifest_self": {
+    "path": "docs/execution/dags/git-commit-observation-v1/sequencing-adaptation.manifest.json",
+    "canonical_material_sha256": "sha256:261c435a0373e0dca1fea8c06e04f21c6c3666a01b42a03496e18cc34f218748"
+  },
+  "permitted_delta": {
+    "status": "added-only",
+    "paths": [
+      "docs/execution/dags/git-commit-observation-v1/sequencing-adaptation.json",
+      "docs/execution/dags/git-commit-observation-v1/sequencing-adaptation.manifest.json",
+      "docs/execution/dags/git-commit-observation-v1/verify_sequencing_adaptation.py",
+      "evidence/courts/CASE-GIT-COMMIT-OBSERVATION-SEQUENCING-APPEAL.json"
+    ],
+    "commit_count": 1
+  },
+  "carried_forward_nodes": [
+    "GCO-SEAL-000",
+    "GCO-BASELINE-010",
+    "GCO-TEST-020",
+    "GCO-ARCH-030"
+  ],
+  "adapted_sequence": [
+    "GCO-ERRATUM-SEAL-035",
+    "GCO-BUILD-040",
+    "GCO-INTEGRATE-050",
+    "GCO-SAFETY-060",
+    "GCO-SMOKE-070",
+    "GCO-QUALIFY-080",
+    "GCO-JUDGE-090"
+  ],
+  "provisional_builder": {
+    "sole_expected_focused_failure": "test_24_durable_consumption_is_explicit_pure_and_never_retained",
+    "all_other_27_methods_pass": true,
+    "autopilot_381_vector_green": true,
+    "one_path_one_commit": true,
+    "authority": "start-GCO-INTEGRATE-050-only",
+    "status": "quarantined"
+  },
+  "integrator": {
+    "requires_exact_provisional_commit_and_digest_receipt": true,
+    "all_28_focused_methods_green": true,
+    "durable_completion_green": true,
+    "autopilot_381_vector_green": true,
+    "full_repository_ci_green": true,
+    "one_path_one_commit": true,
+    "fresh_effects_required": true
+  },
+  "blocked_tail_until_integrator_green": true,
+  "original_v1_status": "permanently-historical-and-quarantined",
+  "completion_claim": false,
+  "superiority_claim": false
+}
