@@ -12,9 +12,10 @@ import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 from hive_mind_os.acceptance import AcceptanceSpecification
+from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.contracts import (
     tool_intent_digest,
     validate_contract,
@@ -27,12 +28,15 @@ from hive_mind_os.mission_store import (
     SimulatedCrash,
     StoreIntegrityError,
     StoreVersionError,
+    _atomic_write,
     resume_mission,
 )
 from hive_mind_os.models import WorkStatus
 from tests.fixtures.fixture_repo import build_fixture_repo
 
 DURABLE_STEP_COUNT = 18
+MAX_PATH = 260
+COMPONENT_LIMIT = 255
 CRASH_BOUNDARIES = ("before_intent", "after_intent", "after_effect")
 FAST_TEST_ARGV = (
     sys.executable,
@@ -420,6 +424,207 @@ def _case_raw_effect_receipt_is_adopted_without_reexecution(
     store.close()
 
 
+class _IrreversibleRemote:
+    """A host that accepts one effect per idempotency key and can be asked about it."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.applied: list[str] = []
+        self.witnessed: list[bool] = []
+
+    def apply(self, key: str, witness: Callable[[], bool]) -> dict[str, str]:
+        self.witnessed.append(witness())
+        self.applied.append(key)
+        effect = {"key": key, "effect_id": f"remote-effect-{len(self.applied)}"}
+        with self.path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(effect, sort_keys=True) + "\n")
+        return effect
+
+    def lookup(self, key: str) -> dict[str, str] | None:
+        if not self.path.is_file():
+            return None
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            effect = json.loads(line)
+            if effect["key"] == key:
+                return effect
+        return None
+
+
+def _register(store: MissionStore, mission_id: str) -> None:
+    store.register_mission(
+        mission_id,
+        {
+            "objective": "close A4 defect D1",
+            "repository": "hive-mind-os",
+            "source_pack_fingerprint": f"sha256:{'0' * 64}",
+        },
+        AutonomyBudget(1, 4, 10.0),
+    )
+
+
+def _delivery_intent(
+    mission_id: str,
+    action_id: str,
+    key: str,
+) -> dict[str, object]:
+    intent = {
+        "schema_version": 1,
+        "action_id": action_id,
+        "mission_id": mission_id,
+        "state_ref": f"MISSION_STATE:{mission_id}:1",
+        "actor_id": "agent-integrator",
+        "kind": "network",
+        "description": "push the pilot branch to the delivery remote",
+        "action_digest": f"sha256:{'0' * 64}",
+        "policy_decision_ref": "POLICY-WAL-1200",
+        "lease_id": "LEASE-WAL-1200",
+        "idempotency_key": key,
+        "rollback_ref": None,
+        "status": "proposed",
+    }
+    intent["action_digest"] = tool_intent_digest(intent)
+    return intent
+
+
+def _deep(path: Path) -> str:
+    target = os.fspath(path)
+    if os.name == "nt":
+        return "\\\\?\\" + os.path.abspath(target)
+    return target
+
+
+def _remove_deep_tree(root: Path) -> None:
+    shutil.rmtree(_deep(root), ignore_errors=True)
+
+
+def _case_effect_interrupted_before_receipt_reconciles_from_write_ahead_record(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    mission_id = "MISSION-WAL-1200"
+    key = "IDEMPOTENCY-WAL-1200-push"
+    remote = _IrreversibleRemote(tmp_path / "remote-effects.jsonl")
+
+    store = MissionStore(state_dir)
+    _register(store, mission_id)
+    intent = _delivery_intent(mission_id, "ACT-WAL-1200-push", key)
+    checkpoint = store.checkpoint_for_intent(mission_id, intent)
+    assert store.find_effect_receipt(checkpoint) is None
+    written_ahead = store.begin_effect(mission_id, checkpoint.step_index)
+    assert written_ahead["idempotency_key"] == key
+    assert written_ahead["intent_digest"] == checkpoint.intent_digest
+    ahead_path = store.effect_intent_path(mission_id, checkpoint.intent_digest)
+    applied = remote.apply(key, ahead_path.is_file)
+    store.close()
+
+    assert remote.witnessed == [True]
+
+    resumed = MissionStore(state_dir)
+    try:
+        pending = resumed.unreconciled_effects(mission_id)
+        assert [item["idempotency_key"] for item in pending] == [key]
+        assert pending[0]["intent_digest"] == checkpoint.intent_digest
+        replayed = resumed.checkpoint(mission_id, int(pending[0]["step_index"]))
+        assert replayed.state == "intent"
+        assert replayed.execution_count == 1
+        observed = remote.lookup(pending[0]["idempotency_key"])
+        assert observed == applied
+        outcome = {"value": dict(observed), "records": []}
+        reference = resumed.reconcile_effect(replayed, outcome, ())
+        assert remote.applied == [key]
+        assert resumed.unreconciled_effects(mission_id) == []
+        settled = resumed.checkpoint(mission_id, replayed.step_index)
+        assert settled.state == "completed"
+        assert settled.execution_count == 1
+        assert settled.receipt_reference == reference
+        assert resumed.idempotency_count(mission_id) == 1
+        adopted = resumed.find_effect_receipt(settled)
+        assert adopted is not None
+        assert adopted[1]["outcome"]["value"] == applied
+
+        unbegun = resumed.checkpoint_for_intent(
+            mission_id,
+            _delivery_intent(
+                mission_id,
+                "ACT-WAL-1200-comment",
+                "IDEMPOTENCY-WAL-1200-comment",
+            ),
+        )
+        with _assert_raises(ReconciliationError, match="write-ahead"):
+            resumed.reconcile_effect(unbegun, outcome, ())
+    finally:
+        resumed.close()
+
+
+def _persist_receipt_under_path_length(root: Path, final_length: int) -> None:
+    store = MissionStore(root / "s")
+    try:
+        padding = final_length - len(str(store.state_dir)) - 100
+        assert padding >= 32, padding
+        mission_id = "M" + "x" * (padding - 1)
+        _register(store, mission_id)
+        intent = _delivery_intent(
+            mission_id,
+            "ACT-WAL-1200-maxpath",
+            "IDEMPOTENCY-WAL-1200-maxpath",
+        )
+        checkpoint = store.checkpoint_for_intent(mission_id, intent)
+        receipts = store.mission_root(mission_id) / "checkpoint-receipts"
+        receipt_path = (
+            receipts / f"{checkpoint.intent_digest.removeprefix('sha256:')}.json"
+        )
+        legacy_temporary = receipt_path.with_name(
+            f".{receipt_path.name}.tmp-{os.getpid()}"
+        )
+        assert len(str(receipt_path)) == final_length
+        assert len(str(legacy_temporary)) > MAX_PATH
+
+        store.begin_effect(mission_id, checkpoint.step_index)
+        outcome = {"value": {"pushed": True}, "records": []}
+        reference = store.write_effect_receipt(checkpoint, outcome, ())
+        store.complete_step(checkpoint, reference, outcome)
+
+        assert receipt_path.name in {entry.name for entry in os.scandir(receipts)}
+        adopted = store.find_effect_receipt(checkpoint)
+        assert adopted is not None
+        assert adopted[0] == reference
+        assert adopted[1]["outcome"] == outcome
+        assert store.checkpoint(mission_id, checkpoint.step_index).state == "completed"
+        assert store.idempotency_count(mission_id) == 1
+        assert validate_runtime_state(store.mission(mission_id)["state"]).valid
+    finally:
+        store.close()
+        _remove_deep_tree(root)
+
+
+def _case_receipt_persists_when_the_legacy_temporary_name_exceeds_max_path(
+    tmp_path: Path,
+) -> None:
+    _persist_receipt_under_path_length(tmp_path / "a", MAX_PATH - 5)
+    _persist_receipt_under_path_length(tmp_path / "b", MAX_PATH + 40)
+
+
+def _case_durable_write_survives_a_name_at_the_component_limit(
+    tmp_path: Path,
+) -> None:
+    deep = tmp_path / "d"
+    deep.mkdir()
+    name = "c" * 245 + ".json"
+    legacy_temporary = f".{name}.tmp-{os.getpid()}"
+    assert len(name) == COMPONENT_LIMIT - 5
+    assert len(legacy_temporary) > COMPONENT_LIMIT
+    try:
+        with _assert_raises(OSError):
+            (deep / legacy_temporary).open("xb").close()
+        content = b'{"intent_digest":"sha256:probe"}\n'
+        _atomic_write(deep / name, content)
+        assert name in {entry.name for entry in os.scandir(deep)}
+        with open(_deep(deep / name), "rb") as stream:
+            assert stream.read() == content
+    finally:
+        _remove_deep_tree(deep)
+
+
 class TestMissionStore(unittest.TestCase):
     pass
 
@@ -454,6 +659,9 @@ for _case in (
     _case_completed_state_round_trips_and_validates,
     _case_cli_lists_and_resumes_interrupted_mission,
     _case_raw_effect_receipt_is_adopted_without_reexecution,
+    _case_effect_interrupted_before_receipt_reconciles_from_write_ahead_record,
+    _case_receipt_persists_when_the_legacy_temporary_name_exceeds_max_path,
+    _case_durable_write_survives_a_name_at_the_component_limit,
 ):
     setattr(
         TestMissionStore,
