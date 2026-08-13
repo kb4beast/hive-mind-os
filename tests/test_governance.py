@@ -136,6 +136,7 @@ class RepositoryGovernanceTests(unittest.TestCase):
             [
                 "IDEMPOTENCY" + "-P06-test",
                 r'ConstraintEnvelope\("AUTH-(?:one|parent|child)", "MISSION-phase-1"',
+                '"AUTH-probe2", "MISSION' + '-probe2", "WORK-probe2"',
             ],
         )
         self.assertNotIn("commits", allowlist)

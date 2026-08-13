@@ -57,7 +57,10 @@ class HiveCortexBuilderTests(unittest.TestCase):
         )
         self.builder = BuilderCoordinator(
             self.gateway, self.registry, self.adapter, mission_id="MISSION-builder", work_id="WORK-builder",
-            actor_id="builder:fixture", authority_envelope_digest=AUTH, policy_decision_ref="POLICY-builder", now=NOW,
+            actor_id="builder:fixture",
+            authority_envelope_digest=AUTH,
+            policy_decision_ref="POLICY-builder",
+            now=NOW,
         )
 
     def tearDown(self) -> None:
@@ -87,7 +90,10 @@ class HiveCortexBuilderTests(unittest.TestCase):
         gateway.register_adapter(self.adapter.adapter_name, record)
         builder = BuilderCoordinator(
             gateway, self.registry, self.adapter, mission_id="MISSION-builder", work_id="WORK-builder",
-            actor_id="builder:fixture", authority_envelope_digest=AUTH, policy_decision_ref="POLICY-builder", now=NOW,
+            actor_id="builder:fixture",
+            authority_envelope_digest=AUTH,
+            policy_decision_ref="POLICY-builder",
+            now=NOW,
         )
         action = BuilderAction(
             "write-sealed", BuilderActionKind.WRITE, "src/sealed.txt", {"content": "sealed\n"}, "remove src/sealed.txt"
