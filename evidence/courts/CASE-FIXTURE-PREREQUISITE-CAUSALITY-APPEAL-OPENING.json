@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-FIXTURE-PREREQUISITE-CAUSALITY-APPEAL-OPENING",
+  "kind": "appeals-judge-opening-order",
+  "baseline": {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"},
+  "predecessor": {"receipt": "evidence/performance/fixture-prerequisite-v1/causality.json", "digest": "sha256:4de1070a524f50ffbc966dbfcbede37df9b97af44ffc49d660e9f3195bcb7313", "finding": "incomplete root-CI inventory; 1059 discovered IDs"},
+  "authorized_disposition": "adapt",
+  "authorized_scope": "six-node no-code causality appeal with one serialized hermetic 2700-second execution",
+  "prohibitions": ["implementation", "test or production-source edits", ".autopilot/plan.json mutation", "main or remote effects", "fixture/GCO promotion", "performance conclusion", "knowledge BASELINE-000 retry", "qualification or candidate receipts during seal"],
+  "required_evidence": ["discovery identity", "one durable execution transcript", "independent cross-examination", "integration", "distinct Judge disposition"],
+  "rollback": "revert only individual retained appeal commits; preserve predecessor and adverse evidence"
+}
