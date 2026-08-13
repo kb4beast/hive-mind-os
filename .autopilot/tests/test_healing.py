@@ -5,11 +5,12 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from datetime import timedelta
 from pathlib import Path
 
-from fixture_support import invocation_scoped_fixture
+from fixture_support import copy_autopilot_fixture
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 # healing imports its siblings by name, exactly as the CLI does.
@@ -60,17 +61,28 @@ class HealingFixture(unittest.TestCase):
     """A work checkout plus a bare origin, exactly as the claim tests build it."""
 
     def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        base = Path(self.temporary.name)
+        self.root = base / "work"
+        self.origin = base / "origin.git"
+        self.root.mkdir()
+        subprocess.run(
+            ("git", "init", "--bare", "--initial-branch=main", str(self.origin)),
+            check=True,
+            capture_output=True,
+        )
+        git(self.root, "init", "--initial-branch=main")
+        git(self.root, "config", "user.name", "Fixture")
+        git(self.root, "config", "user.email", "fixture@hive-mind.invalid")
         source = Path(__file__).resolve().parents[1]
-        self.derived_fixture = invocation_scoped_fixture(source)
-        derived = self.derived_fixture.__enter__()
-        self.root = Path(derived.root)
-        self.origin = Path(derived.origin)
+        copy_autopilot_fixture(source, self.root / ".autopilot")
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
         control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
         git(self.root, "add", "-A")
         git(self.root, "commit", "-m", "fixture base")
+        git(self.root, "remote", "add", "origin", str(self.origin))
         git(self.root, "push", "-u", "origin", "main")
         self.target = git(self.root, "rev-parse", "HEAD")
         self.plane = controller.ControlPlane(self.root)
@@ -81,7 +93,7 @@ class HealingFixture(unittest.TestCase):
         }
 
     def tearDown(self) -> None:
-        self.derived_fixture.__exit__(None, None, None)
+        self.temporary.cleanup()
 
     def publish_claim(
         self,
