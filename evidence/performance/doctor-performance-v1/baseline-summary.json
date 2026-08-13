@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "kind": "doctor-performance-baseline-summary-v1",
+  "node_id": "DP-BENCH-020",
+  "phase": "baseline",
+  "source": {
+    "commit": "1fda8e38a60865dc3a6e95a0d4af403e8178301a",
+    "tree": "bda56eea584dc48d1f056623338d25b899453ca7",
+    "index_tree": "bda56eea584dc48d1f056623338d25b899453ca7",
+    "autopilot_index_digest": "sha256:eff5ac09330688fdb600993c441f0434f5f3cadb9ec83f069497e7dda63e5ced"
+  },
+  "trial_policy": {
+    "trials_per_runtime": 6,
+    "alternation": "cold-first-then-warm",
+    "fresh_process_every_trial": true,
+    "doctor_internal_timeout_seconds": 180,
+    "qualification_limit_seconds": 135.0
+  },
+  "runtimes": [
+    {
+      "runtime_id": "python-3.14-system",
+      "version": "3.14.4",
+      "receipt": "evidence/performance/doctor-performance-v1/baseline-python-3.14.json",
+      "receipt_digest": "sha256:b085d2b1ac520083c661e3a2052a3e1fdd8cc14f9b1e181747f5a766841f4b52",
+      "nearest_rank_p95_seconds": 188.331349,
+      "doctor_passed_trials": 0,
+      "doctor_failed_trials": 6,
+      "outer_timeout_trials": 0,
+      "all_below_doctor_timeout": false,
+      "all_doctor_passed": false
+    },
+    {
+      "runtime_id": "python-3.12-bundled",
+      "version": "3.12.13",
+      "receipt": "evidence/performance/doctor-performance-v1/baseline-python-3.12.json",
+      "receipt_digest": "sha256:05200509f6a542d38760cbd3b1c19ab3ea8df51d0949660b8a8cb094dfe8435b",
+      "nearest_rank_p95_seconds": 186.945909,
+      "doctor_passed_trials": 0,
+      "doctor_failed_trials": 6,
+      "outer_timeout_trials": 0,
+      "all_below_doctor_timeout": false,
+      "all_doctor_passed": false
+    }
+  ],
+  "disposition": "retained_baseline_comparator",
+  "qualification_success": false,
+  "qualification_claimed": false,
+  "interpretation": "Both pinned baseline runtimes returned doctor failure in every trial after exceeding the unchanged 180-second internal timeout. This is comparator evidence only and is not candidate qualification success."
+}
