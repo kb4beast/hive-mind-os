@@ -1,0 +1,187 @@
+{
+  "agreement": {
+    "independently_created_venvs": 2,
+    "observed_complete_id_artifact_digest": "sha256:b6dd240062442a56a2e92b56841b4a139683f1bfdff10348e8125850d543a36b",
+    "observed_ordered_test_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+    "observed_tests_discovered": 1059,
+    "same_ordered_1059_vector": true,
+    "same_projection_manifest": true,
+    "same_source": true
+  },
+  "authority": {
+    "code_changes": false,
+    "fixture_promotion": false,
+    "gco_promotion": false,
+    "knowledge_baseline_retry": false,
+    "performance_claim": false,
+    "root_ci_execution": false
+  },
+  "baseline": {
+    "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+    "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"
+  },
+  "conclusion": "BLOCKER: both fresh source-installed hermetic discoveries deterministically found 1,059 IDs, but their ordered vector digest sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893 does not reproduce the sealed/predecessor digest sha256:8c6047bd0457cd3b880437c466695527e6a8bc342724bab008aac5cebf0d477c. The predecessor 1,050/one-failure/eight-skip predicate is therefore falsified as a discovery-identity predicate. No test execution occurred, so failure and skip claims remain unobserved and require distinct FPC-EXECUTE-020 evidence; no implementation authority exists.",
+  "discovery": {
+    "complete_id_artifact_digest": "sha256:b6dd240062442a56a2e92b56841b4a139683f1bfdff10348e8125850d543a36b",
+    "first_id": "hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_acceptance_harness_self_tests",
+    "last_id": "test_workers.WorkerTests.test_worker_executes_real_durable_mission_with_unique_effect_adoption",
+    "test_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+    "tests_discovered": 1059
+  },
+  "discovery_source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "tree_resolution": "git rev-parse HEAD^{tree} from the detached b789b68 checkout; this tree is not the commit SHA"
+  },
+  "disposition": "blocker",
+  "kind": "fixture-prerequisite-causality-appeal-discovery-analysis-v1",
+  "node_id": "FPC-DISCOVERY-010",
+  "phase": "discovery",
+  "predecessor": {
+    "claimed_discovery": {
+      "test_id_digest": "sha256:8c6047bd0457cd3b880437c466695527e6a8bc342724bab008aac5cebf0d477c",
+      "tests_discovered": 1059
+    },
+    "frozen_predicate": {
+      "skips": 8,
+      "sole_failure": "test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available",
+      "tests_run": 1050
+    },
+    "receipt": "evidence/performance/fixture-prerequisite-v1/causality.json",
+    "receipt_digest": "sha256:4de1070a524f50ffbc966dbfcbede37df9b97af44ffc49d660e9f3195bcb7313"
+  },
+  "receipt_digest": "sha256:7afd497957b39fd86b2b293a592eafdedaceb72d603420d9e40026987ac486da",
+  "root_ci": {
+    "executed": false,
+    "reason": "FPC-DISCOVERY-010 authorizes discovery only; FPC-EXECUTE-020 exclusively owns the one root-CI invocation."
+  },
+  "runs": [
+    {
+      "discovery": {
+        "complete_id_artifact_digest": "sha256:b6dd240062442a56a2e92b56841b4a139683f1bfdff10348e8125850d543a36b",
+        "first_id": "hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_acceptance_harness_self_tests",
+        "last_id": "test_workers.WorkerTests.test_worker_executes_real_durable_mission_with_unique_effect_adoption",
+        "ordered_test_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+        "tests_discovered": 1059
+      },
+      "fresh_environment": {
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONPATH": null,
+        "editable_install": true,
+        "isolated_flags": [
+          "-E",
+          "-s"
+        ],
+        "venv_interpreter": "C:\\Repos\\HiveMind\\.fpc-discovery-010-venv1\\Scripts\\python.exe"
+      },
+      "import_resolution": {
+        "file": "C:\\Repos\\HiveMind\\hive-mind-os-fpc-discovery-source\\src\\hive_mind_os\\__init__.py",
+        "module": "hive_mind_os",
+        "under_repository_src": true
+      },
+      "interpreter": {
+        "executable": "C:\\Repos\\HiveMind\\.fpc-discovery-010-venv1\\Scripts\\python.exe",
+        "implementation": "CPython",
+        "version": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]"
+      },
+      "platform": {
+        "machine": "AMD64",
+        "release": "11",
+        "system": "Windows",
+        "version": "10.0.26200"
+      },
+      "projection_manifest": {
+        "pyproject.toml": {
+          "bytes": 930,
+          "content_sha256": "sha256:7d3d2f0c37d22df9ba863f99c69e6b0ca69025b22a8ab826c22b20fadf95a1c2",
+          "git_blob": "05b1266a8f92fbadfdebbb96c2a2d461090f9fa6",
+          "manifest_digest": "sha256:97b2df723b74145fe7cc3db3b6f34d688768fc0a8c570119b3c39f24334e334f",
+          "path": "pyproject.toml"
+        },
+        "src/hive_mind_os/__init__.py": {
+          "bytes": 7958,
+          "content_sha256": "sha256:79e370d317cc7108bc58d81e6e7c4649157fcbf69483ad8c94d9de979684fcc5",
+          "git_blob": "617a6dabaa444d1eb0e5a9237209043f23083d77",
+          "manifest_digest": "sha256:60cf844d74d3fbbcfd1a33ed7bb226a0225ac433900ab450898178359afcb1b6",
+          "path": "src/hive_mind_os/__init__.py"
+        },
+        "tests": {
+          "entry_count": 137,
+          "manifest_digest": "sha256:e98e012c6f7d1c81a6f4568a8be962086506b1f432816f8730855dc65ea90f35",
+          "path": "tests"
+        }
+      },
+      "projection_manifest_digest": "sha256:79d39f910d9c1627cd23459f8628ce02c91bfa0d794edb370cb599f3be9efe94",
+      "source": {
+        "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+        "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+      }
+    },
+    {
+      "discovery": {
+        "complete_id_artifact_digest": "sha256:b6dd240062442a56a2e92b56841b4a139683f1bfdff10348e8125850d543a36b",
+        "first_id": "hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_acceptance_harness_self_tests",
+        "last_id": "test_workers.WorkerTests.test_worker_executes_real_durable_mission_with_unique_effect_adoption",
+        "ordered_test_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+        "tests_discovered": 1059
+      },
+      "fresh_environment": {
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONPATH": null,
+        "editable_install": true,
+        "isolated_flags": [
+          "-E",
+          "-s"
+        ],
+        "venv_interpreter": "C:\\Repos\\HiveMind\\.fpc-discovery-010-venv2\\Scripts\\python.exe"
+      },
+      "import_resolution": {
+        "file": "C:\\Repos\\HiveMind\\hive-mind-os-fpc-discovery-source\\src\\hive_mind_os\\__init__.py",
+        "module": "hive_mind_os",
+        "under_repository_src": true
+      },
+      "interpreter": {
+        "executable": "C:\\Repos\\HiveMind\\.fpc-discovery-010-venv2\\Scripts\\python.exe",
+        "implementation": "CPython",
+        "version": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]"
+      },
+      "platform": {
+        "machine": "AMD64",
+        "release": "11",
+        "system": "Windows",
+        "version": "10.0.26200"
+      },
+      "projection_manifest": {
+        "pyproject.toml": {
+          "bytes": 930,
+          "content_sha256": "sha256:7d3d2f0c37d22df9ba863f99c69e6b0ca69025b22a8ab826c22b20fadf95a1c2",
+          "git_blob": "05b1266a8f92fbadfdebbb96c2a2d461090f9fa6",
+          "manifest_digest": "sha256:97b2df723b74145fe7cc3db3b6f34d688768fc0a8c570119b3c39f24334e334f",
+          "path": "pyproject.toml"
+        },
+        "src/hive_mind_os/__init__.py": {
+          "bytes": 7958,
+          "content_sha256": "sha256:79e370d317cc7108bc58d81e6e7c4649157fcbf69483ad8c94d9de979684fcc5",
+          "git_blob": "617a6dabaa444d1eb0e5a9237209043f23083d77",
+          "manifest_digest": "sha256:60cf844d74d3fbbcfd1a33ed7bb226a0225ac433900ab450898178359afcb1b6",
+          "path": "src/hive_mind_os/__init__.py"
+        },
+        "tests": {
+          "entry_count": 137,
+          "manifest_digest": "sha256:e98e012c6f7d1c81a6f4568a8be962086506b1f432816f8730855dc65ea90f35",
+          "path": "tests"
+        }
+      },
+      "projection_manifest_digest": "sha256:79d39f910d9c1627cd23459f8628ce02c91bfa0d794edb370cb599f3be9efe94",
+      "source": {
+        "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+        "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+      }
+    }
+  ],
+  "schema_version": 1,
+  "verifier_expectation": {
+    "command": "python docs/execution/dags/fixture-prerequisite-causality-appeal-v1/runner.py verify --receipt evidence/performance/fixture-prerequisite-causality-appeal-v1/discovery-analysis.json --phase discovery",
+    "expected": "reject discovery identity because the observed reproducible digest differs from the sealed required digest; rejection is the fail-closed result."
+  }
+}
