@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
@@ -141,6 +141,10 @@ def normalize_portable_path(value: str) -> str:
     if result == ".":
         raise ValueError("path is required")
     return result
+
+
+def _instant(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _role(value: str) -> None:
@@ -346,17 +350,43 @@ class ConstraintEnvelope(_Contract):
         document["digest"] = document.pop("digest_value")
         return document
 
+    def content_digest(self) -> str:
+        """Pure seal over every field of this envelope except the seal itself."""
+
+        document = self.to_document()
+        document.pop("digest")
+        return canonical_digest(document)
+
+    def sealed(self) -> ConstraintEnvelope:
+        """Return the same authority carrying the digest its contents imply."""
+
+        return replace(self, digest_value=self.content_digest())
+
+    def authority_key(self) -> str:
+        """Pure digest of the authority itself, independent of envelope identity."""
+
+        document = self.to_document()
+        for name in ("digest", "envelope_id", "parent_envelope_digest"):
+            document.pop(name)
+        return canonical_digest(document)
+
     def is_no_broader_than(self, parent: ConstraintEnvelope) -> bool:
         """Pure comparison used by later authority issuers; it performs no effects."""
 
         return (
             set(self.allowed_actions).issubset(parent.allowed_actions)
+            and set(parent.denied_actions).issubset(self.denied_actions)
             and set(self.path_read_scope).issubset(parent.path_read_scope)
             and set(self.path_write_scope).issubset(parent.path_write_scope)
             and set(self.network_allowlist).issubset(parent.network_allowlist)
-            and self.budgets.max_wall_seconds <= parent.budgets.max_wall_seconds
-            and self.budgets.max_model_calls <= parent.budgets.max_model_calls
-            and self.budgets.max_tool_calls <= parent.budgets.max_tool_calls
+            and set(self.data_scopes).issubset(parent.data_scopes)
+            and set(self.secret_scopes).issubset(parent.secret_scopes)
+            and set(parent.human_gates).issubset(self.human_gates)
+            and _instant(self.expires_at) <= _instant(parent.expires_at)
+            and all(
+                getattr(self.budgets, name) <= getattr(parent.budgets, name)
+                for name in Budget.__dataclass_fields__
+            )
         )
 
 

@@ -63,7 +63,10 @@ def _envelope() -> ConstraintEnvelope:
         "2030-01-02T00:00:00Z",
         DIGEST,
         DIGEST,
-    )
+    ).sealed()
+
+
+AUTH = _envelope().digest_value
 
 
 def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
@@ -79,7 +82,7 @@ def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
         "workspace/result.txt",
         DIGEST,
         key,
-        DIGEST,
+        AUTH,
         ("workspace exists",),
         "remove workspace/result.txt",
         "POLICY-durable",
@@ -150,9 +153,14 @@ class CrashMatrixTests(_DurableCase):
         self.path = self.root / DATABASE_FILENAME
         self.store = self.open_store(self.path)
         self.registry = AuthorityRegistry()
-        self.registry.register(_envelope())
+        self.registry.mint_root(
+            _envelope(),
+            issuer="owner:durability-fixture",
+            authority_ref="AUTHORITY-RECORD-durable",
+            recorded_at="2026-01-01T00:00:00Z",
+        )
         self.token = self.registry.authorize(
-            DIGEST, "write", "workspace/result.txt", now=TIME
+            AUTH, "write", "workspace/result.txt", now=TIME
         )
 
     def test_crash_before_adapter_run_resumes_and_delivers_exactly_once(self) -> None:

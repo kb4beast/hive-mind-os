@@ -169,7 +169,7 @@ def _builder_envelope() -> ConstraintEnvelope:
         "2030-01-01T00:00:00Z",
         _DIGEST,
         _DIGEST,
-    )
+    ).sealed()
 
 
 def _with_receipt(result: RoleResult, receipt_digest: str) -> RoleResult:
@@ -208,7 +208,13 @@ def run_sealed_builder_curator_fixture(root: str | Path) -> LocalBuilderCuratorF
         review.seal((check,))
 
         registry = AuthorityRegistry()
-        registry.register(_builder_envelope())
+        envelope = _builder_envelope()
+        registry.mint_root(
+            envelope,
+            issuer="phase7:local:fixture-owner",
+            authority_ref="local-fixture-policy",
+            recorded_at=_TIME,
+        )
         gateway = EffectGateway()
         gateway.register_adapter("isolated-write", adapter.apply)
         parameters_digest = adapter.register_payload(b"after\n")
@@ -224,13 +230,15 @@ def run_sealed_builder_curator_fixture(root: str | Path) -> LocalBuilderCuratorF
             "candidate/app.txt",
             parameters_digest,
             canonical_digest({"fixture": "builder-write"}),
-            _DIGEST,
+            envelope.digest_value,
             (),
             "discard isolated candidate",
             "local-fixture-policy",
             canonical_digest({"effect": "phase7-builder-write"}),
         )
-        token = registry.authorize(_DIGEST, "write", intent.target, now="2029-01-01T00:00:00Z")
+        token = registry.authorize(
+            envelope.digest_value, "write", intent.target, now="2029-01-01T00:00:00Z"
+        )
         receipt = gateway.execute(intent, token)
         builder = _with_receipt(builder, receipt.receipt_digest)
         candidate_access_sequence = ledger.append_event(

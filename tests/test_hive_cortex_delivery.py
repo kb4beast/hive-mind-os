@@ -74,7 +74,7 @@ def _envelope() -> ConstraintEnvelope:
         ("push", "open_draft_pr", "post_comment"),
         ("merge", "deploy"),
         ("workspace",),
-        ("workspace",),
+        ("workspace", TARGET),
         (),
         (),
         (),
@@ -83,7 +83,10 @@ def _envelope() -> ConstraintEnvelope:
         "2030-01-02T00:00:00Z",
         DIGEST,
         DIGEST,
-    )
+    ).sealed()
+
+
+AUTH = _envelope().digest_value
 
 
 def _intent(
@@ -107,7 +110,7 @@ def _intent(
         target,
         parameters_digest,
         key,
-        DIGEST,
+        AUTH,
         ("run branch exists",),
         "git revert the delivery commits",
         "POLICY-delivery",
@@ -190,7 +193,12 @@ class _DeliveryFixture(unittest.TestCase):
         self.kernel_store = KernelStore(Path(self.temporary.name) / "kernel.sqlite3")
         self.addCleanup(self.kernel_store.close)
         self.registry = AuthorityRegistry()
-        self.registry.register(_envelope())
+        self.registry.mint_root(
+            _envelope(),
+            issuer="owner:delivery-fixture",
+            authority_ref="AUTHORITY-RECORD-delivery",
+            recorded_at="2026-01-01T00:00:00Z",
+        )
         self.transport = FakeTransport()
         self.push_executor = FakePushExecutor()
         self.grant = _grant()
@@ -207,7 +215,7 @@ class _DeliveryFixture(unittest.TestCase):
         self.addCleanup(credential.stop)
 
     def token(self, action: str):
-        return self.registry.authorize(DIGEST, action, TARGET, now=TIME)
+        return self.registry.authorize(AUTH, action, TARGET, now=TIME)
 
     def in_memory_gateway(
         self, delivery: ControlledGitHubDelivery | None = None

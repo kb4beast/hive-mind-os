@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import unittest
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 
 from hive_mind_os.brain_kernel.canonical import canonical_bytes, canonical_digest
 from hive_mind_os.brain_kernel.contracts import (
@@ -101,3 +101,41 @@ class KernelContractTests(unittest.TestCase):
         parent = ConstraintEnvelope("AUTH-parent", "MISSION-phase-1", "WORK-one", None, "builder", "R2", ("read", "write"), (), ("src", "tests"), ("src", "tests"), ("local",), (), (), (), BUDGET, TIME, DIGEST, DIGEST)
         child = ConstraintEnvelope("AUTH-child", "MISSION-phase-1", "WORK-one", DIGEST, "builder", "R2", ("read",), (), ("src",), ("src",), (), (), (), (), Budget(1, 0, 0, 0, 0, 0, 0, 0), TIME, DIGEST, DIGEST)
         self.assertTrue(child.is_no_broader_than(parent))
+
+    def test_no_child_may_exceed_its_parent_on_any_authority_field(self) -> None:
+        parent = ConstraintEnvelope("AUTH-parent", "MISSION-phase-1", "WORK-one", None, "builder", "R2", ("read", "write"), ("deploy",), ("src", "tests"), ("src", "tests"), ("local",), ("repository",), ("ci",), ("gate-a",), BUDGET, TIME, DIGEST, DIGEST)
+        child = replace(parent, envelope_id="AUTH-child", parent_envelope_digest=DIGEST)
+        self.assertTrue(child.is_no_broader_than(parent))
+        # The spend ceiling A5-F12 measured: a child raising it is not a ceiling.
+        expensive = replace(child, budgets=replace(BUDGET, max_cost_microunits=999999999))
+        self.assertFalse(expensive.is_no_broader_than(parent))
+        broadenings = {
+            "allowed_actions": ("read", "write", "push"),
+            "denied_actions": (),
+            "path_read_scope": ("src", "tests", "docs"),
+            "path_write_scope": ("src", "tests", "docs"),
+            "network_allowlist": ("local", "remote"),
+            "data_scopes": ("repository", "secrets"),
+            "secret_scopes": ("ci", "production"),
+            "human_gates": (),
+            "expires_at": "2027-08-07T12:00:00Z",
+        }
+        for name, value in broadenings.items():
+            with self.subTest(field=name):
+                self.assertFalse(replace(child, **{name: value}).is_no_broader_than(parent))
+        for name in Budget.__dataclass_fields__:
+            with self.subTest(budget=name):
+                raised = replace(BUDGET, **{name: getattr(BUDGET, name) + 1})
+                self.assertFalse(replace(child, budgets=raised).is_no_broader_than(parent))
+
+    def test_envelope_seal_and_authority_key_are_pure_content_digests(self) -> None:
+        sealed = ConstraintEnvelope("AUTH-one", "MISSION-phase-1", "WORK-one", None, "builder", "R2", ("read",), (), ("src",), ("src",), (), (), (), (), BUDGET, TIME, DIGEST, DIGEST).sealed()
+        self.assertEqual(sealed.content_digest(), sealed.digest_value)
+        self.assertEqual(sealed.digest_value, sealed.sealed().digest_value)
+        widened = replace(sealed, allowed_actions=("read", "write")).sealed()
+        self.assertNotEqual(sealed.digest_value, widened.digest_value)
+        self.assertNotEqual(sealed.authority_key(), widened.authority_key())
+        # Identity is not authority: a rename re-seals to a new digest, same authority.
+        renamed = replace(sealed, envelope_id="AUTH-two").sealed()
+        self.assertNotEqual(sealed.digest_value, renamed.digest_value)
+        self.assertEqual(sealed.authority_key(), renamed.authority_key())

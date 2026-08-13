@@ -45,7 +45,10 @@ def _envelope() -> ConstraintEnvelope:
         "2030-01-02T00:00:00Z",
         DIGEST,
         DIGEST,
-    )
+    ).sealed()
+
+
+AUTH = _envelope().digest_value
 
 
 def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
@@ -61,7 +64,7 @@ def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
         "workspace/result.txt",
         DIGEST,
         key,
-        DIGEST,
+        AUTH,
         ("workspace exists",),
         "remove workspace/result.txt",
         "POLICY-effects",
@@ -74,10 +77,14 @@ class EffectOutboxTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.store = KernelStore(Path(self.temporary.name) / "kernel.sqlite3")
         self.registry = AuthorityRegistry()
-        envelope = _envelope()
-        self.registry.register(envelope)
+        self.registry.mint_root(
+            _envelope(),
+            issuer="owner:effects-fixture",
+            authority_ref="AUTHORITY-RECORD-effects",
+            recorded_at="2026-01-01T00:00:00Z",
+        )
         self.token = self.registry.authorize(
-            DIGEST, "write", "workspace/result.txt", now=TIME
+            AUTH, "write", "workspace/result.txt", now=TIME
         )
 
     def tearDown(self) -> None:
@@ -173,7 +180,7 @@ class EffectOutboxTests(unittest.TestCase):
             )
         with self.assertRaises(AuthorityDenied):
             self.registry.authorize(
-                DIGEST, "write", "other/result.txt", now=TIME
+                AUTH, "write", "other/result.txt", now=TIME
             )
 
 

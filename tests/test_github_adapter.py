@@ -799,6 +799,41 @@ R2_ACTIONS = (
 )
 
 
+def _r2_envelope() -> ConstraintEnvelope:
+    return ConstraintEnvelope(
+        "AUTH-a4-800",
+        "MISSION-a4-800",
+        "WORK-a4-800",
+        None,
+        "builder",
+        "R1",
+        R2_ACTIONS,
+        ("merge", "deploy"),
+        ("workspace",),
+        ("workspace", R2_TARGET),
+        (),
+        (),
+        (),
+        (),
+        Budget(30, 0, 0, 0, 0, 0, 1, 1),
+        "2030-01-02T00:00:00Z",
+        R2_DIGEST,
+        R2_DIGEST,
+    ).sealed()
+
+
+R2_AUTH = _r2_envelope().digest_value
+
+
+def _mint_root(registry: AuthorityRegistry, envelope: ConstraintEnvelope) -> None:
+    registry.mint_root(
+        envelope,
+        issuer="owner:a4-800-fixture",
+        authority_ref="AUTHORITY-RECORD-a4-800",
+        recorded_at="2026-01-01T00:00:00Z",
+    )
+
+
 class RecordingPushExecutor:
     """Records branch names; it opens no socket and runs no command."""
 
@@ -829,7 +864,7 @@ class ControlledRetractionTests(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
         self.registry = AuthorityRegistry()
-        self.registry.register(self.envelope())
+        _mint_root(self.registry, self.envelope())
         self.transport = FakeGitHubTransport()
         self.delivery = self.delivery_for(self.transport)
 
@@ -837,26 +872,7 @@ class ControlledRetractionTests(unittest.TestCase):
 
     @staticmethod
     def envelope() -> ConstraintEnvelope:
-        return ConstraintEnvelope(
-            "AUTH-a4-800",
-            "MISSION-a4-800",
-            "WORK-a4-800",
-            None,
-            "builder",
-            "R1",
-            R2_ACTIONS,
-            ("merge", "deploy"),
-            ("workspace",),
-            ("workspace",),
-            (),
-            (),
-            (),
-            (),
-            Budget(30, 0, 0, 0, 0, 0, 1, 1),
-            "2030-01-02T00:00:00Z",
-            R2_DIGEST,
-            R2_DIGEST,
-        )
+        return _r2_envelope()
 
     @staticmethod
     def grant(
@@ -912,7 +928,7 @@ class ControlledRetractionTests(unittest.TestCase):
             target,
             parameters_digest,
             R2_DIGEST,
-            R2_DIGEST,
+            R2_AUTH,
             ("the pilot opened this draft pull request",),
             "reopen the draft pull request and restore the branch",
             "POLICY-a4-800",
@@ -927,7 +943,7 @@ class ControlledRetractionTests(unittest.TestCase):
     ):
         gateway = EffectGateway()
         (delivery or self.delivery).register_with(gateway)
-        token = self.registry.authorize(R2_DIGEST, action, R2_TARGET, now=R2_TIME)
+        token = self.registry.authorize(R2_AUTH, action, R2_TARGET, now=R2_TIME)
         return gateway.execute(intent, token)
 
     @staticmethod
@@ -1542,7 +1558,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
         self,
     ) -> None:
         registry = AuthorityRegistry()
-        registry.register(ControlledRetractionTests.envelope())
+        _mint_root(registry, ControlledRetractionTests.envelope())
         transport = FakeGitHubTransport()
         delivery = ControlledGitHubDelivery(
             ControlledRetractionTests.grant(),
@@ -1563,7 +1579,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
 
         result = gateway.execute(
             intent,
-            registry.authorize(R2_DIGEST, "push", R2_TARGET, now=R2_TIME),
+            registry.authorize(R2_AUTH, "push", R2_TARGET, now=R2_TIME),
         )
 
         head = self.workspace_head()

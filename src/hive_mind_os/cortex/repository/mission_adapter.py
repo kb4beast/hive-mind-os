@@ -135,15 +135,20 @@ def build_local_mission_environment(
         f"AUTH-mission-{mission_suffix}", mission_id, builder_work_id, None, "builder", "R1",
         ("write",), ("network", "push", "merge", "deploy"), ("candidate",), ("candidate",),
         (), (), (), (), Budget(1, 0, 0, 0, 0, 1, 1, 1), "2030-01-01T00:00:00Z", _Z, _Z,
+    ).sealed()
+    registry.mint_root(
+        envelope,
+        issuer=f"mission:{mission_suffix}:fixture-owner",
+        authority_ref="local-mission-policy",
+        recorded_at=_TIME,
     )
-    registry.register(envelope)
     gateway = _DeterministicEffectGateway(kernel_store, now=_TIME)
     gateway.register_adapter("isolated-write", workspace.apply)
     parameters_digest = workspace.register_payload(b"after\n")
     intent = EffectIntent(
         mission_id, builder_work_id, builder_attempt_id, "mission:builder", "builder", "write", "R1",
         "isolated-write", "candidate/app.txt", parameters_digest,
-        canonical_digest({"mission": mission_id, "effect": "builder-write"}), _Z, (),
+        canonical_digest({"mission": mission_id, "effect": "builder-write"}), envelope.digest_value, (),
         "discard isolated candidate", "local-mission-policy", canonical_digest({"intent": mission_id}),
     )
     specs: dict[str, WorkVerificationSpec] = {}
@@ -185,7 +190,8 @@ def build_local_mission_environment(
         Budget(400, 16, 800, 800, 800, 40, 12, 4), Budget(50, 2, 100, 100, 100, 5, 1, 1),
     )
     bindings = MissionBindings(
-        RepositoryRoleHandlers(), BuilderEffectBinding(registry, gateway, _Z, intent, _AUTH_TIME),
+        RepositoryRoleHandlers(),
+        BuilderEffectBinding(registry, gateway, envelope.digest_value, intent, _AUTH_TIME),
         specs, request, assessments,
     )
     return LocalMissionEnvironment(root_path, kernel_store, workspace, registry, gateway, config,

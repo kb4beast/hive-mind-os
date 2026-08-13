@@ -29,9 +29,12 @@ def _envelope() -> ConstraintEnvelope:
     return ConstraintEnvelope(
         "AUTH-builder", "MISSION-builder", "WORK-builder", None, "builder", "R1",
         ("write", "command", "branch", "commit"), ("push", "merge", "deploy"),
-        ("isolated-workspace",), ("src", "tests"), (), (), (), (),
+        ("isolated-workspace",), ("src", "tests", "isolated-workspace", "autopilot"), (), (), (), (),
         Budget(20, 0, 0, 0, 0, 0, 4, 4), "2030-01-02T00:00:00Z", DIGEST, DIGEST,
-    )
+    ).sealed()
+
+
+AUTH = _envelope().digest_value
 
 
 class HiveCortexBuilderTests(unittest.TestCase):
@@ -39,7 +42,12 @@ class HiveCortexBuilderTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.registry = AuthorityRegistry()
-        self.registry.register(_envelope())
+        self.registry.mint_root(
+            _envelope(),
+            issuer="owner:builder-fixture",
+            authority_ref="AUTHORITY-RECORD-builder",
+            recorded_at="2026-01-01T00:00:00Z",
+        )
         self.adapter = IsolatedBuilderAdapter(self.root)
         self.gateway = EffectGateway()
         self.gateway.register_adapter(
@@ -48,7 +56,7 @@ class HiveCortexBuilderTests(unittest.TestCase):
         )
         self.builder = BuilderCoordinator(
             self.gateway, self.registry, self.adapter, mission_id="MISSION-builder", work_id="WORK-builder",
-            actor_id="builder:fixture", authority_envelope_digest=DIGEST, policy_decision_ref="POLICY-builder", now=NOW,
+            actor_id="builder:fixture", authority_envelope_digest=AUTH, policy_decision_ref="POLICY-builder", now=NOW,
         )
 
     def tearDown(self) -> None:
@@ -293,7 +301,7 @@ class HiveCortexBuilderTests(unittest.TestCase):
                         mission_id="MISSION-builder",
                         work_id="WORK-builder",
                         actor_id="builder:fixture",
-                        authority_envelope_digest=DIGEST,
+                        authority_envelope_digest=AUTH,
                         policy_decision_ref="POLICY-builder",
                         now=NOW,
                     )
@@ -385,7 +393,7 @@ class HiveCortexBuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             BuilderAction("escape", BuilderActionKind.WRITE, "../outside.txt", {"content": "x"}, "remove")
         action = BuilderAction("write-2", BuilderActionKind.WRITE, "src/only.txt", {"content": "x"}, "remove")
-        self.registry.revoke(DIGEST)
+        self.registry.revoke(AUTH)
         with self.assertRaises(AuthorityDenied):
             self.builder.execute_round("ATTEMPT-revoked", (action,))
 
