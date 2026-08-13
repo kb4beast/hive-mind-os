@@ -17,11 +17,11 @@
     "docs/execution/dags/doctor-performance-v1/README.md": "d12d277f7ff533a7f082dc09046e5149a0c62a3a",
     "docs/execution/dags/doctor-performance-v1/benchmark.py": "de2d6a7dc494c47aff0af61c3bcfe2d7dabdbb0f",
     "docs/execution/dags/doctor-performance-v1/generate_plan.py": "f8cc0ff4a573b9cee30d894d1547c0e5e97e91cf",
-    "docs/execution/dags/doctor-performance-v1/specs.py": "9b5c510212a56c556b8b29c2dc340c7d2acf77b8",
+    "docs/execution/dags/doctor-performance-v1/specs.py": "3ff76af9ad33d9100c5ad4a3727c0e12c30b1467",
     "docs/execution/dags/doctor-performance-v1/verify_plan.py": "0180d6d9b8083938e88d45b222cd2e553f9b7464",
     "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json": "c0e2ebfeb1f438ff5a00091f636b31de6153bfca"
   },
-  "expected_plan_digest": "sha256:36147e0917292a7dcb4f77e10633fdb66bfd1b1fd0ca31bb10e9d10cd05f720d",
+  "expected_plan_digest": "sha256:4b3dec3b24fee6b8a5e1be3ac0a8eec69882922a69143bda259c308990a190d6",
   "expected_node_count": 6,
   "expected_node_ids": [
     "DP-CONTRACT-000",
