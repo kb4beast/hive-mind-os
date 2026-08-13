@@ -1,0 +1,154 @@
+{
+  "artifact_type": "A4PathBRunSummary",
+  "authority_envelope_digest": "sha256:c0e366b2a9012265f9748f9aa81e42467b99f43b10fd9d63547ea38da8a1a57d",
+  "base_branch": "main",
+  "branch": "a4-pilot/attempt-1",
+  "credential_value_read_by_driver": false,
+  "credential_value_read_by_driver_note": "A first-person self-report by the driver process, not an external measurement. It is consistent with the addendum's by-reference hoist (HUMAN_AUTHORITY_GATES.md:89-100) and with rest_gateway.py reading os.environ[token_env] itself at call time, but nothing in this evidence tree independently attests it.",
+  "grant_digest": "sha256:5c1f5dd1defc1eb560dd1f875d0bf3f2ed4cb7f384364193bf93c478dece28e9",
+  "host": "github",
+  "network": {
+    "corrected": true,
+    "outbound_connections_occurred": true,
+    "socket_guard_installed": false,
+    "statement": "This run made real outbound network connections -- it had to; that was the point. A `git push` to https://github.com and sixteen REST calls to the GitHub API were issued. The socket guard used in the local rehearsal was deliberately NOT installed here, because installing it would have blocked the very connections the pilot exists to make.",
+    "what_is_and_is_not_evidence": {
+      "is_evidence": "The rest_calls list below and the per-operation receipts in this directory: the driver's own record of the calls it issued, corroborated by host-assigned identifiers (pull #1, comment 5275748785, node ids) that only github.com could have produced.",
+      "is_not_evidence": "Any claim that NO OTHER outbound connection was made. With no socket guard in place, nothing observed the process's sockets. 'No unexpected outbound connection occurred' is NOT proven for this run, and no reader should treat the driver's call list as an egress trace. An auditor wanting that assurance needs an external egress monitor, which was not in place."
+    }
+  },
+  "network_original_driver_values": {
+    "note": "Preserved verbatim so nothing is lost by the correction above. These two zeros were counters belonging to the socket guard; with the guard absent (socket_guard_installed: false) they counted nothing and were never measurements. Left as written they read as 'this run made no outbound connections', which is flatly false. They are superseded, not deleted.",
+    "outbound_connection_attempts": 0,
+    "outbound_connection_targets": []
+  },
+  "operations": [
+    {
+      "file": "01-create-branch.json",
+      "operation": "create-branch",
+      "sequence": 1
+    },
+    {
+      "file": "02-push-branch.json",
+      "operation": "push-branch",
+      "sequence": 2
+    },
+    {
+      "file": "03-open-draft-pr.json",
+      "operation": "open-draft-pr",
+      "sequence": 3
+    },
+    {
+      "file": "04-post-comment.json",
+      "operation": "post-comment",
+      "sequence": 4
+    },
+    {
+      "file": "idempotency-replay.json",
+      "operation": "idempotency-replay",
+      "sequence": 5
+    },
+    {
+      "file": "stop-and-rollback.json",
+      "operation": "stop-and-rollback",
+      "sequence": 6
+    }
+  ],
+  "owner": "patencyhealth-lab",
+  "post_run_annotation": {
+    "by": "claude:a4-800-evidence-scribe",
+    "fields_changed": [
+      "network (rewritten; the original two counters are preserved verbatim under network_original_driver_values)",
+      "credential_value_read_by_driver_note (added)",
+      "rest_calls_provenance (added)",
+      "post_run_annotation (this block)"
+    ],
+    "reason": "The driver emitted this file with a `network` block whose zeros were meaningless once the socket guard was omitted, and which read as an affirmative claim that no outbound connection occurred. Rather than footnote a false statement elsewhere, the statement itself is corrected here and the original values are kept alongside it.",
+    "unchanged": "No per-operation receipt in this directory was touched. 01-create-branch.json, 02-push-branch.json, 03-open-draft-pr.json, 04-post-comment.json, idempotency-replay.json and stop-and-rollback.json are exactly as the driver wrote them. Only this summary file carries scribe edits.",
+    "when": "2026-08-13, after the run"
+  },
+  "repository": "hive-mind-a4-pilot",
+  "rest_calls": [
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls?state=open&head=patencyhealth-lab:a4-pilot/attempt-1&base=main"
+    },
+    {
+      "method": "POST",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls/1"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/issues/1/comments?per_page=100"
+    },
+    {
+      "method": "POST",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/issues/1/comments"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/issues/1/comments?per_page=100"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls?state=open&head=patencyhealth-lab:a4-pilot/attempt-1&base=main"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls?state=open&head=patencyhealth-lab:a4-pilot/attempt-1&base=main"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls?state=open&head=patencyhealth-lab:a4-pilot/attempt-1&base=main"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls/1"
+    },
+    {
+      "method": "PATCH",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls/1"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls/1"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot"
+    },
+    {
+      "method": "DELETE",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/git/refs/heads/a4-pilot/attempt-1"
+    },
+    {
+      "method": "GET",
+      "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls?state=open&head=patencyhealth-lab:a4-pilot/attempt-1&base=main"
+    }
+  ],
+  "rest_calls_provenance": {
+    "aggregate_exceeds_the_itemised_receipts": "This list holds five GET /pulls?state=open... listings; the per-operation receipts itemise only two of them (one in 03-open-draft-pr.json, one in idempotency-replay.json's fresh-intent replay). The remainder are precondition and postcondition reads the driver made but did not itemise per operation -- including the final listing at index 16, whose result backs stop-and-rollback.json's `no_open_draft_pr_remains` assertion even though that file records `open_draft_pr_after_rollback: null`. All five are read-only.",
+    "every_path_is_inside_the_one_granted_repository": true,
+    "recorded_by": "the driver, from the calls it issued through ControlledRestGateway",
+    "write_methods_used": {
+      "DELETE": "1 -- the pilot branch ref only",
+      "PATCH": "1 -- pulls/1 with a state-only body; rest_gateway.close_pull_request sends nothing but {\"state\": \"closed\"} and fails closed if the response claims the pull request was integrated",
+      "POST": "2 -- one draft pull request, one comment"
+    },
+    "no_merge_endpoint_appears": "There is no PUT /pulls/{n}/merge anywhere in this list, and no method on ControlledRestGateway can produce one."
+  },
+  "rest_calls_total": 16,
+  "runtime_root": "C:\\Repos\\trash\\a4rt",
+  "runtime_root_note": "A deliberately short path. See summary.json -> open_defects.D1: mission_store._atomic_write appends '.<name>.tmp-<pid>' to the receipt filename, and a receipt path over the Windows 260-character limit turns a completed push into a permanent EffectReconciliationRequired. The short root is a mitigation, not a fix.",
+  "schema_version": 1,
+  "token_env": "HIVE_A4_PILOT_TOKEN",
+  "token_env_note": "The NAME of the environment variable the gateway reads. Not the credential, and no property of the credential -- not its value, not its length."
+}
