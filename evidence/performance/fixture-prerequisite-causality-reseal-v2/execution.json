@@ -1,0 +1,21 @@
+{
+  "conclusion": "one execution receipt only; no implementation authority",
+  "environment": {
+    "PYTHONNOUSERSITE": "1",
+    "PYTHONPATH": null
+  },
+  "execution": {
+    "attempts": 1,
+    "command": "<venv>/Scripts/python.exe -E -s -m unittest discover -s tests -v",
+    "timeout_seconds": 2700
+  },
+  "kind": "fpcr-execution-v2",
+  "phase": "execution",
+  "receipt_digest": "sha256:85e324a6a12b1bd76d85243c0519a3b3d49ac6c3d986e73fb56eb6ec5f3ce871",
+  "schema_version": 1,
+  "source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "transcript_digest": "sha256:fa47790899393221d3c99d5e26096a4faa48c909fc0195cf2108ffbe791868e3"
+}
