@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-git-commit-observation-manifest-v1",
+  "plan_id": "git-commit-observation-v1",
+  "baseline": {
+    "commit": "61f31cbbee36471ce6e5f0ad7b94db81ad33e9bb",
+    "tree": "8713db647ad2843a336a2f0c6781ebf8161ee47a"
+  },
+  "standard": {
+    "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+    "source_commit": "a93df2632f259f4b63f7a4f27eb0b163b5a47204",
+    "git_blob_sha": "70e43b0a8078a303d44c0109b8dd218a948258c2"
+  },
+  "sources": {
+    "docs/execution/dags/git-commit-observation-v1/.gitignore": "c18dd8d83ceed1806b50b0aaa46beb7e335fff13",
+    "docs/execution/dags/git-commit-observation-v1/README.md": "7da2a62cc4c607fa7d44a6059bd256bcf304a0db",
+    "docs/execution/dags/git-commit-observation-v1/benchmark.py": "ac2e29ceda00bc3acf34965433297d94c7e7a610",
+    "docs/execution/dags/git-commit-observation-v1/generate_plan.py": "f68782f341aa5898fa0ba3410f5f0644f8618f34",
+    "docs/execution/dags/git-commit-observation-v1/specs.py": "2946e786a14ac18b4805a0f5dab62b6380c88eb7",
+    "docs/execution/dags/git-commit-observation-v1/verify_plan.py": "2d348a48616992eca2fca9b3c6bf63f50fc4cdbf",
+    "evidence/courts/CASE-GIT-COMMIT-OBSERVATION-OPENING.json": "d3af08903e9f0a6a7eae8345562a9090e48d8843"
+  },
+  "manifest_self": {
+    "path": "docs/execution/dags/git-commit-observation-v1/manifest.json",
+    "canonical_material_sha256": "sha256:3c34dae09ec85636d781dc20beb12879fedc8f554c1f3a61a0cbb488e17edecc"
+  },
+  "expected_plan_digest": "sha256:6d14f5dee38d15cb9608b7fb8092c4c1f28150961b70737def2fd4ede7f5a90d",
+  "expected_node_count": 10,
+  "expected_node_ids": [
+    "GCO-SEAL-000",
+    "GCO-BASELINE-010",
+    "GCO-TEST-020",
+    "GCO-ARCH-030",
+    "GCO-BUILD-040",
+    "GCO-INTEGRATE-050",
+    "GCO-SAFETY-060",
+    "GCO-SMOKE-070",
+    "GCO-QUALIFY-080",
+    "GCO-JUDGE-090"
+  ],
+  "expected_dependencies": {
+    "GCO-SEAL-000": [],
+    "GCO-BASELINE-010": [
+      "GCO-SEAL-000"
+    ],
+    "GCO-TEST-020": [
+      "GCO-SEAL-000"
+    ],
+    "GCO-ARCH-030": [
+      "GCO-SEAL-000",
+      "GCO-BASELINE-010"
+    ],
+    "GCO-BUILD-040": [
+      "GCO-TEST-020",
+      "GCO-ARCH-030"
+    ],
+    "GCO-INTEGRATE-050": [
+      "GCO-BUILD-040"
+    ],
+    "GCO-SAFETY-060": [
+      "GCO-INTEGRATE-050"
+    ],
+    "GCO-SMOKE-070": [
+      "GCO-SAFETY-060"
+    ],
+    "GCO-QUALIFY-080": [
+      "GCO-SMOKE-070"
+    ],
+    "GCO-JUDGE-090": [
+      "GCO-QUALIFY-080"
+    ]
+  },
+  "expected_round_count": 9,
+  "materialized_path": ".autopilot/state/git-commit-observation-v1.json",
+  "sealed_plan_unchanged": ".autopilot/plan.json",
+  "sealed_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+  "predecessor_dags": {
+    "knowledge-projection-v1": {
+      "verifier": "docs/execution/dags/knowledge-projection-v1/verify_plan.py",
+      "verifier_blob": "32fe02b72bc1590fb68c879eb65177429b603d7b",
+      "manifest": "docs/execution/dags/knowledge-projection-v1/manifest.json",
+      "manifest_blob": "ed16b8398eb70eb2b0c6996e00560778f434cdc3",
+      "plan_digest": "sha256:e61a9b79651871d8d4b8a71e2ed1f540964a9fdc9c4343f5e2f14b73589184ec"
+    },
+    "doctor-performance-v1": {
+      "verifier": "docs/execution/dags/doctor-performance-v1/verify_plan.py",
+      "verifier_blob": "0180d6d9b8083938e88d45b222cd2e553f9b7464",
+      "manifest": "docs/execution/dags/doctor-performance-v1/manifest.json",
+      "manifest_blob": "61e57137b31fdf35d1f96a1f5704ae27a257a778",
+      "plan_digest": "sha256:4b3dec3b24fee6b8a5e1be3ac0a8eec69882922a69143bda259c308990a190d6"
+    }
+  },
+  "rejected_candidate": {
+    "commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+    "tree": "b02326bf108de2fbaa2f174975f937979c02bf90",
+    "disposition": "reject",
+    "evidence": {
+      "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json": "c0e2ebfeb1f438ff5a00091f636b31de6153bfca",
+      "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json": "9809e7f79110237834696e64d8f100379e586ba9"
+    }
+  },
+  "frozen_behavior": {
+    "doctor_internal_timeout_seconds": 180,
+    "total": 381,
+    "passed": 380,
+    "skipped": 1,
+    "failures": 0,
+    "errors": 0,
+    "complete_unittest_id_set_sha256": "sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4",
+    "qualification_nearest_rank_p95_seconds": 135.0
+  },
+  "author_verified": {
+    "narrow_write_scopes": true,
+    "concrete_read_scopes": true,
+    "runnable_focused_required_tests": true,
+    "meaningful_stopping_and_rollback": true,
+    "honest_parallel_safe": true,
+    "semantic_lock_vocabulary": true,
+    "file_locks_cover_write_scopes": true,
+    "safety_before_activation": true,
+    "benchmark_before_promotion": true,
+    "explicit_round_dispatch_required": true,
+    "execution_invariants_preserved": true,
+    "token_economy_preserved": true,
+    "every_other_node_write_scope_forbidden": true
+  }
+}
