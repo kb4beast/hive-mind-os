@@ -1,12 +1,13 @@
 """A deliberately narrow GitHub REST surface for controlled delivery.
 
-Eight calls exist: look up an open draft pull request, create one, read one,
+Nine calls exist: look up an open draft pull request, create one, read one,
 close one, list issue comments, post one comment, read the repository default
-branch, and delete one branch ref.  Closing and branch deletion exist only so a
-pilot can retract exactly what it created; the two reads that precede them exist
-only to enforce that refusal.  There is still no method for integrating a pull
-request, reviewing, or writing branch protection, and none can be added without
-changing this file.  The HTTP seam is the existing
+branch, read one branch ref, and delete one branch ref.  Closing and branch
+deletion exist only so a pilot can retract exactly what it created; the three
+reads that precede them exist only to enforce that refusal and to snapshot what
+was touched.  There is still no method for integrating a pull request,
+reviewing, or writing branch protection, and none can be added without changing
+this file.  The HTTP seam is the existing
 :class:`hive_mind_os.github_adapter.GitHubTransport` protocol so tests can
 supply a deterministic in-process fake.
 """
@@ -16,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.parse
 from typing import Any, Mapping
 
 from hive_mind_os.brain_kernel.canonical import canonical_bytes
@@ -29,8 +31,11 @@ _SIMPLE_NAME = re.compile(r"[A-Za-z0-9_.-]+\Z")
 # A branch ref is slash-separated simple segments and nothing else, so a branch
 # name can never smuggle a traversal, a query string, or a fragment into a path.
 _BRANCH_REF = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\Z")
+_FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
 _API_VERSION = "2022-11-28"
 _USER_AGENT = "hive-mind-os-delivery-420"
+_COMMENT_PAGE_SIZE = 100
+_MAX_COMMENT_PAGES = 50
 
 
 class DeliveryRestError(RuntimeError):
@@ -152,10 +157,12 @@ class ControlledRestGateway:
     def find_open_draft_pr(self, branch: str, base: str) -> Mapping[str, Any] | None:
         """Return an existing open draft PR for the branch, or ``None``."""
 
+        query = urllib.parse.urlencode(
+            {"state": "open", "head": f"{self.owner}:{branch}", "base": base}
+        )
         document = self._request_json(
             "GET",
-            f"{self.repository_path}/pulls"
-            f"?state=open&head={self.owner}:{branch}&base={base}",
+            f"{self.repository_path}/pulls?{query}",
         )
         if not isinstance(document, list):
             raise DeliveryRestError("pull request listing must be an array")
@@ -187,14 +194,22 @@ class ControlledRestGateway:
         return document
 
     def list_comments(self, pull_number: int) -> tuple[Mapping[str, Any], ...]:
-        document = self._request_json(
-            "GET",
-            f"{self.repository_path}/issues/{self._pull_number(pull_number)}"
-            "/comments?per_page=100",
-        )
-        if not isinstance(document, list):
-            raise DeliveryRestError("comment listing must be an array")
-        return tuple(item for item in document if isinstance(item, Mapping))
+        """Read every comment page, so a marker past page one is still found."""
+
+        number = self._pull_number(pull_number)
+        comments: list[Mapping[str, Any]] = []
+        for page in range(1, _MAX_COMMENT_PAGES + 1):
+            document = self._request_json(
+                "GET",
+                f"{self.repository_path}/issues/{number}/comments"
+                f"?per_page={_COMMENT_PAGE_SIZE}&page={page}",
+            )
+            if not isinstance(document, list):
+                raise DeliveryRestError("comment listing must be an array")
+            comments.extend(item for item in document if isinstance(item, Mapping))
+            if len(document) < _COMMENT_PAGE_SIZE:
+                return tuple(comments)
+        raise DeliveryRestError("comment listing exceeded the readable page bound")
 
     def post_comment(self, pull_number: int, body: str) -> Mapping[str, Any]:
         document = self._request_json(
@@ -250,6 +265,34 @@ class ControlledRestGateway:
         if not isinstance(name, str) or not name.strip():
             raise DeliveryRestError("repository response has no default_branch")
         return name
+
+    def read_branch_ref(self, branch: str) -> str | None:
+        """Return one branch head SHA, or ``None`` when the ref does not exist.
+
+        The ref carries the same shape guard the delete path applies, so a
+        branch name can no more smuggle a path into this read than into that
+        write.  This is the snapshot a caller needs to state what a branch
+        pointed at before and after an effect.
+        """
+
+        response = self._request(
+            "GET",
+            f"{self.repository_path}/git/ref/heads/{self._branch_ref(branch)}",
+            accepted=(200, 404),
+        )
+        if response.status == 404:
+            return None
+        try:
+            document = json.loads(response.body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise DeliveryRestError("GitHub API returned invalid UTF-8 JSON") from None
+        if not isinstance(document, Mapping):
+            raise DeliveryRestError("branch ref response must be an object")
+        target = document.get("object")
+        head = target.get("sha") if isinstance(target, Mapping) else None
+        if not isinstance(head, str) or _FULL_SHA.fullmatch(head) is None:
+            raise DeliveryRestError("branch ref response has no full head SHA")
+        return head
 
     def delete_branch(self, branch: str) -> None:
         """Delete exactly one branch ref; only HTTP 204 counts as deleted."""

@@ -6,7 +6,6 @@ import json
 import os
 import re
 import ssl
-import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -18,13 +17,19 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 from .contracts import tool_intent_digest, validate_contract
 from .git_adapter import GitWorkspace
 from .ledger import EvidenceLedger
-from .mission_store import MissionStore, StepCheckpoint
+from .mission_store import (
+    MissionStore,
+    StepCheckpoint,
+    _system_path,
+    _temporary_name,
+)
 from .models import AutonomyLevel, RiskTier, Role, utc_now
 from .policy import Action, PolicyEngine
 from .receipts import ReceiptReference, portable_path_parts, sha256_digest
 
 _API_VERSION = "2022-11-28"
 _NAME = re.compile(r"[A-Za-z0-9_.-]+\Z")
+_BRANCH_REF = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\Z")
 _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
 _RUN_URL = re.compile(
     r"(?P<url>https://github\.com/[^/]+/[^/]+/(?:actions/)?runs/(?P<id>\d+))"
@@ -62,6 +67,10 @@ class CheckPollingTimeout(GitHubDeliveryError):
 
 class CheckRunFailed(GitHubDeliveryError):
     """A completed GitHub check did not have an accepted conclusion."""
+
+
+class GitHubEffectReconciliationRequired(GitHubDeliveryError):
+    """An effect was claimed, its outcome is unwitnessed, and it will not re-fire."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,28 +205,35 @@ def _canonical_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
+def _branch_ref(branch: object) -> str:
+    """Accept only a plain slash-separated branch ref for a REST path segment."""
+
+    if not isinstance(branch, str) or _BRANCH_REF.fullmatch(branch) is None:
+        raise GitHubDeliveryError("branch ref must be slash-separated simple segments")
+    if any(segment.startswith(".") for segment in branch.split("/")):
+        raise GitHubDeliveryError("branch ref segments must not start with '.'")
+    return branch
+
+
 def _atomic_write(path: Path, content: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        dir=path.parent,
-    )
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        if path.exists():
-            if path.read_bytes() != content:
+    os.makedirs(_system_path(path.parent), exist_ok=True)
+    if os.path.isfile(_system_path(path)):
+        with open(_system_path(path), "rb") as stream:
+            if stream.read() != content:
                 raise GitHubDeliveryError(
                     "content-addressed GitHub evidence path was reused"
                 )
-        else:
-            os.replace(temporary, path)
+        return
+    temporary = _system_path(path.with_name(_temporary_name(path.name)))
+    try:
+        with open(temporary, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, _system_path(path))
     finally:
-        temporary.unlink(missing_ok=True)
+        if os.path.exists(temporary):
+            os.remove(temporary)
 
 
 def _normalize_required_check_names(value: object) -> tuple[str, ...]:
@@ -404,10 +420,46 @@ class GitHubClient:
             minimum_step_index=1_000_000,
         )
 
+    def _reconcile_interrupted_effect(
+        self,
+        checkpoint: StepCheckpoint,
+        observe: Callable[
+            [],
+            tuple[dict[str, Any], tuple[dict[str, Any], ...]] | None,
+        ]
+        | None,
+    ) -> dict[str, Any]:
+        """Adopt the observed outcome of a claimed effect; never fire it twice."""
+
+        assert self.mission_store is not None
+        record = self.mission_store.find_effect_intent(checkpoint)
+        if record is None:
+            raise GitHubEffectReconciliationRequired(
+                "GitHub effect was claimed with no write-ahead record at "
+                f"{checkpoint.mission_id} step {checkpoint.step_index}"
+            )
+        observed = observe() if observe is not None else None
+        if observed is None:
+            raise GitHubEffectReconciliationRequired(
+                "interrupted GitHub effect "
+                f"{record['idempotency_key']} has no witnessed outcome; "
+                f"reconcile {checkpoint.mission_id} step {checkpoint.step_index} "
+                "before it can proceed"
+            )
+        value, records = observed
+        outcome = {"value": value, "records": [dict(item) for item in records]}
+        self.mission_store.reconcile_effect(checkpoint, outcome, records)
+        return value
+
     def _idempotent_effect(
         self,
         intent: Mapping[str, Any],
         operation: Callable[[], tuple[dict[str, Any], tuple[dict[str, Any], ...]]],
+        observe: Callable[
+            [],
+            tuple[dict[str, Any], tuple[dict[str, Any], ...]] | None,
+        ]
+        | None = None,
     ) -> dict[str, Any]:
         assert self.mission_store is not None
         checkpoint = self._checkpoint(intent)
@@ -421,6 +473,8 @@ class GitHubClient:
                     wrapper["outcome"],
                 )
             return dict(wrapper["outcome"]["value"])
+        if checkpoint.execution_count > 0:
+            return self._reconcile_interrupted_effect(checkpoint, observe)
         self.mission_store.begin_effect(checkpoint.mission_id, checkpoint.step_index)
         value, records = operation()
         outcome = {"value": value, "records": [dict(record) for record in records]}
@@ -432,6 +486,41 @@ class GitHubClient:
         self.mission_store.complete_step(checkpoint, reference, outcome)
         return value
 
+    @staticmethod
+    def _receipt_summary(
+        receipt_path: Path,
+        encoded: bytes,
+        receipt: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "path": receipt_path.as_posix(),
+            "digest": sha256_digest(encoded),
+            "mission_id": receipt["mission_id"],
+            "state_ref": receipt["state_ref"],
+            "actor_id": receipt["actor_id"],
+            "action_id": receipt["action_id"],
+            "action_kind": receipt["action_kind"],
+            "action_digest": receipt["action_digest"],
+            "result": receipt["result"],
+        }
+
+    def _stored_receipt(
+        self,
+        receipt_path: Path,
+        intent: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        """Reuse the receipt an interrupted run already wrote for this intent."""
+
+        absolute = _system_path(self.evidence_root / receipt_path)
+        if not os.path.isfile(absolute):
+            return None
+        with open(absolute, "rb") as stream:
+            encoded = stream.read()
+        receipt = json.loads(encoded.decode("utf-8"))
+        if receipt.get("action_digest") != intent["action_digest"]:
+            raise GitHubDeliveryError("GitHub receipt path binds another action")
+        return self._receipt_summary(receipt_path, encoded, receipt)
+
     def _persist_tool_receipt(
         self,
         intent: Mapping[str, Any],
@@ -442,6 +531,14 @@ class GitHubClient:
         result: str = "succeeded",
         observed_at: str | None = None,
     ) -> dict[str, Any]:
+        receipt_path = (
+            Path("github")
+            / "receipts"
+            / (str(intent["action_digest"]).removeprefix("sha256:") + ".json")
+        )
+        stored = self._stored_receipt(receipt_path, intent)
+        if stored is not None:
+            return stored
         artifact_digest = sha256_digest(raw)
         artifact_path = (
             Path("github")
@@ -486,26 +583,8 @@ class GitHubClient:
                 "GitHub receipt violates schema: " + "; ".join(validation.issues)
             )
         encoded = _canonical_bytes(receipt) + b"\n"
-        receipt_path = (
-            Path("github")
-            / "receipts"
-            / (
-                str(intent["action_digest"]).removeprefix("sha256:")
-                + ".json"
-            )
-        )
         _atomic_write(self.evidence_root / receipt_path, encoded)
-        return {
-            "path": receipt_path.as_posix(),
-            "digest": sha256_digest(encoded),
-            "mission_id": receipt["mission_id"],
-            "state_ref": receipt["state_ref"],
-            "actor_id": receipt["actor_id"],
-            "action_id": receipt["action_id"],
-            "action_kind": receipt["action_kind"],
-            "action_digest": receipt["action_digest"],
-            "result": receipt["result"],
-        }
+        return self._receipt_summary(receipt_path, encoded, receipt)
 
     def push_branch(
         self,
@@ -557,7 +636,37 @@ class GitHubClient:
                 records,
             )
 
-        value = self._idempotent_effect(intent, operation)
+        def observe() -> tuple[dict[str, Any], tuple[dict[str, Any], ...]] | None:
+            document, raw = self._request_json(
+                "GET",
+                (
+                    f"/repos/{self.owner}/{self.repository}/git/ref/heads/"
+                    f"{_branch_ref(target_branch)}"
+                ),
+                optional=(404,),
+            )
+            if not isinstance(document, Mapping):
+                return None
+            target = document.get("object")
+            observed_head = target.get("sha") if isinstance(target, Mapping) else None
+            if observed_head != head_sha:
+                return None
+            receipt = self._persist_tool_receipt(
+                intent,
+                raw,
+                provider="github-rest-api",
+                verifier="github-rest-tls-observer-v1",
+            )
+            return (
+                {
+                    "branch": target_branch,
+                    "head_sha": head_sha,
+                    "receipt": receipt,
+                },
+                (receipt,),
+            )
+
+        value = self._idempotent_effect(intent, operation, observe)
         return PushResult(
             _required_string(value, "branch"),
             _required_string(value, "head_sha"),
@@ -591,7 +700,7 @@ class GitHubClient:
             },
         )
 
-        def operation() -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+        def find() -> tuple[Mapping[str, Any], bytes] | None:
             query = urllib.parse.urlencode(
                 {
                     "state": "open",
@@ -599,11 +708,10 @@ class GitHubClient:
                     "base": base,
                 }
             )
-            existing, raw = self._request_json(
+            existing, _ = self._request_json(
                 "GET",
                 f"/repos/{self.owner}/{self.repository}/pulls?{query}",
             )
-            selected: Mapping[str, Any] | None = None
             if isinstance(existing, list):
                 for candidate in existing:
                     if not isinstance(candidate, Mapping):
@@ -614,28 +722,13 @@ class GitHubClient:
                         and isinstance(head, Mapping)
                         and head.get("sha") == head_sha
                     ):
-                        selected = candidate
-                        raw = _canonical_bytes(candidate)
-                        break
-            if selected is None:
-                created, raw = self._request_json(
-                    "POST",
-                    f"/repos/{self.owner}/{self.repository}/pulls",
-                    body={
-                        "title": title,
-                        "body": body,
-                        "head": branch,
-                        "base": base,
-                        "draft": True,
-                        "maintainer_can_modify": False,
-                    },
-                    accepted=(201,),
-                )
-                if not isinstance(created, Mapping):
-                    raise GitHubResponseError(
-                        "create pull request response must be an object"
-                    )
-                selected = created
+                        return candidate, _canonical_bytes(candidate)
+            return None
+
+        def adopt(
+            selected: Mapping[str, Any],
+            raw: bytes,
+        ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
             head = selected.get("head")
             if not isinstance(head, Mapping) or head.get("sha") != head_sha:
                 raise GitHubResponseError("draft PR response is not bound to head SHA")
@@ -658,7 +751,34 @@ class GitHubClient:
                 (receipt,),
             )
 
-        value = self._idempotent_effect(intent, operation)
+        def operation() -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+            found = find()
+            if found is not None:
+                return adopt(*found)
+            created, raw = self._request_json(
+                "POST",
+                f"/repos/{self.owner}/{self.repository}/pulls",
+                body={
+                    "title": title,
+                    "body": body,
+                    "head": branch,
+                    "base": base,
+                    "draft": True,
+                    "maintainer_can_modify": False,
+                },
+                accepted=(201,),
+            )
+            if not isinstance(created, Mapping):
+                raise GitHubResponseError(
+                    "create pull request response must be an object"
+                )
+            return adopt(created, raw)
+
+        def observe() -> tuple[dict[str, Any], tuple[dict[str, Any], ...]] | None:
+            found = find()
+            return None if found is None else adopt(*found)
+
+        value = self._idempotent_effect(intent, operation, observe)
         return PullRequestResult(
             _required_int(value, "number"),
             _required_string(value, "url"),
@@ -1178,7 +1298,7 @@ def validate_github_receipt(
         path = Path(evidence_root) / Path(
             *portable_path_parts(str(record["path"]))
         )
-        if not path.is_file():
+        if not os.path.isfile(_system_path(path)):
             return False
         validation = FileReceiptValidator(evidence_root).validate(
             ReceiptReference(str(record["path"]), str(record["digest"])),

@@ -12,6 +12,10 @@ one refuses any target the grant could not itself have created, so they can only
 ever undo this pilot's own work.  Integrating a pull request, reviewing, and
 protection writes are not implemented here and are not grantable, so no routine
 mission can reach them through this boundary.
+
+``branch_head`` is a read, not a sixth adapter: it is never registered on a
+gateway, changes nothing, and exists so a replay can state what a branch pointed
+at before and after an effect instead of comparing two nulls.
 """
 
 from __future__ import annotations
@@ -132,6 +136,13 @@ class ControlledGitHubDelivery:
             self.delete_branch_adapter,
             version=self.adapter_version,
         )
+
+    # -- reads -------------------------------------------------------------
+
+    def branch_head(self, branch: str) -> str | None:
+        """Snapshot one branch head in the granted repository; it changes nothing."""
+
+        return self.rest.read_branch_ref(branch)
 
     # -- adapters ----------------------------------------------------------
 
