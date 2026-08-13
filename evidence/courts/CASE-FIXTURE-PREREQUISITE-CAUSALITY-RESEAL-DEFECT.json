@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-DEFECT",
+  "kind": "appeals-judge-reseal-defect-order",
+  "disposition": "adapt",
+  "defect": "The superseded FPC appeal sealed and evaluated an invalid source identity. A commit SHA is not a tree SHA and the two specified historical tuples are not the real source under examination.",
+  "sole_evaluated_source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "verification": "git rev-parse b789b68e7d6a741e0b85a3ac33cbce846e1e32c9^{tree}"
+  },
+  "explicitly_rejected_tuples": [
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"},
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "4f20bd2"}
+  ],
+  "authorized_scope": "Six-node no-code corrected-source causality reseal. The 1059 discovery result is a claim requiring independent verification; one serialized root-CI execution is permitted with a 2700-second limit only after discovery.",
+  "required_graph": ["FPCR-SEAL-000", "FPCR-DISCOVERY-010", "FPCR-EXECUTE-020", "FPCR-CROSS-030", "FPCR-INTEGRATE-040", "FPCR-JUDGE-050"],
+  "prohibitions": ["unlock original FPC nodes", "implementation", "test or production-source edits", ".autopilot/plan.json mutation", "main or remote effects", "fixture promotion", "GCO work or promotion", "performance conclusion", "knowledge BASELINE-000 retry", "retry of the sole execution"],
+  "required_evidence": ["independent corrected-source discovery", "one durable hermetic execution transcript", "independent cross-examination", "integration", "distinct Judge disposition"],
+  "rollback": "Revert only individual retained FPCR v2 commits; retain previous evidence and all dissent."
+}
