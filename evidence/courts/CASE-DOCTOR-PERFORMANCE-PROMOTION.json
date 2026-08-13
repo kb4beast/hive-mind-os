@@ -1,0 +1,345 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-DOCTOR-PERFORMANCE-PROMOTION",
+  "node_id": "DP-JUDGE-050",
+  "recorded_at": "2026-08-13",
+  "subject": "Promotion of the immutable invocation-scoped content-addressed healing-fixture candidate and authority to retry knowledge-projection BASELINE-000",
+  "judge": {
+    "identity": "codex:dp-judge-050",
+    "seat": "judge",
+    "worktree": "C:/Repos/HiveMind/hive-mind-os-dp-judge-050",
+    "branch": "codex/dp-judge-050",
+    "independent_from": [
+      "codex:dp-contract-000",
+      "codex:dp-tests-010",
+      "codex:dp-bench-020",
+      "codex:dp-fixture-030",
+      "codex:dp-qualify-040",
+      "role:doctor-performance-advocate",
+      "role:doctor-performance-cross-examiner",
+      "role:test-isolation-expert",
+      "knowledge-projection-v1:BASELINE-000"
+    ],
+    "self_approval": false
+  },
+  "role_identities": [
+    {
+      "seat": "architect",
+      "identity": "codex:dp-contract-000",
+      "node": "DP-CONTRACT-000"
+    },
+    {
+      "seat": "test_curator",
+      "identity": "codex:dp-tests-010",
+      "node": "DP-TESTS-010"
+    },
+    {
+      "seat": "optimizer",
+      "identity": "codex:dp-bench-020",
+      "node": "DP-BENCH-020"
+    },
+    {
+      "seat": "builder",
+      "identity": "codex:dp-fixture-030",
+      "node": "DP-FIXTURE-030"
+    },
+    {
+      "seat": "qualification_curator",
+      "identity": "codex:dp-qualify-040",
+      "node": "DP-QUALIFY-040"
+    },
+    {
+      "seat": "advocate",
+      "identity": "role:doctor-performance-advocate",
+      "source": "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json"
+    },
+    {
+      "seat": "cross_examiner",
+      "identity": "role:doctor-performance-cross-examiner",
+      "source": "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json"
+    },
+    {
+      "seat": "expert_witness",
+      "identity": "role:test-isolation-expert",
+      "source": "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json"
+    },
+    {
+      "seat": "judge",
+      "identity": "codex:dp-judge-050",
+      "node": "DP-JUDGE-050"
+    }
+  ],
+  "governing_sources": [
+    {
+      "path": "AGENTS.md",
+      "claim": "Promotion and superiority fail closed without independent reproducible evidence."
+    },
+    {
+      "path": "docs/architecture/ADR-063-INVOCATION-SCOPED-TEST-FIXTURES.md",
+      "git_blob": "2b8209f7cf28e5363edd8e5da4fe2522cb34fabd",
+      "claim": "All exact doctor trials must pass below 180 seconds and nearest-rank p95 must be at most 135 seconds on both pinned runtimes."
+    },
+    {
+      "path": "docs/execution/dags/doctor-performance-v1/manifest.json",
+      "git_blob": "61e57137b31fdf35d1f96a1f5704ae27a257a778",
+      "plan_digest": "sha256:4b3dec3b24fee6b8a5e1be3ac0a8eec69882922a69143bda259c308990a190d6"
+    },
+    {
+      "path": "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json",
+      "git_blob": "c0e2ebfeb1f438ff5a00091f636b31de6153bfca",
+      "claim": "Only an ADOPT disposition with no material unresolved finding may authorize BASELINE-000 retry."
+    }
+  ],
+  "immutable_candidate": {
+    "commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+    "tree": "b02326bf108de2fbaa2f174975f937979c02bf90",
+    "parent": "635dfa51fe0caebb09e9b283ccf21574b65e0258",
+    "subject": "invocation-scoped content-addressed healing fixtures",
+    "commit_scope": [
+      ".autopilot/tests/fixture_support.py",
+      ".autopilot/tests/test_healing.py"
+    ],
+    "byte_seals": {
+      ".autopilot/tests/fixture_support.py": {
+        "git_blob": "44ab23f56914877fbe518c06dbd4b207db46cbf5",
+        "sha256": "sha256:cda625264cebbe7c3ff9d8b712ee7ebc87014284d80e9e39d363b7bb872a6a71"
+      },
+      ".autopilot/tests/test_healing.py": {
+        "git_blob": "b357492e38fb89644978b17470644defc624045e",
+        "sha256": "sha256:4b12c25a53f2225383ea2b55243b199a657db82d90c6178e5ac0e9a4297963ec"
+      }
+    },
+    "scope_confinement_verified": true,
+    "production_files_changed": false,
+    "controller_files_changed": false
+  },
+  "qualification_evidence": {
+    "commit": "be9495ad5a54274bfa25d05b32045052fc229858",
+    "tree": "0b0952f0c3ba867587e4f4aa587e0e0cb3920f9f",
+    "parent": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+    "branch_head_alias_checked": {
+      "commit": "77e345711a0b85e820d8d82cb497bfa8807315c5",
+      "tree": "0b0952f0c3ba867587e4f4aa587e0e0cb3920f9f",
+      "parent": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+      "diff_from_qualification_commit": []
+    },
+    "commit_scope": [
+      "evidence/performance/doctor-performance-v1/candidate-python-3.12.json",
+      "evidence/performance/doctor-performance-v1/candidate-python-3.14.json",
+      "evidence/performance/doctor-performance-v1/qualification.json"
+    ],
+    "byte_seals": {
+      "evidence/performance/doctor-performance-v1/candidate-python-3.12.json": {
+        "git_blob": "719885089125817ab532eff2f78e2e1d36459148",
+        "file_sha256": "sha256:0be65bbb42ef5915ee580340011a0564770d37c3672b6a16ebad7e9390f1ba52",
+        "receipt_digest": "sha256:50b56618f815497db5400db2e2d24f0773454a673100e0219498aaf27e40ad62"
+      },
+      "evidence/performance/doctor-performance-v1/candidate-python-3.14.json": {
+        "git_blob": "67640be1b519c45c2f66c998a9696439537f79d0",
+        "file_sha256": "sha256:0ed8235aaf6f50deed54e43cfc4f1d0c8abd264a3609b21bf0ae550a1030509e",
+        "receipt_digest": "sha256:b5795ece72223af7980fd6095b66ac1159719dcab928c6296a4a67ee3a5c1e99"
+      },
+      "evidence/performance/doctor-performance-v1/qualification.json": {
+        "git_blob": "908b046154d42301bee50c9618ab4b7ec09b858b"
+      }
+    },
+    "scope_confinement_verified": true
+  },
+  "frozen_behavior_vector": {
+    "complete_unittest_id_set_sha256": "sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4",
+    "required": {
+      "total": 381,
+      "passed": 380,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "conditional_skip": "test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected"
+    },
+    "contract_seals_reproduced": true,
+    "candidate_exact_doctor_vector_completed": false,
+    "material_finding": "Every candidate exact-doctor trial reached the unchanged internal timeout before the full vector completed."
+  },
+  "baseline_matrix": {
+    "source_commit": "1fda8e38a60865dc3a6e95a0d4af403e8178301a",
+    "source_tree": "bda56eea584dc48d1f056623338d25b899453ca7",
+    "evidence_commit": "635dfa51fe0caebb09e9b283ccf21574b65e0258",
+    "runtimes": [
+      {
+        "runtime_id": "python-3.14-system",
+        "version": "3.14.4",
+        "trial_seconds": [188.331349, 186.587055, 186.712683, 187.509034, 186.664459, 186.629394],
+        "doctor_passed_trials": 0,
+        "doctor_failed_trials": 6,
+        "nearest_rank_p95_seconds": 188.331349,
+        "receipt_digest": "sha256:b085d2b1ac520083c661e3a2052a3e1fdd8cc14f9b1e181747f5a766841f4b52"
+      },
+      {
+        "runtime_id": "python-3.12-bundled",
+        "version": "3.12.13",
+        "trial_seconds": [186.945909, 186.704175, 186.638581, 186.597567, 186.595641, 186.645606],
+        "doctor_passed_trials": 0,
+        "doctor_failed_trials": 6,
+        "nearest_rank_p95_seconds": 186.945909,
+        "receipt_digest": "sha256:05200509f6a542d38760cbd3b1c19ab3ea8df51d0949660b8a8cb094dfe8435b"
+      }
+    ],
+    "qualification_success": false
+  },
+  "candidate_matrix": {
+    "source_commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+    "source_tree": "b02326bf108de2fbaa2f174975f937979c02bf90",
+    "qualification_limit_seconds": 135.0,
+    "doctor_internal_timeout_seconds": 180,
+    "runtimes": [
+      {
+        "runtime_id": "python-3.14-system",
+        "version": "3.14.4",
+        "trial_seconds": [187.051918, 186.495149, 186.851545, 186.740816, 186.545991, 186.669888],
+        "doctor_passed_trials": 0,
+        "doctor_failed_trials": 6,
+        "nearest_rank_p95_seconds": 187.051918,
+        "p95_delta_from_baseline_seconds": -1.279431,
+        "all_below_180_seconds": false,
+        "p95_at_or_below_135_seconds": false,
+        "qualification_gate": "failed"
+      },
+      {
+        "runtime_id": "python-3.12-bundled",
+        "version": "3.12.13",
+        "trial_seconds": [187.290851, 186.712117, 186.893996, 186.917883, 186.48562, 185.98613],
+        "doctor_passed_trials": 0,
+        "doctor_failed_trials": 6,
+        "nearest_rank_p95_seconds": 187.290851,
+        "p95_delta_from_baseline_seconds": 0.344942,
+        "all_below_180_seconds": false,
+        "p95_at_or_below_135_seconds": false,
+        "qualification_gate": "failed"
+      }
+    ],
+    "qualification_success": false,
+    "superiority_supported": false
+  },
+  "verification": [
+    {
+      "command": "python docs/execution/dags/doctor-performance-v1/verify_plan.py",
+      "result": "passed",
+      "plan_digest": "sha256:4b3dec3b24fee6b8a5e1be3ac0a8eec69882922a69143bda259c308990a190d6",
+      "node_count": 6,
+      "sealed_sources": 8
+    },
+    {
+      "command": "python docs/execution/dags/knowledge-projection-v1/verify_plan.py",
+      "result": "passed",
+      "plan_digest": "sha256:e61a9b79651871d8d4b8a71e2ed1f540964a9fdc9c4343f5e2f14b73589184ec",
+      "node_count": 31
+    },
+    {
+      "command": "python docs/execution/dags/doctor-performance-v1/benchmark.py self-test",
+      "result": "passed"
+    },
+    {
+      "command": "python docs/execution/dags/doctor-performance-v1/benchmark.py verify --receipt <each of four baseline and candidate receipts>",
+      "result": "passed_all_four_digest_and_shape_checks"
+    },
+    {
+      "command": "python docs/execution/dags/doctor-performance-v1/benchmark.py verify --receipt evidence/performance/doctor-performance-v1/candidate-python-3.14.json --qualification",
+      "result": "failed_as_required_by_adverse_evidence",
+      "error": "candidate doctor trial failed"
+    },
+    {
+      "command": "python docs/execution/dags/doctor-performance-v1/benchmark.py verify --receipt evidence/performance/doctor-performance-v1/candidate-python-3.12.json --qualification",
+      "result": "failed_as_required_by_adverse_evidence",
+      "error": "candidate doctor trial failed"
+    },
+    {
+      "command": "python -m unittest -v tests.test_doctor_performance_contract tests.test_autopilot_fixture_seed",
+      "result": "passed",
+      "tests_run": 15,
+      "failures": 0,
+      "errors": 0,
+      "advisory": "Two ResourceWarning notices were emitted by the forced-child-termination test."
+    }
+  ],
+  "acceptance_gates": {
+    "sealed_doctor_plan": true,
+    "sealed_knowledge_plan": true,
+    "candidate_commit_and_tree_bound": true,
+    "qualification_commit_and_tree_bound": true,
+    "candidate_scope_confined": true,
+    "qualification_scope_confined": true,
+    "byte_seals_reproduced": true,
+    "focused_contract_and_isolation_tests": true,
+    "six_fresh_alternating_trials_python_3_14": true,
+    "six_fresh_alternating_trials_python_3_12": true,
+    "all_exact_doctor_trials_passed": false,
+    "all_exact_doctor_trials_below_180_seconds": false,
+    "p95_at_or_below_135_seconds_both_runtimes": false,
+    "full_behavior_vector_reproduced": false,
+    "full_autopilot_suite_passed": false,
+    "full_repository_ci_passed": false,
+    "zero_unresolved_material_findings": false
+  },
+  "adverse_evidence": [
+    "All twelve candidate exact-doctor trials failed: 0/6 passed on Python 3.14.4 and 0/6 passed on Python 3.12.13.",
+    "Candidate nearest-rank p95 was 187.051918 seconds on Python 3.14.4 and 187.290851 seconds on Python 3.12.13, above the 135-second promotion limit.",
+    "Neither candidate runtime completed below the unchanged 180-second internal timeout.",
+    "The candidate did not reproduce the complete frozen 381-execution behavior vector through the required exact doctor command.",
+    "Full .autopilot test discovery and full repository CI were not run after the decisive two-runtime fail-closed result.",
+    "The candidate's p95 changed in mixed directions relative to baseline: 1.279431 seconds lower on Python 3.14 and 0.344942 seconds higher on Python 3.12; this is not consistent superiority evidence."
+  ],
+  "dissent_preserved": [
+    "The focused contract, seed-isolation, fixture-isolation, and healing tests passed, so rejection of promotion is not a finding that every isolation property failed.",
+    "The Python 3.14 p95 is slightly lower than its baseline p95, but all trials still failed and the result is far above the promotion threshold.",
+    "The baseline court recorded fixture construction as a hypothesis only; this experiment does not establish it as the dominant runtime cause.",
+    "A content-addressed fixture may remain useful outside this promotion claim, but usefulness cannot substitute for the sealed end-to-end burden."
+  ],
+  "verdict": {
+    "disposition": "reject",
+    "scope": "exact immutable candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 / b02326bf108de2fbaa2f174975f937979c02bf90 for doctor-performance promotion",
+    "rationale": "The candidate conclusively failed mandatory two-runtime exact-doctor completion, latency, frozen-vector, full-suite, and zero-material-finding gates. Deferral would misstate a completed adverse evaluation as merely awaiting evidence, and adaptation inside this case would violate the immutable-candidate boundary.",
+    "candidate_promotion_authorized": false,
+    "knowledge_baseline_retry_authorized": false,
+    "production_authority_granted": false,
+    "policy_authority_granted": false,
+    "remote_authority_granted": false,
+    "superiority_claim_authorized": false,
+    "completion_claim": false,
+    "knowledge_projection_baseline_status": "blocked"
+  },
+  "rollback": {
+    "action_now": "No rollback action is executed by this Judge node; the failed candidate remains immutable evidence and is not promoted.",
+    "if_restoration_is_required": "On an authorized integration branch, revert only candidate commit 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 to restore the frozen fixture implementation.",
+    "evidence_retention": "Retain the baseline, candidate, qualification, dissent, and this verdict append-only; never rewrite adverse receipts.",
+    "forbidden": [
+      "amending or relabeling the rejected candidate",
+      "deleting adverse benchmark evidence",
+      "changing the doctor timeout or discovery command",
+      "using cached verdicts or prior results as fresh qualification"
+    ]
+  },
+  "appeal": {
+    "same_candidate_same_evidence": "denied",
+    "new_separate_court_authorized": true,
+    "authorized_subject": "Judge-deferred invocation-scoped immutable Git read batching",
+    "classification": "A new court may evaluate a separately pinned challenger; this authorization does not adapt, extend, revive, or promote candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 and grants no implementation authority by itself.",
+    "mandatory_conditions": [
+      "Open a new court and sealed DAG with Advocate, Cross-Examiner, Expert Witness, Builder, independent Curator, Integrator, and Judge identities distinct where required.",
+      "Bind a new immutable candidate commit and tree; do not amend or reuse the rejected candidate's qualification receipts.",
+      "Constrain batching to immutable Git reads within one invocation and prove there is no mutable state, object database, index, refs, worktree, receipt, verdict, or result shared across invocations.",
+      "Keep production/controller Git caching deferred; do not edit controller.py, production src, the doctor command, the 180-second timeout, the frozen test vector, or either sealed plan without a separately authorized architecture decision.",
+      "Use the frozen baseline and this rejected candidate as pinned comparators and retain all losing measurements.",
+      "Run at least six fresh cold-first alternating exact-doctor trials on each pinned runtime; every trial must pass below 180 seconds and each nearest-rank p95 must be at most 135 seconds.",
+      "Reproduce the exact 381-execution vector and its ID digest, pass focused isolation tests, full .autopilot discovery, and full repository CI, and obtain independent scope, seal, safety, and rollback receipts.",
+      "Make no superiority or BASELINE-000 retry claim until the new independent Judge issues ADOPT with zero unresolved material findings."
+    ],
+    "authority_granted_now": "court_opening_only",
+    "implementation_authority_granted_now": false,
+    "baseline_retry_authority_granted_now": false
+  },
+  "finality": {
+    "current_candidate_case_closed": true,
+    "new_evidence_path": "new separately governed challenger court only",
+    "next_node_authority": "No doctor-performance-v1 node may promote this candidate or retry knowledge-projection BASELINE-000."
+  }
+}
