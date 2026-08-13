@@ -9,6 +9,12 @@ regexTarget = "line"
 regexes = [
   '''IDEMPOTENCY-P06-test''',
   '''ConstraintEnvelope\("AUTH-(?:one|parent|child)", "MISSION-phase-1"''',
+  # Present in commits 540f980 and edc21f8 of the authority-hardening branch and
+  # therefore permanent in history, though the working tree no longer packs these
+  # kwargs onto one line. generic-api-key captures the literal text
+  # `policy_decision_ref=` because the `auth` in `authority_envelope_digest`
+  # precedes it; AUTH is a computed sha256 of a test envelope.
+  '''authority_envelope_digest=AUTH, policy_decision_ref="POLICY-builder"''',
   # Synthetic identifiers in a retained audit probe transcript, kept verbatim as
   # evidence. generic-api-key fires on the adjacency, not on any credential.
   '''"AUTH-probe2", "MISSION-probe2", "WORK-probe2"''',
