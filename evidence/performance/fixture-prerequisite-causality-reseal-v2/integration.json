@@ -1,0 +1,91 @@
+{
+  "authority": {
+    "code_changes": false,
+    "fixture_promotion": false,
+    "gco_promotion": false,
+    "implementation": false,
+    "knowledge_baseline_retry": false,
+    "original_fpc_unlock": false,
+    "performance_claim": false,
+    "root_ci_retry": false,
+    "test_changes": false
+  },
+  "conclusion": "REJECT: the corrected-source receipts establish one completed b789 root-CI observation, but reject the fixture-only causal predicate. The observed 28 failures comprise 27 missing GitCommitObservation contract-API failures and one missing fixture API-surface failure; satisfying the fixture API alone cannot make this root-CI result pass. The source baseline predates the GCO candidate, the discovery and execution totals disagree (1,059 versus 1,050), strict DAG lint remains fail-closed at 0 errors and 2 warnings (exit 1), and the Cross-Examiner records verifier and hermeticity gaps. Preserve this adverse evidence. This integration grants no build, implementation, fixture or GCO promotion, performance claim, original-FPC authority, or knowledge BASELINE-000 retry.",
+  "disposition": {
+    "causal_predicate": "rejected",
+    "narrow_observation": "One serialized FPCR-EXECUTE-020 root-CI run completed without timeout against b789, but it did not isolate a fixture prerequisite as the sole blocking cause.",
+    "unresolved": [
+      "The independent discovery receipt reports 1,059 test IDs while the sole execution transcript reports 1,050 tests run; this nine-test discrepancy is not resolved by the runner verifier.",
+      "The runner execution verifier checks a receipt digest and nonempty transcript reference but does not parse the inventory or enforce a single wall-clock budget across venv setup, editable installation, and root CI.",
+      "Strict DAG lint is recorded as 0 errors and 2 inherited FPCR-SEAL-000 scaffold-scope warnings with exit 1; it is not a passed or waived 0/0 result."
+    ]
+  },
+  "evidence_reconciliation": {
+    "cross_examination": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/cross-examination.json",
+      "receipt_digest": "sha256:bfc7a6f293131183fec323bdb9a94914ac0d4f28ad4f1ecf0a9300ebae503cf2",
+      "runner_verification": "passed"
+    },
+    "discovery": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e",
+      "reported_tests_discovered": 1059,
+      "runner_verification": "passed"
+    },
+    "execution": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+      "receipt_digest": "sha256:85e324a6a12b1bd76d85243c0519a3b3d49ac6c3d986e73fb56eb6ec5f3ce871",
+      "runner_verification": "passed",
+      "transcript_whole_document_digest": "sha256:fa47790899393221d3c99d5e26096a4faa48c909fc0195cf2108ffbe791868e3"
+    },
+    "execution_transcript": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66",
+      "referenced_by_execution": true,
+      "root_ci": {
+        "attempts": 1,
+        "failures": 28,
+        "skipped": 8,
+        "tests_run": 1050,
+        "timed_out": false,
+        "wall_time_seconds": 1130.917
+      }
+    },
+    "source": {
+      "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+      "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+      "tuple_consistent_across_receipts": true
+    }
+  },
+  "failure_inventory": {
+    "fixture_api_surface": {
+      "count": 1,
+      "test": "test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available",
+      "missing_symbols": [
+        "ContentAddressedFixtureSeed",
+        "FixtureIntegrityError",
+        "FixturePolicyError"
+      ]
+    },
+    "gco_contract_api": {
+      "count": 27,
+      "cause": "The b789 source has no authorized GitCommitObservation contract API.",
+      "missing_symbols": [
+        "GitCommitObservation",
+        "GitCommitObservationError",
+        "_git_commit_observation",
+        "_parse_git_commit_batch"
+      ],
+      "test_module": "test_doctor_git_fact_batching"
+    }
+  },
+  "kind": "fpcr-integration-v2",
+  "node_id": "FPCR-INTEGRATE-040",
+  "phase": "integration",
+  "receipt_digest": "sha256:cb7719748c3acd40c8a32589770a72a335017115ca9bd5ab2c07c50f07650005",
+  "schema_version": 1,
+  "source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  }
+}
