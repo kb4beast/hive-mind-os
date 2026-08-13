@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "fixture-prerequisite-causality-appeal-seal-v1",
+  "baseline": {
+    "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+    "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"
+  },
+  "expected_node_ids": [
+    "FPC-SEAL-000", "FPC-DISCOVERY-010", "FPC-EXECUTE-020",
+    "FPC-CROSS-030", "FPC-INTEGRATE-040", "FPC-JUDGE-050"
+  ],
+  "expected_dependencies": {
+    "FPC-SEAL-000": [],
+    "FPC-DISCOVERY-010": ["FPC-SEAL-000"],
+    "FPC-EXECUTE-020": ["FPC-SEAL-000", "FPC-DISCOVERY-010"],
+    "FPC-CROSS-030": ["FPC-SEAL-000", "FPC-DISCOVERY-010"],
+    "FPC-INTEGRATE-040": ["FPC-EXECUTE-020", "FPC-CROSS-030"],
+    "FPC-JUDGE-050": ["FPC-INTEGRATE-040"]
+  },
+  "expected_plan_digest": "sha256:d3f0400295bda3d69fac8999d27513a5294d0ce4415d9df9a3669238a2f84535",
+  "sealed_autopilot_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+  "sources": {
+    "docs/execution/dags/fixture-prerequisite-causality-appeal-v1/.gitignore": "61152428e3dccb8d04bd9596ac7e0dadc7f0be4e",
+    "docs/execution/dags/fixture-prerequisite-causality-appeal-v1/README.md": "9be6d318fd38b8b8482e7afaebe975d070b54570",
+    "docs/execution/dags/fixture-prerequisite-causality-appeal-v1/generate_plan.py": "cc115aa1d657fd1b66733a3964a676c23d25fddd",
+    "docs/execution/dags/fixture-prerequisite-causality-appeal-v1/runner.py": "2b85f758918293dd4e3b807379ccbdbfe2001345",
+    "docs/execution/dags/fixture-prerequisite-causality-appeal-v1/specs.py": "13e467a2c28c9d7e0545bfd2df7cd0d62548c5fb",
+    "docs/execution/dags/fixture-prerequisite-causality-appeal-v1/verify_plan.py": "f0abc0d0d1c62a8b14ff77cc440a38c9cb7490ef",
+    "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-APPEAL-OPENING.json": "77e203e470dcbce07672ebc6cdc0a95b1eb7e2a6"
+  },
+  "prohibitions": [
+    "implementation", "qualification/candidate receipts during seal", ".autopilot/plan.json mutation",
+    "main or remote effects", "fixture/GCO promotion", "performance conclusion", "knowledge BASELINE-000 retry"
+  ]
+}
