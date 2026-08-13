@@ -1,0 +1,84 @@
+{
+  "baseline": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "benchmark_verification": {
+    "attempted": true,
+    "reason": "not the sealed fixture-only baseline inventory",
+    "verified": false
+  },
+  "code_changes": false,
+  "commands": {
+    "discovery_only": "<venv>/Scripts/python.exe -E -s - (unittest default loader discovery; no test execution)",
+    "editable_install": "<venv>/Scripts/python.exe -E -s -m pip install --disable-pip-version-check --no-deps -e .",
+    "root_ci": "<venv>/Scripts/python.exe -E -s -m unittest discover -s tests -v",
+    "venv_creation": "python -E -s -m venv C:/Repos/HiveMind/.fpp-causality-010-venv"
+  },
+  "conclusion": {
+    "build_authorized": false,
+    "fixture_only_causality_proven": false,
+    "reason": "sealed predicate requires exactly 1050 executed tests, eight skips, and a complete sole-failure inventory; discovery found 1059 IDs and the only root-CI invocation ended without a final inventory"
+  },
+  "discovery": {
+    "first_id": "hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_acceptance_harness_self_tests",
+    "last_id": "test_workers.WorkerTests.test_worker_executes_real_durable_mission_with_unique_effect_adoption",
+    "test_id_digest": "sha256:8c6047bd0457cd3b880437c466695527e6a8bc342724bab008aac5cebf0d477c",
+    "tests_discovered": 1059
+  },
+  "disposition": "blocker",
+  "environment": {
+    "PYTHONNOUSERSITE": "1",
+    "PYTHONPATH": null,
+    "sanitized_environment_digest": "sha256:24793b52e1803d6cddd1d225a14c1c518359b26c9f0f138f2c239c6295d8ba1d"
+  },
+  "import_resolution": {
+    "file": "C:/Repos/HiveMind/hive-mind-os-fpp-causality-010/src/hive_mind_os/__init__.py",
+    "module": "hive_mind_os",
+    "under_repository_src": true
+  },
+  "interpreter": {
+    "executable": "C:/Repos/HiveMind/.fpp-causality-010-venv/Scripts/python.exe",
+    "implementation": "CPython",
+    "version": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "kind": "fixture-prerequisite-causality-receipt-v1",
+  "node_id": "FPP-CAUSALITY-010",
+  "phase": "causality",
+  "platform": {
+    "machine": "AMD64",
+    "release": "11",
+    "system": "Windows",
+    "version": "10.0.26200"
+  },
+  "receipt_digest": "sha256:9acc31d8b4d5eee92cb3a1a1fdb359036829910b0b23cb2a569d177cd553e7c3",
+  "recorded_at": "2026-08-13",
+  "result": {
+    "error_ids": [],
+    "failure_ids": [],
+    "inventory_complete": false,
+    "skips": null,
+    "tests_run": null
+  },
+  "root_ci": {
+    "completed_test_result_lines_observed": 857,
+    "failure_or_error_headers_observed": [],
+    "final_unittest_summary_present": false,
+    "full_failure_error_inventory": "unavailable: process output ended before unittest summary after forced wrapper timeout",
+    "last_complete_test_id": "test_pit_oracle.PointInTimeOracleTests.test_seal_rejects_mutated_target_environment",
+    "log_lines": 1113,
+    "log_sha256": "sha256:d61b328d7a00a93c3d4b27584056b087ebcb311db41a2052516819ea9ddbc8c7",
+    "ok_lines_observed": 825,
+    "skip_lines_observed": 3,
+    "status": "incomplete_forced_wrapper_timeout",
+    "wrapper_exit_code": 124,
+    "wrapper_timeout_seconds": 900
+  },
+  "schema_version": 1,
+  "source_identity": {
+    "fixture_api_test_blob": "c352b4f87a678787111850fb598e4d849a20fdd7",
+    "observed_head": "02b830ec9a15c2cf60e522923fc10c5e7093205b",
+    "observed_tree": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "src_hive_mind_os_init_blob": "617a6dabaa444d1eb0e5a9237209043f23083d77"
+  }
+}
