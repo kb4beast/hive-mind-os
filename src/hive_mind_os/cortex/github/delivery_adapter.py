@@ -21,6 +21,7 @@ at before and after an effect instead of comparing two nulls.
 from __future__ import annotations
 
 import re
+import urllib.parse
 from typing import Any, Mapping, Protocol
 
 from hive_mind_os.brain_kernel.canonical import canonical_digest
@@ -116,26 +117,26 @@ class ControlledGitHubDelivery:
 
     # -- registration ------------------------------------------------------
 
+    @property
+    def network_hosts(self) -> tuple[str, ...]:
+        """The single remote host every delivery adapter reaches."""
+
+        return (urllib.parse.urlsplit(self.rest.api_base).netloc,)
+
     def register_with(self, gateway: EffectGateway) -> None:
         """Register exactly the five delivery adapters on a kernel gateway."""
 
-        gateway.register_adapter(
-            self.PUSH_ADAPTER, self.push_adapter, version=self.adapter_version
-        )
-        gateway.register_adapter(
-            self.DRAFT_PR_ADAPTER, self.draft_pr_adapter, version=self.adapter_version
-        )
-        gateway.register_adapter(
-            self.COMMENT_ADAPTER, self.comment_adapter, version=self.adapter_version
-        )
-        gateway.register_adapter(
-            self.CLOSE_PR_ADAPTER, self.close_pr_adapter, version=self.adapter_version
-        )
-        gateway.register_adapter(
-            self.DELETE_BRANCH_ADAPTER,
-            self.delete_branch_adapter,
-            version=self.adapter_version,
-        )
+        hosts = self.network_hosts
+        for name, adapter in (
+            (self.PUSH_ADAPTER, self.push_adapter),
+            (self.DRAFT_PR_ADAPTER, self.draft_pr_adapter),
+            (self.COMMENT_ADAPTER, self.comment_adapter),
+            (self.CLOSE_PR_ADAPTER, self.close_pr_adapter),
+            (self.DELETE_BRANCH_ADAPTER, self.delete_branch_adapter),
+        ):
+            gateway.register_adapter(
+                name, adapter, version=self.adapter_version, network_hosts=hosts
+            )
 
     # -- reads -------------------------------------------------------------
 

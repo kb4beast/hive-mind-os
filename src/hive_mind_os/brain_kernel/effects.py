@@ -6,9 +6,14 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Callable
 
-from .authority import AuthorityDenied, AuthorityRegistry, CapabilityToken
+from .authority import (
+    AuthorityDenied,
+    AuthorityRegistry,
+    CapabilityToken,
+    token_is_issued,
+)
 from .canonical import canonical_digest
-from .contracts import ConstraintEnvelope, EffectIntent, EffectReceipt
+from .contracts import EffectIntent, EffectReceipt
 
 if TYPE_CHECKING:
     from .store import KernelStore
@@ -39,15 +44,6 @@ def sealed_intent(intent: EffectIntent) -> EffectIntent:
     return replace(intent, intent_digest=intent_seal(intent))
 
 
-def _admitted_envelope(authority: AuthorityRegistry, digest: str) -> ConstraintEnvelope:
-    """Read the admitted envelope behind an authorized digest, or fail closed."""
-
-    envelope = authority._envelopes.get(digest)
-    if envelope is None:
-        raise AuthorityDenied("authority envelope is unavailable")
-    return envelope
-
-
 def validate_capability_token(
     intent: EffectIntent,
     token: CapabilityToken,
@@ -72,19 +68,21 @@ def validate_capability_token(
         or token.target != intent.target
     ):
         raise AuthorityDenied("capability token does not bind this intent")
+    if intent.intent_digest != intent_seal(intent):
+        raise AuthorityDenied("intent digest does not seal this intent")
     if authority is None:
         if network_hosts:
             raise AuthorityDenied("a network effect requires an authority-bound gateway")
+        if not token_is_issued(token):
+            raise AuthorityDenied("capability token was not issued by an authority registry")
         return
-    if intent.intent_digest != intent_seal(intent):
-        raise AuthorityDenied("intent digest does not seal this intent")
     issued = authority.authorize(
         token.envelope_digest, token.action, token.target, now=now or _now()
     )
     if issued != token:
         raise AuthorityDenied("capability token was not issued by this authority")
     if network_hosts:
-        envelope = _admitted_envelope(authority, token.envelope_digest)
+        envelope = authority.envelope(token.envelope_digest)
         outside = sorted(set(network_hosts) - set(envelope.network_allowlist))
         if outside:
             raise AuthorityDenied(
@@ -186,6 +184,8 @@ class EffectGateway:
                 self._store,
                 adapters=self._adapters,
                 adapter_versions=self._adapter_versions,
+                adapter_hosts=self._adapter_hosts,
+                authority=self._authority,
             ).execute(intent, token)
         previous = self._receipts.get(intent.idempotency_key)
         if previous is not None:

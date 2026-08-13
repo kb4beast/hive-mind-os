@@ -1123,7 +1123,7 @@ def _r2_envelope() -> ConstraintEnvelope:
         ("merge", "deploy"),
         ("workspace",),
         ("workspace", R2_TARGET),
-        (),
+        ("api.github.com",),
         (),
         (),
         (),

@@ -9,7 +9,7 @@ from hive_mind_os.brain_kernel.authority import (
     RootProvenance,
 )
 from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope, EffectIntent
-from hive_mind_os.brain_kernel.effects import EffectGateway
+from hive_mind_os.brain_kernel.effects import EffectGateway, sealed_intent
 
 DIGEST = "sha256:" + "0" * 64
 ISSUER = "owner:fixture"
@@ -86,7 +86,7 @@ class AuthorityTests(unittest.TestCase):
         token = registry.authorize(
             AUTH, "write", "src/one.py", now="2029-01-01T00:00:00Z"
         )
-        intent = EffectIntent(
+        intent = sealed_intent(EffectIntent(
             "MISSION-one",
             "WORK-one",
             "ATTEMPT-one",
@@ -103,7 +103,7 @@ class AuthorityTests(unittest.TestCase):
             "revert",
             "policy",
             DIGEST,
-        )
+        ))
         calls: list[str] = []
         gateway = EffectGateway()
         gateway.register_adapter("local", lambda _: calls.append("called"))

@@ -13,11 +13,16 @@ import json
 import os
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
 from unittest import mock
 
-from hive_mind_os.brain_kernel.authority import AuthorityRegistry, RootProvenance
+from hive_mind_os.brain_kernel.authority import (
+    AuthorityDenied,
+    AuthorityRegistry,
+    RootProvenance,
+)
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.contracts import (
     Budget,
@@ -77,7 +82,7 @@ def _envelope() -> ConstraintEnvelope:
         ("merge", "deploy"),
         ("workspace",),
         ("workspace", TARGET),
-        (),
+        ("api.github.com",),
         (),
         (),
         (),
@@ -99,6 +104,7 @@ def _intent(
     key: str = DIGEST,
     digest: str = DIGEST,
     target: str = TARGET,
+    envelope_digest: str = AUTH,
 ) -> EffectIntent:
     return sealed_intent(EffectIntent(
         "MISSION-delivery",
@@ -112,7 +118,7 @@ def _intent(
         target,
         parameters_digest,
         key,
-        AUTH,
+        envelope_digest,
         ("run branch exists",),
         "git revert the delivery commits",
         "POLICY-delivery",
@@ -270,6 +276,40 @@ class _DeliveryFixture(unittest.TestCase):
             (intent_digest,),
         ).fetchone()
         return int(row["total"])
+
+
+class NetworkAllowlistTests(_DeliveryFixture):
+    """The allowlist is live for the only adapters in the repository that use it."""
+
+    def test_delivery_adapters_declare_the_host_they_reach(self) -> None:
+        self.assertEqual(("api.github.com",), self.delivery.network_hosts)
+
+    def test_an_envelope_that_does_not_allow_the_api_host_refuses_delivery(self) -> None:
+        registry = AuthorityRegistry()
+        narrow = replace(_envelope(), network_allowlist=()).sealed()
+        registry.mint_root(
+            narrow,
+            issuer="owner:delivery-fixture",
+            authority_ref="AUTHORITY-RECORD-narrow",
+            recorded_at="2026-01-01T00:00:00Z",
+        )
+        gateway = EffectGateway(authority=registry, clock=lambda: TIME)
+        self.delivery.register_with(gateway)
+        parameters_digest = self.delivery.bind_parameters({"branch": RUN_BRANCH})
+        intent = _intent(
+            action="push",
+            adapter=ControlledGitHubDelivery.PUSH_ADAPTER,
+            parameters_digest=parameters_digest,
+            envelope_digest=narrow.digest_value,
+        )
+
+        with self.assertRaisesRegex(AuthorityDenied, "network allowlist"):
+            gateway.execute(
+                intent,
+                registry.authorize(narrow.digest_value, "push", TARGET, now=TIME),
+            )
+
+        self.assertEqual([], self.push_executor.branches)
 
 
 class DeliveryAdapterTests(_DeliveryFixture):

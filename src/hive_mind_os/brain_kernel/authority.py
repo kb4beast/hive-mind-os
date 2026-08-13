@@ -57,6 +57,14 @@ class CapabilityToken:
             )
 
 
+def token_is_issued(token: CapabilityToken) -> bool:
+    """Report whether a token still carries this process's issuance witness."""
+
+    return token.issuance_witness == _issuance_witness(
+        token.envelope_digest, token.action, token.target
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class RootProvenance:
     """The recorded act that admitted one root authority into a registry."""

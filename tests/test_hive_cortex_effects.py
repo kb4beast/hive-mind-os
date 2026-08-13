@@ -62,8 +62,10 @@ def _envelope() -> ConstraintEnvelope:
 AUTH = _envelope().digest_value
 
 
-def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
-    return EffectIntent(
+def _intent(*, key: str = DIGEST, digest: str | None = None) -> EffectIntent:
+    """Seal by default; an explicit digest is for the tamper cases only."""
+
+    intent = EffectIntent(
         "MISSION-effects",
         "WORK-effects",
         "ATTEMPT-effects",
@@ -79,8 +81,9 @@ def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
         ("workspace exists",),
         "remove workspace/result.txt",
         "POLICY-effects",
-        digest,
+        digest or DIGEST,
     )
+    return intent if digest else sealed_intent(intent)
 
 
 def _boundary_envelope(
@@ -294,8 +297,8 @@ class EffectBoundaryTests(unittest.TestCase):
         self.assertIsNone(store.effect_entry(intent_digest=intent.intent_digest))
         self.assertEqual([], self.calls)
 
-    def test_gateway_without_an_authority_still_serves_existing_callers(self) -> None:
-        """The compatibility path kernel callers still take; it verifies no issuance."""
+    def test_gateway_without_an_authority_serves_only_sealed_issued_work(self) -> None:
+        """The compatibility path still runs, but refuses an unsealed or unissued one."""
 
         token = self.issued()
         gateway = EffectGateway()
@@ -303,7 +306,14 @@ class EffectBoundaryTests(unittest.TestCase):
         unsealed = replace(
             _boundary_intent(self.envelope.digest_value), intent_digest=DIGEST
         )
-        self.assertEqual("SUCCEEDED", gateway.execute(unsealed, token).status)
+        with self.assertRaisesRegex(AuthorityDenied, "does not seal"):
+            gateway.execute(unsealed, token)
+        forged = _hand_built_token(self.envelope.digest_value, "write", GRANTED_TARGET)
+        with self.assertRaisesRegex(AuthorityDenied, "was not issued"):
+            gateway.execute(_boundary_intent(self.envelope.digest_value), forged)
+        self.assertEqual([], self.calls)
+        sealed = _boundary_intent(self.envelope.digest_value)
+        self.assertEqual("SUCCEEDED", gateway.execute(sealed, token).status)
         self.assertEqual([GRANTED_TARGET], self.calls)
 
 
@@ -405,14 +415,14 @@ class EffectOutboxTests(unittest.TestCase):
         )
         outbox.enqueue(intent, self.token)
         self.assertEqual([], calls)
-        entry = self.store.effect_entry(intent_digest=DIGEST)
+        entry = self.store.effect_entry(intent_digest=intent.intent_digest)
         self.assertIsNotNone(entry)
         assert entry is not None
         self.assertEqual("pending", entry["state"])
         result = gateway.execute(intent, self.token)
         self.assertEqual("SUCCEEDED", result.status)
         self.assertEqual(["workspace/result.txt"], calls)
-        entry = self.store.effect_entry(intent_digest=DIGEST)
+        entry = self.store.effect_entry(intent_digest=intent.intent_digest)
         self.assertIsNotNone(entry)
         assert entry is not None
         self.assertEqual("receipt_recorded", entry["state"])
@@ -441,7 +451,7 @@ class EffectOutboxTests(unittest.TestCase):
             calls.append("physical-effect-happened")
             raise RuntimeError("simulated crash after physical effect")
 
-        intent = _intent(key=canonical_digest({"key": "crash"}), digest=canonical_digest({"intent": "crash"}))
+        intent = _intent(key=canonical_digest({"key": "crash"}))
         gateway = EffectGateway(store=self.store)
         gateway.register_adapter("fake", ambiguous)
         with self.assertRaises(EffectReconciliationRequired):
