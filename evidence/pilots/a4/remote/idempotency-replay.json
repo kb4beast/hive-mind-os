@@ -1,0 +1,165 @@
+{
+  "artifact_type": "A4PathBRemoteOperation",
+  "assertions": {
+    "branch_head_unchanged": true,
+    "no_second_pull_request_created": true,
+    "no_write_rest_call_during_replay": true,
+    "open_draft_pr_set_unchanged": true
+  },
+  "base_branch": "main",
+  "branch": "a4-pilot/attempt-1",
+  "grant": {
+    "allowed_actions": [
+      "push",
+      "open_draft_pr",
+      "post_comment",
+      "close_own_pr",
+      "delete_own_branch"
+    ],
+    "branch_prefix": "a4-pilot/",
+    "grant_digest": "sha256:5c1f5dd1defc1eb560dd1f875d0bf3f2ed4cb7f384364193bf93c478dece28e9",
+    "grant_id": "GRANT-A4-800-PATH-B"
+  },
+  "host": "github",
+  "host_response": {
+    "after": {
+      "branch_head_sha": null,
+      "host_pull_count": null,
+      "open_draft_pr_numbers": [
+        1
+      ]
+    },
+    "before": {
+      "branch_head_sha": null,
+      "host_pull_count": null,
+      "open_draft_pr_numbers": [
+        1
+      ]
+    }
+  },
+  "intent": {
+    "fresh_pr_intent_digest": "sha256:ce718176b9dc3777b5ff01679734c7b90496a1ff03e54b8317ca4ccbc9bf1536",
+    "fresh_push_intent_digest": "sha256:16060cb7ebae094acede8950186487c3235516aba1625af0407a2d18d9adb68d",
+    "replayed_pr_intent_digest": "sha256:5fa712eb94cea859ab12ff8a1faebdd477f1c82a8a130dd7e16d70fe1d46df44",
+    "replayed_push_intent_digest": "sha256:f6132210ffa012212431dff838c5cea2c7cde7107fccb4200fd6909fba11a275"
+  },
+  "no_op_detected": true,
+  "operation": "idempotency-replay",
+  "owner": "patencyhealth-lab",
+  "receipt": {
+    "fresh_pr_receipt": {
+      "adapter_identity": "github-draft-pr",
+      "adapter_version": "1",
+      "ended_at": "2026-08-13T03:53:28.259916Z",
+      "intent_digest": "sha256:ce718176b9dc3777b5ff01679734c7b90496a1ff03e54b8317ca4ccbc9bf1536",
+      "observed_precondition_digest": "sha256:9d1d2c2e6b17af5a6ec61b42c71e8e2646c36229dd6bad95536e248aa10837b0",
+      "postcondition_digest": "sha256:a85aae9c118009b11b3802e51476b757daca6cb7d80d11ee95f3febe078a49b9",
+      "produced_identifiers": [
+        "pr:1",
+        "https://github.com/patencyhealth-lab/hive-mind-a4-pilot/pull/1"
+      ],
+      "retry_of": null,
+      "rollback_receipt": null,
+      "started_at": "2026-08-13T03:53:27.822891Z",
+      "status": "SUCCEEDED",
+      "stderr_digest": null,
+      "stdout_digest": null
+    },
+    "fresh_push_receipt": {
+      "adapter_identity": "github-push",
+      "adapter_version": "1",
+      "ended_at": "2026-08-13T03:53:27.813033Z",
+      "intent_digest": "sha256:16060cb7ebae094acede8950186487c3235516aba1625af0407a2d18d9adb68d",
+      "observed_precondition_digest": "sha256:253cf96b93dd81294723b96d56a49c8122f3c7f69f0aa4584b2a405f00484707",
+      "postcondition_digest": "sha256:d96e8952253d10b95b31087fe6038acc864c4188db965fd05138681f1e1e96af",
+      "produced_identifiers": [
+        "branch:a4-pilot/attempt-1",
+        "sha:9dbbdd124840064d1698905d96ce56128183d137"
+      ],
+      "retry_of": null,
+      "rollback_receipt": null,
+      "started_at": "2026-08-13T03:53:27.724187Z",
+      "status": "SUCCEEDED",
+      "stderr_digest": null,
+      "stdout_digest": null
+    },
+    "pr_receipt": {
+      "adapter_identity": "github-draft-pr",
+      "adapter_version": "1",
+      "ended_at": "2026-08-13T03:53:24.027970Z",
+      "intent_digest": "sha256:5fa712eb94cea859ab12ff8a1faebdd477f1c82a8a130dd7e16d70fe1d46df44",
+      "observed_precondition_digest": "sha256:9d1d2c2e6b17af5a6ec61b42c71e8e2646c36229dd6bad95536e248aa10837b0",
+      "postcondition_digest": "sha256:a85aae9c118009b11b3802e51476b757daca6cb7d80d11ee95f3febe078a49b9",
+      "produced_identifiers": [
+        "pr:1",
+        "https://github.com/patencyhealth-lab/hive-mind-a4-pilot/pull/1"
+      ],
+      "retry_of": null,
+      "rollback_receipt": null,
+      "started_at": "2026-08-13T03:53:22.140578Z",
+      "status": "SUCCEEDED",
+      "stderr_digest": null,
+      "stdout_digest": null
+    },
+    "push_receipt": {
+      "adapter_identity": "github-push",
+      "adapter_version": "1",
+      "ended_at": "2026-08-13T03:53:22.127555Z",
+      "intent_digest": "sha256:f6132210ffa012212431dff838c5cea2c7cde7107fccb4200fd6909fba11a275",
+      "observed_precondition_digest": "sha256:253cf96b93dd81294723b96d56a49c8122f3c7f69f0aa4584b2a405f00484707",
+      "postcondition_digest": "sha256:d96e8952253d10b95b31087fe6038acc864c4188db965fd05138681f1e1e96af",
+      "produced_identifiers": [
+        "branch:a4-pilot/attempt-1",
+        "sha:9dbbdd124840064d1698905d96ce56128183d137"
+      ],
+      "retry_of": null,
+      "rollback_receipt": null,
+      "started_at": "2026-08-13T03:53:20.067618Z",
+      "status": "SUCCEEDED",
+      "stderr_digest": null,
+      "stdout_digest": null
+    }
+  },
+  "recorded_at": "2026-08-13T03:53:28Z",
+  "replays": [
+    {
+      "git_commands": [],
+      "mode": "identical intent digest",
+      "pr_intent_digest": "sha256:5fa712eb94cea859ab12ff8a1faebdd477f1c82a8a130dd7e16d70fe1d46df44",
+      "pr_receipt_digest": "sha256:9509fee963ea55cb3b0d96a680e1acfcf4bbc34dd9b278ccd6c757fe4749998c",
+      "push_intent_digest": "sha256:f6132210ffa012212431dff838c5cea2c7cde7107fccb4200fd6909fba11a275",
+      "push_receipt_digest": "sha256:1e92ffa14d415d4e2950213bf1e89abf9d238d9a30eb44f378fd620e949f8791",
+      "rest_calls": [],
+      "stored_pr_receipt_rows": 1,
+      "stored_push_receipt_rows": 1
+    },
+    {
+      "git_commands": [
+        "rev-parse"
+      ],
+      "mode": "fresh intent digest, identical parameters",
+      "pr_effect_status": "SUCCEEDED",
+      "pr_intent_digest": "sha256:ce718176b9dc3777b5ff01679734c7b90496a1ff03e54b8317ca4ccbc9bf1536",
+      "pr_produced_identifiers": [
+        "pr:1",
+        "https://github.com/patencyhealth-lab/hive-mind-a4-pilot/pull/1"
+      ],
+      "push_effect_status": "SUCCEEDED",
+      "push_intent_digest": "sha256:16060cb7ebae094acede8950186487c3235516aba1625af0407a2d18d9adb68d",
+      "push_produced_identifiers": [
+        "branch:a4-pilot/attempt-1",
+        "sha:9dbbdd124840064d1698905d96ce56128183d137"
+      ],
+      "rest_calls": [
+        {
+          "method": "GET",
+          "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls?state=open&head=patencyhealth-lab:a4-pilot/attempt-1&base=main"
+        }
+      ]
+    }
+  ],
+  "repository": "hive-mind-a4-pilot",
+  "request_digest": "sha256:725222d19f03d0b44237a58cfe93d1b9bbd13b6c3755a4928b22d406747bdb99",
+  "schema_version": 1,
+  "sequence": 5
+}

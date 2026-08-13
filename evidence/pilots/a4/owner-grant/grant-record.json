@@ -1,0 +1,121 @@
+{
+  "artifact_type": "A4OwnerGrantRecord",
+  "authority_record": {
+    "amendment": {
+      "commit": "db34487f0103a650dbaf152d026dad7f1aed3955",
+      "commit_author": "Brian Espinosa <Beespinosa04@gmail.com>",
+      "commit_committer": "Brian Espinosa <Beespinosa04@gmail.com>",
+      "commit_signature": "none (git log %G? = N -- the commit is not GPG/SSH signed)",
+      "committed_at": "2026-08-12T15:53:44-05:00",
+      "lines": "61-87",
+      "section": "Owner decision amendment -- 2026-08-12",
+      "title_of_file": "docs/architecture/HUMAN_AUTHORITY_GATES.md"
+    },
+    "addendum": {
+      "commit": "c78adf4499a8d9976367c13f62fbd23fa7f279ec",
+      "commit_author": "Brian Espinosa <Beespinosa04@gmail.com>",
+      "commit_committer": "Brian Espinosa <Beespinosa04@gmail.com>",
+      "commit_signature": "none (git log %G? = N -- the commit is not GPG/SSH signed)",
+      "committed_at": "2026-08-12T15:59:08-05:00",
+      "lines": "89-100",
+      "section": "Amendment addendum -- 2026-08-12, credential delivery mechanism",
+      "title_of_file": "docs/architecture/HUMAN_AUTHORITY_GATES.md"
+    },
+    "path": "docs/architecture/HUMAN_AUTHORITY_GATES.md"
+  },
+  "credential_handling": {
+    "credential_value_encountered_by_this_scribe": false,
+    "declared_permissions_per_the_authority_record": "Contents read/write, Pull requests read/write, and the mandatory Metadata read-only, scoped to that repository alone, with a short expiry (HUMAN_AUTHORITY_GATES.md:67-71). These are the OWNER'S DECLARED scopes as written in the authority record. No agent verified them against GitHub, because verifying them would require reading the token or querying its metadata with it.",
+    "delivery_mechanism": "The addendum (HUMAN_AUTHORITY_GATES.md:89-100) authorizes an agent-written wrapper that hoists the token from the user-scope registry into the pilot subprocess's environment BY VARIABLE REFERENCE. It narrowly relaxes only the amendment's 'pass it to a subprocess' prohibition; the value is never rendered.",
+    "expiry_recorded": null,
+    "expiry_recorded_why_null": "The authority record says 'a short expiry' without a date, and reading the token's real expiry would require using or inspecting the credential. No expiry value is asserted here rather than one being invented.",
+    "fingerprint_or_last_four_recorded": null,
+    "fingerprint_or_last_four_why_null": "docs/execution/runbooks/A4-800.md:106 lists 'fingerprint/last-4' among the metadata grant-record.json may carry. Obtaining either requires reading the credential value, which every layer of this node forbids. The field is deliberately empty; an absent fingerprint is correct, a fabricated one would not be.",
+    "token_env_variable_name": "HIVE_A4_PILOT_TOKEN",
+    "token_env_variable_name_note": "This is the NAME of the environment variable the gateway reads (rest_gateway.py reads os.environ[token_env] at call time). It is not the credential and carries no information about it. Its value was never read, echoed, logged, or written anywhere in this evidence tree, and its length is not recorded."
+  },
+  "delivery_grant_actually_used_by_the_run": {
+    "allowed_actions": [
+      "push",
+      "open_draft_pr",
+      "post_comment",
+      "close_own_pr",
+      "delete_own_branch"
+    ],
+    "allowed_actions_count_note": "Five, not six. The owner authorized six operations; 'create-branch' has no entry because the closed delivery-action vocabulary has no create-ref action. The branch is created locally under the granted prefix and first reaches the host on push. See remote/01-create-branch.json -> intent_note.",
+    "base_branch": "main",
+    "branch_prefix": "a4-pilot/",
+    "grant_digest": "sha256:5c1f5dd1defc1eb560dd1f875d0bf3f2ed4cb7f384364193bf93c478dece28e9",
+    "grant_id": "GRANT-A4-800-PATH-B",
+    "issued_at": "2026-08-13T03:53:19Z",
+    "owner": "patencyhealth-lab",
+    "repository": "hive-mind-a4-pilot",
+    "verification_of_this_reconstruction": {
+      "how": "The driver did not retain the DeliveryGrant document itself; every remote receipt cites only its digest. This scribe reconstructed the seven-field payload that src/hive_mind_os/cortex/github/grants.py:38-58 (_grant_payload) seals, recovering the one unknown field (issued_at) by searching one-second candidates across the run window and testing canonical_digest equality. The reconstruction is confirmed by exact digest equality with the value every receipt cites.",
+      "reconstructed_payload_fields": [
+        "grant_id",
+        "owner",
+        "repository",
+        "base_branch",
+        "branch_prefix",
+        "allowed_actions",
+        "issued_at"
+      ],
+      "recomputed_digest_matches_receipts": true,
+      "why_this_is_meaningful": "grants.py:114-129 makes DeliveryGrant reject any grant_digest that does not seal its own fields, so the grant the run used genuinely carried these five actions, this branch prefix, this base branch and this one repository -- and could not have carried a sixth action without a different digest.",
+      "why_this_is_not_everything": "It proves what the grant SAID, not that the host enforced it. GitHub enforced the token's real scopes, which this node cannot inspect."
+    }
+  },
+  "gate": "owner credential + pilot repository authority",
+  "gate_status": "OPEN",
+  "grant_statement_as_recorded_by_the_owner": {
+    "note": "Quoted from the owner's own committed amendment. The runbook's model grant sentence (A4-800.md:137-140) was a template; the owner wrote their own, which is what the runbook asks for.",
+    "quotes": [
+      {
+        "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:63-65",
+        "text": "The repository owner authorizes one scoped GitHub credential and bounded draft-pull-request delivery for the A4-800 pilot, against exactly one disposable repository: `patencyhealth-lab/hive-mind-a4-pilot`."
+      },
+      {
+        "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:73-75",
+        "text": "Within that one repository, this authority permits exactly: creating a branch under the pilot prefix, pushing that branch, opening one draft pull request, commenting once on it, closing that pull request, and deleting that branch."
+      },
+      {
+        "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:84-87",
+        "text": "This amendment narrowly supersedes the 2026-08-06 amendment's withholding of a GitHub credential and of remote delivery, for this one repository and these six operations only. Every other withholding in that amendment, including the API-key and spend prohibitions, stands unchanged."
+      }
+    ]
+  },
+  "limits_of_this_record": [
+    "The grant lives in a git commit, not in a signature. Both commits are authored and committed by Brian Espinosa <Beespinosa04@gmail.com> and neither is cryptographically signed (git %G? = N). Git authorship is self-asserted metadata; anyone with write access to the working tree can set it. The runbook (A4-800.md:98-101) accepts a grant the owner commits themselves, and this is that -- but 'the owner committed it' rests on repository access control, not on cryptography.",
+    "The runbook's other accepted form is a live chat statement. This scribe cannot inspect the live session record and does not claim to have seen one. What is checkable here is the committed amendment.",
+    "This record was written AFTER the run, not before it. It is a record that the gate was opened, not the artifact that opened it. The artifact that opened it is the owner's commit db34487, which predates the run by roughly two hours (2026-08-12T15:53-05:00 versus the run at 2026-08-12T22:53-05:00).",
+    "No expiry, no fingerprint and no scope verification appear here, because each would require touching the credential. See credential_handling."
+  ],
+  "node": "A4-800",
+  "pilot_repository": "patencyhealth-lab/hive-mind-a4-pilot",
+  "relationship_to_gate_stop": {
+    "gate_stop_is_retained_unchanged": true,
+    "statement": "owner-grant/gate-stop.json is the true and unaltered record of the Path A terminal state: at 2026-08-12T14:46:27-05:00 the gate was CLOSED and the node stopped. It has not been rewritten and must not be. This file records only that the gate was subsequently OPENED by the owner, roughly one hour later, and that Path B then executed.",
+    "supersedes": "owner-grant/gate-stop.json, as to gate status only -- not as to its history"
+  },
+  "required_authority_classes": {
+    "credential_or_secret": {
+      "how": "A fine-grained personal access token scoped to patencyhealth-lab/hive-mind-a4-pilot alone, installed by the owner, hoisted into the pilot subprocess by variable reference per the addendum.",
+      "satisfied": true
+    },
+    "owner_value_choice": {
+      "how": "The owner named exactly one disposable repository, patencyhealth-lab/hive-mind-a4-pilot, in the amendment itself.",
+      "satisfied": true
+    }
+  },
+  "schema_version": 1,
+  "what_the_grant_does_not_authorize": [
+    "any merge",
+    "any push to a default or protected branch",
+    "any deployment or production pilot",
+    "any spend",
+    "any repository creation, deletion, or settings change",
+    "any second repository",
+    "closing B-OPS-03, or altering gates G3, G4, G5, G6, G7 or G8"
+  ]
+}

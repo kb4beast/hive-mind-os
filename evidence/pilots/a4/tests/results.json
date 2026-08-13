@@ -1,0 +1,106 @@
+{
+  "discovery_note": "No repo-wide `python -m unittest discover` was run in either pass. Only the two named modules were executed.",
+  "discovery_used": false,
+  "node": "A4-800",
+  "path_taken": "B (executed); the Path A pass is retained below as history",
+  "required_tests": [
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "discharged_by": [
+        "tests.test_github_adapter.ControlledRetractionTests (16 tests) -- close-own-PR and delete-own-branch, added by fix commit b6ec6b7",
+        "tests.test_github_adapter.GitHubAdapterTests (13 tests) -- local, credential-free delivery-client behaviour",
+        "tests.test_github_adapter.WorkspacePushExecutorTests (7 tests) -- the production PushExecutor, added by fix commit a6865fb",
+        "tests.test_git_adapter.GitAdapterTests (18 tests) -- typed git authority and delivery export",
+        "evidence/pilots/a4/pilot-plan.json (the sealed plan)",
+        "evidence/pilots/a4/owner-grant/gate-stop.json and owner-grant/grant-record.json",
+        "evidence/pilots/a4/remote/01-create-branch.json, 02-push-branch.json, 03-open-draft-pr.json, 04-post-comment.json, stop-and-rollback.json -- the executed remote half"
+      ],
+      "mapping": "docs/execution/runbooks/A4-800.md:186",
+      "name": "a4-delivery-pilot",
+      "not_discharged": "Nothing in the runbook's mapping is now undischarged. What the suite itself still does not cover is the real host: every test in it runs against in-process fakes or local fixture repositories. The github.com half is discharged by the remote receipts, not by these tests.",
+      "run": "run-2-path-b",
+      "runbook_named_paths_exercised": {
+        "ExplodingTransport": "failure path exercised by test_token_never_persists_or_escapes_errors -- the transport raises and the assertion is that the token does not appear in the error or on disk.",
+        "LocalDeliveryClient": "tests/test_github_adapter.py subclasses GitHubClient as LocalDeliveryClient; exercised by test_repository_mission_delivers_after_curator_adoption and test_lower_authority_denies_before_push_or_pr."
+      },
+      "status": "passed"
+    },
+    {
+      "claims_checked_and_rejected": [
+        {
+          "candidate": "tests.test_git_adapter.GitAdapterTests.test_preexisting_delivery_root_is_rejected_before_any_write",
+          "proposed_as": "a local idempotent refusal path (a second delivery into an existing root)",
+          "rejected_because": "Source-checked during the Path A pass. It is not an idempotency test: it creates a delivery root whose 'evidence' entry is a symlink pointing outside the root and asserts export_delivery raises WorkspaceDirty without writing through the link. That is a path-escape guard. The rejection is retained here so the receipt does not quietly inflate on the second pass."
+        }
+      ],
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "discharged_by": [
+        "evidence/pilots/a4/remote/idempotency-replay.json -- THE LIVE HALF, now executed: a same-intent replay made 0 REST calls and 0 git commands (durable outbox short-circuit), and a fresh-intent replay with identical parameters issued only the GET listing, made no POST, and returned the same pull request #1",
+        "tests.test_github_adapter.GitHubAdapterTests.test_pr_creation_is_durable_and_idempotent -- the local half: two identical open_draft_pr calls return equal results and produce exactly one POST against the in-process fake transport",
+        "tests.test_github_adapter.GitHubAdapterTests.test_draft_pr_request_and_response_are_head_bound -- the POST payload is pinned exactly (draft True, head, base, maintainer_can_modify False)",
+        "evidence/pilots/a4/pilot-plan.json -> idempotency (the sealed plan's idempotency section)"
+      ],
+      "live_replay_note": "The two replay modes prove different things and are not interchangeable. The same-intent replay proves the DURABLE OUTBOX short-circuits before any call; it says nothing about github.com. The fresh-intent replay is the one that exercised the host: it re-derived the effect from scratch, listed open pull requests, found #1 and adopted it rather than POSTing a second one. What neither proves is the driver's own 'branch_head_unchanged' assertion -- see the caveat in summary.json -> honest_limits.driver_self_verdicts_are_weak.",
+      "live_replay_status": "PERFORMED (2026-08-13T03:53:28Z)",
+      "mapping": "docs/execution/runbooks/A4-800.md:187",
+      "name": "remote-idempotency-pilot",
+      "run": "run-2-path-b",
+      "status": "passed"
+    }
+  ],
+  "runs": [
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+      "duration_s": 30.972,
+      "errors": 0,
+      "exit_code": 0,
+      "failures": 0,
+      "head_commit": "8041964bd8299871ad30f8b60fe7cc3f6b14b250",
+      "id": "run-1-path-a",
+      "outcome": "OK",
+      "retained_as": "history -- the Path A pass, before the three defect fixes existed",
+      "skipped": 0,
+      "tests_run": 31,
+      "transcript": "tests/a4-focused-suite.txt",
+      "transcript_sha256_crlf_normalised": "sha256:bedc8ef9283a06bd5811243bb1f90b4a31ec4dd67c37bdb8cab03ed49635ac06",
+      "warnings_observed": "One ResourceWarning (unclosed sqlite3 connection) during tests.test_git_adapter.GitAdapterTests.test_export_and_verify_delivery_with_resolvable_receipts."
+    },
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "cwd": "C:\\Repos\\HiveMind\\hive-mind-os",
+      "duration_s": 42.017,
+      "errors": 0,
+      "exit_code": 0,
+      "failures": 0,
+      "head_commit": "f5784267ced8bca363d5c63c8aeda37a1978ce50",
+      "id": "run-2-path-b",
+      "outcome": "OK",
+      "retained_as": "current -- the Path B pass, at the head that carries all three defect fixes",
+      "skipped": 0,
+      "tests_run": 54,
+      "tests_run_by_class": {
+        "tests.test_git_adapter.GitAdapterTests": 18,
+        "tests.test_github_adapter.ControlledRetractionTests": 16,
+        "tests.test_github_adapter.GitHubAdapterTests": 13,
+        "tests.test_github_adapter.WorkspacePushExecutorTests": 7
+      },
+      "transcript": "tests/a4-focused-suite-path-b.txt",
+      "transcript_sha256": "sha256:cf3a1083066635936500326616f7093c7b25387679ed521702e851eb2e658181",
+      "transcript_sha256_note": "SHA-256 over the file's bytes exactly as they sit on disk (this transcript is CRLF), so `sha256sum` and `Get-FileHash -Algorithm SHA256` both reproduce it. The Path A digest above is labelled CRLF-normalised because that is what it is: the Path A summary hashed a CRLF rendering of every file, which happens to equal raw bytes for that CRLF transcript but does NOT equal raw bytes for the LF JSON and Markdown files it also listed. See summary.json -> honest_limits.path_a_file_digests_do_not_reproduce_with_sha256sum.",
+      "warnings_observed": "One ResourceWarning (unclosed sqlite3 connection), this time surfacing during tests.test_github_adapter.WorkspacePushExecutorTests.test_controlled_delivery_accepts_the_executor_and_pushes_through_it. The test passed. The warning is pre-existing and unrelated to this node, which changes no code."
+    }
+  ],
+  "schema_version": 1,
+  "test_count_changed_between_runs": {
+    "delta": "+23",
+    "from": 31,
+    "note": "The growth is not this node's doing and is not a code change by this node -- src/** and tests/** are read-only here. It is the test coverage that arrived with the three production fixes the pilot attempt forced: b6ec6b7 (close-own-PR / delete-own-branch, +ControlledRetractionTests), a6865fb (production PushExecutor, +WorkspacePushExecutorTests), f578426 (sandbox remote-URL fix, whose tests live in tests/test_sandbox.py and are therefore NOT in this suite's count).",
+    "to": 54
+  },
+  "tool_versions": {
+    "git": "2.53.0.windows.3",
+    "platform": "Windows 11 Home 10.0.26200",
+    "python": "3.14.4"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "artifact_type": "A4PathBRemoteOperation",
+  "base_branch": "main",
+  "branch": "a4-pilot/attempt-1",
+  "grant": {
+    "allowed_actions": [
+      "push",
+      "open_draft_pr",
+      "post_comment",
+      "close_own_pr",
+      "delete_own_branch"
+    ],
+    "branch_prefix": "a4-pilot/",
+    "grant_digest": "sha256:5c1f5dd1defc1eb560dd1f875d0bf3f2ed4cb7f384364193bf93c478dece28e9",
+    "grant_id": "GRANT-A4-800-PATH-B"
+  },
+  "host": "github",
+  "host_response": {
+    "base_sha": "288610d48a10d8162fc45727c5a2ba81c55d5d05",
+    "branch": "a4-pilot/attempt-1",
+    "remote_head_before_push": null
+  },
+  "intent": null,
+  "intent_note": "Branch creation has no remote adapter by design: the closed delivery action vocabulary has no create-ref action, so the branch is created locally under the granted prefix and first becomes visible to the host in operation 2 (push).",
+  "operation": "create-branch",
+  "owner": "patencyhealth-lab",
+  "receipt": {
+    "git_commands": [
+      "check-ref-format",
+      "switch"
+    ],
+    "kind": "git-sandbox-receipts",
+    "records": [
+      {
+        "action_digest": "sha256:5e6a9bbb45bf61382e04c28e2a0f07a6a97290cb53f36487bdaee02c2431a47c",
+        "action_id": "ACT-git-9c538264-8445-48f1-bd7c-f26bd636654b",
+        "action_kind": "command",
+        "actor_id": "builder",
+        "digest": "sha256:916304d0e0b781cd2833db17b6bffefce318d064d247277df445329a0d105a25",
+        "mission_id": "git-workspace-f8593ca9-f5ae-460d-b652-9e72f1330f0a",
+        "path": "r/916304d0e0b781cd2833db17b6bffefce318d064d247277df445329a0d105a25.json",
+        "result": "succeeded",
+        "state_ref": "MISSION_STATE:git-workspace-f8593ca9-f5ae-460d-b652-9e72f1330f0a:1"
+      },
+      {
+        "action_digest": "sha256:2fd8b4b9e60339c35d78a426cd7c00812e765e5af1f4085486daac12d0811d26",
+        "action_id": "ACT-git-e311fe40-790f-4a70-9784-2b2c9eac786b",
+        "action_kind": "command",
+        "actor_id": "builder",
+        "digest": "sha256:4ced48d5a5aa5fb76ebe28eba8e04f38b97be3ff937e76877fadd4e91c25dfdf",
+        "mission_id": "git-workspace-f8593ca9-f5ae-460d-b652-9e72f1330f0a",
+        "path": "r/4ced48d5a5aa5fb76ebe28eba8e04f38b97be3ff937e76877fadd4e91c25dfdf.json",
+        "result": "succeeded",
+        "state_ref": "MISSION_STATE:git-workspace-f8593ca9-f5ae-460d-b652-9e72f1330f0a:1"
+      }
+    ],
+    "trusted_root": "C:\\Repos\\trash\\a4rt\\git-evidence"
+  },
+  "recorded_at": "2026-08-13T03:53:19Z",
+  "repository": "hive-mind-a4-pilot",
+  "request_digest": "sha256:0fcd75756daa8c2d0ddfd7ad22c6a5052e277541e7312c706ad6eafa4002e9f8",
+  "schema_version": 1,
+  "sequence": 1
+}

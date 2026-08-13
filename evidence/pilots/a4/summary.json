@@ -1,0 +1,383 @@
+{
+  "acceptance_self_check": {
+    "criterion_1_owner_supplies_scoped_credentials_and_repository": {
+      "authority_record": [
+        "docs/architecture/HUMAN_AUTHORITY_GATES.md:61-87 -- 'Owner decision amendment -- 2026-08-12', commit db34487f0103a650dbaf152d026dad7f1aed3955, authored and committed by Brian Espinosa <Beespinosa04@gmail.com> at 2026-08-12T15:53:44-05:00. It names the credential, its scopes, the one repository (patencyhealth-lab/hive-mind-a4-pilot) and the six permitted operations.",
+        "docs/architecture/HUMAN_AUTHORITY_GATES.md:89-100 -- 'Amendment addendum -- 2026-08-12, credential delivery mechanism', commit c78adf4499a8d9976367c13f62fbd23fa7f279ec, same author, 2026-08-12T15:59:08-05:00. It authorizes the by-reference hoist of the token into the pilot subprocess and re-states every other handling prohibition."
+      ],
+      "credential_or_secret": "SUPPLIED. A fine-grained PAT scoped to the one pilot repository, installed by the owner, never read by any agent.",
+      "faked": false,
+      "limit": "Neither commit is cryptographically signed (git %G? = N). 'The owner committed it' rests on repository access control, not on a signature. The runbook's other accepted form is a live chat statement, which this scribe cannot inspect and does not claim to have seen.",
+      "owner_value_choice": "SUPPLIED. patencyhealth-lab/hive-mind-a4-pilot, named by the owner in the amendment itself.",
+      "receipt": "owner-grant/grant-record.json",
+      "status": "MET",
+      "was_unmet_at": "2026-08-12T14:46:27-05:00 -- see owner-grant/gate-stop.json, retained unaltered. The gate was genuinely closed then; the owner opened it about an hour later."
+    },
+    "criterion_2_only_non_protected_branch_and_draft_pr_operations": {
+      "evidence": [
+        "remote/run-summary.json -> rest_calls: 16 calls, every path inside /repos/patencyhealth-lab/hive-mind-a4-pilot. Four are writes: POST /pulls (one draft PR), POST /issues/1/comments (one comment), PATCH /pulls/1 (state-only close), DELETE /git/refs/heads/a4-pilot/attempt-1. No merge endpoint appears.",
+        "remote/03-open-draft-pr.json -> host_response.draft = true, head_ref a4-pilot/attempt-1, base_ref main. rest_gateway.py:185-186 raises if the host returns a non-draft pull request, so this is a checked host response, not an assumption.",
+        "remote/02-push-branch.json -> the only push target is a4-pilot/attempt-1, under the granted prefix. grants.py:23 pins PROTECTED_BRANCHES and require_push_branch denies the base branch and anything outside the prefix.",
+        "independent_verification.ls_remote -- the pilot repository's main is still at 288610d48a10d8162fc45727c5a2ba81c55d5d05, its pre-pilot SHA. Nothing was pushed to it."
+      ],
+      "limit": "The REST call list is the driver's own record of the calls it issued, not an independently captured egress trace. See honest_limits.socket_guard_was_absent.",
+      "status": "MET AND EXERCISED",
+      "was_previously": "VACUOUSLY TRUE -- zero operations occurred (Path A). It is no longer vacuous: real operations occurred and stayed inside the boundary."
+    },
+    "criterion_3_no_merge_and_no_production_deployment": {
+      "deployment": "No deployment surface was touched. The 2026-08-12 amendment explicitly leaves G5 -- 'No production pilot is authorized' -- unaltered (HUMAN_AUTHORITY_GATES.md:77-82).",
+      "evidence": [
+        "independent_verification.get_pull_request_1 -- merged=False, merged_at=None, state=closed. Measured by the orchestrator, not by the driver.",
+        "remote/stop-and-rollback.json -> host_response: pull_merged false, pull_merged_at null, close_rest_calls contain exactly one PATCH of /pulls/1.",
+        "rest_gateway.py:221-241 (close_pull_request) sends only {\"state\": \"closed\"} and raises 'pull request was integrated, not closed' if the response reports merged. tests.test_github_adapter.ControlledRetractionTests.test_a_close_response_claiming_integration_fails_closed covers that path.",
+        "grants.py:29-31 closes VALID_DELIVERY_ACTIONS to five self-scoped actions; 'merge' is not a spelling the package accepts (grants.py:25)."
+      ],
+      "status": "MET AND EXERCISED",
+      "strongest_of_the_four": "This is the criterion with the cleanest independent evidence: a third party read the pull request back from the host and it was closed, unmerged.",
+      "was_previously": "HELD, but also vacuous (Path A)."
+    },
+    "criterion_4_pilot_can_be_stopped_and_rolled_back": {
+      "evidence": [
+        "remote/stop-and-rollback.json -- PR #1 PATCHed to closed at 2026-08-13T03:53:30Z, then DELETE /git/refs/heads/a4-pilot/attempt-1 accepted with HTTP 204.",
+        "independent_verification.ls_remote -- `git ls-remote --heads origin` returns ONLY refs/heads/main at 288610d48a10d8162fc45727c5a2ba81c55d5d05. The pilot branch is gone and the default branch is byte-identical to pre-pilot.",
+        "independent_verification.get_pull_request_1 -- state=closed."
+      ],
+      "limit": "The driver could not verify its own rollback: stop-and-rollback.json records branch_head_after_delete=null, host_branches_after_delete=null, open_draft_pr_after_rollback=null, and honestly flags pilot_branch_deletion_independently_verified=false. The orchestrator's ls-remote is what supplies the missing verification. See honest_limits.driver_self_verdicts_are_weak.",
+      "resolved_path_a_gap": "Path A recorded this criterion as DOCUMENTED, NOT EXECUTED, with plan risk R2 noting that the governed surface implemented neither close-own-pr nor delete-own-branch. That gap was real. It was fixed by commit b6ec6b7 before Path B ran -- see fixed_defects.F1.",
+      "status": "MET AND EXERCISED",
+      "was_previously": "DOCUMENTED, NOT EXECUTED (Path A)."
+    },
+    "criterion_5_evidence_boilerplate": {
+      "absent": "final_commit / final_tree (see final_commit_note) and the PR description for this repository's own node branch (no such PR was opened; the node's output is uncommitted working-tree content and all git is the integrator's).",
+      "present": [
+        "base_commit and base_tree",
+        "changed-path inventory, verified a subset of the write scope",
+        "per-file sha256 digests over raw bytes",
+        "command receipts with exit codes and retained transcripts (two runs)",
+        "role identity",
+        "rollback reference"
+      ],
+      "status": "PARTIAL"
+    }
+  },
+  "base_commit": "f5784267ced8bca363d5c63c8aeda37a1978ce50",
+  "base_tree": "8d570ebb55bd0d2af6ceb47a1ca7f8aa4b23abaa",
+  "changed_paths": [
+    "docs/execution/A4_DELIVERY_PILOT.md",
+    "evidence/pilots/a4/owner-grant/gate-stop.json",
+    "evidence/pilots/a4/owner-grant/grant-record.json",
+    "evidence/pilots/a4/pilot-plan.json",
+    "evidence/pilots/a4/remote/01-create-branch.json",
+    "evidence/pilots/a4/remote/02-push-branch.json",
+    "evidence/pilots/a4/remote/03-open-draft-pr.json",
+    "evidence/pilots/a4/remote/04-post-comment.json",
+    "evidence/pilots/a4/remote/idempotency-replay.json",
+    "evidence/pilots/a4/remote/run-summary.json",
+    "evidence/pilots/a4/remote/stop-and-rollback.json",
+    "evidence/pilots/a4/summary.json",
+    "evidence/pilots/a4/tests/a4-focused-suite-path-b.txt",
+    "evidence/pilots/a4/tests/a4-focused-suite.txt",
+    "evidence/pilots/a4/tests/results.json"
+  ],
+  "changed_paths_within_write_scope": true,
+  "dependency_check": {
+    "A3-700": {
+      "measurement": "evidence/pilots/a3/** was read only. Finding F3 is carried forward -- see inherited_risk_from_a3.",
+      "requirement": "Integrated sibling evidence at evidence/pilots/a3/ is a read-only input.",
+      "satisfied": true
+    },
+    "DELIVERY-420": {
+      "measurement": "src/hive_mind_os/cortex/github/ contains __init__.py, delivery_adapter.py, grants.py, push_executor.py, rest_gateway.py at the base commit. push_executor.py did not exist at the Path A base commit; it was added by a6865fb because the pilot found it missing.",
+      "requirement": "A4-800.md:38-41 -- src/hive_mind_os/cortex/github/** MUST exist on the release branch at R11.",
+      "satisfied": true
+    }
+  },
+  "escalation_record": "owner-grant/gate-stop.json",
+  "escalation_record_id": "ESC-A4-800-67ad9aad5d48",
+  "escalation_record_status": "Historical. It records the Path A terminal state truthfully and is retained byte-unchanged. Its two escalation reasons -- Missing credential_or_secret authority, Missing owner_value_choice for pilot repository -- were both subsequently satisfied by the owner. The escalation was never registered in .autopilot state (see runbook_contradictions.C2), and this node still cannot register it.",
+  "executed_operations": [
+    {
+      "identifiers": [
+        "branch:a4-pilot/attempt-1"
+      ],
+      "note": "Local only. The closed delivery-action vocabulary has no create-ref action, so the branch is created under the granted prefix with git (check-ref-format, switch) and first reaches the host on push. Sandbox-receipted, no REST call.",
+      "operation": "create-branch",
+      "receipt": "remote/01-create-branch.json",
+      "sequence": 1
+    },
+    {
+      "identifiers": [
+        "branch:a4-pilot/attempt-1",
+        "sha:9dbbdd124840064d1698905d96ce56128183d137"
+      ],
+      "note": "One trivial commit, 'chore(a4-800): pilot attempt-1 marker', pushed to the pilot branch. Effect status SUCCEEDED.",
+      "operation": "push-branch",
+      "receipt": "remote/02-push-branch.json",
+      "sequence": 2
+    },
+    {
+      "identifiers": [
+        "pr:1",
+        "PR_kwDOT2tST87-Y13k",
+        "https://github.com/patencyhealth-lab/hive-mind-a4-pilot/pull/1"
+      ],
+      "note": "draft=true, head a4-pilot/attempt-1, base main, created 2026-08-13T03:53:24Z. GET listing, POST, GET readback.",
+      "operation": "open-draft-pr",
+      "receipt": "remote/03-open-draft-pr.json",
+      "sequence": 3
+    },
+    {
+      "identifiers": [
+        "comment:5275748785",
+        "IC_kwDOT2tST88AAAABOnWJsQ"
+      ],
+      "note": "One comment on PR #1 at 2026-08-13T03:53:26Z. The body is recorded by digest only.",
+      "operation": "comment-on-own-pr",
+      "receipt": "remote/04-post-comment.json",
+      "sequence": 4
+    },
+    {
+      "fresh_intent_replay": "Fresh intent digest, identical parameters: one GET /pulls?state=open... and NO POST. It returned pr:1 -- the adapter found the existing draft and adopted it. This is the mode that actually exercised github.com.",
+      "note": "Two distinct modes, proving two different things. Neither proves the driver's own 'branch head unchanged' assertion -- see honest_limits.driver_self_verdicts_are_weak.",
+      "operation": "idempotency-replay",
+      "receipt": "remote/idempotency-replay.json",
+      "same_intent_replay": "Identical intent digest: 0 REST calls, 0 git commands. The durable outbox short-circuited on the stored receipt before any adapter ran. This proves the outbox, not the host.",
+      "sequence": 5
+    },
+    {
+      "identifiers": [
+        "pr:1",
+        "branch:a4-pilot/attempt-1"
+      ],
+      "note": "PR #1 closed unmerged at 2026-08-13T03:53:30Z via a state-only PATCH; pilot branch ref deleted, HTTP 204. Both operations are the ones that did not exist before commit b6ec6b7.",
+      "operation": "close-own-pr + delete-own-branch",
+      "receipt": "remote/stop-and-rollback.json",
+      "sequence": 6
+    }
+  ],
+  "file_digests": {
+    "algorithm": "SHA-256 over each file's bytes exactly as they sit on disk. `sha256sum` and `Get-FileHash -Algorithm SHA256` both reproduce these. See honest_limits.path_a_file_digests_do_not_reproduce_with_sha256sum for why the Path A summary's digests did not.",
+    "docs/execution/A4_DELIVERY_PILOT.md": "sha256:94753c695eab7f35dbfc1c1e9cf6130df57283d781eb031b0b76be3fa396f1ef",
+    "evidence/pilots/a4/owner-grant/gate-stop.json": "sha256:88dfe740ed5919ed1f47c6d94657500e2153ac826cf3be49a441482c6be38bea",
+    "evidence/pilots/a4/owner-grant/grant-record.json": "sha256:e4753255f1a10a7b696933bd48fbe0225a280ffda12f0654b0d03108b4e82735",
+    "evidence/pilots/a4/pilot-plan.json": "sha256:324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc",
+    "evidence/pilots/a4/remote/01-create-branch.json": "sha256:8353a70ccf2ff11ba2d87b64003e8c111d5634ce0c176626ffb0334b84445cad",
+    "evidence/pilots/a4/remote/02-push-branch.json": "sha256:5d8a4da522116832aa706ddc6c0fb8a8b45a000350f01bb2501093e90c38d633",
+    "evidence/pilots/a4/remote/03-open-draft-pr.json": "sha256:41c02d94f015b3816c585f06f4f21d8bcc18a70a01a954e8d2e08deb81182b33",
+    "evidence/pilots/a4/remote/04-post-comment.json": "sha256:e8ee003671b78254bc80c20bcff236b6808fcf9309c6231c544ae3db0c21b767",
+    "evidence/pilots/a4/remote/idempotency-replay.json": "sha256:dc2024f053dbd040ba49e0b0968d62cb2697747bab59eae06d1894ab3fb62477",
+    "evidence/pilots/a4/remote/run-summary.json": "sha256:87a3d520055994730c142ff21ee3acdc819641942fcc0c4c5ef6a021f26c2795",
+    "evidence/pilots/a4/remote/stop-and-rollback.json": "sha256:ec65a3634f56a486c356c9c3e64dda239ef068a58eabf16a4057a2ab46aadc8f",
+    "evidence/pilots/a4/tests/a4-focused-suite-path-b.txt": "sha256:cf3a1083066635936500326616f7093c7b25387679ed521702e851eb2e658181",
+    "evidence/pilots/a4/tests/a4-focused-suite.txt": "sha256:bedc8ef9283a06bd5811243bb1f90b4a31ec4dd67c37bdb8cab03ed49635ac06",
+    "evidence/pilots/a4/tests/results.json": "sha256:edd0f4bea7a1ebd32661a39d291a577f7dbee3481b36a820a876f39dbb73fc93"
+  },
+  "file_digests_note": "summary.json is not in file_digests: a file cannot contain its own digest. Same self-reference constraint as final_commit.",
+  "final_commit": null,
+  "final_commit_note": "Null and necessarily so: a tracked file cannot contain the digest of the commit that introduces it. Separately, this worker performed no state-changing git command at all -- no add, commit, branch, checkout, or push in C:\\Repos\\HiveMind\\hive-mind-os. All node output is uncommitted working-tree content and every git write is the integrator's.",
+  "fixed_defects": {
+    "F1": {
+      "discovered_by": "Attempting Path B's stop-and-rollback. Recorded on Path A as plan risk R2 and runbook contradiction C3 before it could do harm.",
+      "fixed_by": "b6ec6b7 -- adds the retraction path to delivery_adapter.py, grants.py and rest_gateway.py, plus tests.test_github_adapter.ControlledRetractionTests (16 tests).",
+      "severity": "critical",
+      "title": "close-own-pr and delete-own-branch were mandated allowed operations with no implementation anywhere in the governed surface",
+      "why_it_mattered": "Acceptance criterion 4 could not have been satisfied. Worse than that: the pilot could have created an irreversible remote effect it had no code path to undo."
+    },
+    "F2": {
+      "discovered_by": "Attempting the push. The seam existed; nothing filled it.",
+      "fixed_by": "a6865fb -- adds src/hive_mind_os/cortex/github/push_executor.py plus tests.test_github_adapter.WorkspacePushExecutorTests (7 tests).",
+      "severity": "critical",
+      "title": "PushExecutor had no production implementation at all",
+      "why_it_mattered": "The delivery path could not push. Every green test in the suite ran against something else."
+    },
+    "F3fix": {
+      "also_broke": "materialize(allow_remote=True) was broken by the same defect.",
+      "discovered_by": "The first real Path B attempt, which it blocked outright.",
+      "fixed_by": "f578426 -- plus tests in tests/test_sandbox.py (which are NOT in this node's focused suite and so do not appear in its 54-test count).",
+      "severity": "critical",
+      "title": "sandbox.py::_validate_paths auto-detected an HTTPS remote URL as a filesystem path and rejected it, so GitWorkspace.push_branch could never push to a real remote",
+      "why_it_mattered": "The governed surface physically could not reach github.com."
+    },
+    "what_this_says": "A delivery surface that had never been pointed at a real host was missing two of its six mandated operations and its only production push implementation, and could not resolve a remote URL. Local tests were green the whole time. Finding this is the pilot's most valuable result; a clean first run would have taught nothing."
+  },
+  "honest_limits": {
+    "credential_scopes_were_never_verified": "What is recorded is what the owner DECLARED in the amendment (Contents RW, Pull requests RW, Metadata RO, short expiry). Verifying the token's actual permissions would require using or inspecting it. No expiry date, fingerprint, last-4, or length appears anywhere in this evidence tree.",
+    "driver_self_verdicts_are_weak": "remote/idempotency-replay.json asserts branch_head_unchanged: true, but host_response.before.branch_head_sha and host_response.after.branch_head_sha are BOTH null -- ControlledRestGateway has no ref-read method (open_defects.D6). That assertion is None == None and verified nothing by itself. Likewise host_pull_count is null on both sides. remote/stop-and-rollback.json asserts no_open_draft_pr_remains while its own open_draft_pr_after_rollback is null, and branch_head_after_delete and host_branches_after_delete are null too. The driver was honest enough to record pilot_branch_deletion_independently_verified: false. THE REAL VERIFICATION IS independent_verification BELOW -- the orchestrator's ls-remote and get_pull_request -- not anything the driver said about itself. The better-supported driver assertion is no_second_pull_request_created, because the fresh-intent replay's own REST list genuinely contains one GET and no POST.",
+    "focused_tests_still_run_against_fakes": "All 54 tests in the node's suite drive in-process fake transports, a recording push executor, or bare repositories the test creates with `git init --bare` in its own temp directory and reaches through allow_local_test_remote=True (tests/test_github_adapter.py:159, 514, 1404). The 'https://github.com/...' strings in that file are fixture data inside fake responses, not requests. The real-host half of this node's evidence is the remote receipts, not the test suite.",
+    "independent_verification_was_not_re_run_by_this_scribe": "The ls-remote and get_pull_request results recorded below were performed by the orchestrator. The scribe that wrote this summary holds no network authority, did not re-run them, and reports them as the orchestrator's measurements rather than its own.",
+    "path_a_file_digests_do_not_reproduce_with_sha256sum": "The Path A summary.json listed sha256 values computed over a CRLF rendering of each file. Four of its five files are LF on disk, so `sha256sum` reproduces none of those four (for example gate-stop.json: recorded 30ca8905..., actual raw bytes 88dfe740...). Only the CRLF transcript matched. Nothing was tampered with -- the files are unchanged -- but the digests as published were not verifiable with an ordinary hashing tool. This summary's file_digests are over raw bytes and do reproduce.",
+    "socket_guard_was_absent": "remote/run-summary.json records socket_guard_installed: false. The network guard used in the local rehearsal was deliberately not installed for this run, because real network access was required and the guard would have blocked it. Consequence: 'no unexpected outbound connection occurred' is NOT independently proven for this run. The only evidence of what went out is the REST call list, which is the driver's own record of the calls it issued -- not an egress trace. The driver additionally emitted outbound_connection_attempts: 0 next to the absent guard, which reads as an affirmative claim of no network activity and is false; that field has been corrected in run-summary.json with the original value preserved beside it.",
+    "the_grant_is_an_unsigned_commit": "See acceptance_self_check.criterion_1.limit.",
+    "the_sealed_plan_is_outside_the_receipt_chain": "See open_defects.D7."
+  },
+  "independent_verification": {
+    "checks": [
+      {
+        "check": "git ls-remote --heads origin (pilot repository)",
+        "meaning": "The pilot branch is gone and the default branch is byte-identical to its pre-pilot state. This is the real evidence for acceptance criterion 4.",
+        "result": "Returns ONLY refs/heads/main at 288610d48a10d8162fc45727c5a2ba81c55d5d05 -- the same SHA the pilot started from."
+      },
+      {
+        "check": "get_pull_request(1)",
+        "meaning": "The one pull request the pilot created was a draft against main from the pilot branch, and it ended closed and unmerged. This is the real evidence for acceptance criterion 3.",
+        "result": "state=closed, draft=True, merged=False, merged_at=None, head.ref=a4-pilot/attempt-1, base.ref=main."
+      }
+    ],
+    "performed_by": "the orchestrator",
+    "why_it_matters": "The driver verifying itself proves less than it appears to. These two checks were run by a party other than the driver, after the run, and they are what carry criteria 3 and 4.",
+    "not_performed_by": [
+      "the Path B driver",
+      "the evidence scribe that wrote this summary"
+    ]
+  },
+  "inherited_risk_from_a3": {
+    "carried_as": "pilot-plan.json risk R1; A4_DELIVERY_PILOT.md section 8.3",
+    "finding": "A3-700 F3",
+    "statement": "hive_mind_os.verify.verify_bundle (src/hive_mind_os/verify.py:266-379) re-derives file digests but never reads document['verdict']. A bundle whose verdict is flipped from reject to adopt is ACCEPTED once integrity.json is recomputed, because integrity.json is an unkeyed in-bundle manifest attesting self-consistency rather than authenticity. Any delivery pilot that ships artifacts on the strength of a retained bundle inherits that weakness.",
+    "status": "still open; carried forward unchanged",
+    "what_this_pilot_did_about_it": "Gated no remote operation on a retained bundle's verdict field.",
+    "verified_by_this_node": "Line locations were re-checked on the release branch during the Path A pass. The forgery itself was not re-executed by this node; the measurement is A3-700's."
+  },
+  "node": "A4-800",
+  "open_defects": {
+    "D1": {
+      "evidence": "Observed during the local rehearsal: a successful push became a permanent EffectReconciliationRequired purely because a temp filename exceeded 260 characters. The push had happened; the system could not record that it had.",
+      "fixed": false,
+      "mechanism": "src/hive_mind_os/mission_store.py:81-92 (_atomic_write) writes through a temporary file named '.<name>.tmp-<pid>', which is LONGER than the final name, with no Windows long-path handling. src/hive_mind_os/brain_kernel/effect_outbox.py:150-168 marks the effect reconciliation_required when the receipt append fails after the physical effect completed, and effect_outbox.py:91-93 makes that state terminal on every subsequent attempt.",
+      "mitigation_used_in_this_run": "A deliberately short runtime root, C:\\Repos\\trash\\a4rt. That is a workaround that depends on an operator remembering to apply it, not a fix.",
+      "severity": "high -- can strand a completed irreversible remote effect",
+      "title": "The effect receipt is written AFTER the irreversible remote effect, through a longer temporary filename, with no Windows long-path handling"
+    },
+    "D2": {
+      "contrast": "The delete path IS guarded: _branch_ref sanitises the ref, covered by tests.test_github_adapter.ControlledRetractionTests.test_a_branch_name_cannot_smuggle_a_path_into_the_ref_delete. The read path has no equivalent.",
+      "fixed": false,
+      "mechanism": "src/hive_mind_os/cortex/github/rest_gateway.py:152-165 builds '?state=open&head={owner}:{branch}&base={base}' at lines 157-158 with no percent-encoding.",
+      "severity": "medium",
+      "title": "find_open_draft_pr interpolates the branch and base into the query string without encoding"
+    },
+    "D3": {
+      "consequence": "Past 100 comments the idempotency marker falls off page one and the adapter DOUBLE-POSTS. The comment idempotency this pilot demonstrated holds for a pull request with one comment on it.",
+      "fixed": false,
+      "mechanism": "src/hive_mind_os/cortex/github/rest_gateway.py:189-197 requests ?per_page=100 and never follows the Link header.",
+      "severity": "medium",
+      "title": "list_comments never follows Link, so comment idempotency silently breaks past 100 comments"
+    },
+    "D4": {
+      "consequence": "A grant never goes stale on its own; only the token's own expiry ends it, which puts grant lifetime outside the governance object.",
+      "fixed": false,
+      "mechanism": "src/hive_mind_os/cortex/github/grants.py:91-101 -- DeliveryGrant carries issued_at and no expiry field.",
+      "severity": "medium",
+      "title": "DeliveryGrant has issued_at but no expiry"
+    },
+    "D5": {
+      "contrast": "DeliveryGrant.__post_init__ (grants.py:114-129) DOES recompute its digest over its own fields and raises 'delivery grant digest does not seal its fields' on mismatch. The intent contract should do the same and does not.",
+      "fixed": false,
+      "mechanism": "src/hive_mind_os/brain_kernel/contracts.py:527-535 runs _digest() over intent_digest, which only checks the string looks like a digest. Nothing recomputes it from the intent's contents.",
+      "severity": "medium -- an intent digest that does not seal its intent is a weak binding",
+      "title": "EffectIntent.intent_digest is format-checked but never verified to seal its fields"
+    },
+    "D6": {
+      "consequence": "This is why the idempotency replay's before/after branch snapshots are null, and therefore why the driver's 'branch head unchanged' verdict is worthless. See honest_limits.driver_self_verdicts_are_weak.",
+      "fixed": false,
+      "mechanism": "ControlledRestGateway exposes default_branch(), get_pull_request(), find_open_draft_pr(), create_draft_pr(), list_comments(), post_comment(), close_pull_request() and delete_branch(). Nothing reads refs/heads/<branch>.",
+      "severity": "medium",
+      "title": "The gateway has no ref-read method"
+    },
+    "D7": {
+      "consequence": "The chain that exists is owner amendment -> GRANT-A4-800-PATH-B -> intent digests -> receipts. The chain that does not exist is plan-to-receipt. Re-sealing the plan now would be back-dating a seal, so it was not done.",
+      "fixed": false,
+      "mechanism": "A4-800.md:94-96 requires every remote action to cite plan_digest. No file in remote/ contains the string plan_digest or 1b19c027. pilot-plan.json still reads pilot_repository: 'UNGRANTED' and authority_gate.status: 'CLOSED', unchanged since it was sealed at 2026-08-12T14:46:27-05:00.",
+      "severity": "evidence-chain",
+      "title": "No remote receipt cites the sealed plan digest, and the plan was never re-sealed for Path B"
+    }
+  },
+  "path_taken": "B",
+  "path_taken_note": "Path B EXECUTED. This node has two terminal states in sequence and both are true: Path A (gate closed, nothing remote, 2026-08-12T14:46:27-05:00) and then Path B (gate opened by the owner, pilot executed, 2026-08-13T03:53:19Z through 03:53:32Z). owner-grant/gate-stop.json is retained byte-unchanged as the record of the first; owner-grant/grant-record.json records that the gate was subsequently opened. Path B does not erase Path A -- Path A was the correct answer to the question as it stood at 14:46.",
+  "pilot_base_branch": "main",
+  "pilot_base_sha": "288610d48a10d8162fc45727c5a2ba81c55d5d05",
+  "pilot_repository": "patencyhealth-lab/hive-mind-a4-pilot",
+  "plan_digest": "sha256:1b19c027f58dd526058c3de9b0231e64b11e28fbea3003eac3f59b4e4c999776",
+  "remote_delivery_performed": true,
+  "required_tests": [
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "evidence": "tests/a4-focused-suite-path-b.txt",
+      "evidence_sha256": "sha256:cf3a1083066635936500326616f7093c7b25387679ed521702e851eb2e658181",
+      "exit_code": 0,
+      "name": "a4-delivery-pilot",
+      "outcome": "OK (Ran 54 tests in 42.017s)",
+      "path_b_pilot_receipts": [
+        "owner-grant/grant-record.json",
+        "remote/01-create-branch.json",
+        "remote/02-push-branch.json",
+        "remote/03-open-draft-pr.json",
+        "remote/04-post-comment.json",
+        "remote/stop-and-rollback.json"
+      ],
+      "test_count_note": "54, not the 31 of the Path A run. The suite grew because the three fixes above added ControlledRetractionTests (16) and WorkspacePushExecutorTests (7); GitHubAdapterTests (13) and GitAdapterTests (18) are unchanged. This node changed no code and no test -- src/** and tests/** are read-only here."
+    },
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_git_adapter -v",
+      "evidence": "tests/a4-focused-suite-path-b.txt",
+      "evidence_sha256": "sha256:cf3a1083066635936500326616f7093c7b25387679ed521702e851eb2e658181",
+      "exit_code": 0,
+      "live_replay_performed": true,
+      "live_replay_statement": "LIVE REPLAY WAS PERFORMED at 2026-08-13T03:53:27-28Z and is recorded in remote/idempotency-replay.json. Two modes. (1) Same intent digest: 0 REST calls and 0 git commands -- the durable outbox short-circuited on the stored receipt before any adapter ran; this proves the outbox, not github.com. (2) Fresh intent digest with identical parameters: one GET /pulls?state=open&head=...&base=main, NO POST, and pr:1 returned -- the adapter listed open pull requests, found the existing draft and adopted it. That second mode is the one that exercised the real host. What neither mode proves is the driver's own branch_head_unchanged assertion, which compared two nulls; see honest_limits.driver_self_verdicts_are_weak.",
+      "name": "remote-idempotency-pilot",
+      "outcome": "OK (Ran 54 tests in 42.017s)",
+      "path_b_pilot_receipt": "remote/idempotency-replay.json"
+    }
+  ],
+  "role_identity": "claude:a4-800-worker",
+  "role_identity_note": "docs/execution/runbooks/A4-800.md:201 specifies actor 'codex:a4-800-worker'. This node was executed by Anthropic Claude models through Claude Code, not by Codex. Recording the runbook's literal string would be a false provenance claim. Three distinct actors touched this evidence: the Path A worker, the Path B driver, and the evidence scribe that wrote this summary and the document. All are Claude; none is Codex.",
+  "rollback_reference": {
+    "pilot_repository": "Already rolled back and independently verified: PR #1 closed unmerged, pilot branch deleted, main untouched at 288610d48a10d8162fc45727c5a2ba81c55d5d05. Nothing remains to undo. Owner-side deletion of the token and the repository completes revocation and needs no agent.",
+    "this_repository": "The node is additive and reversible. It writes only evidence/pilots/a4/** and docs/execution/A4_DELIVERY_PILOT.md, and changes no runtime code, tests, or configuration. Because this worker made no commit, rollback is `git checkout -- docs/execution/A4_DELIVERY_PILOT.md && rm -rf evidence/pilots/a4`; once committed it is `git revert` of the node commits. Note that the three production fixes (b6ec6b7, a6865fb, f578426) are NOT this node's changes and are not covered by that rollback."
+  },
+  "run_summary_retention_decision": {
+    "decision": "RETAINED, with its network block corrected in place.",
+    "reasoning": "run-summary.json is the only artifact that aggregates the full 16-call REST list and names the runtime root, so it earns its place. But as the driver emitted it, it paired socket_guard_installed: false with outbound_connection_attempts: 0 and outbound_connection_targets: [] -- counters that belonged to the absent guard and therefore measured nothing. Left as written they read as 'this run made no outbound connections', which is flatly false: a real git push and sixteen REST calls went out. Footnoting a false statement elsewhere is weaker than correcting the statement, so the block was rewritten, the original values were preserved verbatim under network_original_driver_values, and the edit is declared in the file's own post_run_annotation.",
+    "what_was_not_touched": "No per-operation receipt was modified. 01-create-branch.json, 02-push-branch.json, 03-open-draft-pr.json, 04-post-comment.json, idempotency-replay.json and stop-and-rollback.json are exactly as the driver wrote them."
+  },
+  "runbook_contradictions": [
+    {
+      "id": "C1",
+      "location": "docs/execution/runbooks/A4-800.md:152 (also 43-44 and 176)",
+      "measurement": "Still not performed, now for a different reason. On Path A the contradiction was structural: Path A is entered because credential authority is missing, yet its final step requires push and PR authority on THIS repository. On Path B the owner's grant is scoped to the pilot repository ALONE (HUMAN_AUTHORITY_GATES.md:63-65, 'exactly one disposable repository'), so it does not authorize a push to hive-mind-os either. The stopping condition remains unsatisfiable by this worker.",
+      "resolution_taken": "Not performed. Branch, commit, push and draft PR for autopilot/a4-800 are outstanding and require the integrator's authority.",
+      "status": "OPEN",
+      "text": "Path A must 'still push the branch and open the draft PR carrying the plan + checklist + gate-stop evidence'."
+    },
+    {
+      "id": "C2",
+      "location": "docs/execution/runbooks/A4-800.md:150 and 176 versus A4-800.md:29 and 35",
+      "measurement": "`autopilot fail` writes escalation state under .autopilot/**, which the same runbook forbids this worker from writing.",
+      "resolution_taken": "Moot for the terminal outcome: the node did not end in escalation, it ended in an executed pilot. The historical Path A escalation content remains fully specified in gate-stop.json for the record. Nothing was written under .autopilot/**.",
+      "status": "MOOT",
+      "text": "Path A must 'run autopilot fail for A4-800', while '.autopilot/**' is in the forbidden-write list."
+    },
+    {
+      "id": "C3",
+      "location": "docs/execution/runbooks/A4-800.md:90-91 and 161-162 versus the delivery surface as it stood at 8041964",
+      "measurement": "Measured correctly on Path A: two of the six mandated allowed operations had no implementation. Commit b6ec6b7 implemented both, with 16 tests. The Path B stop-and-rollback then ran through the governed surface as the runbook intended.",
+      "resolution_taken": "RESOLVED by b6ec6b7 -- not by this node, which holds src/** read-only. See fixed_defects.F1.",
+      "status": "RESOLVED",
+      "text": "allowed_operations includes close-own-pr and delete-own-branch, and the Path B stop procedure requires both."
+    },
+    {
+      "id": "C4",
+      "location": "docs/execution/runbooks/A4-800.md:201",
+      "measurement": "This node was executed by Anthropic Claude models, not by Codex.",
+      "resolution_taken": "role_identity recorded as 'claude:a4-800-worker'. See role_identity_note.",
+      "status": "OPEN (recorded, not resolvable by this node)",
+      "text": "actor `codex:a4-800-worker`"
+    }
+  ],
+  "schema_version": 1,
+  "sealed_plan": "pilot-plan.json",
+  "sealed_plan_note": "Retained byte-unchanged as sealed at 2026-08-12T14:46:27-05:00, still naming pilot_repository 'UNGRANTED'. It was deliberately NOT re-sealed for Path B: a seal rewritten after the action it was supposed to precede is not a seal. See open_defects.D7.",
+  "write_scope": [
+    "docs/execution/A4_DELIVERY_PILOT.md",
+    "evidence/pilots/a4/**"
+  ]
+}

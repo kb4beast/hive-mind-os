@@ -1,0 +1,128 @@
+{
+  "artifact_type": "A4PathBRemoteOperation",
+  "assertions": {
+    "no_open_draft_pr_remains": true,
+    "pilot_branch_delete_accepted_http_204": true,
+    "pilot_branch_deleted": true,
+    "pilot_branch_deletion_independently_verified": false,
+    "pull_request_closed_not_merged": true
+  },
+  "base_branch": "main",
+  "branch": "a4-pilot/attempt-1",
+  "grant": {
+    "allowed_actions": [
+      "push",
+      "open_draft_pr",
+      "post_comment",
+      "close_own_pr",
+      "delete_own_branch"
+    ],
+    "branch_prefix": "a4-pilot/",
+    "grant_digest": "sha256:5c1f5dd1defc1eb560dd1f875d0bf3f2ed4cb7f384364193bf93c478dece28e9",
+    "grant_id": "GRANT-A4-800-PATH-B"
+  },
+  "host": "github",
+  "host_response": {
+    "branch_head_after_delete": null,
+    "close_rest_calls": [
+      {
+        "method": "GET",
+        "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls/1"
+      },
+      {
+        "method": "PATCH",
+        "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls/1"
+      },
+      {
+        "method": "GET",
+        "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/pulls/1"
+      }
+    ],
+    "delete_rest_calls": [
+      {
+        "method": "GET",
+        "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot"
+      },
+      {
+        "method": "DELETE",
+        "path": "/repos/patencyhealth-lab/hive-mind-a4-pilot/git/refs/heads/a4-pilot/attempt-1"
+      }
+    ],
+    "host_branches_after_delete": null,
+    "open_draft_pr_after_rollback": null,
+    "pull_closed_at": "2026-08-13T03:53:30Z",
+    "pull_merged": false,
+    "pull_merged_at": null,
+    "pull_node_id": "PR_kwDOT2tST87-Y13k",
+    "pull_number": 1,
+    "pull_state": "closed"
+  },
+  "intent": {
+    "close_own_pr": {
+      "action": "close_own_pr",
+      "authority_envelope_digest": "sha256:c0e366b2a9012265f9748f9aa81e42467b99f43b10fd9d63547ea38da8a1a57d",
+      "idempotency_key": "sha256:ca14ab1c5d4463dbc31be55b703bcf0091709a31a35ca1116ce1abdafa71061a",
+      "intent_digest": "sha256:943ca24576b856dd314e4af4562c19574c45a55061b196e1df0b3fbb6674264b",
+      "parameters_digest": "sha256:2e7bb0eeaf1de7bcf27a76bd2a4a7fe2748cca8f347b436651f9474b9e606925",
+      "policy_decision_ref": "POLICY-a4-800-close-own-pr-1",
+      "target": "github/patencyhealth-lab/hive-mind-a4-pilot",
+      "target_adapter": "github-close-own-pr"
+    },
+    "delete_own_branch": {
+      "action": "delete_own_branch",
+      "authority_envelope_digest": "sha256:c0e366b2a9012265f9748f9aa81e42467b99f43b10fd9d63547ea38da8a1a57d",
+      "idempotency_key": "sha256:b1ace1ff2db72ca4425bfba34ce38251eda460dd80690517a21f7f1cdc0c21bb",
+      "intent_digest": "sha256:e10a42af4c063e5311e8ff593b1a43bd1fa88aa6351abb7d666f0c124671cb0d",
+      "parameters_digest": "sha256:2b8d9fa1191508b90cb58eeae0be8dde6834e5ed9a2ea54bc09e6ce9fed6c2f3",
+      "policy_decision_ref": "POLICY-a4-800-delete-own-branch-1",
+      "target": "github/patencyhealth-lab/hive-mind-a4-pilot",
+      "target_adapter": "github-delete-own-branch"
+    }
+  },
+  "operation": "stop-and-rollback",
+  "owner": "patencyhealth-lab",
+  "receipt": {
+    "close_own_pr": {
+      "adapter_identity": "github-close-own-pr",
+      "adapter_version": "1",
+      "ended_at": "2026-08-13T03:53:30.348150Z",
+      "intent_digest": "sha256:943ca24576b856dd314e4af4562c19574c45a55061b196e1df0b3fbb6674264b",
+      "observed_precondition_digest": "sha256:4c28b3e7a739a1a4b5e6cdcbb8239372655c0a3a3fd86e98c1bc6fece9ca0a63",
+      "postcondition_digest": "sha256:921ee328ff46025e19de38c797556d5dfe0d4b5bd95f166c03217d1b1d1602e3",
+      "produced_identifiers": [
+        "pr:1",
+        "branch:a4-pilot/attempt-1"
+      ],
+      "retry_of": null,
+      "rollback_receipt": null,
+      "started_at": "2026-08-13T03:53:28.794763Z",
+      "status": "SUCCEEDED",
+      "stderr_digest": null,
+      "stdout_digest": null
+    },
+    "close_receipt_digest": "sha256:adeacf90bf351de8aaa88ae06b93776bac5e086f20220ff29f1e42ebdc6bdd09",
+    "delete_own_branch": {
+      "adapter_identity": "github-delete-own-branch",
+      "adapter_version": "1",
+      "ended_at": "2026-08-13T03:53:31.795059Z",
+      "intent_digest": "sha256:e10a42af4c063e5311e8ff593b1a43bd1fa88aa6351abb7d666f0c124671cb0d",
+      "observed_precondition_digest": "sha256:b0419215415c18a05653407c6c40cdef2f733e90e2feaad1d1614efc3faaa81a",
+      "postcondition_digest": "sha256:a488a4bfcd8069784a55d223067ddc30580e5f2a2e05534792ac4de39bc2ea00",
+      "produced_identifiers": [
+        "branch:a4-pilot/attempt-1"
+      ],
+      "retry_of": null,
+      "rollback_receipt": null,
+      "started_at": "2026-08-13T03:53:30.876642Z",
+      "status": "SUCCEEDED",
+      "stderr_digest": null,
+      "stdout_digest": null
+    },
+    "delete_receipt_digest": "sha256:01283640848713b9a582b8732d17aa99eeee5941620999bcfb7339a1197334e8"
+  },
+  "recorded_at": "2026-08-13T03:53:32Z",
+  "repository": "hive-mind-a4-pilot",
+  "request_digest": "sha256:79cb96ced7f035f4ea486b718c84a44ef9178a4983e6fb47d51e10cca7490878",
+  "schema_version": 1,
+  "sequence": 6
+}
