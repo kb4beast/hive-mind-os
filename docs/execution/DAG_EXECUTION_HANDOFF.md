@@ -55,10 +55,10 @@ work, not a symptom of something wrong.
 
 ## 1. Where the DAG actually is
 
-**37 of 39 nodes COMPLETE and integrated**, all pushed. Integrated in the
-2026-08-12 afternoon session: BENCH-600, PROMOTE-530, QUALIFY-610, LEGACY-620,
-A3-700 — 5 nodes, every one independently verified before its receipt was
-sealed (focused suite re-run by the orchestrator, mandated-test inventory
+**39 of 39 nodes COMPLETE and integrated**, all pushed. Integrated across the
+2026-08-12/13 session: BENCH-600, PROMOTE-530, QUALIFY-610, LEGACY-620, A3-700,
+A4-800, A5-900 — 7 nodes, every one independently verified before its receipt
+was sealed (focused suite re-run by the orchestrator, mandated-test inventory
 checked against the runbook, at least one mutation proved the suite bites).
 
 | Round | Node | State |
@@ -80,11 +80,14 @@ granted a scoped credential, named a disposable repository, and the pilot ran
 end to end against it: one branch, one draft PR, one comment, an idempotency
 replay with no duplicate effect, then the PR closed and the branch deleted.
 
-**Repo-wide gate on the current tip `8041964`: `Ran 985 tests … OK (skipped=7)`,
-exit 0.** Run deliberately AFTER LEGACY-620 changed four `src/` modules, because
-QUALIFY-610's qualification was measured at `00fd1d8` and would otherwise have
-predated a runtime change. Log sha256
-`3bf99bc3a702ae7a4bca8cc7397285d9e9171b04d78ed8bbc508afbff30e70c3`.
+**Final repo-wide gate: `Ran 1016 tests … OK (skipped=7)`, exit 0**, ruff clean,
+pyright 0 errors, working tree clean. The count grew 985 → 1016 across the three
+production repairs (16 + 7 + 8 new tests).
+
+Re-run the gate whenever `src/` changes, not only at the end. An intermediate
+run at `8041964` was made deliberately *after* LEGACY-620 touched four `src/`
+modules, because QUALIFY-610's qualification had been measured at `00fd1d8` and
+would otherwise have certified a tree that no longer existed.
 
 **Implementation parallelism and dispatch parallelism are different things —
 do not confuse them.** A previous session did, and stalled on it.
@@ -101,8 +104,8 @@ That pairing is now history — both are sealed. It is retained because the
 distinction is the one that stalled a previous session. In practice the whole
 tail of this plan ran serially, one node per round, and that was correct.
 
-The tree is clean. Nothing is half-finished. A4-800's preparation is committed
-and pushed on `autopilot/a4-800` (`1592a1a`) but deliberately unmerged.
+The tree is clean and nothing is half-finished. Every node branch is sealed,
+pushed and merged into the release branch.
 
 ---
 
