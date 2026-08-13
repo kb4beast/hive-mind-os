@@ -9,7 +9,6 @@
   {
    "acceptance_criteria": [
     "ConstraintEnvelope carries a pure digest helper that computes the digest from field contents, and AuthorityRegistry.register recomputes it and REFUSES an envelope whose digest_value does not match its contents (closes A5-F3).",
-    "EffectIntent recomputes intent_digest over its own fields exactly as DeliveryGrant.__post_init__ seals its grant, raising on mismatch (closes A4 D5).",
     "Minting a ROOT envelope requires an explicit registry ceremony recording provenance; a bare in-process root mint is refused by the registry (closes A5-F4).",
     "A revoked authority re-minted under a fresh digest string is still refused: revocation keys on authority content, not the digest string (closes A5-F5).",
     "intersect_envelopes resolves the parent from the registry by digest and rejects a caller-supplied parent the registry has never admitted (closes A5-F13).",
@@ -450,7 +449,7 @@
    "acceptance_criteria": [
     "The exact forgery from A5 probe 2 -- a hand-built token with an envelope digest never registered and never issued -- is REJECTED by EffectGateway.execute (closes A5-F10).",
     "Tokens bound to expired or revoked envelopes are rejected; tokens whose scope does not cover the requested effect are rejected.",
-    "EffectIntent.intent_digest is verified at the boundary before execution.",
+    "EffectIntent.intent_digest is verified at the boundary to seal the intent's own fields, and an intent whose digest does not seal its fields is refused before execution (closes A4 D5; enforced at the boundary rather than in __post_init__, whose 10 construction sites would break for no additional security).",
     "An effect naming a host outside the kernel's declared network_allowlist is refused at the boundary (closes A5-F14).",
     "Each closed finding has a mandated test proven to fail when its fix is reverted."
    ],
