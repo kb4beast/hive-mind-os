@@ -22,7 +22,7 @@ from ...brain_kernel.contracts import (
     EffectIntent,
     RoleResult,
 )
-from ...brain_kernel.effects import EffectGateway
+from ...brain_kernel.effects import EffectGateway, sealed_intent
 from ...brain_kernel.roles import RoleInvocation, result_digest
 from ...curator import AcceptanceCheck, CuratorReview, check_context_manifest
 from ...ledger import EvidenceLedger
@@ -31,6 +31,7 @@ from .role_handlers import RepositoryRoleHandlers
 _DIGEST = "sha256:" + "0" * 64
 _MISSION_ID = "MISSION-phase7-local"
 _TIME = "1970-01-01T00:00:00Z"
+_AUTH_TIME = "2029-01-01T00:00:00Z"
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,29 +216,31 @@ def run_sealed_builder_curator_fixture(root: str | Path) -> LocalBuilderCuratorF
             authority_ref="local-fixture-policy",
             recorded_at=_TIME,
         )
-        gateway = EffectGateway()
+        gateway = EffectGateway(authority=registry, clock=lambda: _AUTH_TIME)
         gateway.register_adapter("isolated-write", adapter.apply)
         parameters_digest = adapter.register_payload(b"after\n")
-        intent = EffectIntent(
-            _MISSION_ID,
-            "WORK-phase7-builder",
-            "ATTEMPT-phase7-builder",
-            builder.executor_id,
-            "builder",
-            "write",
-            "R1",
-            "isolated-write",
-            "candidate/app.txt",
-            parameters_digest,
-            canonical_digest({"fixture": "builder-write"}),
-            envelope.digest_value,
-            (),
-            "discard isolated candidate",
-            "local-fixture-policy",
-            canonical_digest({"effect": "phase7-builder-write"}),
+        intent = sealed_intent(
+            EffectIntent(
+                _MISSION_ID,
+                "WORK-phase7-builder",
+                "ATTEMPT-phase7-builder",
+                builder.executor_id,
+                "builder",
+                "write",
+                "R1",
+                "isolated-write",
+                "candidate/app.txt",
+                parameters_digest,
+                canonical_digest({"fixture": "builder-write"}),
+                envelope.digest_value,
+                (),
+                "discard isolated candidate",
+                "local-fixture-policy",
+                canonical_digest({"effect": "phase7-builder-write"}),
+            )
         )
         token = registry.authorize(
-            envelope.digest_value, "write", intent.target, now="2029-01-01T00:00:00Z"
+            envelope.digest_value, "write", intent.target, now=_AUTH_TIME
         )
         receipt = gateway.execute(intent, token)
         builder = _with_receipt(builder, receipt.receipt_digest)

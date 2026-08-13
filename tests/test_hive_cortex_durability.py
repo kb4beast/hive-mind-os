@@ -12,16 +12,25 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
-from hive_mind_os.brain_kernel.authority import AuthorityRegistry
+from hive_mind_os.brain_kernel.authority import (
+    AuthorityDenied,
+    AuthorityRegistry,
+    CapabilityToken,
+)
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope, EffectIntent
 from hive_mind_os.brain_kernel.effect_outbox import (
     DurableEffectOutbox,
     EffectReconciliationRequired,
 )
-from hive_mind_os.brain_kernel.effects import EffectGateway, build_effect_receipt
+from hive_mind_os.brain_kernel.effects import (
+    EffectGateway,
+    build_effect_receipt,
+    sealed_intent,
+)
 from hive_mind_os.brain_kernel.events import KernelEvent
 from hive_mind_os.brain_kernel.mission_runtime import MissionRuntime
 from hive_mind_os.brain_kernel.projection import empty_state, reduce_event, state_digest
@@ -70,7 +79,7 @@ AUTH = _envelope().digest_value
 
 
 def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
-    return EffectIntent(
+    return sealed_intent(EffectIntent(
         MISSION,
         WORK,
         "ATTEMPT-durable",
@@ -87,7 +96,28 @@ def _intent(*, key: str = DIGEST, digest: str = DIGEST) -> EffectIntent:
         "remove workspace/result.txt",
         "POLICY-durable",
         digest,
+    ))
+
+
+def _forged_token(envelope_digest: str, action: str, target: str) -> CapabilityToken:
+    """The A5-F10 forgery, written past the constructor's issuance check.
+
+    Re-declared locally on purpose; sibling test modules are never imported.
+    """
+
+    forged = object.__new__(CapabilityToken)
+    values = (
+        envelope_digest,
+        action,
+        target,
+        canonical_digest(
+            {"envelope": envelope_digest, "action": action, "target": target}
+        ),
+        "",
     )
+    for name, value in zip(CapabilityToken.__slots__, values):
+        object.__setattr__(forged, name, value)
+    return forged
 
 
 def event(
@@ -167,7 +197,9 @@ class CrashMatrixTests(_DurableCase):
         calls: list[str] = []
         intent = _intent()
         outbox = DurableEffectOutbox(
-            self.store, adapters={"fake": lambda _: calls.append("pre-crash")}
+            self.store,
+            adapters={"fake": lambda _: calls.append("pre-crash")},
+            authority=self.registry,
         )
         outbox.enqueue(intent, self.token)
         entry = self.store.effect_entry(intent_digest=intent.intent_digest)
@@ -178,7 +210,7 @@ class CrashMatrixTests(_DurableCase):
         # Crash: the intent is durable, the adapter never ran.
         self.store.close()
         resumed = self.open_store(self.path)
-        gateway = EffectGateway(store=resumed)
+        gateway = EffectGateway(resumed, authority=self.registry)
         gateway.register_adapter("fake", lambda _: calls.append("delivered"))
         first = gateway.execute(intent, self.token)
         self.assertEqual("SUCCEEDED", first.status)
@@ -187,7 +219,7 @@ class CrashMatrixTests(_DurableCase):
         # Crash again, after the receipt: resume must not redeliver.
         resumed.close()
         second_life = self.open_store(self.path)
-        retry = EffectGateway(store=second_life)
+        retry = EffectGateway(second_life, authority=self.registry)
         retry.register_adapter("fake", lambda _: calls.append("duplicate"))
         second = retry.execute(intent, self.token)
         self.assertEqual(first, second)
@@ -196,15 +228,81 @@ class CrashMatrixTests(_DurableCase):
         assert entry is not None
         self.assertEqual("receipt_recorded", entry["state"])
 
+    def test_a_directly_constructed_outbox_still_consults_the_registry(self) -> None:
+        """BIND-1030: constructing the outbox by hand does not skip the boundary."""
+
+        calls: list[str] = []
+        escape = sealed_intent(replace(_intent(), target="secrets/keys.txt"))
+        forged = _forged_token(AUTH, "write", "secrets/keys.txt")
+        outbox = DurableEffectOutbox(
+            self.store,
+            adapters={"fake": lambda _: calls.append("forged delivery")},
+            authority=self.registry,
+        )
+
+        for call in (
+            lambda: outbox.enqueue(escape, forged),
+            lambda: outbox.execute(escape, forged),
+        ):
+            with self.subTest(call=call):
+                with self.assertRaisesRegex(AuthorityDenied, "outside write scope"):
+                    call()
+        self.assertEqual([], calls)
+        self.assertIsNone(self.store.effect_entry(intent_digest=escape.intent_digest))
+
+        # Positive control: the same outbox delivers a token the registry issued.
+        honest = _intent()
+        self.assertEqual(
+            "SUCCEEDED", outbox.execute(honest, self.token).status
+        )
+        self.assertEqual(["forged delivery"], calls)
+
+    def test_a_reconciliation_witness_is_checked_against_the_registry(self) -> None:
+        """BIND-1030: ``reconcile`` adopts a receipt only for an issued token."""
+
+        intent = _intent(
+            key=canonical_digest({"key": "reconcile-authority"}),
+            digest=canonical_digest({"key": "reconcile-authority"}),
+        )
+        outbox = DurableEffectOutbox(
+            self.store, adapters={"fake": lambda _: None}, authority=self.registry
+        )
+        outbox.enqueue(intent, self.token)
+        receipt = build_effect_receipt(
+            intent,
+            adapter_identity="fake",
+            adapter_version="1",
+            started_at=TIME,
+            ended_at=LATER,
+        )
+
+        # Cheat: a token that binds the stored intent perfectly, but that this
+        # registry never issued.  Only the issuance check can tell them apart.
+        with self.assertRaisesRegex(AuthorityDenied, "was not issued by this authority"):
+            outbox.reconcile(
+                intent.intent_digest,
+                receipt,
+                token=_forged_token(AUTH, "write", "workspace/result.txt"),
+            )
+        self.assertEqual(
+            "pending",
+            str(self.store.effect_entry(intent_digest=intent.intent_digest)["state"]),
+        )
+        # Positive control: the issued token adopts the same receipt.
+        self.assertEqual(
+            "SUCCEEDED",
+            outbox.reconcile(intent.intent_digest, receipt, token=self.token).status,
+        )
+
     def test_crash_during_execution_is_quarantined_not_retried(self) -> None:
         calls: list[str] = []
         intent = _intent(
             key=canonical_digest({"key": "executing"}),
             digest=canonical_digest({"key": "executing-intent"}),
         )
-        DurableEffectOutbox(self.store, adapters={"fake": lambda _: None}).enqueue(
-            intent, self.token
-        )
+        DurableEffectOutbox(
+            self.store, adapters={"fake": lambda _: None}, authority=self.registry
+        ).enqueue(intent, self.token)
         # The process dies inside the adapter: claimed, executing, no receipt.
         claimed = self.store.begin_effect(
             intent_digest=intent.intent_digest, recorded_at=TIME
@@ -214,7 +312,9 @@ class CrashMatrixTests(_DurableCase):
 
         resumed = self.open_store(self.path)
         outbox = DurableEffectOutbox(
-            resumed, adapters={"fake": lambda _: calls.append("blind-retry")}
+            resumed,
+            adapters={"fake": lambda _: calls.append("blind-retry")},
+            authority=self.registry,
         )
         self.assertEqual([intent.intent_digest], outbox.recover())
         entry = resumed.effect_entry(intent_digest=intent.intent_digest)
@@ -247,14 +347,14 @@ class CrashMatrixTests(_DurableCase):
             key=canonical_digest({"key": "ack"}),
             digest=canonical_digest({"key": "ack-intent"}),
         )
-        gateway = EffectGateway(store=self.store)
+        gateway = EffectGateway(self.store, authority=self.registry)
         gateway.register_adapter("fake", lambda _: calls.append("physical"))
         first = gateway.execute(intent, self.token)
         # The receipt is durable; the acknowledgement to the caller is lost.
         self.store.close()
 
         resumed = self.open_store(self.path)
-        retry = EffectGateway(store=resumed)
+        retry = EffectGateway(resumed, authority=self.registry)
         retry.register_adapter("fake", lambda _: calls.append("duplicate"))
         second = retry.execute(intent, self.token)
         self.assertEqual(
@@ -637,7 +737,7 @@ class MissionRuntimeReplayTests(_DurableCase):
     def test_builder_effect_is_not_redelivered_after_restart(self) -> None:
         binding = self.environment.bindings.builder_effect
         calls: list[str] = []
-        gateway = EffectGateway(store=self.resumed)
+        gateway = EffectGateway(self.resumed, authority=binding.registry)
         gateway.register_adapter(
             binding.intent.target_adapter, lambda _: calls.append("duplicate")
         )

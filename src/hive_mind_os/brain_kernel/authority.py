@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -10,17 +11,50 @@ from .contracts import ConstraintEnvelope, normalize_portable_path
 
 READ_ACTIONS = frozenset({"read"})
 
+# A capability is only a capability if it cannot be minted by whoever wants to
+# spend it.  ``authorize`` seals every token it issues with a process-local key,
+# so a hand-built token -- the A5-F10 forgery -- fails at construction rather
+# than travelling to a gateway that may or may not hold the issuing registry.
+# Like the delivery grant ledger this is attribution by record, not a signature:
+# it cannot stop a caller that is already inside the process from reading the key
+# or writing the dataclass slots directly.
+_ISSUANCE_KEY = secrets.token_hex(32)
+
 
 class AuthorityDenied(PermissionError):
     """A requested capability is absent, expired, revoked, or out of scope."""
 
 
+def _issuance_witness(envelope_digest: str, action: str, target: str) -> str:
+    """Keyed seal proving some registry in this process issued these three fields."""
+
+    return canonical_digest(
+        {
+            "envelope": envelope_digest,
+            "action": action,
+            "target": target,
+            "issuance_key": _ISSUANCE_KEY,
+        }
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class CapabilityToken:
+    """One issued capability; a token no registry issued cannot be constructed."""
+
     envelope_digest: str
     action: str
     target: str
     token_digest: str
+    issuance_witness: str = ""
+
+    def __post_init__(self) -> None:
+        if self.issuance_witness != _issuance_witness(
+            self.envelope_digest, self.action, self.target
+        ):
+            raise AuthorityDenied(
+                "capability token was not issued by an authority registry"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +125,18 @@ class AuthorityRegistry:
     def root_provenance(self, digest: str) -> RootProvenance | None:
         return self._roots.get(digest)
 
+    def envelope(self, digest: str) -> ConstraintEnvelope:
+        """Read one admitted authority; absence and revocation both fail closed.
+
+        The public read the effect boundary needs, so no caller has to reach into
+        the registry's private admission table to resolve an authorized digest.
+        """
+
+        envelope = self._envelopes.get(digest)
+        if envelope is None or self._is_revoked(envelope):
+            raise AuthorityDenied("authority envelope is unavailable")
+        return envelope
+
     def register(self, envelope: ConstraintEnvelope, parent: ConstraintEnvelope | None = None) -> None:
         if envelope.parent_envelope_digest is None:
             raise AuthorityDenied("root envelope requires an explicit mint ceremony")
@@ -111,9 +157,7 @@ class AuthorityRegistry:
             self._revoked_authorities.add(envelope.authority_key())
 
     def authorize(self, digest: str, action: str, target: str, *, now: str) -> CapabilityToken:
-        envelope = self._envelopes.get(digest)
-        if envelope is None or self._is_revoked(envelope):
-            raise AuthorityDenied("authority envelope is unavailable")
+        envelope = self.envelope(digest)
         if datetime.fromisoformat(now.replace("Z", "+00:00")) >= datetime.fromisoformat(envelope.expires_at.replace("Z", "+00:00")):
             raise AuthorityDenied("authority envelope is expired")
         normalized = normalize_portable_path(target)
@@ -128,7 +172,13 @@ class AuthorityRegistry:
                 "target is outside read scope" if reading else "target is outside write scope"
             )
         token_digest = canonical_digest({"envelope": digest, "action": action, "target": normalized})
-        return CapabilityToken(digest, action, normalized, token_digest)
+        return CapabilityToken(
+            digest,
+            action,
+            normalized,
+            token_digest,
+            _issuance_witness(digest, action, normalized),
+        )
 
     def _admit(self, envelope: ConstraintEnvelope) -> None:
         if envelope.digest_value != envelope.content_digest():

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from unittest import mock
 
-from hive_mind_os.brain_kernel.authority import AuthorityRegistry
+from hive_mind_os.brain_kernel.authority import AuthorityRegistry, RootProvenance
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.contracts import (
     Budget,
@@ -25,8 +25,9 @@ from hive_mind_os.brain_kernel.contracts import (
     EffectIntent,
 )
 from hive_mind_os.brain_kernel.effect_outbox import EffectReconciliationRequired
-from hive_mind_os.brain_kernel.effects import EffectGateway
+from hive_mind_os.brain_kernel.effects import EffectGateway, sealed_intent
 from hive_mind_os.brain_kernel.store import KernelStore
+from hive_mind_os.cortex.github import grants
 from hive_mind_os.cortex.github.delivery_adapter import (
     COMMENT_MARKER_PREFIX,
     ControlledGitHubDelivery,
@@ -37,6 +38,7 @@ from hive_mind_os.cortex.github.grants import (
     VALID_DELIVERY_ACTIONS,
     DeliveryGrant,
     DeliveryGrantError,
+    DeliveryGrantLedger,
 )
 from hive_mind_os.cortex.github.rest_gateway import (
     ControlledRestGateway,
@@ -98,7 +100,7 @@ def _intent(
     digest: str = DIGEST,
     target: str = TARGET,
 ) -> EffectIntent:
-    return EffectIntent(
+    return sealed_intent(EffectIntent(
         "MISSION-delivery",
         "WORK-delivery",
         "ATTEMPT-delivery",
@@ -115,6 +117,21 @@ def _intent(
         "git revert the delivery commits",
         "POLICY-delivery",
         digest,
+    ))
+
+
+def _owner_authority() -> RootProvenance:
+    """The owner authority record every grant in this module is issued under.
+
+    ``mint_root`` is deterministic over its inputs, so each call reproduces the
+    same ``record_digest`` the ledger was anchored to.
+    """
+
+    return AuthorityRegistry().mint_root(
+        _envelope(),
+        issuer="repository-owner:delivery",
+        authority_ref="OWNER-DELEGATION-delivery",
+        recorded_at="2026-01-01T00:00:00Z",
     )
 
 
@@ -133,6 +150,7 @@ def _grant(
         branch_prefix=branch_prefix,
         allowed_actions=allowed_actions,
         issued_at=TIME,
+        provenance=_owner_authority(),
     )
 
 
@@ -192,6 +210,11 @@ class _DeliveryFixture(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.kernel_store = KernelStore(Path(self.temporary.name) / "kernel.sqlite3")
         self.addCleanup(self.kernel_store.close)
+        # A5-F6: the owner authority is anchored before any grant is issued, so
+        # nothing in this module depends on a deployment step nobody performed.
+        self.addCleanup(setattr, grants, "LEDGER", grants.LEDGER)
+        grants.LEDGER = DeliveryGrantLedger()
+        self.owner_authority = grants.LEDGER.anchor(_owner_authority())
         self.registry = AuthorityRegistry()
         self.registry.mint_root(
             _envelope(),
@@ -220,14 +243,16 @@ class _DeliveryFixture(unittest.TestCase):
     def in_memory_gateway(
         self, delivery: ControlledGitHubDelivery | None = None
     ) -> EffectGateway:
-        gateway = EffectGateway()
+        gateway = EffectGateway(authority=self.registry, clock=lambda: TIME)
         (delivery or self.delivery).register_with(gateway)
         return gateway
 
     def durable_gateway(
         self, delivery: ControlledGitHubDelivery | None = None
     ) -> EffectGateway:
-        gateway = EffectGateway(store=self.kernel_store)
+        gateway = EffectGateway(
+            self.kernel_store, authority=self.registry, clock=lambda: TIME
+        )
         (delivery or self.delivery).register_with(gateway)
         return gateway
 
@@ -433,6 +458,44 @@ class DeliveryAdapterTests(_DeliveryFixture):
             with self.assertRaises(DeliveryRestError):
                 self.rest.list_comments(41)
         self.assertEqual([], self.transport.calls)
+
+
+class AnchoredIssuanceTests(_DeliveryFixture):
+    """A5-F6: every grant this module delivers with is owner-anchored."""
+
+    def test_the_delivery_grant_is_issued_under_the_anchored_owner_authority(
+        self,
+    ) -> None:
+        self.assertEqual(self.owner_authority.record_digest, grants.LEDGER.anchor_digest)
+        record = grants.LEDGER.issuance(self.grant.grant_digest)
+        assert record is not None
+        self.assertEqual(self.owner_authority.record_digest, record.anchor_digest)
+        self.assertEqual(self.owner_authority.issuer, self.grant.issuer)
+
+    def test_a_self_issued_grant_can_no_longer_be_cut_or_used(self) -> None:
+        with self.assertRaisesRegex(DeliveryGrantError, "not anchored"):
+            DeliveryGrant.issue(
+                grant_id="GRANT-self-issued",
+                owner=OWNER,
+                repository=REPOSITORY,
+                base_branch=BASE_BRANCH,
+                branch_prefix=BRANCH_PREFIX,
+                allowed_actions=("push",),
+                issued_at=TIME,
+            )
+        parameters_digest = self.delivery.bind_parameters({"branch": RUN_BRANCH})
+        intent = _intent(
+            action="push",
+            adapter=ControlledGitHubDelivery.PUSH_ADAPTER,
+            parameters_digest=parameters_digest,
+        )
+        # Positive control: the anchored grant still delivers on the same seam.
+        self.transport.script("GET", "/pulls?", 200, [])
+        self.assertEqual(
+            "SUCCEEDED",
+            self.in_memory_gateway().execute(intent, self.token("push")).status,
+        )
+        self.assertEqual([RUN_BRANCH], self.push_executor.branches)
 
 
 class ProtectedBranchDenialTests(_DeliveryFixture):

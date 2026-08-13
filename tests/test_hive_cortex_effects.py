@@ -139,10 +139,29 @@ def _boundary_intent(
     )
 
 
+def _forged_token(
+    envelope_digest: str, action: str, target: str, token_digest: str
+) -> CapabilityToken:
+    """Write a token straight into its slots, past the constructor's issuance check.
+
+    ``CapabilityToken.__post_init__`` now refuses a token no registry issued, so
+    the probe-2 forgery cannot be built the ordinary way.  These fixtures forge
+    it at the slot level anyway, which keeps every gateway-level refusal below
+    under test rather than short-circuiting it at construction;
+    ``IssuanceWitnessTests`` covers the constructor guard on its own.
+    """
+
+    forged = object.__new__(CapabilityToken)
+    values = (envelope_digest, action, target, token_digest, "")
+    for name, value in zip(CapabilityToken.__slots__, values):
+        object.__setattr__(forged, name, value)
+    return forged
+
+
 def _hand_built_token(envelope_digest: str, action: str, target: str) -> CapabilityToken:
     """The probe-2 forgery: a token no registry ever issued, sealed as one seals."""
 
-    return CapabilityToken(
+    return _forged_token(
         envelope_digest,
         action,
         target,
@@ -288,6 +307,74 @@ class EffectBoundaryTests(unittest.TestCase):
         self.assertEqual([GRANTED_TARGET], self.calls)
 
 
+class IssuanceWitnessTests(unittest.TestCase):
+    """BIND-1030: a capability nobody issued cannot be constructed at all."""
+
+    def setUp(self) -> None:
+        self.registry = AuthorityRegistry()
+        self.envelope = _boundary_envelope()
+        self.registry.mint_root(
+            self.envelope,
+            issuer="owner:witness-fixture",
+            authority_ref="AUTHORITY-RECORD-witness",
+            recorded_at="2026-01-01T00:00:00Z",
+        )
+
+    def test_a_token_no_registry_issued_cannot_be_constructed(self) -> None:
+        for envelope_digest, target in (
+            (FORGED_ENVELOPE, REFUSED_TARGET),
+            (self.envelope.digest_value, REFUSED_TARGET),
+            (self.envelope.digest_value, GRANTED_TARGET),
+        ):
+            with self.subTest(envelope=envelope_digest, target=target):
+                with self.assertRaisesRegex(AuthorityDenied, "was not issued"):
+                    CapabilityToken(
+                        envelope_digest,
+                        "write",
+                        target,
+                        canonical_digest(
+                            {
+                                "envelope": envelope_digest,
+                                "action": "write",
+                                "target": target,
+                            }
+                        ),
+                    )
+
+    def test_an_issued_token_carries_a_witness_bound_to_its_own_fields(self) -> None:
+        issued = self.registry.authorize(
+            self.envelope.digest_value, "write", GRANTED_TARGET, now=TIME
+        )
+        self.assertTrue(issued.issuance_witness)
+        # Positive control: the same issuance reproduces exactly, so the witness
+        # is a function of the token, not a nonce that breaks re-issue equality.
+        self.assertEqual(
+            issued,
+            self.registry.authorize(
+                self.envelope.digest_value, "write", GRANTED_TARGET, now=TIME
+            ),
+        )
+        # Cheat: keep the witness while pointing the token at another target.
+        with self.assertRaisesRegex(AuthorityDenied, "was not issued"):
+            CapabilityToken(
+                issued.envelope_digest,
+                issued.action,
+                REFUSED_TARGET,
+                issued.token_digest,
+                issued.issuance_witness,
+            )
+
+    def test_the_registry_publishes_the_envelope_behind_a_digest(self) -> None:
+        self.assertIs(
+            self.envelope, self.registry.envelope(self.envelope.digest_value)
+        )
+        with self.assertRaisesRegex(AuthorityDenied, "unavailable"):
+            self.registry.envelope(FORGED_ENVELOPE)
+        self.registry.revoke(self.envelope.digest_value)
+        with self.assertRaisesRegex(AuthorityDenied, "unavailable"):
+            self.registry.envelope(self.envelope.digest_value)
+
+
 class EffectOutboxTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -387,7 +474,7 @@ class EffectOutboxTests(unittest.TestCase):
         with self.assertRaises(AuthorityDenied):
             EffectGateway().execute(
                 intent,
-                type(self.token)(
+                _forged_token(
                     self.token.envelope_digest,
                     self.token.action,
                     self.token.target,

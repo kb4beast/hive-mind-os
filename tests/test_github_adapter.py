@@ -17,14 +17,15 @@ from unittest.mock import patch
 
 from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
-from hive_mind_os.brain_kernel.authority import AuthorityRegistry
+from hive_mind_os.brain_kernel.authority import AuthorityRegistry, RootProvenance
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.contracts import (
     Budget,
     ConstraintEnvelope,
     EffectIntent,
 )
-from hive_mind_os.brain_kernel.effects import EffectGateway
+from hive_mind_os.brain_kernel.effects import EffectGateway, sealed_intent
+from hive_mind_os.cortex.github import grants
 from hive_mind_os.cortex.github.delivery_adapter import (
     COMMENT_MARKER_PREFIX,
     ControlledGitHubDelivery,
@@ -34,6 +35,7 @@ from hive_mind_os.cortex.github.grants import (
     VALID_DELIVERY_ACTIONS,
     DeliveryGrant,
     DeliveryGrantError,
+    DeliveryGrantLedger,
 )
 from hive_mind_os.cortex.github.push_executor import WorkspacePushExecutor
 from hive_mind_os.cortex.github.rest_gateway import (
@@ -1144,6 +1146,29 @@ def _mint_root(registry: AuthorityRegistry, envelope: ConstraintEnvelope) -> Non
     )
 
 
+def _r2_owner_authority() -> RootProvenance:
+    """The owner authority every R2 grant is issued under.
+
+    ``mint_root`` is deterministic over its inputs, so each call reproduces the
+    same ``record_digest`` the ledger was anchored to.
+    """
+
+    return AuthorityRegistry().mint_root(
+        _r2_envelope(),
+        issuer="repository-owner:a4-800",
+        authority_ref="OWNER-DELEGATION-a4-800",
+        recorded_at="2026-01-01T00:00:00Z",
+    )
+
+
+def _anchor_delivery_ledger(case: unittest.TestCase) -> RootProvenance:
+    """A5-F6: anchor a fresh process ledger before any grant is issued."""
+
+    case.addCleanup(setattr, grants, "LEDGER", grants.LEDGER)
+    grants.LEDGER = DeliveryGrantLedger()
+    return grants.LEDGER.anchor(_r2_owner_authority())
+
+
 class RecordingPushExecutor:
     """Records branch names; it opens no socket and runs no command."""
 
@@ -1180,6 +1205,7 @@ class ControlledRetractionTests(unittest.TestCase):
         sockets = patch("socket.socket", refuse)
         sockets.start()
         self.addCleanup(sockets.stop)
+        self.owner_authority = _anchor_delivery_ledger(self)
         self.registry = AuthorityRegistry()
         _mint_root(self.registry, self.envelope())
         self.transport = FakeGitHubTransport()
@@ -1207,6 +1233,7 @@ class ControlledRetractionTests(unittest.TestCase):
             branch_prefix=branch_prefix,
             allowed_actions=allowed_actions,
             issued_at=R2_TIME,
+            provenance=_r2_owner_authority(),
         )
 
     def delivery_for(
@@ -1233,7 +1260,7 @@ class ControlledRetractionTests(unittest.TestCase):
         parameters_digest: str,
         target: str = R2_TARGET,
     ) -> EffectIntent:
-        return EffectIntent(
+        return sealed_intent(EffectIntent(
             "MISSION-a4-800",
             "WORK-a4-800",
             "ATTEMPT-a4-800",
@@ -1250,7 +1277,7 @@ class ControlledRetractionTests(unittest.TestCase):
             "reopen the draft pull request and restore the branch",
             "POLICY-a4-800",
             R2_DIGEST,
-        )
+        ))
 
     def execute(
         self,
@@ -1258,7 +1285,7 @@ class ControlledRetractionTests(unittest.TestCase):
         action: str,
         delivery: ControlledGitHubDelivery | None = None,
     ):
-        gateway = EffectGateway()
+        gateway = EffectGateway(authority=self.registry, clock=lambda: R2_TIME)
         (delivery or self.delivery).register_with(gateway)
         token = self.registry.authorize(R2_AUTH, action, R2_TARGET, now=R2_TIME)
         return gateway.execute(intent, token)
@@ -1664,6 +1691,26 @@ class ControlledRetractionTests(unittest.TestCase):
         with self.assertRaisesRegex(DeliveryRestError, "full head SHA"):
             self.gateway(transport).read_branch_ref(R2_BRANCH)
 
+    def test_every_r2_grant_is_issued_under_the_anchored_owner_authority(self) -> None:
+        """A5-F6: no grant in this class depends on an anchoring step nobody ran."""
+
+        self.assertEqual(self.owner_authority.record_digest, grants.LEDGER.anchor_digest)
+        record = grants.LEDGER.issuance(self.grant().grant_digest)
+        assert record is not None
+        self.assertEqual(self.owner_authority.record_digest, record.anchor_digest)
+        self.assertEqual(self.owner_authority.issuer, self.grant().issuer)
+        # Cheat: cut a grant the anchored owner never backed.
+        with self.assertRaisesRegex(DeliveryGrantError, "not anchored"):
+            DeliveryGrant.issue(
+                grant_id="GRANT-a4-800-self-issued",
+                owner=R2_OWNER,
+                repository=R2_REPOSITORY,
+                base_branch=R2_BASE,
+                branch_prefix=R2_PREFIX,
+                allowed_actions=("push",),
+                issued_at=R2_TIME,
+            )
+
     def test_the_delivery_boundary_exposes_the_snapshot_read(self) -> None:
         transport = FakeGitHubTransport()
         transport.add(
@@ -1675,7 +1722,7 @@ class ControlledRetractionTests(unittest.TestCase):
 
         self.assertEqual(HEAD_SHA, delivery.branch_head(R2_BRANCH))
         # A read is not a sixth adapter: nothing new is registered.
-        gateway = EffectGateway()
+        gateway = EffectGateway(authority=self.registry, clock=lambda: R2_TIME)
         delivery.register_with(gateway)
         self.assertEqual(
             {
@@ -1863,6 +1910,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
+        self.owner_authority = _anchor_delivery_ledger(self)
         self.environment = patch.dict(
             os.environ,
             {self.TOKEN_ENV: "fixture-push-executor-token"},
@@ -2048,7 +2096,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
             ),
             push_executor=self.executor(),
         )
-        gateway = EffectGateway()
+        gateway = EffectGateway(authority=registry, clock=lambda: R2_TIME)
         delivery.register_with(gateway)
         intent = ControlledRetractionTests.intent(
             action="push",
