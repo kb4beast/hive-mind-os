@@ -1,10 +1,16 @@
-# DAG execution handoff — resume from 37/39 (blocked on owner authority)
+# DAG execution — COMPLETE at 39/39
 
-Written 2026-08-12 at the end of a session that took the plan from 32 complete
-nodes to 37. This is everything the next session needs, and what it needs most
-is this: **the two remaining nodes are not blocked on engineering. They are
-blocked on a human decision, exactly as designed.** Read §10 before doing
-anything else.
+`run-round` reports `QUIESCENT — every compiled round is complete`. Repo-wide
+gate on the final commit: `Ran 1016 tests … OK (skipped=7)`, exit 0; ruff clean;
+pyright 0 errors.
+
+**Do not read this as "the system is ready."** The final node, A5-900,
+adjudicated governed-full autonomy as **`not-ready`**, and it is right. The plan
+finishing and the system being production-ready are different claims, and only
+the first one is true. Read §11 before acting on any of this.
+
+Written 2026-08-12/13 across a session that took the plan from 32 complete nodes
+to 39.
 
 Branch: `release/hive-mind-os-singleton-20260812-r5` (PR #144). Never touch
 `main`.
@@ -62,12 +68,17 @@ checked against the runbook, at least one mutation proved the suite bites).
 | R17 | `QUALIFY-610` | ✅ COMPLETE — verdict `LOCAL-QUALIFIED (pre-A3)` |
 | R18 | `LEGACY-620` | ✅ COMPLETE — rollback tag `legacy-620-rollback` pushed |
 | R19 | `A3-700` | ✅ COMPLETE |
-| R20 | `A4-800` | ⛔ **ESCALATED at the owner-credential gate.** Not complete, and must not be forced complete. See §10. |
-| R21 | `A5-900` | ⛔ BLOCKED behind A4-800 by the DAG, correctly |
+| R20 | `A4-800` | ✅ COMPLETE — escalated at the credential gate, then the owner opened it and the pilot **executed for real** |
+| R21 | `A5-900` | ✅ COMPLETE — readiness verdict **`not-ready`** |
 
-`run-round` reports `STUCK_HUMAN`, triage `CLASS_C — sealed or external
-authority`, `resolvable: false`. That is the correct machine state, not a
-defect to route around.
+A4-800's history is worth keeping straight, because both states are true in
+sequence and the evidence retains both. It first stopped at the owner-credential
+gate with nothing remote attempted, and `run-round` correctly reported
+`STUCK_HUMAN`, triage `CLASS_C — sealed or external authority`,
+`resolvable: false`. It was **not** forced complete in that state. The owner then
+granted a scoped credential, named a disposable repository, and the pilot ran
+end to end against it: one branch, one draft PR, one comment, an idempotency
+replay with no duplicate effect, then the PR closed and the branch deleted.
 
 **Repo-wide gate on the current tip `8041964`: `Ran 985 tests … OK (skipped=7)`,
 exit 0.** Run deliberately AFTER LEGACY-620 changed four `src/` modules, because
@@ -424,3 +435,83 @@ blocker.
   receipt with a non-passing test, so an honest failing receipt is invalid and a
   passing one is a lie. The only exits are: repair the defect and re-run, or
   `autopilot fail`. That choice is the orchestrator's, never a worker's.
+
+---
+
+## 11. Complete, and still not ready — what is actually open
+
+The DAG is finished. §10 above is retained as the record of A4-800's gate-stop,
+which was real; the gate was subsequently opened and the pilot executed. What
+follows is what a future session must not mistake for done.
+
+### The verdict of the last node
+
+A5-900 adjudicated **`not-ready`**, deliberately not `ready-behind-gates`,
+because the residue is not only the external gates: A5-F1/F3/F4/F5/F8/F10-F14,
+A4 D1-D7 and A3 F3 are all locally satisfiable and unremediated. Twenty of
+twenty-two gate rows are closed by the owner's own recorded decisions and none
+of the twenty-two is authenticated.
+
+### Open, in the order they should be fixed
+
+1. **`validate_capability_token` authenticates nothing** (`effects.py:23-39`).
+   It recomputes an unkeyed digest over the token's OWN three fields and
+   compares it to the token's own digest -- no registry lookup, no envelope
+   lookup, no expiry, no revocation, no scope -- and `EffectGateway.execute`
+   calls nothing else. Reproduced twice independently: a hand-built token
+   carrying an envelope digest invented in the probe file, never registered and
+   never issued, is ACCEPTED for `secrets/keys.txt`. The docstring claims it
+   binds cryptographically; it does not. This makes the envelope system
+   bypassable outright and is why acceptance criterion 4 is recorded NOT MET.
+2. **`verify_bundle` never reads the recorded verdict** (`verify.py:266-379`;
+   `verdict` appears only at `:58/179/185/194/250`). Flip a bundle from reject
+   to adopt, recompute `integrity.json`, and it verifies. Retained bundles are
+   tamper-evident, not authenticated.
+3. **The receipt is written after the irreversible remote effect**
+   (`mission_store.py:81-92`), with no Windows long-path handling. Measured: a
+   successful push became a permanent `EffectReconciliationRequired` because a
+   temp filename exceeded 260 characters. Only a short runtime root avoided it.
+4. Lower severity, all measured and recorded in `evidence/pilots/a4/summary.json`
+   and `evidence/pilots/a5/audits/authority-boundary.json`: `authorize()`
+   scope-checks only `write`; `is_no_broader_than` omits eight fields;
+   `network_allowlist` is inert; `DeliveryGrant` has no expiry;
+   `EffectIntent.intent_digest` is never verified to seal its fields; the
+   delivery gateway has no ref-read method; `find_open_draft_pr` does not encode
+   its query; `list_comments` does not paginate.
+5. **Containment is unproven on Windows.** Deleting the sandbox-root containment
+   check entirely still passes the whole suite here, because that branch is only
+   reachable via symlink/junction and its one test is `skipIf(os.name == "nt")`.
+   Wants a junction fixture.
+6. **The authority chain is unsigned.** `git log --format='%G?'` over
+   `HUMAN_AUTHORITY_GATES.md` returns four `N` and one `E`. "The owner said so"
+   rests on repository write access, not on a signature.
+
+### The finding that matters more than the list
+
+Six production defects were found by attempting the work, and **every one was
+invisible until something genuinely tried to use the path end to end**: the
+delivery path could not clean up after itself, could not push at all, was
+rejected by its own sandbox for every real remote, could not quarantine a
+branch during healing, and had no lawful way back from a resolved escalation.
+Five are fixed (`b6ec6b7`, `a6865fb`, `f578426`, `091e554`, `5177d4c`).
+
+A readiness record produced without executing anything would have found none of
+them, and would have reported a sound authority boundary. Execution is what
+produced the evidence; the paperwork alone would have lied.
+
+### Rules that earned their place this session
+
+- **A red gate cannot be sealed at all.** `controller.py:2291-2298` rejects a
+  receipt with a non-passing test, so an honest failing receipt is invalid and a
+  passing one is a lie. Repair the defect and re-run, or `autopilot fail`.
+- **Never force a node complete to finish the plan.** A4-800 would have sealed
+  cleanly while its pilot had not run. Its objective, not its test list, is the
+  thing being claimed.
+- **An agent must not write its own authorization.** The owner amends
+  `HUMAN_AUTHORITY_GATES.md`; the agent transcribes a decision the owner states.
+- **A self-declared identity label proves nothing.** A `human:` actor namespace
+  was rejected in favour of comparing the resolving actor against the identity
+  the system stamped at failure time -- two records, not one assertion.
+- **`escalation-resolve` must never be automatic.** It is deliberately not wired
+  into `heal_round`. If it ever is, self-certified blocker resolutions would
+  clear escalations with no human in the loop.
