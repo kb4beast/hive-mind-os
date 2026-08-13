@@ -132,6 +132,7 @@ SPECS = [
             "python -m unittest tests.test_doctor_performance_contract -v",
         ],
         "acceptance_criteria": [
+            "The frozen and candidate suites discover exactly 381 executions on the cited host.",
             "The frozen and candidate suites have the identical complete unittest ID set digest sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4, with identical IDs, assertion bodies, subtests, behavior constants, skip decorators, and discovery order.",
             "On the cited host the frozen suite has 381 total executions: 380 pass, zero fail, zero error, and the same conditional skip test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected only when directory symlink creation raises OSError.",
             "Adversarial cases cover source tree, commit, index mode, blob identity, source mutation fail-closed/rebuild, and exclusion of untracked, ignored, state, bytecode, credential-shaped, and outside-snapshot material.",
