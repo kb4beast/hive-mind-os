@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-QUALIFICATION",
+  "node_id": "FPCR-JUDGE-050",
+  "recorded_at": "2026-08-13",
+  "subject": "Corrected-source determination whether an ephemeral fixture API is the sole root-CI prerequisite",
+  "judge": {
+    "identity": "codex:fpcr-judge-050",
+    "seat": "judge-distinct-from-all-prior",
+    "worktree": "C:/Repos/HiveMind/hive-mind-os-fpcr-judge-050",
+    "branch": "codex/fpcr-judge-050",
+    "self_approval": false,
+    "independent_from": [
+      "FPCR-SEAL-000",
+      "FPCR-DISCOVERY-010",
+      "FPCR-EXECUTE-020",
+      "FPCR-CROSS-030",
+      "FPCR-INTEGRATE-040",
+      "FPP-CAUSALITY-010",
+      "FPC-DISCOVERY-010",
+      "CASE-DOCTOR-PERFORMANCE-PROMOTION"
+    ]
+  },
+  "governing_order": {
+    "path": "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-DEFECT.json",
+    "disposition": "adapt",
+    "sole_source": {
+      "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+      "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+    },
+    "prohibitions_reaffirmed": [
+      "unlock original FPC nodes",
+      "FPP build or fixture implementation",
+      "test or production-source edits",
+      ".autopilot/plan.json mutation",
+      "fixture or GCO promotion",
+      "performance conclusion",
+      "knowledge BASELINE-000 retry",
+      "main or remote effects",
+      "retry of the sole FPCR execution"
+    ]
+  },
+  "sealed_plan": {
+    "path": "docs/execution/dags/fixture-prerequisite-causality-reseal-v2/manifest.json",
+    "plan_digest": "sha256:df0ec52106a425306b7590d61c03a77186b79e320daf9d895e0cd12ad05674fe",
+    "verification": {
+      "command": "python docs/execution/dags/fixture-prerequisite-causality-reseal-v2/verify_plan.py",
+      "result": "passed",
+      "node_count": 6
+    }
+  },
+  "receipt_bindings": {
+    "discovery": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e",
+      "reported_tests_discovered": 1059,
+      "runner_verification": "passed"
+    },
+    "execution": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+      "receipt_digest": "sha256:85e324a6a12b1bd76d85243c0519a3b3d49ac6c3d986e73fb56eb6ec5f3ce871",
+      "runner_verification": "passed"
+    },
+    "execution_transcript": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66",
+      "tests_run": 1050,
+      "failures": 28,
+      "skipped": 8,
+      "timed_out": false,
+      "wall_time_seconds": 1130.917
+    },
+    "cross_examination": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/cross-examination.json",
+      "receipt_digest": "sha256:bfc7a6f293131183fec323bdb9a94914ac0d4f28ad4f1ecf0a9300ebae503cf2",
+      "runner_verification": "passed"
+    },
+    "integration": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/integration.json",
+      "receipt_digest": "sha256:cb7719748c3acd40c8a32589770a72a335017115ca9bd5ab2c07c50f07650005",
+      "runner_verification": "passed"
+    }
+  },
+  "findings": {
+    "corrected_source_execution_completed": true,
+    "fixture_only_causal_predicate": false,
+    "reason": "The complete corrected-source root-CI result has 28 failures. One is the missing fixture API surface, but 27 independent failures require the absent GitCommitObservation contract API. Providing only the fixture API cannot make this execution pass.",
+    "failure_inventory": {
+      "fixture_api_surface": {
+        "count": 1,
+        "test": "test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available",
+        "missing_symbols": [
+          "ContentAddressedFixtureSeed",
+          "FixtureIntegrityError",
+          "FixturePolicyError"
+        ]
+      },
+      "gco_contract_api": {
+        "count": 27,
+        "test_module": "test_doctor_git_fact_batching",
+        "missing_symbols": [
+          "GitCommitObservation",
+          "GitCommitObservationError",
+          "_git_commit_observation",
+          "_parse_git_commit_batch"
+        ]
+      }
+    },
+    "material_unresolved_findings": [
+      "The discovery receipt reports 1,059 IDs whereas the sole execution reports 1,050 tests run; the nine-test delta is not reconciled.",
+      "The corrected-source baseline b789 predates the non-promoted GCO candidate and therefore cannot establish that a fixture-only candidate is the applicable next delivery.",
+      "The Cross-Examiner identifies receipt-verifier, hermeticity, transcript-inventory, and whole-wall-clock-budget limitations.",
+      "Strict FPCR DAG lint remains fail-closed at zero errors and two inherited scaffold-scope warnings with exit code 1.",
+      "The rejected immutable fixture candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 remains non-promotable after its failed doctor-performance qualification."
+    ]
+  },
+  "predecessor_and_adverse_evidence_retention": {
+    "original_fpp": {
+      "status": "quarantined_non_promotable",
+      "opening": "evidence/courts/CASE-FIXTURE-PREREQUISITE-OPENING.json",
+      "causality_receipt": "evidence/performance/fixture-prerequisite-v1/causality.json",
+      "reason": "Its asserted sole-failure predicate was not established by a complete root-CI inventory."
+    },
+    "superseded_fpc": {
+      "status": "quarantined_non_promotable",
+      "opening": "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-APPEAL-OPENING.json",
+      "discovery_receipt": "evidence/performance/fixture-prerequisite-causality-appeal-v1/discovery-analysis.json",
+      "reason": "Its sealed source tuple was invalid and cannot be normalized or repaired."
+    },
+    "rejected_fixture_candidate": {
+      "commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+      "tree": "b02326bf108de2fbaa2f174975f937979c02bf90",
+      "court": "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json",
+      "status": "rejected_non_promotable_no_reuse_or_relabel"
+    },
+    "retention_rule": "Retain all original FPP/FPC/FPCR and doctor-performance receipts, dissent, failures, invalid tuples, and rejected candidates append-only. None is proof of fixture-only causality."
+  },
+  "verdict": {
+    "disposition": "reject",
+    "scope": "Only the claim that fixture support is the sole remaining prerequisite for the corrected b789 root-CI execution.",
+    "rationale": "The actual complete corrected-source execution falsifies sole fixture causality: a fixture API can address at most one of 28 failures while 27 missing GitCommitObservation contract-API failures remain. The unresolved count discrepancy and inherited verifier/lint defects independently require a fail-closed disposition.",
+    "fpp_build_authorized": false,
+    "original_fpc_nodes_authorized": false,
+    "fixture_implementation_authorized": false,
+    "fixture_promotion_authorized": false,
+    "gco_implementation_or_promotion_authorized": false,
+    "performance_or_superiority_claim_authorized": false,
+    "knowledge_baseline_retry_authorized": false,
+    "completion_claim": false
+  },
+  "narrow_follow_on": {
+    "authorized_now": "separate_court_opening_only",
+    "subject": "No-code validation of target composition and candidate applicability",
+    "implementation_authority": false,
+    "required_conditions": [
+      "Use a distinct court, sealed DAG, independent Explorer, Cross-Examiner, Integrator, and Judge; do not revive an original FPP or FPC node.",
+      "Bind exactly one immutable source commit and its real tree before any observation; explicitly reject the two historical bad FPC tuples.",
+      "Classify and reconcile the 1,059 discovery IDs against the 1,050 executed tests, including collection, execution, skip, and inventory differences, without treating either count as inherited truth.",
+      "Model fixture API and GitCommitObservation contract requirements as separate candidate components; do not infer causal sufficiency from either component in isolation.",
+      "Preserve FPCR's one completed execution as historical evidence; no retry or rerun is authorized by this verdict.",
+      "Forbid all code, test, fixture, GCO, controller, durable-controller, performance, promotion, plan, main, remote, and knowledge-BASELINE changes.",
+      "Retain and cite the FPP/FPC quarantines and rejected 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 candidate without reusing, relabeling, or qualifying it.",
+      "Require a later distinct Judge with zero unresolved material findings before any separate implementation proposal may be opened."
+    ]
+  },
+  "rollback": {
+    "action": "No code or prior evidence is changed by this Judge receipt.",
+    "if_authorized": "Revert only this retained court receipt; do not delete or rewrite adverse evidence."
+  },
+  "receipt_digest": "sha256:65f12d4be22ffc7a3266f50880b89114b55c0e74cecb7d51633c7cc7ec710631"
+}
