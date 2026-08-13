@@ -1568,6 +1568,98 @@ class ControlPlane:
         )
         return recovery
 
+    def resolve_escalation(self, node_id: str, *, actor: str) -> Mapping[str, Any] | None:
+        """Retire an escalation packet after every recorded cause has a fix.
+
+        An escalation preserves a packet so a human decides before the node
+        moves again, and that packet is not tied to the retry budget: a node
+        can escalate on its first failure and never earn a quarantine, so
+        ``lift_retry_quarantine`` — the only other verb that clears a packet —
+        never runs and the escalation outlives every blocker it named.  This
+        verb is the lawful way back, and it demands the same proof the
+        quarantine lift demands: a ``BLOCKER_RESOLVED`` event for every blocker
+        the node recorded, each carrying a verified fix.  When that proof is
+        complete it archives the escalation record together with the failure
+        ledger into one recovery document — nothing is deleted — and retires
+        the packet so the node stops reporting ``ESCALATION_REQUIRED``.  The
+        failure ledger and any retry quarantine are left exactly as they were:
+        this clears the escalation and nothing else.  Returns None when the
+        node holds no escalation packet.
+
+        Resolution is also independent: the identity recorded as the packet's
+        ``owner`` may not be the identity that clears it.  A resolved blocker
+        proves only that a fix was *claimed*, and the claim is worth nothing
+        when the party that failed is the same party that certifies itself
+        cleared.  This is the invariant the court refuses a judge listed in
+        ``affected_identities`` for, and the one promotion enforces by
+        requiring distinct proposer, builder, evaluator, and judge — applied
+        here to escalation.
+        """
+
+        if not actor.strip():
+            raise AutopilotError("resolving an escalation requires the acting identity")
+        escalation_path = self.escalations_dir / f"{node_id}.json"
+        if not escalation_path.is_file():
+            return None
+        # Read once: the identity the check runs against and the record the
+        # archive preserves must be the same bytes.
+        escalation = read_json(escalation_path)
+        owner = escalation.get("owner") if isinstance(escalation, Mapping) else None
+        # Surrounding whitespace never makes a second identity: ``actor`` is
+        # validated with ``strip`` above, so compare on the same footing.
+        if isinstance(owner, str) and owner.strip() == actor.strip():
+            raise AutopilotError(
+                "the identity that escalated may not clear the escalation: "
+                f"actor {actor} matches the escalating owner {owner} on {node_id}"
+            )
+        if not self.blockers_fully_resolved(node_id):
+            # An empty or unparseable ledger is NOT proof: a worker deliberately
+            # preserved this packet, so retiring it needs at least one named
+            # cause and a resolution for every one of them.
+            unresolved = self.unresolved_blockers(node_id)
+            raise AutopilotError(
+                "escalation stands while blockers remain unresolved: "
+                + (
+                    ", ".join(unresolved)
+                    if unresolved
+                    else "the blocker ledger names no resolvable causes"
+                )
+            )
+        now = self.clock()
+        quarantine_path = self.quarantine_dir / f"{node_id}.json"
+        recovery = {
+            "schema_version": SCHEMA_VERSION,
+            "kind": "hive-mind-autopilot-escalation-resolution-v1",
+            "node_id": node_id,
+            "actor": actor,
+            "lifted_at": format_time(now),
+            "escalation": escalation,
+            "quarantine": read_json(quarantine_path) if quarantine_path.is_file() else None,
+            "failures": list(self.failures(node_id)),
+            "plan_fingerprint": self.expected_plan_fingerprint,
+        }
+        recovery["recovery_id"] = digest_json(recovery)
+        # The distinct suffix keeps this archive from ever landing on the name a
+        # quarantine lift would choose for the same node at the same instant.
+        archive = (
+            self.state_dir
+            / "recoveries"
+            / f"{node_id}-{format_time(now).replace(':', '-')}-escalation.json"
+        )
+        atomic_write_json(archive, recovery)
+        escalation_path.unlink()
+        append_jsonl(
+            self.state_dir / "recoveries.jsonl",
+            {
+                "recovery_id": recovery["recovery_id"],
+                "node_id": node_id,
+                "actor": actor,
+                "lifted_at": recovery["lifted_at"],
+                "archive": str(archive.relative_to(self.state_dir)),
+            },
+        )
+        return recovery
+
     def claim_path(self, node_id: str) -> Path:
         return self.claims_dir / f"{node_id}.json"
 

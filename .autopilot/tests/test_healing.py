@@ -524,6 +524,238 @@ class RetryQuarantineLiftTests(HealingFixture):
         self.assertFalse((Path(self.plane.quarantine_dir) / f"{NODE}.json").is_file())
 
 
+class EscalationResolutionTests(HealingFixture):
+    """An escalation that never spent a retry budget still needs a way back.
+
+    ``lift_retry_quarantine`` is the only other verb that clears an escalation
+    packet, and it refuses unless a quarantine file exists.  A node that
+    escalates inside its retry budget therefore writes a packet no verb could
+    ever retire, so it reports ESCALATION_REQUIRED forever.  These tests pin the
+    lawful exit and, just as importantly, pin that it stays shut until the
+    blocker ledger proves every named cause was fixed.
+    """
+
+    def escalate(self) -> str:
+        """Escalate through the real verb, inside the budget, and return the blocker id."""
+
+        record = self.plane.fail(
+            NODE,
+            OWNER,
+            error="host adapter refused the dispatch",
+            kind="escalation",
+            blocker_cause="host adapter refused the dispatch",
+            blocker_fix="Install the missing host adapter and re-run the round.",
+            retry_when="Retry once the adapter answers a probe.",
+        )
+        # The gap under test: one failure against max_retries=2 escalates
+        # without ever earning the quarantine that lift_retry_quarantine needs.
+        self.assertFalse(self.plane.is_quarantined(NODE))
+        self.assertTrue(self.plane.is_escalated(NODE))
+        self.assertIsNone(self.plane.lift_retry_quarantine(NODE, actor="test:healer"))
+        return str(record["blocker"]["blocker_id"])
+
+    def resolve_blocker(self, blocker_id: str) -> None:
+        self.plane.resolve_blocker(
+            NODE,
+            blocker_id,
+            actor="test:healer",
+            fix="Installed the host adapter and verified it answers a probe.",
+            retry_command=["python", ".autopilot/bin/autopilot.py", "status"],
+        )
+
+    def archives(self) -> list[Path]:
+        return sorted((self.root / ".autopilot" / "state" / "recoveries").glob("*.json"))
+
+    def test_no_escalation_packet_returns_none_and_changes_nothing(self) -> None:
+        state = self.root / ".autopilot" / "state"
+        before = sorted(str(p.relative_to(state)) for p in state.rglob("*"))
+        self.assertIsNone(self.plane.resolve_escalation(NODE, actor="test:healer"))
+        after = sorted(str(p.relative_to(state)) for p in state.rglob("*"))
+        self.assertEqual(before, after)
+        self.assertFalse((state / "recoveries.jsonl").exists())
+
+    def test_an_open_blocker_refuses_and_the_packet_survives(self) -> None:
+        blocker_id = self.escalate()
+        with self.assertRaises(controller.AutopilotError) as raised:
+            self.plane.resolve_escalation(NODE, actor="test:healer")
+        self.assertIn("unresolved", str(raised.exception))
+        self.assertIn(blocker_id, str(raised.exception))
+        self.assertTrue((Path(self.plane.escalations_dir) / f"{NODE}.json").is_file())
+        self.assertTrue(self.plane.is_escalated(NODE))
+        self.assertEqual(self.plane.node_view(NODE).state, "ESCALATION_REQUIRED")
+        self.assertEqual(self.archives(), [])
+
+    def test_the_escalating_identity_may_not_clear_its_own_escalation(self) -> None:
+        blocker_id = self.escalate()
+        self.resolve_blocker(blocker_id)
+        # Every other gate is satisfied: only the identity is wrong.
+        self.assertTrue(self.plane.blockers_fully_resolved(NODE))
+        with self.assertRaises(controller.AutopilotError) as raised:
+            self.plane.resolve_escalation(NODE, actor=OWNER)
+        message = str(raised.exception)
+        self.assertIn("may not clear", message)
+        self.assertIn(OWNER, message)
+        self.assertIn(NODE, message)
+        self.assertTrue((Path(self.plane.escalations_dir) / f"{NODE}.json").is_file())
+        self.assertTrue(self.plane.is_escalated(NODE))
+        self.assertEqual(self.plane.node_view(NODE).state, "ESCALATION_REQUIRED")
+        self.assertEqual(self.archives(), [])
+
+    def test_padding_the_owner_does_not_manufacture_a_second_identity(self) -> None:
+        blocker_id = self.escalate()
+        self.resolve_blocker(blocker_id)
+        for actor in (f"  {OWNER}", f"{OWNER}\t", f"\n {OWNER} \n"):
+            with self.assertRaises(controller.AutopilotError) as raised:
+                self.plane.resolve_escalation(NODE, actor=actor)
+            self.assertIn("may not clear", str(raised.exception))
+        self.assertTrue((Path(self.plane.escalations_dir) / f"{NODE}.json").is_file())
+
+    def test_an_independent_identity_clears_the_escalation(self) -> None:
+        blocker_id = self.escalate()
+        self.resolve_blocker(blocker_id)
+        packet = json.loads(
+            (Path(self.plane.escalations_dir) / f"{NODE}.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(packet["owner"], OWNER)
+        recovery = self.plane.resolve_escalation(NODE, actor="codex:orchestrator")
+        self.assertEqual(recovery["actor"], "codex:orchestrator")
+        self.assertNotEqual(recovery["actor"], recovery["escalation"]["owner"])
+        # The archive keeps both halves of the independence claim checkable.
+        self.assertEqual(recovery["escalation"]["owner"], OWNER)
+        self.assertFalse(self.plane.is_escalated(NODE))
+        self.assertNotEqual(self.plane.node_view(NODE).state, "ESCALATION_REQUIRED")
+
+    def test_an_empty_ledger_never_retires_an_escalation(self) -> None:
+        escalations = Path(self.plane.escalations_dir)
+        escalations.mkdir(parents=True, exist_ok=True)
+        (escalations / f"{NODE}.json").write_text(
+            json.dumps({"node_id": NODE, "kind": "escalation"}) + "\n", encoding="utf-8"
+        )
+        with self.assertRaises(controller.AutopilotError) as raised:
+            self.plane.resolve_escalation(NODE, actor="test:healer")
+        self.assertIn("names no resolvable causes", str(raised.exception))
+        self.assertTrue((escalations / f"{NODE}.json").is_file())
+
+    def test_resolved_blockers_retire_the_escalation(self) -> None:
+        blocker_id = self.escalate()
+        self.resolve_blocker(blocker_id)
+        recovery = self.plane.resolve_escalation(NODE, actor="test:healer")
+        self.assertEqual(recovery["kind"], "hive-mind-autopilot-escalation-resolution-v1")
+        self.assertFalse((Path(self.plane.escalations_dir) / f"{NODE}.json").is_file())
+        self.assertFalse(self.plane.is_escalated(NODE))
+        self.assertNotEqual(self.plane.node_view(NODE).state, "ESCALATION_REQUIRED")
+        # Idempotent: a second run finds no packet and reports so without error.
+        self.assertIsNone(self.plane.resolve_escalation(NODE, actor="test:healer"))
+
+    def test_the_archive_holds_the_escalation_record_and_failure_ledger(self) -> None:
+        blocker_id = self.escalate()
+        ledger = list(self.plane.failures(NODE))
+        self.resolve_blocker(blocker_id)
+        recovery = self.plane.resolve_escalation(NODE, actor="test:healer")
+        archives = self.archives()
+        self.assertEqual(len(archives), 1)
+        archived = json.loads(archives[0].read_text(encoding="utf-8"))
+        self.assertEqual(archived, dict(recovery))
+        self.assertEqual(archived["node_id"], NODE)
+        self.assertEqual(archived["escalation"]["kind"], "escalation")
+        self.assertEqual(
+            archived["escalation"]["error"], "host adapter refused the dispatch"
+        )
+        self.assertEqual(archived["escalation"]["owner"], OWNER)
+        self.assertEqual(archived["failures"], [dict(item) for item in ledger])
+        self.assertEqual(len(archived["failures"]), 1)
+        self.assertEqual(
+            archived["failures"][0]["error"], "host adapter refused the dispatch"
+        )
+        # Nothing is lost: the live ledger and any quarantine are untouched.
+        self.assertEqual(len(self.plane.failures(NODE)), 1)
+
+    def test_a_blank_actor_is_refused(self) -> None:
+        blocker_id = self.escalate()
+        self.resolve_blocker(blocker_id)
+        for actor in ("", "   ", "\t\n"):
+            with self.assertRaises(controller.AutopilotError) as raised:
+                self.plane.resolve_escalation(NODE, actor=actor)
+            self.assertIn("acting identity", str(raised.exception))
+        self.assertTrue((Path(self.plane.escalations_dir) / f"{NODE}.json").is_file())
+
+    def test_the_audit_record_names_the_actor(self) -> None:
+        blocker_id = self.escalate()
+        self.resolve_blocker(blocker_id)
+        recovery = self.plane.resolve_escalation(NODE, actor="human:brian")
+        audit = self.root / ".autopilot" / "state" / "recoveries.jsonl"
+        rows = [
+            json.loads(line)
+            for line in audit.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["actor"], "human:brian")
+        self.assertEqual(rows[0]["node_id"], NODE)
+        self.assertEqual(rows[0]["recovery_id"], recovery["recovery_id"])
+        self.assertEqual(recovery["actor"], "human:brian")
+        # The audit row points at an archive that really exists.
+        archive = self.root / ".autopilot" / "state" / rows[0]["archive"]
+        self.assertTrue(archive.is_file())
+
+    def test_a_retry_quarantine_outlives_the_escalation_resolution(self) -> None:
+        """Clearing an escalation must not smuggle a spent budget back open."""
+
+        blocker_id = self.escalate()
+        quarantine = Path(self.plane.quarantine_dir)
+        quarantine.mkdir(parents=True, exist_ok=True)
+        (quarantine / f"{NODE}.json").write_text(
+            json.dumps({"node_id": NODE, "reason": "configured retry budget exhausted"})
+            + "\n",
+            encoding="utf-8",
+        )
+        self.resolve_blocker(blocker_id)
+        recovery = self.plane.resolve_escalation(NODE, actor="test:healer")
+        self.assertTrue((quarantine / f"{NODE}.json").is_file())
+        self.assertTrue(self.plane.is_quarantined(NODE))
+        self.assertEqual(self.plane.node_view(NODE).state, "QUARANTINED")
+        self.assertEqual(recovery["quarantine"]["reason"], "configured retry budget exhausted")
+
+    def test_the_cli_verb_prints_the_recovery_document(self) -> None:
+        blocker_id = self.escalate()
+        self.resolve_blocker(blocker_id)
+        completed = subprocess.run(
+            (
+                sys.executable,
+                str(BIN / "autopilot.py"),
+                "escalation-resolve",
+                NODE,
+                "--actor",
+                "human:brian",
+            ),
+            cwd=self.root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["kind"], "hive-mind-autopilot-escalation-resolution-v1")
+        self.assertEqual(payload["actor"], "human:brian")
+        self.assertFalse(self.plane.is_escalated(NODE))
+        again = subprocess.run(
+            (
+                sys.executable,
+                str(BIN / "autopilot.py"),
+                "escalation-resolve",
+                NODE,
+                "--actor",
+                "human:brian",
+            ),
+            cwd=self.root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(
+            json.loads(again.stdout), {"node_id": NODE, "outcome": "not-escalated"}
+        )
+
+
 class ValidationLeaseBreakTests(HealingFixture):
     """An expired lease left by a dead session must stop wedging rounds."""
 

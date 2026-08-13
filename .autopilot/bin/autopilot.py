@@ -867,6 +867,10 @@ def parser() -> argparse.ArgumentParser:
     lift.add_argument("node_id")
     lift.add_argument("--actor", required=True)
 
+    retire = commands.add_parser("escalation-resolve")
+    retire.add_argument("node_id")
+    retire.add_argument("--actor", required=True)
+
     lessons = commands.add_parser("lessons")
     lessons.add_argument("--json", action="store_true", dest="json_output")
     lessons.add_argument(
@@ -1287,6 +1291,18 @@ def main(argv: list[str] | None = None) -> int:
                     lifted
                     if lifted is not None
                     else {"node_id": args.node_id, "outcome": "not-quarantined"},
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "escalation-resolve":
+            resolved = plane.resolve_escalation(args.node_id, actor=args.actor)
+            print(
+                json.dumps(
+                    resolved
+                    if resolved is not None
+                    else {"node_id": args.node_id, "outcome": "not-escalated"},
                     indent=2,
                     sort_keys=True,
                 )
