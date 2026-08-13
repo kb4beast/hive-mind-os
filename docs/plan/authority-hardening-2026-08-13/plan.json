@@ -8,13 +8,14 @@
  "nodes": [
   {
    "acceptance_criteria": [
-    "ConstraintEnvelope's digest is recomputed from field contents on construction and on registry admission; a mismatched digest_value is rejected (closes A5-F3).",
+    "ConstraintEnvelope carries a pure digest helper that computes the digest from field contents, and AuthorityRegistry.register recomputes it and REFUSES an envelope whose digest_value does not match its contents (closes A5-F3).",
     "EffectIntent recomputes intent_digest over its own fields exactly as DeliveryGrant.__post_init__ seals its grant, raising on mismatch (closes A4 D5).",
     "Minting a ROOT envelope requires an explicit registry ceremony recording provenance; a bare in-process root mint is refused by the registry (closes A5-F4).",
     "A revoked authority re-minted under a fresh digest string is still refused: revocation keys on authority content, not the digest string (closes A5-F5).",
     "intersect_envelopes resolves the parent from the registry by digest and rejects a caller-supplied parent the registry has never admitted (closes A5-F13).",
     "AuthorityRegistry.authorize scope-checks every declared action, and path_read_scope is enforced (closes A5-F11).",
     "is_no_broader_than compares every authority-bearing field, including max_cost_microunits; no child may exceed its parent on any of them (closes A5-F12).",
+    "Every envelope-registering call site in the repository mints a sealed envelope; the re-sealing is mechanical and changes no authority any envelope actually carries.",
     "Each closed finding has a mandated test proven to fail when that fix is reverted."
    ],
    "assumptions": [
@@ -52,7 +53,16 @@
    "file_locks": [
     "src/hive_mind_os/brain_kernel/authority.py",
     "src/hive_mind_os/brain_kernel/contracts.py",
-    "tests/test_brain_kernel_authority.py"
+    "src/hive_mind_os/cortex/repository/local_execution.py",
+    "src/hive_mind_os/cortex/repository/mission_adapter.py",
+    "tests/test_brain_kernel_authority.py",
+    "tests/test_brain_kernel_contracts.py",
+    "tests/hive_cortex/test_no_cheating.py",
+    "tests/test_hive_cortex_builder.py",
+    "tests/test_hive_cortex_delivery.py",
+    "tests/test_hive_cortex_durability.py",
+    "tests/test_hive_cortex_effects.py",
+    "tests/test_github_adapter.py"
    ],
    "forbidden_scope": [
     ".autopilot/**",
@@ -70,7 +80,7 @@
    "objective": "Anchor the authority chain in the registry: recompute envelope and intent digests from contents, control root minting, make revocation survive re-minting, resolve parents from the registry, scope-check every action, and close the is_no_broader_than field gaps.",
    "parallel_safe": true,
    "pr_target": "main",
-   "rationale": "A5's audit showed the chain is self-referential: digests are format-checked, roots are free to mint, revocation keys on the digest string, and intersect_envelopes trusts caller-supplied parents. TOKEN-1010 and GRANT-1020 consume the registry surface this node fixes, so it lands first. This node must not touch effects.py or grants.py; those belong to its dependents.",
+   "rationale": "A5's audit showed the chain is self-referential: digests are format-checked, roots are free to mint, revocation keys on the digest string, and intersect_envelopes trusts caller-supplied parents. TOKEN-1010 and GRANT-1020 consume the registry surface this node fixes, so it lands first. This node must not touch effects.py or grants.py; those belong to its dependents. CONTRACT REPAIR 2026-08-13 (orchestrator, measured before dispatch): sealing the envelope digest changes the digest->envelope mapping the registry keys on, so it necessarily re-seals every fixture that registers an envelope -- 2 production minting sites (cortex/repository/local_execution.py:211, mission_adapter.py:139, both registering placeholder digests) and 7 test modules. Enforcement is therefore specified at REGISTRY ADMISSION plus a minting helper, not in ConstraintEnvelope.__post_init__: construction-time rejection would break 13 construction sites across 11 files for no additional security, since the registry is the boundary A5-F3 names. The write scope is widened to exactly the re-sealing surface, and GATEWAY-1040 gains a dependency on this node because its fixtures are in that surface.",
    "read_scope": [
     "src/hive_mind_os/brain_kernel/authority.py",
     "src/hive_mind_os/brain_kernel/contracts.py",
@@ -86,7 +96,9 @@
     "Validated dependency receipts"
    ],
    "required_tests": [
-    "PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority -v"
+    "PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority tests.test_brain_kernel_contracts -v",
+    "PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating tests.test_hive_cortex_builder tests.test_hive_cortex_delivery tests.test_hive_cortex_durability tests.test_hive_cortex_effects -v",
+    "PYTHONPATH=src python -m unittest tests.test_github_adapter tests.test_brain_kernel_local_execution tests.test_hive_cortex_mission_runtime -v"
    ],
    "reversibility": "Revert the node branch; no external effects are performed by this node.",
    "risk": "critical",
@@ -118,7 +130,16 @@
    "write_scope": [
     "src/hive_mind_os/brain_kernel/authority.py",
     "src/hive_mind_os/brain_kernel/contracts.py",
-    "tests/test_brain_kernel_authority.py"
+    "src/hive_mind_os/cortex/repository/local_execution.py",
+    "src/hive_mind_os/cortex/repository/mission_adapter.py",
+    "tests/test_brain_kernel_authority.py",
+    "tests/test_brain_kernel_contracts.py",
+    "tests/hive_cortex/test_no_cheating.py",
+    "tests/test_hive_cortex_builder.py",
+    "tests/test_hive_cortex_delivery.py",
+    "tests/test_hive_cortex_durability.py",
+    "tests/test_hive_cortex_effects.py",
+    "tests/test_github_adapter.py"
    ]
   },
   {
@@ -659,7 +680,8 @@
    "contract_version": 1,
    "critical_path_importance": 65,
    "dependencies": [
-    "WAL-1200"
+    "WAL-1200",
+    "REG-1000"
    ],
    "downstream_unlock_value": 25,
    "effort": "large",
@@ -700,7 +722,7 @@
    "objective": "Complete the remote gateway's read and idempotency surface: a guarded ref-read method, encoded queries in find_open_draft_pr, and pagination in list_comments.",
    "parallel_safe": true,
    "pr_target": "main",
-   "rationale": "A4 D2/D3/D6: the delete path sanitises refs but the read path does not exist at all -- which is why the idempotency replay's branch snapshots were null and the driver's 'branch head unchanged' verdict was worthless; past 100 comments the idempotency marker falls off page one and the adapter double-posts. Unit tests run against recorded fakes only; no live remote effect and no credential. Ordered behind WAL-1200 per DAG standard §4 (durability before external-effect surface).",
+   "rationale": "A4 D2/D3/D6: the delete path sanitises refs but the read path does not exist at all -- which is why the idempotency replay's branch snapshots were null and the driver's 'branch head unchanged' verdict was worthless; past 100 comments the idempotency marker falls off page one and the adapter double-posts. Unit tests run against recorded fakes only; no live remote effect and no credential. Ordered behind WAL-1200 per DAG standard §4 (durability before external-effect surface), and behind REG-1000 because that node's envelope re-sealing rewrites this node's own test fixtures (contract repair 2026-08-13).",
    "read_scope": [
     "src/hive_mind_os/cortex/github/rest_gateway.py",
     "src/hive_mind_os/cortex/github/delivery_adapter.py",

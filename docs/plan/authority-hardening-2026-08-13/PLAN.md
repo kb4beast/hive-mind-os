@@ -39,6 +39,24 @@ python .autopilot/bin/autopilot.py --repo-root . dag-rounds --plan docs/plan/aut
 | 5. Containment unproven on Windows | §11.5 | `SANDBOX-1300` | `sandbox.py`, `tests/test_sandbox.py` |
 | closure adjudication | all of the above | `REAUDIT-1900` | evidence + results doc only |
 
+## Contract repair — 2026-08-13, before any worker ran
+
+Measuring REG-1000 against real source before dispatch found the acceptance criterion as
+first drafted was the wrong shape, so it was repaired rather than worked around:
+
+Sealing the envelope digest changes the digest→envelope mapping the registry keys on, so
+it necessarily re-seals **every** call site that registers an envelope — two production
+minting sites (`cortex/repository/local_execution.py:211`, `mission_adapter.py:139`, both
+registering placeholder digests) and seven test modules. The first draft said the digest is
+recomputed "on construction and on registry admission"; construction-time rejection would
+break 13 construction sites across 11 files for **no additional security**, because
+`AuthorityRegistry` is the boundary A5-F3 actually names.
+
+Repair: enforcement is specified at registry admission plus a pure minting helper;
+REG-1000's write scope is widened to exactly the re-sealing surface; and GATEWAY-1040 gains
+a dependency on REG-1000 because its fixtures are inside that surface. The compiled rounds
+are unchanged, and `dag-lint --strict` stays clean.
+
 ## The graph
 
 ```
