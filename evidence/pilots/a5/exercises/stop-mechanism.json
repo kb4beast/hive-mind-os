@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "node": "A5-900",
+  "exercise": "stop mechanism -- interrupt, record state, resume; no duplicate step, and no lost evidence FOR INTERRUPTIONS OUTSIDE THE RECEIPT-WRITE WINDOW",
+  "title_correction": "The first version of this record billed the exercise as proving 'no duplicate and no lost evidence' without qualification. The blind operational review measured a counterexample inside the write window (finding A5-F8) and the title is corrected rather than defended.",
+  "base_commit": "7a2e19e769cbeb1b3f3a515037c1173af28c9893",
+  "transcript": "evidence/pilots/a5/tests/stop-mechanism.txt",
+  "transcript_contains": "every run's OUTPUT verbatim with its exit code, the full ledger after each run, and the driver and harness sources",
+  "transcript_command_lines_are_abridged": "The printed command lines omit the required --dir argument, so copying them verbatim yields argparse exit 2. The full form is `python stepped.py --dir <ledger-dir> --run rN [--stop-after N | --kill-before-receipt N]`. Reported by the blind operational reviewer and corrected here rather than in the retained transcript, which is left as it ran.",
+  "ran_utc": {"start": "2026-08-13T05:09:10Z", "end": "2026-08-13T05:09:12Z"},
+  "environment": {
+    "python": "Python 3.14.4",
+    "network": "none used",
+    "credential": "none read, referenced, or required",
+    "effects_outside_the_ledger_directory": "none"
+  },
+  "procedure_under_test": {
+    "description": "A four-step receipt-ledgered procedure over RETAINED A4 evidence. Each step digests one retained file and appends one receipt keyed by step id. On start, every step that already has a receipt is ADOPTED rather than re-executed.",
+    "steps": [
+      "S1 digest evidence/pilots/a4/pilot-plan.json",
+      "S2 digest evidence/pilots/a4/summary.json",
+      "S3 digest evidence/pilots/a4/owner-grant/gate-stop.json",
+      "S4 digest evidence/pilots/a4/owner-grant/grant-record.json"
+    ],
+    "why_this_procedure": "The runbook requires the stop path be demonstrated on the exercise itself. Digesting the prior level's retained evidence is real work this node needs done, is read-only, and is idempotent -- which is exactly the property the exercise then interrogates."
+  },
+  "runs": [
+    {
+      "run": "r1",
+      "mode": "the stop trigger fires after step 2",
+      "command": "python stepped.py --run r1 --stop-after 2",
+      "exit_code": 0,
+      "observed": "S1 EXECUTED, S2 EXECUTED, then STOP: no further step issued; stop-record-r1.json written naming stopped_after=S2 and receipts_at_stop=[S1,S2].",
+      "ledger_receipts_after": 2,
+      "ledger_digest_after": "8a13cb51dc810d0aaa070471295f94485ab058e27a6fc3eb3f3134131def0421"
+    },
+    {
+      "run": "r2",
+      "mode": "HARD KILL during step 3, after its effect and before its receipt",
+      "command": "python stepped.py --run r2 --kill-before-receipt 3",
+      "exit_code": 9,
+      "observed": "S1 and S2 ADOPTED without re-execution. S3's effect was performed, then the process died via os._exit(9) before the receipt append.",
+      "ledger_receipts_after": 2,
+      "ledger_digest_after": "8a13cb51dc810d0aaa070471295f94485ab058e27a6fc3eb3f3134131def0421",
+      "ledger_unchanged_by_the_kill": true,
+      "significance": "This is deliberately the shape of A4-800 open defect D1: the effect happens, the process dies, no receipt records it. It is survivable HERE only because the step is an idempotent local read. D1's version of this window has an irreversible remote push in it."
+    },
+    {
+      "run": "r3",
+      "mode": "resume",
+      "command": "python stepped.py --run r3",
+      "exit_code": 0,
+      "observed": "S1, S2 ADOPTED. S3 RE-EXECUTED (its prior effect left no receipt, so the ledger correctly did not adopt it). S4 EXECUTED. 4/4 steps have receipts.",
+      "ledger_receipts_after": 4
+    },
+    {
+      "run": "r4",
+      "mode": "resume again -- replay safety",
+      "command": "python stepped.py --run r4",
+      "exit_code": 0,
+      "observed": "All four steps ADOPTED. executed_this_run=[]. No receipt appended, no work repeated.",
+      "ledger_receipts_after": 4
+    }
+  ],
+  "assertions": {
+    "E1_no_duplicate_effect": "PASS -- exactly one receipt per step: S1 x1, S2 x1, S3 x1, S4 x1.",
+    "E2_no_lost_step": "PASS -- 4/4 steps present after the interruption.",
+    "E3_pre_stop_receipts_byte_unchanged": "PASS -- sha256 of the first two ledger lines is 8a13cb51dc810d0aaa070471295f94485ab058e27a6fc3eb3f3134131def0421 both immediately after the stop and after both resumes.",
+    "E4_attribution": "S1 and S2 were executed by run r1; S3 and S4 by run r3; r4 executed nothing. The ledger records which run performed each step.",
+    "E5_recorded_digests_match_the_retained_originals": "PASS for all four: 324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc, d660b2043383a53d1075e7cf95a57c1da9ce1b04c42a232821519314c377953e, 88dfe740ed5919ed1f47c6d94657500e2153ac826cf3be49a441482c6be38bea, e4753255f1a10a7b696933bd48fbe0225a280ffda12f0654b0d03108b4e82735. The first, third and fourth also match evidence/pilots/a4/summary.json file_digests exactly."
+  },
+  "closed_gate_encountered_mid_procedure": {
+    "gate": "G4-external-append-only-retention / B-GOV-04",
+    "where": "The natural next step of a retention exercise is to replicate the ledger to durable external append-only storage and recover it from there.",
+    "what_was_done": "The step was NOT performed. It was recorded as gate-blocked and mapped to its matrix row. No external endpoint was contacted, no storage account was sought, and no substitute was improvised.",
+    "matrix_row": "evidence/pilots/a5/gates/gate-matrix.json -> rows[] gate 'G4-external-append-only-retention' and 'B-GOV-04-external-retention'"
+  },
+  "findings": [
+    {
+      "id": "A5-F8",
+      "severity": "operational -- evidence durability",
+      "title": "A crash INSIDE the receipt-append window destroys the entire ledger, and the exercise as first written never tested that placement",
+      "found_by": "the blind operational reviewer, then re-measured here rather than adopted",
+      "measurement": "stop-mechanism.txt ADDENDUM 1. After a clean two-receipt ledger, a truncated JSON line was appended to simulate a crash mid-append. The resume died with json.decoder.JSONDecodeError 'Unterminated string starting at: line 1 column 12 (char 11)', exit code 1. Both intact prior receipts became unreadable along with the partial one.",
+      "root_cause": "load_ledger in the exercise driver calls json.loads(line) with no error handling, so one partial line poisons every earlier record. append_receipt writes, flushes and fsyncs but is not atomic against a kill mid-write.",
+      "why_it_was_missed": "Every kill in the original exercise was placed BEFORE append_receipt. That is the safe placement and it avoided the interesting case. This is the same class of self-flattering test design the whole record warns about.",
+      "scope": "This is a defect in THIS exercise's driver, which is scratch code, not in production. It does not by itself say anything about hive_mind_os.brain_kernel.effect_outbox. It does mean the exercise proves less than its first title claimed."
+    },
+    {
+      "id": "A5-F9",
+      "severity": "disclosure",
+      "title": "The stop is self-triggered by a startup flag, not a signal delivered to an unwilling process",
+      "found_by": "the blind operational reviewer",
+      "measurement": "The driver reads --stop-after at startup and returns before issuing the next step. No external stop signal, no cooperative cancellation, and no halting of an in-flight process was demonstrated.",
+      "consequence": "The name 'stop mechanism' invites the reading that an operator can stop a running agent. Nothing here demonstrates that. What is demonstrated is that a procedure which decides to stop leaves a clean, resumable state."
+    }
+  ],
+  "what_this_exercise_does_not_prove": [
+    "It does NOT demonstrate an externally commanded stop. The stop is a flag the process reads at startup; no signal was delivered to an unwilling process. See finding A5-F9.",
+    "It does NOT prove 'no lost evidence' in general -- only for interruptions outside the receipt-write window. A crash inside that window destroyed the whole ledger. See finding A5-F8.",
+    "It exercises THIS procedure's ledger, not hive_mind_os.brain_kernel.effect_outbox. The production outbox was exercised by A4-800, not here.",
+    "Every step is an idempotent local read. No irreversible effect was interrupted, so 'resume is safe' is proven only for idempotent steps.",
+    "A4-800 open defect D1 (src/hive_mind_os/mission_store.py:81-92 -- _atomic_write writes through a temporary filename LONGER than the final name with no Windows long-path handling, and src/hive_mind_os/brain_kernel/effect_outbox.py:91-93 makes reconciliation_required terminal) is UNFIXED at this base commit and is not remediated by anything demonstrated here.",
+    "No production incident, no rollback of a live system, and no paging path was exercised. B-OPS-04 owns those claims."
+  ]
+}

@@ -1,0 +1,405 @@
+===== A5-900 production-recovery exercise =====
+node: A5-900
+utc_start: 2026-08-13T05:07:34Z
+host: MINGW64_NT-10.0-26200 3.6.6-1cdd4371.x86_64
+git: git version 2.53.0.windows.3
+source_repo: C:/Repos/HiveMind/hive-mind-os
+network: NONE. Every command below is local filesystem or local git.
+credential: NONE read, referenced, or required.
+
+===== R0 baseline =====
+
+### R0.1 source HEAD
+$ git -C 'C:/Repos/HiveMind/hive-mind-os' rev-parse HEAD
+7a2e19e769cbeb1b3f3a515037c1173af28c9893
+[exit_code=0]
+
+### R0.2 source HEAD tree
+$ git -C 'C:/Repos/HiveMind/hive-mind-os' rev-parse HEAD^{tree}
+fdadc72266c0c67615f07472c966d0af7d296696
+[exit_code=0]
+
+### R0.3 source branch
+$ git -C 'C:/Repos/HiveMind/hive-mind-os' rev-parse --abbrev-ref HEAD
+release/hive-mind-os-singleton-20260812-r5
+[exit_code=0]
+
+### R0.4 digest of record for evidence/pilots/a4/pilot-plan.json (evidence/pilots/a4/summary.json file_digests)
+$ echo 324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc
+324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc
+[exit_code=0]
+
+### R0.5 on-disk digest of that artifact in the source repo
+$ sha256sum 'C:/Repos/HiveMind/hive-mind-os/evidence/pilots/a4/pilot-plan.json'
+324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc *C:/Repos/HiveMind/hive-mind-os/evidence/pilots/a4/pilot-plan.json
+[exit_code=0]
+
+### R0.6 longest tracked path length
+$ git -C 'C:/Repos/HiveMind/hive-mind-os' ls-files | awk '{print length($0)}' | sort -rn | head -1
+169
+[exit_code=0]
+
+### R0.7 core.longpaths in the SOURCE repo (local / global / system)
+$ echo local=$(git -C 'C:/Repos/HiveMind/hive-mind-os' config --local core.longpaths || echo UNSET); echo global=$(git -C 'C:/Repos/HiveMind/hive-mind-os' config --global core.longpaths || echo UNSET); echo system=$(git -C 'C:/Repos/HiveMind/hive-mind-os' config --system core.longpaths || echo UNSET)
+local=true
+global=UNSET
+system=UNSET
+[exit_code=0]
+
+===== R1 fresh clone at a normal temp path, DEFAULT git config (the naive recovery) =====
+
+### R1.1 git clone (default config), destination length 127
+$ git clone 'C:/Repos/HiveMind/hive-mind-os' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec1'
+[exit_code=128]
+filename_too_long_errors=21
+error: unable to create file e/p12f/attempts/a-53cc11ad795130c2/.delivery-failed-evidence-ab9c06b9-e357-45b6-8b2a-2a141d2f9209/r/01df98fe8af2dd3e02fbedfde7a19ecddc707613dc0a131568095d817c60daae.json: 
+You can inspect what was checked out with 'git status'
+and retry with 'git restore --source=HEAD :/'
+
+
+### R1.2 objects DID transfer: clone HEAD
+$ git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec1' rev-parse HEAD
+7a2e19e769cbeb1b3f3a515037c1173af28c9893
+[exit_code=0]
+
+### R1.3 index deletions reported by git status (first-column 'D')
+$ git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec1' status --porcelain | grep -c '^D '
+940
+[exit_code=0]
+
+### R1.4 materialisation census
+$ materialised 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec1'
+tracked=0 missing_on_disk=0
+[exit_code=0]
+
+### R1.5 VERDICT R1
+$ echo 'clone exit 128; history recovered, working tree NOT recovered; this repository cannot be recovered at this path with default git config'
+clone exit 128; history recovered, working tree NOT recovered; this repository cannot be recovered at this path with default git config
+[exit_code=0]
+
+===== R2 fresh clone at a SHORT path, DEFAULT git config =====
+
+### R2.1 git clone (default config), destination length 24
+$ git clone 'C:/Repos/HiveMind/hive-mind-os' 'C:/Repos/trash/a5rt/rec2'
+[exit_code=0]
+filename_too_long_errors=0
+Cloning into 'C:/Repos/trash/a5rt/rec2'...
+done.
+
+### R2.2 clone HEAD
+$ git -C 'C:/Repos/trash/a5rt/rec2' rev-parse HEAD
+7a2e19e769cbeb1b3f3a515037c1173af28c9893
+[exit_code=0]
+
+### R2.3 materialisation census
+$ materialised 'C:/Repos/trash/a5rt/rec2'
+tracked=940 missing_on_disk=0
+[exit_code=0]
+
+### R2.4 arithmetic of the limit
+$ echo "260 - 169 (longest tracked path) - 1 separator = 90 characters is the maximum destination path length for a default-config recovery on this host; R1 used 127, R2 used 24"
+260 - 169 (longest tracked path) - 1 separator = 90 characters is the maximum destination path length for a default-config recovery on this host; R1 used 127, R2 used 24
+[exit_code=0]
+
+===== R3 fresh clone at the SAME long path as R1, WITH core.longpaths=true =====
+
+### R3.1 git -c core.longpaths=true clone, destination length 127
+$ git -c core.longpaths=true clone 'C:/Repos/HiveMind/hive-mind-os' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3'
+[exit_code=0]
+filename_too_long_errors=0
+Cloning into 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3'...
+done.
+
+### R3.2 clone HEAD equals source HEAD
+$ test "$(git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' rev-parse HEAD)" = "$(git -C 'C:/Repos/HiveMind/hive-mind-os' rev-parse HEAD)" && echo MATCH || echo MISMATCH
+MATCH
+[exit_code=0]
+
+### R3.3 clone HEAD tree equals source HEAD tree
+$ test "$(git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' rev-parse HEAD^{tree})" = "$(git -C 'C:/Repos/HiveMind/hive-mind-os' rev-parse HEAD^{tree})" && echo MATCH || echo MISMATCH
+MATCH
+[exit_code=0]
+
+### R3.4 checked-out branch
+$ git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' rev-parse --abbrev-ref HEAD
+release/hive-mind-os-singleton-20260812-r5
+[exit_code=0]
+
+### R3.5 explicit checkout of the release branch by name
+$ git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' -c core.longpaths=true checkout 'release/hive-mind-os-singleton-20260812-r5' 2>&1 | tail -2; git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' rev-parse HEAD
+Already on 'release/hive-mind-os-singleton-20260812-r5'
+Your branch is up to date with 'origin/release/hive-mind-os-singleton-20260812-r5'.
+7a2e19e769cbeb1b3f3a515037c1173af28c9893
+[exit_code=0]
+
+### R3.6 materialisation census
+$ materialised 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3'
+tracked=940 missing_on_disk=0
+[exit_code=0]
+
+### R3.7 working tree clean (longpaths-aware status)
+$ git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' -c core.longpaths=true status --porcelain | wc -l
+0
+[exit_code=0]
+
+### R3.8 was core.longpaths INHERITED into the recovered clone?
+$ echo local_in_clone=$(git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' config --local core.longpaths || echo UNSET)
+local_in_clone=UNSET
+[exit_code=0]
+
+### R3.9 consequence: plain status in the recovered clone
+$ git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' status --porcelain | wc -l
+0
+[exit_code=0]
+
+### R3.10 recomputed digest of the retained artifact in the RECOVERED clone
+$ sha256sum 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3/evidence/pilots/a4/pilot-plan.json'
+324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc *C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3/evidence/pilots/a4/pilot-plan.json
+[exit_code=0]
+
+### R3.11 recovered digest vs digest of record
+$ byte-for-byte comparison
+MATCH
+[exit_code=0]
+
+===== R4 simulated total loss and second independent recovery =====
+
+### R4.1 delete the recovered clone
+$ rm -rf 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3'; test -d 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec3' && echo STILL_PRESENT || echo GONE
+GONE
+[exit_code=0]
+
+### R4.2 re-clone into a FRESH directory with the remediated command
+$ git -c core.longpaths=true clone 'C:/Repos/HiveMind/hive-mind-os' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4'
+[exit_code=0]
+Cloning into 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4'...
+done.
+
+### R4.3 re-recovered HEAD matches source HEAD
+$ test "$(git -C 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4' rev-parse HEAD)" = "$(git -C 'C:/Repos/HiveMind/hive-mind-os' rev-parse HEAD)" && echo MATCH || echo MISMATCH
+MATCH
+[exit_code=0]
+
+### R4.4 materialisation census
+$ materialised 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4'
+tracked=940 missing_on_disk=0
+[exit_code=0]
+
+### R4.5 re-recovered artifact digest
+$ sha256sum 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4/evidence/pilots/a4/pilot-plan.json'
+324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc *C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4/evidence/pilots/a4/pilot-plan.json
+[exit_code=0]
+
+### R4.6 recovery is reproducible
+$ byte-for-byte comparison
+MATCH (two independent recoveries produced identical bytes)
+[exit_code=0]
+
+===== R5 fail-closed demonstration on a TEMP COPY (retained evidence is never altered) =====
+
+### R5.1 copy the retained artifact to a temp path
+$ cp 'C:/Repos/HiveMind/hive-mind-os/evidence/pilots/a4/pilot-plan.json' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper/pilot-plan.json' && sha256sum 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper/pilot-plan.json'
+324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc *C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper/pilot-plan.json
+[exit_code=0]
+
+### R5.2 flip one gate field in the COPY: authority_gate.status CLOSED -> OPENED
+$ python -c "import pathlib;p=pathlib.Path(r'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper/pilot-plan.json');b=p.read_bytes();n=b.replace(b'\"status\": \"CLOSED\"', b'\"status\": \"OPENED\"',1);p.write_bytes(n);print('bytes_before',len(b),'bytes_after',len(n),'content_changed',b!=n)"
+bytes_before 13985 bytes_after 13985 content_changed True
+[exit_code=0]
+
+### R5.3 digest of the tampered copy
+$ sha256sum 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper/pilot-plan.json'
+484ae2d7dadf21ac92655f04d45a6c7969d2176b3eba2e2824512c8686f77f3e *C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper/pilot-plan.json
+[exit_code=0]
+
+### R5.4 verify the tampered copy against the digest of record
+$ expect REJECT
+REJECTED: digest mismatch. Digest-bound verification fails closed.
+[exit_code=0 (rejection is the expected outcome)]
+
+### R5.5 the retained original is byte-unchanged
+$ sha256sum 'C:/Repos/HiveMind/hive-mind-os/evidence/pilots/a4/pilot-plan.json'
+324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc *C:/Repos/HiveMind/hive-mind-os/evidence/pilots/a4/pilot-plan.json
+[exit_code=0]
+
+### R5.6 scope of what R5 proves
+$ echo 'A digest-bound exhibit list detects an altered exhibit. It does NOT authenticate the exhibit: the digest list is unkeyed, so a party who can rewrite both the exhibit and the list can re-seal. Same structural limit as A3-700 finding F3.'
+A digest-bound exhibit list detects an altered exhibit. It does NOT authenticate the exhibit: the digest list is unkeyed, so a party who can rewrite both the exhibit and the list can re-seal. Same structural limit as A3-700 finding F3.
+[exit_code=0]
+
+===== R6 cleanup =====
+
+### R6.1 remove recovery directories
+$ rm -rf 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec1' 'C:/Repos/trash/a5rt/rec2' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper' 2>/dev/null; for d in 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec1' 'C:/Repos/trash/a5rt/rec2' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4' 'C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper'; do test -d "$d" && echo "RESIDUE: $d" || echo "removed: $d"; done
+removed: C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec1
+removed: C:/Repos/trash/a5rt/rec2
+removed: C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/rec4
+removed: C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5/tamper
+[exit_code=0]
+
+### R6.2 remove the short-path scratch root
+$ rmdir 'C:/Repos/trash/a5rt' 2>/dev/null; test -d 'C:/Repos/trash/a5rt' && echo 'still present (non-empty or in use)' || echo removed
+removed
+[exit_code=0]
+
+===== R7 what this exercise did NOT do =====
+- no production system, deployment target, external storage, or paid service was contacted
+- no external append-only retention was exercised: G4 / B-GOV-04 are closed, and no such adapter exists
+- no incident-response path (paging, rotation, on-call, containment drill) was exercised: no such system exists in this repository
+- recovery was from a LOCAL clone on the SAME host. Off-host durability against host loss is NOT demonstrated and is exactly what B-GOV-04 requires
+- the recovered artifact was verified against a digest recorded in the same repository; that is self-consistency, not independent attestation
+utc_end: 2026-08-13T05:08:02Z
+
+----- BEGIN HARNESS SOURCE (recovery.sh) -----
+#!/usr/bin/env bash
+# A5-900 production-recovery exercise (retained run). Local only.
+# No network, no credential, no production system. Each recovery uses a FRESH
+# destination directory so no measurement is confounded by deleting a prior one.
+set -u
+
+REPO="C:/Repos/HiveMind/hive-mind-os"
+SCR="C:/Users/beesp/AppData/Local/Temp/claude/C--Repos-HiveMind-hive-mind-os/7a67801b-465b-4082-948f-c38656749678/scratchpad/a5"
+SHORT="C:/Repos/trash/a5rt"
+BRANCH="release/hive-mind-os-singleton-20260812-r5"
+ARTIFACT="evidence/pilots/a4/pilot-plan.json"
+RECORDED="324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc"
+
+step() { echo; echo "### $1"; echo "\$ $2"; }
+do_step() { step "$1" "$2"; eval "$2" 2>&1 | tail -"${3:-12}"; echo "[exit_code=${PIPESTATUS[0]}]"; }
+
+# Count tracked paths that exist on disk, using a longpaths-aware ls-files.
+materialised() {
+  local root="$1" miss=0 total=0 f
+  while IFS= read -r f; do
+    total=$((total+1)); [ -f "$root/$f" ] || miss=$((miss+1))
+  done < <(git -C "$root" -c core.longpaths=true ls-files)
+  echo "tracked=$total missing_on_disk=$miss"
+}
+
+echo "===== A5-900 production-recovery exercise ====="
+echo "node: A5-900"
+echo "utc_start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "host: $(uname -s) $(uname -r)"
+echo "git: $(git --version)"
+echo "source_repo: $REPO"
+echo "network: NONE. Every command below is local filesystem or local git."
+echo "credential: NONE read, referenced, or required."
+
+echo
+echo "===== R0 baseline ====="
+do_step "R0.1 source HEAD" "git -C '$REPO' rev-parse HEAD"
+do_step "R0.2 source HEAD tree" "git -C '$REPO' rev-parse HEAD^{tree}"
+do_step "R0.3 source branch" "git -C '$REPO' rev-parse --abbrev-ref HEAD"
+do_step "R0.4 digest of record for $ARTIFACT (evidence/pilots/a4/summary.json file_digests)" "echo $RECORDED"
+do_step "R0.5 on-disk digest of that artifact in the source repo" "sha256sum '$REPO/$ARTIFACT'"
+do_step "R0.6 longest tracked path length" "git -C '$REPO' ls-files | awk '{print length(\$0)}' | sort -rn | head -1"
+do_step "R0.7 core.longpaths in the SOURCE repo (local / global / system)" "echo local=\$(git -C '$REPO' config --local core.longpaths || echo UNSET); echo global=\$(git -C '$REPO' config --global core.longpaths || echo UNSET); echo system=\$(git -C '$REPO' config --system core.longpaths || echo UNSET)"
+
+echo
+echo "===== R1 fresh clone at a normal temp path, DEFAULT git config (the naive recovery) ====="
+R1="$SCR/rec1"
+rm -rf "$R1" 2>/dev/null
+step "R1.1 git clone (default config), destination length ${#R1}" "git clone '$REPO' '$R1'"
+git clone "$REPO" "$R1" > "$SCR/rec1.txt" 2>&1; R1E=$?
+echo "[exit_code=$R1E]"
+echo "filename_too_long_errors=$(grep -c 'Filename too long' "$SCR/rec1.txt")"
+grep 'Filename too long' "$SCR/rec1.txt" | head -1 | cut -c1-200
+tail -3 "$SCR/rec1.txt"
+do_step "R1.2 objects DID transfer: clone HEAD" "git -C '$R1' rev-parse HEAD"
+do_step "R1.3 index deletions reported by git status (first-column 'D')" "git -C '$R1' status --porcelain | grep -c '^D '"
+do_step "R1.4 materialisation census" "materialised '$R1'"
+do_step "R1.5 VERDICT R1" "echo 'clone exit 128; history recovered, working tree NOT recovered; this repository cannot be recovered at this path with default git config'"
+
+echo
+echo "===== R2 fresh clone at a SHORT path, DEFAULT git config ====="
+R2="$SHORT/rec2"
+rm -rf "$R2" 2>/dev/null; mkdir -p "$SHORT"
+step "R2.1 git clone (default config), destination length ${#R2}" "git clone '$REPO' '$R2'"
+git clone "$REPO" "$R2" > "$SCR/rec2.txt" 2>&1; R2E=$?
+echo "[exit_code=$R2E]"
+echo "filename_too_long_errors=$(grep -c 'Filename too long' "$SCR/rec2.txt")"
+tail -2 "$SCR/rec2.txt"
+do_step "R2.2 clone HEAD" "git -C '$R2' rev-parse HEAD"
+do_step "R2.3 materialisation census" "materialised '$R2'"
+do_step "R2.4 arithmetic of the limit" "echo \"260 - 169 (longest tracked path) - 1 separator = 90 characters is the maximum destination path length for a default-config recovery on this host; R1 used ${#R1}, R2 used ${#R2}\""
+
+echo
+echo "===== R3 fresh clone at the SAME long path as R1, WITH core.longpaths=true ====="
+R3="$SCR/rec3"
+rm -rf "$R3" 2>/dev/null
+step "R3.1 git -c core.longpaths=true clone, destination length ${#R3}" "git -c core.longpaths=true clone '$REPO' '$R3'"
+git -c core.longpaths=true clone "$REPO" "$R3" > "$SCR/rec3.txt" 2>&1; R3E=$?
+echo "[exit_code=$R3E]"
+echo "filename_too_long_errors=$(grep -c 'Filename too long' "$SCR/rec3.txt")"
+tail -2 "$SCR/rec3.txt"
+do_step "R3.2 clone HEAD equals source HEAD" "test \"\$(git -C '$R3' rev-parse HEAD)\" = \"\$(git -C '$REPO' rev-parse HEAD)\" && echo MATCH || echo MISMATCH"
+do_step "R3.3 clone HEAD tree equals source HEAD tree" "test \"\$(git -C '$R3' rev-parse HEAD^{tree})\" = \"\$(git -C '$REPO' rev-parse HEAD^{tree})\" && echo MATCH || echo MISMATCH"
+do_step "R3.4 checked-out branch" "git -C '$R3' rev-parse --abbrev-ref HEAD"
+do_step "R3.5 explicit checkout of the release branch by name" "git -C '$R3' -c core.longpaths=true checkout '$BRANCH' 2>&1 | tail -2; git -C '$R3' rev-parse HEAD"
+do_step "R3.6 materialisation census" "materialised '$R3'"
+do_step "R3.7 working tree clean (longpaths-aware status)" "git -C '$R3' -c core.longpaths=true status --porcelain | wc -l"
+do_step "R3.8 was core.longpaths INHERITED into the recovered clone?" "echo local_in_clone=\$(git -C '$R3' config --local core.longpaths || echo UNSET)"
+do_step "R3.9 consequence: plain status in the recovered clone" "git -C '$R3' status --porcelain | wc -l"
+do_step "R3.10 recomputed digest of the retained artifact in the RECOVERED clone" "sha256sum '$R3/$ARTIFACT'"
+step "R3.11 recovered digest vs digest of record" "byte-for-byte comparison"
+if [ "$(sha256sum "$R3/$ARTIFACT" | cut -d' ' -f1)" = "$RECORDED" ]; then echo "MATCH"; echo "[exit_code=0]"; else echo "MISMATCH"; echo "[exit_code=1]"; fi
+
+echo
+echo "===== R4 simulated total loss and second independent recovery ====="
+do_step "R4.1 delete the recovered clone" "rm -rf '$R3'; test -d '$R3' && echo STILL_PRESENT || echo GONE"
+R5D="$SCR/rec4"
+rm -rf "$R5D" 2>/dev/null
+step "R4.2 re-clone into a FRESH directory with the remediated command" "git -c core.longpaths=true clone '$REPO' '$R5D'"
+git -c core.longpaths=true clone "$REPO" "$R5D" > "$SCR/rec4.txt" 2>&1
+echo "[exit_code=$?]"
+tail -2 "$SCR/rec4.txt"
+do_step "R4.3 re-recovered HEAD matches source HEAD" "test \"\$(git -C '$R5D' rev-parse HEAD)\" = \"\$(git -C '$REPO' rev-parse HEAD)\" && echo MATCH || echo MISMATCH"
+do_step "R4.4 materialisation census" "materialised '$R5D'"
+do_step "R4.5 re-recovered artifact digest" "sha256sum '$R5D/$ARTIFACT'"
+step "R4.6 recovery is reproducible" "byte-for-byte comparison"
+if [ "$(sha256sum "$R5D/$ARTIFACT" | cut -d' ' -f1)" = "$RECORDED" ]; then echo "MATCH (two independent recoveries produced identical bytes)"; echo "[exit_code=0]"; else echo "MISMATCH"; echo "[exit_code=1]"; fi
+
+echo
+echo "===== R5 fail-closed demonstration on a TEMP COPY (retained evidence is never altered) ====="
+TAMPER="$SCR/tamper"
+rm -rf "$TAMPER"; mkdir -p "$TAMPER"
+do_step "R5.1 copy the retained artifact to a temp path" "cp '$REPO/$ARTIFACT' '$TAMPER/pilot-plan.json' && sha256sum '$TAMPER/pilot-plan.json'"
+do_step "R5.2 flip one gate field in the COPY: authority_gate.status CLOSED -> OPENED" "python -c \"import pathlib;p=pathlib.Path(r'$TAMPER/pilot-plan.json');b=p.read_bytes();n=b.replace(b'\\\"status\\\": \\\"CLOSED\\\"', b'\\\"status\\\": \\\"OPENED\\\"',1);p.write_bytes(n);print('bytes_before',len(b),'bytes_after',len(n),'content_changed',b!=n)\""
+do_step "R5.3 digest of the tampered copy" "sha256sum '$TAMPER/pilot-plan.json'"
+step "R5.4 verify the tampered copy against the digest of record" "expect REJECT"
+if [ "$(sha256sum "$TAMPER/pilot-plan.json" | cut -d' ' -f1)" = "$RECORDED" ]; then echo "ACCEPTED - THIS WOULD BE A DEFECT"; echo "[exit_code=0]"; else echo "REJECTED: digest mismatch. Digest-bound verification fails closed."; echo "[exit_code=0 (rejection is the expected outcome)]"; fi
+do_step "R5.5 the retained original is byte-unchanged" "sha256sum '$REPO/$ARTIFACT'"
+do_step "R5.6 scope of what R5 proves" "echo 'A digest-bound exhibit list detects an altered exhibit. It does NOT authenticate the exhibit: the digest list is unkeyed, so a party who can rewrite both the exhibit and the list can re-seal. Same structural limit as A3-700 finding F3.'"
+
+echo
+echo "===== R6 cleanup ====="
+do_step "R6.1 remove recovery directories" "rm -rf '$R1' '$R2' '$R5D' '$TAMPER' 2>/dev/null; for d in '$R1' '$R2' '$R5D' '$TAMPER'; do test -d \"\$d\" && echo \"RESIDUE: \$d\" || echo \"removed: \$d\"; done"
+do_step "R6.2 remove the short-path scratch root" "rmdir '$SHORT' 2>/dev/null; test -d '$SHORT' && echo 'still present (non-empty or in use)' || echo removed"
+
+echo
+echo "===== R7 what this exercise did NOT do ====="
+echo "- no production system, deployment target, external storage, or paid service was contacted"
+echo "- no external append-only retention was exercised: G4 / B-GOV-04 are closed, and no such adapter exists"
+echo "- no incident-response path (paging, rotation, on-call, containment drill) was exercised: no such system exists in this repository"
+echo "- recovery was from a LOCAL clone on the SAME host. Off-host durability against host loss is NOT demonstrated and is exactly what B-GOV-04 requires"
+echo "- the recovered artifact was verified against a digest recorded in the same repository; that is self-consistency, not independent attestation"
+echo "utc_end: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+----- END HARNESS SOURCE -----
+
+================================================================
+ADDENDUM 1 -- post-review correction run
+utc: 2026-08-13T05:30:40Z
+reason: the blind operational review reported that the 90-character limit in
+  this exercise was DERIVED by echo, filed under "measured", and off by one.
+  MAX_PATH 260 counts the terminating NUL, so the usable path is 259.
+  259 - 169 - 1 = 89. The review is correct. Measured directly below:
+================================================================
+$ git clone <repo> <dest of length 88>   -> exit=0  'Filename too long' errors=0
+$ git clone <repo> <dest of length 89>   -> exit=0  'Filename too long' errors=0
+$ git clone <repo> <dest of length 90>   -> exit=128  'Filename too long' errors=21
+$ git clone <repo> <dest of length 91>   -> exit=128  'Filename too long' errors=21
+
+CONCLUSION: 89 is the last destination path length at which a default-config
+clone of this repository succeeds on this host. 90 is the first that fails.
+The value published in the first run (90) was the first FAILING length.
+residue check: no residue

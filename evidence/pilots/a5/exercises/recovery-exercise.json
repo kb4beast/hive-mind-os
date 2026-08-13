@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "node": "A5-900",
+  "exercise": "production-recovery-exercise (local rehearsal)",
+  "base_commit": "7a2e19e769cbeb1b3f3a515037c1173af28c9893",
+  "transcript": "evidence/pilots/a5/tests/production-recovery-exercise.txt",
+  "transcript_contains": "every command verbatim with its exit code, plus the harness source",
+  "ran_utc": {"start": "2026-08-13T05:07:34Z", "end": "2026-08-13T05:08:02Z"},
+  "environment": {
+    "host": "MINGW64_NT-10.0-26200 3.6.6-1cdd4371.x86_64 (Windows 11, MAX_PATH 260)",
+    "git": "git version 2.53.0.windows.3",
+    "network": "none used",
+    "credential": "none read, referenced, or required",
+    "production_systems_touched": "none"
+  },
+  "baseline": {
+    "source_head": "7a2e19e769cbeb1b3f3a515037c1173af28c9893",
+    "source_head_tree": "fdadc72266c0c67615f07472c966d0af7d296696",
+    "source_branch": "release/hive-mind-os-singleton-20260812-r5",
+    "artifact_under_test": "evidence/pilots/a4/pilot-plan.json",
+    "digest_of_record": "324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc",
+    "digest_of_record_source": "evidence/pilots/a4/summary.json -> file_digests['evidence/pilots/a4/pilot-plan.json']",
+    "on_disk_digest_matches_record": true,
+    "longest_tracked_path_length": 169,
+    "core_longpaths": {"local": "true", "global": "UNSET", "system": "UNSET"}
+  },
+  "steps": [
+    {
+      "id": "R1",
+      "what": "Fresh clone at a normal temp path with DEFAULT git config -- the naive recovery",
+      "command": "git clone C:/Repos/HiveMind/hive-mind-os <temp>/rec1   (destination path length 127)",
+      "exit_code": 128,
+      "outcome": "FAILED. 21 'Filename too long' errors in this run, then 'fatal: unable to checkout working tree' / 'warning: Clone succeeded, but checkout failed.' The error count varies between runs because checkout aborts at different points; the failure does not.",
+      "measured": "objects DID transfer (git rev-parse HEAD in the failed clone returns 7a2e19e7...), but git status reports 940 first-column 'D' entries -- every tracked path staged as deleted. The recovered repository is not usable as-is.",
+      "finding": "A5-F1"
+    },
+    {
+      "id": "R2",
+      "what": "Fresh clone at a SHORT path with DEFAULT git config",
+      "command": "git clone C:/Repos/HiveMind/hive-mind-os C:/Repos/trash/a5rt/rec2   (destination path length 24)",
+      "exit_code": 0,
+      "outcome": "SUCCEEDED. 0 errors; tracked=940 missing_on_disk=0.",
+      "derived_then_corrected_then_measured": "The first run of this exercise DERIVED '90 characters' by arithmetic (260 - 169 - 1) and filed it under a key named 'measured'. That was wrong twice over: it was never measured, and 90 is the first FAILING length, not the last working one. MAX_PATH 260 counts the terminating NUL, so the usable path is 259 and 259 - 169 - 1 = 89. The blind operational review caught it; the correction was then measured directly.",
+      "measured_limit": "89 characters is the maximum destination path length for a default-config recovery of this repository on this host.",
+      "measurement": "production-recovery-exercise.txt ADDENDUM 1: clone at destination length 88 -> exit 0, 0 errors; 89 -> exit 0, 0 errors; 90 -> exit 128, 21 'Filename too long'; 91 -> exit 128, 21 errors."
+    },
+    {
+      "id": "R3",
+      "what": "Fresh clone at the SAME long path as R1, with core.longpaths supplied on the command line",
+      "command": "git -c core.longpaths=true clone C:/Repos/HiveMind/hive-mind-os <temp>/rec3",
+      "exit_code": 0,
+      "outcome": "SUCCEEDED. 0 errors.",
+      "measured": [
+        "HEAD equals the source HEAD: MATCH",
+        "HEAD tree equals the source HEAD tree: MATCH (fdadc72266c0c67615f07472c966d0af7d296696)",
+        "checked-out branch: release/hive-mind-os-singleton-20260812-r5",
+        "explicit checkout of the release branch by name: 'Already on ...', HEAD 7a2e19e7...",
+        "materialisation census: tracked=940 missing_on_disk=0",
+        "working tree clean: 0 porcelain lines",
+        "core.longpaths INSIDE the recovered clone: UNSET -- it is NOT inherited",
+        "recomputed digest of evidence/pilots/a4/pilot-plan.json in the recovered clone: 324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc = MATCH against the digest of record"
+      ],
+      "finding": "A5-F1 (the remediation is knowledge the repository does not carry)"
+    },
+    {
+      "id": "R4",
+      "what": "Simulated total loss and a second, independent recovery",
+      "commands": [
+        "rm -rf <temp>/rec3  ->  GONE",
+        "git -c core.longpaths=true clone C:/Repos/HiveMind/hive-mind-os <temp>/rec4  ->  exit 0"
+      ],
+      "outcome": "SUCCEEDED",
+      "measured": [
+        "re-recovered HEAD equals source HEAD: MATCH",
+        "materialisation census: tracked=940 missing_on_disk=0",
+        "re-recovered artifact digest: 324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc = MATCH",
+        "two independent recoveries produced byte-identical artifact content"
+      ]
+    },
+    {
+      "id": "R5",
+      "what": "Fail-closed demonstration -- a deliberately altered TEMP COPY, never the retained evidence",
+      "commands": [
+        "cp evidence/pilots/a4/pilot-plan.json <temp>/tamper/pilot-plan.json  ->  digest 3241514684...  (equal to the original)",
+        "flip authority_gate.status from CLOSED to OPENED in the COPY  ->  bytes_before 13985 bytes_after 13985 content_changed True",
+        "sha256sum the tampered copy  ->  484ae2d7dadf21ac92655f04d45a6c7969d2176b3eba2e2824512c8686f77f3e"
+      ],
+      "outcome": "REJECTED. The tampered copy's digest does not equal the digest of record, so digest-bound verification fails closed.",
+      "retained_evidence_untouched": "evidence/pilots/a4/pilot-plan.json re-hashed after the demonstration: 324151468418014ed70c22162d2689d3ab7d9ac1770e80fc7ca4b228fc9a9fbc -- byte-unchanged.",
+      "scope_of_what_this_proves": "A digest-bound exhibit list DETECTS an altered exhibit. It does not AUTHENTICATE it: the list is unkeyed, so a party who can rewrite both the exhibit and the list can re-seal both. This is the same structural limit A3-700 measured as finding F3 in verify_bundle, and the same limit that makes every row of the gate matrix authenticated=false."
+    },
+    {
+      "id": "R6",
+      "what": "Cleanup",
+      "outcome": "All four recovery directories and the tamper directory removed; the short-path scratch root removed. No residue reported."
+    }
+  ],
+  "findings": [
+    {
+      "id": "A5-F1",
+      "severity": "operational -- disaster recovery",
+      "title": "A default-config fresh clone of this repository cannot be recovered at an ordinary path on this host, and the remediation is recorded nowhere in the repository",
+      "measurement": "R1: git clone at a 127-character destination exits 128 with 'unable to checkout working tree'; the resulting repository reports all 940 tracked paths as staged deletions. R2: the same command at a 24-character destination exits 0 with all 940 files present. R3: the same 127-character destination succeeds when core.longpaths=true is supplied on the command line.",
+      "root_cause": "The longest tracked path is 169 characters. Windows MAX_PATH is 260 including the terminating NUL, so the usable path is 259 and the maximum destination is 89 characters (measured, see step R2). core.longpaths=true is set in this working copy's LOCAL git config only (global and system are UNSET), and R3.8 measures that a fresh clone does NOT inherit it -- core.longpaths is UNSET inside the recovered clone.",
+      "consequence": "The one setting that makes this repository recoverable lives in .git/config, which is the exact artifact a disaster destroys. An operator recovering from history alone has no way to learn it from the repository, and the naive command fails in a way that still leaves a directory that looks like a clone.",
+      "relation_to_prior_evidence": "Extends A3-700 finding F1 (sealed verification fails under a long Windows path) and shares a root cause with A4-800 open defect D1 (mission_store.py:81-92 writes receipts through a longer temporary filename with no long-path handling).",
+      "locally_satisfiable": true,
+      "what_would_fix_it": "Any of: shorten the longest tracked path enough that ordinary destinations fit (the current 169 leaves only 89 characters); document `git -c core.longpaths=true clone` in the repository where a recovering operator will find it; or ship a bootstrap that sets core.longpaths in a fresh clone. None is in this node's write scope."
+    },
+    {
+      "id": "A5-F2",
+      "severity": "informational -- unexplained, observed once",
+      "title": "A first, non-retained run of this exercise reported a transient inconsistent working tree",
+      "measurement": "In a first run at 2026-08-13T05:04:45Z, a successful core.longpaths clone made into a directory that had just been rm -rf'd (the failed R1 clone) reported 16 porcelain status lines immediately afterwards, and a subsequent checkout printed 'D' lines for long paths. The retained run avoided reusing any destination directory and reported 0 porcelain lines; two clean re-probes also reported 0.",
+      "status": "NOT REPRODUCED and NOT EXPLAINED. The most likely cause is Windows deletion latency on the just-removed directory tree, but that is a hypothesis, not a measurement.",
+      "why_recorded": "It was observed. Dropping an observation because it did not reproduce is how a readiness record becomes decoration."
+    }
+  ],
+  "what_this_exercise_did_not_do": [
+    "No production system, deployment target, external storage, or paid service was contacted.",
+    "No external append-only retention was exercised. G4 and B-GOV-04 are closed and no such adapter exists; the production retention claim belongs to those gate rows, not to this exercise.",
+    "No incident-response path was exercised -- no paging, rotation, on-call, or containment drill. No such system exists in this repository, and B-OPS-04 owns the production claim.",
+    "Recovery was from a LOCAL clone on the SAME host. Durability against loss of this host is not demonstrated; that is precisely B-GOV-04's exit condition.",
+    "The recovered artifact was verified against a digest recorded in the same repository. That is self-consistency, not independent attestation (see R5 scope)."
+  ],
+  "criterion_3_mapping": {
+    "rollback": "PROVEN LOCALLY for this node's own output: the node is additive, uncommitted, and removable by deleting evidence/pilots/a5 and docs/execution/A5_GOVERNED_FULL_READINESS.md. PROVEN REMOTELY by A4-800 and orchestrator-verified there. Production rollback: gate-blocked, B-OPS-04 / G5.",
+    "recovery": "PROVEN LOCALLY twice, with a measured precondition (A5-F1). Off-host recovery: gate-blocked, B-GOV-04 / G4.",
+    "evidence_retention": "PROVEN LOCALLY as tamper-EVIDENCE (R5), explicitly not as authenticity. Durable external retention: gate-blocked, B-GOV-04 / G4.",
+    "stop": "See evidence/pilots/a5/exercises/stop-mechanism.json.",
+    "incident_response": "NOT EXERCISED. No incident-response mechanism exists in this repository to exercise. Mapped to B-OPS-04."
+  }
+}

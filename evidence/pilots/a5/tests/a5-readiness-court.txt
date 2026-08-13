@@ -1,0 +1,19 @@
+# transcript: a5-readiness-court
+# node: A5-900
+# cwd: C:\Repos\HiveMind\hive-mind-os
+# base_commit: 7a2e19e769cbeb1b3f3a515037c1173af28c9893
+# command: PYTHONPATH=src python -m unittest tests.test_hive_cortex_court -v
+# python: Python 3.14.4
+# started_utc: 2026-08-13T05:00:39Z
+----- BEGIN OUTPUT -----
+test_court_identity_separation_tests (tests.test_hive_cortex_court.HiveCortexCourtTests.test_court_identity_separation_tests) ... ok
+test_dissent_retention_tests (tests.test_hive_cortex_court.HiveCortexCourtTests.test_dissent_retention_tests) ... ok
+test_friendly_reviewer_attack_tests (tests.test_hive_cortex_court.HiveCortexCourtTests.test_friendly_reviewer_attack_tests) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.002s
+
+OK
+----- END OUTPUT -----
+# exit_code: 0
+# finished_utc: 2026-08-13T05:00:40Z

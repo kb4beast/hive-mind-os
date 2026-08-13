@@ -1,0 +1,288 @@
+{
+  "a4_terminal_state_recorded": {
+    "limits_recorded_just_as_accurately": [
+      "The grant commits db34487 and c78adf4 are NOT cryptographically signed (%G? = N). That is the weakest link in the authority chain and it is measured in gates/gate-matrix.json authority_chain_strength.",
+      "The driver's own idempotency and rollback verdicts were vacuous on the real host (None == None) because the gateway has no ref-read method (D6). The real proof is the orchestrator's independent checks.",
+      "No socket guard was installed on the real run, so 'no unexpected outbound connection' is NOT proven for it. The REST call list is the driver's own record of the calls it issued, not an egress trace.",
+      "The 2026-08-12 amendment states in terms that it does not close B-OPS-03 and does not alter G3-G8."
+    ],
+    "orchestrator_verified_afterwards": "git ls-remote --heads returns ONLY refs/heads/main at 288610d48a10d8162fc45727c5a2ba81c55d5d05, the pre-pilot SHA; get_pull_request(1) reports state=closed, merged=False, merged_at=None.",
+    "path_taken": "B -- the pilot EXECUTED. A4-800 did not stop at the gate.",
+    "sequence": "Path A recorded a genuine gate-stop at 2026-08-12T14:46:27-05:00 with the gate closed and nothing remote done. The owner then opened the gate by committing an amendment, and Path B executed from 2026-08-13T03:53:19Z to 03:53:32Z. Both terminal states are true and both are retained; owner-grant/gate-stop.json is byte-unchanged.",
+    "the_pattern_that_matters_more_than_the_list": "Six production defects were found by actually exercising the delivery path end to end, and every one of them was invisible until something genuinely tried to use it: two of six mandated operations had no implementation, the only production push implementation did not exist, the sandbox rejected every HTTPS remote, an overridden signature silently disabled branch quarantine in healing, and there was no lawful way back from a resolved escalation. Local tests were green throughout. The same pattern then repeated inside this node: nine focused tests green, and the effect boundary does not consult the authority registry (A5-F10). This is the most important finding about production readiness in the whole plan.",
+    "what_executed": "Against patencyhealth-lab/hive-mind-a4-pilot: branch created and pushed, one draft PR (#1), one comment, an idempotency replay with no duplicate effect, then the PR closed unmerged and the branch deleted."
+  },
+  "acceptance_self_check": {
+    "criterion_1_independent_security_and_operational_reviews_pass": {
+      "receipt": "readiness-court.json reviews[]",
+      "round_1_outcome": "BOTH RETURNED FAIL. Between them they found nine defects including A5-F10, the strongest finding in the node, which the author missed.",
+      "round_2_outcome": "BOTH RETURNED PASS-with-findings after every correction was re-derived by this node and then re-measured a third time by the reviewers themselves. Neither withdrew a substantive objection. Standing findings attached: A5-F15 (the candidate was never frozen while under review) and A5-F16 (a second forward reference written as a completed fact). A round-2 PASS from an agent reviewer does not satisfy this criterion and is not offered as if it did.",
+      "status": "NOT SATISFIABLE BY ANY AGENT",
+      "what_was_actually_done": "Two reviewers were spawned as separate agent processes with sealed adversarial check lists, the candidate paths and the hard constraints, and none of the author's conclusions. Each re-ran the focused suites and re-executed the load-bearing measurements itself.",
+      "why_not_satisfiable": "HUMAN_AUTHORITY_GATES.md:21-23 -- separately prompted agent identities are procedural separation, not authenticated independent human review. G8 is closed with no owner decision recorded. B-GOV-02 is open, so no participant identity is externally authenticated."
+    },
+    "criterion_2_owner_legal_production_gates_explicit_and_authenticated": {
+      "authenticated": "NO -- zero of 22 rows. Measured: git log --format='%G?' over docs/architecture/HUMAN_AUTHORITY_GATES.md returns 4 x N (no signature) and 1 x E (a signature that cannot be verified on this host). Both 2026-08-12 grant commits db34487 and c78adf4 are unsigned.",
+      "explicit": "YES -- 22 rows in gates/gate-matrix.json, exhaustive over G1-G8, every open blocker, and the five contract escalation conditions, each cited to HUMAN_AUTHORITY_GATES.md or BLOCKERS.md by line. Both reviewers independently verified the citations; the security reviewer re-derived all three axes and confirmed exhaustiveness and the 22/2/20/0 tally.",
+      "receipt": "gates/gate-matrix.json authority_chain_strength",
+      "status": "HALF MET"
+    },
+    "criterion_3_rollback_incident_response_retention_stop_proven": {
+      "bounded_by_measurement": "A5-F1 -- default-config recovery fails at any destination longer than 89 characters and the remedy is recorded nowhere in the repository. A5-F8 -- a crash inside the receipt-write window destroys the exercise ledger entirely. A5-F9 -- the demonstrated stop is a startup flag, not a signal to an unwilling process.",
+      "gate_blocked_and_mapped": "Off-host retention -> G4 / B-GOV-04. Production rollback -> G5 / B-OPS-04. Incident response -> B-OPS-04, and no incident-response mechanism exists in this repository to exercise.",
+      "proven_locally": "Fresh-clone recovery (twice, reproducible, byte-identical artifacts), digest-bound tamper rejection on a temp copy, stop-and-resume with exactly one receipt per step and pre-stop receipts byte-unchanged, and this node's own rollback.",
+      "receipt": "exercises/recovery-exercise.json, exercises/stop-mechanism.json, gates/gate-matrix.json",
+      "status": "PARTIAL, HONESTLY BOUNDED"
+    },
+    "criterion_4_no_autonomous_expansion_of_authority_possible": {
+      "findings": [
+        "A5-F3",
+        "A5-F4",
+        "A5-F5",
+        "A5-F6",
+        "A5-F10",
+        "A5-F11",
+        "A5-F12",
+        "A5-F13",
+        "A5-F14"
+      ],
+      "receipt": "audits/authority-boundary.json, tests/authority-boundary-probe.txt, tests/authority-boundary-probe-2.txt",
+      "status": "NOT MET AS WORDED",
+      "strongest_measurement": "authority-boundary-probe-2.txt P3.1-P3.2. A CapabilityToken constructed by hand -- no AuthorityRegistry involved -- naming target 'secrets/keys.txt', which the registered envelope had just refused with 'target is outside write scope', was accepted by validate_capability_token; EffectGateway.execute then ran the adapter with status=SUCCEEDED.",
+      "what_is_true_instead": "Authority expansion is prevented today by controls external to the code: a credential scope the agent can neither read nor widen, host-side branch protection (B-GOV-01, resolved), and the fact that provisioning is a human act. Those held throughout A4-800 and are not the audited code boundary the criterion asks for. B-OPS-06 is open, so there is no containment tier underneath them, and A5-F14 records that the kernel's own network allowlist is inert."
+    },
+    "criterion_5_evidence_boilerplate": {
+      "absent": "final_commit / final_tree (see final_commit_note) and the PR description for this node's own branch: no such PR was opened, because this worker holds no push or PR authority for this repository. See runbook_contradictions C1 and C2.",
+      "present": [
+        "base_commit and base_tree",
+        "changed-path inventory, verified a subset of the write scope",
+        "per-file sha256 over raw bytes",
+        "command receipts with exit codes and retained transcripts",
+        "role identities",
+        "dissent records, verbatim",
+        "rollback reference"
+      ],
+      "status": "PARTIAL"
+    }
+  },
+  "base_branch": "release/hive-mind-os-singleton-20260812-r5",
+  "base_commit": "7a2e19e769cbeb1b3f3a515037c1173af28c9893",
+  "base_tree": "fdadc72266c0c67615f07472c966d0af7d296696",
+  "carried_forward_unfixed": {
+    "A3_F3": "src/hive_mind_os/verify.py:266-379 -- verify_bundle never reads document['verdict']. Verified here: 'verdict' occurs in verify.py at lines 58, 179, 185, 194 and 250, none inside 266-379 (the next def is at 381). Retained bundles are tamper-evident, not authenticated.",
+    "A4_D1": "src/hive_mind_os/mission_store.py:81-92 -- _atomic_write writes through a temporary filename LONGER than the final name with no Windows long-path handling; the adapter fires at brain_kernel/effect_outbox.py:116 and the receipt is not persisted until :151-158; :150-168 marks reconciliation_required and :91-93 makes it terminal. Verified unfixed at HEAD by both this node and the blind operational reviewer. NOTE: the task brief cited mission_store.py:80-91; the measured range is 81-92, which is what A4-800's own summary recorded.",
+    "A4_D2": "src/hive_mind_os/cortex/github/rest_gateway.py:152-165 -- find_open_draft_pr interpolates branch and base into the query string at :156-158 with no percent-encoding. A4 recorded :152-165 / :157-158; measured here as :156-158.",
+    "A4_D3": "src/hive_mind_os/cortex/github/rest_gateway.py:188-196 -- list_comments requests per_page=100 and never follows Link. A4 recorded :189-197; measured here as :188-196.",
+    "A4_D4": "src/hive_mind_os/cortex/github/grants.py:94-101 -- DeliveryGrant has issued_at and no expiry.",
+    "A4_D5": "src/hive_mind_os/brain_kernel/contracts.py:527-535 -- EffectIntent.intent_digest is format-checked, never recomputed to seal its fields.",
+    "A4_D6": "no ref-read method on ControlledRestGateway, which is why A4's own idempotency and rollback verdicts compared None == None.",
+    "A4_D7": "no remote receipt cites the sealed plan digest; pilot-plan.json still reads pilot_repository UNGRANTED because re-sealing after the fact would not be a seal."
+  },
+  "changed_paths_within_write_scope": true,
+  "court_digest": "sha256:26257ec5d9c94731a72f6ab51fc0ff73c9bac2b5ce678331b899b1d2ded3ad01",
+  "file_digests": {
+    "docs/execution/A5_GOVERNED_FULL_READINESS.md": "sha256:f1782244f7f200c2af503dee80dec72be28b6864d89706bb436bb559ca03a96f",
+    "evidence/pilots/a5/audits/authority-boundary.json": "sha256:75d8b7c15515a0da26fc739775584b942e6bf01e71c3387df036407a76b912cc",
+    "evidence/pilots/a5/exercises/recovery-exercise.json": "sha256:e8d20f03c2822ca00a7d72e08d1b5ca63ead7485d19d5db6b052e100e0decdc4",
+    "evidence/pilots/a5/exercises/stop-mechanism.json": "sha256:db1708d40780c6a3743a7081368bba812b7f7deda4cc6054f03a308da1e0db08",
+    "evidence/pilots/a5/gates/gate-matrix.json": "sha256:23371e045c2abd33d3219abf94025a077a29a2a88ea6e93221f7405b536726db",
+    "evidence/pilots/a5/readiness-court.json": "sha256:5158466483ee9bc0755d9812ec22acbc8bd67cb30414d1a9c30fd7cde06c8cde",
+    "evidence/pilots/a5/tests/a5-readiness-court.txt": "sha256:47486b39c8e9314b2ba9679625dcf86018c44d2028919c46474371aba623ba21",
+    "evidence/pilots/a5/tests/authority-boundary-audit.txt": "sha256:272b28730fd0f9ff0dde10af94f81e7e531f2950b4e65613f9e5e58ce4ee1f5a",
+    "evidence/pilots/a5/tests/authority-boundary-probe-2.txt": "sha256:71ccb57dd1e4f7cead19c4c1538bb70137c573d26252fa262b63d2ca5b98f9b2",
+    "evidence/pilots/a5/tests/authority-boundary-probe.txt": "sha256:544b15d32bff76171befef6aff5021c06c8c5ed33cac8a46a65f0672392606c0",
+    "evidence/pilots/a5/tests/credential-scan.txt": "sha256:ebff72527a9891b35d84194870771c9c61bc854f33baba8238a90b2af5c10f7c",
+    "evidence/pilots/a5/tests/production-recovery-exercise.txt": "sha256:fb6959cb1ee24e27e5a4e8dc94c5c901486b5da43bf2a4e4997efc51148cd3b4",
+    "evidence/pilots/a5/tests/stop-mechanism.txt": "sha256:2bfce2ac79d9d11464a5482e77a06b5ee0d09a6e668a280bc82f591a8df7a4d2"
+  },
+  "file_digests_note": "SHA-256 over each file's raw bytes exactly as they sit on disk; sha256sum and Get-FileHash -Algorithm SHA256 both reproduce these. summary.json is absent from its own list because a file cannot contain its own digest -- the same constraint as final_commit. Nothing digests summary.json, which is why the A5 document's digest is recorded here: the court record cannot hold it without a non-terminating self-reference. See readiness-court.json exhibits_note.",
+  "final_commit": null,
+  "final_commit_note": "Null and necessarily so: a tracked file cannot contain the digest of the commit that introduces it. Separately, this worker performed no state-changing git command at all -- no add, commit, branch, checkout, stash, reset, tag, or push in C:\\Repos\\HiveMind\\hive-mind-os. All node output is uncommitted working-tree content and every git write is the integrator's.",
+  "findings_introduced_by_this_node": {
+    "A5-F1": "operational -- default-config recovery of this repository fails at any destination longer than 89 characters, and the remedy (core.longpaths=true, set only in this working copy's local .git/config and not inherited by a clone) is recorded nowhere in the repository. Locally satisfiable.",
+    "A5-F10": "security, HIGHEST IMPACT -- the effect boundary never consults the AuthorityRegistry. Found by the blind security reviewer, re-derived here.",
+    "A5-F11": "security -- authorize() target-scopes only the 'write' action; path_read_scope is enforced nowhere.",
+    "A5-F12": "security, latent -- is_no_broader_than omits denied_actions, secret_scopes, human_gates and five Budget fields including max_cost_microunits.",
+    "A5-F13": "security -- intersect_envelopes trusts a caller-supplied parent object the registry has never seen.",
+    "A5-F14": "security, informational -- the kernel's declared network_allowlist is enforced nowhere.",
+    "A5-F15": "process -- the candidate was never frozen while under review; three cited artifacts came into existence during the reviews that cited them. UNRESOLVED: sealing is the integrator's act, not this worker's.",
+    "A5-F16": "documentation -- a second forward reference written as a completed fact (the credential-scan addendum). RESOLVED by producing it.",
+    "A5-F2": "informational -- a transient inconsistent working tree observed once in a non-retained first run, NOT reproduced and NOT explained. Retained because it was observed.",
+    "A5-F3": "security -- ConstraintEnvelope.digest_value is format-checked, never recomputed from contents; AuthorityRegistry keys on it, so a later register() silently overwrites a narrower envelope. Both production sites use the all-zero placeholder.",
+    "A5-F4": "security -- a fresh root envelope with any authority registers unconditionally.",
+    "A5-F5": "security -- revocation is keyed by the digest string.",
+    "A5-F6": "security -- DeliveryGrant is self-issuable under an unkeyed seal; no production caller of DeliveryGrant.issue exists in src/**.",
+    "A5-F7": "evidence-citation -- A5-900.md:136-137 says to compare against 'the digest recorded in the A4 doc', but A4_DELIVERY_PILOT.md:6-7 records the sealed plan_digest next to the file path, not the file's raw-byte sha256. Taken literally the instruction produces a mismatch that is not tampering. Both digests verify; the seal was tested and reproduces.",
+    "A5-F8": "operational -- a crash inside the receipt-append window destroys the entire exercise ledger; the exercise as first written never tested that placement. Found by the blind operational reviewer, re-measured here.",
+    "A5-F9": "disclosure -- the demonstrated stop is a startup flag, not a signal to an unwilling process."
+  },
+  "hard_constraints_observed": {
+    "credentials": "NONE read, printed, or referenced. The host environment was not inspected for a token: an existing credential is not a grant, and checking would itself be an access the closed gate does not authorize. The credential scanner reads no environment variable.",
+    "forbidden_scopes": "Untouched. Verified by working-tree change set AND by an mtime cross-check that covers gitignored paths under .autopilot, which git status alone would not have shown.",
+    "network": "NONE. This node made no network call of any kind. No gh, no curl, no remote git operation.",
+    "pythonpath": "PYTHONPATH=src on every python command.",
+    "repo_wide_test_discovery": "NEVER run. Only the two focused suites named in the runbook's section 5 mapping.",
+    "sibling_evidence": "evidence/pilots/a3/** and evidence/pilots/a4/** were read only. git diff and git status over both trees are empty; both reviewers independently confirmed.",
+    "state_changing_git": "NONE. No add, commit, branch, checkout, tag, stash, reset or push. HEAD is unchanged at the base commit and git diff --name-only HEAD is empty.",
+    "windows_max_path": "Observed. The recovery exercise measured the limit rather than tripping over it, and every temporary directory was removed with a residue check."
+  },
+  "maturity_verdict_verbatim": "A5-900 maturity verdict: not-ready. Governed-full autonomy is NOT qualified. The procedure and evidence for governed-full autonomy were exercised to the limit that local exercise allows, and that exercise found an authority boundary that does not hold, a recovery path that fails at an ordinary destination, and an evidence-durability window that loses everything. Twenty of twenty-two gate rows are closed by the repository owner's own recorded decisions, and none of the twenty-two is authenticated. Autonomy is not switched on, nothing in this record switches it on, and nothing in this record asks for it to be switched on.",
+  "node": "A5-900",
+  "not_claimed": [
+    "No production readiness. BLOCKERS.md:61 -- B-OPS-04 is open and records release_ready=false.",
+    "No release readiness. G3 -- no stable or production-positioned release until an externally controlled signing identity exists.",
+    "No superiority and no comparative claim of any kind. BLOCKERS.md:62 -- B-OPS-05 is open.",
+    "No independent human review. G8, and HUMAN_AUTHORITY_GATES.md:21-23.",
+    "No verified end-to-end delivery. B-OPS-03 is open and the amendment authorizing the A4 pilot says in terms that it does not close it.",
+    "No claim that governed-full autonomy is enabled, approvable, or imminent. This node records what would be required. It does not request it."
+  ],
+  "required_tests": [
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_hive_cortex_court -v",
+      "evidence": "evidence/pilots/a5/tests/a5-readiness-court.txt",
+      "exit_code": 0,
+      "independently_reproduced_by": "the blind operational reviewer, same result",
+      "name": "a5-readiness-court",
+      "note": "tests.test_hive_cortex_court.test_friendly_reviewer_attack_tests refuses a court whose advocate and cross-examiner share a task. The two reviews convened here were given different roles and different adversarial check lists, which is the property that regression protects.",
+      "outcome": "OK (Ran 3 tests in 0.002s)",
+      "plus": "evidence/pilots/a5/readiness-court.json -- digest-bound exhibits, two role-separated reviews, verdict and court_digest"
+    },
+    {
+      "command": "commands recorded verbatim in evidence/pilots/a5/tests/production-recovery-exercise.txt and evidence/pilots/a5/tests/stop-mechanism.txt (harness and driver sources appended)",
+      "evidence": [
+        "evidence/pilots/a5/exercises/recovery-exercise.json",
+        "evidence/pilots/a5/exercises/stop-mechanism.json",
+        "evidence/pilots/a5/tests/production-recovery-exercise.txt",
+        "evidence/pilots/a5/tests/stop-mechanism.txt"
+      ],
+      "exit_codes": {
+        "clone at a 24-character destination, default config": 0,
+        "clone at the 127-character destination with core.longpaths=true": 0,
+        "naive clone at a 127-character destination, default config": 128,
+        "path-limit sweep (ADDENDUM 1)": "88 -> 0, 89 -> 0, 90 -> 128, 91 -> 128",
+        "re-clone after simulated total loss": 0,
+        "stop exercise r1 (stop trigger after step 2)": 0,
+        "stop exercise r2 (deliberate hard kill before receipt)": 9,
+        "stop exercise r3 (resume)": 0,
+        "stop exercise r4 (resume again)": 0,
+        "torn-append resume (ADDENDUM 1)": 1
+      },
+      "independently_reproduced_by": "the blind operational reviewer, byte-identical including both ledger digests; it also measured 37 'Filename too long' errors where this node measured 21, which vindicates the disclosed run-to-run variance",
+      "name": "production-recovery-exercise",
+      "outcome": "Recovery proven twice and reproducible, with a measured precondition (A5-F1, limit 89 characters). Tamper rejection proven on a temp copy; retained evidence byte-unchanged. Stop and resume proven with exactly one receipt per step and no lost step -- bounded by A5-F8 to interruptions outside the receipt-write window, and by A5-F9 to a self-triggered stop."
+    },
+    {
+      "audit_verdict": "NOT MET AS WORDED -- see acceptance_self_check.criterion_4",
+      "command": "PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority tests.test_governance -v",
+      "evidence": "evidence/pilots/a5/tests/authority-boundary-audit.txt",
+      "exit_code": 0,
+      "independently_reproduced_by": "both blind reviewers, same 9 tests OK",
+      "name": "authority-boundary-audit",
+      "outcome": "OK (Ran 9 tests in 0.044s)",
+      "plus": [
+        "evidence/pilots/a5/audits/authority-boundary.json",
+        "evidence/pilots/a5/tests/authority-boundary-probe.txt (exit 0)",
+        "evidence/pilots/a5/tests/authority-boundary-probe-2.txt (exit 0)",
+        "evidence/pilots/a5/tests/credential-scan.txt (exit 0, 0 credential-shaped hits)"
+      ]
+    }
+  ],
+  "review_outcome": {
+    "A5-F15": "process -- the candidate was never frozen while under review. Across two rounds, three cited artifacts came into existence during the review that cited them. The security reviewer's position, adopted here: no verdict on this node, including its own, should be treated as binding until it is re-verified against sealed, unchanging bytes. This worker performs no git and cannot seal anything, so that re-verification is work for the integrator.",
+    "A5-F16": "documentation -- credential-scan.txt forward-referenced an ADDENDUM 1 that did not exist, leaving readiness-court.json and summary.json unscanned while the coverage was described as complete. Resolved: the addendum was produced and re-runs the scanner over the full write scope. Both reviewers had already scanned the two missing files themselves and found nothing.",
+    "round_1": "BOTH REVIEWERS RETURNED FAIL. Between them: the missing effect-boundary audit (A5-F10), four further authority defects (A5-F11 to A5-F14), an off-by-one in a published recovery limit, an untested torn-write case (A5-F8), a missing stop disclosure (A5-F9), an inoperative rollback command, and three citations to artifacts that did not exist.",
+    "round_2": "BOTH RETURNED PASS-with-findings after every correction was re-derived by this node and then independently re-measured by the reviewers a third time. Neither withdrew a substantive objection. Two standing findings are attached: A5-F15 and A5-F16.",
+    "scope_limit_the_security_reviewer_asked_to_have_recorded": "It did NOT review readiness-court.json; that file appeared after its round-2 brief. It confirmed only that the court record transcribes its round-1 checks and attributes its dissent correctly. Its PASS does not extend to that document's contents.",
+    "the_authors_own_finding_about_the_author": "Three times in one node the author wrote a completed fact about work that was not yet done: the credential-scan citation, the created-paths census, and the addendum forward reference. That is a habit, not an accident. It is recorded in readiness-court.json dissent[] and it is the thing about this node's authorship a reader should weigh most heavily."
+  },
+  "role_identity": "claude:a5-900-worker",
+  "role_identity_note": "docs/execution/runbooks/A5-900.md:112-113 specifies codex:a5-900-worker/orchestrator, codex:a5-900-curator and codex:a5-900-steward. This node was executed by Anthropic Claude models through Claude Code, not by Codex. Recording the runbook's literal strings would be a false provenance claim. Same contradiction A4-800 recorded as its C4.",
+  "rollback_reference": {
+    "after_commit": "git revert of the node commits",
+    "before_the_integrator_commits": "rm -f docs/execution/A5_GOVERNED_FULL_READINESS.md && rm -rf evidence/pilots/a5",
+    "correction": "The first version of this recipe used `git checkout -- docs/execution/A5_GOVERNED_FULL_READINESS.md 2>/dev/null`. The blind security reviewer measured that this does not work: the file is untracked, git checkout errors, 2>/dev/null swallows the error, and the file survives. Half the write scope had an inoperative rollback.",
+    "not_covered": "The five A4 production fixes (b6ec6b7, a6865fb, f578426, 091e554, 5177d4c) are not this node's changes and are not covered by this rollback.",
+    "scope": "This node is additive and changes no runtime code, test, or configuration. Nothing outside the two write-scope paths was modified."
+  },
+  "runbook_contradictions": [
+    {
+      "id": "C1",
+      "location": "docs/execution/runbooks/A5-900.md:44-45",
+      "measurement": "This worker holds no push or pull-request authority for THIS repository. Every state-changing git command is forbidden to it, and the only remote grant on record (HUMAN_AUTHORITY_GATES.md:63-65) is scoped to 'exactly one disposable repository', which is not hive-mind-os. Identical in shape to A4-800's contradiction C1, which is still OPEN.",
+      "resolution_taken": "NOT PERFORMED. Branch, commits, push and draft PR for autopilot/a5-900 are outstanding and require the integrator's authority.",
+      "status": "OPEN",
+      "text": "Stopping condition: 'Open a draft PR with a validated node receipt; do not merge'."
+    },
+    {
+      "id": "C2",
+      "location": "docs/execution/runbooks/A5-900.md:162 and :171",
+      "measurement": "Same as C1. No commit was made and no branch was created. All node output is uncommitted working-tree content.",
+      "resolution_taken": "NOT PERFORMED. The evidence layout and content of each numbered step were produced in order; only the git actions were not.",
+      "status": "OPEN",
+      "text": "'Implementation order (small commits on autopilot/a5-900)' and 'Push autopilot/a5-900; open a DRAFT PR to main.'"
+    },
+    {
+      "id": "C3",
+      "location": "docs/execution/runbooks/A5-900.md:136-137",
+      "measurement": "docs/execution/A4_DELIVERY_PILOT.md contains no raw-byte sha256 for that file. Line 6-7 prints the path followed by 'digest sha256:1b19c027...', which is the sealed plan_digest; the file's raw bytes hash to 3241514684.... Taken literally, the instruction produces a mismatch on an untampered file.",
+      "resolution_taken": "Used evidence/pilots/a4/summary.json file_digests as the digest of record -- it reproduces exactly -- and separately verified that the doc's seal reproduces as canonical_digest(document minus plan_digest). Both verify. Recorded as finding A5-F7.",
+      "status": "RESOLVED BY MEASUREMENT, recorded as a hazard",
+      "text": "'recompute the SHA-256 of evidence/pilots/a4/pilot-plan.json and compare to the digest recorded in the A4 doc'."
+    },
+    {
+      "id": "C4",
+      "location": "docs/execution/runbooks/A5-900.md:112-113",
+      "measurement": "This node was executed by Anthropic Claude models through Claude Code, not by Codex.",
+      "resolution_taken": "Recorded as claude:* identities. Same as A4-800's C4.",
+      "status": "OPEN (recorded, not resolvable by this node)",
+      "text": "roles 'codex:a5-900-worker/orchestrator', reviewers 'codex:a5-900-curator' and 'codex:a5-900-steward'."
+    },
+    {
+      "id": "C5",
+      "location": "docs/execution/runbooks/A5-900.md:154",
+      "measurement": "The document exceeds 200 lines. The overage is the 22-row gate table and the defect table, both of which the runbook separately requires.",
+      "resolution_taken": "Recorded rather than met by deleting rows. A line budget does not outrank an exhaustive gate matrix.",
+      "status": "DEVIATION, declared",
+      "text": "'docs/execution/A5_GOVERNED_FULL_READINESS.md (~120-200 lines)'."
+    },
+    {
+      "id": "C6",
+      "location": "task brief versus measured source",
+      "measurement": "def _atomic_write is at line 81 and the function ends at line 92. The correct range is 81-92, which is what A4-800's own summary recorded.",
+      "resolution_taken": "81-92 used throughout. Independently confirmed by the blind operational reviewer.",
+      "status": "CORRECTED",
+      "text": "The brief cited 'mission_store.py:80-91' for open defect D1."
+    }
+  ],
+  "schema_version": 1,
+  "seal_time_census": {
+    "count": 14,
+    "created_by_this_node": [
+      "docs/execution/A5_GOVERNED_FULL_READINESS.md",
+      "evidence/pilots/a5/audits/authority-boundary.json",
+      "evidence/pilots/a5/exercises/recovery-exercise.json",
+      "evidence/pilots/a5/exercises/stop-mechanism.json",
+      "evidence/pilots/a5/gates/gate-matrix.json",
+      "evidence/pilots/a5/readiness-court.json",
+      "evidence/pilots/a5/summary.json",
+      "evidence/pilots/a5/tests/a5-readiness-court.txt",
+      "evidence/pilots/a5/tests/authority-boundary-audit.txt",
+      "evidence/pilots/a5/tests/authority-boundary-probe-2.txt",
+      "evidence/pilots/a5/tests/authority-boundary-probe.txt",
+      "evidence/pilots/a5/tests/credential-scan.txt",
+      "evidence/pilots/a5/tests/production-recovery-exercise.txt",
+      "evidence/pilots/a5/tests/stop-mechanism.txt"
+    ],
+    "forbidden_intersection": "EMPTY, verified by grep against the forbidden list AND by an mtime cross-check over src, tests, .github, docs/architecture, docs/plan, evidence/courts, evidence/pilots/a3, evidence/pilots/a4, pyproject.toml and .autopilot (which covers gitignored paths git status would not show). Both return nothing.",
+    "not_created_by_this_node": "identtest/ -- untracked, directory mtime 2026-08-12 08:39:47, present in the session-start git status, and independently timestamped by both reviewers.",
+    "note": "A real census, not a boolean. authority-boundary.json promised one here and the operational reviewer checked; the first version of this file carried only the flag above. This is the literal output of `git status --porcelain --untracked-files=all` at the timestamp below, minus identtest/, which predates this node.",
+    "observed_utc": "2026-08-13T06:05:00Z",
+    "tracked_modifications_vs_head": 0
+  },
+  "statement": "Every number and outcome in this record came from a command this node ran or an artifact it read, with a path. Where a number turned out not to have come from a command, a blind reviewer caught it and it is corrected in place with the correction declared. Nothing here grants authority to anything.",
+  "verdict": "not-ready",
+  "write_scope": [
+    "docs/execution/A5_GOVERNED_FULL_READINESS.md",
+    "evidence/pilots/a5/**"
+  ]
+}
