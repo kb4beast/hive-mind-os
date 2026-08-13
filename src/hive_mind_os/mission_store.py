@@ -4,6 +4,10 @@ P06 does not promise exactly-once execution: a process can die after an effect b
 the completion transaction.  It promises exactly-once *effect adoption*.  Canonical tool
 intent digests identify effects, content-addressed checkpoint receipts prove observed
 outcomes, and resume adopts a matching receipt before considering re-execution.
+
+A write-ahead effect record carrying the idempotency key is durable before the effect
+runs, so an interruption between the effect and its receipt resumes into reconciliation
+against that record instead of leaving the outcome unnamed.
 """
 
 from __future__ import annotations
@@ -78,18 +82,52 @@ def _canonical_json(value: Any) -> str:
     )
 
 
+_EXTENDED_PREFIX = "\\\\?\\"
+
+
+def _system_path(path: Path) -> str:
+    """Return an OS path that the Windows MAX_PATH limit does not truncate."""
+
+    text = os.fspath(path)
+    if os.name != "nt" or text.startswith(_EXTENDED_PREFIX):
+        return text
+    absolute = os.path.abspath(text)
+    if absolute.startswith("\\\\"):
+        return f"{_EXTENDED_PREFIX}UNC\\{absolute[2:]}"
+    return f"{_EXTENDED_PREFIX}{absolute}"
+
+
+def _temporary_name(name: str) -> str:
+    """A sibling temporary name that is never longer than the name it replaces."""
+
+    marker = f"~{os.getpid():x}~"
+    if len(marker) >= len(name):
+        return f"{marker}{name}"
+    candidate = f"{marker}{name[len(marker):]}"
+    return candidate if candidate != name else f"{marker}{name}"
+
+
+def _file_exists(path: Path) -> bool:
+    return os.path.isfile(_system_path(path))
+
+
+def _read_bytes(path: Path) -> bytes:
+    with open(_system_path(path), "rb") as stream:
+        return stream.read()
+
+
 def _atomic_write(path: Path, content: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    os.makedirs(_system_path(path.parent), exist_ok=True)
+    temporary = _system_path(path.with_name(_temporary_name(path.name)))
     try:
-        with temporary.open("xb") as stream:
+        with open(temporary, "xb") as stream:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        os.replace(temporary, _system_path(path))
     finally:
-        if temporary.exists():
-            temporary.unlink()
+        if os.path.exists(temporary):
+            os.remove(temporary)
 
 
 def _git_text(repository: Path, *arguments: str) -> str:
@@ -349,7 +387,7 @@ class MissionStore:
                     _canonical_json(budget_payload),
                 ),
             )
-        self.mission_root(mission_id).mkdir(parents=True, exist_ok=True)
+        os.makedirs(_system_path(self.mission_root(mission_id)), exist_ok=True)
 
     def has_mission(self, mission_id: str) -> bool:
         row = self._connection.execute(
@@ -536,7 +574,71 @@ class MissionStore:
         ).fetchall()
         return [self.checkpoint(mission_id, int(row["step_index"])) for row in indices]
 
-    def begin_effect(self, mission_id: str, step_index: int) -> None:
+    def effect_intent_path(self, mission_id: str, intent_digest: str) -> Path:
+        return (
+            self.mission_root(mission_id)
+            / "effect-intents"
+            / f"{intent_digest.removeprefix('sha256:')}.json"
+        )
+
+    def _write_ahead_effect(self, checkpoint: StepCheckpoint) -> dict[str, Any]:
+        path = self.effect_intent_path(
+            checkpoint.mission_id,
+            checkpoint.intent_digest,
+        )
+        record = {
+            "schema_version": 1,
+            "mission_id": checkpoint.mission_id,
+            "step_index": checkpoint.step_index,
+            "intent_digest": checkpoint.intent_digest,
+            "idempotency_key": checkpoint.intent["idempotency_key"],
+            "action_id": checkpoint.intent["action_id"],
+            "action_kind": checkpoint.intent["kind"],
+            "state_ref": checkpoint.intent["state_ref"],
+            "recorded_at": utc_now(),
+        }
+        if _file_exists(path):
+            stored = json.loads(_read_bytes(path).decode("utf-8"))
+            if (
+                stored.get("intent_digest") != record["intent_digest"]
+                or stored.get("idempotency_key") != record["idempotency_key"]
+            ):
+                raise StoreIntegrityError(
+                    "write-ahead effect record binds a different intent"
+                )
+            return stored
+        _atomic_write(path, (_canonical_json(record) + "\n").encode("utf-8"))
+        return record
+
+    def find_effect_intent(
+        self,
+        checkpoint: StepCheckpoint,
+    ) -> dict[str, Any] | None:
+        path = self.effect_intent_path(
+            checkpoint.mission_id,
+            checkpoint.intent_digest,
+        )
+        if not _file_exists(path):
+            return None
+        record = json.loads(_read_bytes(path).decode("utf-8"))
+        if record.get("intent_digest") != checkpoint.intent_digest:
+            raise StoreIntegrityError(
+                "write-ahead effect record belongs to another intent"
+            )
+        return record
+
+    def begin_effect(self, mission_id: str, step_index: int) -> dict[str, Any]:
+        """Persist the write-ahead effect record, then claim the execution."""
+
+        try:
+            checkpoint = self.checkpoint(mission_id, step_index)
+        except KeyError as error:
+            raise StoreIntegrityError(
+                "effect began outside an intent checkpoint"
+            ) from error
+        if checkpoint.state != "intent":
+            raise StoreIntegrityError("effect began outside an intent checkpoint")
+        record = self._write_ahead_effect(checkpoint)
         with self._lock, self._connection:
             row = self._connection.execute(
                 """
@@ -548,7 +650,7 @@ class MissionStore:
             if row is None or row["state"] != "intent":
                 raise StoreIntegrityError("effect began outside an intent checkpoint")
             if int(row["execution_count"]) > 0:
-                return
+                return record
             cursor = self._connection.execute(
                 """
                 UPDATE checkpoints
@@ -560,6 +662,52 @@ class MissionStore:
             )
             if cursor.rowcount != 1:
                 raise StoreIntegrityError("effect began outside an intent checkpoint")
+        return record
+
+    def unreconciled_effects(self, mission_id: str) -> list[dict[str, Any]]:
+        """Write-ahead effects that were claimed but whose outcome is unwitnessed."""
+
+        pending: list[dict[str, Any]] = []
+        for checkpoint in self.checkpoints(mission_id):
+            if checkpoint.state == "completed" or checkpoint.execution_count == 0:
+                continue
+            record = self.find_effect_intent(checkpoint)
+            if record is None:
+                continue
+            if self.find_effect_receipt(checkpoint) is not None:
+                continue
+            pending.append(record)
+        return pending
+
+    def reconcile_effect(
+        self,
+        checkpoint: StepCheckpoint,
+        outcome: Mapping[str, Any],
+        records: Sequence[Mapping[str, Any]],
+        *,
+        budget: AutonomyBudget | None = None,
+    ) -> dict[str, str]:
+        """Adopt an observed outcome against a write-ahead record, never re-executing."""
+
+        record = self.find_effect_intent(checkpoint)
+        if record is None:
+            raise ReconciliationError(
+                "effect has no write-ahead record to reconcile against",
+                {
+                    "mission_id": checkpoint.mission_id,
+                    "step_index": checkpoint.step_index,
+                    "intent_digest": checkpoint.intent_digest,
+                },
+            )
+        if record.get("idempotency_key") != checkpoint.intent["idempotency_key"]:
+            raise StoreIntegrityError(
+                "write-ahead idempotency key does not bind this intent"
+            )
+        if checkpoint.execution_count == 0:
+            raise StoreIntegrityError("effect was never claimed for execution")
+        reference = self.write_effect_receipt(checkpoint, outcome, records)
+        self.complete_step(checkpoint, reference, outcome, budget=budget)
+        return reference
 
     def write_effect_receipt(
         self,
@@ -606,8 +754,8 @@ class MissionStore:
             / "checkpoint-receipts"
             / f"{checkpoint.intent_digest.removeprefix('sha256:')}.json"
         )
-        if path.exists():
-            existing = path.read_bytes()
+        if _file_exists(path):
+            existing = _read_bytes(path)
             existing_wrapper = json.loads(existing)
             if existing_wrapper.get("intent_digest") != checkpoint.intent_digest:
                 raise StoreIntegrityError("checkpoint receipt path was reused")
@@ -628,9 +776,9 @@ class MissionStore:
             / "checkpoint-receipts"
             / f"{checkpoint.intent_digest.removeprefix('sha256:')}.json"
         )
-        if not path.is_file():
+        if not _file_exists(path):
             return None
-        content = path.read_bytes()
+        content = _read_bytes(path)
         wrapper = json.loads(content)
         if wrapper.get("intent_digest") != checkpoint.intent_digest:
             raise StoreIntegrityError("effect receipt belongs to another intent")
@@ -810,7 +958,7 @@ class MissionStore:
             path = self.state_dir / Path(
                 *checkpoint.receipt_reference["path"].split("/")
             )
-            wrapper = json.loads(path.read_text(encoding="utf-8"))
+            wrapper = json.loads(_read_bytes(path).decode("utf-8"))
             wrappers.append(wrapper)
         state = self._state_document(
             mission_id,

@@ -1,0 +1,131 @@
+# transcript: reaudit_probe3_sandbox
+# node: REAUDIT-1900
+# measures: DAG_EXECUTION_HANDOFF.md §11.5 / SANDBOX-1300 residual --
+#   how many tests actually reach the Windows containment guard.
+# what it touches: runs tests.test_sandbox under sys.settrace. Reads
+#   src/hive_mind_os/sandbox.py. Writes NO repository file and edits nothing.
+# base_commit: 4c85ebee7a590d1ea2649457f0fa301bd2d1cda2
+# command: PYTHONPATH=src python <scratch>/reaudit_probe3_sandbox.py
+# python: 3.14.4
+# started_utc: 2026-08-13T16:23:47.472892Z
+# finished_utc: 2026-08-13T16:23:51.861995Z
+# probe source retained verbatim at the end of this file
+----- BEGIN OUTPUT -----
+sandbox module      : C:\Repos\HiveMind\hive-mind-os\src\hive_mind_os\sandbox.py
+guard line numbers  : [487, 491]
+  487: resolved.relative_to(self.spec.root)
+  491: "path argument escapes sandbox root",
+
+
+tests.test_sandbox  : Ran 40, failures=0, errors=0, skipped=1
+threading trace set : True
+
+which tests execute each guard line:
+  line 487: 2 test(s) -> ['test_relative_path_argument_is_still_resolved_inside_the_root', 'test_windows_junction_escape_is_rejected']
+  line 491: 1 test(s) -> ['test_windows_junction_escape_is_rejected']
+
+REFUSAL BRANCH line 491 reached by 1 test(s): ['test_windows_junction_escape_is_rejected']
+
+skips recorded (reason matters -- a skip is not a proof):
+  test_symlink_escape_is_rejected: POSIX-only symlink confinement case
+----- BEGIN STDERR -----
+----------------------------------------------------------------------
+Ran 40 tests in 3.847s
+
+OK (skipped=1)
+----- END STDERR -----
+----- END OUTPUT -----
+# exit_code: 0
+
+----- BEGIN PROBE SOURCE -----
+"""REAUDIT-1900 residual measurement: how load-bearing is the containment proof?
+
+Residual 5 as declared by SANDBOX-1300: "the containment proof is load-bearing on
+a SINGLE test -- delete it and the original Windows blind spot silently returns."
+
+This measures it WITHOUT editing tests/ or src/ (both forbidden here): it runs
+tests.test_sandbox under a line tracer and records exactly which tests execute
+the containment guard at sandbox.py, and which reach its refusal branch.
+
+Read-only. No repository file is written.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import unittest
+from pathlib import Path
+
+REPO = r"C:\Repos\HiveMind\hive-mind-os"
+sys.path.insert(0, REPO)
+
+import hive_mind_os.sandbox as sandbox_module
+
+SANDBOX_FILE = os.path.abspath(sandbox_module.__file__)
+
+# Locate the guard by content rather than by a hard-coded line number.
+lines = Path(SANDBOX_FILE).read_text(encoding="utf-8").splitlines()
+GUARD_LINES = {
+    n
+    for n, text in enumerate(lines, start=1)
+    if "resolved.relative_to(self.spec.root)" in text
+    or "path argument escapes sandbox root" in text
+}
+print(f"sandbox module      : {SANDBOX_FILE}")
+print(f"guard line numbers  : {sorted(GUARD_LINES)}")
+for n in sorted(GUARD_LINES):
+    print(f"  {n}: {lines[n - 1].strip()}")
+print()
+
+hits: dict[int, set[str]] = {n: set() for n in GUARD_LINES}
+current = {"test": "<none>"}
+
+
+def tracer(frame, event, arg):
+    if event == "call":
+        return tracer if os.path.abspath(frame.f_code.co_filename) == SANDBOX_FILE else None
+    if event == "line" and frame.f_lineno in hits:
+        hits[frame.f_lineno].add(current["test"])
+    return tracer
+
+
+class Recorder(unittest.TextTestResult):
+    def startTest(self, test):
+        current["test"] = test.id().split(".")[-1]
+        super().startTest(test)
+
+
+loader = unittest.TestLoader()
+suite = loader.loadTestsFromName("tests.test_sandbox")
+sys.settrace(tracer)
+threading_ok = True
+try:
+    import threading
+
+    threading.settrace(tracer)
+except Exception:  # noqa: BLE001
+    threading_ok = False
+runner = unittest.TextTestRunner(verbosity=0, resultclass=Recorder, stream=sys.stderr)
+result = runner.run(suite)
+sys.settrace(None)
+
+print()
+print(f"tests.test_sandbox  : Ran {result.testsRun}, failures={len(result.failures)}, "
+      f"errors={len(result.errors)}, skipped={len(result.skipped)}")
+print(f"threading trace set : {threading_ok}")
+print()
+print("which tests execute each guard line:")
+for n in sorted(GUARD_LINES):
+    names = sorted(hits[n])
+    print(f"  line {n}: {len(names)} test(s) -> {names or '<NONE>'}")
+print()
+refusal = [n for n in sorted(GUARD_LINES) if "escapes sandbox root" in lines[n - 1]]
+for n in refusal:
+    names = sorted(hits[n])
+    print(f"REFUSAL BRANCH line {n} reached by {len(names)} test(s): {names or '<NONE>'}")
+print()
+print("skips recorded (reason matters -- a skip is not a proof):")
+for test, reason in result.skipped:
+    print(f"  {test.id().split('.')[-1]}: {reason}")
+----- END PROBE SOURCE -----

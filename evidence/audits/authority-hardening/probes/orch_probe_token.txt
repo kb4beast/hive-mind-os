@@ -1,0 +1,91 @@
+# transcript: orch_probe_token
+# node: REAUDIT-1900
+# author: the orchestrator (retained verbatim, unmodified by this node)
+# source: <scratch>/orch_probe_token.py
+# what it touches: two EffectGateway instances with list adapters, plus
+#   inspect.getsource over two production modules. No effect, no network.
+# base_commit: 4c85ebee7a590d1ea2649457f0fa301bd2d1cda2
+# command: PYTHONPATH=src python <scratch>/orch_probe_token.py
+# python: 3.14.4
+# started_utc: 2026-08-13T16:23:51.898020Z
+# finished_utc: 2026-08-13T16:23:52.339576Z
+# probe source retained verbatim at the end of this file
+----- BEGIN OUTPUT -----
+CASE 1 authority-bound  : REFUSED   (capability token was not issued by an authority registry)
+CASE 2 registry-less    : REFUSED   (capability token was not issued by an authority registry)
+CASE 3 local_execution : EffectGateway constructed WITH authority=
+CASE 3 mission_adapter : EffectGateway constructed WITH authority=
+adapter invocations: []
+----- END OUTPUT -----
+# exit_code: 0
+
+----- BEGIN PROBE SOURCE -----
+"""Orchestrator's independent check of TOKEN-1010: is the probe-2 forgery refused,
+and is the reported registry-less residual real? Verifies both, does not trust either."""
+
+from hive_mind_os.brain_kernel.authority import AuthorityDenied, AuthorityRegistry, CapabilityToken
+from hive_mind_os.brain_kernel.canonical import canonical_digest
+from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope, EffectIntent
+from hive_mind_os.brain_kernel.effects import EffectGateway, sealed_intent
+
+Z = "sha256:" + "0" * 64
+FORGED_ENVELOPE = "sha256:" + "d" * 64   # never registered, never issued -- probe 2 verbatim
+SECRET = "secrets/keys.txt"              # the registered envelope explicitly refuses this
+
+
+def envelope():
+    return ConstraintEnvelope(
+        "AUTH-probe", "MISSION-probe", "WORK-probe", None, "builder", "R1",
+        ("write",), ("push", "merge", "deploy"), ("workspace",), ("workspace",),
+        (), (), (), (), Budget(30, 0, 0, 0, 0, 0, 1, 1),
+        "2030-01-02T00:00:00Z", Z, Z,
+    ).sealed()
+
+
+def intent(envelope_digest, target):
+    return sealed_intent(EffectIntent(
+        "MISSION-probe", "WORK-probe", "ATTEMPT-probe", "actor-1", "builder", "write", "R1",
+        "fake", target, Z, Z, envelope_digest, ("x",), "rollback", "policy", Z,
+    ))
+
+
+def forged_token(envelope_digest, action, target):
+    return CapabilityToken(envelope_digest, action, target, canonical_digest(
+        {"envelope": envelope_digest, "action": action, "target": target}))
+
+
+calls = []
+env = envelope()
+
+# --- Case 1: authority-bound gateway, probe-2 forgery -----------------------
+registry = AuthorityRegistry()
+registry.mint_root(env, issuer="orchestrator:probe", authority_ref="probe", recorded_at="2026-01-01T00:00:00Z")
+bound = EffectGateway(authority=registry, clock=lambda: "2029-01-01T00:00:00Z")
+bound.register_adapter("fake", lambda i: calls.append("ADAPTER RAN"))
+try:
+    bound.execute(intent(FORGED_ENVELOPE, SECRET), forged_token(FORGED_ENVELOPE, "write", SECRET))
+    print("CASE 1 authority-bound  : ACCEPTED  <-- A5-F10 STILL OPEN")
+except AuthorityDenied as e:
+    print(f"CASE 1 authority-bound  : REFUSED   ({e})")
+
+# --- Case 2: the residual -- registry-less gateway WITH an adapter registered
+unbound = EffectGateway()
+unbound.register_adapter("fake", lambda i: calls.append("ADAPTER RAN (unbound)"))
+try:
+    unbound.execute(intent(FORGED_ENVELOPE, SECRET), forged_token(FORGED_ENVELOPE, "write", SECRET))
+    print("CASE 2 registry-less    : ACCEPTED  <-- residual bypass IS REAL")
+except AuthorityDenied as e:
+    print(f"CASE 2 registry-less    : REFUSED   ({e})")
+
+# --- Case 3: does production build such a gateway with adapters? ------------
+import inspect
+
+from hive_mind_os.cortex.repository import local_execution, mission_adapter
+for mod in (local_execution, mission_adapter):
+    src = inspect.getsource(mod)
+    bound_here = "EffectGateway(" in src and "authority=" in src.split("EffectGateway(")[1][:120]
+    print(f"CASE 3 {mod.__name__.split('.')[-1]:16}: EffectGateway constructed "
+          f"{'WITH' if bound_here else 'WITHOUT'} authority=")
+
+print("adapter invocations:", calls)
+----- END PROBE SOURCE -----

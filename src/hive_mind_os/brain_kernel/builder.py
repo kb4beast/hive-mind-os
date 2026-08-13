@@ -16,7 +16,7 @@ from typing import Mapping, Protocol, Sequence
 from .authority import AuthorityRegistry
 from .canonical import canonical_digest
 from .contracts import EffectIntent, normalize_portable_path
-from .effects import EffectGateway, EffectResult
+from .effects import EffectGateway, EffectResult, sealed_intent
 
 
 class BuilderActionDenied(PermissionError):
@@ -228,23 +228,25 @@ class BuilderCoordinator:
             parameters_digest = self.adapter.register_action(action)
             if parameters_digest != action.parameters_digest:
                 raise BuilderActionDenied("adapter changed the sealed Builder payload")
-            intent = EffectIntent(
-                self.mission_id,
-                self.work_id,
-                attempt_id,
-                self.actor_id,
-                "builder",
-                str(action.kind),
-                self.risk_tier,
-                self.adapter.adapter_name,
-                action.target,
-                parameters_digest,
-                action.idempotency_key,
-                self.authority_envelope_digest,
-                ("isolated workspace is present",),
-                action.rollback_description,
-                self.policy_decision_ref,
-                canonical_digest({"action": action.action_id, "attempt": attempt_id, "parameters": parameters_digest}),
+            intent = sealed_intent(
+                EffectIntent(
+                    self.mission_id,
+                    self.work_id,
+                    attempt_id,
+                    self.actor_id,
+                    "builder",
+                    str(action.kind),
+                    self.risk_tier,
+                    self.adapter.adapter_name,
+                    action.target,
+                    parameters_digest,
+                    action.idempotency_key,
+                    self.authority_envelope_digest,
+                    ("isolated workspace is present",),
+                    action.rollback_description,
+                    self.policy_decision_ref,
+                    canonical_digest({"action": action.action_id, "attempt": attempt_id, "parameters": parameters_digest}),
+                )
             )
             token = self.authority.authorize(
                 self.authority_envelope_digest, str(action.kind), action.target, now=self.now

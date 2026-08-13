@@ -228,7 +228,17 @@ def _envelope(
         expires_at,
         DIGEST,
         DIGEST,
+    ).sealed()
+
+
+def _mint(registry: AuthorityRegistry, envelope: ConstraintEnvelope) -> ConstraintEnvelope:
+    registry.mint_root(
+        envelope,
+        issuer="owner:no-cheating-fixture",
+        authority_ref="AUTHORITY-RECORD-no-cheating",
+        recorded_at="2026-01-01T00:00:00Z",
     )
+    return envelope
 
 
 class NoCheatingSuiteTests(unittest.TestCase):
@@ -715,34 +725,41 @@ class AuthorityExpansionSuiteTests(unittest.TestCase):
         self.assertIs(narrower, intersect_envelopes(parent, narrower))
 
     def test_orphan_child_cannot_self_register(self) -> None:
-        child = _envelope(envelope_id="AUTH-child", parent=DIGEST)
+        parent = _envelope()
+        child = _envelope(envelope_id="AUTH-child", parent=parent.digest_value)
         # Cheat: register a derived envelope without presenting the parent it claims.
         with self.assertRaisesRegex(AuthorityDenied, "parent envelope is required"):
             AuthorityRegistry().register(child)
+        # Cheat: mint a fresh root rather than deriving from an admitted authority.
+        with self.assertRaisesRegex(AuthorityDenied, "explicit mint ceremony"):
+            AuthorityRegistry().register(_envelope())
         # Positive control: presenting the parent registers the same child.
         registry = AuthorityRegistry()
-        registry.register(_envelope())
-        registry.register(child, _envelope())
+        _mint(registry, parent)
+        registry.register(child, parent)
 
     def test_registry_denies_scope_expansion_expiry_and_revocation(self) -> None:
         registry = AuthorityRegistry()
-        registry.register(_envelope())
+        digest = _mint(registry, _envelope()).digest_value
         # Positive control: the granted action inside the granted scope is authorized.
-        token = registry.authorize(DIGEST, "write", "src/x.py", now="2029-01-01T00:00:00Z")
+        token = registry.authorize(digest, "write", "src/x.py", now="2029-01-01T00:00:00Z")
         self.assertEqual("src/x.py", token.target)
         # Cheat: write outside the granted path scope.
         with self.assertRaisesRegex(AuthorityDenied, "outside write scope"):
-            registry.authorize(DIGEST, "write", "docs/x.md", now="2029-01-01T00:00:00Z")
+            registry.authorize(digest, "write", "docs/x.md", now="2029-01-01T00:00:00Z")
         # Cheat: perform an explicitly denied action.
         with self.assertRaisesRegex(AuthorityDenied, "action is not granted"):
-            registry.authorize(DIGEST, "deploy", "src/x.py", now="2029-01-01T00:00:00Z")
+            registry.authorize(digest, "deploy", "src/x.py", now="2029-01-01T00:00:00Z")
         # Cheat: keep using the envelope after it expired.
         with self.assertRaisesRegex(AuthorityDenied, "expired"):
-            registry.authorize(DIGEST, "write", "src/x.py", now="2031-01-01T00:00:00Z")
+            registry.authorize(digest, "write", "src/x.py", now="2031-01-01T00:00:00Z")
         # Cheat: keep using the envelope after it was revoked.
-        registry.revoke(DIGEST)
+        registry.revoke(digest)
         with self.assertRaisesRegex(AuthorityDenied, "unavailable"):
-            registry.authorize(DIGEST, "write", "src/x.py", now="2029-01-01T00:00:00Z")
+            registry.authorize(digest, "write", "src/x.py", now="2029-01-01T00:00:00Z")
+        # Cheat: re-mint the identical authority under a new envelope identity.
+        with self.assertRaisesRegex(AuthorityDenied, "authority is revoked"):
+            _mint(registry, _envelope(envelope_id="AUTH-remint"))
 
 
 class FriendlyConsultationSuiteTests(unittest.TestCase):

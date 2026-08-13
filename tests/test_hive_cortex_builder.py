@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable, cast
 from unittest.mock import patch
@@ -18,7 +19,7 @@ from hive_mind_os.brain_kernel.builder import (
     BuilderIterationExhausted,
 )
 from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope, EffectIntent
-from hive_mind_os.brain_kernel.effects import EffectGateway
+from hive_mind_os.brain_kernel.effects import EffectGateway, intent_seal
 from hive_mind_os.cortex.repository.builder_adapter import IsolatedBuilderAdapter
 
 DIGEST = "sha256:" + "b" * 64
@@ -29,9 +30,12 @@ def _envelope() -> ConstraintEnvelope:
     return ConstraintEnvelope(
         "AUTH-builder", "MISSION-builder", "WORK-builder", None, "builder", "R1",
         ("write", "command", "branch", "commit"), ("push", "merge", "deploy"),
-        ("isolated-workspace",), ("src", "tests"), (), (), (), (),
+        ("isolated-workspace",), ("src", "tests", "isolated-workspace", "autopilot"), (), (), (), (),
         Budget(20, 0, 0, 0, 0, 0, 4, 4), "2030-01-02T00:00:00Z", DIGEST, DIGEST,
-    )
+    ).sealed()
+
+
+AUTH = _envelope().digest_value
 
 
 class HiveCortexBuilderTests(unittest.TestCase):
@@ -39,16 +43,24 @@ class HiveCortexBuilderTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.registry = AuthorityRegistry()
-        self.registry.register(_envelope())
+        self.registry.mint_root(
+            _envelope(),
+            issuer="owner:builder-fixture",
+            authority_ref="AUTHORITY-RECORD-builder",
+            recorded_at="2026-01-01T00:00:00Z",
+        )
         self.adapter = IsolatedBuilderAdapter(self.root)
-        self.gateway = EffectGateway()
+        self.gateway = EffectGateway(authority=self.registry, clock=lambda: NOW)
         self.gateway.register_adapter(
             self.adapter.adapter_name,
             cast(Callable[[EffectIntent], None], self.adapter.apply),
         )
         self.builder = BuilderCoordinator(
             self.gateway, self.registry, self.adapter, mission_id="MISSION-builder", work_id="WORK-builder",
-            actor_id="builder:fixture", authority_envelope_digest=DIGEST, policy_decision_ref="POLICY-builder", now=NOW,
+            actor_id="builder:fixture",
+            authority_envelope_digest=AUTH,
+            policy_decision_ref="POLICY-builder",
+            now=NOW,
         )
 
     def tearDown(self) -> None:
@@ -64,6 +76,38 @@ class HiveCortexBuilderTests(unittest.TestCase):
         self.assertEqual(["SUCCEEDED", "SUCCEEDED"], [item.outcome.status for item in executions])
         self.assertEqual("fixed\n", (self.root / "src" / "result.txt").read_text(encoding="utf-8"))
         self.assertTrue(all(item.effect.receipt_digest.startswith("sha256:") for item in executions))
+
+    def test_builder_submits_intents_sealed_over_their_own_fields(self) -> None:
+        """A4-D5: the digest a Builder intent carries is the seal of its fields."""
+
+        seen: list[EffectIntent] = []
+
+        def record(intent: EffectIntent) -> object:
+            seen.append(intent)
+            return self.adapter.apply(intent)
+
+        gateway = EffectGateway(authority=self.registry, clock=lambda: NOW)
+        gateway.register_adapter(self.adapter.adapter_name, record)
+        builder = BuilderCoordinator(
+            gateway, self.registry, self.adapter, mission_id="MISSION-builder", work_id="WORK-builder",
+            actor_id="builder:fixture",
+            authority_envelope_digest=AUTH,
+            policy_decision_ref="POLICY-builder",
+            now=NOW,
+        )
+        action = BuilderAction(
+            "write-sealed", BuilderActionKind.WRITE, "src/sealed.txt", {"content": "sealed\n"}, "remove src/sealed.txt"
+        )
+        builder.execute_round("ATTEMPT-sealed", (action,))
+
+        self.assertEqual(1, len(seen))
+        self.assertEqual(intent_seal(seen[0]), seen[0].intent_digest)
+        # Cheat: keep the sealed digest while changing what the intent says.
+        with self.assertRaisesRegex(AuthorityDenied, "does not seal"):
+            gateway.execute(
+                replace(seen[0], rollback_description="keep it"),
+                self.registry.authorize(AUTH, "write", "src/sealed.txt", now=NOW),
+            )
 
     def test_iterative_repair_tests_keep_failed_test_evidence_then_repair(self) -> None:
         failing = BuilderAction(
@@ -281,7 +325,7 @@ class HiveCortexBuilderTests(unittest.TestCase):
                 with tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
                     adapter = IsolatedBuilderAdapter(root)
-                    gateway = EffectGateway()
+                    gateway = EffectGateway(authority=self.registry, clock=lambda: NOW)
                     gateway.register_adapter(
                         adapter.adapter_name,
                         cast(Callable[[EffectIntent], None], adapter.apply),
@@ -293,7 +337,7 @@ class HiveCortexBuilderTests(unittest.TestCase):
                         mission_id="MISSION-builder",
                         work_id="WORK-builder",
                         actor_id="builder:fixture",
-                        authority_envelope_digest=DIGEST,
+                        authority_envelope_digest=AUTH,
                         policy_decision_ref="POLICY-builder",
                         now=NOW,
                     )
@@ -385,7 +429,7 @@ class HiveCortexBuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             BuilderAction("escape", BuilderActionKind.WRITE, "../outside.txt", {"content": "x"}, "remove")
         action = BuilderAction("write-2", BuilderActionKind.WRITE, "src/only.txt", {"content": "x"}, "remove")
-        self.registry.revoke(DIGEST)
+        self.registry.revoke(AUTH)
         with self.assertRaises(AuthorityDenied):
             self.builder.execute_round("ATTEMPT-revoked", (action,))
 

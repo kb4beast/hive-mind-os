@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from dataclasses import replace
 
-from hive_mind_os.brain_kernel.authority import AuthorityDenied
+from hive_mind_os.brain_kernel.authority import AuthorityDenied, CapabilityToken
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.consultation import (
     ConsultationReason,
@@ -21,6 +21,7 @@ from hive_mind_os.brain_kernel.contracts import (
     EvaluationState,
     TechnicalCloseoutState,
 )
+from hive_mind_os.brain_kernel.effects import intent_seal, sealed_intent
 from hive_mind_os.brain_kernel.events import KernelEvent
 from hive_mind_os.brain_kernel.mission_runtime import (
     MissionEscalationRequired,
@@ -232,7 +233,62 @@ def _curator_invocation(environment, *, evaluator_mode: bool) -> RoleInvocation:
     )
 
 
+def _forged_token(envelope_digest: str, action: str, target: str):
+    """The A5-F10 forgery, written past the constructor's issuance check.
+
+    Re-declared locally on purpose; sibling test modules are never imported.
+    """
+
+    forged = object.__new__(CapabilityToken)
+    values = (
+        envelope_digest,
+        action,
+        target,
+        canonical_digest(
+            {"envelope": envelope_digest, "action": action, "target": target}
+        ),
+        "",
+    )
+    for name, value in zip(CapabilityToken.__slots__, values):
+        object.__setattr__(forged, name, value)
+    return forged
+
+
 class AuthorityBoundaryTests(_EnvironmentCase):
+    def test_mission_gateway_refuses_a_forged_token_before_the_outbox(self):
+        """BIND-1030: the deterministic gateway's override no longer skips issuance."""
+
+        environment = self.environment()
+        effect = environment.bindings.builder_effect
+        escape = sealed_intent(replace(effect.intent, target="base/app.txt"))
+        forged = _forged_token(effect.envelope_digest, "write", "base/app.txt")
+        environment.workspace.register_payload(b"escaped\n")
+
+        with self.assertRaisesRegex(AuthorityDenied, "outside write scope"):
+            environment.gateway.execute(escape, forged)
+
+        self.assertEqual("before\n", (environment.root / "base" / "app.txt").read_text())
+        self.assertIsNone(
+            environment.store.effect_entry(intent_digest=escape.intent_digest)
+        )
+
+    def test_mission_builder_intent_is_sealed_over_its_own_fields(self):
+        """A4-D5: the mission fixture's intent carries the digest its fields imply."""
+
+        environment = self.environment()
+        intent = environment.bindings.builder_effect.intent
+        self.assertEqual(intent_seal(intent), intent.intent_digest)
+        with self.assertRaisesRegex(AuthorityDenied, "does not seal"):
+            environment.gateway.execute(
+                replace(intent, rollback_description="keep it"),
+                environment.registry.authorize(
+                    environment.bindings.builder_effect.envelope_digest,
+                    "write",
+                    intent.target,
+                    now=environment.bindings.builder_effect.authorization_time,
+                ),
+            )
+
     def test_effect_outside_write_scope_is_denied(self):
         environment = self.environment()
         with self.assertRaises(AuthorityDenied):

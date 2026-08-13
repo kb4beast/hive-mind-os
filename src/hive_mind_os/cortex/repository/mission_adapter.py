@@ -17,7 +17,7 @@ from ...brain_kernel.consultation import (
 )
 from ...brain_kernel.contracts import Budget, ConstraintEnvelope, EffectIntent
 from ...brain_kernel.effect_outbox import DurableEffectOutbox
-from ...brain_kernel.effects import EffectGateway
+from ...brain_kernel.effects import EffectGateway, sealed_intent
 from ...brain_kernel.mission_runtime import (
     BuilderEffectBinding,
     MissionBindings,
@@ -43,7 +43,7 @@ class MissionAdapterError(RuntimeError):
 
 
 class _DeterministicEffectGateway(EffectGateway):
-    """An ``EffectGateway`` whose durable receipts carry injected time.
+    """A store-backed gateway built with authority=registry and an injected clock.
 
     ``EffectGateway`` constructs its ``DurableEffectOutbox`` with the default
     wall clock, and a receipt's ``started_at``/``ended_at`` are inside
@@ -56,16 +56,22 @@ class _DeterministicEffectGateway(EffectGateway):
     supplies it.  Widening ``EffectGateway`` to take a clock would be the
     tidier home for this, but ``brain_kernel/effects.py`` belongs to EFFECT-220
     and is outside this node's write scope, so the seam is supplied here rather
-    than by editing another node's file.  Token validation is unchanged:
-    ``DurableEffectOutbox.execute`` validates before any adapter runs.
+    than by editing another node's file.  The override hands the outbox the
+    issuing registry and the adapter host table, so the boundary this gateway
+    would have applied is applied by the outbox instead of being skipped.
     """
 
-    def __init__(self, store: KernelStore, *, now: str) -> None:
-        super().__init__(store)
+    def __init__(
+        self, store: KernelStore, *, now: str, authority: AuthorityRegistry, authorized_at: str
+    ) -> None:
+        super().__init__(store, authority=authority, clock=lambda: authorized_at)
         self._kernel_store = store
         self._now = now
+        self._registry = authority
+        self._authorized_at = authorized_at
         self._bound: dict[str, Callable[[EffectIntent], None]] = {}
         self._bound_versions: dict[str, str] = {}
+        self._bound_hosts: dict[str, tuple[str, ...]] = {}
 
     def register_adapter(
         self,
@@ -73,16 +79,20 @@ class _DeterministicEffectGateway(EffectGateway):
         adapter: Callable[[EffectIntent], None],
         *,
         version: str = "1",
+        network_hosts: tuple[str, ...] = (),
     ) -> None:
-        super().register_adapter(name, adapter, version=version)
+        super().register_adapter(name, adapter, version=version, network_hosts=network_hosts)
         self._bound[name] = adapter
         self._bound_versions[name] = version
+        self._bound_hosts[name] = tuple(network_hosts)
 
     def execute(self, intent: EffectIntent, token):
         return DurableEffectOutbox(
             self._kernel_store,
             adapters=self._bound,
             adapter_versions=self._bound_versions,
+            adapter_hosts=self._bound_hosts,
+            authority=self._registry,
             clock=lambda: self._now,
         ).execute(intent, token)
 
@@ -135,17 +145,24 @@ def build_local_mission_environment(
         f"AUTH-mission-{mission_suffix}", mission_id, builder_work_id, None, "builder", "R1",
         ("write",), ("network", "push", "merge", "deploy"), ("candidate",), ("candidate",),
         (), (), (), (), Budget(1, 0, 0, 0, 0, 1, 1, 1), "2030-01-01T00:00:00Z", _Z, _Z,
+    ).sealed()
+    registry.mint_root(
+        envelope,
+        issuer=f"mission:{mission_suffix}:fixture-owner",
+        authority_ref="local-mission-policy",
+        recorded_at=_TIME,
     )
-    registry.register(envelope)
-    gateway = _DeterministicEffectGateway(kernel_store, now=_TIME)
+    gateway = _DeterministicEffectGateway(
+        kernel_store, now=_TIME, authority=registry, authorized_at=_AUTH_TIME
+    )
     gateway.register_adapter("isolated-write", workspace.apply)
     parameters_digest = workspace.register_payload(b"after\n")
-    intent = EffectIntent(
+    intent = sealed_intent(EffectIntent(
         mission_id, builder_work_id, builder_attempt_id, "mission:builder", "builder", "write", "R1",
         "isolated-write", "candidate/app.txt", parameters_digest,
-        canonical_digest({"mission": mission_id, "effect": "builder-write"}), _Z, (),
+        canonical_digest({"mission": mission_id, "effect": "builder-write"}), envelope.digest_value, (),
         "discard isolated candidate", "local-mission-policy", canonical_digest({"intent": mission_id}),
-    )
+    ))
     specs: dict[str, WorkVerificationSpec] = {}
     directories: dict[str, Path] = {}
     for role in KERNEL_IMPLEMENTED_ROLES:
@@ -185,7 +202,8 @@ def build_local_mission_environment(
         Budget(400, 16, 800, 800, 800, 40, 12, 4), Budget(50, 2, 100, 100, 100, 5, 1, 1),
     )
     bindings = MissionBindings(
-        RepositoryRoleHandlers(), BuilderEffectBinding(registry, gateway, _Z, intent, _AUTH_TIME),
+        RepositoryRoleHandlers(),
+        BuilderEffectBinding(registry, gateway, envelope.digest_value, intent, _AUTH_TIME),
         specs, request, assessments,
     )
     return LocalMissionEnvironment(root_path, kernel_store, workspace, registry, gateway, config,

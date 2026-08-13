@@ -274,7 +274,7 @@ def verify_bundle(bundle: str | Path) -> None:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise VerificationError(f"integrity manifest is unreadable: {error}") from None
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 2:
         raise VerificationError("integrity manifest schema is unsupported")
     files = manifest.get("files")
     if not isinstance(files, dict) or not files:
@@ -321,6 +321,7 @@ def verify_bundle(bundle: str | Path) -> None:
         ledger.close()
     if document.get("ledger_events") != events:
         raise VerificationError("verification report ledger events do not match the ledger")
+    _verify_verdict(document, manifest, events)
     for label, binding in (("candidate", candidate), ("base", base)):
         for field in ("commit", "tree"):
             value = binding.get(field)
@@ -335,9 +336,13 @@ def verify_bundle(bundle: str | Path) -> None:
             raise VerificationError("verification report contains an invalid check")
         if check.get("candidate_commit") != candidate.get("commit") or check.get("candidate_tree") != candidate.get("tree"):
             raise VerificationError("check is not bound to the candidate objects")
+        if check.get("expected") != specification.expected:
+            raise VerificationError("check is not bound to the sealed acceptance outcome")
         receipt = check.get("receipt")
         binding = check.get("receipt_binding")
         if receipt is None:
+            if check.get("matched") is not False:
+                raise VerificationError("check claims an outcome without an execution receipt")
             continue
         if not isinstance(receipt, Mapping) or not isinstance(binding, Mapping):
             raise VerificationError("check receipt binding is malformed")
@@ -376,6 +381,12 @@ def verify_bundle(bundle: str | Path) -> None:
             or acceptance_binding.get("candidate_tree") != candidate.get("tree")
         ):
             raise VerificationError("check receipt is not bound to the candidate objects")
+        observed_match = (
+            receipt_document.get("result") == specification.expected
+            and check.get("workspace_unchanged") is True
+        )
+        if bool(check.get("matched")) is not observed_match:
+            raise VerificationError("recorded check outcome contradicts its execution receipt")
 
 
 def _validate_repository(repository: str | Path) -> Path:
@@ -960,10 +971,96 @@ def _atomic_write(destination: Path, content: bytes) -> None:
 
 
 def _write_integrity_manifest(staging: Path) -> None:
+    document = _read_json_object(staging / "verification.json", "verification report")
+    record = _adjudication_record(document)
     _atomic_write_json(
         staging / "integrity.json",
-        {"schema_version": 1, "files": _bundle_file_digests(staging, include_integrity=False)},
+        {
+            "schema_version": 2,
+            "verdict": {
+                "verdict": document.get("verdict"),
+                "adjudication_digest": _digest_json(record),
+            },
+            "files": _bundle_file_digests(staging, include_integrity=False),
+        },
     )
+
+
+def _adjudication_record(document: Mapping[str, object]) -> dict[str, object]:
+    """The verdict plus every observation the verdict is derived from."""
+
+    analysis = document.get("test_analysis")
+    checks = document.get("checks")
+    return {
+        "schema_version": 1,
+        "run_id": document.get("run_id"),
+        "verdict": document.get("verdict"),
+        "undeclared_paths": document.get("undeclared_paths"),
+        "weakened_tests": document.get("weakened_tests"),
+        "not_evaluated_tests": analysis.get("not_evaluated") if isinstance(analysis, Mapping) else None,
+        "checks": [
+            {
+                "id": check.get("id"),
+                "expected": check.get("expected"),
+                "matched": check.get("matched"),
+                "workspace_unchanged": check.get("workspace_unchanged"),
+                "receipt": check.get("receipt"),
+            }
+            if isinstance(check, Mapping)
+            else None
+            for check in checks
+        ]
+        if isinstance(checks, list)
+        else None,
+    }
+
+
+def _adjudicated_verdict(record: Mapping[str, object]) -> str:
+    checks = record.get("checks")
+    accepted = (
+        isinstance(checks, list)
+        and bool(checks)
+        and all(isinstance(check, Mapping) and check.get("matched") is True for check in checks)
+        and not record.get("undeclared_paths")
+        and not record.get("weakened_tests")
+        and not record.get("not_evaluated_tests")
+    )
+    return "adopt" if accepted else "reject"
+
+
+def _verify_verdict(
+    document: Mapping[str, object],
+    manifest: Mapping[str, object],
+    events: Sequence[Mapping[str, object]],
+) -> None:
+    """Refuse a bundle whose recorded verdict is not the one its evidence produces."""
+
+    verdict = document.get("verdict")
+    if verdict not in {"adopt", "reject"}:
+        raise VerificationError("verification report has no recorded verdict")
+    record = _adjudication_record(document)
+    if _adjudicated_verdict(record) != verdict:
+        raise VerificationError("recorded verdict contradicts the bundle's adjudication evidence")
+    binding = manifest.get("verdict")
+    if not isinstance(binding, Mapping):
+        raise VerificationError("integrity manifest does not bind the verdict")
+    if binding.get("verdict") != verdict or binding.get("adjudication_digest") != _digest_json(record):
+        raise VerificationError("integrity manifest verdict binding is inconsistent")
+    completions = [
+        event.get("payload") for event in events if event.get("event_type") == "verify.completed"
+    ]
+    if len(completions) != 1 or not isinstance(completions[0], Mapping):
+        raise VerificationError("ledger does not record exactly one adjudication event")
+    payload = completions[0]
+    analysis = document.get("test_analysis")
+    not_evaluated = analysis.get("not_evaluated") if isinstance(analysis, Mapping) else None
+    if (
+        payload.get("verdict") != verdict
+        or payload.get("undeclared_paths") != document.get("undeclared_paths")
+        or payload.get("weakened_tests") != document.get("weakened_tests")
+        or payload.get("not_evaluated_tests") != not_evaluated
+    ):
+        raise VerificationError("ledger adjudication event contradicts the verification report")
 
 
 def _bundle_file_digests(root: Path, *, include_integrity: bool) -> dict[str, str]:

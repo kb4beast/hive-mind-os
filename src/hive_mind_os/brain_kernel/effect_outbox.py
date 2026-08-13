@@ -13,7 +13,7 @@ from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from .authority import AuthorityDenied, CapabilityToken
+from .authority import AuthorityDenied, AuthorityRegistry, CapabilityToken
 from .canonical import canonical_bytes, canonical_digest
 from .contracts import EffectIntent, EffectReceipt
 from .effects import (
@@ -36,7 +36,14 @@ def _time() -> str:
 
 
 class DurableEffectOutbox:
-    """SQLite-backed effect intent, delivery, receipt, and repair boundary."""
+    """SQLite-backed effect intent, delivery, receipt, and repair boundary.
+
+    An outbox built with an ``authority`` registry re-derives every token through
+    live issuance state before it records or delivers anything, so constructing
+    the outbox directly reaches the same boundary a gateway would apply.  Built
+    without one it can only bind a token to its intent, so an issuer should be
+    supplied wherever the registry that minted the token is in hand.
+    """
 
     def __init__(
         self,
@@ -44,17 +51,32 @@ class DurableEffectOutbox:
         *,
         adapters: Mapping[str, Adapter] | None = None,
         adapter_versions: Mapping[str, str] | None = None,
+        adapter_hosts: Mapping[str, tuple[str, ...]] | None = None,
+        authority: AuthorityRegistry | None = None,
         clock: Callable[[], str] = _time,
     ) -> None:
         self.store = store
         self.adapters = dict(adapters or {})
         self.adapter_versions = dict(adapter_versions or {})
+        self.adapter_hosts = dict(adapter_hosts or {})
+        self.authority = authority
         self.clock = clock
+
+    def _validate(self, intent: EffectIntent, token: CapabilityToken) -> None:
+        """The one boundary every durable entry point crosses."""
+
+        validate_capability_token(
+            intent,
+            token,
+            authority=self.authority,
+            now=self.clock(),
+            network_hosts=self.adapter_hosts.get(intent.target_adapter, ()),
+        )
 
     def enqueue(self, intent: EffectIntent, token: CapabilityToken) -> dict[str, Any]:
         """Validate and persist an intent without invoking an adapter."""
 
-        validate_capability_token(intent, token)
+        self._validate(intent, token)
         if intent.target_adapter not in self.adapters:
             raise AuthorityDenied("adapter is not registered")
         return self.store.enqueue_effect(
@@ -74,7 +96,7 @@ class DurableEffectOutbox:
     def execute(self, intent: EffectIntent, token: CapabilityToken) -> EffectResult:
         """Deliver one effect, never retrying an ambiguous physical outcome."""
 
-        validate_capability_token(intent, token)
+        self._validate(intent, token)
         adapter = self.adapters.get(intent.target_adapter)
         if adapter is None:
             raise AuthorityDenied("adapter is not registered")
@@ -190,7 +212,7 @@ class DurableEffectOutbox:
             )
         except (TypeError, ValueError, json.JSONDecodeError) as error:
             raise KernelIntegrityError("durable effect intent is corrupt") from error
-        validate_capability_token(stored_intent, token)
+        self._validate(stored_intent, token)
         receipt_digest = canonical_digest(receipt.to_document())
         entry = self.store.record_effect_receipt(
             intent_digest=intent_digest,

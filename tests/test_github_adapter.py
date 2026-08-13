@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
 import os
@@ -16,20 +17,25 @@ from unittest.mock import patch
 
 from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
-from hive_mind_os.brain_kernel.authority import AuthorityRegistry
+from hive_mind_os.brain_kernel.authority import AuthorityRegistry, RootProvenance
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.contracts import (
     Budget,
     ConstraintEnvelope,
     EffectIntent,
 )
-from hive_mind_os.brain_kernel.effects import EffectGateway
-from hive_mind_os.cortex.github.delivery_adapter import ControlledGitHubDelivery
+from hive_mind_os.brain_kernel.effects import EffectGateway, sealed_intent
+from hive_mind_os.cortex.github import grants
+from hive_mind_os.cortex.github.delivery_adapter import (
+    COMMENT_MARKER_PREFIX,
+    ControlledGitHubDelivery,
+)
 from hive_mind_os.cortex.github.grants import (
     PROTECTED_BRANCHES,
     VALID_DELIVERY_ACTIONS,
     DeliveryGrant,
     DeliveryGrantError,
+    DeliveryGrantLedger,
 )
 from hive_mind_os.cortex.github.push_executor import WorkspacePushExecutor
 from hive_mind_os.cortex.github.rest_gateway import (
@@ -43,6 +49,7 @@ from hive_mind_os.github_adapter import (
     GitHubClient,
     GitHubDeliveryError,
     GitHubDeliveryTarget,
+    GitHubEffectReconciliationRequired,
     GitHubPolicyDenied,
     GitHubResponse,
     GitHubTransportError,
@@ -53,7 +60,12 @@ from hive_mind_os.github_adapter import (
 )
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.mission import RepositoryMission
-from hive_mind_os.mission_store import MissionStore
+from hive_mind_os.mission_store import (
+    MissionStore,
+    SimulatedCrash,
+    _system_path,
+    _temporary_name,
+)
 from hive_mind_os.models import AutonomyLevel
 from hive_mind_os.policy import PolicyEngine
 from tests.fixtures.fixture_repo import COMMIT_TWO_SHA, build_fixture_repo
@@ -131,6 +143,141 @@ class ExplodingTransport:
     ) -> GitHubResponse:
         self.calls += 1
         raise OSError(f"transport failure carried {self.secret}")
+
+
+class SingleEffectHost:
+    """A queryable fake host that accepts one effect per idempotency key.
+
+    Every answer comes from in-memory state, so nothing here opens a socket.
+    A second attempt at an effect key the host already accepted is refused
+    loudly: a duplicated remote effect fails the test instead of passing.
+    """
+
+    def __init__(
+        self,
+        *,
+        owner: str = "octocat",
+        repository: str = "hive-mind-os",
+        head_sha: str = HEAD_SHA,
+    ) -> None:
+        self.owner = owner
+        self.prefix = f"/repos/{owner}/{repository}"
+        self.head_sha = head_sha
+        self.accepted: list[str] = []
+        self.refused: list[str] = []
+        self.pulls: list[dict[str, Any]] = []
+        self.refs: dict[str, str] = {}
+        self.calls: list[tuple[str, str]] = []
+
+    def accept(self, key: str) -> None:
+        if key in self.accepted:
+            self.refused.append(key)
+            raise AssertionError(f"the host was asked to perform {key} twice")
+        self.accepted.append(key)
+
+    def count(self, key: str) -> int:
+        return self.accepted.count(key)
+
+    def create_ref(self, branch: str, head_sha: str) -> None:
+        self.accept(f"push:{branch}:{head_sha}")
+        self.refs[branch] = head_sha
+
+    @staticmethod
+    def _response(status: int, payload: object) -> GitHubResponse:
+        return GitHubResponse(status, json.dumps(payload).encode(), {})
+
+    def request(
+        self,
+        method: str,
+        url: str,
+        headers: dict[str, str],
+        body: bytes | None,
+        timeout_s: float,
+    ) -> GitHubResponse:
+        parsed = urllib.parse.urlsplit(url)
+        query = urllib.parse.parse_qs(parsed.query)
+        self.calls.append((method, parsed.path))
+        if method == "GET" and parsed.path == f"{self.prefix}/pulls":
+            branch = query.get("head", [""])[0].removeprefix(f"{self.owner}:")
+            return self._response(
+                200,
+                [pull for pull in self.pulls if pull["head"]["ref"] == branch],
+            )
+        if method == "POST" and parsed.path == f"{self.prefix}/pulls":
+            payload = json.loads(body or b"{}")
+            self.accept(f"pull:{payload['head']}:{payload['base']}")
+            number = 71 + len(self.pulls)
+            pull = {
+                "number": number,
+                "draft": True,
+                "state": "open",
+                "html_url": f"https://github.com/{self.owner}/pull/{number}",
+                "head": {
+                    "ref": payload["head"],
+                    "sha": self.refs.get(payload["head"], self.head_sha),
+                },
+                "base": {"ref": payload["base"]},
+            }
+            self.pulls.append(pull)
+            return self._response(201, pull)
+        if method == "GET" and parsed.path.startswith(f"{self.prefix}/git/ref/heads/"):
+            branch = parsed.path.removeprefix(f"{self.prefix}/git/ref/heads/")
+            head_sha = self.refs.get(branch)
+            if head_sha is None:
+                return self._response(404, {"message": "Not Found"})
+            return self._response(
+                200,
+                {
+                    "ref": f"refs/heads/{branch}",
+                    "object": {"sha": head_sha, "type": "commit"},
+                },
+            )
+        raise AssertionError(f"unexpected GitHub request: {method} {url}")
+
+
+class RecordingWorkspace:
+    """Answers the two calls ``push_branch`` makes; it runs no Git command.
+
+    The push lands on the fake host, so an observation can witness it exactly
+    the way a REST ref read witnesses a push that really happened.
+    """
+
+    def __init__(self, host: SingleEffectHost, head_sha: str = HEAD_SHA) -> None:
+        self.host = host
+        self.head_sha = head_sha
+        self.branch_name = "phase/P07-live-fixture"
+        self.receipt_records: list[dict[str, Any]] = []
+        self.pushes: list[str] = []
+
+    def _git_text(self, arguments: Any, action: Any, description: str) -> str:
+        return self.head_sha
+
+    def push_branch(
+        self,
+        remote_url: Any,
+        token: str,
+        *,
+        branch: str,
+        allow_local: bool = False,
+    ) -> str:
+        self.pushes.append(branch)
+        self.host.create_ref(branch, self.head_sha)
+        self.receipt_records.append({"command": "git push", "branch": branch})
+        return self.head_sha
+
+
+def _remove_long_tree(root: Path) -> None:
+    """Delete a tree whose paths may exceed MAX_PATH, which rmtree cannot."""
+
+    system_root = _system_path(root)
+    if not os.path.isdir(system_root):
+        return
+    for parent, directories, files in os.walk(system_root, topdown=False):
+        for name in files:
+            os.remove(os.path.join(parent, name))
+        for name in directories:
+            os.rmdir(os.path.join(parent, name))
+    os.rmdir(system_root)
 
 
 class LocalDeliveryClient(GitHubClient):
@@ -257,18 +404,29 @@ class GitHubAdapterTests(unittest.TestCase):
             AutonomyBudget(100, 100, 100.0),
         )
 
+    def forbid_sockets(self) -> None:
+        """Any socket this test creates is a failure, not a slow test."""
+
+        def refuse(*arguments: object, **keywords: object) -> None:
+            raise AssertionError("this test must not open a network connection")
+
+        guard = patch("socket.socket", refuse)
+        guard.start()
+        self.addCleanup(guard.stop)
+
     def client(
         self,
         transport: object,
         *,
         policy: PolicyEngine | None = None,
         ledger: EvidenceLedger | None = None,
+        evidence_root: Path | None = None,
         sleep=lambda _seconds: None,
     ) -> GitHubClient:
         return GitHubClient(
             "octocat",
             "hive-mind-os",
-            self.root / "github-evidence",
+            evidence_root or self.root / "github-evidence",
             transport=transport,  # type: ignore[arg-type]
             policy=policy or PolicyEngine(AutonomyLevel.REPOSITORY),
             ledger=ledger,
@@ -356,6 +514,162 @@ class GitHubAdapterTests(unittest.TestCase):
             1,
         )
         self.assertEqual(self.store.idempotency_count(self.mission_id), 1)
+
+    def draft_pr_arguments(self) -> dict[str, str]:
+        return {
+            "branch": "phase/P07-live-fixture",
+            "base": "main",
+            "head_sha": HEAD_SHA,
+            "title": "P07 live delivery",
+            "body": "Draft evidence only.",
+        }
+
+    def interrupt_receipt_write(self):
+        """Kill the run exactly between the remote effect and its receipt."""
+
+        return patch.object(
+            self.store,
+            "write_effect_receipt",
+            side_effect=SimulatedCrash("interrupted before the receipt was written"),
+        )
+
+    def test_an_interrupted_draft_pr_is_reconciled_not_reissued(self) -> None:
+        self.forbid_sockets()
+        host = SingleEffectHost()
+        client = self.client(host)
+        arguments = self.draft_pr_arguments()
+        effect = "pull:phase/P07-live-fixture:main"
+        with self.interrupt_receipt_write():
+            with self.assertRaises(SimulatedCrash):
+                client.open_draft_pr(**arguments)
+        # The effect fired; its receipt did not survive the interruption.
+        self.assertEqual(1, host.count(effect))
+        self.assertEqual(
+            1,
+            len(self.store.unreconciled_effects(self.mission_id)),
+        )
+
+        with patch.object(
+            self.store, "reconcile_effect", wraps=self.store.reconcile_effect
+        ) as reconciled, patch.object(
+            self.store, "begin_effect", wraps=self.store.begin_effect
+        ) as claimed:
+            resumed = client.open_draft_pr(**arguments)
+
+        # The outcome was adopted against the write-ahead record, and the
+        # effect was never claimed for a second execution.
+        self.assertEqual(1, reconciled.call_count)
+        self.assertEqual(0, claimed.call_count)
+        self.assertEqual(71, resumed.number)
+        self.assertEqual(HEAD_SHA, resumed.head_sha)
+        self.assertEqual(1, host.count(effect))
+        self.assertEqual([], host.refused)
+        self.assertEqual(1, sum(method == "POST" for method, _ in host.calls))
+        self.assertEqual([], self.store.unreconciled_effects(self.mission_id))
+        self.assertEqual(1, self.store.idempotency_count(self.mission_id))
+        self.assertTrue(
+            validate_github_receipt(self.root / "github-evidence", resumed.receipt)
+        )
+
+    def test_an_interrupted_push_is_reconciled_from_the_observed_ref(self) -> None:
+        self.forbid_sockets()
+        host = SingleEffectHost()
+        workspace = RecordingWorkspace(host)
+        client = self.client(host)
+        with self.interrupt_receipt_write():
+            with self.assertRaises(SimulatedCrash):
+                client.push_branch(workspace, branch="phase/P07-live-fixture")
+        self.assertEqual(["phase/P07-live-fixture"], workspace.pushes)
+
+        resumed = client.push_branch(workspace, branch="phase/P07-live-fixture")
+
+        self.assertEqual(HEAD_SHA, resumed.head_sha)
+        self.assertEqual("phase/P07-live-fixture", resumed.branch)
+        # The ref read witnessed the push; the push itself never happened twice.
+        self.assertEqual(["phase/P07-live-fixture"], workspace.pushes)
+        self.assertEqual([], host.refused)
+        self.assertIn(
+            ("GET", "/repos/octocat/hive-mind-os/git/ref/heads/phase/P07-live-fixture"),
+            host.calls,
+        )
+        self.assertEqual([], self.store.unreconciled_effects(self.mission_id))
+
+    def test_an_unwitnessed_interrupted_effect_refuses_to_fire_again(self) -> None:
+        self.forbid_sockets()
+        host = SingleEffectHost()
+        workspace = RecordingWorkspace(host)
+        client = self.client(host)
+        with self.interrupt_receipt_write():
+            with self.assertRaises(SimulatedCrash):
+                client.push_branch(workspace, branch="phase/P07-live-fixture")
+        host.refs.clear()
+
+        with self.assertRaises(GitHubEffectReconciliationRequired):
+            client.push_branch(workspace, branch="phase/P07-live-fixture")
+
+        self.assertEqual(["phase/P07-live-fixture"], workspace.pushes)
+        self.assertEqual(
+            1,
+            len(self.store.unreconciled_effects(self.mission_id)),
+        )
+
+    def test_receipts_are_written_beyond_max_path(self) -> None:
+        self.forbid_sockets()
+        deep = self.root / ("d" * 200)
+        self.addCleanup(_remove_long_tree, deep)
+        transport = FakeGitHubTransport()
+        self.add_pr_routes(transport)
+
+        result = self.client(transport, evidence_root=deep).open_draft_pr(
+            **self.draft_pr_arguments()
+        )
+
+        receipt = deep / Path(*result.receipt["path"].split("/"))
+        self.assertGreater(len(str(receipt)), 260)
+        self.assertTrue(os.path.isfile(_system_path(receipt)))
+        with open(_system_path(receipt), "rb") as stream:
+            stored = stream.read()
+        self.assertEqual(
+            result.receipt["digest"],
+            "sha256:" + hashlib.sha256(stored).hexdigest(),
+        )
+
+    def test_a_receipt_written_beyond_max_path_still_validates(self) -> None:
+        self.forbid_sockets()
+        deep = self.root / ("d" * 200)
+        self.addCleanup(_remove_long_tree, deep)
+        transport = FakeGitHubTransport()
+        self.add_pr_routes(transport)
+
+        result = self.client(transport, evidence_root=deep).open_draft_pr(
+            **self.draft_pr_arguments()
+        )
+
+        receipt = deep / Path(*result.receipt["path"].split("/"))
+        # Whether a plain Path.is_file() can see this receipt depends on the host
+        # (POSIX has no MAX_PATH; Windows honours LongPathsEnabled), so only the
+        # validator's own answer is asserted here.
+        self.assertGreater(len(str(receipt)), 260)
+        self.assertTrue(validate_github_receipt(deep, result.receipt))
+
+    def test_a_receipt_temporary_name_never_outgrows_its_final_name(self) -> None:
+        self.forbid_sockets()
+        transport = FakeGitHubTransport()
+        self.add_pr_routes(transport)
+        renames: list[tuple[str, str]] = []
+        real_replace = os.replace
+
+        def recording_replace(source: Any, target: Any) -> None:
+            renames.append((os.path.basename(source), os.path.basename(target)))
+            real_replace(source, target)
+
+        with patch("hive_mind_os.github_adapter.os.replace", recording_replace):
+            self.client(transport).open_draft_pr(**self.draft_pr_arguments())
+
+        self.assertTrue(renames)
+        for temporary, final in renames:
+            self.assertLessEqual(len(temporary), len(final))
+        self.assertLessEqual(len(_temporary_name("a" * 64 + ".json")), 69)
 
     def test_check_polling_transitions_and_persists_external_receipts(self) -> None:
         transport = FakeGitHubTransport()
@@ -799,6 +1113,64 @@ R2_ACTIONS = (
 )
 
 
+def _r2_envelope() -> ConstraintEnvelope:
+    return ConstraintEnvelope(
+        "AUTH-a4-800",
+        "MISSION-a4-800",
+        "WORK-a4-800",
+        None,
+        "builder",
+        "R1",
+        R2_ACTIONS,
+        ("merge", "deploy"),
+        ("workspace",),
+        ("workspace", R2_TARGET),
+        ("api.github.com",),
+        (),
+        (),
+        (),
+        Budget(30, 0, 0, 0, 0, 0, 1, 1),
+        "2030-01-02T00:00:00Z",
+        R2_DIGEST,
+        R2_DIGEST,
+    ).sealed()
+
+
+R2_AUTH = _r2_envelope().digest_value
+
+
+def _mint_root(registry: AuthorityRegistry, envelope: ConstraintEnvelope) -> None:
+    registry.mint_root(
+        envelope,
+        issuer="owner:a4-800-fixture",
+        authority_ref="AUTHORITY-RECORD-a4-800",
+        recorded_at="2026-01-01T00:00:00Z",
+    )
+
+
+def _r2_owner_authority() -> RootProvenance:
+    """The owner authority every R2 grant is issued under.
+
+    ``mint_root`` is deterministic over its inputs, so each call reproduces the
+    same ``record_digest`` the ledger was anchored to.
+    """
+
+    return AuthorityRegistry().mint_root(
+        _r2_envelope(),
+        issuer="repository-owner:a4-800",
+        authority_ref="OWNER-DELEGATION-a4-800",
+        recorded_at="2026-01-01T00:00:00Z",
+    )
+
+
+def _anchor_delivery_ledger(case: unittest.TestCase) -> RootProvenance:
+    """A5-F6: anchor a fresh process ledger before any grant is issued."""
+
+    case.addCleanup(setattr, grants, "LEDGER", grants.LEDGER)
+    grants.LEDGER = DeliveryGrantLedger()
+    return grants.LEDGER.anchor(_r2_owner_authority())
+
+
 class RecordingPushExecutor:
     """Records branch names; it opens no socket and runs no command."""
 
@@ -828,8 +1200,16 @@ class ControlledRetractionTests(unittest.TestCase):
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)
+
+        def refuse(*arguments: object, **keywords: object) -> None:
+            raise AssertionError("this test must not open a network connection")
+
+        sockets = patch("socket.socket", refuse)
+        sockets.start()
+        self.addCleanup(sockets.stop)
+        self.owner_authority = _anchor_delivery_ledger(self)
         self.registry = AuthorityRegistry()
-        self.registry.register(self.envelope())
+        _mint_root(self.registry, self.envelope())
         self.transport = FakeGitHubTransport()
         self.delivery = self.delivery_for(self.transport)
 
@@ -837,26 +1217,7 @@ class ControlledRetractionTests(unittest.TestCase):
 
     @staticmethod
     def envelope() -> ConstraintEnvelope:
-        return ConstraintEnvelope(
-            "AUTH-a4-800",
-            "MISSION-a4-800",
-            "WORK-a4-800",
-            None,
-            "builder",
-            "R1",
-            R2_ACTIONS,
-            ("merge", "deploy"),
-            ("workspace",),
-            ("workspace",),
-            (),
-            (),
-            (),
-            (),
-            Budget(30, 0, 0, 0, 0, 0, 1, 1),
-            "2030-01-02T00:00:00Z",
-            R2_DIGEST,
-            R2_DIGEST,
-        )
+        return _r2_envelope()
 
     @staticmethod
     def grant(
@@ -874,6 +1235,7 @@ class ControlledRetractionTests(unittest.TestCase):
             branch_prefix=branch_prefix,
             allowed_actions=allowed_actions,
             issued_at=R2_TIME,
+            provenance=_r2_owner_authority(),
         )
 
     def delivery_for(
@@ -900,7 +1262,7 @@ class ControlledRetractionTests(unittest.TestCase):
         parameters_digest: str,
         target: str = R2_TARGET,
     ) -> EffectIntent:
-        return EffectIntent(
+        return sealed_intent(EffectIntent(
             "MISSION-a4-800",
             "WORK-a4-800",
             "ATTEMPT-a4-800",
@@ -912,12 +1274,12 @@ class ControlledRetractionTests(unittest.TestCase):
             target,
             parameters_digest,
             R2_DIGEST,
-            R2_DIGEST,
+            R2_AUTH,
             ("the pilot opened this draft pull request",),
             "reopen the draft pull request and restore the branch",
             "POLICY-a4-800",
             R2_DIGEST,
-        )
+        ))
 
     def execute(
         self,
@@ -925,9 +1287,9 @@ class ControlledRetractionTests(unittest.TestCase):
         action: str,
         delivery: ControlledGitHubDelivery | None = None,
     ):
-        gateway = EffectGateway()
+        gateway = EffectGateway(authority=self.registry, clock=lambda: R2_TIME)
         (delivery or self.delivery).register_with(gateway)
-        token = self.registry.authorize(R2_DIGEST, action, R2_TARGET, now=R2_TIME)
+        token = self.registry.authorize(R2_AUTH, action, R2_TARGET, now=R2_TIME)
         return gateway.execute(intent, token)
 
     @staticmethod
@@ -1279,6 +1641,188 @@ class ControlledRetractionTests(unittest.TestCase):
 
                 self.assertEqual(["GET"], self.methods(transport))
 
+    # -- ref reads ---------------------------------------------------------
+
+    def gateway(self, transport: FakeGitHubTransport) -> ControlledRestGateway:
+        return ControlledRestGateway(
+            R2_OWNER,
+            R2_REPOSITORY,
+            transport=transport,  # type: ignore[arg-type]
+        )
+
+    @staticmethod
+    def ref_path(branch: str) -> str:
+        return f"/repos/{R2_OWNER}/{R2_REPOSITORY}/git/ref/heads/{branch}"
+
+    def test_a_branch_ref_read_snapshots_the_head_it_points_at(self) -> None:
+        # A4 D6: without this read the replay's before/after snapshots were
+        # both null, so "branch head unchanged" compared None to None.
+        transport = FakeGitHubTransport()
+        transport.add(
+            "GET",
+            self.ref_path(R2_BRANCH),
+            json.dumps(
+                {
+                    "ref": f"refs/heads/{R2_BRANCH}",
+                    "object": {"sha": HEAD_SHA, "type": "commit"},
+                }
+            ).encode(),
+        )
+
+        head = self.gateway(transport).read_branch_ref(R2_BRANCH)
+
+        self.assertEqual(HEAD_SHA, head)
+        self.assertEqual(["GET"], self.methods(transport))
+        self.assertEqual(self.ref_path(R2_BRANCH), transport.calls[0]["path"])
+        self.assertIsNone(transport.calls[0]["body"])
+
+    def test_a_missing_branch_ref_reads_as_absent_not_as_an_error(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.add("GET", self.ref_path(R2_BRANCH), b"{}", status=404)
+
+        self.assertIsNone(self.gateway(transport).read_branch_ref(R2_BRANCH))
+
+    def test_a_branch_ref_read_without_a_full_head_sha_fails_closed(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.add(
+            "GET",
+            self.ref_path(R2_BRANCH),
+            json.dumps({"object": {"sha": "abc", "type": "commit"}}).encode(),
+        )
+
+        with self.assertRaisesRegex(DeliveryRestError, "full head SHA"):
+            self.gateway(transport).read_branch_ref(R2_BRANCH)
+
+    def test_every_r2_grant_is_issued_under_the_anchored_owner_authority(self) -> None:
+        """A5-F6: no grant in this class depends on an anchoring step nobody ran."""
+
+        self.assertEqual(self.owner_authority.record_digest, grants.LEDGER.anchor_digest)
+        record = grants.LEDGER.issuance(self.grant().grant_digest)
+        assert record is not None
+        self.assertEqual(self.owner_authority.record_digest, record.anchor_digest)
+        self.assertEqual(self.owner_authority.issuer, self.grant().issuer)
+        # Cheat: cut a grant the anchored owner never backed.
+        with self.assertRaisesRegex(DeliveryGrantError, "not anchored"):
+            DeliveryGrant.issue(
+                grant_id="GRANT-a4-800-self-issued",
+                owner=R2_OWNER,
+                repository=R2_REPOSITORY,
+                base_branch=R2_BASE,
+                branch_prefix=R2_PREFIX,
+                allowed_actions=("push",),
+                issued_at=R2_TIME,
+            )
+
+    def test_the_delivery_boundary_exposes_the_snapshot_read(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.add(
+            "GET",
+            self.ref_path(R2_BRANCH),
+            json.dumps({"object": {"sha": HEAD_SHA, "type": "commit"}}).encode(),
+        )
+        delivery = self.delivery_for(transport)
+
+        self.assertEqual(HEAD_SHA, delivery.branch_head(R2_BRANCH))
+        # A read is not a sixth adapter: nothing new is registered.
+        gateway = EffectGateway(authority=self.registry, clock=lambda: R2_TIME)
+        delivery.register_with(gateway)
+        self.assertEqual(
+            {
+                ControlledGitHubDelivery.PUSH_ADAPTER,
+                ControlledGitHubDelivery.DRAFT_PR_ADAPTER,
+                ControlledGitHubDelivery.COMMENT_ADAPTER,
+                ControlledGitHubDelivery.CLOSE_PR_ADAPTER,
+                ControlledGitHubDelivery.DELETE_BRANCH_ADAPTER,
+            },
+            set(gateway._adapters),
+        )
+
+    def test_a_branch_name_cannot_smuggle_a_path_into_the_ref_read(self) -> None:
+        # The same names the delete-side guard refuses; the read carries the
+        # same guard, so none of them reaches the transport at all.
+        for branch in (
+            "autopilot/../../../repos/octocat/hive-mind-os/git/refs/heads/main",
+            "autopilot/a4-800?ref=main",
+            "autopilot/a4-800#fragment",
+            "autopilot/.hidden",
+            "autopilot/a4 800",
+        ):
+            with self.subTest(branch=branch):
+                transport = FakeGitHubTransport()
+
+                with self.assertRaises(DeliveryRestError):
+                    self.gateway(transport).read_branch_ref(branch)
+
+                self.assertEqual([], transport.calls)
+
+    # -- query encoding and paging ----------------------------------------
+
+    def test_find_open_draft_pr_encodes_its_query_parameters(self) -> None:
+        transport = FakeGitHubTransport()
+        expected = (
+            f"/repos/{R2_OWNER}/{R2_REPOSITORY}/pulls?state=open"
+            f"&head={R2_OWNER}%3Aautopilot%2Fa4-800%2Bfeature&base=release%2Fnext"
+        )
+        transport.add("GET", expected, b"[]")
+
+        found = self.gateway(transport).find_open_draft_pr(
+            "autopilot/a4-800+feature",
+            "release/next",
+        )
+
+        self.assertIsNone(found)
+        self.assertEqual(expected, transport.calls[0]["path"])
+
+    def comment_page_path(self, page: int) -> str:
+        return (
+            f"/repos/{R2_OWNER}/{R2_REPOSITORY}/issues/{R2_PULL}"
+            f"/comments?per_page=100&page={page}"
+        )
+
+    def test_a_comment_marker_beyond_page_one_is_found_and_not_reposted(self) -> None:
+        # A4 D3: with a single unpaged read the marker fell off page one and
+        # the adapter posted a second identical comment.
+        intent = self.intent(
+            action="post_comment",
+            adapter=ControlledGitHubDelivery.COMMENT_ADAPTER,
+            parameters_digest=self.delivery.bind_parameters(
+                {"pull_number": R2_PULL, "body": "node receipt"}
+            ),
+        )
+        marker = f"{COMMENT_MARKER_PREFIX}{intent.idempotency_key} -->"
+        first = [
+            {"id": index, "body": f"unrelated chatter {index}"}
+            for index in range(1, 101)
+        ]
+        second = [{"id": 900, "body": f"node receipt\n\n{marker}"}]
+        self.assertEqual(100, len(first))
+        self.transport.add("GET", self.comment_page_path(1), json.dumps(first).encode())
+        self.transport.add(
+            "GET", self.comment_page_path(2), json.dumps(second).encode()
+        )
+
+        outcome = self.delivery.comment_adapter(intent)
+
+        self.assertEqual(("comment:900",), outcome["produced_identifiers"])
+        self.assertEqual(["GET", "GET"], self.methods(self.transport))
+        self.assertNotIn("POST", self.methods(self.transport))
+        self.assertEqual(
+            [self.comment_page_path(1), self.comment_page_path(2)],
+            [call["path"] for call in self.transport.calls],
+        )
+
+    def test_a_short_first_comment_page_ends_the_read(self) -> None:
+        self.transport.add(
+            "GET",
+            self.comment_page_path(1),
+            json.dumps([{"id": 5, "body": "unrelated"}]).encode(),
+        )
+
+        comments = self.delivery.rest.list_comments(R2_PULL)
+
+        self.assertEqual((5,), tuple(comment["id"] for comment in comments))
+        self.assertEqual(["GET"], self.methods(self.transport))
+
     def test_retractions_refuse_an_intent_aimed_at_another_repository(self) -> None:
         for action, adapter, parameters in (
             (
@@ -1368,6 +1912,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
+        self.owner_authority = _anchor_delivery_ledger(self)
         self.environment = patch.dict(
             os.environ,
             {self.TOKEN_ENV: "fixture-push-executor-token"},
@@ -1542,7 +2087,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
         self,
     ) -> None:
         registry = AuthorityRegistry()
-        registry.register(ControlledRetractionTests.envelope())
+        _mint_root(registry, ControlledRetractionTests.envelope())
         transport = FakeGitHubTransport()
         delivery = ControlledGitHubDelivery(
             ControlledRetractionTests.grant(),
@@ -1553,7 +2098,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
             ),
             push_executor=self.executor(),
         )
-        gateway = EffectGateway()
+        gateway = EffectGateway(authority=registry, clock=lambda: R2_TIME)
         delivery.register_with(gateway)
         intent = ControlledRetractionTests.intent(
             action="push",
@@ -1563,7 +2108,7 @@ class WorkspacePushExecutorTests(unittest.TestCase):
 
         result = gateway.execute(
             intent,
-            registry.authorize(R2_DIGEST, "push", R2_TARGET, now=R2_TIME),
+            registry.authorize(R2_AUTH, "push", R2_TARGET, now=R2_TIME),
         )
 
         head = self.workspace_head()

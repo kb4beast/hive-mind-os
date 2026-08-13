@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Callable
 
-from .authority import AuthorityDenied, CapabilityToken
+from .authority import (
+    AuthorityDenied,
+    AuthorityRegistry,
+    CapabilityToken,
+    token_is_issued,
+)
 from .canonical import canonical_digest
 from .contracts import EffectIntent, EffectReceipt
 
@@ -20,8 +26,33 @@ class EffectResult:
     status: str
 
 
-def validate_capability_token(intent: EffectIntent, token: CapabilityToken) -> None:
-    """Require a token to bind cryptographically to the complete intent target."""
+def _now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def intent_seal(intent: EffectIntent) -> str:
+    """Pure seal over every field of an intent except the seal itself."""
+
+    document = intent.to_document()
+    document.pop("intent_digest")
+    return canonical_digest(document)
+
+
+def sealed_intent(intent: EffectIntent) -> EffectIntent:
+    """Return the same intent carrying the digest its fields imply."""
+
+    return replace(intent, intent_digest=intent_seal(intent))
+
+
+def validate_capability_token(
+    intent: EffectIntent,
+    token: CapabilityToken,
+    *,
+    authority: AuthorityRegistry | None = None,
+    now: str | None = None,
+    network_hosts: tuple[str, ...] = (),
+) -> None:
+    """Bind a token to an intent and, given an issuer, to live authority state."""
 
     expected_token_digest = canonical_digest(
         {
@@ -37,6 +68,27 @@ def validate_capability_token(intent: EffectIntent, token: CapabilityToken) -> N
         or token.target != intent.target
     ):
         raise AuthorityDenied("capability token does not bind this intent")
+    if intent.intent_digest != intent_seal(intent):
+        raise AuthorityDenied("intent digest does not seal this intent")
+    if authority is None:
+        if network_hosts:
+            raise AuthorityDenied("a network effect requires an authority-bound gateway")
+        if not token_is_issued(token):
+            raise AuthorityDenied("capability token was not issued by an authority registry")
+        return
+    issued = authority.authorize(
+        token.envelope_digest, token.action, token.target, now=now or _now()
+    )
+    if issued != token:
+        raise AuthorityDenied("capability token was not issued by this authority")
+    if network_hosts:
+        envelope = authority.envelope(token.envelope_digest)
+        outside = sorted(set(network_hosts) - set(envelope.network_allowlist))
+        if outside:
+            raise AuthorityDenied(
+                "effect reaches a host outside the network allowlist: "
+                + ", ".join(outside)
+            )
 
 
 def build_effect_receipt(
@@ -75,13 +127,29 @@ def build_effect_receipt(
 
 
 class EffectGateway:
-    """An adapter registry; duplicate intents return their prior local receipt."""
+    """An adapter registry; duplicate intents return their prior local receipt.
 
-    def __init__(self, store: KernelStore | None = None) -> None:
+    A gateway built with an ``authority`` registry verifies every token against
+    live issuance state -- registration, expiry, revocation and scope -- plus the
+    intent seal and the envelope's network allowlist, before any adapter runs. A
+    gateway built without one can only bind a token to its intent, so an issuer
+    should be supplied wherever the registry that minted the token is in hand.
+    """
+
+    def __init__(
+        self,
+        store: KernelStore | None = None,
+        *,
+        authority: AuthorityRegistry | None = None,
+        clock: Callable[[], str] = _now,
+    ) -> None:
         self._adapters: dict[str, Callable[[EffectIntent], object]] = {}
         self._adapter_versions: dict[str, str] = {}
+        self._adapter_hosts: dict[str, tuple[str, ...]] = {}
         self._receipts: dict[str, EffectResult] = {}
         self._store = store
+        self._authority = authority
+        self._clock = clock
 
     def register_adapter(
         self,
@@ -89,6 +157,7 @@ class EffectGateway:
         adapter: Callable[[EffectIntent], object],
         *,
         version: str = "1",
+        network_hosts: tuple[str, ...] = (),
     ) -> None:
         if not name or name in self._adapters:
             raise ValueError("adapter name must be new and non-empty")
@@ -96,9 +165,16 @@ class EffectGateway:
             raise ValueError("adapter version must be non-empty")
         self._adapters[name] = adapter
         self._adapter_versions[name] = version
+        self._adapter_hosts[name] = tuple(network_hosts)
 
     def execute(self, intent: EffectIntent, token: CapabilityToken) -> EffectResult:
-        validate_capability_token(intent, token)
+        validate_capability_token(
+            intent,
+            token,
+            authority=self._authority,
+            now=self._clock(),
+            network_hosts=self._adapter_hosts.get(intent.target_adapter, ()),
+        )
         if self._store is not None:
             # Lazy import keeps the original in-memory gateway dependency-free and
             # avoids a module cycle between the gateway and durable adapter.
@@ -108,6 +184,8 @@ class EffectGateway:
                 self._store,
                 adapters=self._adapters,
                 adapter_versions=self._adapter_versions,
+                adapter_hosts=self._adapter_hosts,
+                authority=self._authority,
             ).execute(intent, token)
         previous = self._receipts.get(intent.idempotency_key)
         if previous is not None:

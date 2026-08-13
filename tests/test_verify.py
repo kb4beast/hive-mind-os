@@ -402,6 +402,103 @@ class StandaloneVerificationTests(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertEqual(list(self.root.glob(".hive-mind-verify-*")), [])
 
+    def _bundle_document(self, bundle: Path) -> dict:
+        return json.loads((bundle / "verification.json").read_text(encoding="utf-8"))
+
+    def _forge(self, bundle: Path, mutate) -> None:
+        """Rewrite the report as a tamperer would, then recompute the whole manifest."""
+
+        document = self._bundle_document(bundle)
+        mutate(document)
+        (bundle / "verification.json").write_text(
+            json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        verification._write_integrity_manifest(bundle)
+        manifest = json.loads((bundle / "integrity.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            manifest["files"],
+            verification._bundle_file_digests(bundle, include_integrity=False),
+        )
+
+    def _rejected_bundle_from_a_deleted_test(self, name: str) -> Path:
+        (self.repository / "tests" / "test_existing.py").unlink()
+        self._git("rm", "tests/test_existing.py")
+        self._git("commit", "-m", "delete test")
+        self.candidate = self._git_text("rev-parse", "HEAD")
+        report = self._verify(self._specification(paths=["tests/test_existing.py"]), name)
+        self.assertEqual(report.verdict, "reject")
+        return report.report_path.parent
+
+    def test_flipping_a_retained_verdict_from_reject_to_adopt_is_refused(self) -> None:
+        bundle = self._rejected_bundle_from_a_deleted_test("flipped-verdict-bundle")
+        verification.verify_bundle(bundle)
+
+        self._forge(bundle, lambda document: document.__setitem__("verdict", "adopt"))
+
+        self.assertEqual(self._bundle_document(bundle)["verdict"], "adopt")
+        with self.assertRaisesRegex(VerificationError, "adjudication evidence"):
+            verification.verify_bundle(bundle)
+
+    def test_forged_adoption_of_a_timed_out_check_is_refused(self) -> None:
+        (self.repository / "check_value.py").write_text(
+            "import time\ntime.sleep(10)\n", encoding="utf-8"
+        )
+        self._commit("make check hang", "check_value.py")
+        with patch.object(verification, "_CHECK_TIMEOUT_SECONDS", 0.05):
+            report = self._verify(
+                self._specification(paths=["check_value.py"]),
+                "forged-timeout-bundle",
+            )
+        bundle = report.report_path.parent
+        self.assertEqual(report.verdict, "reject")
+
+        def forge(document: dict) -> None:
+            document["verdict"] = "adopt"
+            document["checks"][0]["matched"] = True
+
+        self._forge(bundle, forge)
+
+        with self.assertRaisesRegex(VerificationError, "ledger adjudication event"):
+            verification.verify_bundle(bundle)
+
+    def test_recorded_check_outcome_that_contradicts_its_receipt_is_refused(self) -> None:
+        fixtures = self.repository / "tests" / "fixtures"
+        fixtures.mkdir()
+        (fixtures / "value.json").write_text('{"value": 2}\n', encoding="utf-8")
+        self._commit("add fixture", "tests/fixtures/value.json")
+        report = self._verify(self._specification(paths=[]), "contradicted-check-bundle")
+        bundle = report.report_path.parent
+        self.assertEqual(report.verdict, "reject")
+        self.assertTrue(self._bundle_document(bundle)["checks"][0]["matched"])
+
+        self._forge(bundle, lambda document: document["checks"][0].__setitem__("matched", False))
+
+        with self.assertRaisesRegex(VerificationError, "execution receipt"):
+            verification.verify_bundle(bundle)
+
+    def test_integrity_manifest_that_drops_the_verdict_binding_is_refused(self) -> None:
+        report = self._verify(self._specification(), "unbound-verdict-bundle")
+        bundle = report.report_path.parent
+        verification.verify_bundle(bundle)
+
+        (bundle / "integrity.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "files": verification._bundle_file_digests(bundle, include_integrity=False),
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(VerificationError, "does not bind the verdict"):
+            verification.verify_bundle(bundle)
+
     def test_cli_requires_the_candidate_and_returns_success_for_an_adopted_verdict(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
