@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-GIT-COMMIT-OBSERVATION-OPENING",
+  "node_id": "GCO-SEAL-000",
+  "recorded_at": "2026-08-13",
+  "subject": "A separately governed invocation-local immutable Git commit observation challenger",
+  "clerk": {
+    "identity": "codex:gco-seal-000",
+    "seat": "clerk",
+    "worktree": "C:/Repos/HiveMind/hive-mind-os-gco-seal-000",
+    "branch": "codex/gco-seal-000",
+    "authority": "seal the authorized opening court and deterministic DAG only",
+    "self_approval": false
+  },
+  "appeal_authority": {
+    "source": "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json",
+    "source_git_blob": "9809e7f79110237834696e64d8f100379e586ba9",
+    "source_disposition": "reject",
+    "current_candidate_case_closed": true,
+    "new_separate_court_authorized": true,
+    "authorized_subject": "Judge-deferred invocation-scoped immutable Git read batching",
+    "authority_granted_now": "court-opening-and-sealed-DAG-only",
+    "implementation_authority_granted_by_source": false,
+    "baseline_retry_authority_granted": false
+  },
+  "baseline": {
+    "commit": "61f31cbbee36471ce6e5f0ad7b94db81ad33e9bb",
+    "tree": "8713db647ad2843a336a2f0c6781ebf8161ee47a",
+    "state": "the rejected fixture implementation is reverted; existing knowledge and doctor DAG seals remain valid"
+  },
+  "governing_sources": [
+    {
+      "path": "AGENTS.md",
+      "claim": "Material architecture, implementation, learning, and superiority claims require independent court evidence and fail-closed gates."
+    },
+    {
+      "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+      "git_blob": "70e43b0a8078a303d44c0109b8dd218a948258c2",
+      "claim": "Executable DAGs require complete node contracts, deterministic rounds, scope isolation, independent integration, and focused worker tests."
+    },
+    {
+      "path": "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json",
+      "git_blob": "c0e2ebfeb1f438ff5a00091f636b31de6153bfca",
+      "claim": "The exact doctor command, 180-second timeout, frozen behavior vector, and two-runtime p95 burden are sealed."
+    },
+    {
+      "path": "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json",
+      "git_blob": "9809e7f79110237834696e64d8f100379e586ba9",
+      "claim": "The fixture challenger is rejected and a new, separate immutable Git-read challenger court may be opened under mandatory conditions."
+    },
+    {
+      "path": "docs/execution/dags/knowledge-projection-v1/verify_plan.py",
+      "git_blob": "32fe02b72bc1590fb68c879eb65177429b603d7b",
+      "plan_digest": "sha256:e61a9b79651871d8d4b8a71e2ed1f540964a9fdc9c4343f5e2f14b73589184ec"
+    },
+    {
+      "path": "docs/execution/dags/doctor-performance-v1/verify_plan.py",
+      "git_blob": "0180d6d9b8083938e88d45b222cd2e553f9b7464",
+      "plan_digest": "sha256:4b3dec3b24fee6b8a5e1be3ac0a8eec69882922a69143bda259c308990a190d6"
+    }
+  ],
+  "rejected_comparator": {
+    "commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+    "tree": "b02326bf108de2fbaa2f174975f937979c02bf90",
+    "subject": "invocation-scoped content-addressed healing fixtures",
+    "disposition": "reject",
+    "promotion_authorized": false,
+    "reuse_or_amendment_forbidden": true,
+    "retention_reason": "pinned adverse comparator only"
+  },
+  "participants": [
+    {
+      "seat": "clerk",
+      "identity": "codex:gco-seal-000",
+      "node": "GCO-SEAL-000"
+    },
+    {
+      "seat": "explorer_and_optimizer",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-BASELINE-010"
+    },
+    {
+      "seat": "independent_test_curator",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-TEST-020"
+    },
+    {
+      "seat": "architect",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-ARCH-030"
+    },
+    {
+      "seat": "builder",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-BUILD-040"
+    },
+    {
+      "seat": "integrator",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-INTEGRATE-050"
+    },
+    {
+      "seat": "steward_and_independent_safety_curator",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-SAFETY-060"
+    },
+    {
+      "seat": "optimizer",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-SMOKE-070"
+    },
+    {
+      "seat": "independent_qualification_curator",
+      "identity_binding": "future-node-receipt",
+      "node": "GCO-QUALIFY-080"
+    },
+    {
+      "seat": "judge",
+      "identity_binding": "future-node-receipt-distinct-from-all-prior-identities",
+      "node": "GCO-JUDGE-090"
+    }
+  ],
+  "atomic_claims": [
+    {
+      "claim_id": "GCO-CLAIM-001",
+      "claim": "A private immutable invocation-local observation may read a finite set of full commit OIDs in one raw Git batch for diagnostics and pure validation.",
+      "disposition": "adapt",
+      "mapped_nodes": ["GCO-TEST-020", "GCO-ARCH-030", "GCO-BUILD-040", "GCO-INTEGRATE-050"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-002",
+      "claim": "The reader must bind repository identity and permitted object storage and fail closed on shallow, graft, promisor, replace, or alternate configurations unless separately proven safe.",
+      "disposition": "adopt",
+      "mapped_nodes": ["GCO-TEST-020", "GCO-ARCH-030", "GCO-SAFETY-060"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-003",
+      "claim": "One replacement-disabled git cat-file --batch process must validate full OID order/count, type, decimal size, exact bytes/terminator, reconstructed object hash, and commit grammar.",
+      "disposition": "adopt",
+      "mapped_nodes": ["GCO-TEST-020", "GCO-ARCH-030", "GCO-BUILD-040"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-004",
+      "claim": "Missing, malformed, duplicate, extra, truncated, reordered, wrong-type, or hash-mismatched output may be accepted partially.",
+      "disposition": "reject",
+      "mapped_nodes": ["GCO-TEST-020", "GCO-BUILD-040", "GCO-SAFETY-060"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-005",
+      "claim": "The observation may replace existing Git helpers ambiently or become a generic, ref, HEAD, negative, ancestry, persistent, shared, cross-instance, or cross-invocation cache.",
+      "disposition": "reject",
+      "mapped_nodes": ["GCO-ARCH-030", "GCO-BUILD-040", "GCO-SAFETY-060"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-006",
+      "claim": "Diff or ancestry conclusions may be derived from delimiter-based batch output in this challenger.",
+      "disposition": "reject",
+      "mapped_nodes": ["GCO-TEST-020", "GCO-ARCH-030", "GCO-BUILD-040"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-007",
+      "claim": "The observation may remain alive across claims, completion, retirement, repair, fetch, push, update-ref, CAS, compensation, or publication.",
+      "disposition": "reject",
+      "mapped_nodes": ["GCO-INTEGRATE-050", "GCO-SAFETY-060"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-008",
+      "claim": "sealed_recovery.py or release_barrier.py may consume or retain the observation.",
+      "disposition": "reject",
+      "mapped_nodes": ["GCO-TEST-020", "GCO-INTEGRATE-050", "GCO-SAFETY-060"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-009",
+      "claim": "A one-trial smoke on each pinned runtime must precede the expensive six-trial qualification matrix.",
+      "disposition": "adopt",
+      "mapped_nodes": ["GCO-SMOKE-070", "GCO-QUALIFY-080"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-010",
+      "claim": "The unchanged exact doctor gate requires the complete 381-execution vector, every trial below 180 seconds, and nearest-rank p95 at most 135 seconds on both pinned runtimes.",
+      "disposition": "adopt",
+      "mapped_nodes": ["GCO-SMOKE-070", "GCO-QUALIFY-080", "GCO-JUDGE-090"]
+    },
+    {
+      "claim_id": "GCO-CLAIM-011",
+      "claim": "A passing benchmark may automatically promote the candidate, claim superiority, or authorize knowledge BASELINE-000 retry.",
+      "disposition": "reject",
+      "mapped_nodes": ["GCO-QUALIFY-080", "GCO-JUDGE-090"]
+    }
+  ],
+  "authorized_architecture": {
+    "type": "controller-private GitCommitObservation",
+    "properties": [
+      "immutable",
+      "finite",
+      "invocation-local",
+      "non-serializable",
+      "non-retained",
+      "fully cleaned"
+    ],
+    "reader": "one narrowly named replacement-disabled git cat-file --batch process over deduplicated validated full commit OIDs",
+    "repository_binding": [
+      "repository root",
+      "absolute Git directory",
+      "common directory",
+      "object format",
+      "permitted object store"
+    ],
+    "commit_validation": [
+      "exact input/output count and order",
+      "exact <oid> commit <decimal-size> header",
+      "exact body and terminator",
+      "recompute declared-format OID from commit <size> NUL body",
+      "exactly one tree followed by zero or more parents before one blank line"
+    ],
+    "only_consumers": [
+      "exercised controller diagnostics",
+      "explicit invocation-local pure receipt validation in durable_controller"
+    ],
+    "effect_boundary": "destroy observation, freshly read every mutable fact and authority before effect decision, retain existing CAS/force-with-lease, and freshly verify after effect"
+  },
+  "required_dag": {
+    "nodes": [
+      "GCO-SEAL-000",
+      "GCO-BASELINE-010",
+      "GCO-TEST-020",
+      "GCO-ARCH-030",
+      "GCO-BUILD-040",
+      "GCO-INTEGRATE-050",
+      "GCO-SAFETY-060",
+      "GCO-SMOKE-070",
+      "GCO-QUALIFY-080",
+      "GCO-JUDGE-090"
+    ],
+    "edges": [
+      ["GCO-SEAL-000", "GCO-BASELINE-010"],
+      ["GCO-SEAL-000", "GCO-TEST-020"],
+      ["GCO-SEAL-000", "GCO-ARCH-030"],
+      ["GCO-BASELINE-010", "GCO-ARCH-030"],
+      ["GCO-TEST-020", "GCO-BUILD-040"],
+      ["GCO-ARCH-030", "GCO-BUILD-040"],
+      ["GCO-BUILD-040", "GCO-INTEGRATE-050"],
+      ["GCO-INTEGRATE-050", "GCO-SAFETY-060"],
+      ["GCO-SAFETY-060", "GCO-SMOKE-070"],
+      ["GCO-SMOKE-070", "GCO-QUALIFY-080"],
+      ["GCO-QUALIFY-080", "GCO-JUDGE-090"]
+    ],
+    "dispatch_rounds": [
+      ["GCO-SEAL-000"],
+      ["GCO-BASELINE-010", "GCO-TEST-020"],
+      ["GCO-ARCH-030"],
+      ["GCO-BUILD-040"],
+      ["GCO-INTEGRATE-050"],
+      ["GCO-SAFETY-060"],
+      ["GCO-SMOKE-070"],
+      ["GCO-QUALIFY-080"],
+      ["GCO-JUDGE-090"]
+    ]
+  },
+  "frozen_qualification_contract": {
+    "exact_doctor_suffix": [
+      ".autopilot/bin/autopilot.py",
+      "--repo-root",
+      ".",
+      "doctor",
+      "--json"
+    ],
+    "doctor_internal_timeout_seconds": 180,
+    "complete_unittest_id_set_sha256": "sha256:7c0cf4ae7a2efca60af613b1702c97133a28b043bad09b231fe3a6c97d23eef4",
+    "total_executions": 381,
+    "passed": 380,
+    "skipped": 1,
+    "failures": 0,
+    "errors": 0,
+    "conditional_skip_id": "test_orchestration.IntentOrchestrationTests.test_binding_state_symlink_escape_is_rejected",
+    "smoke_policy": "exactly one fresh trial per pinned runtime; either non-pass or >=180 seconds stops the six-trial matrix",
+    "qualification_policy": "at least six fresh cold-first alternating trials per runtime; every trial passes below 180 seconds; nearest-rank p95 <=135 seconds",
+    "post_performance_gates": [
+      "focused adversarial tests",
+      "full .autopilot discovery",
+      "full repository CI",
+      "independent scope, seal, safety, and rollback receipts"
+    ]
+  },
+  "global_forbidden": [
+    ".autopilot/plan.json mutation",
+    "existing .autopilot test mutation",
+    "production src mutation",
+    "existing knowledge and doctor DAG or manifest mutation",
+    "existing receipt or adverse evidence mutation",
+    "rejected candidate or qualification receipt reuse",
+    "doctor command, timeout, vector, discovery, or behavior change",
+    "persistent state or shared daemon",
+    "generic, ref, HEAD, negative, or ancestry cache",
+    "diff or ancestry batching",
+    "remote effects or authority expansion"
+  ],
+  "dissent": [
+    "Batching immutable commit bodies can reduce process overhead, but the retained baseline does not prove Git subprocesses are the dominant end-to-end runtime cause.",
+    "A process-local object can still become a semantic cache if it crosses a mutable-state or effect boundary; locality alone is insufficient.",
+    "Git repositories with replace, shallow, graft, alternate, promisor, worktree, or non-default object-format configuration need explicit rejection or evidence, not optimistic compatibility.",
+    "A passing two-runtime matrix supports only the sealed candidate and cannot establish superiority over unmeasured alternatives."
+  ],
+  "verdict": {
+    "disposition": "adapt",
+    "authorized_program": "git-commit-observation-v1",
+    "authorized_now": "GCO-SEAL-000 sealing work only",
+    "implementation_status": "not_started",
+    "automatic_promotion": false,
+    "superiority_claim": false,
+    "knowledge_baseline_retry_authorized": false,
+    "remote_authority_granted": false,
+    "final_gate": "Only a distinct GCO-JUDGE-090 ADOPT verdict with zero unresolved material findings may authorize the narrowly scoped immutable challenger."
+  },
+  "rollback": "Revert one node's retained unsquashed integration commit without rebasing or squashing neighbors; retain all externally cited adverse evidence as superseded.",
+  "appeal_conditions": [
+    "new evidence shows the bounded observation crosses an invocation, mutable-state, or effect boundary",
+    "repository configuration or object-format cases invalidate the parser or identity binding",
+    "either smoke fails or either runtime misses the six-trial completion or p95 burden",
+    "the frozen behavior vector, focused safety tests, full .autopilot suite, or full repository CI changes or fails",
+    "a narrower or safer separately pinned challenger produces stronger retained evidence"
+  ],
+  "completion_claim": false,
+  "superiority_claim": false
+}
