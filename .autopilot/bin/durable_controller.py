@@ -24,6 +24,8 @@ from controller import (
     ClaimError,
     ConfigurationError,
     ControlPlane as BaseControlPlane,
+    GitCommitObservation,
+    GitCommitObservationError,
     NodeView,
     ReceiptError,
     append_jsonl,
@@ -136,10 +138,41 @@ class ControlPlane(BaseControlPlane):
         value: object,
         *,
         require_integrated: bool = False,
+        commit_observation: GitCommitObservation | None = None,
     ) -> tuple[str, ...]:
         """Preserve base checks and additionally bind trees and the exact Git diff."""
 
-        issues = list(
+        issues: list[str] = []
+        observation_is_usable = False
+        if commit_observation is not None:
+            if not isinstance(commit_observation, GitCommitObservation):
+                issues.append("commit observation has an invalid type")
+            elif not isinstance(value, Mapping):
+                issues.append("commit observation cannot cover a non-object receipt")
+            else:
+                observed_commits = tuple(
+                    dict.fromkeys(
+                        commit
+                        for commit in (value.get("base_commit"), value.get("final_commit"))
+                        if isinstance(commit, str) and FULL_SHA.fullmatch(commit)
+                    )
+                )
+                try:
+                    commit_observation.assert_repository(self.repo_root)
+                    if commit_observation.oids != observed_commits:
+                        issues.append(
+                            "commit observation does not exactly cover receipt commits"
+                        )
+                    elif len(observed_commits) != 2:
+                        issues.append(
+                            "commit observation cannot cover invalid receipt commits"
+                        )
+                    else:
+                        observation_is_usable = True
+                except GitCommitObservationError as error:
+                    issues.append(f"commit observation is invalid: {error}")
+
+        issues.extend(
             super().validate_receipt(
                 node_id,
                 value,
@@ -168,10 +201,24 @@ class ControlPlane(BaseControlPlane):
             and self.git_object_exists(base)
             and self.git_object_exists(final)
         ):
-            if self._commit_tree(base) != base_tree:
-                issues.append("receipt base_tree does not match base_commit")
-            if self._commit_tree(final) != final_tree:
-                issues.append("receipt final_tree does not match final_commit")
+            try:
+                observed_base_tree = (
+                    commit_observation.tree(base)
+                    if observation_is_usable and commit_observation is not None
+                    else self._commit_tree(base)
+                )
+                observed_final_tree = (
+                    commit_observation.tree(final)
+                    if observation_is_usable and commit_observation is not None
+                    else self._commit_tree(final)
+                )
+            except GitCommitObservationError as error:
+                issues.append(f"commit observation is invalid: {error}")
+            else:
+                if observed_base_tree != base_tree:
+                    issues.append("receipt base_tree does not match base_commit")
+                if observed_final_tree != final_tree:
+                    issues.append("receipt final_tree does not match final_commit")
             if self.is_ancestor(base, final):
                 if self._diff_paths(base, final) != self._normalized_receipt_changed_paths(value):
                     issues.append("receipt changed_paths do not match the exact base..final diff")
