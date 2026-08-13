@@ -37,7 +37,26 @@ python .autopilot/bin/autopilot.py --repo-root . dag-rounds --plan docs/plan/aut
 | 4. Grant authenticity and lifetime | A5-F6, A4 D4 | `GRANT-1020` | `cortex/github/grants.py` |
 | 4. Gateway read/idempotency surface | A4 D2, D3, D6 | `GATEWAY-1040` | `rest_gateway.py`, `delivery_adapter.py` |
 | 5. Containment unproven on Windows | §11.5 | `SANDBOX-1300` | `sandbox.py`, `tests/test_sandbox.py` |
+| residual binding | A5-F10, A5-F6 (production paths) | `BIND-1030` | gateway/outbox/grant construction sites |
 | closure adjudication | all of the above | `REAUDIT-1900` | evidence + results doc only |
+
+## Plan extension — BIND-1030, added mid-execution
+
+TOKEN-1010 and GRANT-1020 both delivered **conditional** closures, and the orchestrator
+reproduced both independently before accepting them:
+
+```
+authority-bound gateway  -> REFUSED  (probe-2 forgery)
+registry-less gateway    -> ACCEPTED, adapter RAN
+local_execution.py:218   -> constructs EffectGateway WITHOUT authority=
+mission_adapter.py:145   -> constructs EffectGateway WITHOUT authority=
+```
+
+A delivery grant is likewise refused only once the owner *anchors* the ledger, and no
+fixture anchors it. Neither node could fix this from inside its own write scope — the
+offending constructors and fixtures belonged to other nodes and were mandated green.
+`BIND-1030` owns exactly that binding surface. Without it, `REAUDIT-1900` would correctly
+record the plan's highest-impact finding as half-closed.
 
 ## Contract repair — 2026-08-13, before any worker ran
 

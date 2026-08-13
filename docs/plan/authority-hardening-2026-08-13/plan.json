@@ -774,6 +774,147 @@
   },
   {
    "acceptance_criteria": [
+    "The probe-2 forgery is REFUSED through the production construction path, not merely through a hand-built authority-bound gateway: local_execution and mission_adapter build authority-bound gateways (closes A5-F10 for production).",
+    "DurableEffectOutbox consults the registry -- its validate_capability_token calls (effect_outbox.py:57,77,193) carry authority -- so constructing the outbox directly does not skip the boundary.",
+    "_DeterministicEffectGateway.execute (mission_adapter.py:81-87) no longer reaches the outbox in a way that skips validation.",
+    "Production intents are sealed (builder.py:247, local_execution.py:237, mission_adapter.py:152), so the intent-seal check is unconditional rather than authority-bound-only (completes A4 D5).",
+    "AuthorityRegistry exposes a public envelope accessor and effects.py no longer reaches into authority._envelopes.",
+    "An unanchored delivery-grant ledger cannot produce a usable grant: fixtures mint a RootProvenance and anchor, so A5-F6's closure no longer depends on an unperformed deployment step.",
+    "A registry-less gateway carrying registered adapters can no longer execute a forged token anywhere in the repository; if any construction site must remain unbound, it is named with its justification.",
+    "Each closed residual has a mandated test proven to fail when its fix is reverted, and the full focused-suite union stays green."
+   ],
+   "assumptions": [
+    "No node may expand its own authority or weaken acceptance to pass.",
+    "Retained evidence under evidence/pilots/** is immutable; probes are re-run, never edited."
+   ],
+   "branch": "autopilot/bind-1030",
+   "category": "security-hardening",
+   "consultation_routes": [
+    "orchestrator"
+   ],
+   "contract_version": 1,
+   "critical_path_importance": 95,
+   "dependencies": [
+    "TOKEN-1010",
+    "GRANT-1020",
+    "GATEWAY-1040"
+   ],
+   "downstream_unlock_value": 60,
+   "effort": "large",
+   "escalation_conditions": [
+    "runbook contradiction with real source requires an orchestrator repair commit",
+    "fix requires writing outside the declared write scope",
+    "fix requires new authority, credentials, or any live remote effect"
+   ],
+   "evidence_requirements": [
+    "Exact base and final commit/tree identities",
+    "Changed-path inventory bound to declared write scope",
+    "Command/test receipts with outcomes",
+    "Role and authority identities",
+    "Consultation and dissent records where invoked",
+    "Rollback reference"
+   ],
+   "expected_outputs": [
+    "Bounded implementation artifact",
+    "Mandated tests plus mutation evidence that each fix bites",
+    "Node completion receipt"
+   ],
+   "file_locks": [
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "src/hive_mind_os/brain_kernel/effect_outbox.py",
+    "src/hive_mind_os/brain_kernel/builder.py",
+    "src/hive_mind_os/cortex/repository/local_execution.py",
+    "src/hive_mind_os/cortex/repository/mission_adapter.py",
+    "src/hive_mind_os/cortex/github/grants.py",
+    "tests/test_hive_cortex_effects.py",
+    "tests/test_hive_cortex_builder.py",
+    "tests/test_brain_kernel_local_execution.py",
+    "tests/test_hive_cortex_mission_runtime.py",
+    "tests/test_hive_cortex_durability.py",
+    "tests/test_hive_cortex_delivery.py",
+    "tests/test_github_adapter.py",
+    "tests/test_delivery_grants.py"
+   ],
+   "forbidden_scope": [
+    ".autopilot/**",
+    "docs/execution/runbooks/**",
+    "evidence/pilots/**",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md",
+    "pyproject.toml"
+   ],
+   "id": "BIND-1030",
+   "interfaces": [],
+   "max_retries": 2,
+   "merge_conflict_surface": "low",
+   "objective": "Bind the hardened authority surfaces to the paths production actually uses, so the closures of A5-F10 and A5-F6 hold for every caller rather than only for a cooperating one.",
+   "parallel_safe": false,
+   "pr_target": "main",
+   "rationale": "PLAN EXTENSION 2026-08-13, added after TOKEN-1010 and GRANT-1020 reported conditional closures and the orchestrator reproduced both independently. Measured: an authority-bound gateway REFUSES the probe-2 forgery, a registry-less gateway ACCEPTS it and runs the adapter, and local_execution.py:218 and mission_adapter.py:145 both construct EffectGateway WITHOUT authority= -- so production sits on the vulnerable path. Likewise a delivery grant is refused only once the owner anchors the ledger, and no fixture anchors it. Neither node could fix this from inside its own write scope: the offending constructors and fixtures belonged to other nodes and were mandated green. Without this node REAUDIT-1900 would correctly record the plan's highest-impact finding as half-closed.",
+   "read_scope": [
+    "src/hive_mind_os/brain_kernel/effects.py",
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "src/hive_mind_os/cortex/github/grants.py",
+    "evidence/pilots/a5/audits/authority-boundary.json",
+    "evidence/pilots/a5/tests/authority-boundary-probe.txt",
+    "evidence/pilots/a5/tests/authority-boundary-probe-2.txt"
+   ],
+   "required_inputs": [
+    "Current target SHA and ancestry",
+    "Applicable AGENTS.md and architecture contracts",
+    "Validated dependency receipts"
+   ],
+   "required_tests": [
+    "PYTHONPATH=src python -m unittest tests.test_hive_cortex_effects tests.test_hive_cortex_builder tests.test_brain_kernel_local_execution tests.test_hive_cortex_mission_runtime -v",
+    "PYTHONPATH=src python -m unittest tests.test_hive_cortex_durability tests.test_hive_cortex_delivery tests.test_delivery_grants tests.test_github_adapter -v",
+    "PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority tests.test_brain_kernel_contracts tests.hive_cortex.test_no_cheating -v"
+   ],
+   "reversibility": "Revert the node branch; no external effects are performed by this node.",
+   "risk": "critical",
+   "roles": [
+    "explorer",
+    "builder",
+    "integrator"
+   ],
+   "rollback": "Revert the node branch commits; preserve adverse receipts.",
+   "routes": {
+    "anthropic": {
+     "availability": "verified-current",
+     "model": "Claude Fable 5",
+     "reasoning_effort": "high"
+    },
+    "openai": {
+     "availability": "verified-current",
+     "model": "GPT-5.6 Sol",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Focused security-hardening implementation with mandated adversarial tests.",
+    "tier": "T2"
+   },
+   "semantic_locks": [
+    "iface:effect-gateway",
+    "iface:authority-registry",
+    "iface:delivery-grant"
+   ],
+   "stopping_condition": "required_tests green; each closed finding has a test proven to fail when its fix is reverted (mutation evidence retained); no files outside write_scope; receipt written; claim settled.",
+   "write_scope": [
+    "src/hive_mind_os/brain_kernel/authority.py",
+    "src/hive_mind_os/brain_kernel/effect_outbox.py",
+    "src/hive_mind_os/brain_kernel/builder.py",
+    "src/hive_mind_os/cortex/repository/local_execution.py",
+    "src/hive_mind_os/cortex/repository/mission_adapter.py",
+    "src/hive_mind_os/cortex/github/grants.py",
+    "tests/test_hive_cortex_effects.py",
+    "tests/test_hive_cortex_builder.py",
+    "tests/test_brain_kernel_local_execution.py",
+    "tests/test_hive_cortex_mission_runtime.py",
+    "tests/test_hive_cortex_durability.py",
+    "tests/test_hive_cortex_delivery.py",
+    "tests/test_github_adapter.py",
+    "tests/test_delivery_grants.py"
+   ]
+  },
+  {
+   "acceptance_criteria": [
     "A5 probe 2's forged capability token, re-run verbatim from the retained transcript source, is now rejected.",
     "A5 probe 1's registry and grant findings are re-measured with the retained probe source; results recorded per finding.",
     "A findings matrix maps each of A5-F3/F4/F5/F6/F10/F11/F12/F13/F14, A4 D1-D7, A3-F3, and handoff §11.5 to closed or open, each closed row naming the mandated test that bites and its mutation evidence.",
@@ -799,7 +940,8 @@
     "SANDBOX-1300",
     "TOKEN-1010",
     "GRANT-1020",
-    "GATEWAY-1040"
+    "GATEWAY-1040",
+    "BIND-1030"
    ],
    "downstream_unlock_value": 0,
    "effort": "large",
