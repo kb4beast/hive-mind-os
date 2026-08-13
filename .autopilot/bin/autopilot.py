@@ -374,14 +374,19 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             return False
         return record["origin_url"] == f"https://github.com/{record['repository']}.git"
 
-    def _remote_ref_sha(self, reference: str) -> str | None:
-        completed = self._git(("ls-remote", "origin", reference), check=False)
+    def _remote_ref_sha(self, ref: str, *, remote: str = "origin") -> str | None:
+        # The keyword is part of the base signature (controller.ControlPlane).
+        # Dropping it here made every base-class call that passes remote= raise
+        # TypeError, which silently disabled branch quarantine during healing.
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
+        completed = self._git(("ls-remote", remote, ref), check=False)
         if completed.returncode != 0:
             raise ClaimError("cannot inspect configured origin: " + completed.stderr.strip())
         fields = completed.stdout.strip().split()
         if not fields:
             return None
-        if len(fields) != 2 or fields[1] != reference or FULL_SHA.fullmatch(fields[0]) is None:
+        if len(fields) != 2 or fields[1] != ref or FULL_SHA.fullmatch(fields[0]) is None:
             raise ClaimError("configured origin returned an invalid ref identity")
         return fields[0]
 
