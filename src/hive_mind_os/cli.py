@@ -24,6 +24,17 @@ from .autonomous_os import (
     HostKind,
 )
 from .autonomy import AutonomyBudget
+from .autopilot_workflow import (
+    DEFAULT_OBJECTIVE,
+    DEFAULT_TARGET_BRANCH,
+    PortableAutopilotError,
+    initialize_repository,
+    inspect_repository,
+    trust_controller,
+)
+from .autopilot_workflow import (
+    simple_prompt as portable_autopilot_prompt,
+)
 from .benchmark_harness import BenchmarkHarness
 from .brain_kernel.context import ContextManifestStore
 from .brain_kernel.contracts import MissionCharter
@@ -68,7 +79,14 @@ from .models import AutonomyLevel, Objective, Role
 from .pit_oracle import LeakageError, PointInTimeOracle, SealViolation
 from .policy import PolicyEngine
 from .projection import build_projection, projection_json, write_projection_html
-from .repository_compatibility import record_legacy_enqueue
+from .repository_compatibility import (
+    COMPATIBILITY_MODES,
+    RuntimeRouteError,
+    record_canonical_enqueue,
+    record_legacy_enqueue,
+    resolve_runtime_route,
+    runtime_identity,
+)
 from .runtime import HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
@@ -118,6 +136,76 @@ def build_audit_parser() -> argparse.ArgumentParser:
         help="Required stable identifier when --signing-key-file is used",
     )
     return parser
+
+
+def build_autopilot_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind autopilot",
+        description="Initialize or operate a reusable intent-driven repository DAG.",
+    )
+    commands = parser.add_subparsers(dest="autopilot_command", required=True)
+    init = commands.add_parser("init", help="Record a portable governed DAG-build request")
+    init.add_argument("--repository", default=".")
+    init.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    init.add_argument("--target-branch", default=DEFAULT_TARGET_BRANCH)
+    init.add_argument("--remote", default="origin", help="Git remote to identify, or an empty value for local-only use")
+    init.add_argument(
+        "--protected-branch",
+        action="append",
+        default=[],
+        help="Additional protected branch name; repeat for repository-specific policy",
+    )
+    inspect = commands.add_parser("inspect", help="Infer intent and emit the next orchestration contract")
+    inspect.add_argument("--repository", default=".")
+    inspect.add_argument("--request", default="")
+    inspect.add_argument("--actor", default="hive-mind:portable-orchestrator")
+    inspect.add_argument("--apply", action="store_true")
+    inspect.add_argument("--trust-state-root")
+    trust = commands.add_parser(
+        "trust-controller",
+        help="Pin an independently reviewed target-controller bundle outside the repository",
+    )
+    trust.add_argument("--repository", default=".")
+    trust.add_argument("--actor", required=True)
+    trust.add_argument("--authorization-capability", required=True)
+    trust.add_argument("--trust-state-root")
+    commands.add_parser("prompt", help="Print the one reusable operator prompt")
+    return parser
+
+
+def _run_autopilot(args: argparse.Namespace) -> int:
+    try:
+        if args.autopilot_command == "init":
+            result = initialize_repository(
+                args.repository,
+                objective=args.objective,
+                target_branch=args.target_branch,
+                remote_name=args.remote,
+                protected_branches=args.protected_branch,
+            )
+        elif args.autopilot_command == "inspect":
+            result = inspect_repository(
+                args.repository,
+                request=args.request,
+                apply=args.apply,
+                actor=args.actor,
+                trust_state_root=args.trust_state_root,
+            )
+        elif args.autopilot_command == "trust-controller":
+            result = trust_controller(
+                args.repository,
+                actor=args.actor,
+                authorization_capability=args.authorization_capability,
+                trust_state_root=args.trust_state_root,
+            )
+        else:
+            print(portable_autopilot_prompt())
+            return 0
+    except PortableAutopilotError as error:
+        print(f"hive-mind autopilot: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
 
 
 def build_kernel_parser() -> argparse.ArgumentParser:
@@ -520,9 +608,15 @@ def build_enqueue_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--compatibility-mode",
-        choices=("kernel-v1", "legacy"),
-        default="kernel-v1",
-        help="Use the versioned kernel ingress record or retain legacy-only dispatch for rollback.",
+        choices=COMPATIBILITY_MODES,
+        default="canonical",
+        help=(
+            "Runtime routing for this request. 'canonical' (default) runs new "
+            "missions on the canonical mission runtime. 'kernel-v1' and 'legacy' "
+            "are explicit, reversible rollback modes during qualification: both "
+            "keep legacy execution, and 'legacy' additionally writes no kernel "
+            "ingress record."
+        ),
     )
     return parser
 
@@ -1135,12 +1229,19 @@ def _run_enqueue(args: argparse.Namespace) -> int:
         allow_nan=False,
     ).encode("utf-8")
     mission_id = f"M-{sha256(encoded).hexdigest()[:32]}"
+    try:
+        route = resolve_runtime_route(
+            getattr(args, "compatibility_mode", "canonical")
+        )
+    except RuntimeRouteError as error:
+        raise SystemExit(f"compatibility mode is invalid: {error}") from None
     scheduler = Scheduler(args.state_dir)
     try:
         job = scheduler.enqueue(
-            "repository-mission",
+            route.job_kind,
             {
                 "mission_id": mission_id,
+                "runtime": route.runtime,
                 **semantic_payload,
             },
             max_attempts=args.max_attempts,
@@ -1148,7 +1249,13 @@ def _run_enqueue(args: argparse.Namespace) -> int:
         )
     finally:
         scheduler.close()
-    if getattr(args, "compatibility_mode", "kernel-v1") == "kernel-v1":
+    if route.mode == "canonical":
+        record_canonical_enqueue(
+            job,
+            legacy_state_dir=args.state_dir,
+            kernel_state_dir=getattr(args, "kernel_state_dir", None),
+        )
+    elif route.mode == "kernel-v1":
         record_legacy_enqueue(
             job,
             legacy_state_dir=args.state_dir,
@@ -1160,6 +1267,7 @@ def _run_enqueue(args: argparse.Namespace) -> int:
                 "status": "enqueued",
                 "job_id": job.id,
                 "mission_id": mission_id,
+                "runtime": route.runtime,
                 "deduplication_digest": job.payload_digest,
             },
             indent=2,
@@ -1189,6 +1297,14 @@ def _run_serve(args: argparse.Namespace) -> int:
 
 def _run_status(args: argparse.Namespace) -> int:
     model = build_projection(args.state_dir)
+    scheduler = Scheduler(args.state_dir)
+    try:
+        model["runtime_routes"] = {
+            job.mission_id or job.id: runtime_identity(job.kind)
+            for job in scheduler.jobs()
+        }
+    finally:
+        scheduler.close()
     if args.html:
         output = write_projection_html(model, args.html)
         print(json.dumps({"status": "written", "html": str(output)}, indent=2))
@@ -1676,6 +1792,9 @@ def _run_defer(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "autopilot":
+        args = build_autopilot_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_autopilot(args))
     if arguments and arguments[0] == "kernel":
         args = build_kernel_parser().parse_args(arguments[1:])
         if args.kernel_command == "doctor":

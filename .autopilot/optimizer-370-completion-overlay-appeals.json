@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "appeal_id": "appeal-optimizer-370-completion-overlay-20260811",
+  "court_case_id": "court-optimizer-370-completion-overlay-20260811",
+  "court_disposition": "ADAPT",
+  "court_digest": "sha256:6434acb4f59fbfa2d0d2242e578d0b85446fe3b8f15670b8dff8e4883183e9b4",
+  "appeals_judge_identity": "appeals-judge:optimizer-370-completion-independent",
+  "disposition": "ADAPT",
+  "finding": "The exception is lawful only as an exact, one-time, crash-safe completion capability for the already sealed Optimizer claim and candidate.",
+  "constraints": [
+    "No other node, grant, target, head, receipt, path set, or continuation is admitted.",
+    "No expired, ADVERSE, PREPARING, or foreign claim is admitted.",
+    "The old and replacement receipt pair remains append-only; any third receipt fails.",
+    "Release integration is an explicit G-to-H fast-forward and is not authorized by this appeal."
+  ],
+  "dissent_preserved": true
+}

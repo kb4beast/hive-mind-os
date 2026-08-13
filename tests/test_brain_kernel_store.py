@@ -156,6 +156,60 @@ class KernelStoreTests(unittest.TestCase):
         self.assertEqual(1, len(store.events()))
         store.close()
 
+    def test_batch_append_is_atomic_and_exact_retry_is_read_only(self) -> None:
+        store = KernelStore()
+        first = event("EVENT-1", "mission.created", None)
+        first_digest = first.digest_for(None)
+        second = event(
+            "EVENT-2",
+            "mission.transition",
+            first_digest,
+            {"status": "PLANNING"},
+        )
+        entries = ((first, "batch-one"), (second, "batch-two"))
+        self.assertEqual((1, 2), store.append_batch(entries))
+        before_events = store.events()
+        before_projection = store.projection()
+        self.assertEqual((1, 2), store.append_batch(entries))
+        self.assertEqual(before_events, store.events())
+        self.assertEqual(before_projection, store.projection())
+        store.close()
+
+    def test_batch_reducer_failure_rolls_back_every_event_and_projection(self) -> None:
+        store = KernelStore()
+        first = event("EVENT-1", "mission.created", None)
+        first_digest = first.digest_for(None)
+        invalid = event(
+            "EVENT-2",
+            "mission.transition",
+            first_digest,
+            {"status": "COMPLETED"},
+        )
+        with self.assertRaises(KernelIntegrityError):
+            store.append_batch(((first, "batch-one"), (invalid, "batch-two")))
+        self.assertEqual([], store.events())
+        self.assertEqual({"missions": {}, "work": {}}, store.projection())
+        store.close()
+
+    def test_batch_rejects_partial_retry_and_competing_bindings(self) -> None:
+        store = KernelStore()
+        first = event("EVENT-1", "mission.created", None)
+        store.append(first, idempotency_key="batch-one")
+        first_digest = store.events()[-1]["digest"]
+        second = event(
+            "EVENT-2",
+            "mission.transition",
+            first_digest,
+            {"status": "PLANNING"},
+        )
+        with self.assertRaisesRegex(KernelIntegrityError, "partial batch retry"):
+            store.append_batch(((first, "batch-one"), (second, "batch-two")))
+        competing = event("EVENT-other", "mission.created", None)
+        with self.assertRaisesRegex(KernelIntegrityError, "already bound"):
+            store.append(competing, idempotency_key="batch-one")
+        self.assertEqual(["EVENT-1"], [row["event_id"] for row in store.events()])
+        store.close()
+
     def test_kernel_status_reads_a_fixture_database_without_creating_missing_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             state_dir = Path(temporary) / "state"

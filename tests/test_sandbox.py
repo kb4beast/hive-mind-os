@@ -190,6 +190,97 @@ class SandboxTests(unittest.TestCase):
             runner.run(intent)
         self.assertEqual(runner.spawn_count, 0)
 
+    def test_https_remote_url_is_not_auto_detected_as_a_workspace_path(self) -> None:
+        url = "https://github.com/patencyhealth-lab/hive-mind-a4-pilot.git"
+        runner = self.runner()
+        receipt = runner.run(self.intent([sys.executable, "-c", "print('pushed')", url]))
+        self.assertEqual(receipt["result"], "succeeded")
+        self.assertEqual(runner.spawn_count, 1)
+        self.assertEqual(receipt["execution"]["argv"][3], url)
+
+    def test_https_url_at_a_declared_path_index_is_still_validated(self) -> None:
+        url = "https://github.com/patencyhealth-lab/hive-mind-a4-pilot.git"
+        runner = self.runner()
+        with self.assertRaises(ConfinementViolation):
+            runner.run(self.intent([sys.executable, "-c", "print('no spawn')", url], path_args=[3]))
+        self.assertEqual(runner.spawn_count, 0)
+
+    def test_https_url_carrying_credentials_is_never_exempted(self) -> None:
+        runner = self.runner()
+        for url in (
+            "https://user:pass@github.com/o/r.git",
+            "https://token@github.com/o/r.git",
+        ):
+            with self.subTest(url=url):
+                with self.assertRaises(ConfinementViolation):
+                    runner.run(self.intent([sys.executable, "-c", "print('no spawn')", url]))
+        self.assertEqual(runner.spawn_count, 0)
+
+    def test_non_https_remote_forms_keep_their_confinement_treatment(self) -> None:
+        runner = self.runner()
+        for argument in (
+            "http://github.com/o/r.git",
+            "file:///c/tmp/repo.git",
+            "file://server/share/repo.git",
+            "ssh://git@github.com/o/r.git",
+            "git://github.com/o/r.git",
+            "git@github.com:o/r.git",
+            "//server/share/repo.git",
+            "\\\\server\\share\\repo.git",
+            "https://github.com/o/../r.git",
+            "https://github.com/o//r.git",
+        ):
+            with self.subTest(argument=argument):
+                with self.assertRaises(ConfinementViolation):
+                    runner.run(self.intent([sys.executable, "-c", "print('no spawn')", argument]))
+        self.assertEqual(runner.spawn_count, 0)
+
+    def test_embedded_https_substring_does_not_exempt_a_path_argument(self) -> None:
+        runner = self.runner()
+        for argument in ("./notes/https://weird.txt", "docs/https://x.md"):
+            with self.subTest(argument=argument):
+                with self.assertRaises(ConfinementViolation):
+                    runner.run(self.intent([sys.executable, "-c", "print('no spawn')", argument]))
+        self.assertEqual(runner.spawn_count, 0)
+
+    def test_nested_parent_traversal_argument_is_still_rejected(self) -> None:
+        runner = self.runner()
+        for path_args in ([], [3]):
+            with self.subTest(path_args=path_args):
+                with self.assertRaises(ConfinementViolation):
+                    runner.run(
+                        self.intent(
+                            [sys.executable, "-c", "print('no spawn')", "nested/../../outside.txt"],
+                            path_args=path_args,
+                        )
+                    )
+        self.assertEqual(runner.spawn_count, 0)
+
+    def test_absolute_path_outside_root_is_still_rejected(self) -> None:
+        outside = (self.base / "outside.txt").resolve()
+        runner = self.runner()
+        for path_args in ([], [3]):
+            with self.subTest(path_args=path_args):
+                with self.assertRaises(ConfinementViolation):
+                    runner.run(
+                        self.intent(
+                            [sys.executable, "-c", "print('no spawn')", str(outside)],
+                            path_args=path_args,
+                        )
+                    )
+        self.assertEqual(runner.spawn_count, 0)
+
+    def test_relative_path_argument_is_still_resolved_inside_the_root(self) -> None:
+        runner = self.runner()
+        receipt = runner.run(
+            self.intent([sys.executable, "-c", "print('resolved')", "nested/file.txt"])
+        )
+        self.assertEqual(receipt["result"], "succeeded")
+        rewritten = Path(receipt["execution"]["argv"][3])
+        self.assertTrue(rewritten.is_absolute())
+        self.assertEqual(rewritten, (runner.spec.root / "nested" / "file.txt").resolve())
+        self.assertEqual(receipt["execution"]["requested_argv"][3], "nested/file.txt")
+
     @unittest.skipIf(os.name == "nt", "POSIX-only symlink confinement case")
     def test_symlink_escape_is_rejected(self) -> None:
         outside = self.base / "outside.txt"

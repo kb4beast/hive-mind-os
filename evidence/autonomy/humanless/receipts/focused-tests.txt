@@ -1,0 +1,53 @@
+$ PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation -v
+test_authority_claim_without_evidence_blocks_instead_of_escalating (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_authority_claim_without_evidence_blocks_instead_of_escalating) ... ok
+test_every_genuine_authority_class_escalates (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_every_genuine_authority_class_escalates) ... ok
+test_harness_accepts_only_genuine_authority_packets (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_harness_accepts_only_genuine_authority_packets) ... ok
+test_result_contract_rejects_convenience_escalation (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_result_contract_rejects_convenience_escalation) ... ok
+test_unknown_authority_class_is_rejected_at_construction (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_unknown_authority_class_is_rejected_at_construction) ... ok
+test_ambiguity_resolved_by_role_consultation (tests.hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_ambiguity_resolved_by_role_consultation) ... ok
+test_ci_failure_creates_bounded_retry_repair (tests.hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_ci_failure_creates_bounded_retry_repair) ... ok
+test_design_tradeoff_replans_with_recorded_dissent (tests.hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_design_tradeoff_replans_with_recorded_dissent) ... ok
+test_end_to_end_run_passes_acceptance_harness (tests.hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_end_to_end_run_passes_acceptance_harness) ... ok
+test_missing_tests_become_repair_work (tests.hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_missing_tests_become_repair_work) ... ok
+test_recoverable_interruption_resumes_without_restating_context (tests.hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_recoverable_interruption_resumes_without_restating_context) ... ok
+test_worker_retries_recoverable_execution_failure (tests.hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_worker_retries_recoverable_execution_failure) ... ok
+test_defect_consultation_cannot_manufacture_authority (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_defect_consultation_cannot_manufacture_authority) ... ok
+test_defect_within_budget_retries_not_escalates (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_defect_within_budget_retries_not_escalates) ... ok
+test_exhausted_defect_quarantines_in_system (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_exhausted_defect_quarantines_in_system) ... ok
+test_no_progress_quarantines_within_bound (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_no_progress_quarantines_within_bound) ... ok
+test_repair_vocabulary_has_no_human_channel (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_repair_vocabulary_has_no_human_channel) ... ok
+test_retained_evidence_packet_matches_recomputation (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_retained_evidence_packet_matches_recomputation) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.025s
+
+OK
+exit_code=0
+
+$ PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests -v
+test_authority_claim_without_evidence_blocks_instead_of_escalating (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_authority_claim_without_evidence_blocks_instead_of_escalating) ... ok
+test_every_genuine_authority_class_escalates (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_every_genuine_authority_class_escalates) ... ok
+test_harness_accepts_only_genuine_authority_packets (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_harness_accepts_only_genuine_authority_packets) ... ok
+test_result_contract_rejects_convenience_escalation (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_result_contract_rejects_convenience_escalation) ... ok
+test_unknown_authority_class_is_rejected_at_construction (tests.hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_unknown_authority_class_is_rejected_at_construction) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+exit_code=0
+
+$ PYTHONPATH=src python -m unittest tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests -v
+test_defect_consultation_cannot_manufacture_authority (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_defect_consultation_cannot_manufacture_authority) ... ok
+test_defect_within_budget_retries_not_escalates (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_defect_within_budget_retries_not_escalates) ... ok
+test_exhausted_defect_quarantines_in_system (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_exhausted_defect_quarantines_in_system) ... ok
+test_no_progress_quarantines_within_bound (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_no_progress_quarantines_within_bound) ... ok
+test_repair_vocabulary_has_no_human_channel (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_repair_vocabulary_has_no_human_channel) ... ok
+test_retained_evidence_packet_matches_recomputation (tests.hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_retained_evidence_packet_matches_recomputation) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.006s
+
+OK
+exit_code=0
+

@@ -1,0 +1,93 @@
+{
+  "kind": "hive-mind-autopilot-post-merge-repair-authorities-v1",
+  "records": [
+    {
+      "base_commit": "5f420cabeb1dbc19fd797433dcae62ef518e21dc",
+      "base_tree": "5be34cf05ae634f37df1f41d842c5f9d4259ac7c",
+      "branch": "autopilot/builder-330",
+      "candidate_commit": "d1de8d093464a95d78540dec995b19c1cec4a033",
+      "candidate_tree": "ae698a4e3eb2861eaa4f27b737e71de37bf44fc5",
+      "changed_paths": [
+        "src/hive_mind_os/brain_kernel/builder.py",
+        "src/hive_mind_os/cortex/repository/builder_adapter.py",
+        "tests/test_hive_cortex_builder.py"
+      ],
+      "claim_commit": "ee915a300f476225c7bf9ff4c4623a35f983190f",
+      "contract_version": 1,
+      "decision": "ADAPT",
+      "evidence_refs": [
+        "git:01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+        "git:ee915a300f476225c7bf9ff4c4623a35f983190f",
+        "git:d1de8d093464a95d78540dec995b19c1cec4a033",
+        "git:6e7a4dd8a8bc24c589b14b3e4909216f35d850cb"
+      ],
+      "grant_id": "post-merge-repair:BUILDER-330:v1",
+      "local_ref": "refs/heads/post-merge/builder-330",
+      "node_id": "BUILDER-330",
+      "old_receipt_commit": "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+      "old_receipt_payload_digest": "sha256:99ba1cf456234e2245f909f0284fdfd19f4544fe9cc9d4b3d74eeee36297bb03",
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "pr": null,
+      "receipt_commit": "6e7a4dd8a8bc24c589b14b3e4909216f35d850cb",
+      "receipt_payload_digest": "sha256:eca1774b6fda56a1df4e2c61199e3bcac54d9e958307544aabedc32e39e9aae3"
+    },
+    {
+      "base_commit": "47876bddea2a41fe436c6af40c69fd0e6e8143d2",
+      "base_tree": "87e39de1e1b6d1e32f5dda3eb244a9ea99f8fb1d",
+      "branch": "autopilot/orch-300",
+      "candidate_commit": "c6e7e5cc299ae8538b8449061f5e6f3769989235",
+      "candidate_tree": "03a0050fca47ee9a1b4a1ce15dcd14f63595bfd1",
+      "changed_paths": [
+        "src/hive_mind_os/brain_kernel/planner.py",
+        "tests/test_hive_cortex_orchestrator.py"
+      ],
+      "claim_commit": "c3f3e5327a7a4da65d8932711b751eea943bedee",
+      "contract_version": 1,
+      "decision": "ADAPT",
+      "evidence_refs": [
+        "git:dbb8cb736eb98e77ef35eb141b2e55e492fbcf88",
+        "git:c3f3e5327a7a4da65d8932711b751eea943bedee",
+        "git:c6e7e5cc299ae8538b8449061f5e6f3769989235",
+        "git:38912a9e590581ecf1e3100256d8bb43466b92e9"
+      ],
+      "grant_id": "post-merge-repair:ORCH-300:v1",
+      "local_ref": "refs/heads/post-merge/orch-300",
+      "node_id": "ORCH-300",
+      "old_receipt_commit": "dbb8cb736eb98e77ef35eb141b2e55e492fbcf88",
+      "old_receipt_payload_digest": "sha256:14a9d15f9a2e2d924bf7803f5230ce6d0fe3890d47efce6cf6962d602750a0e5",
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "pr": 131,
+      "receipt_commit": "38912a9e590581ecf1e3100256d8bb43466b92e9",
+      "receipt_payload_digest": "sha256:fda7d041c5a44e26fc4814b59c7e056b7b55fd6a59f555e78bc17846da1ad77d"
+    },
+    {
+      "base_commit": "47876bddea2a41fe436c6af40c69fd0e6e8143d2",
+      "base_tree": "87e39de1e1b6d1e32f5dda3eb244a9ea99f8fb1d",
+      "branch": "autopilot/optimizer-370",
+      "candidate_commit": "4e6cbbf42f36ee00b7a730fd307f67c28fe018e8",
+      "candidate_tree": "8bc394172aa2aaa969c33b2964d6a899e1688fce",
+      "changed_paths": [
+        "tests/test_hive_cortex_optimizer.py"
+      ],
+      "claim_commit": "a06ca71e6c12f4121b6e393c4c9aa7c8c9877cf5",
+      "contract_version": 1,
+      "decision": "ADAPT",
+      "evidence_refs": [
+        "git:926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+        "git:a06ca71e6c12f4121b6e393c4c9aa7c8c9877cf5",
+        "git:4e6cbbf42f36ee00b7a730fd307f67c28fe018e8",
+        "git:9470f751a9cbd2e16dc05a99389c68770b3ed232"
+      ],
+      "grant_id": "post-merge-repair:OPTIMIZER-370:v1",
+      "local_ref": "refs/heads/post-merge/optimizer-370",
+      "node_id": "OPTIMIZER-370",
+      "old_receipt_commit": "926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+      "old_receipt_payload_digest": "sha256:7e493003cb9d3eefbdcabece3bdba56c1d11f2378594803924bcf6fee0f93334",
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "pr": 135,
+      "receipt_commit": "9470f751a9cbd2e16dc05a99389c68770b3ed232",
+      "receipt_payload_digest": "sha256:03ef9279df4e88991ff4c663c7f404d5ce9248fc120b623b1481d31d9b6bca5f"
+    }
+  ],
+  "schema_version": 1
+}

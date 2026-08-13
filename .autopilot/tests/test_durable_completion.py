@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from fixture_support import copy_autopilot_fixture
+
 BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
@@ -28,7 +30,7 @@ class DurableCompletionTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         source = Path(__file__).resolve().parents[1]
-        shutil.copytree(source, self.root / ".autopilot")
+        copy_autopilot_fixture(source, self.root / ".autopilot")
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
@@ -188,7 +190,8 @@ class DurableCompletionTests(unittest.TestCase):
         self.assertEqual(self.plane.node_view("BOOT-000").state, "BOOTSTRAP_REQUIRED")
 
     def test_09_future_receipt_commit_survives_deleted_local_state(self) -> None:
-        self.git("init", "-b", "main")
+        target_branch = self.plane.target_branch
+        self.git("init", "-b", target_branch)
         self.git("config", "user.name", "Autopilot Test")
         self.git("config", "user.email", "autopilot-test@example.invalid")
         self.git("add", ".autopilot")
@@ -241,7 +244,7 @@ class DurableCompletionTests(unittest.TestCase):
         self.assertEqual(self.git("rev-parse", f"{receipt_commit}^{{tree}}"), final_tree)
         self.assertEqual(self.git("diff", "--name-only", f"{final}..{receipt_commit}"), "")
 
-        self.git("checkout", "main")
+        self.git("checkout", target_branch)
         self.git("merge", "--no-ff", branch, "-m", "merge synthetic BASE-020")
         shutil.rmtree(self.plane.state_dir, ignore_errors=True)
 

@@ -1,0 +1,39 @@
+test_check_polling_transitions_and_persists_external_receipts (tests.test_github_adapter.GitHubAdapterTests.test_check_polling_transitions_and_persists_external_receipts) ... ok
+test_check_polling_waits_for_late_required_check (tests.test_github_adapter.GitHubAdapterTests.test_check_polling_waits_for_late_required_check) ... ok
+test_check_timeout_fails_closed_with_failed_observation (tests.test_github_adapter.GitHubAdapterTests.test_check_timeout_fails_closed_with_failed_observation) ... ok
+test_code_scanning_run_url_is_receipted (tests.test_github_adapter.GitHubAdapterTests.test_code_scanning_run_url_is_receipted) ... ok
+test_default_transport_keeps_tls_chain_and_hostname_validation (tests.test_github_adapter.GitHubAdapterTests.test_default_transport_keeps_tls_chain_and_hostname_validation) ... ok
+test_draft_pr_request_and_response_are_head_bound (tests.test_github_adapter.GitHubAdapterTests.test_draft_pr_request_and_response_are_head_bound) ... ok
+test_lower_authority_denies_before_push_or_pr (tests.test_github_adapter.GitHubAdapterTests.test_lower_authority_denies_before_push_or_pr) ... ok
+test_pr_creation_is_durable_and_idempotent (tests.test_github_adapter.GitHubAdapterTests.test_pr_creation_is_durable_and_idempotent) ... ok
+test_protection_match_and_mismatch_are_evidenced (tests.test_github_adapter.GitHubAdapterTests.test_protection_match_and_mismatch_are_evidenced) ... ok
+test_remote_materialization_is_explicit_and_github_only (tests.test_github_adapter.GitHubAdapterTests.test_remote_materialization_is_explicit_and_github_only) ... ok
+test_repository_mission_delivers_after_curator_adoption (tests.test_github_adapter.GitHubAdapterTests.test_repository_mission_delivers_after_curator_adoption) ... ok
+test_ruleset_branch_exclusion_and_malformed_conditions_fail_closed (tests.test_github_adapter.GitHubAdapterTests.test_ruleset_branch_exclusion_and_malformed_conditions_fail_closed) ... ok
+test_token_never_persists_or_escapes_errors (tests.test_github_adapter.GitHubAdapterTests.test_token_never_persists_or_escapes_errors) ... ok
+test_api_has_no_merge_rebase_or_force_surface (tests.test_git_adapter.GitAdapterTests.test_api_has_no_merge_rebase_or_force_surface) ... ok
+test_branch_edit_commit_diff_tree_and_receipts (tests.test_git_adapter.GitAdapterTests.test_branch_edit_commit_diff_tree_and_receipts) ... ok
+test_declared_tests_fail_at_fixture_head_and_pass_after_fix (tests.test_git_adapter.GitAdapterTests.test_declared_tests_fail_at_fixture_head_and_pass_after_fix) ... ok
+test_dirty_workspace_cannot_export_delivery (tests.test_git_adapter.GitAdapterTests.test_dirty_workspace_cannot_export_delivery) ... ok
+test_export_and_verify_delivery_with_resolvable_receipts (tests.test_git_adapter.GitAdapterTests.test_export_and_verify_delivery_with_resolvable_receipts) ... C:\Python314\Lib\json\decoder.py:361: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000026DA2557880>
+  obj, end = self.scan_once(s, idx)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_fixture_repository_has_stable_pinned_history (tests.test_git_adapter.GitAdapterTests.test_fixture_repository_has_stable_pinned_history) ... ok
+test_lower_authority_cannot_write_git_metadata (tests.test_git_adapter.GitAdapterTests.test_lower_authority_cannot_write_git_metadata) ... ok
+test_materialize_exact_detached_pin_and_inert_hooks (tests.test_git_adapter.GitAdapterTests.test_materialize_exact_detached_pin_and_inert_hooks) ... ok
+test_materialize_excludes_local_codex_bookkeeping_refs (tests.test_git_adapter.GitAdapterTests.test_materialize_excludes_local_codex_bookkeeping_refs) ... ok
+test_materialize_ignores_host_global_git_configuration (tests.test_git_adapter.GitAdapterTests.test_materialize_ignores_host_global_git_configuration) ... ok
+test_mutable_and_short_pins_are_rejected (tests.test_git_adapter.GitAdapterTests.test_mutable_and_short_pins_are_rejected) ... ok
+test_policy_denial_occurs_before_git_spawn (tests.test_git_adapter.GitAdapterTests.test_policy_denial_occurs_before_git_spawn) ... ok
+test_preexisting_delivery_root_is_rejected_before_any_write (tests.test_git_adapter.GitAdapterTests.test_preexisting_delivery_root_is_rejected_before_any_write) ... ok
+test_repository_urls_are_rejected (tests.test_git_adapter.GitAdapterTests.test_repository_urls_are_rejected) ... ok
+test_run_tests_cannot_bypass_typed_git_authority (tests.test_git_adapter.GitAdapterTests.test_run_tests_cannot_bypass_typed_git_authority) ... ok
+test_truncated_git_output_fails_closed (tests.test_git_adapter.GitAdapterTests.test_truncated_git_output_fails_closed) ... ok
+test_verifier_rejects_escaped_evidence_root (tests.test_git_adapter.GitAdapterTests.test_verifier_rejects_escaped_evidence_root) ... ok
+test_write_file_rejects_nonportable_and_escaping_paths (tests.test_git_adapter.GitAdapterTests.test_write_file_rejects_nonportable_and_escaping_paths) ... ok
+
+----------------------------------------------------------------------
+Ran 31 tests in 30.972s
+
+OK

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "candidate_commit": "00fd1d80579a6bbaee35abd9288fddceb05c6ebe",
+  "candidate_tree": "b383e64f9c54bd4050136488243cd6cea383a66a",
+  "maturity": "LOCAL-QUALIFIED",
+  "maturity_label": "LOCAL-QUALIFIED (pre-A3)",
+  "release_ready": false,
+  "production_ready": false,
+  "comparative_claim_authorized": false,
+  "real_provider_used": false,
+  "verdict_reason": "Every gate executable on this host passed on the exact candidate commit: compileall exit 0; repo-wide unittest discovery Ran 985 tests OK (skipped=7) on CPython 3.14 and again on 3.12, 0 failures and 0 errors on both; ruff 0.16.0 'All checks passed!'; pyright 1.1.411 '0 errors'; focused acceptance 26/26; focused replay 13/13; clean-worktree identity, snapshot_tree, and full re-verification of every retained phase12 assurance packet. Six of seven acceptance-matrix suites PASS with all required_nodes COMPLETE and covering modules present. staged_autonomy is DEFERRED, not FAILED, because its required_nodes A3-700/A4-800/A5-900 are downstream of this node and not COMPLETE (amended runbook step 4). Nothing was weakened, excluded, or restated to reach this verdict; the two defects the previous execution found were repaired upstream by orchestrator commit 5ead055 and independently re-measured as clear here.",
+  "gates_passed": [
+    "compileall",
+    "repo-wide unittest discovery (windows x 3.14): Ran 985, OK (skipped=7)",
+    "repo-wide unittest discovery (windows x 3.12): Ran 985, OK (skipped=7)",
+    "quality job ruff 0.16.0: All checks passed!",
+    "quality job pyright 1.1.411: 0 errors, 6 warnings",
+    "complete-autonomy-acceptance focused suites: Ran 26, OK",
+    "clean-replay-verification focused suites: Ran 13, OK",
+    "clean worktree identity + snapshot_tree + retained phase12 assurance replay",
+    "acceptance-matrix suites all_role, humanless_operation, learning, no_cheating, repository_safety, self_healing"
+  ],
+  "gates_failed": [],
+  "gates_deferred": [
+    "codeql, secret-scan, dependency-review, build-evidence (GitHub-hosted only)",
+    "ubuntu x python 3.11 / 3.12 / 3.14 matrix cells",
+    "acceptance-matrix suite staged_autonomy (blocked on A3-700, A4-800, A5-900)"
+  ],
+  "residual_blockers": [
+    {
+      "id": 1,
+      "blocker": "GitHub-hosted-only CI jobs are not reproducible locally: codeql (security-events), secret-scan (gitleaks + GITHUB_TOKEN), dependency-review (pull_request only), build-evidence (SBOM + provenance attestation).",
+      "resolving_stage": "CI (Constitutional CI on the draft PR)"
+    },
+    {
+      "id": 2,
+      "blocker": "CI matrix cells ubuntu x {3.11, 3.12, 3.14} were not executed: the host is Windows 11 and no CPython 3.11 interpreter is installed; provisioning runners or interpreters is forbidden by the node contract. Only windows x 3.12 (a real matrix cell) and windows x 3.14 (extra coverage) were measured.",
+      "resolving_stage": "CI (Constitutional CI matrix on the draft PR)"
+    },
+    {
+      "id": 3,
+      "blocker": "Acceptance-matrix suite 'staged_autonomy' is DEFERRED, not proven: it has no covering test module because its required_nodes A3-700, A4-800 and A5-900 are downstream of this node and are all in state RECONCILIATION_REQUIRED. Its proof obligations (A3 no avoidable human answer, A4 explicit remote grant, A5 external governance and production authority) are unmet.",
+      "resolving_stage": "A3-700 / A4-800 / A5-900"
+    },
+    {
+      "id": 4,
+      "blocker": "No real disposable-repository pilot has been run; all repository work is against fixtures and the local checkout.",
+      "resolving_stage": "A3-700"
+    },
+    {
+      "id": 5,
+      "blocker": "No remote delivery credentials were exercised and no remote effect was produced; retained packets pin real_provider_used: false.",
+      "resolving_stage": "A4-800"
+    },
+    {
+      "id": 6,
+      "blocker": "External security, legal, operational and owner governance gates are unmet; no merge or production authority exists.",
+      "resolving_stage": "A5-900"
+    },
+    {
+      "id": 7,
+      "blocker": "No comparative or superiority claim is authorized: both retained phase12 assurance packets pin comparative_claim_authorized: false, and no comparator baseline was measured by this node.",
+      "resolving_stage": "A5-900"
+    },
+    {
+      "id": 8,
+      "blocker": "Retained packet evidence/local_assurance/phase12-54020b7.json could be verified digest-only: it has no adjacent receipts manifest, so verify_local_assurance_artifact's receipt-transcript digest check could not be applied to it. Its self-describing report_digest re-derived correctly. This is a coverage limitation, not a detected corruption; retained evidence was not modified.",
+      "resolving_stage": "CI / owning node (Phase 12 evidence retention)"
+    },
+    {
+      "id": 9,
+      "blocker": "The retained evidence layout mandated by runbook section 3.2 is largely *.log files, but .gitignore:127 ignores *.log repo-wide. A plain `git add` would drop all 11 logs and commit a receipts.json whose sha256 digests reference files absent from the repository. Force-add is required at seal time: `git add -f evidence/qualification/hive-cortex/q610-00fd1d80/`. .gitignore was not edited (out of write scope).",
+      "resolving_stage": "CI / runbook repair"
+    },
+    {
+      "id": 10,
+      "blocker": "pyright reports 6 non-blocking reportUnsupportedDunderAll warnings in src/hive_mind_os/brain_kernel/__init__.py (names in __all__ that are not present in the module). The quality job gates on errors, so this does not fail CI, but the package's declared public surface does not match its actual one.",
+      "resolving_stage": "CI / owning node repair flow"
+    }
+  ],
+  "resolved_since_previous_execution": [
+    "ruff 15 errors and pyright 4 errors at a3faac5e -> both clear at 00fd1d80 (orchestrator commit 5ead055), independently re-measured by this node.",
+    "Validation lease overrun -> acquired with --lease-minutes 90; held 32m45s and released 57m15s before expiry.",
+    "staged_autonomy misclassified FAIL under the old flat rule -> DEFERRED with blocking nodes named (runbook amendment 00fd1d8)."
+  ]
+}

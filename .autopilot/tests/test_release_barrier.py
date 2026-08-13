@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import importlib
 import json
-import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from fixture_support import copy_autopilot_fixture
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
@@ -19,6 +20,8 @@ BASELINE = "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23"
 SECOND = "b" * 40
 PLAN_FINGERPRINT = "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39"
 PREMATURE_RECEIPT = "37055e0b8c6dac451e899401802061fe258594f7"
+ANCESTRY_DUPLICATE_RECEIPT = "4191ebfd571c9852f5f6faaa43cea0f48f3e0fe8"
+CANONICAL_RECEIPT = "369f956817ff10231c06d09c7c802f47f76d57b0"
 
 
 class DispatcherReleaseBarrierTests(unittest.TestCase):
@@ -26,7 +29,7 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         source = Path(__file__).resolve().parents[1]
-        shutil.copytree(source, self.root / ".autopilot")
+        copy_autopilot_fixture(source, self.root / ".autopilot")
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
@@ -78,7 +81,7 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
             "schema_version": 1,
             "plan_id": self.plane.plan.get("plan_id"),
             "plan_fingerprint": self.plane.expected_plan_fingerprint,
-            "target_branch": "main",
+            "target_branch": "release/hive-mind-os-singleton-20260810",
             "target_sha": self.plane.current_target_sha(),
             "last_reconciled_sha": self.plane.reconciled_target_sha(),
             "reconciliation_required": self.plane.target_requires_reconciliation(),
@@ -95,6 +98,7 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         commit: str,
         *,
         supersedes: str | None = None,
+        expanded: bool = False,
     ) -> dict[str, object]:
         authority: dict[str, object] = {
             "autonomy_level": "A3",
@@ -102,6 +106,19 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         }
         if supersedes is not None:
             authority["supersedes_receipt_commit"] = supersedes
+        if expanded:
+            authority["grants"] = [
+                "repository-reconciliation",
+                "documentation",
+                "evidence-publication",
+                "dispatcher-release-barrier",
+            ]
+        else:
+            authority["grants"] = [
+                "repository-reconciliation",
+                "documentation",
+                "evidence-publication",
+            ]
         return {
             "commit": commit,
             "receipt": {
@@ -114,6 +131,17 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
                 "branch": "autopilot/recon-010",
                 "pr": 122,
                 "final_commit": "c" * 40,
+                "final_tree": "f" * 40,
+                "changed_paths": (
+                    ["docs/reconciliation.md", ".autopilot/bin/release_barrier.py"]
+                    if expanded
+                    else ["docs/reconciliation.md"]
+                ),
+                "evidence_refs": (
+                    [f"historical-receipt:{PREMATURE_RECEIPT}"]
+                    if expanded
+                    else ["evidence/reconciliation.json"]
+                ),
                 "authority": authority,
             },
         }
@@ -171,6 +199,53 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
             set(verdicts.values()).issubset({"START NOW", "WAIT", "STOP"})
         )
         self.assertEqual(verdicts["BOOT-000"], "STOP")
+
+    def test_04a_serial_node_cannot_be_co_released(self) -> None:
+        self.plane._nodes["RECON-010"]["parallel_safe"] = False
+        with self.assertRaisesRegex(Exception, "serial node"):
+            self.plane.dispatch(
+                actor="test:dispatcher",
+                requested_nodes=["RECON-010", "BASE-020"],
+            )
+
+    def test_04b_automatic_wave_prioritizes_and_isolates_serial_node(self) -> None:
+        self.plane._nodes["RECON-010"]["parallel_safe"] = False
+        self.plane._nodes["RECON-010"]["critical_path_importance"] = 100
+        self.plane._nodes["BASE-020"]["critical_path_importance"] = 1
+        release = self.plane.dispatch(actor="test:dispatcher")
+        self.assertEqual(release["released_wave"], ["RECON-010"])
+
+    def test_04c_observe_status_does_not_reap_stale_claims(self) -> None:
+        claim_path = self.plane.claim_path("RECON-010")
+        claim_path.parent.mkdir(parents=True, exist_ok=True)
+        claim_path.write_text(
+            json.dumps(
+                {
+                    "node_id": "RECON-010",
+                    "owner": "fixture:stale",
+                    "status": "RUNNING",
+                    "expires_at": "2000-01-01T00:00:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.plane.observe_status()
+        self.assertTrue(claim_path.exists())
+
+    def test_04d_persisted_wave_revalidates_serial_safety(self) -> None:
+        self.plane.dispatch(
+            actor="test:dispatcher",
+            requested_nodes=["RECON-010", "BASE-020"],
+        )
+        self.plane._nodes["RECON-010"]["parallel_safe"] = False
+        status = self.plane.status()
+        self.assertFalse(status["dispatch_release"]["valid"])
+        self.assertTrue(
+            any(
+                "serial node pair" in issue
+                for issue in status["dispatch_release"]["issues"]
+            )
+        )
 
     def test_05_target_advance_invalidates_release(self) -> None:
         self.plane.dispatch(
@@ -316,6 +391,21 @@ class DispatcherReleaseBarrierTests(unittest.TestCase):
         historical = self._receipt_record(PREMATURE_RECEIPT)
         duplicate = self._receipt_record("d" * 40)
         records = [historical, duplicate]
+        self.assertIs(plane._resolve_recon_receipt_records(records), records)
+
+    def test_14_exact_integrated_ancestry_duplicate_uses_expanded_receipt(self) -> None:
+        plane = self._cli_plane()
+        duplicate = self._receipt_record(ANCESTRY_DUPLICATE_RECEIPT)
+        canonical = self._receipt_record(CANONICAL_RECEIPT, expanded=True)
+        records = [canonical, duplicate]
+        self.assertEqual(plane._resolve_recon_receipt_records(records), [canonical])
+
+    def test_15_integrated_ancestry_duplicate_remains_fail_closed_if_mutated(self) -> None:
+        plane = self._cli_plane()
+        duplicate = self._receipt_record(ANCESTRY_DUPLICATE_RECEIPT)
+        canonical = self._receipt_record(CANONICAL_RECEIPT, expanded=True)
+        canonical["receipt"]["final_tree"] = "e" * 40  # type: ignore[index]
+        records = [duplicate, canonical]
         self.assertIs(plane._resolve_recon_receipt_records(records), records)
 
 

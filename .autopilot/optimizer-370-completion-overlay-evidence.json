@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "evidence_id": "evidence-optimizer-370-completion-overlay-20260811",
+  "source": "live Git objects, authenticated GitHub PR metadata, released validation lease, and intended receipt document",
+  "observed_at": "2026-08-11T19:50:02Z",
+  "claims": [
+    {"id": "topology", "evidence": ["git:926f60ec345d7bf5b5eb9229009de1f7e7888a97", "git:8fa51243327ae928e46df180bfd81fbf90062cf5", "git:88f2962b64f7cc9f88284c5dd30106de5313da7b", "git:948368b77ba8de920369f416970e83b909bd50ba"]},
+    {"id": "receipt", "evidence": ["sha256:bf5b2cdd03f40b88980a964d843bf8829b9dc2393864b4ded360f04a42e8afdd"]},
+    {"id": "validation", "evidence": ["validation-lease:sha256:2bf411f8cb1037f45d5005109fc7826fb1dcd452e0fe5df370c9d1f415e51b48:RELEASED"]},
+    {"id": "pr", "evidence": ["https://github.com/kb4beast/hive-mind-os/pull/135", "ci:two-constitutional-runs-terminal-green"]}
+  ],
+  "independent_testimony": [
+    "curator: live remote and Git object topology reproduced",
+    "architect: ADR and exact incident-only capability required",
+    "cross-examiner: includeif, wrong-H, path omission, third receipt, and crash cuts must fail closed"
+  ],
+  "license": "repository-internal evidence; no external code copied"
+}

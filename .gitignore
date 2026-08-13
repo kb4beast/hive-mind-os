@@ -49,6 +49,12 @@ bld/
 
 # Build results on 'Bin' directories
 **/[Bb]in/*
+# The control plane lives in .autopilot/bin and is source, not build output.
+# Negate the whole directory: an autopilot module that needs a per-file
+# exception here is one un-forced `git add` away from a CI that imports a
+# module the repository does not contain.
+!.autopilot/bin/
+!.autopilot/bin/**
 # Uncomment if you have tasks that rely on *.refresh files to move binaries
 # (https://github.com/github/gitignore/pull/3736)
 #!**/[Bb]in/*.refresh

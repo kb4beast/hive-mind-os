@@ -1,8 +1,8 @@
 # Architecture Decision Record Index
 
-This registry disambiguates two historical numeric collisions without renaming or deleting
+This registry disambiguates four historical numeric collisions without renaming or deleting
 records referenced by committed audits. Use the qualified key or the full filename in new
-evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
+evidence. Numeric-only references to ADR-008, ADR-012, ADR-057, or ADR-058 are ambiguous.
 
 | Qualified key | Record                                                                                                                      | Phase                      | Current posture                                                                      |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------ |
@@ -27,9 +27,19 @@ evidence. Numeric-only references to ADR-008 or ADR-012 are ambiguous.
 | `ADR-052`     | [Verifiable Hive Kernel exact-candidate local verification](ADR-052-VERIFIABLE-HIVE-KERNEL-EXACT-CANDIDATE-VERIFICATION.md) | Verifiable Hive Kernel P8  | proposed; local-only first slice, independent courtroom disposition remains required |
 | `ADR-053`     | [Verifiable Hive Kernel local technical closeout](ADR-053-VERIFIABLE-HIVE-KERNEL-LOCAL-TECHNICAL-CLOSEOUT.md)               | Verifiable Hive Kernel P9  | proposed; local-only first slice, independent courtroom disposition remains required |
 | `ADR-054`     | [Verifiable Hive Kernel local compatibility firewall](ADR-054-VERIFIABLE-HIVE-KERNEL-LOCAL-COMPATIBILITY-FIREWALL.md)       | Verifiable Hive Kernel P10 | implemented locally; local Builder gate passed, independent court remains deferred   |
+| `ADR-055`     | [Exact Explorer receipt-branch retirement](ADR-055-EXACT-EXPLORER-RECEIPT-RETIREMENT.md)                                    | Singleton L2 recovery      | adopted only for the sealed rejected receipt branch                                  |
+| `ADR-056`     | [Singleton release branch execution](ADR-056-SINGLETON-RELEASE-BRANCH-EXECUTION.md)                                         | Singleton execution        | adopted; `main` remains excluded until final promotion                               |
+| `ADR-057-RECOVERY` | [Sealed L2 recovery bootstrap](ADR-057-SEALED-L2-RECOVERY-BOOTSTRAP.md)                                               | Singleton L2 recovery      | adapted only for OPTIMIZER-370, ORCH-300, and BUILDER-330                            |
+| `ADR-057-PORTABLE` | [Portable intent-driven Autopilot orchestration](ADR-057-PORTABLE-INTENT-DRIVEN-AUTOPILOT.md)                          | Autopilot portability      | adapted implementation candidate; independent Curator/Judge pending                  |
+| `ADR-058-HOST` | [Capability-bound durable-task execution](ADR-058-CAPABILITY-BOUND-HOST-EXECUTION.md)                                      | Autopilot host execution   | adapted implementation candidate; independent Curator/security review pending        |
+| `ADR-058-OPTIMIZER` | [Exact OPTIMIZER-370 completion overlay](ADR-058-OPTIMIZER-370-COMPLETION-OVERLAY.md)                              | Singleton L2 recovery      | retained historical recovery evidence; superseded by exact post-merge repair         |
+| `ADR-059`     | [Host-authorized external controller trust](ADR-059-HOST-AUTHORIZED-CONTROLLER-TRUST.md)                                   | Autopilot controller trust | adapted implementation candidate; independent Curator/security review pending        |
+| `ADR-060`     | [Visible parallel task cohorts](ADR-060-VISIBLE-PARALLEL-TASK-COHORTS.md)                                                   | Autopilot task scheduling  | adapted implementation candidate; independent Curator/security review pending        |
+| `ADR-061`     | [Token-aware root-mediated sidecars](ADR-061-TOKEN-AWARE-ROOT-MEDIATED-SIDECARS.md)                                        | Autopilot execution topology | adapted implementation candidate; independent Curator promotion review pending      |
+| `ADR-062`     | [Post-merge reconciliation and atomic planning](ADR-062-POST-MERGE-RECONCILIATION-AND-ATOMIC-PLANNING.md)                  | Singleton repair/promotion | implemented candidate; exact-head CI and independent promotion review pending        |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-055; it must be unique at creation time.
+is ADR-063; it must be unique at creation time.

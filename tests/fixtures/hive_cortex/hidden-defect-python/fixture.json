@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "fixture_id": "hidden-defect-python",
+  "scenario": "hidden-defect",
+  "language": "python",
+  "languages": ["python"],
+  "tests_present": true
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-post-merge-pyright-cleanup-v1",
+  "parent_commit": "371b00e900faaf315a6656216308d30670b9d51a",
+  "repair_commit": "b9931110002ba787a30c9022c47e56126bfeff3a",
+  "diagnostic": "planner budget reconstruction passed Mapping[str, object] values directly to Budget integer fields",
+  "changed_paths": [
+    "src/hive_mind_os/brain_kernel/planner.py"
+  ],
+  "controls": [
+    "require every reconstructed budget value to have exact int type",
+    "construct Budget with explicit typed field bindings",
+    "retain fail-closed invalid-document behavior"
+  ],
+  "validation": [
+    {
+      "command": "ruff 0.16.0 check src tests",
+      "status": "passed"
+    },
+    {
+      "command": "pyright 1.1.411",
+      "status": "passed",
+      "errors": 0
+    },
+    {
+      "command": "PYTHONPATH=src python -m unittest tests.test_hive_cortex_orchestrator -v",
+      "status": "passed",
+      "tests": 17
+    },
+    {
+      "command": "python -m compileall -q src tests",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ]
+}

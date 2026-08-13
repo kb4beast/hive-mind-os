@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-autopilot-optimizer-completion-overlay-v1",
+  "overlay_id": "optimizer-370-completion-overlay-20260811",
+  "node_id": "OPTIMIZER-370",
+  "repository": "kb4beast/hive-mind-os",
+  "target_branch": "release/hive-mind-os-singleton-20260810-r2",
+  "main_sha": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8",
+  "execution_target_sha": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+  "execution_target_tree": "2a5b94489c368c0e3798c2d38d85f7631adb8604",
+  "incident_base_sha": "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58",
+  "incident_base_tree": "8bfe011cb1ac5cbbc4772d5b77dd981638a38b8d",
+  "old_receipt_commit": "926f60ec345d7bf5b5eb9229009de1f7e7888a97",
+  "repair_claim_commit": "8fa51243327ae928e46df180bfd81fbf90062cf5",
+  "execution_merge_commit": "88f2962b64f7cc9f88284c5dd30106de5313da7b",
+  "candidate_commit": "948368b77ba8de920369f416970e83b909bd50ba",
+  "candidate_tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+  "receipt_digest": "sha256:bf5b2cdd03f40b88980a964d843bf8829b9dc2393864b4ded360f04a42e8afdd",
+  "validation_lease_id": "sha256:2bf411f8cb1037f45d5005109fc7826fb1dcd452e0fe5df370c9d1f415e51b48",
+  "grant_id": "optimizer-370-invalid-receipt-supersession-v1",
+  "claim_owner": "codex:optimizer-370-repair",
+  "claim_expires_at": "2026-08-11T21:13:07.231123Z",
+  "pr": 135,
+  "pr_head_branch": "autopilot/optimizer-370",
+  "pr_head_sha": "948368b77ba8de920369f416970e83b909bd50ba",
+  "court_digest": "sha256:6434acb4f59fbfa2d0d2242e578d0b85446fe3b8f15670b8dff8e4883183e9b4",
+  "appeals_digest": "sha256:717acf4e0224a43a8f90fbf6e3663305a5c1f314d56c4ac45437e12cd551d4a4",
+  "evidence_digest": "sha256:3f7302d660bf67dfe7411abc2f42f06f6bd485770ec2490d6dc7de0eaec877ca",
+  "authorized_optimizer_paths": [
+    "src/hive_mind_os/brain_kernel/optimizer.py",
+    "tests/test_hive_cortex_optimizer.py"
+  ],
+  "overlay_paths": [
+    ".autopilot/bin/autopilot.py",
+    ".autopilot/bin/controller.py",
+    ".autopilot/bin/sealed_recovery.py",
+    ".autopilot/optimizer-370-completion-overlay-appeals.json",
+    ".autopilot/optimizer-370-completion-overlay-authority.json",
+    ".autopilot/optimizer-370-completion-overlay-court.json",
+    ".autopilot/optimizer-370-completion-overlay-evidence.json",
+    ".autopilot/optimizer-370-intended-receipt.json",
+    ".autopilot/tests/test_sealed_recovery_bootstrap.py",
+    "docs/architecture/ADR-058-OPTIMIZER-370-COMPLETION-OVERLAY.md",
+    "docs/architecture/ADR_INDEX.md"
+  ],
+  "reseal_paths": [
+    ".autopilot/bin/sealed_recovery.py",
+    ".autopilot/optimizer-370-completion-overlay-authority.json"
+  ],
+  "continuation_minutes": 20,
+  "capability_commit": "5c6243b2beb06aa9b9087dd1aec05b340af59c02"
+}

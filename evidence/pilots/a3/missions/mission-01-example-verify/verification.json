@@ -1,0 +1,181 @@
+{
+  "base": {
+    "commit": "8b10151a2b3341025a639497be70d156152ecaa4",
+    "tree": "2afc56d48c5926b8c9326f359907db97d34d5ff9"
+  },
+  "candidate": {
+    "commit": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+    "reference": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+    "tree": "d17759bc7d4fb7d7168856cbc862657503e04f5b"
+  },
+  "changed_paths": [
+    "discounts.py"
+  ],
+  "changes": [
+    {
+      "paths": [
+        "discounts.py"
+      ],
+      "status": "M"
+    }
+  ],
+  "checks": [
+    {
+      "candidate_commit": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+      "candidate_tree": "d17759bc7d4fb7d7168856cbc862657503e04f5b",
+      "error": null,
+      "expected": "succeeded",
+      "id": "nonprofit-discount-is-applied",
+      "matched": true,
+      "outcome": "succeeded",
+      "output_truncated": false,
+      "receipt": {
+        "digest": "sha256:45329ddfb4c3d335ede8139b73432c6c7c8a43cb5851767cdc6d1eecc5edbf51",
+        "path": "r/45329ddfb4c3d335ede8139b73432c6c7c8a43cb5851767cdc6d1eecc5edbf51.json"
+      },
+      "receipt_binding": {
+        "action_digest": "sha256:851c79c36fcc5129fff67c889a7eb2971d891a2f7546edf0b45c6d305a54e2aa",
+        "action_id": "ACT-VERIFY-af3ab5f9-9ae7-4710-9770-784abc9cc8b8-0",
+        "actor_id": "verify-cli",
+        "mission_id": "VERIFY-af3ab5f9-9ae7-4710-9770-784abc9cc8b8",
+        "state_ref": "VERIFY_STATE:61648ddc357744576fd1ba45494b11756d9ffbf7:d17759bc7d4fb7d7168856cbc862657503e04f5b"
+      },
+      "workspace_unchanged": true
+    }
+  ],
+  "contract": {
+    "candidate_reference": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+    "environment": {
+      "credential_inheritance": "disabled",
+      "fixed": {
+        "COMSPEC": "C:\\Windows\\system32\\cmd.exe",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "SYSTEMROOT": "C:\\Windows",
+        "WINDIR": "C:\\Windows"
+      },
+      "inherited_allowlist": []
+    },
+    "policy_version": "verify-immutable-v1",
+    "sandbox": {
+      "filesystem": "none",
+      "max_output_bytes": 1000000,
+      "network": "none",
+      "profile": "process-sandbox-v1",
+      "timeout_s": 30.0
+    },
+    "schema_version": 1,
+    "specification_digest": "sha256:92c88f205bc64537e1e1372afb9184ee30834c3e568a2e4d0e983add338d5192",
+    "tool": {
+      "git": "git version 2.53.0.windows.3",
+      "hive_mind_os": "0.7.0",
+      "python": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]"
+    }
+  },
+  "ledger_events": [
+    {
+      "actor": "curator",
+      "created_at": "2026-08-12T19:23:40.670537+00:00",
+      "event_type": "verify.acceptance.sealed",
+      "payload": {
+        "contract": {
+          "candidate_reference": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+          "environment": {
+            "credential_inheritance": "disabled",
+            "fixed": {
+              "COMSPEC": "C:\\Windows\\system32\\cmd.exe",
+              "PYTHONDONTWRITEBYTECODE": "1",
+              "SYSTEMROOT": "C:\\Windows",
+              "WINDIR": "C:\\Windows"
+            },
+            "inherited_allowlist": []
+          },
+          "policy_version": "verify-immutable-v1",
+          "sandbox": {
+            "filesystem": "none",
+            "max_output_bytes": 1000000,
+            "network": "none",
+            "profile": "process-sandbox-v1",
+            "timeout_s": 30.0
+          },
+          "schema_version": 1,
+          "specification_digest": "sha256:92c88f205bc64537e1e1372afb9184ee30834c3e568a2e4d0e983add338d5192",
+          "tool": {
+            "git": "git version 2.53.0.windows.3",
+            "hive_mind_os": "0.7.0",
+            "python": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]"
+          }
+        },
+        "contract_digest": "sha256:142d2c989885945b5bdab4a40d4de6e87337d8ac9dda820e79a4a1a54993ab5d"
+      },
+      "prev_digest": "",
+      "row_digest": "sha256:869dadd21f2c12a08917dc192f0ff3fa90f1f1a18fc05c025d73b34bb85530b0",
+      "run_id": "VERIFY-af3ab5f9-9ae7-4710-9770-784abc9cc8b8",
+      "sequence": 1
+    },
+    {
+      "actor": "curator",
+      "created_at": "2026-08-12T19:23:40.986076+00:00",
+      "event_type": "verify.repository.objects.resolved",
+      "payload": {
+        "base_commit": "8b10151a2b3341025a639497be70d156152ecaa4",
+        "base_tree": "2afc56d48c5926b8c9326f359907db97d34d5ff9",
+        "candidate_commit": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+        "candidate_reference": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+        "candidate_tree": "d17759bc7d4fb7d7168856cbc862657503e04f5b",
+        "repository": {
+          "origin": null,
+          "source_git_dir": "C:\\Users\\beesp\\AppData\\Local\\Temp\\claude\\C--Repos-HiveMind-hive-mind-os\\7a67801b-465b-4082-948f-c38656749678\\scratchpad\\a3\\m1\\nonprofit-checkout\\.git"
+        }
+      },
+      "prev_digest": "sha256:869dadd21f2c12a08917dc192f0ff3fa90f1f1a18fc05c025d73b34bb85530b0",
+      "row_digest": "sha256:4be8d0e1be78fdfd1af75adf3535cc04034014c98958963b2fe6f49597be90d5",
+      "run_id": "VERIFY-af3ab5f9-9ae7-4710-9770-784abc9cc8b8",
+      "sequence": 2
+    },
+    {
+      "actor": "curator",
+      "created_at": "2026-08-12T19:23:42.218739+00:00",
+      "event_type": "verify.completed",
+      "payload": {
+        "not_evaluated_tests": [],
+        "undeclared_paths": [],
+        "verdict": "adopt",
+        "weakened_tests": []
+      },
+      "prev_digest": "sha256:4be8d0e1be78fdfd1af75adf3535cc04034014c98958963b2fe6f49597be90d5",
+      "row_digest": "sha256:890b3e8649983f1bb30070999dde0046d6fd36d554134f569cc2defb69963b40",
+      "run_id": "VERIFY-af3ab5f9-9ae7-4710-9770-784abc9cc8b8",
+      "sequence": 3
+    }
+  ],
+  "materialization": {
+    "base": {
+      "commit": "8b10151a2b3341025a639497be70d156152ecaa4",
+      "detached": true,
+      "tree": "2afc56d48c5926b8c9326f359907db97d34d5ff9"
+    },
+    "candidate": {
+      "commit": "61648ddc357744576fd1ba45494b11756d9ffbf7",
+      "detached": true,
+      "tree": "d17759bc7d4fb7d7168856cbc862657503e04f5b"
+    },
+    "source_worktree_used_for_execution": false
+  },
+  "policy_version": "verify-immutable-v1",
+  "repository": {
+    "origin": null,
+    "source_git_dir": "C:\\Users\\beesp\\AppData\\Local\\Temp\\claude\\C--Repos-HiveMind-hive-mind-os\\7a67801b-465b-4082-948f-c38656749678\\scratchpad\\a3\\m1\\nonprofit-checkout\\.git"
+  },
+  "repository_read_sequence": 2,
+  "run_id": "VERIFY-af3ab5f9-9ae7-4710-9770-784abc9cc8b8",
+  "schema_version": 2,
+  "seal_sequence": 1,
+  "test_analysis": {
+    "files": [],
+    "not_evaluated": [],
+    "weakened": []
+  },
+  "undeclared_paths": [],
+  "verdict": "adopt",
+  "weakened_tests": []
+}

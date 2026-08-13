@@ -1,0 +1,30 @@
+test_compatibility_adapter_tests (tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests.test_compatibility_adapter_tests) ... ok
+test_no_dual_write_tests (tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests.test_no_dual_write_tests) ... ok
+test_parity_rejects_authority_effects (tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests.test_parity_rejects_authority_effects) ... ok
+test_rollback_routing_tests (tests.test_hive_cortex_compatibility.HiveCortexCompatibilityTests.test_rollback_routing_tests) ... ok
+test_closeout_import_is_lazy_and_legacy_status_route_is_read_only (tests.test_brain_kernel_compatibility.LocalCompatibilityFirewallTests.test_closeout_import_is_lazy_and_legacy_status_route_is_read_only) ... ok
+test_closeout_preserves_historical_receipt_bytes_for_all_local_outcomes (tests.test_brain_kernel_compatibility.LocalCompatibilityFirewallTests.test_closeout_preserves_historical_receipt_bytes_for_all_local_outcomes) ... ok
+test_closeout_replays_phase_one_through_eight_fixtures_without_mutation (tests.test_brain_kernel_compatibility.LocalCompatibilityFirewallTests.test_closeout_replays_phase_one_through_eight_fixtures_without_mutation) ... ok
+test_api_has_no_merge_rebase_or_force_surface (tests.test_git_adapter.GitAdapterTests.test_api_has_no_merge_rebase_or_force_surface) ... ok
+test_branch_edit_commit_diff_tree_and_receipts (tests.test_git_adapter.GitAdapterTests.test_branch_edit_commit_diff_tree_and_receipts) ... ok
+test_declared_tests_fail_at_fixture_head_and_pass_after_fix (tests.test_git_adapter.GitAdapterTests.test_declared_tests_fail_at_fixture_head_and_pass_after_fix) ... ok
+test_dirty_workspace_cannot_export_delivery (tests.test_git_adapter.GitAdapterTests.test_dirty_workspace_cannot_export_delivery) ... ok
+test_export_and_verify_delivery_with_resolvable_receipts (tests.test_git_adapter.GitAdapterTests.test_export_and_verify_delivery_with_resolvable_receipts) ... ok
+test_fixture_repository_has_stable_pinned_history (tests.test_git_adapter.GitAdapterTests.test_fixture_repository_has_stable_pinned_history) ... ok
+test_lower_authority_cannot_write_git_metadata (tests.test_git_adapter.GitAdapterTests.test_lower_authority_cannot_write_git_metadata) ... ok
+test_materialize_exact_detached_pin_and_inert_hooks (tests.test_git_adapter.GitAdapterTests.test_materialize_exact_detached_pin_and_inert_hooks) ... ok
+test_materialize_excludes_local_codex_bookkeeping_refs (tests.test_git_adapter.GitAdapterTests.test_materialize_excludes_local_codex_bookkeeping_refs) ... ok
+test_materialize_ignores_host_global_git_configuration (tests.test_git_adapter.GitAdapterTests.test_materialize_ignores_host_global_git_configuration) ... ok
+test_mutable_and_short_pins_are_rejected (tests.test_git_adapter.GitAdapterTests.test_mutable_and_short_pins_are_rejected) ... ok
+test_policy_denial_occurs_before_git_spawn (tests.test_git_adapter.GitAdapterTests.test_policy_denial_occurs_before_git_spawn) ... ok
+test_preexisting_delivery_root_is_rejected_before_any_write (tests.test_git_adapter.GitAdapterTests.test_preexisting_delivery_root_is_rejected_before_any_write) ... ok
+test_repository_urls_are_rejected (tests.test_git_adapter.GitAdapterTests.test_repository_urls_are_rejected) ... ok
+test_run_tests_cannot_bypass_typed_git_authority (tests.test_git_adapter.GitAdapterTests.test_run_tests_cannot_bypass_typed_git_authority) ... ok
+test_truncated_git_output_fails_closed (tests.test_git_adapter.GitAdapterTests.test_truncated_git_output_fails_closed) ... ok
+test_verifier_rejects_escaped_evidence_root (tests.test_git_adapter.GitAdapterTests.test_verifier_rejects_escaped_evidence_root) ... ok
+test_write_file_rejects_nonportable_and_escaping_paths (tests.test_git_adapter.GitAdapterTests.test_write_file_rejects_nonportable_and_escaping_paths) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 19.857s
+
+OK

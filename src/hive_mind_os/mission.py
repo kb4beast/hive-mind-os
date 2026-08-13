@@ -1,6 +1,14 @@
-"""Local repository mission orchestration for the P05 vertical slice.
+"""Retired legacy runtime surface: the P05/P06 repository mission (LEGACY-620).
 
-The mission composes the model boundary, typed Git adapter, process sandbox, policy
+Canonical ownership of mission execution belongs to
+``hive_mind_os.brain_kernel.mission_runtime``, reached through the
+MIGRATION-460 routing installed in ``hive_mind_os.cli``.  :class:`RepositoryMission`
+survives only as an explicitly marked rollback/compatibility surface: rollback tag
+``legacy-620-rollback``, migration receipts in
+``docs/execution/LEGACY_RUNTIME_RETIREMENT.md``.
+
+Local repository mission orchestration for the P05 vertical slice.  The mission
+composes the model boundary, typed Git adapter, process sandbox, policy
 engine, append-only ledger, and fixed autonomy budget.  An optional P06 mission store
 adds local checkpoints and resume.  Remote repositories, credentials, pushes, pull
 requests, and hard hostile-code isolation remain later-phase work.
@@ -16,6 +24,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import warnings
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -82,6 +91,43 @@ from .runtime import AgentBackend, HiveKernel
 
 if TYPE_CHECKING:
     from .mission_store import MissionStore
+
+LEGACY_RUNTIME_NOTICE: dict[str, str] = {
+    "entry_point": "hive_mind_os.mission",
+    "status": "retired-legacy-rollback-only",
+    "canonical_owner": "hive_mind_os.brain_kernel.mission_runtime",
+    "canonical_ingress": "hive_mind_os.cli (MIGRATION-460 routing)",
+    "canonical_destination": "repository effect adapter plus Curator verifier",
+    "rollback_ref": "rollback:legacy-620",
+    "rollback_tag": "legacy-620-rollback",
+    "retired_by_node": "LEGACY-620",
+    "parity_evidence": "evidence/qualification/hive-cortex/",
+    "migration_receipts": "docs/execution/LEGACY_RUNTIME_RETIREMENT.md",
+}
+
+
+def retirement_notice() -> dict[str, str]:
+    """Machine-readable compatibility notice for this retired legacy entry point."""
+
+    return dict(LEGACY_RUNTIME_NOTICE)
+
+
+def _warn_retired(entry: str) -> None:
+    """Emit this module's retirement DeprecationWarning.
+
+    Retained for parity with the other three retired modules, but intentionally
+    *not* called from :meth:`RepositoryMission.__init__` — see the comment there
+    and section 6 of ``docs/execution/LEGACY_RUNTIME_RETIREMENT.md``.
+    """
+
+    warnings.warn(
+        f"{entry} is a retired legacy runtime surface (LEGACY-620); the canonical "
+        "owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag "
+        "legacy-620-rollback",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
 
 _T = TypeVar("_T")
 _GOOD_FIX = b"def increment(value: int) -> int:\n    return value + 1\n"
@@ -568,6 +614,17 @@ class RepositoryMission:
         _resume: bool = False,
         _missing_workspaces: set[str] | None = None,
     ) -> None:
+        # No _warn_retired() call here, deliberately.  LEGACY-620 runbook section 3.2
+        # requires the construction warning but subordinates it to behavior
+        # preservation, and this surface cannot carry it: `hive-mind deliver`
+        # constructs this class from cli.py, so with the mandated stacklevel=3 the
+        # DeprecationWarning is attributed to __main__ and Python's default
+        # `default::DeprecationWarning:__main__` filter prints it to stderr.
+        # tests/test_mission.py:769 does json.loads(sabotage.stderr) and requires that
+        # stream to be a bare JSON document, so the warning breaks an un-editable
+        # test.  The retirement contract is carried by LEGACY_RUNTIME_NOTICE /
+        # retirement_notice() instead; see docs/execution/LEGACY_RUNTIME_RETIREMENT.md
+        # section 6.
         self.repository = Path(repository).resolve()
         if not self.repository.is_dir() or not (self.repository / ".git").exists():
             raise ValueError("repository must be a local Git worktree")

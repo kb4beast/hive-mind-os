@@ -1,0 +1,85 @@
+{
+  "artifact_type": "A4PathBRemoteOperation",
+  "base_branch": "main",
+  "branch": "a4-pilot/attempt-1",
+  "commit": {
+    "git_commands": [
+      "add",
+      "commit",
+      "rev-parse"
+    ],
+    "head_sha": "9dbbdd124840064d1698905d96ce56128183d137",
+    "message": "chore(a4-800): pilot attempt-1 marker"
+  },
+  "effect_status": "SUCCEEDED",
+  "grant": {
+    "allowed_actions": [
+      "push",
+      "open_draft_pr",
+      "post_comment",
+      "close_own_pr",
+      "delete_own_branch"
+    ],
+    "branch_prefix": "a4-pilot/",
+    "grant_digest": "sha256:5c1f5dd1defc1eb560dd1f875d0bf3f2ed4cb7f384364193bf93c478dece28e9",
+    "grant_id": "GRANT-A4-800-PATH-B"
+  },
+  "host": "github",
+  "host_response": {
+    "branch_head_sha": "9dbbdd124840064d1698905d96ce56128183d137",
+    "branch_head_source": "bound by the push receipt; no REST ref-read method exists",
+    "produced_identifiers": [
+      "branch:a4-pilot/attempt-1",
+      "sha:9dbbdd124840064d1698905d96ce56128183d137"
+    ],
+    "rest_calls": []
+  },
+  "intent": {
+    "action": "push",
+    "authority_envelope_digest": "sha256:c0e366b2a9012265f9748f9aa81e42467b99f43b10fd9d63547ea38da8a1a57d",
+    "idempotency_key": "sha256:268a38245ed53adef19ada77b8c398ec68fb8a44cc347b85a2a6c1d2171851cf",
+    "intent_digest": "sha256:f6132210ffa012212431dff838c5cea2c7cde7107fccb4200fd6909fba11a275",
+    "parameters_digest": "sha256:2b8d9fa1191508b90cb58eeae0be8dde6834e5ed9a2ea54bc09e6ce9fed6c2f3",
+    "policy_decision_ref": "POLICY-a4-800-push-1",
+    "target": "github/patencyhealth-lab/hive-mind-a4-pilot",
+    "target_adapter": "github-push"
+  },
+  "observations": {
+    "git_commands": [
+      "rev-parse",
+      "status",
+      "rev-parse",
+      "ls-remote",
+      "push"
+    ]
+  },
+  "operation": "push-branch",
+  "owner": "patencyhealth-lab",
+  "receipt": {
+    "adapter_identity": "github-push",
+    "adapter_version": "1",
+    "ended_at": "2026-08-13T03:53:22.127555Z",
+    "intent_digest": "sha256:f6132210ffa012212431dff838c5cea2c7cde7107fccb4200fd6909fba11a275",
+    "observed_precondition_digest": "sha256:253cf96b93dd81294723b96d56a49c8122f3c7f69f0aa4584b2a405f00484707",
+    "postcondition_digest": "sha256:d96e8952253d10b95b31087fe6038acc864c4188db965fd05138681f1e1e96af",
+    "produced_identifiers": [
+      "branch:a4-pilot/attempt-1",
+      "sha:9dbbdd124840064d1698905d96ce56128183d137"
+    ],
+    "retry_of": null,
+    "rollback_receipt": null,
+    "started_at": "2026-08-13T03:53:20.067618Z",
+    "status": "SUCCEEDED",
+    "stderr_digest": null,
+    "stdout_digest": null
+  },
+  "receipt_digest": "sha256:1e92ffa14d415d4e2950213bf1e89abf9d238d9a30eb44f378fd620e949f8791",
+  "recorded_at": "2026-08-13T03:53:22Z",
+  "repository": "hive-mind-a4-pilot",
+  "request_digest": "sha256:2b8d9fa1191508b90cb58eeae0be8dde6834e5ed9a2ea54bc09e6ce9fed6c2f3",
+  "request_parameters": {
+    "branch": "a4-pilot/attempt-1"
+  },
+  "schema_version": 1,
+  "sequence": 2
+}

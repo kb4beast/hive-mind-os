@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "node_id": "QUALIFY-610",
+  "candidate_commit": "00fd1d80579a6bbaee35abd9288fddceb05c6ebe",
+  "candidate_tree": "b383e64f9c54bd4050136488243cd6cea383a66a",
+  "branch": "release/hive-mind-os-singleton-20260812-r5",
+  "generated_utc": "2026-08-12T18:40:00Z",
+  "host_platform": "Windows-11-10.0.26200-SP0",
+  "host_python": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]",
+  "supersedes": "A previous execution of this node against candidate a3faac5e68643bcba0b8990a20f76db71496d574. That run's evidence directory was deleted in full; no digest, log or exit code below is carried over from it. Every value here was measured against 00fd1d80.",
+  "retention_requirement": {
+    "problem": ".gitignore:127 contains a repo-wide `*.log` rule (Visual Studio boilerplate). Every log named in this manifest is therefore ignored by default, and a plain `git add evidence/qualification/...` would silently drop all 11 of them, leaving this manifest citing sha256 digests of files absent from the repository.",
+    "required_action": "The committing agent MUST force-add the retained logs: `git add -f evidence/qualification/hive-cortex/q610-00fd1d80/`. Do NOT edit .gitignore - it is outside this node's write scope.",
+    "precedent": "Prior retained evidence logs are tracked the same way, e.g. `git ls-files evidence/local_assurance/phase12-9efe64b/logs/` returns four committed *.log files even though no negation rule exists for them.",
+    "ignored_paths_requiring_force_add": [
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate1-ci/compileall.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate1-ci/git-env-proof.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate1-ci/lease-acquire.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate1-ci/lease-release.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate1-ci/pyright.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate1-ci/ruff.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate1-ci/unittest-full.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate2-acceptance/focused-suite.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate3-replay/assurance-verify.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate3-replay/replay-focused.log",
+      "evidence/qualification/hive-cortex/q610-00fd1d80/gate4-platform/py312.log"
+    ]
+  },
+  "environment_normalization": {
+    "inherited_git_variables_found": ["GIT_EDITOR=true"],
+    "action": "stripped with `env -u GIT_EDITOR` on every test command",
+    "reason": "src/hive_mind_os/brain_kernel/explorer.py:224-225 raises ExplorerDenied for ANY inherited GIT_* variable. GitHub Actions runners export no GIT_* variable, so stripping reproduces CI rather than laundering a failure.",
+    "proof_log": "gate1-ci/git-env-proof.log",
+    "proof_summary": "tests.test_hive_cortex_explorer at this candidate: with GIT_EDITOR set -> Ran 7 tests, FAILED (errors=2), exit 1; with GIT_EDITOR unset -> Ran 7 tests, OK, exit 0."
+  },
+  "validation_lease": {
+    "node_id": "QUALIFY-610",
+    "owner": "codex:qualify-610",
+    "lease_id": "sha256:b88185d3c093adc718ed08ddfd24cbab14aec70911a96865b47ac1547bcaef47",
+    "target_sha": "00fd1d80579a6bbaee35abd9288fddceb05c6ebe",
+    "lease_minutes": 90,
+    "acquired_at": "2026-08-12T18:01:02.278622Z",
+    "expires_at": "2026-08-12T19:31:02.278622Z",
+    "released_at": "2026-08-12T18:33:47.847218Z",
+    "status": "RELEASED",
+    "acquire_exit_code": 0,
+    "release_exit_code": 0,
+    "overrun_note": "RESOLVED for this execution. The previous run's 10-minute default lease was overrun by 23m38s; this run acquired with --lease-minutes 90, held the lease 32m45s covering both repo-wide interpreter runs, and released 57m15s before expiry. Exclusivity was lease-guaranteed for the entire window."
+  },
+  "gates": [
+    {
+      "gate": "full-constitutional-ci / compileall (ci.yml unit-tests step 'Compile bytecode')",
+      "command": "python -m compileall -q src tests",
+      "exit_code": 0,
+      "log": "gate1-ci/compileall.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "PASS",
+      "note": "Empty log is the expected quiet-mode success output."
+    },
+    {
+      "gate": "full-constitutional-ci / unit-tests repo-wide discovery (leased Gate 1b)",
+      "command": "env -u GIT_EDITOR PYTHONPATH=src python -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "log": "gate1-ci/unittest-full.log",
+      "log_sha256": "671e1d6c8d1e5179f70bad343ce7995a4adcbbdb045941c8e41e0b4cce18046c",
+      "outcome": "PASS",
+      "result": "Ran 985 tests in 1006.990s -- OK (skipped=7); 0 failures, 0 errors."
+    },
+    {
+      "gate": "full-constitutional-ci / quality job - ruff",
+      "command": "python -m ruff check src tests",
+      "exit_code": 0,
+      "log": "gate1-ci/ruff.log",
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "outcome": "PASS",
+      "result": "All checks passed! ruff 0.16.0 == the version pinned by .github/workflows/ci.yml; rule set is the repo's own pyproject select = [E4, E7, E9, F, I]. The 15 errors this node measured at a3faac5e were repaired by orchestrator commit 5ead055 and are independently re-measured as clear here."
+    },
+    {
+      "gate": "full-constitutional-ci / quality job - pyright",
+      "command": "python -m pyright",
+      "exit_code": 0,
+      "log": "gate1-ci/pyright.log",
+      "log_sha256": "3edfdcb1e9892ce3f41cb21c1c7a110554ab66f9f825d2e5b028319e3ff97f6d",
+      "outcome": "PASS",
+      "result": "0 errors, 6 warnings, 0 informations. pyright 1.1.411 == the version pinned by ci.yml; configuration is the repo's own pyrightconfig.json (include src, pythonVersion 3.11, basic). The 4 errors measured at a3faac5e are gone. The 6 remaining reportUnsupportedDunderAll warnings are non-blocking: pyright exits 0 and the CI quality job gates on errors."
+    },
+    {
+      "gate": "full-constitutional-ci / GitHub-hosted-only jobs (codeql, secret-scan, dependency-review, build-evidence)",
+      "command": "<not runnable locally: requires GitHub Actions runners, GITHUB_TOKEN, and attestation identity>",
+      "exit_code": null,
+      "log": null,
+      "log_sha256": null,
+      "outcome": "DEFERRED",
+      "result": "Deferred to the Constitutional CI run on the draft PR. No network or GitHub API effects were produced by this node."
+    },
+    {
+      "gate": "complete-autonomy-acceptance / focused suites",
+      "command": "env -u GIT_EDITOR PYTHONPATH=src python -m unittest tests.test_acceptance tests.hive_cortex.test_acceptance_harness tests.test_autonomy tests.test_policy_invariants -v",
+      "exit_code": 0,
+      "log": "gate2-acceptance/focused-suite.log",
+      "log_sha256": "a0dbf44c8be36f6d8c6eb373b1654c3a3e3893b5c928b607cbc13a097167e632",
+      "outcome": "PASS",
+      "result": "Ran 26 tests in 3.564s -- OK."
+    },
+    {
+      "gate": "complete-autonomy-acceptance / executed module inventory",
+      "command": "python -c \"<regex extraction of dotted module names from the Gate 1b log>\"",
+      "exit_code": 0,
+      "log": "gate2-acceptance/module-inventory.txt",
+      "log_sha256": "649831fe3e00501a9ef02ff0b8f7f8be7fb5d410abc44e393202d965d8e9361a",
+      "outcome": "PASS",
+      "result": "97 distinct test modules executed; per-module test counts sum to exactly 985, matching the Ran-985 summary line. Regenerated from THIS run's log; the digest matches the previous run's inventory because no test module changed between a3faac5e and 00fd1d80."
+    },
+    {
+      "gate": "complete-autonomy-acceptance / acceptance-matrix suite coverage (7 suites)",
+      "command": "python .autopilot/bin/autopilot.py --repo-root . status --json (node states) cross-referenced against the module inventory",
+      "exit_code": 0,
+      "log": "gate2-acceptance/module-inventory.txt",
+      "log_sha256": "649831fe3e00501a9ef02ff0b8f7f8be7fb5d410abc44e393202d965d8e9361a",
+      "outcome": "PASS",
+      "result": "6 of 7 suites (all_role, humanless_operation, learning, no_cheating, repository_safety, self_healing) have all required_nodes COMPLETE and covering modules present -> PASS. staged_autonomy is DEFERRED under the amended runbook step 4: its required_nodes A3-700, A4-800 and A5-900 are all in state RECONCILIATION_REQUIRED (not COMPLETE) and are downstream of this node, so its evidence cannot exist yet. Blocking nodes named; residual-blocker row recorded. No suite omitted silently."
+    },
+    {
+      "gate": "clean-replay-verification / clean worktree identity",
+      "command": "git -c core.longpaths=true worktree add --detach <scratch>/q610/clean2 00fd1d80579a6bbaee35abd9288fddceb05c6ebe && git status --porcelain",
+      "exit_code": 0,
+      "log": "gate3-replay/worktree-status.txt",
+      "log_sha256": "92f761a596739ef13dd5c87e68716904604ee296cf851984fecdc4f2d908c397",
+      "outcome": "PASS",
+      "result": "HEAD 00fd1d80579a6bbaee35abd9288fddceb05c6ebe, tree b383e64f9c54bd4050136488243cd6cea383a66a, porcelain line count 0. Worktree removed afterwards."
+    },
+    {
+      "gate": "clean-replay-verification / snapshot_tree identity",
+      "command": "PYTHONPATH=src python -c \"from hive_mind_os.brain_kernel.verification import snapshot_tree; ...\" (run inside the clean worktree)",
+      "exit_code": 0,
+      "log": "gate3-replay/tree-snapshot.json",
+      "log_sha256": "94ba88586a0be96242360fb1a889d8f537bd96c38112c63586c4153e75f3d9c3",
+      "outcome": "PASS",
+      "result": "root_digest sha256:3ce600f2d8635aa35fbab322772cf2d5e1d0339c0605f2e3305cb7fcbebce4a9 over 257 files. Differs from the a3faac5e snapshot as expected: commit 5ead055 changed src/."
+    },
+    {
+      "gate": "clean-replay-verification / retained phase12 assurance replay",
+      "command": "PYTHONPATH=src python <scratch>/assurance_verify.py (run inside the clean worktree; verifies every evidence/local_assurance/phase12-* packet)",
+      "exit_code": 0,
+      "log": "gate3-replay/assurance-verify.log",
+      "log_sha256": "838c325bf4986727e18024a1873627c1bde57b863b97e347a15bdb9dceaf7bd1",
+      "outcome": "PASS",
+      "result": "phase12-9efe64b verified in full via verify_local_assurance_artifact(assurance.json, receipts.json). phase12-54020b7.json has no adjacent receipts manifest, so it was verified digest-only by re-deriving canonical_digest (claimed == re-derived). No LocalAssuranceError raised. Both packets pin comparative_claim_authorized=false, real_provider_used=false, release_ready=false, production_ready=false."
+    },
+    {
+      "gate": "clean-replay-verification / focused replay suites",
+      "command": "env -u GIT_EDITOR PYTHONPATH=src python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v (run inside the clean worktree)",
+      "exit_code": 0,
+      "log": "gate3-replay/replay-focused.log",
+      "log_sha256": "b45ae4e8125fe4b830912e0f9ec66adcc2f741531d5f9838cae069cb60c3adb9",
+      "outcome": "PASS",
+      "result": "Ran 13 tests in 0.085s -- OK."
+    },
+    {
+      "gate": "cross-platform-qualification / windows x python 3.12 (CI matrix cell unit-tests-windows)",
+      "command": "env -u GIT_EDITOR PYTHONPATH=src py -3.12 -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "log": "gate4-platform/py312.log",
+      "log_sha256": "323f3bd7c8bc2f45a5b6971ae288c70a2b660af1ee8475c87cdea2f6c729d1f8",
+      "outcome": "PASS",
+      "result": "CPython 3.12.10 on Windows-11-10.0.26200-SP0: Ran 985 tests in 956.960s -- OK (skipped=7). Executed inside the Gate 1b lease window."
+    },
+    {
+      "gate": "cross-platform-qualification / windows x python 3.14 (host; not a CI matrix cell)",
+      "command": "env -u GIT_EDITOR PYTHONPATH=src python -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "log": "gate1-ci/unittest-full.log",
+      "log_sha256": "671e1d6c8d1e5179f70bad343ce7995a4adcbbdb045941c8e41e0b4cce18046c",
+      "outcome": "PASS",
+      "result": "Extra coverage beyond the declared matrix: ci.yml runs 3.14 only on ubuntu. Ran 985 tests -- OK (skipped=7)."
+    },
+    {
+      "gate": "cross-platform-qualification / ubuntu x python 3.11",
+      "command": "<not runnable: no ubuntu host and no CPython 3.11 interpreter installed; installing either is forbidden>",
+      "exit_code": null,
+      "log": "gate4-platform/host-platform.txt",
+      "log_sha256": "27c46b82e9aabab6a8d4107c478fd5ecdf28711913bdcd7b296f24d0e378dc5f",
+      "outcome": "DEFERRED",
+      "result": "Deferred to the CI matrix on the draft PR. Locally visible interpreters are only 3.14 and 3.12 (py -0p)."
+    },
+    {
+      "gate": "cross-platform-qualification / ubuntu x python 3.12",
+      "command": "<not runnable: host is Windows 11; no ubuntu runner available and none may be provisioned>",
+      "exit_code": null,
+      "log": "gate4-platform/host-platform.txt",
+      "log_sha256": "27c46b82e9aabab6a8d4107c478fd5ecdf28711913bdcd7b296f24d0e378dc5f",
+      "outcome": "DEFERRED",
+      "result": "Deferred to the CI matrix on the draft PR."
+    },
+    {
+      "gate": "cross-platform-qualification / ubuntu x python 3.14",
+      "command": "<not runnable: host is Windows 11; no ubuntu runner available and none may be provisioned>",
+      "exit_code": null,
+      "log": "gate4-platform/host-platform.txt",
+      "log_sha256": "27c46b82e9aabab6a8d4107c478fd5ecdf28711913bdcd7b296f24d0e378dc5f",
+      "outcome": "DEFERRED",
+      "result": "Deferred to the CI matrix on the draft PR."
+    }
+  ]
+}

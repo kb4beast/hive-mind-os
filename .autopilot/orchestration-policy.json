@@ -1,0 +1,152 @@
+{
+  "closure_first": {
+    "before_optional_audits": 1,
+    "enabled": true,
+    "selection": [
+      "closest_to_valid_receipt",
+      "critical_path_importance",
+      "downstream_unlock_value",
+      "node_id"
+    ]
+  },
+  "host_adapters": {
+    "codex": {
+      "create": "create_thread",
+      "durable_task_title": "Hive Mind <NODE-ID>",
+      "message": "send_message_to_thread",
+      "nested_sidecar": "multi_agent_v1.spawn_agent",
+      "sidecar_close": "multi_agent_v1.close_agent",
+      "sidecar_lookup": "lookup_sidecar",
+      "sidecar_message": "multi_agent_v1.send_input",
+      "sidecar_wait": "wait_activity",
+      "wait": "wait_threads"
+    },
+    "generic": {
+      "create": "create_durable_task",
+      "message": "send_message_to_task",
+      "sidecar_close": "close_sidecar",
+      "sidecar_lookup": "lookup_sidecar",
+      "sidecar_message": "send_message_to_sidecar",
+      "sidecar_wait": "wait_activity",
+      "wait": "wait_durable_tasks"
+    }
+  },
+  "host_executor": {
+    "module": ".autopilot/bin/host_execution.py",
+    "entrypoint": "execute_contract",
+    "capability_bound_events": true,
+    "create_entire_wave_before_wait": true,
+    "bounded_no_progress_blocker": true
+  },
+  "intent": {
+    "implicit_installed_default": "CONTINUE",
+    "implicit_uninstalled_default": "BUILD_DAG",
+    "supported": [
+      "BUILD_DAG",
+      "START",
+      "CONTINUE",
+      "CHECK",
+      "FINISH"
+    ]
+  },
+  "kind": "hive-mind-autopilot-orchestration-policy-v1",
+  "polling": {
+    "answer_questions_then_resume": true,
+    "minimum_primary_completions_before_parent_yield": 1,
+    "parent_final_while_required_tasks_active": false,
+    "poll_until_terminal": true
+  },
+  "parallel_task_cohort": {
+    "closure_target_prioritizes_collection_not_creation": true,
+    "create_eligible_preparation_tasks": true,
+    "create_entire_cohort_before_first_wait": true,
+    "create_released_tasks_even_when_recovery_tasks_exist": true,
+    "poll_every_created_task_to_terminal": true,
+    "preparation_authority": "read_only_until_start_now",
+    "title_fields": [
+      "node_id",
+      "action",
+      "authority_mode",
+      "instruction_digest"
+    ]
+  },
+  "recovery": {
+    "blocker_is_completion": false,
+    "classifications": [
+      "SUCCEEDED",
+      "RECOVERABLE",
+      "EXTERNALLY_BLOCKED",
+      "INCOMPLETE"
+    ],
+    "consult_roles_before_human": true,
+    "record_resolved_questions": true,
+    "resume_same_task_after_fix": true
+  },
+  "schema_version": 1,
+  "sidecars": {
+    "allowed_purposes": [
+      "bounded_read_only_research",
+      "independent_review",
+      "non_blocking_validation"
+    ],
+    "close_descendants_before_parent_terminal": true,
+    "coordination_overhead_tokens": 450,
+    "enabled": true,
+    "max_depth": 2,
+    "max_no_progress_cycles": 3,
+    "max_poll_cycles": 40,
+    "max_replay_events": 3,
+    "max_result_tokens": 700,
+    "max_sidecars_per_primary": 2,
+    "max_targets_per_wait": 8,
+    "max_total_sidecars": 8,
+    "min_net_savings_tokens": 1200,
+    "per_sidecar_token_budget": 2600,
+    "primary_authority_inheritance": false,
+    "require_parent_ack": true,
+    "root_mediates_descendants": true,
+    "total_token_budget": 20800,
+    "wait_timeout_seconds": 120
+  },
+  "task_transport": {
+    "binding_ledger": ".autopilot/state/task-bindings.jsonl",
+    "binding_sequence": [
+      "PREPARED",
+      "CREATED",
+      "BOUND",
+      "TERMINAL_OBSERVED",
+      "RELEASED"
+    ],
+    "nested_allowed_for": [
+      "bounded_read_only_research",
+      "independent_review",
+      "non_blocking_validation"
+    ],
+    "nested_primary_forbidden": true,
+    "primary": "durable_user_owned_task",
+    "record_host_id": true,
+    "record_task_id": true,
+    "resume_by_node_identity": true
+  },
+  "wave": {
+    "dispatch_order": [
+      "snapshot",
+      "doctor",
+      "reconcile",
+      "dispatch",
+      "claim",
+      "execute",
+      "validate",
+      "complete",
+      "release"
+    ],
+    "mode": "deterministic_priority_ordered_maximal_conflict_free",
+    "never_start_next_level_before_required_current_cohort_quiescence": true,
+    "repository_wide_validation": {
+      "duplicate_run_disposition": "stop_and_record_non_verdict",
+      "focused_checks_without_lease": true,
+      "lease_required": true,
+      "retry_while_another_owner_holds_lease": false
+    }
+  }
+}

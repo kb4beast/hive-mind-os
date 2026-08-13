@@ -27,10 +27,11 @@
     "No role, worker, or dispatcher may expand authority.",
     "No same-model role label may be presented as an independent human.",
     "No human escalation may substitute for a software repair or role-resolvable question.",
-    "ChatGPT Classic is the default node owner; Codex may be used only for the smallest proven unavailable execution capability after Classic/tool/role paths are exhausted.",
+    "The approved durable primary task owns its released node; nested agents may not replace it, and host choice never expands authority.",
     "Never ask the user for a manual action without novice-safe exact instructions and proof that genuine human authority or access is required."
   ],
   "schema_version": 1,
+  "orchestration_policy_file": ".autopilot/orchestration-policy.json",
   "source_of_truth": [
     "target branch ancestry",
     "durable validated node receipt commits and sealed bootstrap attestation",
@@ -44,8 +45,14 @@
     "baseline_rule": "The baseline must remain an ancestor. Any target advancement must be reconciled before new claims.",
     "baseline_sha": "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23",
     "baseline_tree": "ac76686aa004cf8188f0281b1ec9ac1f5c666929",
-    "branch": "main",
-    "repository": "kb4beast/hive-mind-os"
+    "branch": "release/hive-mind-os-singleton-20260812-r5",
+    "repository": "kb4beast/hive-mind-os",
+    "execution_mode": "singleton-release-branch",
+    "final_integration_branch": "main",
+    "protected_until_final_integration": [
+      "main"
+    ],
+    "release_branch_base": "f1a5ae749ac5d9dd25d8c72a87d49a9d8a4ae86f"
   },
   "verify_git_objects": true,
   "workflow_policy_file": ".autopilot/workflow-policy.json"

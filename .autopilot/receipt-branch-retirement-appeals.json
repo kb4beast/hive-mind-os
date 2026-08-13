@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "appeals_id": "appeals-explorer-310-retirement-ordering-20260811",
+  "node_id": "EXPLORER-310",
+  "decision": "ADAPT",
+  "preserves_court_disposition": "QUARANTINE",
+  "appeals_judge_identity": "appeals:independent-retirement-ordering",
+  "incident_target_sha": "01ca563a8a11fddde6f698abe42d10db3dd1bc71",
+  "capability_commit": "e57790de9b6db7a426db620f4db59db8c13495bc",
+  "finding": "The sealed incident target is provenance, while execution requires a current reconciled singleton target containing the integrated retirement capability."
+}

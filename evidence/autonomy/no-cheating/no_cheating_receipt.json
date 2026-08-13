@@ -1,0 +1,63 @@
+{
+  "node": "CHEAT-440",
+  "base_commit": "7ec26c540e211dfe06007259df90c2091c04034d",
+  "final_commit": null,
+  "final_commit_note": "This worker was instructed not to run any state-changing git command, so no node commit exists yet; the receipt binds the working-tree run against base_commit.",
+  "command": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating -v",
+  "command_note": "PYTHONPATH=src is required: a bare 'python -m unittest' in this environment resolves hive_mind_os to an unrelated worktree (C:/Users/beesp/.codex/worktrees/1a44/hive-mind-os/src).",
+  "outcome": "passed",
+  "tests_run": 20,
+  "transcript_path": "test-transcript.txt",
+  "transcript_sha256": "ecca4dfa7c803e2adce5d689cb4938a94189bae6276744bae129bdf585ded8e9",
+  "class_map": {
+    "authority-expansion": [
+      "AuthorityExpansionSuiteTests.test_child_envelope_cannot_broaden_parent",
+      "AuthorityExpansionSuiteTests.test_orphan_child_cannot_self_register",
+      "AuthorityExpansionSuiteTests.test_registry_denies_scope_expansion_expiry_and_revocation"
+    ],
+    "evaluator-leakage": [
+      "EvaluatorLeakageSuiteTests.test_evaluator_mode_excludes_generator_material",
+      "EvaluatorLeakageSuiteTests.test_generator_manifest_never_claims_separation"
+    ],
+    "fake-receipts": [
+      "NoCheatingSuiteTests.test_fake_receipts_fail_closed_in_report_builder",
+      "NoCheatingSuiteTests.test_fake_receipts_tampered_report_or_transcript_is_rejected"
+    ],
+    "friendly-consultation": [
+      "FriendlyConsultationSuiteTests.test_echo_chamber_testimony_is_rejected",
+      "FriendlyConsultationSuiteTests.test_friendly_court_is_structurally_impossible",
+      "FriendlyConsultationSuiteTests.test_harness_flags_friendly_consultation",
+      "FriendlyConsultationSuiteTests.test_requester_cannot_pack_its_own_council",
+      "FriendlyConsultationSuiteTests.test_role_labels_are_never_independent_humans"
+    ],
+    "future-access": [
+      "EvaluatorLeakageSuiteTests.test_future_dated_memory_is_invisible_to_every_context",
+      "NoCheatingSuiteTests.test_future_access_observed_commits_must_be_sealed"
+    ],
+    "role-council-and-quarantine": [
+      "NoCheatingSuiteTests.test_confirmed_cheating_quarantines_and_disproved_cites_retained_evidence",
+      "NoCheatingSuiteTests.test_suspected_cheating_triggers_role_council_before_continuation"
+    ],
+    "stale-evidence": [
+      "NoCheatingSuiteTests.test_stale_evidence_appeal_without_new_evidence_is_rejected",
+      "NoCheatingSuiteTests.test_stale_evidence_rewritten_artifact_is_denied"
+    ],
+    "test-weakening": [
+      "NoCheatingSuiteTests.test_test_weakening_cannot_convert_failure_into_adoption",
+      "NoCheatingSuiteTests.test_test_weakening_tampered_seal_fails_closed"
+    ]
+  },
+  "suite_commands": {
+    "no-cheating-suite": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.NoCheatingSuiteTests -v",
+    "evaluator-leakage-suite": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests -v",
+    "authority-expansion-suite": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests -v",
+    "friendly-consultation-suite": "PYTHONPATH=src python -m unittest tests.hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests -v"
+  },
+  "changed_paths": [
+    "tests/hive_cortex/test_no_cheating.py",
+    "evidence/autonomy/no-cheating/test-transcript.txt",
+    "evidence/autonomy/no-cheating/no_cheating_receipt.json",
+    "docs/execution/NO_CHEATING_RESULTS.md"
+  ],
+  "rollback": "revert <final_commit>"
+}

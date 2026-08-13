@@ -1,0 +1,25 @@
+# transcript: authority-boundary-audit
+# node: A5-900
+# cwd: C:\Repos\HiveMind\hive-mind-os
+# base_commit: 7a2e19e769cbeb1b3f3a515037c1173af28c9893
+# command: PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority tests.test_governance -v
+# python: Python 3.14.4
+# started_utc: 2026-08-13T05:00:46Z
+----- BEGIN OUTPUT -----
+test_gateway_requires_matching_token_and_deduplicates (tests.test_brain_kernel_authority.AuthorityTests.test_gateway_requires_matching_token_and_deduplicates) ... ok
+test_scope_expiry_revocation_and_action_denials_fail_closed (tests.test_brain_kernel_authority.AuthorityTests.test_scope_expiry_revocation_and_action_denials_fail_closed) ... ok
+test_build_backend_is_exactly_pinned (tests.test_governance.RepositoryGovernanceTests.test_build_backend_is_exactly_pinned) ... ok
+test_ci_covers_required_constitutional_checks (tests.test_governance.RepositoryGovernanceTests.test_ci_covers_required_constitutional_checks) ... ok
+test_constitutional_files_have_code_owners (tests.test_governance.RepositoryGovernanceTests.test_constitutional_files_have_code_owners) ... ok
+test_contributor_material_and_lite_path_are_present (tests.test_governance.RepositoryGovernanceTests.test_contributor_material_and_lite_path_are_present) ... ok
+test_every_ci_action_is_pinned_to_a_commit (tests.test_governance.RepositoryGovernanceTests.test_every_ci_action_is_pinned_to_a_commit) ... ok
+test_required_rules_bind_remote_verification_evidence (tests.test_governance.RepositoryGovernanceTests.test_required_rules_bind_remote_verification_evidence) ... ok
+test_secret_scan_allowlist_is_narrow_and_extends_defaults (tests.test_governance.RepositoryGovernanceTests.test_secret_scan_allowlist_is_narrow_and_extends_defaults) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.044s
+
+OK
+----- END OUTPUT -----
+# exit_code: 0
+# finished_utc: 2026-08-13T05:00:46Z

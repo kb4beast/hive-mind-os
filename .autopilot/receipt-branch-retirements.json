@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "receipt_branch_retirements": [
+    {
+      "schema_version": 1,
+      "retirement_id": "explorer-310-rejected-receipt-branch-v1",
+      "node_id": "EXPLORER-310",
+      "origin_name": "origin",
+      "origin_url": "https://github.com/kb4beast/hive-mind-os.git",
+      "repository": "kb4beast/hive-mind-os",
+      "branch": "autopilot/explorer-310",
+      "candidate_commit": "3d305e63391094846e8d8ebacad2fa73dbb2db8b",
+      "receipt_commit": "2304036fe92e7fe499785a500c173300943a55fb",
+      "expected_remote_head": "2304036fe92e7fe499785a500c173300943a55fb",
+      "incident_target_sha": "01ca563a8a11fddde6f698abe42d10db3dd1bc71",
+      "capability_commit": "e57790de9b6db7a426db620f4db59db8c13495bc",
+      "contract_version": 1,
+      "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+      "blocker_id": "sha256:e3d19e5a17fb286d55eb7bf82d975aaed569c514d37553218391e13518b48382",
+      "violation": "Explorer's broad Git argv allowlist admitted git diff --output=escaped.patch, a repository-writing flag outside its read-only authority.",
+      "court_disposition_digest": "sha256:d7495303c9d3ab79b20fc359c7bd85d1e44b91a4b620738754cc501ca344ef94",
+      "appeals_ordering_disposition_digest": "sha256:29352a7af27f95ea820bd51876b311f3f48a144861480b89becfe49dd465c6f0",
+      "archive_ref": "refs/hive-mind-autopilot/quarantine/explorer-310/2304036fe92e7fe499785a500c173300943a55fb",
+      "replacement_required": true
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "files": {
+    "acceptance.json": "sha256:3169ddb268c4e82e8251967697c51955baadc04ad4ed9cb77ee872cab79cd8e0",
+    "changed-paths.json": "sha256:7f380be9ca0895af07a8d7892a01e69f091872ab1a5dacea8fae286486bcce2d",
+    "environment.json": "sha256:7b10b2ded41fecb310145d611e4194819239d73e0200d080b59291350d3f14c0",
+    "ledger.sqlite3": "sha256:e2ed7b4180251b26ebf2684230164c24e9a5a9e66445d6cb6605ed5ca301a6b6",
+    "objects.json": "sha256:9976e26c06c89ce145ead41893b73d3650ea08c1ed5368bc5eea0830d7a5505b",
+    "receipts/artifacts/95f0a424da58f82b3a4c42b06e443c20e218c95ea2462196468b38b8ba9d41cb.stdout": "sha256:95f0a424da58f82b3a4c42b06e443c20e218c95ea2462196468b38b8ba9d41cb",
+    "receipts/artifacts/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.stderr": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "receipts/r/0d3876ae987daeee52af039b1c7581a2db0fc587ee23f3a49249b792e39cc7e7.json": "sha256:0d3876ae987daeee52af039b1c7581a2db0fc587ee23f3a49249b792e39cc7e7",
+    "tool-versions.json": "sha256:5735c01ea035e71d2c46151ba65a1564d639becfdf91c64ec642bdaa9b81fa49",
+    "verification.json": "sha256:f8191e98cb1f91bcf3b8c59278023cdd08ca705d869472a839a9efc933805f54"
+  },
+  "schema_version": 1
+}

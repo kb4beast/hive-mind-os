@@ -47,6 +47,19 @@ python .autopilot/bin/autopilot.py --repo-root . ready
 python .autopilot/bin/autopilot.py --repo-root . dispatch \
   --actor DISPATCHER_ID [--node NODE_ID ...]
 python .autopilot/bin/autopilot.py --repo-root . render-prompt NODE_ID
+python .autopilot/bin/autopilot.py --repo-root . infer-intent "USER MESSAGE"
+python .autopilot/bin/autopilot.py --repo-root . orchestrate \
+  --request "USER MESSAGE" [--apply] --json
+python .autopilot/bin/autopilot.py --repo-root . simple-prompt
+python .autopilot/bin/autopilot.py --repo-root . prepare-launch INSTRUCTION_ID --host HOST
+python .autopilot/bin/autopilot.py --repo-root . bind-launch INSTRUCTION_ID \
+  --host HOST --task-id TASK_ID [--host-id HOST_ID] [--cursor CURSOR]
+python .autopilot/bin/autopilot.py --repo-root . record-launch-terminal INSTRUCTION_ID \
+  --terminal-state SUCCEEDED --host-event-ref HOST_TERMINAL_EVENT \
+  --observed-by ORCHESTRATOR_ID
+python .autopilot/bin/autopilot.py --repo-root . release-launch INSTRUCTION_ID \
+  --terminal-event TERMINAL_OBSERVATION_EVENT_ID \
+  --reason "terminal host result recorded"
 python .autopilot/bin/autopilot.py --repo-root . claim NODE_ID \
   --owner PROVIDER:SESSION --publish-remote
 python .autopilot/bin/autopilot.py --repo-root . heartbeat NODE_ID \
@@ -54,6 +67,21 @@ python .autopilot/bin/autopilot.py --repo-root . heartbeat NODE_ID \
 python .autopilot/bin/autopilot.py --repo-root . complete NODE_ID \
   --owner PROVIDER:SESSION --receipt PATH
 ```
+
+`orchestrate` is the normal host entrypoint. It reads live controller truth, infers
+build/start/continue/check/finish intent, resumes unfinished node work before widening
+the wave, and emits digest-bound durable-task instructions. `--apply` may publish the
+existing safe dispatcher release for start/continue/finish intent; it never grants merge,
+deployment, credential, spending, or protected-ref authority. `CHECK` uses non-mutating
+observation.
+
+The mandatory host-neutral behavior is versioned in
+`.autopilot/orchestration-policy.json`. Codex maps primary work to `create_thread`,
+`wait_threads`, and `send_message_to_thread`. Nested subagents cannot replace primary
+node tasks. External task operations are performed by the active host adapter. The CLI
+records `PREPARED -> CREATED -> BOUND -> TERMINAL_OBSERVED -> RELEASED` events and
+consumes existing bindings;
+emitting JSON alone is not task creation.
 
 `status` distinguishes static **eligibility** from current execution **release**.
 `ready` returns only nodes whose latest valid dispatcher release assigns `START NOW`.
@@ -70,9 +98,15 @@ durable completion source.
 A dispatcher session does not implement product work. Until it completes the steps below,
 all not-yet-released workers are `WAIT`.
 
+For level-by-level execution of the current DAG, follow
+`docs/execution/runbooks/README.md`: it fixes the dispatch rounds, the explicit
+`--node` waves, the serial integration order, and bounded-wait supervision.
+`python .autopilot/bin/github_snapshot.py --reconcile --actor <id>` performs
+steps 2, 4, and 6 below deterministically in one command.
+
 1. Read this file, `workflow-policy.json`, `control-plane.json`,
    `authority-amendments.json`, and `plan.json`.
-2. Fetch current `main` and record its exact commit and tree.
+2. Fetch the configured singleton release target branch and record its exact commit and tree.
 3. Inspect open/merged/closed PRs, CI, remote node branches, claims, durable receipts, and
    plan-impacting changes.
 4. Install a current `.autopilot/state/github-state.json` snapshot through
@@ -96,13 +130,33 @@ release instructions stale. Run the dispatcher again rather than reusing an old 
 The claim command independently revalidates the release before creating a claim.
 
 Target reconciliation remains intentionally live and session-local: a fresh dispatcher
-must inspect whatever `main` is now before releasing work. Completion evidence is the
+must inspect the configured singleton release target branch before releasing work. Completion evidence is the
 opposite: once integrated and validated, it survives deletion of local
 `.autopilot/state/` and a completely fresh checkout.
 
-## ChatGPT Classic-first execution workflow
+## Host-neutral durable primary-task workflow
 
-`.autopilot/workflow-policy.json` is a mandatory plan-wide policy for every node and every dispatcher/repair/reconciliation/integration/promotion/replan session. ChatGPT Classic is the normal node owner and must exhaust its available reasoning, connectors/tools, bounded repair paths, and role-first consultation before Codex is considered. Codex is a last-resort executor for only the smallest concrete subtask requiring a capability unavailable in Classic; ownership returns to Classic afterward. Difficulty or convenience alone is never a Codex reason.
+`.autopilot/workflow-policy.json` is mandatory for every node and every
+dispatcher/repair/reconciliation/integration/promotion/replan task. The approved durable
+primary task owns its released node through the stopping condition. Host selection is
+capability-matched and never expands authority. Nested agents are bounded sidecars for
+research, review, or non-blocking validation; they cannot replace primary delivery.
+
+Sidecars are admitted only when deterministic token accounting predicts a positive net
+saving above policy margin. The root creates them with read-only authority, reserves a
+shared descendant budget, and records every preparation, binding, progress event, and
+terminal result in the hash-chained `state/sidecar-bindings.jsonl` registry. A sidecar
+may request a depth-two descendant, but only the root may authenticate and spawn it;
+deeper, duplicate, unevidenced, or over-budget requests are denied before side effects.
+The host waits for primary and sidecar activity together in fair groups of at most eight
+with a wall-clock deadline. Parent tasks receive idempotent spawn and terminal notices.
+Early parent termination cancels and settles its whole sidecar subtree first. Poll,
+replay, timeout, malformed-result, and cancellation paths fail closed and active
+sidecars prevent a quiescent verdict.
+
+When a capability is unavailable, return an exact typed blocker to the parent. The parent
+repairs the workflow or selects an approved capable host and resumes the same node. A
+repairable host/tool gap is not a reason to make the user execute commands manually.
 
 If human action is genuinely required, never assume the user knows the UI, command, or terminology. Give exact novice-safe steps, expected results, what to return, and safety/rollback guidance. Every session response ends with `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`.
 
@@ -168,6 +222,56 @@ The receipt still contains exact base/final commit **and tree** identities, plan
 contract binding, changed paths, passing required tests, evidence, role identities,
 authority, consultations, acceptance decision, and rollback reference.
 
+### Sealed receipt-branch retirement
+
+The controller has one non-generic recovery for the court-quarantined `EXPLORER-310`
+receipt branch. Its sealed record, independent court disposition, source SHA, archive ref,
+and configured `origin` repository are fixed in repository artifacts. The command has no
+remote, branch, SHA, or replacement-node option. It creates and verifies a zero-path
+quarantine commit before atomically deleting the active receipt branch under an exact lease.
+The single literal `origin` fetch URL must also be the actual push destination: push URLs,
+Git URL rewrites, and injected Git configuration fail closed.
+It writes append-only runtime evidence only after remote verification. A fresh snapshot,
+reconciliation, and dispatcher release are mandatory before a replacement claim.
+The sealed incident target remains provenance; the independent Appeals `ADAPT` record
+requires the current reconciled singleton target to contain the integrated capability.
+
+### Sealed L2 recovery bootstrap
+
+ADR-057 adds three separately sealed, release-only recovery primitives. `OPTIMIZER-370`
+and `ORCH-300` may receive an exact repair dispatch and CAS-published ancestry-preserving
+repair claim only when their committed authorities, current authenticated snapshot,
+reconciliation, full doctor evidence, dispatcher release, literal origin, branch head,
+PR mapping, and node scope all match. Their replacement receipts must bind the exact grant,
+old receipt, complete repair-claim payload, captured execution release, and deterministic
+merge. Only the exact historical/replacement pair resolves; every other duplicate remains
+fail closed.
+
+The literal-origin singleton release ref is fetched and compared immediately before and
+after each recovery CAS. Repair claim and receipt intents are written before publication,
+so an exact interrupted or expired lease can be verified and resumed or rolled back after
+restart. Ambiguous or failed compensation remains `ADVERSE` with its intent and audit
+evidence intact. The global validation lease is an exclusive-create mutex, and replacement
+receipts are rejected unless their complete schema, identities, evidence references, and
+model-runtime record have the sealed types and nonblank values. Consultation and identity
+rows have exact nested schemas and unique roles; authority digests use canonical lowercase
+SHA-256 syntax.
+The sealed envelope also fixes node-defined test/role ordering and forbids identity reuse
+or requester self-consultation. Its end-to-end regression uses a wholly disposable bare
+remote through real claim and receipt CAS, restart recovery, integration, and durable
+`COMPLETE` reconstruction.
+
+`retire-builder-330-branch --actor IDENTITY` has no caller-selected remote/ref/SHA inputs.
+It may archive and retire only the sealed stale Builder head under an atomic source-head and
+archive-absence lease. A fresh snapshot must then show the canonical branch absent and the
+dedicated archive ref at the exact candidate before reconciliation, full doctor, status,
+dispatch, and ordinary canonical reclaim. It does not reuse the Explorer retirement grant.
+
+Controller test fixtures are built from the Git-tracked `.autopilot` manifest with an empty
+runtime state directory. Tests must never import ignored `.autopilot/state/**`, generated
+modules, bytecode caches, or live origin refs. Production generated-state and literal-origin
+verification semantics are unchanged.
+
 Worker publication order is mandatory:
 
 1. Receive a current explicit dispatcher `START NOW` for the exact node.
@@ -182,9 +286,9 @@ Worker publication order is mandatory:
    durable repository evidence; no extra file path is required.
 6. **Integrate node PRs with an ancestry-preserving merge commit. Do not squash or
    rebase.** The claim, exact candidate, and receipt commits must remain ancestors of
-   `main`. The historical PR #120 squash is handled only by its sealed bootstrap
+   the singleton release branch. The historical PR #120 squash is handled only by its sealed bootstrap
    attestation and is not precedent for future nodes.
-7. After merge, rerun the dispatcher. The merge advances `main`, so every earlier worker
+7. After merge, rerun the dispatcher. The merge advances the singleton release branch, so every earlier worker
    release is stale by definition. A fresh controller reconstructs completion and only a
    new dispatch release may start further work.
 
@@ -195,6 +299,7 @@ provenance, or otherwise inconsistent, the node fails closed as `REPAIR_REQUIRED
 
 ## Permanent dispatcher prompt
 
-Use the exact prompt in `USER_GUIDE/02_ONE_PROMPT_FOREVER.md`. The human should never need
-to remember the prior dispatcher response, and prior releases must never be carried into
+Use the short prompt in `USER_GUIDE/02_ONE_PROMPT_FOREVER.md`. Its behavior is defined by
+the versioned policy and controller rather than repeated prompt prose. The human should
+never need to remember the prior response, and prior releases must never be carried into
 a new dispatcher session.

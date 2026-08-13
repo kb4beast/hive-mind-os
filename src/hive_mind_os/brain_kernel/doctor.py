@@ -173,7 +173,9 @@ def _ci_check(repository: Path) -> dict[str, object]:
         "python -m unittest discover -s tests -v": "python -m unittest discover -s tests -v"
         in content,
         "ruff check src tests": (
-            "astral-sh/ruff-action@" in content and 'args: "check src tests"' in content
+            "astral-sh/ruff-action@" in content
+            and 'args: "check"' in content
+            and 'src: "src tests"' in content
         ),
         "pyright": "jakebailey/pyright-action@" in content,
     }

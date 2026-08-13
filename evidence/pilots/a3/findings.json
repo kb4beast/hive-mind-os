@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "node": "A3-700",
+  "statement": "Every finding below was produced by a command that was actually run during this pilot. None is inferred from reading source alone; each cites the source location that explains the measurement.",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "environment-blocking",
+      "title": "Sealed verification cannot run under a long Windows path, and core.longpaths cannot reach it",
+      "measurement": "The first Mission 1 attempt, with output directory <scratch>/a3/a3-mission-01, failed: 'fatal: cannot write keep file ... pack-<sha>.keep: Filename too long' / 'fatal: fetch-pack: invalid index-pack output'. The failing path is exactly 261 characters; the Windows MAX_PATH limit is 260. Re-running with the output directory shortened to <scratch>/a3/m1 (250 characters) succeeded with verdict adopt.",
+      "root_cause": "src/hive_mind_os/verify.py:484-496 (_git_environment) builds a fresh environment containing GIT_CONFIG_GLOBAL=os.devnull and GIT_CONFIG_NOSYSTEM=1, so neither global nor system git config is visible to the verifier's own git subprocesses. src/hive_mind_os/verify.py:751-773 (_materialize_workspace) passes only core.hooksPath, core.autocrlf and core.eol to git clone. core.longpaths is therefore unreachable: setting it globally, in the system config, or in the source repository has no effect on the isolated clone.",
+      "operating_system_state": "HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled = 0",
+      "consequence": "On Windows the only available mitigation is a shorter path. This is an environment constraint on the pilot, not a defect in the verification logic, but it does mean an unattended A3 mission can hard-fail purely on path length.",
+      "runtime_behaviour_on_failure": "GOOD: the runtime did not hang or ask a question. It published a failure-evidence bundle at receipt-bundle.failed-<run_id>/failure.json containing the resolved object identities. Retained at evidence/pilots/a3/missions/m01-longpath-failure.json.",
+      "evidence": "evidence/pilots/a3/missions/m01-longpath-failure.json"
+    },
+    {
+      "id": "F2",
+      "severity": "capability-gap",
+      "title": "The canonical enqueue -> serve mission loop cannot execute any mission",
+      "measurement": "hive-mind enqueue --compatibility-mode canonical succeeded (job JOB-289e5a6e-3ec3-48a6-95f3-2691f1ec61e6, mission M-331cd9851d9e0b5c172a67227d6a5a9a, runtime 'canonical'). hive-mind serve --once then exited 0 while the job retried 3 times and landed in state 'dead-letter' with last_error: 'RuntimeRouteError: canonical mission runtime has no registered bindings provider: MissionRuntime.run requires a MissionConfig and MissionBindings that a scheduler payload cannot supply'.",
+      "root_cause": "src/hive_mind_os/workers.py:155 declares _canonical_bindings_provider = None at module scope. src/hive_mind_os/workers.py:206-212 raises RuntimeRouteError when it is None. A repository-wide grep for '_canonical_bindings_provider' and 'register_canonical_bindings' over src/ and tests/ returns only the declaration, the setter at workers.py:171-173, and the read at workers.py:206 - no caller anywhere registers a provider.",
+      "consequence": "The durable queue path advertised by build_enqueue_parser is enqueue-only in this release. A queued canonical mission can never run to completion; it always dead-letters after max_attempts. The canonical mission runtime is reachable only by in-process construction, which is how tests.test_brain_kernel_local_execution exercises it.",
+      "affects_runbook": "docs/execution/runbooks/A3-700.md:57 lists build_enqueue_parser as the 'mission-loop path of the pilot', and the Section 3 evidence layout names the mission-02 directory 'mission-02-enqueue-loop'. The enqueue loop cannot serve that role.",
+      "escalation_fired": false,
+      "note": "This is a dead-letter with a recorded reason, not a human escalation. No discretionary human answer was requested."
+    },
+    {
+      "id": "F3",
+      "severity": "evidence-integrity",
+      "title": "verify_bundle accepts a forged verdict when the integrity manifest is recomputed",
+      "measurement": "A retained bundle whose true verdict is 'reject' was copied; verification.json was edited to 'adopt' with undeclared_paths []; integrity.json was recomputed using hive_mind_os.receipts.sha256_digest so the manifest genuinely matched (confirmed: _bundle_file_digests(root) == manifest['files'] is True). hive_mind_os.verify.verify_bundle() then ACCEPTED the forged bundle. The same forgery WITHOUT recomputing the manifest is correctly rejected with 'integrity manifest does not match bundle bytes'.",
+      "root_cause": "src/hive_mind_os/verify.py:266-379 (verify_bundle) never reads document['verdict'], document['undeclared_paths'] or document['weakened_tests']. integrity.json is an unkeyed, in-bundle digest manifest, so it attests self-consistency, not authenticity; anyone who can rewrite the bundle can re-seal it.",
+      "detection_material_is_already_present": "The forged bundle still contains, in files that ARE integrity-checked, everything needed to recompute the true verdict: changed-paths.json lists ['check_rates.py']; acceptance.json declares ['rates.py'], so undeclared_paths is non-empty and the verdict must be 'reject'. Furthermore document['ledger_events'] is compared against ledger.sqlite3 and its final verify.completed event payload still reads {\"verdict\": \"reject\", \"undeclared_paths\": [\"check_rates.py\"]}.",
+      "suggested_fix_not_applied_here": "verify_bundle could cross-check document['verdict'] against the verify.completed ledger event payload it already loads, and recompute undeclared_paths from acceptance.json and changed-paths.json. src/** is read-only for this node, so no change was made.",
+      "scope_of_claim": "This does NOT weaken the mission results in this pilot: both accepted bundles were produced by the verifier itself and re-verify cleanly. It bounds what a retained bundle proves - it is tamper-evident against edits, not against an attacker who can rewrite and re-seal the whole directory.",
+      "evidence": "evidence/pilots/a3/cheating/tamper-rejection.json"
+    },
+    {
+      "id": "F4",
+      "severity": "environment-blocking",
+      "title": "The legacy durable-mission queue also exceeds MAX_PATH under the mandated scratch root",
+      "measurement": "hive-mind enqueue --compatibility-mode legacy + serve --once dead-lettered with FileNotFoundError [WinError 3] renaming a temp file to <state-dir>/missions/<mission-id>/staging/evidence/artifacts/<64hex>.stdout - a 274-character path. An isolated probe reproduced the identical error for os.replace() at that exact 274-character path, and the same os.replace() succeeded at a 135-character control path.",
+      "quantified_limit": "The fixed suffix after the state directory is 143 characters, so the legacy queue requires a state-directory path of at most 117 characters on this machine. The scratch root mandated for this node is 122 characters, so the legacy durable queue cannot be exercised anywhere beneath it.",
+      "distinction_from_F2": "F4 is environment-dependent (it would pass under a short path). F2 is deterministic and environment-independent (missing wiring). They are different failures that happen to share a symptom of 'dead-letter'.",
+      "progress_before_failure": "The legacy route got substantially further than the canonical one: 21 ledger events and a checkpoint at stage 'intent', versus 0 ledger events for canonical.",
+      "escalation_fired": false
+    },
+    {
+      "id": "F5",
+      "severity": "informational",
+      "title": "The installed hive-mind entry point resolves to a different interpreter than the environment python",
+      "measurement": "`which hive-mind` resolves to /c/Users/beesp/AppData/Local/Programs/Python/Python312/Scripts/hive-mind while `python --version` is 3.14.4 at C:\\Python314\\python.exe.",
+      "action_taken": "Every CLI invocation in this pilot used `PYTHONPATH=src python -m hive_mind_os.cli ...`, which docs/execution/runbooks/A3-700.md:118 explicitly permits. This guarantees the source tree under test is the code that ran.",
+      "escalation_fired": false
+    },
+    {
+      "id": "F6",
+      "severity": "runbook-inconsistency",
+      "title": "The mission-02 directory name does not match the mission-02 procedure",
+      "measurement": "docs/execution/runbooks/A3-700.md:77 names the evidence directory 'mission-02-enqueue-loop', but the Section 3 procedure for Mission 2 (A3-700.md:113-120) specifies building a fresh repository and running `hive-mind verify`, with no enqueue step. Attempting the enqueue loop as well surfaced F2 and F4.",
+      "resolution": "The runbook-mandated directory name was kept for contract fidelity; the directory holds the `hive-mind verify` evidence the Section 3 procedure actually specifies. The enqueue probes are reported as findings F2 and F4 rather than as the mission.",
+      "escalation_fired": false
+    }
+  ]
+}

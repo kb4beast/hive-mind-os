@@ -14,14 +14,19 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
+from urllib.parse import urlparse
 
 SCHEMA_VERSION = 1
 FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
+CLAIM_COMMIT_EMAIL = "autopilot-claim@hive-mind.invalid"
+RECEIPT_COMMIT_EMAIL = "autopilot-receipt@hive-mind.invalid"
 ROLE_NAMES = (
     "orchestrator",
     "explorer",
@@ -32,6 +37,85 @@ ROLE_NAMES = (
     "steward",
     "optimizer",
 )
+UNSAFE_REMEDIATION_MARKERS = (
+    "disable tls",
+    "skip tls",
+    "disable certificate",
+    "skip certificate",
+    "disable revocation",
+    "skip revocation",
+    "sslverify=false",
+    "verify=false",
+    "ignore certificate",
+)
+UNSAFE_RETRY_ARGUMENT_MARKERS = (
+    "git_ssl_no_verify",
+    "curl_insecure",
+    "sslverify=false",
+    "sslverify=0",
+    "http.sslverify=false",
+    "http.sslverify=0",
+    "schannel.checkrevoke=false",
+    "schannel.checkrevoke=0",
+    "gnutlsverify=false",
+    "--insecure",
+    "-k",
+)
+SUBTASK_EXECUTION_SEQUENCE = (
+    "fetch_current_singleton_release",
+    "install_current_github_snapshot",
+    "reconcile_target",
+    "run_doctor_and_status",
+    "dispatch_explicit_start_now",
+    "claim_remote_node_branch",
+)
+STALE_TARGET_RECOVERY_SEQUENCE = (
+    "preserve_scoped_work_with_node_named_stash",
+    "verify_current_singleton_remote_sha",
+    "refresh_validated_github_snapshot",
+    "archive_stale_runtime_projection",
+    "retire_exact_stale_remote_claim_ref",
+    "install_snapshot_and_reconcile",
+    "doctor_status_dispatch_and_reclaim",
+    "apply_exact_node_named_stash",
+    "verify_changed_paths_against_node_scope",
+)
+SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+)
+SAFE_GIT_RUNTIME_ENVIRONMENT_KEYS = (
+    "PATH",
+    "PATHEXT",
+    "SystemRoot",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "LOCALAPPDATA",
+    "APPDATA",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "LANG",
+    "LC_ALL",
+)
+SUBTASK_STATES = frozenset(
+    {
+        "PENDING",
+        "ACTIVE",
+        "IDLE_UNCOLLECTED",
+        "BLOCKED_RECOVERABLE",
+        "SUCCEEDED",
+        "BLOCKED_EXTERNAL_AUTHORITY",
+    }
+)
+SUBTASK_SETTLED_STATES = frozenset({"SUCCEEDED", "BLOCKED_EXTERNAL_AUTHORITY"})
 LEGAL_STATES = (
     "BOOTSTRAP_REQUIRED",
     "BOOTSTRAP_INVALID",
@@ -79,6 +163,9 @@ CONSULTATION_DECISIONS = {
     "QUARANTINE",
 }
 CHEATING_DISPOSITIONS = {"NOT_APPLICABLE", "CONFIRMED", "DISPROVED", "UNRESOLVED"}
+_STATUS_READ_ONLY_GIT_COMMANDS = frozenset(
+    {"cat-file", "diff", "log", "merge-base", "rev-parse", "show"}
+)
 
 
 class AutopilotError(RuntimeError):
@@ -109,6 +196,54 @@ class NodeView:
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class _StatusCommitGraph:
+    """Commit facts proven by one immutable target-history observation."""
+
+    parents: dict[str, tuple[str, ...]]
+    trees: dict[str, str]
+    ancestor_cache: dict[str, frozenset[str]]
+
+    @classmethod
+    def from_log(cls, output: str) -> _StatusCommitGraph:
+        parents: dict[str, tuple[str, ...]] = {}
+        trees: dict[str, str] = {}
+        for raw_record in output.split("\x1e"):
+            parts = raw_record.strip("\n").split("\x1f", 3)
+            if len(parts) != 4:
+                continue
+            commit, parents_text, tree, _ = parts
+            commit_parents = tuple(parents_text.split())
+            if (
+                FULL_SHA.fullmatch(commit) is None
+                or FULL_SHA.fullmatch(tree) is None
+                or any(FULL_SHA.fullmatch(parent) is None for parent in commit_parents)
+            ):
+                continue
+            parents[commit] = commit_parents
+            trees[commit] = tree
+        return cls(parents, trees, {})
+
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool | None:
+        """Return graph truth, or ``None`` when the descendant was not observed."""
+
+        if descendant not in self.parents:
+            return None
+        cached = self.ancestor_cache.get(descendant)
+        if cached is None:
+            observed: set[str] = set()
+            pending = [descendant]
+            while pending:
+                commit = pending.pop()
+                if commit in observed:
+                    continue
+                observed.add(commit)
+                pending.extend(self.parents.get(commit, ()))
+            cached = frozenset(observed)
+            self.ancestor_cache[descendant] = cached
+        return ancestor in cached
 
 
 def utc_now() -> datetime:
@@ -148,6 +283,12 @@ def read_json(path: Path) -> Any:
         raise ConfigurationError(f"cannot parse JSON file {path}: {error}") from error
 
 
+def windows_replace_retry_enabled() -> bool:
+    """Return whether atomic replacement needs the bounded Windows retry."""
+
+    return os.name == "nt"
+
+
 def atomic_write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
@@ -162,7 +303,16 @@ def atomic_write_json(path: Path, value: object) -> None:
         temporary.flush()
         os.fsync(temporary.fileno())
         temporary_path = Path(temporary.name)
-    os.replace(temporary_path, path)
+    # Windows cannot reliably replace an open NamedTemporaryFile. Close the
+    # handle first, then retain a bounded retry for transient scanner/indexer locks.
+    for attempt in range(5):
+        try:
+            os.replace(temporary_path, path)
+            break
+        except PermissionError:
+            if not windows_replace_retry_enabled() or attempt == 4:
+                raise
+            time.sleep(0.01 * (2**attempt))
 
 
 def append_jsonl(path: Path, value: Mapping[str, object]) -> None:
@@ -263,6 +413,10 @@ class ControlPlane:
         ".autopilot/receipt.schema.json",
         ".autopilot/consultation.schema.json",
         ".autopilot/role-wiring.schema.json",
+        ".autopilot/orchestration-policy.json",
+        ".autopilot/orchestration-policy.schema.json",
+        ".autopilot/bin/orchestration.py",
+        ".autopilot/task-bindings.lock",
         ".autopilot/acceptance-matrix.json",
         ".autopilot/templates/worker.md",
         ".autopilot/templates/repair.md",
@@ -293,6 +447,10 @@ class ControlPlane:
         self.claims_dir = self.state_dir / "claims"
         self.receipts_dir = self.state_dir / "receipts"
         self.failures_dir = self.state_dir / "failures"
+        self.blockers_dir = self.state_dir / "blockers"
+        self.questions_dir = self.state_dir / "questions"
+        self.subtask_waves_dir = self.state_dir / "subtask-waves"
+        self.validation_lease_path = self.state_dir / "global-validation-lease.json"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -334,6 +492,24 @@ class ControlPlane:
         return _require_nonempty_text(target.get("branch"), "target.branch")
 
     @property
+    def final_integration_branch(self) -> str:
+        target = _require_mapping(self.control.get("target"), "control-plane.target")
+        return _require_nonempty_text(
+            target.get("final_integration_branch"),
+            "target.final_integration_branch",
+        )
+
+    @property
+    def execution_mode(self) -> str:
+        target = _require_mapping(self.control.get("target"), "control-plane.target")
+        mode = _require_nonempty_text(target.get("execution_mode"), "target.execution_mode")
+        if mode != "singleton-release-branch":
+            raise ConfigurationError("target.execution_mode must be singleton-release-branch")
+        if self.target_branch == self.final_integration_branch:
+            raise ConfigurationError("singleton release target must not equal final integration branch")
+        return mode
+
+    @property
     def baseline_sha(self) -> str:
         target = _require_mapping(self.control.get("target"), "control-plane.target")
         sha = _require_nonempty_text(target.get("baseline_sha"), "target.baseline_sha")
@@ -350,15 +526,31 @@ class ControlPlane:
 
     def node(self, node_id: str) -> Mapping[str, Any]:
         try:
-            return self._nodes[node_id]
+            node = self._nodes[node_id]
         except KeyError as error:
             raise AutopilotError(f"unknown node: {node_id}") from error
+        # Historical plans named the final integration branch in ``pr_target``.
+        # In singleton mode that field is legacy plan provenance, never live
+        # authority.  The control-plane target is the only executable target and
+        # is overlaid without rewriting the fingerprinted historical plan.
+        return {**node, "pr_target": self.target_branch}
 
     def nodes(self) -> tuple[Mapping[str, Any], ...]:
-        return tuple(self._nodes[node_id] for node_id in sorted(self._nodes))
+        return tuple(self.node(node_id) for node_id in sorted(self._nodes))
 
     def validate_configuration(self) -> tuple[str, ...]:
         issues: list[str] = []
+        try:
+            self.execution_mode
+            target = _require_mapping(self.control.get("target"), "control-plane.target")
+            protected = target.get("protected_until_final_integration")
+            if protected != [self.final_integration_branch]:
+                issues.append("target.protected_until_final_integration must protect final integration branch")
+            release_base = target.get("release_branch_base")
+            if not isinstance(release_base, str) or FULL_SHA.fullmatch(release_base) is None:
+                issues.append("target.release_branch_base must be a full lowercase Git SHA")
+        except ConfigurationError as error:
+            issues.append(str(error))
         if self.plan.get("schema_version") != SCHEMA_VERSION:
             issues.append("plan schema_version is unsupported")
         if self.control.get("schema_version") != SCHEMA_VERSION:
@@ -379,7 +571,8 @@ class ControlPlane:
         if len(self._nodes) != len(raw_nodes):
             issues.append("every node must be an object with an id")
         dependencies: dict[str, tuple[str, ...]] = {}
-        for node_id, node in self._nodes.items():
+        for node_id in self._nodes:
+            node = self.node(node_id)
             issues.extend(self._validate_node(node_id, node))
             deps = node.get("dependencies", [])
             if not isinstance(deps, list) or any(not isinstance(item, str) for item in deps):
@@ -458,6 +651,8 @@ class ControlPlane:
         for key in required_text:
             if not isinstance(node.get(key), str) or not str(node.get(key)).strip():
                 issues.append(f"{node_id}: {key} must be non-empty text")
+        if node.get("pr_target") != self.target_branch:
+            issues.append(f"{node_id}: effective pr_target must equal the singleton target branch")
         if node.get("contract_version") != 1:
             issues.append(f"{node_id}: contract_version must be 1")
         list_fields = (
@@ -562,14 +757,35 @@ class ControlPlane:
         check: bool = False,
         environment: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        # Git gets only the runtime locations needed by Windows/Schannel and the
+        # explicitly validated transport path. Credentials and GIT_CONFIG_*
+        # injection variables are never inherited by the child process.
         base_environment = {
-            "PATH": os.environ.get("PATH", ""),
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_TERMINAL_PROMPT": "0",
+            key: value
+            for key in SAFE_GIT_RUNTIME_ENVIRONMENT_KEYS
+            if (value := os.environ.get(key))
+            and not any(character in value for character in "\r\n")
         }
+        base_environment["GIT_TERMINAL_PROMPT"] = "0"
+        # Keep the controller deterministic while allowing a trusted local
+        # proxy/network path to reach GitHub. These values exist only in the
+        # child process environment; they are never persisted or printed.
+        for key in SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS:
+            value = os.environ.get(key)
+            if not value or any(character in value for character in "\r\n"):
+                base_environment.pop(key, None)
+                continue
+            if key.lower() in {"http_proxy", "https_proxy"}:
+                parsed = urlparse(value)
+                if parsed.scheme not in {"http", "https", "socks5", "socks5h"} or not parsed.hostname:
+                    base_environment.pop(key, None)
+                    continue
+            base_environment[key] = value
         if environment is not None:
-            base_environment.update(environment)
+            for key, value in environment.items():
+                if key.startswith("GIT_CONFIG_"):
+                    raise AutopilotError("Git config injection variables are forbidden")
+                base_environment[key] = value
         completed = subprocess.run(
             ("git", "-C", str(self.repo_root), *args),
             stdin=subprocess.DEVNULL,
@@ -680,6 +896,8 @@ class ControlPlane:
         return None
 
     def remote_branch_sha(self, branch: str, *, remote: str = "origin") -> str | None:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         completed = self._git(
             ("ls-remote", "--heads", remote, f"refs/heads/{branch}"),
             check=False,
@@ -704,6 +922,8 @@ class ControlPlane:
         *,
         remote: str = "origin",
     ) -> str:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         node = self.node(node_id)
         branch = str(node.get("branch"))
         if self.remote_branch_sha(branch, remote=remote) is not None:
@@ -767,6 +987,8 @@ class ControlPlane:
         *,
         remote: str = "origin",
     ) -> None:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
         branch = str(self.node(node_id).get("branch"))
         observed = self.remote_branch_sha(branch, remote=remote)
         if observed is None:
@@ -783,6 +1005,660 @@ class ControlPlane:
                 "failed to release untouched remote claim branch: "
                 + deleted.stderr.strip()
             )
+
+    def remote_claim_record(self, commit: str) -> Mapping[str, Any] | None:
+        """Return the self-attesting claim record a claim commit carries, if any."""
+
+        shown = self._git(("show", "-s", "--format=%B", commit), check=False)
+        if shown.returncode != 0:
+            return None
+        try:
+            value = json.loads(shown.stdout.strip())
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(value, Mapping):
+            return None
+        if value.get("kind") != "hive-mind-autopilot-remote-claim-v1":
+            return None
+        return value
+
+    def reap_stale_remote_claim(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        reason: str,
+        remote: str = "origin",
+    ) -> Mapping[str, Any]:
+        """Delete an expired remote claim ref whose branch carries no published work.
+
+        ``release`` can only reach a claim whose local file still exists, and claim
+        state is session-local by design, so a worker session that ends leaves a
+        remote claim ref no later session can retire — permanently wedging the node
+        against ``publish_remote_claim``.  The claim commit is itself the record:
+        identity is read back from the remote object, and the ref is deleted only
+        while the branch still carries nothing except that claim.  A live claim is
+        never reaped; it is the only real cross-session mutex.
+        """
+
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
+        if not owner.strip():
+            raise ClaimError("stale remote claim release requires the exact claim owner")
+        branch = str(self.node(node_id).get("branch"))
+        head = self.remote_branch_sha(branch, remote=remote)
+        if head is None:
+            return {"node_id": node_id, "branch": branch, "outcome": "absent"}
+        fetched = self._git(
+            ("fetch", remote, f"refs/heads/{branch}"),
+            check=False,
+        )
+        if fetched.returncode != 0:
+            raise ClaimError(
+                f"cannot inspect remote claim branch {branch!r}: {fetched.stderr.strip()}"
+            )
+        record = self.remote_claim_record(head)
+        if record is None:
+            raise ClaimError(
+                f"remote branch {branch!r} head is not a claim commit; it carries "
+                "published work and must be reconciled, never deleted"
+            )
+        if record.get("node_id") != node_id:
+            raise ClaimError("remote claim identifies a different node")
+        if record.get("owner") != owner:
+            raise ClaimError("claim owner does not match")
+        parents = self._git(
+            ("rev-list", "--parents", "-n", "1", head), check=True
+        ).stdout.split()
+        if len(parents) != 2:
+            raise ClaimError("claim commit must have exactly one parent")
+        claim_tree = self._git(("rev-parse", f"{head}^{{tree}}"), check=True).stdout.strip()
+        parent_tree = self._git(("rev-parse", f"{head}^^{{tree}}"), check=True).stdout.strip()
+        if claim_tree != parent_tree:
+            raise ClaimError(
+                "claim commit changes the target tree; it is not an untouched claim"
+            )
+        expires_at = record.get("expires_at")
+        try:
+            expires = parse_time(expires_at)
+        except (TypeError, ValueError) as error:
+            raise ClaimError("claim record has no readable expiry") from error
+        now = self.clock()
+        if expires > now:
+            raise ClaimError(
+                f"claim on {branch!r} is live until {expires_at}; a live claim is the "
+                "only cross-session mutex and is never reaped"
+            )
+        deleted = self._git(
+            ("push", remote, f":refs/heads/{branch}"),
+            check=False,
+        )
+        if deleted.returncode != 0:
+            raise ClaimError(
+                "failed to retire stale remote claim branch: " + deleted.stderr.strip()
+            )
+        released = {
+            "node_id": node_id,
+            "branch": branch,
+            "owner": owner,
+            "reason": reason,
+            "claim_commit": head,
+            "expired_at": expires_at,
+            "released_at": format_time(now),
+            "outcome": "retired",
+        }
+        append_jsonl(self.state_dir / "releases.jsonl", released)
+        return released
+
+    # ------------------------------------------------------------- self-healing
+
+    def _remote_ref_sha(self, ref: str, *, remote: str = "origin") -> str | None:
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
+        completed = self._git(("ls-remote", remote, ref), check=False)
+        if completed.returncode != 0:
+            raise ClaimError(f"cannot inspect remote ref {ref!r}: {completed.stderr.strip()}")
+        fields = completed.stdout.strip().split()
+        if not fields:
+            return None
+        sha = fields[0]
+        if FULL_SHA.fullmatch(sha) is None:
+            raise ClaimError("remote ref returned an invalid commit identity")
+        return sha
+
+    def _commit_time(self, sha: str) -> datetime:
+        shown = self._git(("show", "-s", "--format=%ct", sha), check=True).stdout.strip()
+        return datetime.fromtimestamp(int(shown), UTC)
+
+    def defunct_remote_claim_proof(
+        self, record: Mapping[str, Any]
+    ) -> Mapping[str, Any] | None:
+        """Return proof that a remote claim can no longer protect integrable work.
+
+        The remote claim is the only cross-session mutex, but a mutex exists to
+        protect work that could still become an integrable receipt. Each fact
+        below alone forecloses that possibility, and each is read from durable
+        evidence rather than any session's memory:
+
+        - ``expired``: the lease bound the owner itself asked for has lapsed;
+        - ``unreadable-expiry``: the record carries no bound at all, so no
+          session could ever prove it lapsed;
+        - ``plan-superseded``: the claim binds a plan fingerprint this plane no
+          longer executes, so no receipt under it can ever validate.
+
+        A stale ``target_sha`` is deliberately NOT proof: the round driver
+        integrates sealed heads rooted at a round's original target after
+        siblings advance it, so a claim bound to an older target may still
+        complete.  Dead-but-live-TTL claims are instead retired through the
+        stall bound in ``reap_defunct_remote_claim``.
+        """
+
+        now = self.clock()
+        try:
+            expires = parse_time(record.get("expires_at"))
+        except (TypeError, ValueError):
+            return {"kind": "unreadable-expiry", "observed_at": format_time(now)}
+        if expires <= now:
+            return {
+                "kind": "expired",
+                "expired_at": str(record.get("expires_at")),
+                "observed_at": format_time(now),
+            }
+        current_fingerprint = self._target_plan_fingerprint()
+        if record.get("plan_fingerprint") != current_fingerprint:
+            return {
+                "kind": "plan-superseded",
+                "claim_plan_fingerprint": str(record.get("plan_fingerprint")),
+                "current_plan_fingerprint": current_fingerprint,
+                "observed_at": format_time(now),
+            }
+        return None
+
+    def _target_plan_fingerprint(self) -> str:
+        """Read the executing plan's fingerprint from the target commit itself.
+
+        A supersession proof must come from durable evidence: a session whose
+        local checkout is behind would otherwise read a stale local plan and
+        reap every live claim of the CURRENT plan.  The fetched target commit
+        is the durable record; the local file is only the fallback when git
+        objects are not verifiable (fixtures) or the file is absent there.
+        """
+
+        if self.verify_git_objects:
+            try:
+                shown = self._git(
+                    ("show", f"{self.current_target_sha()}:.autopilot/control-plane.json"),
+                    check=False,
+                )
+            except AutopilotError:
+                shown = None
+            if shown is not None and shown.returncode == 0:
+                try:
+                    value = json.loads(shown.stdout)
+                except json.JSONDecodeError:
+                    value = None
+                if isinstance(value, Mapping):
+                    fingerprint = value.get("plan_fingerprint")
+                    if isinstance(fingerprint, str) and fingerprint:
+                        return fingerprint
+        return self.expected_plan_fingerprint
+
+    def reap_defunct_remote_claim(
+        self,
+        node_id: str,
+        *,
+        actor: str,
+        reason: str,
+        stall_minutes: int | None = None,
+        remote: str = "origin",
+    ) -> Mapping[str, Any]:
+        """Retire a remote claim that provably cannot protect integrable work.
+
+        ``reap_stale_remote_claim`` retires only expired claims and requires the
+        caller to already know the owner.  This verb reads the owner from the
+        claim record itself and also retires claims carrying any
+        ``defunct_remote_claim_proof``.  With ``stall_minutes`` it additionally
+        retires a live, current claim whose branch never received a single work
+        commit within that window — the signature of a worker session that died
+        after claiming, which would otherwise wedge the node until TTL.
+        The deletion is guarded by ``--force-with-lease`` so a worker pushing
+        work at the same moment wins the race, and the retirement is appended to
+        ``releases.jsonl`` together with the proof that justified it.
+        """
+
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
+        if not actor.strip():
+            raise ClaimError("defunct claim retirement requires the acting identity")
+        branch = str(self.node(node_id).get("branch"))
+        head = self.remote_branch_sha(branch, remote=remote)
+        if head is None:
+            return {"node_id": node_id, "branch": branch, "outcome": "absent"}
+        fetched = self._git(("fetch", remote, f"refs/heads/{branch}"), check=False)
+        if fetched.returncode != 0:
+            raise ClaimError(
+                f"cannot inspect remote claim branch {branch!r}: {fetched.stderr.strip()}"
+            )
+        record = self.remote_claim_record(head)
+        if record is None:
+            raise ClaimError(
+                f"remote branch {branch!r} head is not a claim commit; it carries "
+                "published work and must be reconciled or quarantined, never deleted"
+            )
+        if record.get("node_id") != node_id:
+            raise ClaimError("remote claim identifies a different node")
+        parents = self._git(
+            ("rev-list", "--parents", "-n", "1", head), check=True
+        ).stdout.split()
+        if len(parents) != 2:
+            raise ClaimError("claim commit must have exactly one parent")
+        claim_tree = self._git(("rev-parse", f"{head}^{{tree}}"), check=True).stdout.strip()
+        parent_tree = self._git(("rev-parse", f"{head}^^{{tree}}"), check=True).stdout.strip()
+        if claim_tree != parent_tree:
+            raise ClaimError(
+                "claim commit changes the target tree; it is not an untouched claim"
+            )
+        proof = self.defunct_remote_claim_proof(record)
+        if proof is None and stall_minutes is not None:
+            if type(stall_minutes) is not int or stall_minutes < 1:
+                raise ClaimError("stall_minutes must be a positive integer")
+            claimed_at = self._commit_time(head)
+            now = self.clock()
+            idle = now - claimed_at
+            if idle >= timedelta(minutes=stall_minutes):
+                proof = {
+                    "kind": "stalled-bare-claim",
+                    "claimed_at": format_time(claimed_at),
+                    "idle_minutes": int(idle.total_seconds() // 60),
+                    "stall_minutes": stall_minutes,
+                    "observed_at": format_time(now),
+                }
+        if proof is None:
+            raise ClaimError(
+                f"claim on {branch!r} is live until {record.get('expires_at')} with a "
+                "current target and plan; it may still protect integrable work"
+            )
+        deleted = self._git(
+            (
+                "push",
+                f"--force-with-lease=refs/heads/{branch}:{head}",
+                remote,
+                f":refs/heads/{branch}",
+            ),
+            check=False,
+        )
+        if deleted.returncode != 0:
+            raise ClaimError(
+                "failed to retire defunct remote claim branch (a worker may have "
+                "pushed work at the same moment): " + deleted.stderr.strip()
+            )
+        released = {
+            "node_id": node_id,
+            "branch": branch,
+            "owner": str(record.get("owner")),
+            "actor": actor,
+            "reason": reason,
+            "claim_commit": head,
+            "proof": dict(proof),
+            "released_at": format_time(self.clock()),
+            "outcome": "retired-defunct",
+        }
+        append_jsonl(self.state_dir / "releases.jsonl", released)
+        return released
+
+    def quarantine_defunct_remote_branch(
+        self,
+        node_id: str,
+        *,
+        actor: str,
+        reason: str,
+        stall_minutes: int = 45,
+        remote: str = "origin",
+    ) -> Mapping[str, Any]:
+        """Archive a dead worker's unsealed work and free the node branch.
+
+        Published work is never deleted, but an unsealed branch whose governing
+        claim is expired, superseded, or absent — and whose head has not moved
+        within ``stall_minutes`` — blocks every lawful re-claim while no worker
+        can still complete it.  The head is preserved verbatim under
+        ``refs/hive-mind-autopilot/quarantine/<node>/<sha>`` and the branch ref
+        is retired in the same atomic push, each side guarded by
+        ``--force-with-lease`` so a worker pushing at the same moment wins.
+        """
+
+        if remote != "origin":
+            raise ClaimError("only the configured canonical remote name 'origin' is allowed")
+        if not actor.strip():
+            raise ClaimError("branch quarantine requires the acting identity")
+        if type(stall_minutes) is not int or stall_minutes < 1:
+            raise ClaimError("stall_minutes must be a positive integer")
+        branch = str(self.node(node_id).get("branch"))
+        head = self.remote_branch_sha(branch, remote=remote)
+        if head is None:
+            return {"node_id": node_id, "branch": branch, "outcome": "absent"}
+        fetched = self._git(("fetch", remote, f"refs/heads/{branch}"), check=False)
+        if fetched.returncode != 0:
+            raise ClaimError(
+                f"cannot inspect remote branch {branch!r}: {fetched.stderr.strip()}"
+            )
+        author = self._git(("show", "-s", "--format=%ae", head), check=True).stdout.strip()
+        if author == RECEIPT_COMMIT_EMAIL:
+            raise ClaimError(
+                f"remote branch {branch!r} head is a sealed receipt; it must be "
+                "integrated, never quarantined"
+            )
+        if self.remote_claim_record(head) is not None:
+            raise ClaimError(
+                f"remote branch {branch!r} head is an untouched claim; retire it "
+                "through reap_defunct_remote_claim instead"
+            )
+        now = self.clock()
+        moved_at = self._commit_time(head)
+        idle = now - moved_at
+        if idle < timedelta(minutes=stall_minutes):
+            raise ClaimError(
+                f"remote branch {branch!r} moved {int(idle.total_seconds() // 60)} "
+                f"minutes ago; a worker may still be publishing (stall bound is "
+                f"{stall_minutes} minutes)"
+            )
+        governing = self._governing_claim_record(node_id, head)
+        claim_proof: Mapping[str, Any] | None
+        if governing is None:
+            claim_proof = {"kind": "no-governing-claim", "observed_at": format_time(now)}
+        else:
+            claim_proof = self.defunct_remote_claim_proof(governing)
+            if claim_proof is None:
+                raise ClaimError(
+                    f"remote branch {branch!r} is governed by a live claim with a "
+                    "current target and plan; wait for its lease to resolve"
+                )
+        quarantine_ref = (
+            f"refs/hive-mind-autopilot/quarantine/{node_id.lower()}/{head}"
+        )
+        if self._remote_ref_sha(quarantine_ref, remote=remote) is None:
+            archived = self._git(
+                (
+                    "push",
+                    "--atomic",
+                    f"--force-with-lease={quarantine_ref}:",
+                    f"--force-with-lease=refs/heads/{branch}:{head}",
+                    remote,
+                    f"{head}:{quarantine_ref}",
+                    f":refs/heads/{branch}",
+                ),
+                check=False,
+            )
+        else:
+            # The archive ref already binds this exact head (a previous attempt
+            # crashed between archive and retire); only the retirement remains.
+            archived = self._git(
+                (
+                    "push",
+                    f"--force-with-lease=refs/heads/{branch}:{head}",
+                    remote,
+                    f":refs/heads/{branch}",
+                ),
+                check=False,
+            )
+        if archived.returncode != 0:
+            raise ClaimError(
+                "failed to quarantine defunct remote branch (a worker may have "
+                "pushed at the same moment): " + archived.stderr.strip()
+            )
+        if self._remote_ref_sha(quarantine_ref, remote=remote) != head:
+            raise ClaimError("quarantine archive ref does not bind the retired head")
+        quarantined = {
+            "node_id": node_id,
+            "branch": branch,
+            "head": head,
+            "quarantine_ref": quarantine_ref,
+            "actor": actor,
+            "reason": reason,
+            "claim_proof": dict(claim_proof),
+            "head_moved_at": format_time(moved_at),
+            "idle_minutes": int(idle.total_seconds() // 60),
+            "quarantined_at": format_time(now),
+            "outcome": "quarantined",
+        }
+        append_jsonl(self.state_dir / "quarantines.jsonl", quarantined)
+        return quarantined
+
+    def _governing_claim_record(self, node_id: str, head: str) -> Mapping[str, Any] | None:
+        """Return the claim record governing this branch's unintegrated work.
+
+        Mainline already carries the claim commits of every completed node —
+        integration merges them along with the receipts — so the walk must
+        exclude everything reachable from the current target: an integrated
+        claim belongs to finished history and can never govern live work.
+        Among what remains, only a claim naming this exact node counts, and
+        the newest one wins (a re-claim supersedes its predecessors).
+        """
+
+        exclusions: list[tuple[str, ...]] = []
+        try:
+            exclusions.append((f"^{self.current_target_sha()}",))
+        except AutopilotError:
+            pass
+        exclusions.append(())  # the target may be unfetchable; never fail closed here
+        for exclusion in exclusions:
+            listed = self._git(
+                ("log", "--format=%H %ae", "--author", CLAIM_COMMIT_EMAIL, head)
+                + exclusion,
+                check=False,
+            )
+            if listed.returncode != 0:
+                continue
+            for line in listed.stdout.strip().splitlines():  # newest first
+                if not line.strip():
+                    continue
+                record = self.remote_claim_record(line.split()[0])
+                if record is not None and record.get("node_id") == node_id:
+                    return record
+            return None
+        return None
+
+    def _blocker_ledger(self, node_id: str) -> dict[str, bool]:
+        """Map each recorded blocker id to whether a resolution event covers it."""
+
+        path = self.blockers_dir / f"{node_id}.jsonl"
+        if not path.is_file():
+            return {}
+        opened: dict[str, bool] = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(record, Mapping):
+                continue
+            blocker_id = record.get("blocker_id")
+            if not isinstance(blocker_id, str):
+                continue
+            if record.get("event") == "BLOCKER_RESOLVED":
+                opened[blocker_id] = True
+            elif record.get("status") == "OPEN":
+                opened.setdefault(blocker_id, False)
+        return opened
+
+    def unresolved_blockers(self, node_id: str) -> tuple[str, ...]:
+        """Return the blocker ids still OPEN without a BLOCKER_RESOLVED event."""
+
+        ledger = self._blocker_ledger(node_id)
+        return tuple(sorted(bid for bid, resolved in ledger.items() if not resolved))
+
+    def blockers_fully_resolved(self, node_id: str) -> bool:
+        """True when the ledger names at least one cause and every one has a fix.
+
+        An empty or unparseable ledger is NOT fully resolved: nothing was
+        provably fixed, so triage must still look at what is there.
+        """
+
+        ledger = self._blocker_ledger(node_id)
+        return bool(ledger) and all(ledger.values())
+
+    def lift_retry_quarantine(self, node_id: str, *, actor: str) -> Mapping[str, Any] | None:
+        """Reopen a spent retry budget after every recorded cause has a fix.
+
+        Quarantine-by-budget protects against blind retry loops, not against
+        ever retrying: each failure wrote a blocker naming its exact cause, and
+        the lawful way back is a ``BLOCKER_RESOLVED`` event for every one of
+        them, each carrying a verified fix and a safe retry command.  When that
+        proof is complete, this verb archives the spent failure ledger together
+        with the quarantine and escalation records into one recovery document —
+        nothing is deleted — and the node becomes dispatchable again with its
+        budget reset for the corrected cause.  Returns None when the node is
+        not quarantined.
+        """
+
+        if not actor.strip():
+            raise AutopilotError("lifting a retry quarantine requires the acting identity")
+        quarantine_path = self.quarantine_dir / f"{node_id}.json"
+        if not quarantine_path.is_file():
+            return None
+        if not self.blockers_fully_resolved(node_id):
+            # An empty or unparseable ledger is NOT proof: the quarantine was
+            # earned by real failures, so lifting it needs at least one named
+            # cause and a resolution for every one of them.
+            unresolved = self.unresolved_blockers(node_id)
+            raise AutopilotError(
+                "retry quarantine stands while blockers remain unresolved: "
+                + (
+                    ", ".join(unresolved)
+                    if unresolved
+                    else "the blocker ledger names no resolvable causes"
+                )
+            )
+        now = self.clock()
+        failures_path = self.failures_dir / f"{node_id}.jsonl"
+        escalation_path = self.escalations_dir / f"{node_id}.json"
+        recovery = {
+            "schema_version": SCHEMA_VERSION,
+            "kind": "hive-mind-autopilot-retry-quarantine-lift-v1",
+            "node_id": node_id,
+            "actor": actor,
+            "lifted_at": format_time(now),
+            "quarantine": read_json(quarantine_path),
+            "escalation": read_json(escalation_path) if escalation_path.is_file() else None,
+            "failures": list(self.failures(node_id)),
+            "plan_fingerprint": self.expected_plan_fingerprint,
+        }
+        recovery["recovery_id"] = digest_json(recovery)
+        archive = (
+            self.state_dir
+            / "recoveries"
+            / f"{node_id}-{format_time(now).replace(':', '-')}.json"
+        )
+        atomic_write_json(archive, recovery)
+        quarantine_path.unlink()
+        if escalation_path.is_file():
+            escalation_path.unlink()
+        if failures_path.is_file():
+            failures_path.unlink()
+        append_jsonl(
+            self.state_dir / "recoveries.jsonl",
+            {
+                "recovery_id": recovery["recovery_id"],
+                "node_id": node_id,
+                "actor": actor,
+                "lifted_at": recovery["lifted_at"],
+                "archive": str(archive.relative_to(self.state_dir)),
+            },
+        )
+        return recovery
+
+    def resolve_escalation(self, node_id: str, *, actor: str) -> Mapping[str, Any] | None:
+        """Retire an escalation packet after every recorded cause has a fix.
+
+        An escalation preserves a packet so a human decides before the node
+        moves again, and that packet is not tied to the retry budget: a node
+        can escalate on its first failure and never earn a quarantine, so
+        ``lift_retry_quarantine`` — the only other verb that clears a packet —
+        never runs and the escalation outlives every blocker it named.  This
+        verb is the lawful way back, and it demands the same proof the
+        quarantine lift demands: a ``BLOCKER_RESOLVED`` event for every blocker
+        the node recorded, each carrying a verified fix.  When that proof is
+        complete it archives the escalation record together with the failure
+        ledger into one recovery document — nothing is deleted — and retires
+        the packet so the node stops reporting ``ESCALATION_REQUIRED``.  The
+        failure ledger and any retry quarantine are left exactly as they were:
+        this clears the escalation and nothing else.  Returns None when the
+        node holds no escalation packet.
+
+        Resolution is also independent: the identity recorded as the packet's
+        ``owner`` may not be the identity that clears it.  A resolved blocker
+        proves only that a fix was *claimed*, and the claim is worth nothing
+        when the party that failed is the same party that certifies itself
+        cleared.  This is the invariant the court refuses a judge listed in
+        ``affected_identities`` for, and the one promotion enforces by
+        requiring distinct proposer, builder, evaluator, and judge — applied
+        here to escalation.
+        """
+
+        if not actor.strip():
+            raise AutopilotError("resolving an escalation requires the acting identity")
+        escalation_path = self.escalations_dir / f"{node_id}.json"
+        if not escalation_path.is_file():
+            return None
+        # Read once: the identity the check runs against and the record the
+        # archive preserves must be the same bytes.
+        escalation = read_json(escalation_path)
+        owner = escalation.get("owner") if isinstance(escalation, Mapping) else None
+        # Surrounding whitespace never makes a second identity: ``actor`` is
+        # validated with ``strip`` above, so compare on the same footing.
+        if isinstance(owner, str) and owner.strip() == actor.strip():
+            raise AutopilotError(
+                "the identity that escalated may not clear the escalation: "
+                f"actor {actor} matches the escalating owner {owner} on {node_id}"
+            )
+        if not self.blockers_fully_resolved(node_id):
+            # An empty or unparseable ledger is NOT proof: a worker deliberately
+            # preserved this packet, so retiring it needs at least one named
+            # cause and a resolution for every one of them.
+            unresolved = self.unresolved_blockers(node_id)
+            raise AutopilotError(
+                "escalation stands while blockers remain unresolved: "
+                + (
+                    ", ".join(unresolved)
+                    if unresolved
+                    else "the blocker ledger names no resolvable causes"
+                )
+            )
+        now = self.clock()
+        quarantine_path = self.quarantine_dir / f"{node_id}.json"
+        recovery = {
+            "schema_version": SCHEMA_VERSION,
+            "kind": "hive-mind-autopilot-escalation-resolution-v1",
+            "node_id": node_id,
+            "actor": actor,
+            "lifted_at": format_time(now),
+            "escalation": escalation,
+            "quarantine": read_json(quarantine_path) if quarantine_path.is_file() else None,
+            "failures": list(self.failures(node_id)),
+            "plan_fingerprint": self.expected_plan_fingerprint,
+        }
+        recovery["recovery_id"] = digest_json(recovery)
+        # The distinct suffix keeps this archive from ever landing on the name a
+        # quarantine lift would choose for the same node at the same instant.
+        archive = (
+            self.state_dir
+            / "recoveries"
+            / f"{node_id}-{format_time(now).replace(':', '-')}-escalation.json"
+        )
+        atomic_write_json(archive, recovery)
+        escalation_path.unlink()
+        append_jsonl(
+            self.state_dir / "recoveries.jsonl",
+            {
+                "recovery_id": recovery["recovery_id"],
+                "node_id": node_id,
+                "actor": actor,
+                "lifted_at": recovery["lifted_at"],
+                "archive": str(archive.relative_to(self.state_dir)),
+            },
+        )
+        return recovery
 
     def claim_path(self, node_id: str) -> Path:
         return self.claims_dir / f"{node_id}.json"
@@ -843,6 +1719,497 @@ class ControlPlane:
             if isinstance(value, Mapping):
                 records.append(value)
         return tuple(records)
+
+    def record_blocker(
+        self,
+        node_id: str,
+        *,
+        cause: str,
+        fix: str,
+        retry_when: str,
+        attempted_command: Sequence[str] = (),
+        category: str = "unknown",
+        evidence_refs: Sequence[str] = (),
+    ) -> Mapping[str, Any]:
+        """Preserve an actionable blocker instead of emitting an opaque failure.
+
+        A blocker is an operating-system learning record: it names the exact
+        cause, the safe fix, and the condition that makes retry valid.  The
+        append-only JSONL ledger is runtime state, while the protocol and its
+        tests are repository code so future sessions cannot silently repeat the
+        same failed attempt.
+        """
+
+        for value, label in (
+            (cause, "cause"),
+            (fix, "fix"),
+            (retry_when, "retry_when"),
+            (category, "category"),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise AutopilotError(f"blocker {label} is required")
+        command = [str(item) for item in attempted_command]
+        packet_without_id = {
+            "schema_version": SCHEMA_VERSION,
+            "node_id": node_id,
+            "category": category,
+            "cause": cause,
+            "fix": fix,
+            "retry_when": retry_when,
+            "attempted_command": command,
+            "evidence_refs": [str(item) for item in evidence_refs],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "OPEN",
+        }
+        packet_without_id["recovery_action"] = self.recovery_action(packet_without_id)
+        packet = {
+            **packet_without_id,
+            "blocker_id": digest_json(packet_without_id),
+        }
+        append_jsonl(self.blockers_dir / f"{node_id}.jsonl", packet)
+        return packet
+
+    def record_human_question(
+        self,
+        node_id: str,
+        *,
+        question: str,
+        cause: str,
+        attempted_command: Sequence[str] = (),
+    ) -> Mapping[str, Any]:
+        """Track a human question without persisting its potentially sensitive answer.
+
+        Asking a human is a recoverable control-plane event, not a stopping point.
+        The question is append-only; ``resolve_human_question`` records the answer
+        digest, fix, and immediate retry action so the next run can resume itself.
+        """
+
+        for value, label in ((question, "question"), (cause, "cause")):
+            if not isinstance(value, str) or not value.strip():
+                raise AutopilotError(f"human question {label} is required")
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "QUESTION_OPENED",
+            "node_id": node_id,
+            "question": question,
+            "cause": cause,
+            "attempted_command": [str(item) for item in attempted_command],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "OPEN",
+        }
+        record["question_id"] = digest_json(record)
+        append_jsonl(self.questions_dir / f"{node_id}.jsonl", record)
+        return record
+
+    def resolve_blocker(
+        self,
+        node_id: str,
+        blocker_id: str,
+        *,
+        actor: str,
+        fix: str,
+        retry_command: Sequence[str],
+        evidence_refs: Sequence[str] = (),
+    ) -> Mapping[str, Any]:
+        """Close one exact runtime blocker and make its verified retry actionable."""
+
+        if not actor.strip() or not fix.strip() or not retry_command:
+            raise AutopilotError("blocker resolution requires actor, fix, and retry command")
+        path = self.blockers_dir / f"{node_id}.jsonl"
+        records = (
+            [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+            if path.is_file()
+            else []
+        )
+        opened = next(
+            (
+                record
+                for record in records
+                if record.get("blocker_id") == blocker_id
+                and record.get("status") == "OPEN"
+            ),
+            None,
+        )
+        if not isinstance(opened, Mapping):
+            raise AutopilotError("blocker resolution must name an exact open blocker")
+        if any(
+            record.get("event") == "BLOCKER_RESOLVED"
+            and record.get("blocker_id") == blocker_id
+            for record in records
+        ):
+            raise AutopilotError("blocker is already resolved")
+        normalized_retry = self.validate_retry_command(retry_command)
+        candidate = {**opened, "fix": fix, "retry_when": "retry command is now executable"}
+        if not self.safe_retry_allowed(candidate):
+            raise AutopilotError("blocker resolution would weaken a security control")
+        resolution = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "BLOCKER_RESOLVED",
+            "node_id": node_id,
+            "blocker_id": blocker_id,
+            "actor": actor,
+            "fix": fix,
+            "retry_command": list(normalized_retry),
+            "evidence_refs": [str(item) for item in evidence_refs],
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "RESOLVED",
+            "recovery_action": {"action": "RETRY_NOW", "reason": "verified_fix_recorded"},
+            "lesson": {
+                "trigger_category": opened.get("category"),
+                "policy": "spawn a bounded repair task, verify the fix, record the result, and resume the same task",
+            },
+        }
+        resolution["resolution_id"] = digest_json(resolution)
+        append_jsonl(path, resolution)
+        return resolution
+
+    def resolve_human_question(
+        self,
+        node_id: str,
+        question_id: str,
+        *,
+        answer: str,
+        fix: str,
+        retry_command: Sequence[str],
+    ) -> Mapping[str, Any]:
+        """Record a human result and make the safe retry immediately actionable.
+
+        Only a digest of ``answer`` is retained. Secrets therefore cannot be
+        copied into repository or runtime evidence by the learning mechanism.
+        """
+
+        for value, label in ((answer, "answer"), (fix, "fix")):
+            if not isinstance(value, str) or not value.strip():
+                raise AutopilotError(f"question resolution {label} is required")
+        if not retry_command:
+            raise AutopilotError("question resolution retry_command is required")
+        normalized_retry = self.validate_retry_command(retry_command)
+        result = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "QUESTION_RESOLVED",
+            "node_id": node_id,
+            "question_id": question_id,
+            "answer_digest": digest_json({"answer": answer}),
+            "fix": fix,
+            "retry_command": list(normalized_retry),
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "timestamp": format_time(self.clock()),
+            "status": "RESOLVED",
+            "recovery_action": {"action": "RETRY_NOW", "reason": "human_result_recorded"},
+        }
+        result["resolution_id"] = digest_json(result)
+        append_jsonl(self.questions_dir / f"{node_id}.jsonl", result)
+        return result
+
+    def start_subtask_wave(
+        self,
+        wave_id: str,
+        node_ids: Sequence[str],
+        *,
+        target_sha: str | None = None,
+    ) -> Mapping[str, Any]:
+        """Register children that the orchestrator must supervise to settlement."""
+
+        if not isinstance(wave_id, str) or not wave_id.strip():
+            raise AutopilotError("subtask wave_id is required")
+        nodes = tuple(dict.fromkeys(str(node) for node in node_ids))
+        if not nodes:
+            raise AutopilotError("subtask wave requires at least one node")
+        unknown = sorted(set(nodes) - set(self._nodes))
+        if unknown:
+            raise AutopilotError("subtask wave has unknown nodes: " + ", ".join(unknown))
+        target = target_sha or self.current_target_sha()
+        if FULL_SHA.fullmatch(target) is None:
+            raise AutopilotError("subtask wave target_sha must be a full lowercase Git SHA")
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "SUBTASK_WAVE_STARTED",
+            "wave_id": wave_id,
+            "target_sha": target,
+            "nodes": list(nodes),
+            "statuses": {node: "PENDING" for node in nodes},
+            "timestamp": format_time(self.clock()),
+            "may_end_turn": False,
+            "target_mutation_allowed": False,
+            "next_action": "POLL_AGAIN",
+            "work_preservation_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
+        }
+        append_jsonl(self.subtask_waves_dir / f"{wave_id}.jsonl", record)
+        return record
+
+    def poll_subtask_wave(
+        self,
+        wave_id: str,
+        statuses: Mapping[str, str],
+    ) -> Mapping[str, Any]:
+        """Record one poll and require supervision until every result is collected.
+
+        UI ``idle`` is deliberately represented as ``IDLE_UNCOLLECTED``. It is
+        not success: the parent must read the result and classify it. Recoverable
+        blockers require retry; only success or genuine external authority can
+        settle a child and permit the parent turn to end.
+        """
+
+        path = self.subtask_waves_dir / f"{wave_id}.jsonl"
+        if not path.is_file():
+            raise AutopilotError(f"unknown subtask wave: {wave_id}")
+        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+        started = next((record for record in records if record.get("event") == "SUBTASK_WAVE_STARTED"), None)
+        if not isinstance(started, Mapping):
+            raise AutopilotError(f"subtask wave lacks start record: {wave_id}")
+        nodes = tuple(str(node) for node in started.get("nodes", ()))
+        if set(statuses) != set(nodes):
+            raise AutopilotError("subtask poll must classify every wave node exactly once")
+        normalized = {node: str(statuses[node]).upper() for node in nodes}
+        invalid = sorted({status for status in normalized.values() if status not in SUBTASK_STATES})
+        if invalid:
+            raise AutopilotError("invalid subtask states: " + ", ".join(invalid))
+        actions: dict[str, str] = {}
+        for node, state in normalized.items():
+            if state in {"PENDING", "ACTIVE"}:
+                actions[node] = "POLL_AGAIN"
+            elif state == "IDLE_UNCOLLECTED":
+                actions[node] = "COLLECT_RESULT_NOW"
+            elif state == "BLOCKED_RECOVERABLE":
+                actions[node] = "APPLY_FIX_AND_RETRY_NOW"
+        settled = all(state in SUBTASK_SETTLED_STATES for state in normalized.values())
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "event": "SUBTASK_WAVE_POLLED",
+            "wave_id": wave_id,
+            "target_sha": started.get("target_sha"),
+            "statuses": normalized,
+            "recovery_actions": actions,
+            "timestamp": format_time(self.clock()),
+            "may_end_turn": settled,
+            "target_mutation_allowed": settled,
+            "next_action": "QUIESCENT" if settled else "CONTINUE_SUPERVISION",
+        }
+        append_jsonl(path, record)
+        return record
+
+    def acquire_global_validation_lease(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        lease_minutes: int = 10,
+    ) -> Mapping[str, Any]:
+        """Serialize repository-wide gates while focused node checks stay parallel."""
+
+        if node_id not in self._nodes:
+            raise AutopilotError(f"unknown validation node: {node_id}")
+        if not isinstance(owner, str) or not owner.strip():
+            raise AutopilotError("validation lease owner is required")
+        if type(lease_minutes) is not int or lease_minutes < 1:
+            raise AutopilotError("validation lease_minutes must be positive")
+        now = self.clock()
+        if self.validation_lease_path.is_file():
+            current = read_json(self.validation_lease_path)
+            if isinstance(current, Mapping):
+                expires = parse_time(current.get("expires_at"))
+                identity = (current.get("node_id"), current.get("owner"))
+                if expires > now:
+                    if identity == (node_id, owner):
+                        return current
+                    raise AutopilotError(
+                        "global validation lease is active for "
+                        f"{current.get('node_id')} owned by {current.get('owner')}"
+                    )
+                raise AutopilotError(
+                    "expired global validation lease requires exact-identity release before reacquisition"
+                )
+            raise AutopilotError("global validation lease is malformed")
+        lease = {
+            "schema_version": SCHEMA_VERSION,
+            "node_id": node_id,
+            "owner": owner,
+            "target_sha": self.current_target_sha(),
+            "acquired_at": format_time(now),
+            "expires_at": format_time(now + timedelta(minutes=lease_minutes)),
+            "status": "ACTIVE",
+        }
+        lease["lease_id"] = digest_json(lease)
+        self.validation_lease_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            descriptor = os.open(
+                self.validation_lease_path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+            )
+        except FileExistsError as error:
+            raise AutopilotError("global validation lease acquisition raced") from error
+        try:
+            os.write(descriptor, (json.dumps(lease, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+            os.fsync(descriptor)
+        except Exception:
+            self.validation_lease_path.unlink(missing_ok=True)
+            raise
+        finally:
+            os.close(descriptor)
+        return lease
+
+    def release_global_validation_lease(self, node_id: str, owner: str) -> None:
+        if not self.validation_lease_path.is_file():
+            raise AutopilotError("global validation lease is absent")
+        current = read_json(self.validation_lease_path)
+        identity = (
+            current.get("node_id"),
+            current.get("owner"),
+        ) if isinstance(current, Mapping) else (None, None)
+        if identity != (node_id, owner):
+            raise AutopilotError("global validation lease identity mismatch")
+        lease_id = str(current.get("lease_id", "unknown")).replace(":", "-")
+        archive = self.state_dir / "validation-leases" / f"{lease_id}.json"
+        atomic_write_json(
+            archive,
+            {**current, "status": "RELEASED", "released_at": format_time(self.clock())},
+        )
+        self.validation_lease_path.unlink()
+
+    def break_expired_validation_lease(self, *, actor: str) -> Mapping[str, Any] | None:
+        """Archive and remove an expired validation lease whose owner is gone.
+
+        Exact-identity release is the law for a live lease, but an expired lease
+        left by a dead session would otherwise wedge every future round: policy
+        forbids retrying while the file exists and no other identity may release
+        it.  Expiry is the bound the owner itself declared, so past it the lease
+        grants nothing and archiving it is bookkeeping, not authority.  Returns
+        the broken lease record, or None when no lease file exists.
+        """
+
+        if not actor.strip():
+            raise AutopilotError(
+                "breaking an expired validation lease requires the acting identity"
+            )
+        if not self.validation_lease_path.is_file():
+            return None
+        current = read_json(self.validation_lease_path)
+        if not isinstance(current, Mapping):
+            raise AutopilotError("global validation lease is malformed")
+        now = self.clock()
+        try:
+            expires = parse_time(current.get("expires_at"))
+        except (TypeError, ValueError):
+            expires = None  # an unreadable bound can never be identity-released
+        if expires is not None and expires > now:
+            raise AutopilotError(
+                "global validation lease is live; only its exact owner may release it"
+            )
+        lease_id = str(current.get("lease_id", "unknown")).replace(":", "-")
+        archive = self.state_dir / "validation-leases" / f"{lease_id}.json"
+        broken = {
+            **current,
+            "status": "EXPIRED_BROKEN",
+            "broken_by": actor,
+            "broken_at": format_time(now),
+        }
+        atomic_write_json(archive, broken)
+        self.validation_lease_path.unlink()
+        return broken
+
+    @staticmethod
+    def recovery_action(packet: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Turn known orchestration blockers into bounded child-task work."""
+
+        text = " ".join(
+            str(packet.get(key, "")) for key in ("category", "cause", "fix")
+        ).lower()
+        if any(
+            marker in text
+            for marker in ("dispatcher release", "release record", "dispatch release")
+        ):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "orchestrator",
+                "objective": "refresh the singleton release snapshot, reconcile the current target, dispatch the exact eligible node, and retry its claim",
+                "required_sequence": list(SUBTASK_EXECUTION_SEQUENCE),
+                "stop_if": "target or snapshot changes again, or a protected/security control would need weakening",
+            }
+        if "snapshot" in text and any(marker in text for marker in ("stale", "target", "mismatch")):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "orchestrator",
+                "objective": "refresh the validated singleton snapshot and resume every child invalidated by the target advance",
+                "required_sequence": list(STALE_TARGET_RECOVERY_SEQUENCE),
+                "stop_if": "remote SHA cannot be verified normally or recovery would weaken provenance/security controls",
+            }
+        category = str(packet.get("category", "")).casefold()
+        if not category.endswith("authority") and category not in {
+            "external-authority",
+            "human-authority",
+            "credential-authority",
+            "destructive-authority",
+        } and ControlPlane.safe_retry_allowed(packet):
+            return {
+                "action": "SPAWN_SUBTASK",
+                "role": "steward",
+                "objective": "diagnose the exact failure, implement the bounded safe fix, verify it, record the blocker resolution and lesson, then resume the same task",
+                "required_sequence": [
+                    "inspect_exact_failure_evidence",
+                    "verify_current_target_and_authority",
+                    "apply_bounded_safe_fix",
+                    "rerun_failed_operation",
+                    "record_blocker_resolution_and_lesson",
+                    "resume_same_task",
+                ],
+                "stop_if": "the fix requires new external authority, secrets, destructive action, or weaker security/evidence controls",
+            }
+        return {
+            "action": "REPORT_BLOCKER",
+            "role": "orchestrator",
+            "objective": "report the exact fix and retry condition to the controlling task",
+            "stop_if": "the blocker remains unresolved",
+        }
+
+    @staticmethod
+    def safe_retry_allowed(packet: Mapping[str, Any]) -> bool:
+        """Reject remediation that weakens TLS, certificate, or verification controls."""
+
+        remediation = " ".join(
+            str(packet.get(key, "")) for key in ("fix", "retry_when")
+        ).lower()
+        return not any(marker in remediation for marker in UNSAFE_REMEDIATION_MARKERS)
+
+    @staticmethod
+    def validate_retry_command(command: Sequence[str]) -> tuple[str, ...]:
+        """Validate a tokenized retry without weakening transport or evidence controls."""
+
+        if isinstance(command, (str, bytes)) or not command:
+            raise AutopilotError("retry command must be a non-empty argv sequence")
+        normalized: list[str] = []
+        for item in command:
+            if not isinstance(item, str) or not item or len(item) > 4_096:
+                raise AutopilotError("retry command contains an invalid argument")
+            if any(character in item for character in "\x00\r\n"):
+                raise AutopilotError("retry command arguments must be single-line text")
+            normalized.append(item)
+        if len(normalized) > 128:
+            raise AutopilotError("retry command has too many arguments")
+
+        folded = " ".join(normalized).casefold()
+        compact = re.sub(r"[\s_-]+", "", folded)
+        unsafe = any(marker in folded for marker in UNSAFE_RETRY_ARGUMENT_MARKERS)
+        unsafe = unsafe or any(
+            marker in compact
+            for marker in (
+                "gitsslnoverify",
+                "curlinsecure",
+                "sslverify=false",
+                "sslverify=0",
+                "schannel.checkrevoke=false",
+                "schannel.checkrevoke=0",
+            )
+        )
+        if unsafe or any(
+            item.casefold().startswith(("git_config_", "git_config_count="))
+            for item in normalized
+        ):
+            raise AutopilotError("retry command would weaken a security control")
+        return tuple(normalized)
 
     def is_quarantined(self, node_id: str) -> bool:
         return (self.quarantine_dir / f"{node_id}.json").is_file()
@@ -1286,11 +2653,158 @@ class ControlPlane:
             branch=str(node.get("branch")),
         )
 
-    def status(self) -> dict[str, object]:
-        self.clean_stale_claims()
-        target = self.current_target_sha()
-        changed = self.changed_paths_since_reconciliation()
-        views = [self.node_view(node_id) for node_id in sorted(self._nodes)]
+    @contextmanager
+    def snapshot_cache(self):
+        """Reuse immutable Git facts for one point-in-time observation.
+
+        Installs the same per-call caches ``_status_document`` has always used —
+        dependency recursion, durable receipt reconstruction, and read-only Git
+        facts — so other observation paths (prompt rendering, claim eligibility,
+        receipt verification) do not replay thousands of Git subprocesses. The
+        caches live on the instance only for the ``with`` body and must never
+        span a state mutation that could change the cached truth.
+        """
+        missing = object()
+        installed: list[tuple[str, object]] = []
+
+        def install(name: str, value: object) -> None:
+            installed.append((name, self.__dict__.get(name, missing)))
+            setattr(self, name, value)
+
+        uncached_git = self._git
+        git_cache: dict[
+            tuple[tuple[str, ...], bool, tuple[tuple[str, str], ...]],
+            subprocess.CompletedProcess[str],
+        ] = {}
+
+        def cached_git(
+            args: Sequence[str],
+            *,
+            check: bool = False,
+            environment: Mapping[str, str] | None = None,
+        ) -> subprocess.CompletedProcess[str]:
+            if not args or args[0] not in _STATUS_READ_ONLY_GIT_COMMANDS:
+                return uncached_git(args, check=check, environment=environment)
+            key = (tuple(args), check, tuple(sorted((environment or {}).items())))
+            if key not in git_cache:
+                git_cache[key] = uncached_git(
+                    args,
+                    check=check,
+                    environment=environment,
+                )
+            return git_cache[key]
+
+        install("_git", cached_git)
+        try:
+            target = self.current_target_sha()
+            reconciled_target = self.reconciled_target_sha()
+            install("current_target_sha", lambda: target)
+            install("reconciled_target_sha", lambda: reconciled_target)
+
+            graph: _StatusCommitGraph | None = None
+            if self.verify_git_objects and FULL_SHA.fullmatch(target):
+                history = self._git(
+                    ("log", "--format=%H%x1f%P%x1f%T%x1f%B%x1e", target),
+                    check=False,
+                )
+                if history.returncode == 0:
+                    candidate_graph = _StatusCommitGraph.from_log(history.stdout)
+                    if target in candidate_graph.parents:
+                        graph = candidate_graph
+            if graph is not None:
+                uncached_object_exists = self.git_object_exists
+                uncached_is_ancestor = self.is_ancestor
+
+                def cached_object_exists(sha: str) -> bool:
+                    if sha in graph.trees:
+                        return True
+                    return uncached_object_exists(sha)
+
+                def cached_is_ancestor(ancestor: str, descendant: str) -> bool:
+                    observed = graph.is_ancestor(ancestor, descendant)
+                    if observed is not None:
+                        return observed
+                    return uncached_is_ancestor(ancestor, descendant)
+
+                install("git_object_exists", cached_object_exists)
+                install("is_ancestor", cached_is_ancestor)
+
+                if hasattr(self, "_commit_tree"):
+                    uncached_commit_tree = self._commit_tree
+
+                    def cached_commit_tree(commit: str) -> str | None:
+                        tree = graph.trees.get(commit)
+                        return tree if tree is not None else uncached_commit_tree(commit)
+
+                    install("_commit_tree", cached_commit_tree)
+                if hasattr(self, "_commit_parents"):
+                    uncached_commit_parents = self._commit_parents
+
+                    def cached_commit_parents(commit: str) -> tuple[str, ...]:
+                        parents = graph.parents.get(commit)
+                        return (
+                            parents
+                            if parents is not None
+                            else uncached_commit_parents(commit)
+                        )
+
+                    install("_commit_parents", cached_commit_parents)
+
+            active_claims = self.active_claims()
+            github_snapshot = self.github_snapshot()
+            install("active_claims", lambda: dict(active_claims))
+            install("github_snapshot", lambda: github_snapshot)
+
+            if hasattr(self, "_durable_receipt_records"):
+                uncached_durable_receipts = self._durable_receipt_records
+                durable_receipts: dict[str, list[dict[str, Any]]] | None = None
+
+                def cached_durable_receipts() -> dict[str, list[dict[str, Any]]]:
+                    nonlocal durable_receipts
+                    if durable_receipts is None:
+                        durable_receipts = uncached_durable_receipts()
+                    return durable_receipts
+
+                install("_durable_receipt_records", cached_durable_receipts)
+
+            uncached_node_view = self.node_view
+            view_cache: dict[str, NodeView] = {}
+
+            def cached_node_view(node_id: str) -> NodeView:
+                if node_id not in view_cache:
+                    view_cache[node_id] = uncached_node_view(node_id)
+                return view_cache[node_id]
+
+            install("node_view", cached_node_view)
+            yield
+        finally:
+            for name, prior in reversed(installed):
+                if prior is missing:
+                    self.__dict__.pop(name, None)
+                else:
+                    setattr(self, name, prior)
+
+    def _status_document(self) -> dict[str, object]:
+        # Status is a point-in-time observation over a DAG with substantial fan-in.
+        # Every expensive fact is scoped to this call through snapshot_cache so a
+        # stale truth can never leak into the next snapshot.
+        with self.snapshot_cache():
+            target = self.current_target_sha()
+            changed = self.changed_paths_since_reconciliation()
+            active_claims = self.active_claims()
+
+            validation_lease: Mapping[str, Any] | None = None
+            if self.validation_lease_path.is_file():
+                candidate = read_json(self.validation_lease_path)
+                if (
+                    isinstance(candidate, Mapping)
+                    and parse_time(candidate.get("expires_at")) > self.clock()
+                ):
+                    validation_lease = candidate
+
+            views = [self.node_view(node_id) for node_id in sorted(self._nodes)]
+            last_reconciled = self.reconciled_target_sha()
+            reconciliation_required = self.target_requires_reconciliation()
         counts: dict[str, int] = {state: 0 for state in LEGAL_STATES}
         for view in views:
             counts[view.state] = counts.get(view.state, 0) + 1
@@ -1305,15 +2819,28 @@ class ControlPlane:
             "plan_fingerprint": self.expected_plan_fingerprint,
             "target_branch": self.target_branch,
             "target_sha": target,
-            "last_reconciled_sha": self.reconciled_target_sha(),
-            "reconciliation_required": self.target_requires_reconciliation(),
+            "last_reconciled_sha": last_reconciled,
+            "reconciliation_required": reconciliation_required,
             "changed_paths_since_reconciliation": list(changed),
             "counts": {key: value for key, value in counts.items() if value},
             "ready": ready,
             "nodes": [view.to_dict() for view in views],
             "complete": all(view.state in TERMINAL_STATES for view in views),
+            "active_claims": sorted(active_claims),
+            "active_validation_lease": (
+                dict(validation_lease) if validation_lease is not None else None
+            ),
             "generated_at": format_time(self.clock()),
         }
+
+    def observe_status(self) -> dict[str, object]:
+        """Return controller truth without reaping or otherwise mutating state."""
+
+        return self._status_document()
+
+    def status(self) -> dict[str, object]:
+        self.clean_stale_claims()
+        return self._status_document()
 
     def ready_nodes(self) -> tuple[str, ...]:
         status = self.status()
@@ -1335,7 +2862,10 @@ class ControlPlane:
         if lease_minutes < 1 or lease_minutes > 1_440:
             raise ClaimError("lease must be between 1 and 1440 minutes")
         self.clean_stale_claims()
-        view = self.node_view(node_id)
+        # Eligibility is a read-only observation; scope the snapshot cache to it
+        # so claim does not replay the durable receipt reconstruction per call.
+        with self.snapshot_cache():
+            view = self.node_view(node_id)
         if view.state not in {"READY", "INTEGRATION_READY", "PROMOTION_READY"}:
             raise ClaimError(f"node {node_id} is not claimable: {view.state}")
         claims = self.active_claims()
@@ -1434,6 +2964,11 @@ class ControlPlane:
         error: str,
         kind: str = "failure",
         evidence_refs: Sequence[str] = (),
+        blocker_cause: str | None = None,
+        blocker_fix: str | None = None,
+        retry_when: str | None = None,
+        attempted_command: Sequence[str] = (),
+        blocker_category: str = "execution",
     ) -> Mapping[str, Any]:
         if not error.strip():
             raise AutopilotError("failure requires an error description")
@@ -1453,6 +2988,15 @@ class ControlPlane:
             "plan_fingerprint": self.expected_plan_fingerprint,
         }
         append_jsonl(self.failures_dir / f"{node_id}.jsonl", record)
+        blocker = self.record_blocker(
+            node_id,
+            cause=blocker_cause or error,
+            fix=blocker_fix or "Inspect the retained evidence and correct the reported cause.",
+            retry_when=retry_when or "Retry only after the cause is corrected and the same checks pass.",
+            attempted_command=attempted_command,
+            category=blocker_category,
+            evidence_refs=evidence_refs,
+        )
         if path.is_file():
             path.unlink()
         if kind == "escalation":
@@ -1466,7 +3010,7 @@ class ControlPlane:
                     "reason": "configured retry budget exhausted",
                 },
             )
-        return record
+        return {**record, "blocker": blocker}
 
     def complete(
         self,
@@ -1571,11 +3115,17 @@ class ControlPlane:
             routes.get("anthropic"), f"{node_id}.routes.anthropic"
         )
         values = {
+            "REPOSITORY": str(
+                _require_mapping(self.control.get("target"), "control-plane.target").get(
+                    "repository", "local-repository"
+                )
+            ),
+            "TARGET_BRANCH": self.target_branch,
             "NODE_ID": node_id,
             "NODE_STATE": view.state,
             "OBJECTIVE": str(node.get("objective")),
             "BRANCH": str(node.get("branch")),
-            "PR_TARGET": str(node.get("pr_target")),
+            "PR_TARGET": self.target_branch,
             "ROLES": ", ".join(node.get("roles", [])),
             "DEPENDENCIES": ", ".join(node.get("dependencies", [])) or "none",
             "READ_SCOPE": "\n".join(f"- {item}" for item in node.get("read_scope", [])),

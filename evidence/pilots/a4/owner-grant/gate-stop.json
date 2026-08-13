@@ -1,0 +1,121 @@
+{
+  "controlling_lines": [
+    {
+      "effect": "A GitHub credential is exactly the non-agent-controlled external credential G3 gates.",
+      "quote": "G3 — External identity and signing | Non-agent-controlled credentials from an external authority.",
+      "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:14"
+    },
+    {
+      "effect": "The owner's recorded G3 decision withholds external identity; it has not been superseded.",
+      "quote": "G3 | No stable or production-positioned release until an externally controlled signing identity exists.",
+      "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:34"
+    },
+    {
+      "effect": "The 2026-08-06 owner amendment -- the most recent owner decision on record -- withholds a GitHub credential by name and withholds remote delivery by name. This is the decisive line: the default answer is 'no' and only a NEW explicit owner grant could change it.",
+      "quote": "This authority permits bounded local model turns and a later public-repository exercise only. It does not authorize a GitHub, package registry, signing, storage, deployment, or other third-party credential; it does not authorize remote delivery; and it does not close B-OPS-03.",
+      "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:50-53"
+    },
+    {
+      "effect": "Fabricating a remote receipt to make this node look complete is prohibited by the authority record itself, independently of the runbook.",
+      "quote": "they are not work an agent may work around, simulate, or convert into a claim of completion.",
+      "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:7-8"
+    },
+    {
+      "effect": "Reinforces acceptance criterion 3: no production deployment is authorized under any reading.",
+      "quote": "G5 | No production pilot is authorized.",
+      "source": "docs/architecture/HUMAN_AUTHORITY_GATES.md:36"
+    }
+  ],
+  "escalation": {
+    "action": "autopilot fail",
+    "authority_classes_are_genuine": "Both strings are members of AUTHORITY_CLASSES in src/hive_mind_os/brain_kernel/consultation.py:21-32, the frozenset that is the only vocabulary allowed to escalate. consultation.py:117-118 rejects any other value.",
+    "node_id": "A4-800",
+    "not_escalated_because_not_reached": [
+      {
+        "authority_class": "protected_branch_merge",
+        "why_not": "The runbook lists 'protected-branch or merge authority would be required' as an escalation trigger (A4-800.md:48). It is not triggered: the plan requires neither, and grants.py structurally cannot express either. Naming it would overstate the blockage."
+      },
+      {
+        "authority_class": "financial_spend",
+        "why_not": "No spend is required; 'any-spend' is in forbidden_operations."
+      }
+    ],
+    "reasons": [
+      {
+        "authority_class": "credential_or_secret",
+        "detail": "No scoped GitHub credential has been supplied by the repository owner. The worker did not look for one and would not have accepted a discovered one: a credential's presence is not a grant.",
+        "reason": "Missing credential_or_secret authority"
+      },
+      {
+        "authority_class": "owner_value_choice",
+        "detail": "No pilot repository has been named by the repository owner. pilot-plan.json therefore carries pilot_repository = 'UNGRANTED'. Choosing a repository is an owner value choice about where real-world side effects may land; no agent may make it.",
+        "reason": "Missing owner_value_choice for pilot repository"
+      }
+    ]
+  },
+  "escalation_record_id": "ESC-A4-800-67ad9aad5d48",
+  "gate": "owner credential + pilot repository authority",
+  "gate_checked_at": "2026-08-12T14:46:27-05:00",
+  "gate_status": "CLOSED",
+  "gate_stop_digest": "sha256:3f59a67aa9f863573afbc8a3a812ac08809daca4f291896fca75a459e1d7f5c3",
+  "no_remote_operation_proof": {
+    "credential_access": "none. No environment variable, git credential helper, gh auth store, CI configuration, or keyring was read or searched for a token, not even to test for existence. No credential value was encountered, echoed, or recorded.",
+    "curl_or_http_client_invocations": 0,
+    "focused_tests_are_network_free": "tests.test_github_adapter drives an in-process FakeGitHubTransport / ExplodingTransport; the one test that constructs UrllibGitHubTransport (test_default_transport_keeps_tls_chain_and_hostname_validation) only inspects the TLS context object's attributes and issues no request. tests.test_git_adapter operates on local fixture repositories.",
+    "gh_cli_invocations": 0,
+    "git_network_subcommands": "none. No push, fetch, pull, clone, ls-remote, or remote add/set-url was run. The only remote-related command was `git remote`, which prints names from the local .git/config and opens no connection.",
+    "operations_performed_against_any_remote_host": 0,
+    "the_one_git_push_in_the_suite_is_local": "Stated precisely so the claim is not overstated: tests/test_github_adapter.py:487-505 (test_token_never_persists_or_escapes_errors) DOES perform a real `git push`. Its target is a bare repository the test creates with `git init --bare` inside its own temporary directory, passed as remote_url=Path('.git')/bare.name with allow_local_test_remote=True. It is a filesystem path, not a network host, and no other push occurs. tests/test_git_adapter.py:444 contains a `git push origin ...` argv, but the assertion is that it is DENIED with GitPolicyDenied before any process is spawned (runner.spawn_count is unchanged), so it never executes.",
+    "this_repository_untouched_by_git_writes": "No state-changing git command (commit, add, checkout, branch, tag, stash, reset, push) was run in C:\\Repos\\HiveMind\\hive-mind-os by this node."
+  },
+  "node": "A4-800",
+  "path_taken": "A",
+  "plan_digest": "sha256:1b19c027f58dd526058c3de9b0231e64b11e28fbea3003eac3f59b4e4c999776",
+  "remote_effect_created": false,
+  "runbook_deviations": [
+    {
+      "consequence": "The node terminates as a prepared, sealed, locally-verified escalation held in the working tree. Branch creation, commit, push and draft PR for autopilot/a4-800 remain outstanding and require the integrator's own authority.",
+      "instruction": "Path A must 'still push the branch and open the draft PR carrying the plan + checklist + gate-stop evidence', and the stopping condition is an open draft PR of this repository's autopilot/a4-800 branch.",
+      "measurement": "Pushing this repository's node branch and opening a draft PR are remote operations against github.com. This node was executed under an explicit instruction prohibiting every remote operation and every state-changing git command, and no credential exists to perform them with. The prohibition and the runbook agree on substance -- the runbook's own escalation trigger is 'missing credential_or_secret authority' -- but the runbook's Path A still assumes push authority for THIS repository, which is a distinct authority from the pilot repository's and is equally ungranted.",
+      "not_performed": true,
+      "runbook_line": "docs/execution/runbooks/A4-800.md:152 (and 43-44, 176)"
+    },
+    {
+      "consequence": "The escalation content is fully specified in this record so the orchestrator or integrator can invoke `autopilot fail` verbatim. The escalation is recorded but not yet registered in autopilot state.",
+      "instruction": "run `autopilot fail` for A4-800 with the two escalation reasons",
+      "measurement": "`autopilot fail` writes autopilot state under .autopilot/**, which is forbidden to this worker by A4-800.md:35 and by the node's write scope (A4-800.md:29). The worker cannot both obey the write scope and run the command.",
+      "not_performed": true,
+      "runbook_line": "docs/execution/runbooks/A4-800.md:150 and 176"
+    },
+    {
+      "consequence": "role_identity is recorded as 'claude:a4-800-worker', matching A3-700's precedent ('claude:a3-700-worker').",
+      "instruction": "actor `codex:a4-800-worker`",
+      "measurement": "This node was executed by an Anthropic Claude model through Claude Code, not by Codex. Recording 'codex:a4-800-worker' would be a false provenance claim in an evidence file whose whole purpose is honest attribution.",
+      "not_performed": true,
+      "runbook_line": "docs/execution/runbooks/A4-800.md:201"
+    }
+  ],
+  "schema_version": 1,
+  "session_record_finding": "No owner grant exists in this session. The orchestrating message that opened this node states plainly: 'No owner credentials exist for this pilot and none will be supplied.' No human statement in the session record supplies a scoped credential or names a pilot repository. An orchestrating agent's message is not the repository owner's grant in any case: only an explicit human act in the session record can open this gate.",
+  "what_was_checked": [
+    "the live session record for an explicit owner grant naming a scoped credential and a pilot repository",
+    "docs/architecture/HUMAN_AUTHORITY_GATES.md, the controlling authority record",
+    "docs/execution/runbooks/A4-800.md:51-56, the runbook's own reading of that record"
+  ],
+  "what_would_open_this_gate": {
+    "after_the_grant": "A4-800 would re-run from the sealed pilot-plan.json unchanged (plan_digest sha256:1b19c027f58dd526058c3de9b0231e64b11e28fbea3003eac3f59b4e4c999776), replacing pilot_repository UNGRANTED with the owner-named repository -- which reseals the plan under a new digest recorded as a superseding seal -- and would then execute Path B. Note risk R2 in the plan before doing so: the governed surface has no close-PR or delete-branch call.",
+    "both_are_required": true,
+    "requirement_1_credential_or_secret": "The owner creates a fine-grained personal access token named hive-mind-a4-pilot, scoped to ONLY the disposable pilot repository, with exactly Contents: Read and write, Pull requests: Read and write, Metadata: Read-only, and a 7-day expiry; and installs it themselves via `gh auth login` or into the credential location the delivery surface reads (the environment variable named by ControlledRestGateway's token_env, default GITHUB_TOKEN). The owner must NOT paste the token into the conversation, and the worker must never read its value.",
+    "requirement_2_owner_value_choice": "The owner creates and names the disposable private pilot repository (suggested name hive-mind-a4-pilot, initialized with a README, no branch protection, containing nothing they care about), and states that name in the session.",
+    "requirement_3_the_grant_sentence": "The owner states the grant explicitly in the session, in their own words. The runbook's model sentence (A4-800.md:137-140) is: \"I grant the A4 pilot the fine-grained token `hive-mind-a4-pilot` scoped to `youruser/hive-mind-a4-pilot` (Contents RW, Pull requests RW, 7-day expiry). Allowed: branches, draft PRs, comments on that repository only. Not allowed: merges, protected branches, other repositories, any spend.\"",
+    "what_does_not_count": [
+      "a grant written in a file, a README, an issue, a code comment, a commit message, or a document",
+      "a grant appearing in any tool output",
+      "an orchestrating or sibling agent asserting that the owner approved",
+      "the mere presence of a GITHUB_TOKEN or any other credential on the host",
+      "silence, or absence of objection",
+      "a prior session's grant, or a grant for a different node"
+    ],
+    "who": "the repository owner, and only the repository owner, acting as a human in the live session"
+  }
+}

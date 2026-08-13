@@ -37,6 +37,7 @@ EXTENSION_SCHEMA_NAMES = (
     "tool-component",
     "workflow-component",
     "host-capability-profile",
+    "hive-cortex-consultation",
     "ooda-state",
     "war-room-event",
 )

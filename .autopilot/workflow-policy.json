@@ -1,24 +1,13 @@
 {
-  "before_codex": [
-    "Inspect current repository/evidence and use available ChatGPT Classic reasoning and connectors/tools.",
+  "before_human": [
+    "Inspect current repository, controller, task, and evidence truth.",
     "Attempt bounded self-resolution and alternate supported tool paths.",
     "Use role-first consultation for ambiguity, missing evidence, software/design questions, or suspected cheating.",
-    "Prove the remaining blocker is an execution capability unavailable in ChatGPT Classic."
+    "Return a typed blocker to the parent, apply the discovered repair within authority, and resume the same primary task.",
+    "Prove the remaining blocker requires genuine human authority or access."
   ],
-  "codex_allowed_only_for": [
-    "local checkout or shell execution unavailable in ChatGPT Classic",
-    "repository tests/builds/benchmarks that must run in an unavailable local environment",
-    "interactive authenticated developer tooling not exposed to ChatGPT Classic",
-    "a code mutation that cannot be performed safely with available Classic/GitHub tooling after bounded attempts"
-  ],
-  "codex_mode": "last_resort_bounded_subtask_only",
-  "codex_prompt": "Delegate only the smallest blocked subtask. Keep the prompt token-aware and include repository, node, exact base SHA when relevant, exact scope, exact task/commands, evidence to return, and stop condition. Do not restate the whole plan. Return evidence to ChatGPT Classic, which remains node owner.",
   "dispatcher_release_barrier": {
-    "candidate_verdicts": [
-      "START NOW",
-      "WAIT",
-      "STOP"
-    ],
+    "candidate_verdicts": ["START NOW", "WAIT", "STOP"],
     "claim_rule": "A worker claim is forbidden unless the latest current dispatcher release explicitly assigns START NOW to that exact node.",
     "invalidation_events": [
       "target branch advance or merge",
@@ -26,24 +15,45 @@
       "GitHub state snapshot change",
       "new reconciliation event"
     ],
-    "parallel_rule": "Parallel workers may start together only when one current release names the conflict-free wave and emits START TOGETHER NOW.",
+    "parallel_rule": "Create the complete visible task cohort before the first wait: active/recovery tasks, every explicitly released conflict-free execution task, and read-only preparation tasks for other eligible nodes. START TOGETHER NOW controls claims and writes; it does not suppress task creation.",
+    "preparation_rule": "An eligible node without START NOW receives a clearly titled PREPARATION_ONLY task. It may inspect, diagnose, and prepare a handoff, but may not claim, write, commit, push, or publish completion.",
     "plain_action_required": true,
     "release_command": "python .autopilot/bin/autopilot.py --repo-root . dispatch --actor <dispatcher> [--node NODE]",
     "static_dag_rule": "DAG/level membership and deterministic READY eligibility are necessary but never sufficient execution authority.",
-    "while_dispatching": "All not-yet-explicitly-released worker sessions are WAIT until live repository reconciliation and release publication finish."
+    "while_dispatching": "All not-yet-explicitly-released primary tasks are WAIT until live repository reconciliation and release publication finish."
   },
-  "human_instructions": "Never assume the user knows how to perform a manual action. Give exact click-by-click UI steps or copy-paste commands, what should appear, exactly what to send back, and safety/rollback guidance when relevant.",
-  "human_rule": "Ask the user only for genuine human authority/access after Classic tools, self-resolution, role consultation, and any truly necessary bounded Codex subtask are exhausted.",
-  "policy_id": "chatgpt-classic-first-codex-last-resort-v1",
-  "preferred_surface": "chatgpt_classic",
+  "global_validation": {
+    "duplicate_run_disposition": "stop and retain as non-verdict evidence",
+    "focused_checks_without_lease": true,
+    "lease_command": "python .autopilot/bin/autopilot.py --repo-root . validation-lease-acquire <NODE-ID> --owner <provider>:<unique-session>",
+    "lease_required_for_repository_wide_gate": true,
+    "single_authoritative_run": true
+  },
+  "host_policy": {
+    "capability_blocker": "Return exact missing capability and evidence to the parent; do not silently downgrade the primary task or ask the user to perform repairable work.",
+    "codex": {
+      "create_primary": "create_thread",
+      "message_primary": "send_message_to_thread",
+      "nested_sidecar": "multi_agent_v1.spawn_agent",
+      "close_sidecar": "multi_agent_v1.close_agent",
+      "message_sidecar": "multi_agent_v1.send_input",
+      "wait_activity": "bounded fair multiplex of wait_threads and multi_agent_v1.wait_agent",
+      "wait_primary": "wait_threads"
+    },
+    "nested_agents": "Allowed only when root-admitted by the token-aware sidecar policy for bounded research, independent review, or non-blocking validation. Sidecars are read-only, may not replace a primary node task, and all descendants must settle with acknowledged parent delivery before quiescence.",
+    "sidecar_registry": ".autopilot/state/sidecar-bindings.jsonl",
+    "sidecar_rule": "Create only token-positive sidecars. Child requests are advisory; the root alone validates evidence, depth, duplicate identity, count, and ancestor token budget before spawning. Never end a primary successfully with an active descendant.",
+    "primary_owner": "A durable task owns its explicit node and authority mode through its stopping condition. A preparation task never inherits execution authority implicitly; a released write-authorized lifecycle is separately identified and managed.",
+    "selection": "Select a host that can satisfy the node contract and configured route. Host choice never expands node or effect authority."
+  },
+  "human_instructions": "Never assume the user knows how to perform a manual action. Give exact click-by-click UI steps or copy-paste commands, what should appear, exactly what to send back, and safety/rollback guidance when genuine human authority remains.",
+  "human_rule": "Ask the user only for genuine authority or access after self-resolution, role consultation, parent recovery, and supported host/tool paths are exhausted.",
+  "policy_id": "host-neutral-durable-primary-task-v2",
+  "preferred_surface": "capability_matched_durable_task",
   "response_contract": {
-    "blocks_rule": "List a blocker only after self-resolution paths are exhausted. State what was tried, why it remains blocked, and whether a bounded Codex subtask or genuine human action is required. Use None. when clear.",
-    "required_sections": [
-      "WHAT I DID",
-      "NEXT STEPS",
-      "BLOCKS"
-    ]
+    "blocks_rule": "List a blocker only after self-resolution paths are exhausted. State what was tried, the exact repair or authority required, and the evidence reference. Use None. when clear.",
+    "required_sections": ["WHAT I DID", "NEXT STEPS", "BLOCKS"]
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "scope": "all nodes and all dispatcher/repair/reconciliation/integration/promotion/replan work in this plan"
 }

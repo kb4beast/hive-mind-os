@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import os
 import ssl
@@ -10,19 +11,43 @@ import tempfile
 import unittest
 import urllib.parse
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
+from hive_mind_os.brain_kernel.authority import AuthorityRegistry
+from hive_mind_os.brain_kernel.canonical import canonical_digest
+from hive_mind_os.brain_kernel.contracts import (
+    Budget,
+    ConstraintEnvelope,
+    EffectIntent,
+)
+from hive_mind_os.brain_kernel.effects import EffectGateway
+from hive_mind_os.cortex.github.delivery_adapter import ControlledGitHubDelivery
+from hive_mind_os.cortex.github.grants import (
+    PROTECTED_BRANCHES,
+    VALID_DELIVERY_ACTIONS,
+    DeliveryGrant,
+    DeliveryGrantError,
+)
+from hive_mind_os.cortex.github.push_executor import WorkspacePushExecutor
+from hive_mind_os.cortex.github.rest_gateway import (
+    ControlledRestGateway,
+    DeliveryRestError,
+)
 from hive_mind_os.git_adapter import GitWorkspace, PinViolation
 from hive_mind_os.github_adapter import (
     CheckPollingTimeout,
     CheckRunFailed,
     GitHubClient,
+    GitHubDeliveryError,
     GitHubDeliveryTarget,
     GitHubPolicyDenied,
     GitHubResponse,
     GitHubTransportError,
+    MissingGitHubCredential,
+    PushResult,
     UrllibGitHubTransport,
     validate_github_receipt,
 )
@@ -753,6 +778,811 @@ class GitHubAdapterTests(unittest.TestCase):
             ).stdout.strip(),
             report.head_sha,
         )
+
+
+R2_OWNER = "octocat"
+R2_REPOSITORY = "hive-mind-os"
+R2_TARGET = f"github/{R2_OWNER}/{R2_REPOSITORY}"
+R2_FULL_NAME = f"{R2_OWNER}/{R2_REPOSITORY}"
+R2_BASE = "main"
+R2_PREFIX = "autopilot/"
+R2_BRANCH = "autopilot/a4-800"
+R2_PULL = 71
+R2_DIGEST = "sha256:" + "0" * 64
+R2_TIME = "2030-01-01T00:00:00Z"
+R2_ACTIONS = (
+    "push",
+    "open_draft_pr",
+    "post_comment",
+    "close_own_pr",
+    "delete_own_branch",
+)
+
+
+class RecordingPushExecutor:
+    """Records branch names; it opens no socket and runs no command."""
+
+    def __init__(self) -> None:
+        self.branches: list[str] = []
+
+    def push(self, branch: str) -> str:
+        self.branches.append(branch)
+        return HEAD_SHA
+
+
+class ControlledRetractionTests(unittest.TestCase):
+    """R2: a pilot that can push and open a draft PR can also retract both.
+
+    A4-800's Path B stop-and-rollback needs ``close-own-pr`` and
+    ``delete-own-branch``.  Every request below is answered by the same
+    in-process ``FakeGitHubTransport`` the rest of this module uses; it raises
+    on any request no test scripted, so a code path that reached an unexpected
+    endpoint fails loudly rather than silently.  Nothing here opens a socket.
+    """
+
+    def setUp(self) -> None:
+        self.environment = patch.dict(
+            os.environ,
+            {"GITHUB_TOKEN": "fixture-github-token-value"},
+            clear=False,
+        )
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        self.registry = AuthorityRegistry()
+        self.registry.register(self.envelope())
+        self.transport = FakeGitHubTransport()
+        self.delivery = self.delivery_for(self.transport)
+
+    # -- fixtures ----------------------------------------------------------
+
+    @staticmethod
+    def envelope() -> ConstraintEnvelope:
+        return ConstraintEnvelope(
+            "AUTH-a4-800",
+            "MISSION-a4-800",
+            "WORK-a4-800",
+            None,
+            "builder",
+            "R1",
+            R2_ACTIONS,
+            ("merge", "deploy"),
+            ("workspace",),
+            ("workspace",),
+            (),
+            (),
+            (),
+            (),
+            Budget(30, 0, 0, 0, 0, 0, 1, 1),
+            "2030-01-02T00:00:00Z",
+            R2_DIGEST,
+            R2_DIGEST,
+        )
+
+    @staticmethod
+    def grant(
+        *,
+        grant_id: str = "GRANT-a4-800",
+        base_branch: str = R2_BASE,
+        branch_prefix: str = R2_PREFIX,
+        allowed_actions: tuple[str, ...] = R2_ACTIONS,
+    ) -> DeliveryGrant:
+        return DeliveryGrant.issue(
+            grant_id=grant_id,
+            owner=R2_OWNER,
+            repository=R2_REPOSITORY,
+            base_branch=base_branch,
+            branch_prefix=branch_prefix,
+            allowed_actions=allowed_actions,
+            issued_at=R2_TIME,
+        )
+
+    def delivery_for(
+        self,
+        transport: FakeGitHubTransport,
+        *,
+        grant: DeliveryGrant | None = None,
+    ) -> ControlledGitHubDelivery:
+        return ControlledGitHubDelivery(
+            grant or self.grant(),
+            rest=ControlledRestGateway(
+                R2_OWNER,
+                R2_REPOSITORY,
+                transport=transport,  # type: ignore[arg-type]
+            ),
+            push_executor=RecordingPushExecutor(),
+        )
+
+    @staticmethod
+    def intent(
+        *,
+        action: str,
+        adapter: str,
+        parameters_digest: str,
+        target: str = R2_TARGET,
+    ) -> EffectIntent:
+        return EffectIntent(
+            "MISSION-a4-800",
+            "WORK-a4-800",
+            "ATTEMPT-a4-800",
+            "builder-1",
+            "builder",
+            action,
+            "R1",
+            adapter,
+            target,
+            parameters_digest,
+            R2_DIGEST,
+            R2_DIGEST,
+            ("the pilot opened this draft pull request",),
+            "reopen the draft pull request and restore the branch",
+            "POLICY-a4-800",
+            R2_DIGEST,
+        )
+
+    def execute(
+        self,
+        intent: EffectIntent,
+        action: str,
+        delivery: ControlledGitHubDelivery | None = None,
+    ):
+        gateway = EffectGateway()
+        (delivery or self.delivery).register_with(gateway)
+        token = self.registry.authorize(R2_DIGEST, action, R2_TARGET, now=R2_TIME)
+        return gateway.execute(intent, token)
+
+    @staticmethod
+    def pull_path() -> str:
+        return f"/repos/{R2_OWNER}/{R2_REPOSITORY}/pulls/{R2_PULL}"
+
+    @staticmethod
+    def repository_path() -> str:
+        return f"/repos/{R2_OWNER}/{R2_REPOSITORY}"
+
+    @staticmethod
+    def branch_path(branch: str) -> str:
+        return f"/repos/{R2_OWNER}/{R2_REPOSITORY}/git/refs/heads/{branch}"
+
+    @staticmethod
+    def pull_document(**overrides: Any) -> dict[str, Any]:
+        """The draft pull request this pilot itself would have opened."""
+
+        document: dict[str, Any] = {
+            "number": R2_PULL,
+            "state": "open",
+            "draft": True,
+            "html_url": f"https://github.com/{R2_FULL_NAME}/pull/{R2_PULL}",
+            "base": {"ref": R2_BASE},
+            "head": {"ref": R2_BRANCH, "repo": {"full_name": R2_FULL_NAME}},
+        }
+        document.update(overrides)
+        return document
+
+    def close_intent(self, delivery: ControlledGitHubDelivery) -> EffectIntent:
+        return self.intent(
+            action="close_own_pr",
+            adapter=ControlledGitHubDelivery.CLOSE_PR_ADAPTER,
+            parameters_digest=delivery.bind_parameters({"pull_number": R2_PULL}),
+        )
+
+    def delete_intent(
+        self, delivery: ControlledGitHubDelivery, branch: str
+    ) -> EffectIntent:
+        return self.intent(
+            action="delete_own_branch",
+            adapter=ControlledGitHubDelivery.DELETE_BRANCH_ADAPTER,
+            parameters_digest=delivery.bind_parameters({"branch": branch}),
+        )
+
+    def methods(self, transport: FakeGitHubTransport) -> list[object]:
+        return [call["method"] for call in transport.calls]
+
+    def script_successful_close(self, transport: FakeGitHubTransport) -> None:
+        transport.add(
+            "GET",
+            self.pull_path(),
+            json.dumps(self.pull_document()).encode(),
+        )
+        transport.add(
+            "PATCH",
+            self.pull_path(),
+            json.dumps(
+                self.pull_document(state="closed", merged=False, merged_at=None)
+            ).encode(),
+        )
+
+    # -- close-own-pr ------------------------------------------------------
+
+    def test_close_own_draft_pr_succeeds_and_issues_a_state_only_patch(self) -> None:
+        self.script_successful_close(self.transport)
+
+        result = self.execute(self.close_intent(self.delivery), "close_own_pr")
+
+        self.assertEqual("SUCCEEDED", result.status)
+        self.assertEqual(["GET", "PATCH"], self.methods(self.transport))
+        read, closed = self.transport.calls
+        self.assertEqual(self.pull_path(), read["path"])
+        self.assertIsNone(read["body"])
+        self.assertEqual(self.pull_path(), closed["path"])
+        self.assertEqual(
+            {"state": "closed"},
+            json.loads(closed["body"]),  # type: ignore[arg-type]
+        )
+
+    def test_close_own_pr_receipt_identifies_the_pull_request_and_branch(self) -> None:
+        self.script_successful_close(self.transport)
+        intent = self.close_intent(self.delivery)
+
+        outcome = self.delivery.close_pr_adapter(intent)
+
+        self.assertEqual(
+            (f"pr:{R2_PULL}", f"branch:{R2_BRANCH}"),
+            outcome["produced_identifiers"],
+        )
+        self.assertEqual(
+            canonical_digest({"pr": R2_PULL, "state": "closed"}),
+            outcome["postcondition_digest"],
+        )
+
+    def test_closing_a_pull_request_this_pilot_did_not_open_is_refused(self) -> None:
+        foreign = {
+            "head branch outside the granted prefix": {
+                "head": {
+                    "ref": "release/hive-mind-os-singleton",
+                    "repo": {"full_name": R2_FULL_NAME},
+                }
+            },
+            "head branch is the grant base branch": {
+                "head": {"ref": R2_BASE, "repo": {"full_name": R2_FULL_NAME}}
+            },
+            "head branch is a protected branch": {
+                "head": {"ref": "master", "repo": {"full_name": R2_FULL_NAME}}
+            },
+            "head lives in somebody else's fork": {
+                "head": {
+                    "ref": R2_BRANCH,
+                    "repo": {"full_name": "somebody-else/hive-mind-os"},
+                }
+            },
+            "head repository is unreadable": {"head": {"ref": R2_BRANCH}},
+            "head reference is unreadable": {
+                "head": {"repo": {"full_name": R2_FULL_NAME}}
+            },
+            "base is not the granted base branch": {"base": {"ref": "release/train"}},
+            "pull request is not a draft": {"draft": False},
+            "pull request is already closed": {"state": "closed"},
+        }
+        for label, override in foreign.items():
+            with self.subTest(case=label):
+                transport = FakeGitHubTransport()
+                delivery = self.delivery_for(transport)
+                transport.add(
+                    "GET",
+                    self.pull_path(),
+                    json.dumps(self.pull_document(**override)).encode(),
+                )
+
+                with self.assertRaises(DeliveryGrantError):
+                    self.execute(
+                        self.close_intent(delivery), "close_own_pr", delivery
+                    )
+
+                # The read happened; the state change never did.
+                self.assertEqual(["GET"], self.methods(transport))
+
+    def test_closing_never_reaches_a_pull_request_integration_endpoint(self) -> None:
+        self.script_successful_close(self.transport)
+
+        self.execute(self.close_intent(self.delivery), "close_own_pr")
+
+        self.assertEqual({"GET", "PATCH"}, set(self.methods(self.transport)))
+        for call in self.transport.calls:
+            path = str(call["path"])
+            self.assertNotIn("/merge", path)
+            self.assertNotIn("/merges", path)
+            self.assertNotEqual("PUT", call["method"])
+            body = call["body"]
+            if isinstance(body, bytes):
+                self.assertNotIn(b"merge", body.lower())
+        self.assertNotIn("merge", VALID_DELIVERY_ACTIONS)
+        with self.assertRaises(DeliveryGrantError):
+            self.grant().require("merge")
+
+    def test_a_close_response_claiming_integration_fails_closed(self) -> None:
+        self.transport.add(
+            "GET", self.pull_path(), json.dumps(self.pull_document()).encode()
+        )
+        self.transport.add(
+            "PATCH",
+            self.pull_path(),
+            json.dumps(
+                self.pull_document(
+                    state="closed", merged=True, merged_at="2030-01-01T00:00:01Z"
+                )
+            ).encode(),
+        )
+
+        with self.assertRaisesRegex(DeliveryRestError, "integrated, not closed"):
+            self.execute(self.close_intent(self.delivery), "close_own_pr")
+
+    def test_close_without_the_grant_action_is_refused_before_any_request(self) -> None:
+        delivery = self.delivery_for(
+            self.transport,
+            grant=self.grant(
+                grant_id="GRANT-a4-800-no-close",
+                allowed_actions=("push", "open_draft_pr", "post_comment"),
+            ),
+        )
+
+        with self.assertRaisesRegex(DeliveryGrantError, "does not allow action"):
+            self.execute(self.close_intent(delivery), "close_own_pr", delivery)
+
+        self.assertEqual([], self.transport.calls)
+
+    # -- delete-own-branch -------------------------------------------------
+
+    def test_delete_own_branch_succeeds_and_issues_one_ref_delete(self) -> None:
+        self.transport.add(
+            "GET",
+            self.repository_path(),
+            json.dumps({"default_branch": R2_BASE}).encode(),
+        )
+        self.transport.add("DELETE", self.branch_path(R2_BRANCH), b"", status=204)
+
+        result = self.execute(
+            self.delete_intent(self.delivery, R2_BRANCH), "delete_own_branch"
+        )
+
+        self.assertEqual("SUCCEEDED", result.status)
+        self.assertEqual(["GET", "DELETE"], self.methods(self.transport))
+        deleted = self.transport.calls[-1]
+        self.assertEqual(self.branch_path(R2_BRANCH), deleted["path"])
+        self.assertIsNone(deleted["body"])
+
+    def test_delete_own_branch_receipt_identifies_the_branch(self) -> None:
+        self.transport.add(
+            "GET",
+            self.repository_path(),
+            json.dumps({"default_branch": R2_BASE}).encode(),
+        )
+        self.transport.add("DELETE", self.branch_path(R2_BRANCH), b"", status=204)
+        intent = self.delete_intent(self.delivery, R2_BRANCH)
+
+        outcome = self.delivery.delete_branch_adapter(intent)
+
+        self.assertEqual((f"branch:{R2_BRANCH}",), outcome["produced_identifiers"])
+        self.assertEqual(
+            canonical_digest({"deleted": R2_BRANCH}),
+            outcome["postcondition_digest"],
+        )
+
+    def test_deleting_a_protected_branch_is_refused_before_any_request(self) -> None:
+        self.assertEqual({"main", "master", "staging"}, set(PROTECTED_BRANCHES))
+        for branch in sorted(PROTECTED_BRANCHES):
+            with self.subTest(branch=branch):
+                transport = FakeGitHubTransport()
+                delivery = self.delivery_for(transport)
+
+                with self.assertRaisesRegex(DeliveryGrantError, "protected branch"):
+                    self.execute(
+                        self.delete_intent(delivery, branch),
+                        "delete_own_branch",
+                        delivery,
+                    )
+
+                self.assertEqual([], transport.calls)
+
+    def test_deleting_the_repository_default_branch_is_refused(self) -> None:
+        # A default branch the static rules cannot catch: it is not protected,
+        # it is not the grant base, and it sits inside the granted prefix.  Only
+        # the live default-branch read can deny it.
+        default = "autopilot/trunk"
+        self.assertNotIn(default, PROTECTED_BRANCHES)
+        transport = FakeGitHubTransport()
+        delivery = self.delivery_for(
+            transport,
+            grant=self.grant(grant_id="GRANT-a4-800-develop", base_branch="develop"),
+        )
+        transport.add(
+            "GET",
+            self.repository_path(),
+            json.dumps({"default_branch": default}).encode(),
+        )
+
+        with self.assertRaisesRegex(DeliveryGrantError, "default branch"):
+            self.execute(
+                self.delete_intent(delivery, default), "delete_own_branch", delivery
+            )
+
+        self.assertEqual(["GET"], self.methods(transport))
+
+    def test_an_unreadable_default_branch_denies_the_delete(self) -> None:
+        self.transport.add("GET", self.repository_path(), json.dumps({}).encode())
+
+        with self.assertRaisesRegex(DeliveryRestError, "no default_branch"):
+            self.execute(
+                self.delete_intent(self.delivery, R2_BRANCH), "delete_own_branch"
+            )
+
+        self.assertEqual(["GET"], self.methods(self.transport))
+
+    def test_deleting_outside_the_grant_prefix_is_refused_before_any_request(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            DeliveryGrantError, "outside the granted prefix"
+        ):
+            self.execute(
+                self.delete_intent(self.delivery, "release/hive-mind-os-singleton"),
+                "delete_own_branch",
+            )
+
+        self.assertEqual([], self.transport.calls)
+
+    def test_deleting_the_grant_base_branch_is_refused_before_any_request(self) -> None:
+        # "develop" is not protected, so only the base-branch rule can deny it.
+        self.assertNotIn("develop", PROTECTED_BRANCHES)
+        delivery = self.delivery_for(
+            self.transport,
+            grant=self.grant(grant_id="GRANT-a4-800-base", base_branch="develop"),
+        )
+
+        with self.assertRaisesRegex(DeliveryGrantError, "base branch"):
+            self.execute(
+                self.delete_intent(delivery, "develop"), "delete_own_branch", delivery
+            )
+
+        self.assertEqual([], self.transport.calls)
+
+    def test_delete_without_the_grant_action_is_refused_before_any_request(
+        self,
+    ) -> None:
+        delivery = self.delivery_for(
+            self.transport,
+            grant=self.grant(
+                grant_id="GRANT-a4-800-no-delete",
+                allowed_actions=("push", "open_draft_pr", "post_comment"),
+            ),
+        )
+
+        with self.assertRaisesRegex(DeliveryGrantError, "does not allow action"):
+            self.execute(
+                self.delete_intent(delivery, R2_BRANCH), "delete_own_branch", delivery
+            )
+
+        self.assertEqual([], self.transport.calls)
+
+    def test_a_branch_name_cannot_smuggle_a_path_into_the_ref_delete(self) -> None:
+        # These all satisfy the grant prefix rule, so only the REST-layer ref
+        # shape check stands between them and a DELETE on another path.
+        for branch in (
+            "autopilot/../../../repos/octocat/hive-mind-os/git/refs/heads/main",
+            "autopilot/a4-800?ref=main",
+            "autopilot/a4-800#fragment",
+            "autopilot/.hidden",
+            "autopilot/a4 800",
+        ):
+            with self.subTest(branch=branch):
+                transport = FakeGitHubTransport()
+                delivery = self.delivery_for(transport)
+                transport.add(
+                    "GET",
+                    self.repository_path(),
+                    json.dumps({"default_branch": R2_BASE}).encode(),
+                )
+
+                with self.assertRaises(DeliveryRestError):
+                    self.execute(
+                        self.delete_intent(delivery, branch),
+                        "delete_own_branch",
+                        delivery,
+                    )
+
+                self.assertEqual(["GET"], self.methods(transport))
+
+    def test_retractions_refuse_an_intent_aimed_at_another_repository(self) -> None:
+        for action, adapter, parameters in (
+            (
+                "close_own_pr",
+                ControlledGitHubDelivery.CLOSE_PR_ADAPTER,
+                {"pull_number": R2_PULL},
+            ),
+            (
+                "delete_own_branch",
+                ControlledGitHubDelivery.DELETE_BRANCH_ADAPTER,
+                {"branch": R2_BRANCH},
+            ),
+        ):
+            with self.subTest(action=action):
+                transport = FakeGitHubTransport()
+                delivery = self.delivery_for(transport)
+                intent = self.intent(
+                    action=action,
+                    adapter=adapter,
+                    parameters_digest=delivery.bind_parameters(parameters),
+                    target=R2_TARGET,
+                )
+                # The adapter is called directly with an intent whose target is
+                # a different repository; the gateway token binds the granted
+                # target, so only the adapter's own check can deny this.
+                foreign = self.intent(
+                    action=action,
+                    adapter=adapter,
+                    parameters_digest=intent.parameters_digest,
+                    target="github/somebody-else/hive-mind-os",
+                )
+                adapter_callable = getattr(
+                    delivery,
+                    "close_pr_adapter"
+                    if action == "close_own_pr"
+                    else "delete_branch_adapter",
+                )
+
+                with self.assertRaisesRegex(
+                    DeliveryGrantError, "not the granted repository"
+                ):
+                    adapter_callable(foreign)
+
+                self.assertEqual([], transport.calls)
+
+
+class ScriptedHeadClient(GitHubClient):
+    """Answers a push with a scripted head; it runs no Git and opens no socket."""
+
+    def __init__(
+        self,
+        *args: object,
+        head_sha: object,
+        transport: FakeGitHubTransport,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(*args, transport=transport, **kwargs)  # type: ignore[arg-type]
+        self.scripted_head = head_sha
+        self.calls = 0
+
+    def push_branch(
+        self,
+        workspace: GitWorkspace,
+        *,
+        branch: str | None = None,
+        remote_url: str | Path | None = None,
+        allow_local_test_remote: bool = False,
+    ) -> PushResult:
+        self.calls += 1
+        return PushResult(branch or "", self.scripted_head, {})  # type: ignore[arg-type]
+
+
+class WorkspacePushExecutorTests(unittest.TestCase):
+    """A4-800 Path B: the production binding from ``PushExecutor`` to a real push.
+
+    Every push below lands in a bare repository created by ``git init --bare``
+    inside the workspace and reached through ``allow_local_test_remote``,
+    exactly as ``test_token_never_persists_or_escapes_errors`` does.  Nothing
+    here opens a socket: the REST transport is the same in-process fake the
+    rest of this module uses and it raises on any request, and the credential
+    is a dummy value in an environment variable this class owns and restores.
+    """
+
+    TOKEN_ENV = "HIVE_PUSH_EXECUTOR_TEST_TOKEN"
+
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.environment = patch.dict(
+            os.environ,
+            {self.TOKEN_ENV: "fixture-push-executor-token"},
+            clear=False,
+        )
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        self.store = MissionStore(self.root / "state")
+        self.addCleanup(self.store.close)
+        self.mission_id = "mission-push-executor"
+        self.store.register_mission(
+            self.mission_id,
+            {
+                "objective": "push one granted run branch",
+                "source_pack_fingerprint": f"sha256:{'2' * 64}",
+            },
+            AutonomyBudget(100, 100, 100.0),
+        )
+        fixture = build_fixture_repo(self.root / "parent")
+        self.workspace = GitWorkspace.materialize(
+            fixture.root,
+            COMMIT_TWO_SHA,
+            self.root / "work",
+            self.root / "ev",
+        )
+        self.workspace.create_branch(R2_BRANCH)
+        self.workspace.write_file(
+            "tiny_pkg/maths.py",
+            b"def increment(value: int) -> int:\n    return value + 1\n",
+        )
+        self.workspace.commit("fix: restore increment")
+        self.bare = self.workspace.root / ".git" / "push-executor-remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", str(self.bare)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    # -- fixtures ----------------------------------------------------------
+
+    def client(self, *, token_env: str | None = None) -> GitHubClient:
+        return GitHubClient(
+            R2_OWNER,
+            R2_REPOSITORY,
+            self.root / "gh",
+            transport=FakeGitHubTransport(),
+            token_env=token_env or self.TOKEN_ENV,
+            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+            mission_store=self.store,
+            mission_id=self.mission_id,
+            sleep=lambda _seconds: None,
+            clock=lambda: "2026-07-27T20:03:00Z",
+        )
+
+    def scripted_client(self, head_sha: object) -> ScriptedHeadClient:
+        return ScriptedHeadClient(
+            R2_OWNER,
+            R2_REPOSITORY,
+            self.root / "gh",
+            head_sha=head_sha,
+            transport=FakeGitHubTransport(),
+            token_env=self.TOKEN_ENV,
+            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+            mission_store=self.store,
+            mission_id=self.mission_id,
+        )
+
+    def executor(self, client: GitHubClient | None = None) -> WorkspacePushExecutor:
+        return WorkspacePushExecutor(
+            client or self.client(),
+            self.workspace,
+            remote_url=Path(".git") / self.bare.name,
+            allow_local_test_remote=True,
+        )
+
+    def workspace_head(self) -> str:
+        return subprocess.run(
+            ["git", "-C", str(self.workspace.root), "rev-parse", "HEAD"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ).stdout.strip()
+
+    def remote_head(self) -> str:
+        return subprocess.run(
+            ["git", "--git-dir", str(self.bare), "rev-parse", f"refs/heads/{R2_BRANCH}"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ).stdout.strip()
+
+    # -- the seam ----------------------------------------------------------
+
+    def test_push_returns_the_committed_head_it_actually_wrote(self) -> None:
+        head = self.executor().push(R2_BRANCH)
+
+        self.assertEqual(self.workspace_head(), head)
+        self.assertEqual(self.remote_head(), head)
+
+    def test_returned_head_is_a_lowercase_full_hex_sha(self) -> None:
+        head = self.executor().push(R2_BRANCH)
+
+        self.assertRegex(head, r"\A[0-9a-f]{40}\Z")
+        self.assertEqual(head.lower(), head)
+        # An uppercase head from a delegate is normalized, not rejected.
+        upper = self.workspace_head().upper()
+        self.assertEqual(
+            upper.lower(),
+            self.executor(self.scripted_client(upper)).push(R2_BRANCH),
+        )
+
+    def test_a_head_that_is_not_a_full_sha_raises_instead_of_returning(self) -> None:
+        for head in (
+            "",
+            "abc123",
+            "z" * 40,
+            "a" * 39,
+            "a" * 41,
+            " " + "a" * 39,
+            "a" * 40 + "\n",
+            None,
+            b"a" * 40,
+        ):
+            with self.subTest(head=head):
+                executor = self.executor(self.scripted_client(head))
+
+                with self.assertRaisesRegex(
+                    GitHubDeliveryError, "full 40-hex head SHA"
+                ):
+                    executor.push(R2_BRANCH)
+
+    def test_a_blank_branch_never_falls_back_to_the_workspace_branch(self) -> None:
+        client = self.scripted_client("b" * 40)
+
+        for branch in ("", "   "):
+            with self.subTest(branch=branch):
+                with self.assertRaisesRegex(
+                    GitHubDeliveryError, "requires a mission branch"
+                ):
+                    self.executor(client).push(branch)
+
+        self.assertEqual(0, client.calls)
+
+    def test_a_missing_credential_propagates_unweakened(self) -> None:
+        absent = f"{self.TOKEN_ENV}_ABSENT"
+        self.assertNotIn(absent, os.environ)
+        executor = self.executor(self.client(token_env=absent))
+
+        with self.assertRaises(MissingGitHubCredential) as captured:
+            executor.push(R2_BRANCH)
+
+        self.assertIs(MissingGitHubCredential, type(captured.exception))
+        self.assertIn(absent, str(captured.exception))
+        # The denial preceded the push: the remote has no such ref.
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.remote_head()
+
+    def test_executor_matches_the_push_executor_protocol_signature(self) -> None:
+        # Imported here so this addition leaves the module's import block as it
+        # was; only this test needs the protocol object itself.
+        from hive_mind_os.cortex.github.delivery_adapter import PushExecutor
+
+        self.assertEqual(
+            inspect.signature(PushExecutor.push),
+            inspect.signature(WorkspacePushExecutor.push),
+        )
+
+    def test_controlled_delivery_accepts_the_executor_and_pushes_through_it(
+        self,
+    ) -> None:
+        registry = AuthorityRegistry()
+        registry.register(ControlledRetractionTests.envelope())
+        transport = FakeGitHubTransport()
+        delivery = ControlledGitHubDelivery(
+            ControlledRetractionTests.grant(),
+            rest=ControlledRestGateway(
+                R2_OWNER,
+                R2_REPOSITORY,
+                transport=transport,  # type: ignore[arg-type]
+            ),
+            push_executor=self.executor(),
+        )
+        gateway = EffectGateway()
+        delivery.register_with(gateway)
+        intent = ControlledRetractionTests.intent(
+            action="push",
+            adapter=ControlledGitHubDelivery.PUSH_ADAPTER,
+            parameters_digest=delivery.bind_parameters({"branch": R2_BRANCH}),
+        )
+
+        result = gateway.execute(
+            intent,
+            registry.authorize(R2_DIGEST, "push", R2_TARGET, now=R2_TIME),
+        )
+
+        head = self.workspace_head()
+        self.assertEqual("SUCCEEDED", result.status)
+        self.assertEqual(head, self.remote_head())
+        # The gateway result carries digests only, so read the identifiers the
+        # push adapter produced by replaying the same bound intent; the mission
+        # store answers that from its effect receipt without pushing again.
+        self.assertEqual(
+            {
+                "produced_identifiers": (f"branch:{R2_BRANCH}", f"sha:{head}"),
+                "postcondition_digest": canonical_digest(
+                    {"pushed": R2_BRANCH, "head": head}
+                ),
+            },
+            delivery.push_adapter(intent),
+        )
+        # The push adapter is Git only; it reached no REST endpoint.
+        self.assertEqual([], transport.calls)
 
 
 if __name__ == "__main__":

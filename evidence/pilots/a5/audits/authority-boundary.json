@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "node": "A5-900",
+  "audit": "no autonomous expansion of authority is possible (acceptance criterion 4)",
+  "base_commit": "7a2e19e769cbeb1b3f3a515037c1173af28c9893",
+  "generated_utc": "2026-08-13T05:20:00Z",
+  "revised_utc": "2026-08-13T05:35:00Z",
+  "revision_note": "This document was revised after two blind reviews returned FAIL. The security review found that the first version located its findings one layer too high -- it audited AuthorityRegistry and never tested the effect boundary, which turns out not to consult the registry at all -- and that this document asserted, in the past tense, the existence of three artifacts that had not been written. Both reviews were right. Every claim the reviewers raised was re-derived here by this node before being adopted; none was taken on trust. The corrections are recorded below as corrections, not silently folded in.",
+
+  "verdict": "NOT MET AS WORDED",
+  "verdict_statement": "Criterion 4 asks for an audited boundary showing that no autonomous expansion of authority is possible. The audit found the opposite, and found it worse than the first pass reported. The in-process authority objects are tamper-EVIDENT but not AUTHENTICATED, and the effect boundary -- the place where authority is supposed to be spent -- never consults the authority registry at all. What actually prevents real-world expansion today is external to the code: a repository-scoped credential the agent cannot read or widen, host-side branch protection, and the human acts required to open each gate. Those are real controls and they held throughout A4-800. They are not the audited code boundary the criterion asks for, and saying otherwise would be the exact inflation this node is most tempted toward.",
+
+  "a_focused_test_transcripts": {
+    "authority_and_governance_regressions": {
+      "command": "PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority tests.test_governance -v",
+      "exit_code": 0,
+      "outcome": "OK (Ran 9 tests in 0.044s)",
+      "transcript": "evidence/pilots/a5/tests/authority-boundary-audit.txt",
+      "independently_reproduced": "Both blind reviewers re-ran this command and both report Ran 9 tests, OK, exit 0.",
+      "what_they_cover": [
+        "AuthorityTests.test_scope_expiry_revocation_and_action_denials_fail_closed",
+        "AuthorityTests.test_gateway_requires_matching_token_and_deduplicates",
+        "RepositoryGovernanceTests x7: pinned build backend, required constitutional CI checks, CODEOWNERS coverage of constitutional files, contributor material, every CI action pinned to a commit, required rules bound to remote verification evidence, narrow secret-scan allowlist"
+      ],
+      "what_they_do_not_cover": "No AuthorityTests case constructs a second root envelope; none asserts that ConstraintEnvelope.digest_value seals its contents; and test_gateway_requires_matching_token_and_deduplicates obtains its token from a registry, so it never asks whether the gateway would accept a token that no registry issued. It would. All three properties are false and all three are green. The suite passing is exactly why the probes below exist."
+    },
+    "court_runtime_regression": {
+      "command": "PYTHONPATH=src python -m unittest tests.test_hive_cortex_court -v",
+      "exit_code": 0,
+      "outcome": "OK (Ran 3 tests in 0.002s)",
+      "transcript": "evidence/pilots/a5/tests/a5-readiness-court.txt",
+      "tests": ["test_court_identity_separation_tests", "test_dissent_retention_tests", "test_friendly_reviewer_attack_tests"],
+      "relevance": "test_friendly_reviewer_attack_tests refuses a court whose advocate and cross-examiner share a task. The two reviews convened for this record were given different roles and different adversarial check lists, which is the property that regression protects."
+    },
+    "authority_boundary_probe_1": {
+      "command": "PYTHONPATH=src python <scratch>/a5/authority_probe.py",
+      "exit_code": 0,
+      "transcript": "evidence/pilots/a5/tests/authority-boundary-probe.txt",
+      "scope": "AuthorityRegistry and DeliveryGrant. Findings A5-F3 through A5-F6.",
+      "limitation_found_by_review": "It never tested the effect boundary. See probe 2."
+    },
+    "authority_boundary_probe_2": {
+      "command": "PYTHONPATH=src python <scratch>/a5/probe2.py",
+      "exit_code": 0,
+      "transcript": "evidence/pilots/a5/tests/authority-boundary-probe-2.txt",
+      "scope": "The effect boundary itself, plus four further claims the security review raised. Findings A5-F10 through A5-F14.",
+      "probe_source": "retained verbatim at the end of that transcript",
+      "effects": "one in-memory list append. No network, no credential, no filesystem write outside the transcript."
+    }
+  },
+
+  "what_the_registry_checks_do_and_do_not_mean": {
+    "correction": "The first version of this document listed the checks below under a heading 'boundary_holds_where'. The security review's central objection is that they are not boundary properties at all: they are properties of AuthorityRegistry.authorize, and they bind only a caller who chooses to route through it. Finding A5-F10 shows a caller does not have to. The heading was wrong and is corrected here.",
+    "properties_of_AuthorityRegistry_authorize_only": [
+      {"check": "P1.1", "result": "a narrow envelope authorizes write only inside its declared scope"},
+      {"check": "P1.2", "result": "a denied action is refused: AuthorityDenied 'action is not granted'"},
+      {"check": "P1.3", "result": "a WRITE target outside write scope is refused: AuthorityDenied 'target is outside write scope' -- but only for write; see A5-F11"},
+      {"check": "P1.4", "result": "a CHILD envelope that broadens its declared parent is refused -- but only on the four fields and three budget dimensions it compares; see A5-F12, and the parent need not be registered; see A5-F13", "source": "authority.py:24-29 intersect_envelopes; contracts.py:349-360 is_no_broader_than"},
+      {"check": "P1.7", "result": "revoke(digest) then authorize(digest) is refused -- but only at the registry; the effect boundary ignores revocation entirely; see A5-F10"}
+    ],
+    "genuine_structural_properties_of_the_delivery_grant": [
+      {"check": "P2.2", "result": "'merge' is not a grantable spelling: DeliveryGrantError 'delivery grant action is not grantable: merge'", "source": "src/hive_mind_os/cortex/github/grants.py:29-31 and the comment at :25", "why_this_one_is_structural": "The vocabulary is a frozenset checked at construction; there is no code path that accepts the string. This holds against any caller, cooperating or not."},
+      {"check": "P2.3", "result": "push to a protected branch refused: 'push to protected branch main is denied'", "source": "src/hive_mind_os/cortex/github/grants.py:179-194"},
+      {"check": "P2.4", "result": "push outside the granted prefix refused", "source": "src/hive_mind_os/cortex/github/grants.py:179-194"},
+      {"check": "P2.5", "result": "retraction outside the granted prefix refused: 'delete_own_branch on branch other/x is outside the granted prefix'", "source": "src/hive_mind_os/cortex/github/grants.py:196-221"},
+      {"check": "P2.6", "result": "a mutated DeliveryGrant copy cannot be reconstructed: 'delivery grant digest does not seal its fields'", "source": "src/hive_mind_os/cortex/github/grants.py:103-128"}
+    ],
+    "the_qualification_that_applies_to_all_of_these": "Every one is a property of a grant object a caller must first hold and then choose to consult. A5-F6 shows the caller can issue that object itself. What made these effective in A4-800 was that the credential behind them was scoped by the owner to one repository."
+  },
+
+  "findings": [
+    {
+      "id": "A5-F3",
+      "severity": "security -- authority boundary",
+      "title": "ConstraintEnvelope.digest_value is format-checked but never recomputed from the envelope's contents, and AuthorityRegistry keys on it",
+      "source": "src/hive_mind_os/brain_kernel/contracts.py:342 -- `_digest(self.digest_value, \"digest\")`. Compare src/hive_mind_os/cortex/github/grants.py:116-128, where DeliveryGrant DOES recompute its digest and raises on mismatch.",
+      "measurement": "authority-boundary-probe.txt P1.9. Two ConstraintEnvelopes with different allowed_actions ('write',) versus ('write','push','deploy') and different path_write_scope both construct without error carrying the SAME digest_value. AuthorityRegistry stores envelopes in a dict keyed by digest_value (authority.py:44), so register(narrow) followed by register(broad) OVERWRITES the narrow envelope, and authorize(same_digest, 'push', 'docs/x.md') then returns a CapabilityToken.",
+      "aggravating_measurement": "Both production construction sites use the all-zero placeholder as the envelope digest: src/hive_mind_os/cortex/repository/local_execution.py:31 `_DIGEST = \"sha256:\" + \"0\" * 64` (used at lines 170-171) and src/hive_mind_os/cortex/repository/mission_adapter.py:35 `_Z = \"sha256:\" + \"0\" * 64` (used at line 137). Every envelope these paths register shares one key.",
+      "consequence": "The envelope digest is an identifier, not a seal. Envelope identity does not bind envelope authority.",
+      "locally_satisfiable": true,
+      "what_would_fix_it": "Recompute digest_value from the envelope payload in __post_init__ and refuse a mismatch, exactly as DeliveryGrant already does; and refuse a re-registration under an existing digest."
+    },
+    {
+      "id": "A5-F4",
+      "severity": "security -- authority boundary",
+      "title": "A fresh ROOT envelope can be minted in-process with any authority; the no-broadening rule constrains only a declared parent-child pair",
+      "source": "src/hive_mind_os/brain_kernel/authority.py:39-44 -- register() requires a parent only when envelope.parent_envelope_digest is not None. A root envelope (parent None) is accepted unconditionally.",
+      "measurement": "authority-boundary-probe.txt P1.5 and P1.6. After a narrow envelope refused 'push' (P1.2), the same in-process caller registered a fresh ROOT envelope with allowed_actions ('write','push','deploy') and a wider path scope -- accepted -- and authorize(...,'push','src/one.py') then returned a CapabilityToken.",
+      "correction_from_review": "The first version attributed the out-of-scope target in P1.6 wholly to root-minting. The security review pointed out, and probe 2 P4.1 confirms, that no envelope of any kind would have target-checked that push: authorize() scope-checks only the 'write' action. The root-minting finding stands; the target part of it belongs to A5-F11.",
+      "context": "Production paths already do exactly this: local_execution.py:210-211 and mission_adapter.py:133-139 each construct an AuthorityRegistry and register a root envelope the same process authored. There is no owner-controlled or externally supplied authority source anywhere in src/**.",
+      "locally_satisfiable": true,
+      "what_would_fix_it": "Root envelopes must originate from an externally authenticated record rather than an in-process constructor. That is B-GOV-02, which is open."
+    },
+    {
+      "id": "A5-F5",
+      "severity": "security -- authority boundary",
+      "title": "Revocation is keyed by digest, so re-minting the same authority under a different digest string defeats it",
+      "source": "src/hive_mind_os/brain_kernel/authority.py:46-47 revoke() adds the digest string to a set; authorize() at :51 refuses only that digest.",
+      "measurement": "authority-boundary-probe.txt P1.7 then P1.8. After revoke(D2) correctly refused D2, the same authority re-registered under a new digest string D3 authorized 'push' immediately.",
+      "understated_in_the_first_version": "The security review is right that this understates the problem. Re-minting is unnecessary: probe 2 P3.3 shows the effect boundary never consults the revocation set at all, so a token minted before revocation -- or fabricated without one -- still executes. See A5-F10.",
+      "locally_satisfiable": true,
+      "what_would_fix_it": "Revoke the underlying authority (issuer + subject + scope), not the digest string; consult revocation at the effect boundary; and require externally issued envelopes so re-minting is not available in-process."
+    },
+    {
+      "id": "A5-F6",
+      "severity": "security -- authority boundary",
+      "title": "DeliveryGrant is self-issuable: its digest is unkeyed, so a grant cannot distinguish owner-issued from agent-issued",
+      "source": "src/hive_mind_os/cortex/github/grants.py:130-169 DeliveryGrant.issue is an ordinary classmethod; the seal at :116-128 is canonical_digest over the grant's own payload, which any caller can compute.",
+      "measurement": "authority-boundary-probe.txt P2.1. An in-process caller issued a complete, valid, digest-consistent grant naming an owner and repository the repository owner never named, carrying all five grantable actions.",
+      "no_production_caller": "grep over src/** finds NO caller of DeliveryGrant.issue. The only callers are tests/test_github_adapter.py:869 and tests/test_hive_cortex_delivery.py:125. In production the grant is therefore constructed by whatever driver code is running -- which, for A4-800, was agent-authored. Independently confirmed by the security review.",
+      "consequence": "The grant object is tamper-evident (P2.6 confirms a mutated copy will not reconstruct) and is NOT an authenticity statement. The same structural limit A3-700 measured in verify_bundle (finding F3, an unkeyed in-bundle manifest attesting self-consistency rather than authenticity) applies to the delivery grant.",
+      "what_actually_bounded_a4": "Not the grant object. The owner-installed fine-grained token was scoped to exactly one repository, so a self-issued grant naming a different repository would have failed at the host rather than at the grant. The effective boundary was the credential's scope, which the agent could neither read nor widen.",
+      "locally_satisfiable": "partially -- binding a grant to an externally authenticated issuer is B-GOV-02 and is gate-blocked; recording in the grant which authority record it derives from, and refusing a grant with no such reference, is locally satisfiable.",
+      "what_would_fix_it": "A keyed or externally signed grant, plus a check that the grant's repository matches an owner-committed authority record."
+    },
+    {
+      "id": "A5-F10",
+      "severity": "security -- authority boundary, HIGHEST IMPACT FINDING IN THIS NODE",
+      "title": "The effect boundary never consults the AuthorityRegistry: a capability token validates against its own contents",
+      "found_by": "the blind security reviewer. Re-derived here before adoption; not taken on trust.",
+      "source": "src/hive_mind_os/brain_kernel/effects.py:23-39 -- validate_capability_token recomputes canonical_digest({'envelope','action','target'}) from the TOKEN'S OWN three fields and compares them to the intent. There is no registry lookup, no envelope lookup, no expiry check, no revocation check and no scope check anywhere in the function. src/hive_mind_os/brain_kernel/effects.py:100-101 -- EffectGateway.execute calls only validate_capability_token before dispatching, including down the DurableEffectOutbox path at :103-111.",
+      "measurement": "authority-boundary-probe-2.txt. P3.1: a CapabilityToken was constructed by hand for target 'secrets/keys.txt' -- a target the registered envelope had just refused with 'target is outside write scope' -- and validate_capability_token ACCEPTED it. P3.2: EffectGateway.execute then RAN THE ADAPTER on that token; adapter_calls=['adapter ran'], status=SUCCEEDED. P3.3: after revoke(digest), the registry refused the digest and the effect boundary accepted a token bearing it.",
+      "consequence": [
+        "A5-F3, A5-F4 and A5-F5 all describe ways to mint an ENVELOPE so that authorize() will hand back a token. No envelope is needed. The token is self-authenticating under an unkeyed digest over its own three fields and can simply be constructed.",
+        "The AuthorityRegistry -- envelopes, write scopes, expiry, revocation, and the no-broadening rule -- is advisory at the effect boundary. It binds a caller who chooses to be bound.",
+        "This is the single strongest piece of evidence that acceptance criterion 4 is not met."
+      ],
+      "locally_satisfiable": true,
+      "what_would_fix_it": "validate_capability_token must take the registry (or an equivalent authority source), look the envelope up by digest, and re-check expiry, revocation, action and target scope at spend time. A token that no registry issued must fail closed."
+    },
+    {
+      "id": "A5-F11",
+      "severity": "security -- authority boundary",
+      "title": "AuthorityRegistry.authorize target-scopes only the 'write' action, and path_read_scope is enforced nowhere",
+      "found_by": "the blind security reviewer. Re-derived here.",
+      "source": "src/hive_mind_os/brain_kernel/authority.py:58 -- `if action == \"write\" and not any(...)`. Every other action returns a token for an arbitrary target. path_read_scope is declared at contracts.py:310, normalized at :333 and compared at :354, and is consulted nowhere else in src/** (verified by grep).",
+      "measurement": "authority-boundary-probe-2.txt P4.1. From one envelope with allowed_actions ('write','push') and path_write_scope ('src',): authorize('write','somewhere/else.txt') was refused; authorize('push','somewhere/else.txt') returned a CapabilityToken for the same out-of-scope target.",
+      "consequence": "Any granted action other than 'write' -- push, deploy, network -- carries no target restriction at the registry at all. Combined with A5-F10 it carries none anywhere.",
+      "locally_satisfiable": true
+    },
+    {
+      "id": "A5-F12",
+      "severity": "security -- authority boundary, latent",
+      "title": "is_no_broader_than omits five fields including the spend ceiling, so a child can raise max_cost_microunits above its parent",
+      "found_by": "the blind security reviewer. Re-derived here.",
+      "source": "src/hive_mind_os/brain_kernel/contracts.py:352-360 compares allowed_actions, path_read_scope, path_write_scope, network_allowlist, and three of Budget's eight fields (max_wall_seconds, max_model_calls, max_tool_calls). It does not compare denied_actions, secret_scopes, human_gates, or max_input_tokens, max_output_tokens, max_cost_microunits, max_work_items, max_depth (Budget fields at contracts.py:158-165).",
+      "measurement": "authority-boundary-probe-2.txt P5.1. A child raising max_cost_microunits from 100 to 999999999 (and max_input_tokens, max_output_tokens, max_work_items, max_depth) returned is_no_broader_than(parent) -> True and was accepted by register(child, parent).",
+      "honest_severity": "LATENT. grep finds no enforcement of max_cost_microunits, secret_scopes or human_gates anywhere in src/** -- max_cost_microunits appears only at contracts.py:162 and in planner.py:39,58 as a parsed field. Nothing spends against it today, so nothing is exploitable today. It is recorded because financial_spend is one of this node's five escalation conditions and a spend ceiling that a child can raise is not a ceiling.",
+      "locally_satisfiable": true
+    },
+    {
+      "id": "A5-F13",
+      "severity": "security -- authority boundary",
+      "title": "intersect_envelopes trusts a caller-supplied parent object that the registry has never seen",
+      "found_by": "the blind security reviewer. Re-derived here.",
+      "source": "src/hive_mind_os/brain_kernel/authority.py:39-41 -- register(envelope, parent) takes the parent as a caller argument and never looks it up in self._envelopes.",
+      "measurement": "authority-boundary-probe-2.txt P6.1. A child was registered against a wide parent object that was never registered (membership check printed False), and the resulting envelope authorized 'push' on 'docs/x.md'.",
+      "consequence": "Mechanically distinct from A5-F4: a caller need not even mint a root, only pass one in as an argument. The parent-child chain proves nothing about provenance.",
+      "locally_satisfiable": true
+    },
+    {
+      "id": "A5-F14",
+      "severity": "security -- informational",
+      "title": "The kernel's declared network_allowlist is compared but enforced nowhere",
+      "found_by": "the blind security reviewer. Re-derived here by grep.",
+      "source": "network_allowlist appears exactly twice in src/**: declared at contracts.py:312 and compared at contracts.py:356. Nothing consults it.",
+      "relevance": "B-OPS-06 (hard isolation) is open on the ground that the process sandbox does not block network syscalls. This finding adds that the in-kernel allowlist which might have compensated is inert too."
+    }
+  ],
+
+  "b_credential_and_authority_grant_scan": {
+    "scope_scanned": ["evidence/pilots/a5/** (all files)", "docs/execution/A5_GOVERNED_FULL_READINESS.md"],
+    "transcript": "evidence/pilots/a5/tests/credential-scan.txt",
+    "scanner_source": "retained verbatim at the end of that transcript",
+    "correction": "The first version of this document cited that transcript before it existed, and both blind reviewers caught it. This is the defect that decided both FAIL verdicts, and it is the right call: on a node whose entire value is verifiable citation, asserting that evidence exists when it does not is worse than reporting no evidence. The scan itself was real and its result was correct -- both reviewers independently re-derived zero credential-shaped hits -- but a reader could not open the file. The transcript now exists and was produced by re-running the scanner over the FINAL content of the write scope.",
+    "method": "Regex classes for credential-shaped content (GitHub classic and fine-grained PAT prefixes, AWS access key, Slack token, PEM private-key header, Bearer-with-value, Authorization-header-value, JWT, and non-slash base64-like runs of 40+ characters), plus token variable NAME fragments, plus authority-granting / gate-softening / superiority language. A credential-shaped hit is reported as path + line + pattern name; a value is never printed.",
+    "no_credential_was_read": "The scanner reads no environment variable. It matches literal NAME fragments in evidence text. This node did not inspect the host environment for a token: an existing credential is not a grant, and checking would itself be an access the closed gate does not authorize -- the same discipline A4-800's sealed plan recorded as risk R3.",
+    "result": "PASS -- 0 credential-shaped hits.",
+    "independently_corroborated": "Both blind reviewers ran their own scans with their own patterns. The security reviewer reports 47 high-entropy hits, all resolving to sha256 digests or filesystem paths, and zero credential-shaped content in the evidence tree or the document.",
+    "reported_for_review": [
+      "gate-matrix.json:234 -- 'generic-secret-word' on the phrase 'API-key and spend prohibitions', a verbatim quotation from HUMAN_AUTHORITY_GATES.md:86. Adjudicated benign: it is the authority record's own wording, and it withholds authority rather than granting it.",
+      "authority-boundary.json:181 -- 'generic-secret-word' on this document's own quotation of the line above. Adjudicated benign for the same reason.",
+      "COUNT CORRECTION: the first version of this section said 'one' section-B hit while the transcript reported two. The security reviewer caught it in round 2. A count its own transcript does not support is exactly the defect class this section exists to catch, so it is corrected in place and the correction is declared rather than the number quietly changed."
+    ],
+    "authority_language_result": "CLEAN over the 12-file scan. The 14-file seal-time re-scan (ADDENDUM 1) surfaces two section-C hits, both adjudicated below. No hit anywhere is an actual authority grant, gate softening, or comparative claim.",
+    "seal_time_section_c_adjudications": [
+      "readiness-court.json:39 pattern=declares-ready. The matched text is 'production-ready' inside the SECURITY REVIEWER's own description of what it searched for: 'Deliberate search for production-ready, release-ready, ...: zero hits.' Benign -- it is the prohibited term quoted in the act of confirming its absence, exactly analogous to the section-B API-key hit.",
+      "credential-scan.txt:99 pattern=superiority and :32, :89, :90, :91, :97 pattern=generic-secret-word / token-env-var-name-fragment / github-token-env-var-name. All are inside the scanner's own source, which is retained verbatim at the end of that transcript and therefore contains the literal text of every pattern it searches for. A scanner that matches its own pattern table is working."
+    ],
+    "seal_time_result": "14 files scanned, credential_shaped_failures=0, RESULT PASS. Both reviewers independently scanned readiness-court.json and summary.json before this addendum existed and also found nothing.",
+    "hygiene_note_from_the_security_review": "The retained transcripts embed absolute scratchpad paths containing the Windows account name and a session GUID. Not a credential; recorded because it is host-identifying content in committed evidence.",
+    "scanner_limitation_disclosed": "The base64ish-run-40plus pattern deliberately excludes '/' because filesystem paths in transcripts are otherwise indistinguishable from base64 runs and produced only false positives. The security reviewer's round-2 note is correct that the consequence was not disclosed: a real base64 secret containing '/' would evade that one pattern. It would still have to evade the eight prefix and header patterns, which do not depend on entropy.",
+    "addendum_1_seal_time_rescan": "credential-scan.txt carries an ADDENDUM 1 recording a re-run of the scanner AFTER readiness-court.json and summary.json were written, so the sealed write scope is scanned in full rather than only the part that existed when the first scan ran."
+  },
+
+  "c_forbidden_scope_is_untouched": {
+    "method": "This worker performed no state-changing git command, so HEAD is unchanged from the base commit and `git diff --name-only <base>..HEAD` is empty by construction. The meaningful check is the WORKING-TREE change set against the forbidden list, cross-checked by modification time because git status alone has a blind spot -- see method_correction.",
+    "method_correction": "The first version relied on `git status --porcelain --untracked-files=all` alone. The security review pointed out that git status does not show gitignored paths and that `.autopilot/state/` -- inside a forbidden scope -- IS gitignored, so a write there would have been invisible to the exact command this section relied on. Verified: `git status --porcelain --ignored=matching` lists `.autopilot/state/`, `.autopilot/bin/__pycache__/` and `.autopilot/tests/__pycache__/` under `!!`. An mtime cross-check was added.",
+    "census_observed_utc": "2026-08-13T05:32:40Z",
+    "census_is_a_real_observation": "The first version listed thirteen paths as created by this node, three of which had not been written (readiness-court.json, summary.json, credential-scan.txt). Both reviewers caught it. This census is the literal output of `git status --porcelain --untracked-files=all` at the timestamp above, and it is a point-in-time statement: readiness-court.json and summary.json are written after it, by design, because they must digest everything else. A re-derived census at seal time is recorded in summary.json.",
+    "tracked_modifications_vs_head": 0,
+    "untracked_paths_at_census_time": [
+      "docs/execution/A5_GOVERNED_FULL_READINESS.md",
+      "evidence/pilots/a5/audits/authority-boundary.json",
+      "evidence/pilots/a5/exercises/recovery-exercise.json",
+      "evidence/pilots/a5/exercises/stop-mechanism.json",
+      "evidence/pilots/a5/gates/gate-matrix.json",
+      "evidence/pilots/a5/tests/a5-readiness-court.txt",
+      "evidence/pilots/a5/tests/authority-boundary-audit.txt",
+      "evidence/pilots/a5/tests/authority-boundary-probe-2.txt",
+      "evidence/pilots/a5/tests/authority-boundary-probe.txt",
+      "evidence/pilots/a5/tests/production-recovery-exercise.txt",
+      "evidence/pilots/a5/tests/stop-mechanism.txt",
+      "identtest/ (NOT this node's -- see below)"
+    ],
+    "still_to_be_written_at_census_time": [
+      "evidence/pilots/a5/tests/credential-scan.txt",
+      "evidence/pilots/a5/readiness-court.json",
+      "evidence/pilots/a5/summary.json"
+    ],
+    "forbidden_intersection": "EMPTY. A grep of the full working-tree change set against `__init__.py`, `conftest.py`, `pyproject.toml`, `.autopilot/`, `.github/`, `evidence/courts/`, `docs/architecture/`, `docs/plan/`, `src/`, `tests/`, `evidence/pilots/a3/`, `evidence/pilots/a4/` returns nothing.",
+    "mtime_cross_check": "`find src tests .github docs/architecture docs/plan evidence/courts evidence/pilots/a3 evidence/pilots/a4 pyproject.toml .autopilot -newermt '2026-08-13 00:00' -type f` returns nothing. This covers gitignored paths inside .autopilot that git status would not have shown. Independently reproduced by both blind reviewers.",
+    "newest_file_under_autopilot_state": "heal/observations.jsonl at 2026-08-12 23:59:20.682955300, 31 milliseconds newer than dispatcher-releases.jsonl at 23:59:20.651465200. The first version of this section named dispatcher-releases.jsonl; the operational reviewer measured otherwise and is right. The material claim -- nothing under a forbidden scope was written after this node started -- is unaffected, and the nit is corrected anyway because a record that only corrects the consequential errors is not being audited, it is being edited.",
+    "sibling_evidence_byte_integrity": "git diff --name-only HEAD -- evidence/pilots/a3 evidence/pilots/a4 returns 0 files, and git status over both trees is empty. Both sibling trees are byte-unchanged; they were read only. Independently reproduced by both reviewers.",
+    "pre_existing_untracked_path_not_created_by_this_node": "identtest/ was present and untracked before this node started (directory mtime 2026-08-12 08:39:47; this node's first artifact is 2026-08-13 00:00). It is not in this node's write scope and was not modified. Both reviewers independently measured the same timestamp."
+  },
+
+  "d_every_gate_opening_act_requires_a_human_act_outside_agent_control": {
+    "statement": "For every closed row in evidence/pilots/a5/gates/gate-matrix.json, the act that would open it is a human act that no agent can perform: provisioning a deployment account, issuing an externally controlled signing identity, provisioning storage and naming a recovery authority, authorizing spend, signing a legal or licensing commitment, merging to a protected branch, or being a second person for G8.",
+    "proof": "The matrix's what_would_open_it field on each row, cited to HUMAN_AUTHORITY_GATES.md or BLOCKERS.md by line. Every one of those line citations was independently verified by both blind reviewers.",
+    "structural_corroboration": [
+      "merge is not in the grantable vocabulary at all (src/hive_mind_os/cortex/github/grants.py:29-31), so no grant can carry it (probe 1 P2.2)",
+      "protected branches are denied by name and the grant's own base branch is denied (src/hive_mind_os/cortex/github/grants.py:179-194, probe 1 P2.3)",
+      "the credential is read by the gateway from the environment at call time (src/hive_mind_os/cortex/github/rest_gateway.py:87-92) and the agent neither reads nor sets it; its scope is owner-chosen"
+    ],
+    "the_honest_qualification": "This statement is about the GATES, and it holds. It is not the same statement as criterion 4. A5-F3 through A5-F6 and A5-F10 through A5-F14 show that the in-process authority machinery does not prevent an agent from declaring, or simply fabricating, authority it was not given. The gates hold because they are enforced OUTSIDE the process -- by a credential scope the agent cannot widen, by host-side branch protection (B-GOV-01, resolved), and by the fact that provisioning is a human act. With B-OPS-06 open there is no containment tier underneath that either: BLOCKERS.md:63 records that the current sandbox 'does not block network syscalls, impose filesystem ACLs or mounts, pin executable bytes, or enforce CPU/memory limits on Windows', and A5-F14 adds that the kernel's own network allowlist is inert."
+  },
+
+  "criterion_4_conclusion": {
+    "as_worded": "NOT MET. An authority-expansion path exists and was executed. The strongest single measurement is authority-boundary-probe-2.txt P3.1-P3.2: a capability token that no AuthorityRegistry ever issued, naming a target the registered envelope explicitly refused, was accepted by validate_capability_token and executed by EffectGateway.execute with status SUCCEEDED.",
+    "what_is_true_instead": "Authority expansion is prevented today by external controls -- credential scope, host-side protection, and human provisioning -- not by an audited code boundary. Those controls were sufficient for A4-800's bounded pilot and are not sufficient for governed-full autonomy, where the agent would be the party choosing what to do with them.",
+    "why_this_is_a_finding_and_not_a_failure_to_hide": "The plan asked for an audited boundary. An audit that only confirms the checks that pass is not an audit -- and the first version of this audit was still doing a mild version of that, which is why it needed a blind reviewer to find A5-F10. Every finding here came from pointing a probe at real source and watching what it actually allowed, the same way A4-800's six production defects came from pointing the delivery path at a real host.",
+    "what_the_review_process_itself_demonstrated": "Two separately prompted reviewers, given adversarial check lists and no access to the author's conclusions, both returned FAIL and between them found: the missing effect-boundary audit, four further authority defects, an off-by-one in a published recovery limit, an untested torn-write case, and three citations to artifacts that did not exist. Per G8 that is procedural separation, not independent human review -- but it is the difference between a record that reads well and a record that is true."
+  }
+}

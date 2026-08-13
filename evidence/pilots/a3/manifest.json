@@ -1,0 +1,33 @@
+{
+  "file_count": 25,
+  "files": {
+    "cheating/rejected-integrity.json": "sha256:0059593d590228df8ec2600221b7116d366ad321b549cca6976c62bb2463ba89",
+    "cheating/rejected-verification.json": "sha256:f8191e98cb1f91bcf3b8c59278023cdd08ca705d869472a839a9efc933805f54",
+    "cheating/tamper-rejection.json": "sha256:f59e795f508571267f11fe22c133a2c2c85b60031b6e2ae4dde9c814fe2e83f9",
+    "findings.json": "sha256:1339d575aabf0009de7f0b1710b90371cb473f021bc99344bf0c0e7376490079",
+    "missions/m01-longpath-failure.json": "sha256:2217456e15e6e20f63fdd88e9e6fba604c99e33e2c9dc0e84b273b8be8f3b8b0",
+    "missions/mission-01-example-verify/acceptance.json": "sha256:57afa89f58452fd47a1bec678d411324ca3a33ce0aa8473be43c6e4d88e1c2b7",
+    "missions/mission-01-example-verify/changed-paths.json": "sha256:ea40212f4fe5740eed7177fd1c1cd9ca39c3cceee45e43e93cc4126366fe4dde",
+    "missions/mission-01-example-verify/integrity.json": "sha256:6968409c5b3886762f4e39dba89340c4d1dd34a21e2d19fded14489e7e6a6695",
+    "missions/mission-01-example-verify/objects.json": "sha256:bcaf374635230a1951d4f5d2787475e1133cc9c26baa580cbc2c446f8e756f4a",
+    "missions/mission-01-example-verify/receipt.json": "sha256:45329ddfb4c3d335ede8139b73432c6c7c8a43cb5851767cdc6d1eecc5edbf51",
+    "missions/mission-01-example-verify/tool-versions.json": "sha256:5735c01ea035e71d2c46151ba65a1564d639becfdf91c64ec642bdaa9b81fa49",
+    "missions/mission-01-example-verify/verification.json": "sha256:dca186bbdd36543ae4f8313ae8e201652be3fa16cc0e70d9f981133e09f4c766",
+    "missions/mission-02-enqueue-loop/acceptance-spec.json": "sha256:0e8fb8ed3ff7475bfcbfa393ed3f57704af44623edbfde84061d9cb9d40dd382",
+    "missions/mission-02-enqueue-loop/acceptance.json": "sha256:3169ddb268c4e82e8251967697c51955baadc04ad4ed9cb77ee872cab79cd8e0",
+    "missions/mission-02-enqueue-loop/changed-paths.json": "sha256:1383d78b39472aaa3b669aacd2bf16a57cb73a40b6890e9e89456941a259f577",
+    "missions/mission-02-enqueue-loop/integrity.json": "sha256:4b2ca3d997875b6b137d0147ae6c8ac69da47eb6e41a04fd2f17e99b6aac76a6",
+    "missions/mission-02-enqueue-loop/objects.json": "sha256:e0f96a9d8b6c54b3267adaa50679fdb76e0c9931f86e05bccddb3adef0f9a12c",
+    "missions/mission-02-enqueue-loop/receipt.json": "sha256:872d5b9d7adde1961cb59a1fb55a8ea5705c61f2f8ca10e8c4cf3adaf8469c6a",
+    "missions/mission-02-enqueue-loop/tool-versions.json": "sha256:5735c01ea035e71d2c46151ba65a1564d639becfdf91c64ec642bdaa9b81fa49",
+    "missions/mission-02-enqueue-loop/verification.json": "sha256:198e4937d4920086d6271e5afb646ee500beb1e1a76b8184633cf62a25d09f75",
+    "recovery/rollback.json": "sha256:216da83a46d2d5bcd63fef1d19e4498ad77d229e75c79eff946c026d1294b40d",
+    "summary.json": "sha256:b357dfb58a1cb549b13136bec2ee3c4cb59f16d87ebcead00de451ec12de76de",
+    "tests/a3-pilot-suite.txt": "sha256:bd6814733c8d010516a89afe7760adfc169aadfc24c3004b6e66df42cb3b4258",
+    "tests/real-repository-compatibility-suite.txt": "sha256:0f785051adf1445317571028970701bac8e6e1a7f974ccbb3b59537348030075",
+    "tests/results.json": "sha256:241224132e8aac09960b0147138780faad91921dfb46d64bfd6db4d1c91e8d18"
+  },
+  "node": "A3-700",
+  "note": "sha256 of every retained A3 pilot evidence file, relative to evidence/pilots/a3/. manifest.json itself is excluded.",
+  "schema_version": 1
+}

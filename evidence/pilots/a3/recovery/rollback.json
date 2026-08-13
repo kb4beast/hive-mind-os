@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "node": "A3-700",
+  "purpose": "Demonstrate, by execution, that an adopted local repository mission is reversible.",
+  "repository": "disposable local repository <scratch>/a3/m2r (git init, no remote)",
+  "reverted_commit": "cd27327e6bf82daa39ce60a6c467bec718279400",
+  "command": ["git", "revert", "--no-edit", "cd27327e6bf82daa39ce60a6c467bec718279400"],
+  "exit_code": 0,
+  "stdout_tail": "[master 9b2d460] Revert \"agent: ship free at the documented threshold\"\n Date: Wed Aug 12 14:27:33 2026 -0500\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+  "before": {
+    "head": "cd27327e6bf82daa39ce60a6c467bec718279400",
+    "rates_py_threshold_line": "    if order_total_cents >= FREE_SHIPPING_THRESHOLD_CENTS:",
+    "acceptance_command_exit_code": 0
+  },
+  "after": {
+    "head": "9b2d460506a36fa486cab1d73b1fd9cc4704b3b4",
+    "rates_py_threshold_line": "    if order_total_cents > FREE_SHIPPING_THRESHOLD_CENTS:",
+    "acceptance_command_exit_code": 1,
+    "git_status_porcelain": "",
+    "worktree_clean": true
+  },
+  "restoration_proof": {
+    "method": "compare the post-revert tree object against the pre-mission baseline tree object",
+    "baseline_commit": "1e774c8cc45ec867c2625fde4f59f63c4b21ca38",
+    "baseline_tree": "d95c38fada32a161413843e973bff580e914eb26",
+    "post_revert_tree": "d95c38fada32a161413843e973bff580e914eb26",
+    "trees_identical": true
+  },
+  "history": [
+    "9b2d460 Revert \"agent: ship free at the documented threshold\"",
+    "cd27327 agent: ship free at the documented threshold",
+    "1e774c8 baseline shipping rate rules"
+  ],
+  "properties_demonstrated": {
+    "forward_only": "The rollback added a new commit; no history was rewritten, amended, or force-updated.",
+    "content_exact": "The post-revert tree object is byte-identical to the pre-mission baseline tree object.",
+    "behaviour_restored": "The sealed acceptance command fails again after the revert, exactly as it did before the mission.",
+    "worktree_clean": "git status --porcelain is empty after the revert."
+  },
+  "notes": [
+    "An untracked __pycache__/ directory appeared during the run because the acceptance command was executed directly in the worktree for the before/after behaviour comparison. It is a byproduct of this pilot's own measurement, not of the mission, and was removed before the final clean status was recorded."
+  ]
+}
