@@ -36,6 +36,8 @@ from hive_mind_os.sandbox import (
     _interpreter_flags,
 )
 
+_MOUNT_POINT_TAG = 0xA0000003
+
 
 class SandboxTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -110,6 +112,43 @@ class SandboxTests(unittest.TestCase):
         root = trusted or self.trusted
         artifact = receipt["artifacts"][0]
         return (root / artifact["path"]).read_bytes()
+
+    def junction(self, link: Path, target: Path) -> None:
+        """Create an NTFS junction at ``link``, or skip with the observed failure."""
+
+        try:
+            created = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            self.skipTest(f"mklink /J could not run: {type(error).__name__}: {error}")
+        if created.returncode != 0:
+            self.skipTest(
+                f"mklink /J exited {created.returncode}: "
+                f"{(created.stderr or created.stdout).strip()}"
+            )
+        self.addCleanup(self.remove_junction, link)
+        try:
+            tag = getattr(os.lstat(link), "st_reparse_tag", 0)
+        except OSError as error:
+            self.skipTest(f"mklink /J reported success but {link.name} is unreadable: {error}")
+        if tag != _MOUNT_POINT_TAG:
+            self.skipTest(
+                f"mklink /J reported success but {link.name} carries reparse tag "
+                f"{tag:#x}, not a junction ({_MOUNT_POINT_TAG:#x})"
+            )
+
+    @staticmethod
+    def remove_junction(link: Path) -> None:
+        """Detach a junction without descending into whatever it points at."""
+
+        try:
+            os.rmdir(link)
+        except FileNotFoundError:
+            pass
 
     def test_happy_path_receipt_round_trips_through_validator(self) -> None:
         runner = self.runner()
@@ -293,6 +332,29 @@ class SandboxTests(unittest.TestCase):
         )
         with self.assertRaises(ConfinementViolation):
             runner.run(intent)
+        self.assertEqual(runner.spawn_count, 0)
+
+    @unittest.skipUnless(os.name == "nt", "NTFS junction confinement case")
+    def test_windows_junction_escape_is_rejected(self) -> None:
+        outside = self.base / "outside"
+        outside.mkdir()
+        (outside / "secret.txt").write_text("outside-secret", encoding="utf-8")
+        link = self.root / "escape"
+        self.junction(link, outside)
+        self.assertEqual(
+            (link / "secret.txt").read_text(encoding="utf-8"),
+            "outside-secret",
+        )
+        runner = self.runner()
+        for argument, path_args in (("escape", [3]), ("escape/secret.txt", None)):
+            with self.subTest(argument=argument):
+                with self.assertRaisesRegex(ConfinementViolation, "escapes sandbox root"):
+                    runner.run(
+                        self.intent(
+                            [sys.executable, "-c", "print('no spawn')", argument],
+                            path_args=path_args,
+                        )
+                    )
         self.assertEqual(runner.spawn_count, 0)
 
     def test_environment_is_scrubbed_unless_allowlisted(self) -> None:
