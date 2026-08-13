@@ -8,6 +8,7 @@ plane remains inspectable, portable, and independent of model providers.
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -20,6 +21,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable, Mapping, Sequence
 from urllib.parse import urlparse
 
@@ -182,6 +184,413 @@ class ClaimError(AutopilotError):
 
 class ReceiptError(AutopilotError):
     """A node completion receipt is invalid."""
+
+
+class GitCommitObservationError(AutopilotError):
+    """A bounded Git commit observation cannot be proven safe or complete."""
+
+
+@dataclass(frozen=True, slots=True)
+class _GitCommitObservationLifecycle:
+    active: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class GitCommitObservation:
+    """Invocation-local verified commit facts with an explicitly bounded lifetime."""
+
+    repository_root: Path
+    git_dir: Path
+    common_dir: Path
+    object_format: str
+    object_store: Path
+    oids: tuple[str, ...]
+    _trees: Mapping[str, str]
+    _parent_sets: Mapping[str, tuple[str, ...]]
+    _lifecycle: _GitCommitObservationLifecycle
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("GitCommitObservation cannot be serialized")
+
+    def _require_active(self) -> None:
+        if not self._lifecycle.active:
+            raise GitCommitObservationError("Git commit observation is no longer active")
+
+    def _invalidate(self) -> None:
+        object.__setattr__(self._lifecycle, "active", False)
+        object.__setattr__(self, "_trees", MappingProxyType({}))
+        object.__setattr__(self, "_parent_sets", MappingProxyType({}))
+
+    def tree(self, oid: str) -> str:
+        self._require_active()
+        try:
+            return self._trees[oid]
+        except KeyError as error:
+            raise GitCommitObservationError(
+                f"commit {oid!r} is outside this observation"
+            ) from error
+
+    def parents(self, oid: str) -> tuple[str, ...]:
+        self._require_active()
+        try:
+            return self._parent_sets[oid]
+        except KeyError as error:
+            raise GitCommitObservationError(
+                f"commit {oid!r} is outside this observation"
+            ) from error
+
+    def assert_repository(self, repo_root: str | os.PathLike[str]) -> None:
+        self._require_active()
+        identity = _git_commit_repository_identity(Path(repo_root))
+        expected = (
+            self.repository_root,
+            self.git_dir,
+            self.common_dir,
+            self.object_format,
+            self.object_store,
+        )
+        if identity != expected:
+            raise GitCommitObservationError(
+                "Git commit observation repository identity changed"
+            )
+
+
+_GIT_COMMIT_OBJECT_FORMATS = {"sha1": (40, "sha1"), "sha256": (64, "sha256")}
+_GIT_COMMIT_MAX_BODY_BYTES = 64 * 1024 * 1024
+
+
+def _git_commit_environment(*, batch: bool = False) -> dict[str, str]:
+    environment = {
+        key: value
+        for key in SAFE_GIT_RUNTIME_ENVIRONMENT_KEYS
+        if (value := os.environ.get(key))
+        and not any(character in value for character in "\r\n")
+    }
+    environment["GIT_TERMINAL_PROMPT"] = "0"
+    if batch:
+        environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+        environment["GIT_NO_LAZY_FETCH"] = "1"
+    return environment
+
+
+def _run_git_commit_identity_command(repo_root: Path, args: Sequence[str]) -> bytes:
+    try:
+        completed = subprocess.run(
+            ("git", "-C", str(repo_root), *args),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=30,
+            env=_git_commit_environment(),
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise GitCommitObservationError(
+            f"cannot bind Git repository identity: {error}"
+        ) from error
+    if completed.returncode != 0 or completed.stderr:
+        detail = completed.stderr.decode("utf-8", "replace").strip()
+        raise GitCommitObservationError(
+            f"cannot bind Git repository identity: {detail or 'Git command failed'}"
+        )
+    return completed.stdout
+
+
+def _canonical_git_path(raw: bytes, label: str) -> Path:
+    try:
+        value = os.fsdecode(raw.strip())
+        return Path(value).resolve(strict=True)
+    except (OSError, UnicodeError, ValueError) as error:
+        raise GitCommitObservationError(f"invalid {label}: {error}") from error
+
+
+def _local_git_config(repo_root: Path) -> dict[str, tuple[str, ...]]:
+    raw = _run_git_commit_identity_command(
+        repo_root, ("config", "--local", "--null", "--list")
+    )
+    values: dict[str, list[str]] = {}
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        key_raw, separator, value_raw = record.partition(b"\n")
+        if not separator:
+            raise GitCommitObservationError("malformed repository-local Git config")
+        try:
+            key = key_raw.decode("utf-8", "strict").casefold()
+            value = value_raw.decode("utf-8", "strict")
+        except UnicodeError as error:
+            raise GitCommitObservationError("non-UTF-8 repository-local Git config") from error
+        values.setdefault(key, []).append(value)
+    return {key: tuple(items) for key, items in values.items()}
+
+
+def _git_commit_repository_identity(
+    repo_root: Path,
+) -> tuple[Path, Path, Path, str, Path]:
+    requested = repo_root.resolve(strict=True)
+    repository_root = _canonical_git_path(
+        _run_git_commit_identity_command(requested, ("rev-parse", "--show-toplevel")),
+        "repository root",
+    )
+    git_dir = _canonical_git_path(
+        _run_git_commit_identity_command(requested, ("rev-parse", "--absolute-git-dir")),
+        "absolute Git directory",
+    )
+    common_dir = _canonical_git_path(
+        _run_git_commit_identity_command(
+            requested, ("rev-parse", "--path-format=absolute", "--git-common-dir")
+        ),
+        "common Git directory",
+    )
+    try:
+        object_format = _run_git_commit_identity_command(
+            requested, ("rev-parse", "--show-object-format=storage")
+        ).decode("ascii", "strict").strip()
+    except UnicodeError as error:
+        raise GitCommitObservationError("invalid Git object format") from error
+    if object_format not in _GIT_COMMIT_OBJECT_FORMATS:
+        raise GitCommitObservationError(f"unsupported Git object format: {object_format!r}")
+
+    object_store_path = common_dir / "objects"
+    object_store = object_store_path.resolve(strict=True)
+    if object_store != object_store_path or object_store.parent != common_dir:
+        raise GitCommitObservationError("primary Git object store has an unsupported layout")
+
+    rejected_environment = (
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_GRAFT_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SHALLOW_FILE",
+    )
+    if any(os.environ.get(key) for key in rejected_environment):
+        raise GitCommitObservationError("ambient Git object interpretation is unsupported")
+
+    rejected_files = {
+        "shallow repository": (git_dir / "shallow", common_dir / "shallow"),
+        "grafts": (git_dir / "info" / "grafts", common_dir / "info" / "grafts"),
+        "alternate object store": (
+            git_dir / "objects" / "info" / "alternates",
+            common_dir / "objects" / "info" / "alternates",
+        ),
+    }
+    for label, paths in rejected_files.items():
+        if any(path.exists() for path in paths):
+            raise GitCommitObservationError(f"{label} is unsupported")
+
+    config = _local_git_config(requested)
+    partial_clone = config.get("extensions.partialclone", ())
+    promisor = any(
+        key.startswith("remote.")
+        and key.endswith(".promisor")
+        and any(value.casefold() in {"true", "yes", "on", "1"} for value in values)
+        for key, values in config.items()
+    )
+    if partial_clone or promisor:
+        raise GitCommitObservationError("promisor or partial-clone repositories are unsupported")
+
+    replacements = _run_git_commit_identity_command(
+        requested, ("for-each-ref", "--format=%(refname)", "refs/replace")
+    )
+    if replacements.strip():
+        raise GitCommitObservationError("replace refs are unsupported")
+
+    return repository_root, git_dir, common_dir, object_format, object_store
+
+
+def _validate_git_commit_oids(
+    oids: Sequence[str], object_format: str
+) -> tuple[str, ...]:
+    try:
+        width, _hash_name = _GIT_COMMIT_OBJECT_FORMATS[object_format]
+    except KeyError as error:
+        raise GitCommitObservationError(
+            f"unsupported Git object format: {object_format!r}"
+        ) from error
+    pattern = re.compile(rf"[0-9a-f]{{{width}}}\Z")
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for oid in oids:
+        if not isinstance(oid, str) or pattern.fullmatch(oid) is None:
+            raise GitCommitObservationError(
+                f"commit ID must be a full lowercase {object_format} object ID"
+            )
+        if oid not in seen:
+            seen.add(oid)
+            ordered.append(oid)
+    return tuple(ordered)
+
+
+def _parse_git_commit_body(
+    oid: str, body: bytes, *, object_format: str
+) -> tuple[str, tuple[str, ...]]:
+    header_block, separator, _message = body.partition(b"\n\n")
+    if not separator:
+        raise GitCommitObservationError(f"commit {oid} has no header terminator")
+    lines = header_block.split(b"\n")
+    if not lines:
+        raise GitCommitObservationError(f"commit {oid} has no headers")
+    width, _hash_name = _GIT_COMMIT_OBJECT_FORMATS[object_format]
+    object_pattern = re.compile(rb"[0-9a-f]{" + str(width).encode("ascii") + rb"}\Z")
+    tree_prefix = b"tree "
+    parent_prefix = b"parent "
+    if not lines[0].startswith(tree_prefix):
+        raise GitCommitObservationError(f"commit {oid} does not begin with a tree header")
+    tree_raw = lines[0][len(tree_prefix) :]
+    if object_pattern.fullmatch(tree_raw) is None:
+        raise GitCommitObservationError(f"commit {oid} has an invalid tree object ID")
+    parents: list[str] = []
+    index = 1
+    while index < len(lines) and lines[index].startswith(parent_prefix):
+        parent_raw = lines[index][len(parent_prefix) :]
+        if object_pattern.fullmatch(parent_raw) is None:
+            raise GitCommitObservationError(f"commit {oid} has an invalid parent object ID")
+        parents.append(parent_raw.decode("ascii"))
+        index += 1
+    for line in lines[index:]:
+        if line.startswith(tree_prefix) or line.startswith(parent_prefix):
+            raise GitCommitObservationError(
+                f"commit {oid} has a late or duplicate topology header"
+            )
+        if not line or (b" " not in line and not line.startswith(b" ")):
+            raise GitCommitObservationError(f"commit {oid} has a malformed header")
+    return tree_raw.decode("ascii"), tuple(parents)
+
+
+def _parse_git_commit_batch(
+    oids: Sequence[str], payload: bytes, *, object_format: str = "sha1"
+) -> Mapping[str, tuple[str, tuple[str, ...]]]:
+    ordered = _validate_git_commit_oids(oids, object_format)
+    _width, hash_name = _GIT_COMMIT_OBJECT_FORMATS[object_format]
+    offset = 0
+    facts: dict[str, tuple[str, tuple[str, ...]]] = {}
+    for requested in ordered:
+        newline = payload.find(b"\n", offset)
+        if newline < 0:
+            raise GitCommitObservationError("missing or truncated Git batch header")
+        header = payload[offset:newline]
+        offset = newline + 1
+        parts = header.split(b" ")
+        if len(parts) != 3:
+            raise GitCommitObservationError("malformed Git batch header")
+        oid_raw, kind, size_raw = parts
+        try:
+            response_oid = oid_raw.decode("ascii", "strict")
+            size_text = size_raw.decode("ascii", "strict")
+        except UnicodeError as error:
+            raise GitCommitObservationError("non-ASCII Git batch header") from error
+        if response_oid != requested or kind != b"commit":
+            raise GitCommitObservationError("Git batch response is reordered or wrong-type")
+        if re.fullmatch(r"0|[1-9][0-9]*", size_text) is None:
+            raise GitCommitObservationError("Git batch size is not canonical decimal")
+        size = int(size_text)
+        if size > _GIT_COMMIT_MAX_BODY_BYTES:
+            raise GitCommitObservationError("Git commit body exceeds the bounded reader limit")
+        end = offset + size
+        if end > len(payload):
+            raise GitCommitObservationError("truncated Git commit body")
+        body = payload[offset:end]
+        if end >= len(payload) or payload[end : end + 1] != b"\n":
+            raise GitCommitObservationError("missing Git batch body terminator")
+        offset = end + 1
+        digest = hashlib.new(
+            hash_name,
+            b"commit " + str(size).encode("ascii") + b"\0" + body,
+        ).hexdigest()
+        if digest != requested:
+            raise GitCommitObservationError("Git commit object hash does not match request")
+        facts[requested] = _parse_git_commit_body(
+            requested, body, object_format=object_format
+        )
+    if offset != len(payload):
+        raise GitCommitObservationError("Git batch returned duplicate or extra output")
+    return MappingProxyType(facts)
+
+
+def _start_git_commit_batch(
+    repository_root: Path,
+) -> subprocess.Popen[bytes]:
+    return subprocess.Popen(
+        (
+            "git",
+            "-C",
+            str(repository_root),
+            "--no-replace-objects",
+            "cat-file",
+            "--batch",
+        ),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_git_commit_environment(batch=True),
+    )
+
+
+def _kill_and_reap_git_commit_batch(process: object) -> None:
+    try:
+        process.kill()  # type: ignore[attr-defined]
+    except (OSError, ProcessLookupError):
+        pass
+    finally:
+        try:
+            process.wait(timeout=5)  # type: ignore[attr-defined]
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
+@contextmanager
+def _git_commit_observation(
+    repo_root: str | os.PathLike[str],
+    oids: Sequence[str],
+    *,
+    timeout_seconds: float = 30.0,
+):
+    if timeout_seconds <= 0:
+        raise GitCommitObservationError("Git commit observation timeout must be positive")
+    identity = _git_commit_repository_identity(Path(repo_root))
+    repository_root, git_dir, common_dir, object_format, object_store = identity
+    ordered = _validate_git_commit_oids(oids, object_format)
+    process = _start_git_commit_batch(repository_root)
+    request = b"".join(oid.encode("ascii") + b"\n" for oid in ordered)
+    stdout = b""
+    stderr = b""
+    try:
+        try:
+            stdout, stderr = process.communicate(request, timeout=timeout_seconds)
+        except subprocess.TimeoutExpired as error:
+            _kill_and_reap_git_commit_batch(process)
+            raise GitCommitObservationError("Git commit batch timed out") from error
+        except BaseException:
+            _kill_and_reap_git_commit_batch(process)
+            raise
+        if process.returncode != 0 or stderr:
+            detail = stderr.decode("utf-8", "replace").strip()
+            raise GitCommitObservationError(
+                f"Git commit batch failed: {detail or 'unexpected process result'}"
+            )
+        facts = _parse_git_commit_batch(ordered, stdout, object_format=object_format)
+        trees = MappingProxyType({oid: facts[oid][0] for oid in ordered})
+        parents = MappingProxyType({oid: facts[oid][1] for oid in ordered})
+        observation = GitCommitObservation(
+            repository_root=repository_root,
+            git_dir=git_dir,
+            common_dir=common_dir,
+            object_format=object_format,
+            object_store=object_store,
+            oids=ordered,
+            _trees=trees,
+            _parent_sets=parents,
+            _lifecycle=_GitCommitObservationLifecycle(),
+        )
+        try:
+            yield observation
+        finally:
+            observation._invalidate()
+    finally:
+        stdout = b""
+        stderr = b""
+        request = b""
 
 
 @dataclass(frozen=True, slots=True)
@@ -2655,14 +3064,14 @@ class ControlPlane:
 
     @contextmanager
     def snapshot_cache(self):
-        """Reuse immutable Git facts for one point-in-time observation.
+        """Reuse non-Git diagnostic projections within one status traversal.
 
-        Installs the same per-call caches ``_status_document`` has always used —
-        dependency recursion, durable receipt reconstruction, and read-only Git
-        facts — so other observation paths (prompt rendering, claim eligibility,
-        receipt verification) do not replay thousands of Git subprocesses. The
-        caches live on the instance only for the ``with`` body and must never
-        span a state mutation that could change the cached truth.
+        Real repositories deliberately bypass the historical generic ``_git``
+        substitution and delimiter-derived commit graph. Immutable commit facts
+        have the separate explicit ``_git_commit_observation`` boundary; refs,
+        negative lookups, ancestry, and effect-adjacent reads stay fresh. The
+        legacy graph below is retained only for the repository-free synthetic
+        status fixture that freezes the pre-challenger test vector.
         """
         missing = object()
         installed: list[tuple[str, object]] = []
@@ -2670,6 +3079,47 @@ class ControlPlane:
         def install(name: str, value: object) -> None:
             installed.append((name, self.__dict__.get(name, missing)))
             setattr(self, name, value)
+
+        legacy_graph_fixture = (
+            not (self.repo_root / ".git").exists()
+            and type(self)._git is not ControlPlane._git
+        )
+        if not legacy_graph_fixture:
+            try:
+                active_claims = self.active_claims()
+                github_snapshot = self.github_snapshot()
+                install("active_claims", lambda: dict(active_claims))
+                install("github_snapshot", lambda: github_snapshot)
+
+                if hasattr(self, "_durable_receipt_records"):
+                    uncached_durable_receipts = self._durable_receipt_records
+                    durable_receipts: dict[str, list[dict[str, Any]]] | None = None
+
+                    def cached_durable_receipts() -> dict[str, list[dict[str, Any]]]:
+                        nonlocal durable_receipts
+                        if durable_receipts is None:
+                            durable_receipts = uncached_durable_receipts()
+                        return durable_receipts
+
+                    install("_durable_receipt_records", cached_durable_receipts)
+
+                uncached_node_view = self.node_view
+                view_cache: dict[str, NodeView] = {}
+
+                def cached_node_view(node_id: str) -> NodeView:
+                    if node_id not in view_cache:
+                        view_cache[node_id] = uncached_node_view(node_id)
+                    return view_cache[node_id]
+
+                install("node_view", cached_node_view)
+                yield
+            finally:
+                for name, prior in reversed(installed):
+                    if prior is missing:
+                        self.__dict__.pop(name, None)
+                    else:
+                        setattr(self, name, prior)
+            return
 
         uncached_git = self._git
         git_cache: dict[
