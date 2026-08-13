@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-doctor-performance-manifest-v1",
+  "plan_id": "doctor-performance-v1",
+  "baseline_commit": "b527aa696590d3a56cefa445dd62a65e569f9116",
+  "baseline_tree": "b5f5a459f93e85c34f88c5e9bdaa96aa55c37a5c",
+  "blocker_evidence_commit": "6bc343f079be6f2d5fd6953d92099a8d5de872b1",
+  "blocker_evidence_tree": "16fd5559b5dac7853e044bf2c59893b15022ee74",
+  "standard": {
+    "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+    "source_commit": "a93df2632f259f4b63f7a4f27eb0b163b5a47204",
+    "git_blob_sha": "70e43b0a8078a303d44c0109b8dd218a948258c2"
+  },
+  "sources": {
+    "docs/architecture/ADR-063-INVOCATION-SCOPED-TEST-FIXTURES.md": "b7b709188b1aeea6dabd93b80c71c58521646899",
+    "docs/execution/dags/doctor-performance-v1/.gitignore": "c18dd8d83ceed1806b50b0aaa46beb7e335fff13",
+    "docs/execution/dags/doctor-performance-v1/README.md": "9d9afd7c05cdf2f77d8bfab3e2e1b79eee83ce09",
+    "docs/execution/dags/doctor-performance-v1/benchmark.py": "de2d6a7dc494c47aff0af61c3bcfe2d7dabdbb0f",
+    "docs/execution/dags/doctor-performance-v1/generate_plan.py": "b65a6e100866ceff08ed6b864debfc214c671add",
+    "docs/execution/dags/doctor-performance-v1/specs.py": "82093edf9adc2d06800bdc380207b7944e91db2e",
+    "docs/execution/dags/doctor-performance-v1/verify_plan.py": "0180d6d9b8083938e88d45b222cd2e553f9b7464",
+    "evidence/courts/CASE-BASELINE-000-DOCTOR-PERFORMANCE.json": "8978e2fbed0676c4467d5288bfc24ad221974912"
+  },
+  "expected_plan_digest": "sha256:997bcbb34bec49b4286759e8d054b23bc84b6c1f6e8382074bd6611aee7989a4",
+  "expected_node_count": 6,
+  "expected_node_ids": [
+    "DP-CONTRACT-000",
+    "DP-TESTS-010",
+    "DP-BENCH-020",
+    "DP-FIXTURE-030",
+    "DP-QUALIFY-040",
+    "DP-JUDGE-050"
+  ],
+  "expected_dependencies": {
+    "DP-CONTRACT-000": [],
+    "DP-TESTS-010": ["DP-CONTRACT-000"],
+    "DP-BENCH-020": ["DP-CONTRACT-000"],
+    "DP-FIXTURE-030": ["DP-TESTS-010", "DP-BENCH-020"],
+    "DP-QUALIFY-040": ["DP-FIXTURE-030"],
+    "DP-JUDGE-050": ["DP-QUALIFY-040"]
+  },
+  "expected_round_count": 5,
+  "materialized_path": ".autopilot/state/doctor-performance-v1.json",
+  "sealed_plan_unchanged": ".autopilot/plan.json",
+  "sealed_plan_sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+  "knowledge_plan_verifier": "docs/execution/dags/knowledge-projection-v1/verify_plan.py",
+  "knowledge_plan_verifier_blob": "32fe02b72bc1590fb68c879eb65177429b603d7b"
+}

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-BASELINE-000-DOCTOR-PERFORMANCE",
+  "recorded_at": "2026-08-13",
+  "subject": "Whether and how to remediate the knowledge BASELINE-000 doctor timeout without weakening its sealed contract",
+  "sources": [
+    {
+      "type": "git_commit",
+      "commit": "6bc343f079be6f2d5fd6953d92099a8d5de872b1",
+      "tree": "16fd5559b5dac7853e044bf2c59893b15022ee74",
+      "path": "evidence/knowledge-projection/baseline.json",
+      "provenance": "local Git object read with git show",
+      "license": "repository license",
+      "available": true
+    },
+    {
+      "type": "repository_standard",
+      "commit": "a93df2632f259f4b63f7a4f27eb0b163b5a47204",
+      "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+      "git_blob_sha": "70e43b0a8078a303d44c0109b8dd218a948258c2",
+      "available": true
+    }
+  ],
+  "participants": [
+    {"seat": "clerk", "identity": "codex:orchestrator", "independent_from": []},
+    {"seat": "architect", "identity": "role:doctor-performance-architect", "independent_from": ["judge"]},
+    {"seat": "optimizer", "identity": "role:doctor-performance-optimizer", "independent_from": ["judge"]},
+    {"seat": "advocate", "identity": "role:doctor-performance-advocate", "independent_from": ["cross-examiner", "judge"]},
+    {"seat": "cross-examiner", "identity": "role:doctor-performance-cross-examiner", "independent_from": ["advocate", "builder", "judge"]},
+    {"seat": "expert-witness", "identity": "role:test-isolation-expert", "independent_from": ["builder", "judge"]},
+    {"seat": "judge", "identity": "role:doctor-performance-judge", "independent_from": ["architect", "optimizer", "advocate", "cross-examiner", "expert-witness", "builder", "curator", "integrator"]}
+  ],
+  "baseline_findings": {
+    "knowledge_node": "BASELINE-000",
+    "status": "blocked",
+    "doctor_timeout_seconds": 180,
+    "python_3_14_doctor": {"status": "timeout", "elapsed_seconds": 186.4},
+    "python_3_12_doctor": {"status": "timeout", "elapsed_seconds": 190.4},
+    "direct_suite": {
+      "status": "passed",
+      "executions": 382,
+      "passed": 381,
+      "skipped": 1,
+      "elapsed_seconds": 259.64
+    },
+    "causal_claim_status": "hypothesis_only"
+  },
+  "atomic_claims": [
+    {
+      "id": "DP-CLAIM-001",
+      "claim": "Changing the doctor timeout or skipping controller tests would weaken the sealed baseline gate.",
+      "disposition": "adopt",
+      "mapped_nodes": ["DP-CONTRACT-000", "DP-JUDGE-050"]
+    },
+    {
+      "id": "DP-CLAIM-002",
+      "claim": "Invocation-scoped content-addressed fixture derivation is a bounded test-only candidate worth evaluating.",
+      "disposition": "adapt",
+      "mapped_nodes": ["DP-TESTS-010", "DP-BENCH-020", "DP-FIXTURE-030", "DP-QUALIFY-040"]
+    },
+    {
+      "id": "DP-CLAIM-003",
+      "claim": "Shared object stores, alternates, hardlinks, symlinks, persistent caches, cached verdicts, or reused results are safe performance shortcuts.",
+      "disposition": "reject",
+      "mapped_nodes": ["DP-TESTS-010", "DP-FIXTURE-030"]
+    },
+    {
+      "id": "DP-CLAIM-004",
+      "claim": "Production or controller Git caching should be included in this remediation.",
+      "disposition": "defer",
+      "mapped_nodes": ["DP-CONTRACT-000", "DP-JUDGE-050"]
+    },
+    {
+      "id": "DP-CLAIM-005",
+      "claim": "A passing or faster candidate may automatically unblock the knowledge program.",
+      "disposition": "reject",
+      "mapped_nodes": ["DP-QUALIFY-040", "DP-JUDGE-050"]
+    }
+  ],
+  "verdict": {
+    "disposition": "adapt",
+    "knowledge_baseline_status": "blocked",
+    "authorized_program": "doctor-performance-v1",
+    "authorized_candidate": "invocation-scoped content-addressed test fixtures",
+    "promotion_authority": "distinct DP-JUDGE-050 only",
+    "retry_condition": "DP-JUDGE-050 issues ADOPT with no material unresolved finding after every sealed qualification gate passes"
+  },
+  "required_dag": {
+    "nodes": ["DP-CONTRACT-000", "DP-TESTS-010", "DP-BENCH-020", "DP-FIXTURE-030", "DP-QUALIFY-040", "DP-JUDGE-050"],
+    "edges": [
+      ["DP-CONTRACT-000", "DP-TESTS-010"],
+      ["DP-CONTRACT-000", "DP-BENCH-020"],
+      ["DP-TESTS-010", "DP-FIXTURE-030"],
+      ["DP-BENCH-020", "DP-FIXTURE-030"],
+      ["DP-FIXTURE-030", "DP-QUALIFY-040"],
+      ["DP-QUALIFY-040", "DP-JUDGE-050"]
+    ],
+    "postcondition": "retry knowledge BASELINE-000 only after an ADOPT verdict"
+  },
+  "dissent": [
+    "A content-addressed seed can become hidden mutable shared state unless every derivation revalidates identity and receives a separate writable object database.",
+    "Cold and warm labels do not prove operating-system cache state; receipts must label them as declared modes and avoid claims beyond the observed command timing.",
+    "The retained baseline demonstrates the timeout but does not by itself prove HealingFixture construction is the dominant cause."
+  ],
+  "rollback": "Revert one unsquashed node commit, restore the frozen suite, and retain all evidence as superseded.",
+  "appeal_conditions": [
+    "new evidence disproves fixture construction as a material runtime contributor",
+    "the candidate changes any frozen test behavior or isolation property",
+    "either runtime misses the 135-second nearest-rank p95 burden",
+    "a safer bounded candidate demonstrates superior retained evidence"
+  ],
+  "completion_claim": false,
+  "superiority_claim": false
+}
