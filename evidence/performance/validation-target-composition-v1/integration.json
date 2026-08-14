@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "kind": "validation-target-composition-integration-v1",
+  "node_id": "VTC-INTEGRATE-030",
+  "phase": "integration",
+  "recorded_at": "2026-08-13",
+  "authority": {
+    "implementation": false,
+    "candidate_execution": false,
+    "root_ci_rerun": false,
+    "test_execution": false,
+    "performance_conclusion": false,
+    "promotion": false,
+    "knowledge_baseline_retry": false,
+    "main_or_remote_effect": false
+  },
+  "source_binding": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "rejected_historical_fpc_tuples": [
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"
+      },
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "4f20bd2cbe9c3df8b1cf4a28557f330dd401df40"
+      }
+    ],
+    "rule": "Only b789/b909 is the observed source. The historical FPC tuples remain rejected and are neither repaired nor normalized."
+  },
+  "input_receipts": {
+    "discovery": {
+      "path": "evidence/performance/validation-target-composition-v1/discovery-analysis.json",
+      "receipt_digest": "sha256:d556380b3b61093d5833b0020504d0ff32d603b03eafecb0757455b674303038",
+      "conclusion": "The nine ContentAddressedFixtureSeedContractTests method IDs are source-and-transcript-supported as class-level SkipTest-suppressed before method execution."
+    },
+    "cross_examination": {
+      "path": "evidence/performance/validation-target-composition-v1/cross-examination.json",
+      "receipt_digest": "sha256:8c45e4e64ca2a2094670030193856611a4cc2545becb03cc244d3823e5a28488",
+      "conclusion": "The retained evidence has no machine-checkable ordered per-ID outcome ledger, so it cannot establish an independent exact discovery-to-execution mapping."
+    },
+    "fpcr_execution": {
+      "receipt": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+      "receipt_digest": "sha256:85e324a6a12b1bd76d85243c0519a3b3d49ac6c3d986e73fb56eb6ec5f3ce871",
+      "transcript": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "transcript_receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66",
+      "historical_result": {
+        "tests_run": 1050,
+        "failures": 28,
+        "skipped": 8,
+        "timed_out": false,
+        "wall_time_seconds": 1130.917
+      }
+    }
+  },
+  "inventory_reconciliation": {
+    "discovered_ids": 1059,
+    "historical_executed_method_headers": 1050,
+    "arithmetic_delta": 9,
+    "accounting_disposition": "reconciled_with_evidence_limit",
+    "accounting_explanation": "Static b789 source inspection finds nine declared ContentAddressedFixtureSeedContractTests methods. The historical transcript records that class's setUpClass SkipTest and no member method headers. Those nine methods account for the observed 1059 minus 1050 delta: discovery identifies loadable IDs, while the class-level SkipTest suppresses their method execution.",
+    "cross_examiner_limit_retained": "No ordered 1,059-ID vector or per-ID outcome ledger was retained. The explanation is therefore a source-and-transcript-supported classification, not a newly reproducible one-to-one execution ledger or a proof that every historical discovery/environment condition was hermetic.",
+    "skip_boundary": "The class-level skip is one synthetic lifecycle record. It must not be added to the 1,050 executed method-header total, and the aggregate eight skipped results do not independently explain the nine-method delta."
+  },
+  "component_reconciliation": {
+    "fixture_api": {
+      "surface": "test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available",
+      "missing_symbols": [
+        "ContentAddressedFixtureSeed",
+        "FixtureIntegrityError",
+        "FixturePolicyError"
+      ],
+      "observed_failure_count": 1,
+      "relationship_to_delta": "Its absence triggers the fixture contract class-level skip that accounts for the nine suppressed method IDs; it also yields one independent API-surface failure.",
+      "status": "rejected immutable fixture candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 remains non-promotable and cannot be reused or relabeled."
+    },
+    "git_commit_observation_api": {
+      "surface": "test_doctor_git_fact_batching",
+      "missing_symbols": [
+        "GitCommitObservation",
+        "GitCommitObservationError",
+        "_git_commit_observation",
+        "_parse_git_commit_batch"
+      ],
+      "observed_failure_count": 27,
+      "relationship_to_fixture": "This is a distinct failure surface from the fixture API and is not explained or cured by the fixture accounting classification.",
+      "status": "d02c2d2 remains a non-promoted historical GCO candidate, is not a b789 validation-target component, and is not eligible for reuse."
+    },
+    "causal_boundary": "The separate one-fixture and 27-GCO failure surfaces total all 28 recorded failures, but no component alone proves a passing corrected-source target, causal sufficiency, promotion eligibility, performance improvement, or a knowledge BASELINE-000 retry. Historical candidates cannot be composed or applied under this evidence-only court."
+  },
+  "contradictions_and_limits": [
+    "Discovery classifies the nine-method difference; Cross-Examination correctly retains that the classification lacks a machine-checkable ID-by-ID outcome ledger. These statements are compatible when the classification is not overstated as independent execution proof.",
+    "The sole completed root-CI observation remains adverse: 1,050 tests, 28 failures, and eight skips. It is not a passing validation result.",
+    "The FPCR receipt verifier's discovery-environment, ordered-vector, transcript parsing, and end-to-end budget gaps remain adverse evidence; this node does not cure them.",
+    "Neither this integration nor its predecessors authorized a CI rerun, candidate execution, code/test/fixture/controller/GCO change, promotion, main update, remote effect, or knowledge baseline retry."
+  ],
+  "judge_gate": {
+    "judge_may_open": true,
+    "judge_scope": "A distinct VTC Judge may open only the sealed VTC-JUDGE-040 evidence judgment.",
+    "implementation_proposal_may_open": false,
+    "reason": "The accounting delta is classified, but material provenance and applicability limits remain: there is no retained ID-level execution ledger, the isolated fixture and GCO components remain non-sufficient and ineligible historical candidates, and the sole root-CI result has 28 failures. FPCR requires zero unresolved material findings before any separate implementation proposal."
+  },
+  "conclusion": "DEFER / fail closed. The nine suppressed fixture-contract method IDs reconcile the 1,059 discovery count with 1,050 historical executed method headers for accounting, subject to the retained absence of an ID-level outcome ledger. The one fixture API-surface failure and 27 GitCommitObservation contract-API failures remain separate adverse components. Neither component, alone or by impermissible composition of historical candidates, authorizes causality, implementation, promotion, performance claims, or a knowledge baseline retry. A Judge may decide this no-code VTC record, but cannot authorize opening an implementation proposal.",
+  "receipt_digest": "sha256:362a9ca9852dfa65279f8789dc57166c3bdefc5a8aa082587b727b415ac4b460"
+}
