@@ -635,6 +635,45 @@ class ExecutionSupervisorTests(unittest.TestCase):
         self.assertEqual(changed.disposition, supervisor.StepDisposition.WAITING)
         self.assertEqual(calls, ["ROUND-2"])
 
+    def test_capacity_shortage_is_a_typed_resumable_wait(self) -> None:
+        directory = self.execution_dir()
+        calls = 0
+
+        def step(_context):
+            nonlocal calls
+            calls += 1
+            return supervisor.StepResult(
+                supervisor.StepDisposition.WAITING_FOR_CAPACITY,
+                "another execution currently owns every primary permit",
+                wait_condition=self.wait_condition("capacity-generation-1"),
+            )
+
+        first = self.supervise(directory, step)
+        self.assertEqual(
+            first.disposition, supervisor.StepDisposition.WAITING_FOR_CAPACITY
+        )
+        self.assertEqual(calls, 1)
+        before = self.journal_events(directory)
+        replayed = self.supervise(directory, step)
+        self.assertEqual(
+            replayed.disposition, supervisor.StepDisposition.WAITING_FOR_CAPACITY
+        )
+        self.assertEqual(calls, 1)
+        self.assertEqual(self.journal_events(directory), before)
+        assert first.wait_condition is not None
+        changed = self.digest("capacity-generation-2")
+        resumed = self.supervise(
+            directory,
+            step,
+            observation_fingerprint=changed,
+            resume_token=first.wait_condition.resume_token,
+            verify_wait_observation=lambda _request: changed,
+        )
+        self.assertEqual(
+            resumed.disposition, supervisor.StepDisposition.WAITING_FOR_CAPACITY
+        )
+        self.assertEqual(calls, 2)
+
     def test_partial_journal_cannot_be_replayed_under_another_plan(self) -> None:
         directory = self.execution_dir()
         self.supervise(

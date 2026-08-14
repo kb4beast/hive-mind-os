@@ -106,6 +106,7 @@ class TornJournalTail(SupervisorJournalError):
 
 class StepDisposition(str, Enum):
     WAITING = "WAITING"
+    WAITING_FOR_CAPACITY = "WAITING_FOR_CAPACITY"
     WAITING_FOR_HOST = "WAITING_FOR_HOST"
     BLOCKED = "BLOCKED"
     ROUND_COMPLETE = "ROUND_COMPLETE"
@@ -745,6 +746,7 @@ def _payload_fields(state: str) -> frozenset[str]:
         return frozenset({"epoch", "frontier_id", "attempt_id", "host_capability"})
     if state in {
         StepDisposition.WAITING.value,
+        StepDisposition.WAITING_FOR_CAPACITY.value,
         StepDisposition.WAITING_FOR_HOST.value,
     }:
         return frozenset(
@@ -1018,6 +1020,7 @@ def _replay_events(
                     )
             elif disposition in {
                 StepDisposition.WAITING,
+                StepDisposition.WAITING_FOR_CAPACITY,
                 StepDisposition.WAITING_FOR_HOST,
             }:
                 durable_wait = _wait_from_payload(payload.get("wait_condition"))
@@ -1072,6 +1075,7 @@ def _replay_events(
             raw_disposition = payload.get("disposition")
             allowed = {
                 StepDisposition.WAITING,
+                StepDisposition.WAITING_FOR_CAPACITY,
                 StepDisposition.WAITING_FOR_HOST,
                 StepDisposition.BLOCKED,
                 StepDisposition.ROUND_COMPLETE,
@@ -1125,6 +1129,7 @@ def _replay_events(
                     )
             elif disposition in {
                 StepDisposition.WAITING,
+                StepDisposition.WAITING_FOR_CAPACITY,
                 StepDisposition.WAITING_FOR_HOST,
             }:
                 if next_frontier is not None or raw_evidence is not None:
@@ -1711,6 +1716,7 @@ def _validate_step_result(result: object, context: StepContext) -> StepResult:
             )
     elif result.disposition in {
         StepDisposition.WAITING,
+        StepDisposition.WAITING_FOR_CAPACITY,
         StepDisposition.WAITING_FOR_HOST,
     }:
         if (
@@ -2403,6 +2409,7 @@ def run_to_fixed_point(
                 payload["fixed_point_evidence"] = verified_evidence.to_payload()
             elif result.disposition in {
                 StepDisposition.WAITING,
+                StepDisposition.WAITING_FOR_CAPACITY,
                 StepDisposition.WAITING_FOR_HOST,
             }:
                 assert result.wait_condition is not None
@@ -2567,6 +2574,7 @@ def reconcile_unknown_attempt(
         checked = _validate_step_result(result, context)
         allowed = {
             StepDisposition.WAITING,
+            StepDisposition.WAITING_FOR_CAPACITY,
             StepDisposition.WAITING_FOR_HOST,
             StepDisposition.BLOCKED,
             StepDisposition.ROUND_COMPLETE,
