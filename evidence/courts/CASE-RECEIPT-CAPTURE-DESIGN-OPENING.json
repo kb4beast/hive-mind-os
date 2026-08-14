@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-RECEIPT-CAPTURE-DESIGN-OPENING",
+  "node_id": "RCD-SEAL-000",
+  "recorded_at": "2026-08-13",
+  "subject": "Forward-looking design of durable validation receipt capture",
+  "authority": {
+    "predecessor": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+    "predecessor_disposition": "defer",
+    "authorization": "separate_forward_looking_design_court_only",
+    "implementation_authority": false
+  },
+  "authority_binding": {
+    "commit": "89f1a44a9687d351eae52633d015fc55948005fd",
+    "tree": "bb649cca210b0fa2d2161395e33e6a3b58041b76",
+    "rule": "This is the authority record, not a passing validation target or an input to repair historical evidence."
+  },
+  "claims_under_review": [
+    "A future recorder must retain an ordered discovery vector and bind exactly one terminal outcome to every ID, including lifecycle and class skips.",
+    "A future receipt needs a declared and hashed terminal-label vocabulary, raw stream hashes, an explicit parser grammar, and summary reconciliation.",
+    "A future receipt needs source/tree/interpreter/environment binding, privacy-sensitive redaction, atomic write/retention, and failure/rollback semantics."
+  ],
+  "required_design_elements": [
+    "ordered discovery vector", "one terminal outcome per ID including lifecycle and class skips", "declared and hashed label vocabulary", "raw stream hashes and explicit parser grammar", "summary reconciliation", "source/tree/interpreter/environment binding", "privacy-sensitive redaction", "atomic receipt write and retention", "failure and rollback"
+  ],
+  "adverse_evidence": {
+    "vpr_judgment": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+    "rejected_fixture_candidate": {"commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378", "status": "rejected_no_reuse_or_relabel"},
+    "gco_candidate": {"commit": "d02c2d2", "status": "non_promoted_no_reuse_or_composition"}
+  },
+  "sealed_plan": {"path": "docs/execution/dags/receipt-capture-design-v1/manifest.json", "node_count": 5, "plan_digest": "sha256:7606b7c159cc89feac0815df6ae24f216461daedfe1d79aef12f108656b310ab"},
+  "forbidden": ["production code, tests, fixtures, controllers, .autopilot/plan.json, CI, unittest discovery, candidate execution, performance, promotion, main, remotes", "reuse, relabeling, qualification, or composition of 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 or d02c2d2"],
+  "judge_gate": "Only a distinct RCD Judge, after zero unresolved material design findings, may authorize the opening of a separate newly sealed native implementation-proposal DAG. No implementation follows from this opening or verdict.",
+  "disposition": "open_design_only"
+}

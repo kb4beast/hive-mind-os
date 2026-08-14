@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "kind": "receipt-capture-design-v1-seal",
+  "authority": {
+    "commit": "89f1a44a9687d351eae52633d015fc55948005fd",
+    "tree": "bb649cca210b0fa2d2161395e33e6a3b58041b76"
+  },
+  "predecessor": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+  "expected_node_ids": ["RCD-SEAL-000", "RCD-ARCH-010", "RCD-CROSS-020", "RCD-INTEGRATE-030", "RCD-JUDGE-040"],
+  "expected_dependencies": {
+    "RCD-SEAL-000": [],
+    "RCD-ARCH-010": ["RCD-SEAL-000"],
+    "RCD-CROSS-020": ["RCD-SEAL-000"],
+    "RCD-INTEGRATE-030": ["RCD-ARCH-010", "RCD-CROSS-020"],
+    "RCD-JUDGE-040": ["RCD-INTEGRATE-030"]
+  },
+  "required_design_elements": [
+    "ordered_discovery_vector",
+    "one_terminal_outcome_per_id_including_lifecycle_and_class_skips",
+    "declared_and_hashed_label_vocabulary",
+    "raw_stream_hashes_and_explicit_parser_grammar",
+    "summary_reconciliation",
+    "source_tree_interpreter_and_environment_binding",
+    "privacy_sensitive_redaction",
+    "atomic_receipt_write_and_retention",
+    "failure_and_rollback"
+  ],
+  "judge_limit": "With zero unresolved material design findings, the Judge may authorize only a separate, newly sealed native implementation-proposal DAG. It may not authorize or perform implementation.",
+  "lint_warning_justification": [{"check": "scaffold-collision", "node": "RCD-SEAL-000", "subjects": ["docs/execution/__init__.py", "docs/execution/dags/__init__.py"], "reason": "These documentation-resident DAG scripts are executed by explicit path and are not Python package modules. The requested sealed write surface excludes both unrelated package markers; no marker is needed or may be created."}],
+  "prohibitions": ["code", "tests", "CI", "unittest discovery", "candidate execution", "performance", ".autopilot/plan.json", "main", "remotes", "reuse of 41950", "reuse of d02"],
+  "expected_plan_digest": "sha256:7606b7c159cc89feac0815df6ae24f216461daedfe1d79aef12f108656b310ab"
+}
