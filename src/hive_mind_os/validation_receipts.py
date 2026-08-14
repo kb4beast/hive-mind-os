@@ -64,6 +64,7 @@ _HEX = re.compile(r"[0-9a-f]{40,64}\Z")
 _ENVIRONMENT_KEYS = frozenset(
     {"os", "architecture", "python_implementation", "python_version", "sandbox", "network_policy"}
 )
+_REASON_CODE = re.compile(r"[a-z0-9][a-z0-9-]{0,95}\Z")
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -247,6 +248,33 @@ class RecoveryCase:
             self.escalation_reason = "repeated-blocker-signature"
         else:
             self._move(RecoveryState.BLOCKED, blocker_signature)
+
+    def to_document(self) -> dict[str, Any]:
+        document = {"schema_version": 1, "case_id": self.case_id, "session_id": self.session_id,
+                    "predecessor_receipt_digest": self.predecessor_receipt_digest,
+                    "max_automatic_attempts": self.max_automatic_attempts, "state": self.state.value,
+                    "escalation_reason": self.escalation_reason,
+                    "history": [{"state": event.state.value, "blocker_signature": event.blocker_signature, "at": event.at} for event in self.history]}
+        document["digest"] = digest_json(document)
+        return document
+
+
+class RecoveryStore:
+    """Small append-only checkpoint store; reloading preserves retry history."""
+
+    def __init__(self, root: str | Path) -> None:
+        self.root = Path(root).resolve()
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def checkpoint(self, case: RecoveryCase) -> Path:
+        document = case.to_document()
+        path = self.root / f"{case.case_id}-{len(case.history):04d}.json"
+        if path.exists():
+            raise ValidationReceiptError("recovery checkpoint already exists")
+        with tempfile.NamedTemporaryFile("wb", dir=self.root, delete=False) as handle:
+            handle.write(canonical_bytes(document)); handle.flush(); os.fsync(handle.fileno()); temporary = Path(handle.name)
+        os.replace(temporary, path)
+        return path
 
 
 class ValidationReceiptRecorder:
@@ -452,7 +480,29 @@ class NativeValidationReceipt:
 
     def verify(self) -> bool:
         document = self.to_document()
-        return len(self.discovery_vector) == len(self.terminal_ledger) and document["receipt_digest"] == digest_json({key: value for key, value in document.items() if key != "receipt_digest"})
+        try:
+            self._validate_semantics()
+        except ValidationReceiptError:
+            return False
+        return document["receipt_digest"] == digest_json({key: value for key, value in document.items() if key != "receipt_digest"})
+
+    def _validate_semantics(self) -> None:
+        _require_object_id(self.source_commit, "source_commit")
+        _require_object_id(self.source_tree, "source_tree")
+        _require_sha(self.runner_contract_digest, "runner_contract_digest")
+        if [item.discovery_id for item in self.discovery_vector] != list(range(len(self.discovery_vector))):
+            raise ValidationReceiptError("discovery vector must be ordered")
+        if len({item.test_id for item in self.discovery_vector}) != len(self.discovery_vector):
+            raise ValidationReceiptError("discovery IDs must be unique")
+        if len(self.discovery_vector) != len(self.terminal_ledger):
+            raise ValidationReceiptError("ledger must cover every discovery ID")
+        for index, outcome in enumerate(self.terminal_ledger):
+            record = self.discovery_vector[index]
+            if outcome.discovery_id != index or outcome.test_id != record.test_id:
+                raise ValidationReceiptError("outcome does not bind its discovery record")
+            needs_reason = outcome.terminal_kind.name.startswith("SKIP") or outcome.terminal_kind.name.startswith("NOT_RUN")
+            if needs_reason != bool(outcome.reason_code) or (outcome.reason_code and not _REASON_CODE.fullmatch(outcome.reason_code)):
+                raise ValidationReceiptError("outcome reason code is invalid")
 
 
 class ValidationReceiptCapture:
@@ -511,11 +561,14 @@ class ValidationReceiptCapture:
 
     def record_class_skip(self, *, discovery_ids: Iterable[int], terminal_label: str, event_ordinal: int, reason_code: str) -> None:
         ids = tuple(discovery_ids)
-        if not ids:
+        if not ids or len(set(ids)) != len(ids) or not _REASON_CODE.fullmatch(reason_code):
             raise ValidationReceiptError("class skip must name affected discovery IDs")
+        if self._vector is None or self.label_vocabulary.get(terminal_label) is not TerminalKind.SKIP_CLASS:
+            raise ValidationReceiptError("class skip label is invalid")
+        if event_ordinal <= self._last_event or any(item < 0 or item >= len(self._vector) or item in self._ledger for item in ids):
+            raise ValidationReceiptError("class skip has invalid affected IDs or event ordering")
         for offset, discovery_id in enumerate(ids):
-            if self._vector is None or discovery_id >= len(self._vector):
-                raise ValidationReceiptError("class skip is outside discovery")
+            assert self._vector is not None
             record = self._vector[discovery_id]
             self.record_outcome(TerminalOutcome(discovery_id, record.test_id, TerminalKind.SKIP_CLASS, terminal_label, event_ordinal + offset, reason_code))
 
@@ -541,6 +594,8 @@ class ReceiptStore:
             raise ValidationReceiptError("receipt store cannot be a symlink")
 
     def commit(self, receipt: NativeValidationReceipt) -> ReceiptReference:
+        if not receipt.verify():
+            raise ValidationReceiptError("only a semantically valid receipt may be committed")
         document = receipt.to_document()
         digest = document["receipt_digest"]
         name = digest.removeprefix("sha256:")
@@ -576,6 +631,10 @@ class ReceiptStore:
                 return False
             document = json.loads(body.decode("utf-8"))
             digest = document.pop("receipt_digest")
-            return digest == reference.digest and digest == digest_json(document)
+            if digest != reference.digest or digest != digest_json(document):
+                return False
+            vector = tuple(DiscoveryRecord(**item) for item in document["discovery_vector"])
+            ledger = tuple(TerminalOutcome(item["discovery_id"], item["test_id"], TerminalKind(item["terminal_kind"]), item["terminal_label"], item["event_ordinal"], item.get("reason_code")) for item in document["terminal_ledger"])
+            return NativeValidationReceipt(document["session_id"], document["source_commit"], document["source_tree"], document["runner_contract_digest"], vector, ledger, document["label_vocabulary_digest"], tuple(document.get("diagnostics", [])), int(document.get("privacy", {}).get("redaction_count", 0))).verify()
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError):
             return False
