@@ -1234,10 +1234,10 @@ class RoundCompilationTests(unittest.TestCase):
         self.assertIn("2 dispatch rounds", info[0].message)
 
     def test_level_wider_than_capacity_splits_into_rounds(self) -> None:
-        graph = graph_of(*(node(f"N{index}") for index in range(10)))
+        graph = graph_of(*(node(f"N{index:02d}") for index in range(13)))
         rounds = compile_rounds(graph, max_sessions=4, command_prefix=TEST_PREFIX)
-        self.assertEqual([item.sessions for item in rounds], [4, 4, 2])
-        self.assertEqual(rounds[0].nodes, ("N0", "N1", "N2", "N3"))
+        self.assertEqual([item.sessions for item in rounds], [4, 4, 4, 1])
+        self.assertEqual(rounds[0].nodes, ("N00", "N01", "N02", "N03"))
         self.assertTrue(all(item.level == 0 for item in rounds))
         info = findings_of(graph, "capacity-split", max_sessions=4)
         self.assertEqual(len(info), 1)
