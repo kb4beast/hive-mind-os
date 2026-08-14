@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "kind": "validation-target-composition-discovery-analysis-v1",
+  "node_id": "VTC-DISCOVERY-010",
+  "phase": "discovery",
+  "recorded_at": "2026-08-13",
+  "authority": {
+    "implementation": false,
+    "candidate_execution": false,
+    "root_ci_rerun": false,
+    "test_execution": false,
+    "performance_conclusion": false,
+    "promotion": false,
+    "main_or_remote_effect": false
+  },
+  "source_binding": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "tree_resolution": "git show --format=%T confirms b909b7b7e374bff22912059387ef0fe639498af6 for the only observed commit",
+    "rejected_historical_fpc_tuples": [
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "claimed_tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c",
+        "rejection": "invalid: the claimed tree resolves as a commit object, not the tree of the claimed commit"
+      },
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "claimed_tree": "4f20bd2cbe9c3df8b1cf4a28557f330dd401df40",
+        "rejection": "invalid: the claimed tree is a standalone tree object and is not normalized as the tree of the claimed commit"
+      }
+    ]
+  },
+  "retained_evidence": {
+    "discovery_receipt": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e",
+      "reported_discovery_count": 1059,
+      "ordered_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+      "id_digest_algorithm": "sha256 of UTF-8 test IDs joined by one LF in unittest discovery order",
+      "limitation": "the retained receipt binds a count and digest, but does not retain the ordered 1,059-ID vector as an inspectable artifact"
+    },
+    "sole_execution": {
+      "receipt": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+      "receipt_digest": "sha256:85e324a6a12b1bd76d85243c0519a3b3d49ac6c3d986e73fb56eb6ec5f3ce871",
+      "transcript": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "transcript_receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66",
+      "transcript_document_digest": "sha256:fa47790899393221d3c99d5e26096a4faa48c909fc0195cf2108ffbe791868e3",
+      "summary": {
+        "attempts": 1,
+        "tests_run": 1050,
+        "failures": 28,
+        "skipped": 8,
+        "timed_out": false,
+        "wall_time_seconds": 1130.917
+      }
+    },
+    "adverse_courts_retained": [
+      "evidence/courts/CASE-FIXTURE-PREREQUISITE-OPENING.json",
+      "evidence/performance/fixture-prerequisite-v1/causality.json",
+      "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-APPEAL-OPENING.json",
+      "evidence/performance/fixture-prerequisite-causality-appeal-v1/discovery-analysis.json",
+      "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-QUALIFICATION.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/cross-examination.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/integration.json",
+      "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json"
+    ]
+  },
+  "inventory_reconciliation": {
+    "arithmetic": {
+      "discovered_ids": 1059,
+      "historical_execution_count": 1050,
+      "delta": 9
+    },
+    "static_source_observation": {
+      "mode": "read-only AST and source inspection of b789; no discovery or test command was run",
+      "fixture_test_path": "tests/test_autopilot_fixture_seed.py",
+      "fixture_test_blob": "c352b4f87a678787111850fb598e4d849a20fdd7",
+      "fixture_contract_class": "ContentAddressedFixtureSeedContractTests",
+      "fixture_contract_methods_declared": 9,
+      "class_prerequisite": "setUpClass loads .autopilot/tests/fixture_support.py and raises unittest.SkipTest when ContentAddressedFixtureSeed, FixtureIntegrityError, or FixturePolicyError are absent",
+      "historical_transcript_observation": "one synthetic setUpClass skip is recorded for ContentAddressedFixtureSeedContractTests; none of its nine method IDs is printed as an executed test header",
+      "reconciled_delta": "The nine declared fixture-contract methods are loaded as part of the 1,059-ID discovery inventory but are collectively suppressed by the class-level SkipTest before method execution. This exactly explains 1059 minus 1050."
+    },
+    "execution_header_cross_check": {
+      "method_headers_observed": 1050,
+      "synthetic_class_skip_headers_observed": 1,
+      "method_header_count_matches_summary_tests_run": true,
+      "note": "The synthetic setUpClass skip is a class-lifecycle record, not an additional executed method. Its presence is consistent with the eight skipped results in the historical summary."
+    },
+    "skip_classification": {
+      "historical_skips": 8,
+      "fixture_contract_class_skip": 1,
+      "other_platform_or-policy_skips": 7,
+      "claim_boundary": "The retained transcript identifies the fixture class skip and reports eight skips, but does not preserve a separate machine-readable per-ID outcome vector; no broader skip attribution is claimed."
+    }
+  },
+  "candidate_component_separation": {
+    "fixture_api_component": {
+      "missing_symbols": [
+        "ContentAddressedFixtureSeed",
+        "FixtureIntegrityError",
+        "FixturePolicyError"
+      ],
+      "affected_failure_count": 1,
+      "affected_failure": "test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available",
+      "separate_from_discovery_delta": "The nine skipped fixture-contract methods are inactive because this API is absent; that class-level skip explains the count delta but does not convert the fixture API into a sufficient remediation."
+    },
+    "git_commit_observation_component": {
+      "source_test_blob": "37782c3282cbb23d54cef12c90c0a6ab9ffab63f",
+      "missing_symbols": [
+        "GitCommitObservation",
+        "GitCommitObservationError",
+        "_git_commit_observation",
+        "_parse_git_commit_batch"
+      ],
+      "affected_failure_count": 27,
+      "affected_test_module": "test_doctor_git_fact_batching",
+      "status": "separate non-promoted candidate component; no GCO implementation, promotion, or reuse is authorized"
+    },
+    "causal_conclusion": "The two APIs are distinct components. The fixture API explains the nine-method suppression and one observed API-surface failure; the absent GitCommitObservation API independently explains 27 failures. Neither component alone proves a passing corrected-source validation target."
+  },
+  "material_limits_and_dissent": [
+    "This analysis did not rerun CI, unittest discovery, any test, or a candidate; it relies on the sole retained execution and read-only source inspection.",
+    "The exact ordered 1,059-ID vector is not retained, so the nine-method reconciliation is source-and-transcript-supported rather than a new digest-to-vector comparison.",
+    "The historical transcript remains the sole execution. Its 28 failures, eight skips, and 1,050-test summary are adverse facts, not success evidence.",
+    "The rejected fixture candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 and non-promoted GCO candidate d02c2d2 remain adverse historical evidence and are not validation-target candidates."
+  ],
+  "conclusion": "RECONCILED WITH LIMITS: The b789/b909 discovery-to-execution arithmetic is explained by the nine ContentAddressedFixtureSeedContractTests methods suppressed together by their b789 class-level missing-fixture SkipTest: 1,059 discovered IDs minus nine suppressed methods equals 1,050 historical executed method headers. This resolves the count classification, but it does not cure the 28 historical failures, establish causal sufficiency of either fixture or GCO APIs, or grant any implementation, execution, performance, promotion, main, or remote authority.",
+  "receipt_digest": "sha256:d556380b3b61093d5833b0020504d0ff32d603b03eafecb0757455b674303038"
+}
