@@ -265,6 +265,8 @@ class RecoveryStore:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
+        if self.root.is_symlink():
+            raise ValidationReceiptError("recovery store cannot be a symlink")
 
     def checkpoint(self, case: RecoveryCase) -> Path:
         document = case.to_document()
@@ -275,6 +277,26 @@ class RecoveryStore:
             handle.write(canonical_bytes(document)); handle.flush(); os.fsync(handle.fileno()); temporary = Path(handle.name)
         os.replace(temporary, path)
         return path
+
+    def load_latest(self, case_id: str) -> RecoveryCase:
+        """Reload an authenticated case history; never silently start it over."""
+
+        paths = sorted(self.root.glob(f"{case_id}-*.json"))
+        if not paths:
+            raise ValidationReceiptError("recovery case has no durable checkpoint")
+        try:
+            document = json.loads(paths[-1].read_text(encoding="utf-8"))
+            digest = document.pop("digest")
+            if digest != digest_json(document) or document.get("case_id") != case_id:
+                raise ValidationReceiptError("recovery checkpoint integrity mismatch")
+            history = [RecoveryEvent(RecoveryState(item["state"]), str(item["blocker_signature"]), str(item["at"])) for item in document["history"]]
+            case = RecoveryCase(case_id, str(document["predecessor_receipt_digest"]), int(document["max_automatic_attempts"]), 1, 1, RecoveryState(document["state"]), history, document.get("escalation_reason"))
+            case.session_id = str(document["session_id"])
+            if not case.history or case.history[-1].state is not case.state:
+                raise ValidationReceiptError("recovery checkpoint transition chain is invalid")
+            return case
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValidationReceiptError("recovery checkpoint is malformed") from error
 
 
 class ValidationReceiptRecorder:

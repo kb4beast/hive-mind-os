@@ -11,6 +11,7 @@ from hive_mind_os.validation_receipts import (
     DiscoveryRecord,
     ReceiptStore,
     RecoveryCase,
+    RecoveryStore,
     RecoveryState,
     TerminalKind,
     TerminalOutcome,
@@ -214,6 +215,19 @@ class RecoveryCaseTests(unittest.TestCase):
         self.assertEqual(recovery.escalation_reason, "repeated-blocker-signature")
         with self.assertRaises(ValueError):
             recovery.diagnose("parser:unknown-label")
+
+    def test_recovery_reload_preserves_history_and_cannot_reset_budget(self) -> None:
+        recovery = RecoveryCase("RECOVERY-RELOAD", "sha256:" + "d" * 64)
+        recovery.diagnose("parser:unknown-label")
+        recovery.remediate("parser:unknown-label", remediation_id="grammar-v2")
+        recovery.revalidate(new_session_id="018f8d4a-0000-7000-8000-000000000005")
+        with tempfile.TemporaryDirectory() as temporary:
+            store = RecoveryStore(temporary)
+            store.checkpoint(recovery)
+            resumed = store.load_latest("RECOVERY-RELOAD")
+            resumed.block("parser:unknown-label")
+        self.assertEqual(resumed.state, RecoveryState.ESCALATED)
+        self.assertEqual(resumed.escalation_reason, "repeated-blocker-signature")
 
 
 class CandidateApplicabilityTests(unittest.TestCase):
