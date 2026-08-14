@@ -15,40 +15,49 @@ from pathlib import Path
 from typing import Callable, Mapping, Protocol, Sequence, TypeVar
 
 from controller import (
-    _host_provider_binding,
+    CODEX_APP_SERVER_IDENTITY_FIELDS,
     CapacityAdmissionDenied,
     ConfigurationError,
     ControlPlane,
+    _host_provider_binding,
+    _read_regular_authority_bytes,
+    _validate_codex_app_server_execution_identity,
     active_global_host_reservations,
     append_jsonl,
     assert_execution_authority_open,
     digest_json,
+    exclusive_write_json_or_identical,
     fence_expired_global_host_session,
     format_time,
     global_host_reservation_record,
+    grant_host_scheduler_capacity,
     host_repository_registry_bindings,
+    install_execution_adapter_identity,
+    parse_strict_canonical_json_bytes,
     parse_time,
+    read_execution_adapter_identity,
     read_host_capacity,
+    read_strict_canonical_json,
+    record_host_scheduler_demand,
     release_global_host_session,
     renew_global_host_session,
-    read_strict_canonical_json,
     require_execution_authority_dir,
     require_host_runtime,
     reserve_global_host_session,
     resolve_repository_state_dir,
     runtime_file_lock,
+    runtime_repository_identity,
     strict_jsonl_records,
     utc_now,
-    validate_host_lifecycle_observation,
     validate_host_effect_ledger_records,
+    validate_host_effect_reconciliation_evidence,
+    validate_host_lifecycle_observation,
 )
-
 from orchestration import (
     MAX_PRIMARY_TASKS,
     OrchestrationError,
     active_host_reservations,
     active_launch_bindings,
-    active_repository_host_state,
     assert_launch_authority,
     bind_launch,
     binding_events,
@@ -176,6 +185,10 @@ class HostAdapter(Protocol):
 
     def lookup_thread(self, *, idempotency_key: str) -> Mapping[str, object] | None: ...
 
+    def host_provider_identity(
+        self, *, repo_root: Path
+    ) -> Mapping[str, object]: ...
+
     def trusted_singleton_target(self, *, repo_root: Path) -> str: ...
 
     def dispatcher_effect_guard(
@@ -271,6 +284,10 @@ class _Binding:
     capacity_generation: str
     capacity_epoch: int
     reservation_expires_at: str
+    host_kernel_generation: str
+    execution_adapter_identity_record_id: str
+    execution_adapter_identity_path: str
+    execution_adapter_identity_blob_digest: str
     task: Mapping[str, object]
     host_id: str
     task_id: str
@@ -296,6 +313,10 @@ class _EffectFence:
     authority_epoch: int
     dispatch_release_id: str | None
     dispatch_admission_epoch: int | None
+    host_kernel_generation: str
+    execution_adapter_identity_record_id: str
+    execution_adapter_identity_path: str
+    execution_adapter_identity_blob_digest: str
     task: Mapping[str, object]
 
 
@@ -768,6 +789,10 @@ def _validate_creation(
         capacity_generation="",
         capacity_epoch=0,
         reservation_expires_at="",
+        host_kernel_generation="",
+        execution_adapter_identity_record_id="",
+        execution_adapter_identity_path="",
+        execution_adapter_identity_blob_digest="",
         task={},
         host_id=_required_text(value.get("host_id"), "host_id"),
         task_id=_required_text(value.get("task_id"), "task_id"),
@@ -899,6 +924,14 @@ def _effect_guard(
     adapter: HostAdapter | None = None,
 ) -> Iterator[None]:
     dispatcher_entered = False
+    adapter_snapshot: Mapping[str, object] | None = None
+    host_runtime: Path | None = None
+    if adapter is not None:
+        adapter_snapshot = _execution_adapter_snapshot(adapter, repo_root)
+        host_runtime_value = getattr(adapter, "host_runtime_dir", None)
+        if not isinstance(host_runtime_value, (str, Path)):
+            raise HostExecutionError("adapter host runtime is invalid")
+        host_runtime = require_host_runtime(Path(host_runtime_value))
     try:
         dispatcher_guard = (
             _host_dispatcher_guard(
@@ -909,29 +942,45 @@ def _effect_guard(
             if adapter is not None
             else nullcontext(None)
         )
-        with dispatcher_guard:
-            dispatcher_entered = True
-            if state_dir is None:
-                raise HostExecutionError(
-                    "host effects require an authenticated execution directory"
-                )
-            execution_directory = Path(state_dir).resolve()
-            with runtime_file_lock(
-                execution_directory / "locks" / "dispatcher-admission.lock",
+        host_guard = (
+            runtime_file_lock(
+                host_runtime / "locks" / "host-authority.lock",
                 timeout_seconds=120.0,
-            ):
-                try:
-                    assert_execution_authority_open(execution_directory)
-                except ConfigurationError as error:
-                    raise HostExecutionError(str(error)) from error
-                with launch_authority_guard(
-                    repo_root,
-                    binding.instruction_id,
-                    resource_key=binding.resource_key,
-                    authority_epoch=binding.authority_epoch,
-                    state_dir=execution_directory,
+            )
+            if host_runtime is not None
+            else nullcontext(None)
+        )
+        with host_guard:
+            with dispatcher_guard:
+                dispatcher_entered = True
+                if state_dir is None:
+                    raise HostExecutionError(
+                        "host effects require an authenticated execution directory"
+                    )
+                execution_directory = Path(state_dir).resolve()
+                with runtime_file_lock(
+                    execution_directory / "locks" / "dispatcher-admission.lock",
+                    timeout_seconds=120.0,
                 ):
-                    yield
+                    try:
+                        assert_execution_authority_open(execution_directory)
+                    except ConfigurationError as error:
+                        raise HostExecutionError(str(error)) from error
+                    with launch_authority_guard(
+                        repo_root,
+                        binding.instruction_id,
+                        resource_key=binding.resource_key,
+                        authority_epoch=binding.authority_epoch,
+                        state_dir=execution_directory,
+                    ):
+                        if adapter is not None:
+                            _validate_effect_adapter_fence(
+                                adapter,
+                                repo_root,
+                                binding,
+                                snapshot=adapter_snapshot,
+                            )
+                        yield
     except Exception as error:
         if adapter is not None and not dispatcher_entered:
             error = _DispatcherEffectRejected(str(error))
@@ -969,6 +1018,10 @@ _HOST_EFFECT_FIELDS = frozenset(
         "authority_epoch",
         "dispatcher_release_id",
         "dispatcher_admission_epoch",
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
         "effect_kind",
         "idempotency_key",
         "request_digest",
@@ -999,6 +1052,10 @@ _HOST_EFFECT_IDENTITY_FIELDS = frozenset(
         "authority_epoch",
         "dispatcher_release_id",
         "dispatcher_admission_epoch",
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
         "effect_kind",
         "idempotency_key",
         "request_digest",
@@ -1024,7 +1081,9 @@ def _host_effect_events(
     try:
         records = strict_jsonl_records(path, label="host effect intent ledger")
         return validate_host_effect_ledger_records(
-            records, launch_instruction_id=instruction_id
+            records,
+            launch_instruction_id=instruction_id,
+            execution_dir=Path(state_dir).resolve() if state_dir is not None else None,
         )
     except ConfigurationError as error:
         raise HostExecutionError(str(error)) from error
@@ -1058,7 +1117,293 @@ def _effect_binding_document(
         "authority_epoch": binding.authority_epoch,
         "dispatcher_release_id": binding.dispatch_release_id,
         "dispatcher_admission_epoch": binding.dispatch_admission_epoch,
+        "host_kernel_generation": binding.host_kernel_generation,
+        "execution_adapter_identity_record_id": (
+            binding.execution_adapter_identity_record_id
+        ),
+        "execution_adapter_identity_path": binding.execution_adapter_identity_path,
+        "execution_adapter_identity_blob_digest": (
+            binding.execution_adapter_identity_blob_digest
+        ),
     }
+
+
+def _execution_adapter_snapshot(
+    adapter: HostAdapter, repo_root: Path
+) -> Mapping[str, object]:
+    provider = getattr(adapter, "host_provider_identity", None)
+    if not callable(provider):
+        raise HostExecutionError(
+            "external host effects require a sealed execution adapter identity"
+        )
+    value = provider(repo_root=repo_root)
+    if not isinstance(value, Mapping) or _DIGEST.fullmatch(
+        str(value.get("record_id"))
+    ) is None:
+        raise HostExecutionError("execution adapter identity is invalid")
+    return dict(value)
+
+
+def _authenticate_installed_adapter_source(
+    host_runtime: Path,
+    installed: Mapping[str, object],
+    supplied: Mapping[str, object],
+    *,
+    writer: Mapping[str, object],
+    provider: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Bind a live adapter snapshot to its immutable full source document."""
+
+    source_path = host_runtime / _required_text(
+        installed.get("adapter_identity_source_path"),
+        "installed execution adapter source path",
+    )
+    try:
+        source_raw = _read_regular_authority_bytes(
+            source_path, label="installed execution adapter source"
+        )
+        source = parse_strict_canonical_json_bytes(
+            source_raw,
+            label="installed execution adapter source",
+            expected_fields=CODEX_APP_SERVER_IDENTITY_FIELDS,
+        )
+        source = _validate_codex_app_server_execution_identity(
+            source,
+            execution_namespace=str(installed["execution_namespace"]),
+            execution_id=str(installed["execution_id"]),
+            host_id=str(installed["host_id"]),
+            machine_user_id=str(writer["machine_user_id"]),
+            provider_identity_digest=str(provider["provider_identity_digest"]),
+            verify_live_sources=True,
+        )
+    except ConfigurationError as error:
+        raise HostExecutionError(str(error)) from error
+    if (
+        source != supplied
+        or source.get("record_id") != installed.get("adapter_identity_record_id")
+        or "sha256:" + sha256(source_raw).hexdigest()
+        != installed.get("adapter_identity_blob_digest")
+    ):
+        raise HostExecutionError(
+            "live adapter snapshot differs from immutable execution adapter evidence"
+        )
+    return source
+
+
+def _validate_effect_adapter_fence(
+    adapter: HostAdapter,
+    repo_root: Path,
+    binding: _Binding | _EffectFence,
+    *,
+    snapshot: Mapping[str, object] | None = None,
+) -> Mapping[str, object]:
+    """Authenticate the exact execution-local adapter before a host effect."""
+
+    supplied = dict(snapshot or _execution_adapter_snapshot(adapter, repo_root))
+    host_runtime_value = getattr(adapter, "host_runtime_dir", None)
+    if not isinstance(host_runtime_value, (str, Path)):
+        raise HostExecutionError("adapter host runtime is invalid")
+    host_runtime = require_host_runtime(Path(host_runtime_value))
+    installed = read_execution_adapter_identity(
+        host_runtime, binding.execution_adapter_identity_record_id
+    )
+    provider = _host_provider_binding(
+        host_runtime,
+        host_id=_required_text(getattr(adapter, "host_id", None), "adapter host id"),
+    )
+    writer = read_strict_canonical_json(
+        host_runtime / "host-runtime-identity.json",
+        label="host runtime writer identity",
+    )
+    _authenticate_installed_adapter_source(
+        host_runtime,
+        installed,
+        supplied,
+        writer=writer,
+        provider=provider,
+    )
+    if (
+        installed.get("record_id")
+        != binding.execution_adapter_identity_record_id
+        or installed.get("adapter_identity_record_id") != supplied.get("record_id")
+        or installed.get("host_id") != getattr(adapter, "host_id", None)
+        or installed.get("execution_id")
+        != getattr(adapter, "execution_id", None)
+        or installed.get("execution_namespace")
+        != getattr(adapter, "execution_namespace", None)
+        or installed.get("provider_generation")
+        != provider.get("provider_generation")
+        or installed.get("provider_epoch") != provider.get("provider_epoch")
+        or installed.get("provider_identity_digest")
+        != provider.get("provider_identity_digest")
+        or supplied.get("provider_identity_digest")
+        != provider.get("provider_identity_digest")
+        or binding.host_kernel_generation
+        != writer.get("host_kernel_generation")
+        or provider.get("host_kernel_generation")
+        != binding.host_kernel_generation
+    ):
+        raise HostExecutionError(
+            "execution adapter differs from the reservation and effect authority"
+        )
+    binding_path = (
+        host_runtime
+        / "execution-adapter-bindings"
+        / (
+            binding.execution_adapter_identity_record_id.removeprefix("sha256:")
+            + ".json"
+        )
+    )
+    binding_raw = (
+        json.dumps(
+            dict(installed),
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+    if (
+        binding.execution_adapter_identity_path
+        != str(binding_path.relative_to(host_runtime)).replace("\\", "/")
+        or binding.execution_adapter_identity_blob_digest
+        != "sha256:" + sha256(binding_raw).hexdigest()
+    ):
+        raise HostExecutionError("execution adapter evidence bytes changed")
+    return supplied
+
+
+def _validate_reservation_adapter_identity(
+    adapter: HostAdapter,
+    repo_root: Path,
+    reservation: Mapping[str, object],
+) -> Mapping[str, object]:
+    supplied = _execution_adapter_snapshot(adapter, repo_root)
+    host_runtime_value = getattr(adapter, "host_runtime_dir", None)
+    if not isinstance(host_runtime_value, (str, Path)):
+        raise HostExecutionError("adapter host runtime is invalid")
+    host_runtime = require_host_runtime(Path(host_runtime_value))
+    with runtime_file_lock(
+        host_runtime / "locks" / "host-authority.lock", timeout_seconds=120.0
+    ):
+        installed = read_execution_adapter_identity(
+            host_runtime,
+            _required_text(
+                reservation.get("execution_adapter_identity_record_id"),
+                "reservation execution adapter identity",
+            ),
+        )
+        provider = _host_provider_binding(
+            host_runtime,
+            host_id=_required_text(reservation.get("host_id"), "reservation host id"),
+        )
+        writer = read_strict_canonical_json(
+            host_runtime / "host-runtime-identity.json",
+            label="host runtime writer identity",
+        )
+        _authenticate_installed_adapter_source(
+            host_runtime,
+            installed,
+            supplied,
+            writer=writer,
+            provider=provider,
+        )
+        installed_blob = "sha256:" + sha256(
+            (
+                json.dumps(
+                    dict(installed),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    indent=2,
+                    allow_nan=False,
+                )
+                + "\n"
+            ).encode("utf-8")
+        ).hexdigest()
+    if (
+        installed.get("record_id")
+        != reservation.get("execution_adapter_identity_record_id")
+        or installed.get("adapter_identity_record_id") != supplied.get("record_id")
+        or any(
+            installed.get(field) != reservation.get(field)
+            for field in (
+                "repository",
+                "execution_id",
+                "host_id",
+                "provider_generation",
+            )
+        )
+        or installed.get("execution_namespace")
+        != getattr(adapter, "execution_namespace", None)
+        or installed.get("provider_epoch") != reservation.get("provider_epoch")
+        or provider.get("provider_generation")
+        != reservation.get("provider_generation")
+        or provider.get("provider_epoch") != reservation.get("provider_epoch")
+        or installed.get("provider_identity_digest")
+        != provider.get("provider_identity_digest")
+        or supplied.get("provider_identity_digest")
+        != provider.get("provider_identity_digest")
+        or reservation.get("host_kernel_generation")
+        != writer.get("host_kernel_generation")
+        or provider.get("host_kernel_generation")
+        != reservation.get("host_kernel_generation")
+        or reservation.get("execution_adapter_identity_path")
+        != (
+            "execution-adapter-bindings/"
+            + str(installed["record_id"]).removeprefix("sha256:")
+            + ".json"
+        )
+        or reservation.get("execution_adapter_identity_blob_digest")
+        != installed_blob
+    ):
+        raise HostExecutionError(
+            "lifecycle observer does not match the reserved execution adapter"
+        )
+    return supplied
+
+
+def _bind_lifecycle_observation_to_adapter(
+    supplied: Mapping[str, object], reservation: Mapping[str, object]
+) -> Mapping[str, object]:
+    legacy_fields = {
+        "schema_version",
+        "kind",
+        "host_id",
+        "reservation_id",
+        "execution_id",
+        "local_reservation_id",
+        "capacity_generation",
+        "host_task_id",
+        "host_cursor",
+        "capability_digest",
+        "state",
+        "terminal_state",
+        "observed_at",
+        "source_event_id",
+        "observation_id",
+    }
+    if set(supplied) != legacy_fields:
+        raise HostExecutionError("adapter lifecycle observation schema is invalid")
+    adapter_material = dict(supplied)
+    adapter_observation_id = adapter_material.pop("observation_id", None)
+    if adapter_observation_id != digest_json(adapter_material):
+        raise HostExecutionError("adapter lifecycle observation digest is invalid")
+    material = {
+        **adapter_material,
+        "host_kernel_generation": reservation["host_kernel_generation"],
+        "execution_adapter_identity_record_id": reservation[
+            "execution_adapter_identity_record_id"
+        ],
+        "execution_adapter_identity_path": reservation[
+            "execution_adapter_identity_path"
+        ],
+        "execution_adapter_identity_blob_digest": reservation[
+            "execution_adapter_identity_blob_digest"
+        ],
+        "adapter_observation_id": adapter_observation_id,
+    }
+    return {**material, "observation_id": digest_json(material)}
 
 
 def _validate_effect_reconciliation(
@@ -1203,7 +1548,67 @@ def _validate_effect_reconciliation(
             )
     elif external_id is not None or result is not None or not unobserved:
         raise HostExecutionError("unknown host reconciliation fabricates a result")
-    return value
+    adapter_observation_id = str(record_id)
+    provenance = {
+        "host_kernel_generation": effect.get("host_kernel_generation"),
+        "execution_adapter_identity_record_id": effect.get(
+            "execution_adapter_identity_record_id"
+        ),
+        "execution_adapter_identity_path": effect.get(
+            "execution_adapter_identity_path"
+        ),
+        "execution_adapter_identity_blob_digest": effect.get(
+            "execution_adapter_identity_blob_digest"
+        ),
+    }
+    if (
+        _DIGEST.fullmatch(str(provenance["host_kernel_generation"])) is None
+        or _DIGEST.fullmatch(
+            str(provenance["execution_adapter_identity_record_id"])
+        )
+        is None
+        or not isinstance(provenance["execution_adapter_identity_path"], str)
+        or not provenance["execution_adapter_identity_path"]
+        or _DIGEST.fullmatch(
+            str(provenance["execution_adapter_identity_blob_digest"])
+        )
+        is None
+    ):
+        raise HostExecutionError(
+            "host effect reconciliation lacks execution adapter provenance"
+        )
+    enriched_material = {
+        **material,
+        **provenance,
+        "adapter_observation_id": adapter_observation_id,
+    }
+    enriched = {
+        **enriched_material,
+        "record_id": digest_json(enriched_material),
+    }
+    evidence_path = (
+        Path(state_dir).resolve()
+        / "host-effect-reconciliations"
+        / (str(enriched["record_id"]).removeprefix("sha256:") + ".json")
+    )
+    try:
+        exclusive_write_json_or_identical(evidence_path, enriched)
+        installed = read_strict_canonical_json(
+            evidence_path,
+            label="execution adapter host-effect reconciliation evidence",
+            expected_fields=set(enriched),
+        )
+    except ConfigurationError as error:
+        raise HostExecutionError(str(error)) from error
+    if installed != enriched:
+        raise HostExecutionError(
+            "host effect reconciliation evidence changed after installation"
+        )
+    try:
+        validate_host_effect_reconciliation_evidence(enriched, effect=effect)
+    except ConfigurationError as error:
+        raise HostExecutionError(str(error)) from error
+    return enriched
 
 
 def _prepare_host_effect(
@@ -1231,12 +1636,44 @@ def _prepare_host_effect(
         "effect_kind": effect_kind,
         "idempotency_key": idempotency_key,
         "request_digest": request_digest,
+        "host_kernel_generation": binding.host_kernel_generation,
+        "execution_adapter_identity_record_id": (
+            binding.execution_adapter_identity_record_id
+        ),
+        "execution_adapter_identity_path": binding.execution_adapter_identity_path,
+        "execution_adapter_identity_blob_digest": (
+            binding.execution_adapter_identity_blob_digest
+        ),
     }
     effect_id = digest_json(effect_material)
     path = _host_effect_path(state_dir, binding.instruction_id)
     reconcile_event: Mapping[str, object] | None = None
     with _effect_guard(repo_root, binding, state_dir, adapter=adapter):
         events = list(_host_effect_events(state_dir, binding.instruction_id))
+        logical_coordinates = {
+            "launch_instruction_id": binding.instruction_id,
+            "resource_key": binding.resource_key,
+            "authority_epoch": binding.authority_epoch,
+            "dispatcher_release_id": binding.dispatch_release_id,
+            "dispatcher_admission_epoch": binding.dispatch_admission_epoch,
+            "effect_kind": effect_kind,
+            "idempotency_key": idempotency_key,
+            "request_digest": request_digest,
+        }
+        conflicting_effects = {
+            str(event.get("effect_id"))
+            for event in events
+            if all(
+                event.get(field) == expected
+                for field, expected in logical_coordinates.items()
+            )
+            and event.get("effect_id") != effect_id
+        }
+        if conflicting_effects:
+            raise HostEffectRecoveryRequired(
+                "a legacy or retired-adapter host effect already owns this logical "
+                "request; reconcile its exact external outcome before retry"
+            )
         same_effect = [event for event in events if event.get("effect_id") == effect_id]
         latest = same_effect[-1] if same_effect else None
         now = utc_now()
@@ -1305,6 +1742,16 @@ def _prepare_host_effect(
                     "authority_epoch": binding.authority_epoch,
                     "dispatcher_release_id": binding.dispatch_release_id,
                     "dispatcher_admission_epoch": binding.dispatch_admission_epoch,
+                    "host_kernel_generation": binding.host_kernel_generation,
+                    "execution_adapter_identity_record_id": (
+                        binding.execution_adapter_identity_record_id
+                    ),
+                    "execution_adapter_identity_path": (
+                        binding.execution_adapter_identity_path
+                    ),
+                    "execution_adapter_identity_blob_digest": (
+                        binding.execution_adapter_identity_blob_digest
+                    ),
                     "effect_kind": effect_kind,
                     "idempotency_key": idempotency_key,
                     "request_digest": request_digest,
@@ -1394,7 +1841,7 @@ def _prepare_host_effect(
             raise HostEffectRecoveryRequired(
                 "host effect external outcome is authenticated as unknown; recovery is required"
             )
-        completed = _append_host_effect_event(
+        _append_host_effect_event(
             path,
             events,
             {
@@ -1538,6 +1985,18 @@ def _perform_host_effect(
     if disposition == "ADOPTED":
         return prepared  # type: ignore[return-value]
     try:
+        host_runtime_value = getattr(adapter, "host_runtime_dir", None)
+        if not isinstance(host_runtime_value, (str, Path)):
+            raise HostExecutionError("adapter host runtime is invalid")
+        host_runtime = require_host_runtime(Path(host_runtime_value))
+        live_adapter = _execution_adapter_snapshot(adapter, repo_root)
+        with runtime_file_lock(
+            host_runtime / "locks" / "host-authority.lock",
+            timeout_seconds=120.0,
+        ):
+            _validate_effect_adapter_fence(
+                adapter, repo_root, binding, snapshot=live_adapter
+            )
         result = operation()
         if not isinstance(result, Mapping):
             raise HostExecutionError("external host effect must return an object")
@@ -1695,6 +2154,57 @@ def _host_repository_admission_guard(
                     yield
 
 
+def _scheduler_grant_for_reservation(
+    *,
+    host_runtime_dir: Path,
+    repo_root: Path,
+    capacity: Mapping[str, object],
+    execution_id: str,
+    execution_namespace: str,
+    task: Mapping[str, object],
+    execution_adapter_identity: Mapping[str, object],
+    local_reservation_id: str,
+    now,
+) -> str:
+    """Persist one demand and return only its exact unconsumed slot token."""
+
+    demand = record_host_scheduler_demand(
+        host_runtime_dir,
+        host_id=str(capacity["host_id"]),
+        repository=str(task["repository"]),
+        repository_transport_digest=str(
+            runtime_repository_identity(repo_root)["transport_digest"]
+        ),
+        execution_namespace=execution_namespace,
+        execution_id=execution_id,
+        plan_fingerprint=str(task["plan_fingerprint"]),
+        capacity_generation=str(capacity["capacity_generation"]),
+        execution_adapter_identity=execution_adapter_identity,
+        candidate_reservation_ids=[local_reservation_id],
+        weight=1,
+        actor="host-execution:scheduler",
+        recorded_at=format_time(now),
+    )
+    result = grant_host_scheduler_capacity(
+        host_runtime_dir,
+        host_id=str(capacity["host_id"]),
+        actor="host-execution:scheduler",
+        now=now,
+    )
+    matches = [
+        item
+        for item in result["outstanding_grants"]
+        if isinstance(item, Mapping)
+        and item.get("demand_id") == demand.get("demand_id")
+        and item.get("local_reservation_id") == local_reservation_id
+    ]
+    if len(matches) != 1:
+        raise CapacityAdmissionDenied(
+            "host scheduler retained demand without granting this execution"
+        )
+    return str(matches[0]["grant_id"])
+
+
 def _release_primary_capacity(
     *,
     repo_root: Path,
@@ -1757,6 +2267,7 @@ def _renew_execution_host_reservations(
     host_runtime_dir: Path,
     execution_id: str,
     capacity: Mapping[str, object],
+    execution_adapter_identity: Mapping[str, object],
 ) -> tuple[Mapping[str, object], ...]:
     """Renew near-expiry permits while their authenticated generation is live."""
 
@@ -1802,6 +2313,7 @@ def _renew_execution_host_reservations(
                         renewed_at=format_time(now),
                         expires_at=format_time(requested),
                         now=now,
+                        execution_adapter_identity=execution_adapter_identity,
                     )
                 )
             except ConfigurationError as error:
@@ -2070,9 +2582,20 @@ def recover_expired_host_reservation(
     local_kind, local_event = local
     if reservation.get("reservation_kind") != local_kind:
         raise HostExecutionError("global and local reservation kinds differ")
+    for provenance_field in (
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
+    ):
+        if local_event.get(provenance_field) != reservation.get(provenance_field):
+            raise HostExecutionError(
+                "global and local reservation adapter provenance differs"
+            )
 
     observation: Mapping[str, object] | None = None
     if not _local_host_terminal_is_authoritative(local_kind, local_event):
+        _validate_reservation_adapter_identity(adapter, repo_root, reservation)
         observer = getattr(adapter, "observe_task_lifecycle", None)
         if not callable(observer):
             return {
@@ -2103,8 +2626,11 @@ def recover_expired_host_reservation(
                 "reason": "host lifecycle observation is unavailable",
             }
         try:
+            bound_observation = _bind_lifecycle_observation_to_adapter(
+                supplied, reservation
+            )
             observation = validate_host_lifecycle_observation(
-                supplied, reservation=reservation, now=utc_now()
+                bound_observation, reservation=reservation, now=utc_now()
             )
         except ConfigurationError as error:
             raise HostExecutionError(str(error)) from error
@@ -2289,6 +2815,22 @@ def reconcile_global_expired_host_reservations(
         ):
             reservations = tuple(active_global_host_reservations(host_runtime))
             registry = tuple(host_repository_registry_bindings(host_runtime))
+            adapter_identities: dict[str, Mapping[str, object]] = {}
+            for reservation in reservations:
+                identity_record_id = reservation.get(
+                    "execution_adapter_identity_record_id"
+                )
+                if identity_record_id is None:
+                    continue
+                if not isinstance(identity_record_id, str):
+                    raise HostExecutionError(
+                        "global reservation adapter identity is malformed"
+                    )
+                adapter_identities[str(reservation["reservation_id"])] = dict(
+                    read_execution_adapter_identity(
+                        host_runtime, identity_record_id
+                    )
+                )
     except ConfigurationError as error:
         raise HostExecutionError(str(error)) from error
     bindings_by_repository: dict[str, Mapping[str, object]] = {}
@@ -2391,10 +2933,16 @@ def reconcile_global_expired_host_reservations(
                     reason=reason,
                 )
             else:
+                execution_adapter_identity = adapter_identities.get(reservation_id)
+                if execution_adapter_identity is None:
+                    raise HostExecutionError(
+                        "legacy global reservation has no authenticated execution adapter"
+                    )
                 adapter = adapter_resolver(
                     reservation=dict(reservation),
                     repository_binding=dict(repository_binding),
                     execution_identity=dict(identity),
+                    execution_adapter_identity=dict(execution_adapter_identity),
                     repo_root=Path(repo_root),
                     execution_dir=execution_dir,
                 )
@@ -2420,6 +2968,9 @@ def reconcile_global_expired_host_reservations(
                     raise HostExecutionError(
                         "resolved host adapter is not bound to the owning repository execution"
                     )
+                _validate_reservation_adapter_identity(
+                    adapter, Path(repo_root), reservation
+                )
                 lifecycle = _authenticated_lifecycle_capability(
                     adapter, Path(repo_root)
                 )
@@ -2508,6 +3059,14 @@ def _record_sidecar_authorized(
             parent_authority_class=parent.task.get("authority_class"),
             parent_dispatcher_release_id=parent.dispatch_release_id,
             parent_dispatcher_admission_epoch=parent.dispatch_admission_epoch,
+            host_kernel_generation=parent.host_kernel_generation,
+            execution_adapter_identity_record_id=(
+                parent.execution_adapter_identity_record_id
+            ),
+            execution_adapter_identity_path=parent.execution_adapter_identity_path,
+            execution_adapter_identity_blob_digest=(
+                parent.execution_adapter_identity_blob_digest
+            ),
             **fields,
         )
 
@@ -2729,6 +3288,26 @@ def execute_contract(
                 "host_lifecycle_authority": dict(lifecycle),
             },
         }
+    adapter_identity_source = _execution_adapter_snapshot(adapter, repo_root)
+    with runtime_file_lock(
+        host_runtime / "locks" / "host-authority.lock", timeout_seconds=120.0
+    ):
+        try:
+            execution_adapter_identity = install_execution_adapter_identity(
+                host_runtime,
+                repo_root=repo_root,
+                execution_dir=state_dir,
+                execution_namespace=execution_namespace,
+                execution_id=execution_id,
+                host_id=_required_text(getattr(adapter, "host_id", None), "host id"),
+                adapter_identity_path=Path(state_dir)
+                / "host"
+                / "codex-app-server-v1"
+                / "identity.json",
+                adapter_identity=adapter_identity_source,
+            )
+        except ConfigurationError as error:
+            raise HostExecutionError(str(error)) from error
     with runtime_file_lock(
         host_runtime / "locks" / "host-authority.lock", timeout_seconds=120.0
     ):
@@ -2852,7 +3431,6 @@ def execute_contract(
         instruction_id = event.get("launch_instruction_id")
         if isinstance(instruction_id, str):
             latest_primary[instruction_id] = event
-    latest_sidecar = latest_sidecars(repo_root, state_dir=state_dir)
     prospective_reservations = {
         ("primary", str(item["launch_instruction_id"]))
         for item in active_launch_bindings(repo_root, state_dir=state_dir)
@@ -2943,12 +3521,26 @@ def execute_contract(
                             "host_id": capacity["host_id"],
                             "capacity_generation": capacity["capacity_generation"],
                             "resource_key": task["resource_key"],
+                            "execution_adapter_identity_record_id": (
+                                execution_adapter_identity["record_id"]
+                            ),
                         }.items()
                     ):
                         raise HostExecutionError(
                             "dispatcher primary host reservation fence mismatch"
                         )
                 else:
+                    scheduler_grant_id = _scheduler_grant_for_reservation(
+                        host_runtime_dir=host_runtime,
+                        repo_root=repo_root,
+                        capacity=capacity,
+                        execution_id=execution_id,
+                        execution_namespace=execution_namespace,
+                        task=task,
+                        execution_adapter_identity=execution_adapter_identity,
+                        local_reservation_id=instruction_id,
+                        now=now,
+                    )
                     global_reservation = reserve_global_host_session(
                         host_runtime,
                         repository=str(task["repository"]),
@@ -2962,6 +3554,8 @@ def execute_contract(
                         actor_time=format_time(now),
                         expires_at=str(capacity["expires_at"]),
                         now=now,
+                        execution_adapter_identity=execution_adapter_identity,
+                        host_scheduler_grant_id=scheduler_grant_id,
                     )
             except ConfigurationError as error:
                 raise HostExecutionError(str(error)) from error
@@ -2995,6 +3589,18 @@ def execute_contract(
                 capacity_generation=str(global_reservation["capacity_generation"]),
                 capacity_epoch=int(global_reservation["capacity_epoch"]),
                 reservation_expires_at=str(global_reservation["expires_at"]),
+                host_kernel_generation=str(
+                    global_reservation["host_kernel_generation"]
+                ),
+                execution_adapter_identity_record_id=str(
+                    global_reservation["execution_adapter_identity_record_id"]
+                ),
+                execution_adapter_identity_path=str(
+                    global_reservation["execution_adapter_identity_path"]
+                ),
+                execution_adapter_identity_blob_digest=str(
+                    global_reservation["execution_adapter_identity_blob_digest"]
+                ),
                 attempt=attempt,
                 retry_of=str(task["retry_of"]) if task.get("retry_of") is not None else None,
                 state_dir=state_dir,
@@ -3106,6 +3712,16 @@ def execute_contract(
                         dispatch_admission_epoch
                         if task.get("authority_class") == "WRITE_AUTHORIZED"
                         else None
+                    ),
+                    host_kernel_generation=str(prepared["host_kernel_generation"]),
+                    execution_adapter_identity_record_id=str(
+                        prepared["execution_adapter_identity_record_id"]
+                    ),
+                    execution_adapter_identity_path=str(
+                        prepared["execution_adapter_identity_path"]
+                    ),
+                    execution_adapter_identity_blob_digest=str(
+                        prepared["execution_adapter_identity_blob_digest"]
                     ),
                     task=task,
                 )
@@ -3222,6 +3838,16 @@ def execute_contract(
             capacity_generation=str(prepared["capacity_generation"]),
             capacity_epoch=int(prepared["capacity_epoch"]),
             reservation_expires_at=str(prepared["reservation_expires_at"]),
+            host_kernel_generation=str(prepared["host_kernel_generation"]),
+            execution_adapter_identity_record_id=str(
+                prepared["execution_adapter_identity_record_id"]
+            ),
+            execution_adapter_identity_path=str(
+                prepared["execution_adapter_identity_path"]
+            ),
+            execution_adapter_identity_blob_digest=str(
+                prepared["execution_adapter_identity_blob_digest"]
+            ),
             task=task,
             host_id=created.host_id,
             task_id=created.task_id,
@@ -3296,6 +3922,7 @@ def execute_contract(
                 with _host_repository_admission_guard(
                     host_runtime_dir=host_runtime,
                     coordination_dir=coordination_dir,
+                    execution_dir=Path(state_dir),
                     adapter=adapter,
                     task=parent.task,
                     release_id=parent.dispatch_release_id,
@@ -3308,6 +3935,19 @@ def execute_contract(
                         state_dir=state_dir,
                     ):
                         try:
+                            scheduler_grant_id = _scheduler_grant_for_reservation(
+                                host_runtime_dir=host_runtime,
+                                repo_root=repo_root,
+                                capacity=capacity,
+                                execution_id=execution_id,
+                                execution_namespace=execution_namespace,
+                                task=parent.task,
+                                execution_adapter_identity=(
+                                    execution_adapter_identity
+                                ),
+                                local_reservation_id=sidecar_id,
+                                now=admission_now,
+                            )
                             sidecar_reservation = reserve_global_host_session(
                                 host_runtime,
                                 repository=str(parent.task["repository"]),
@@ -3321,6 +3961,8 @@ def execute_contract(
                                 actor_time=format_time(admission_now),
                                 expires_at=str(capacity["expires_at"]),
                                 now=admission_now,
+                                execution_adapter_identity=execution_adapter_identity,
+                                host_scheduler_grant_id=scheduler_grant_id,
                             )
                         except CapacityAdmissionDenied as error:
                             record_sidecar_state(
@@ -3341,6 +3983,34 @@ def execute_contract(
                                 capacity_generation=capacity["capacity_generation"],
                                 capacity_epoch=capacity["capacity_epoch"],
                                 reservation_expires_at=capacity["expires_at"],
+                                host_kernel_generation=capacity[
+                                    "host_kernel_generation"
+                                ],
+                                execution_adapter_identity_record_id=(
+                                    execution_adapter_identity["record_id"]
+                                ),
+                                execution_adapter_identity_path=(
+                                    "execution-adapter-bindings/"
+                                    + str(
+                                        execution_adapter_identity["record_id"]
+                                    ).removeprefix("sha256:")
+                                    + ".json"
+                                ),
+                                execution_adapter_identity_blob_digest=(
+                                    "sha256:"
+                                    + sha256(
+                                        (
+                                            json.dumps(
+                                                dict(execution_adapter_identity),
+                                                ensure_ascii=False,
+                                                sort_keys=True,
+                                                indent=2,
+                                                allow_nan=False,
+                                            )
+                                            + "\n"
+                                        ).encode("utf-8")
+                                    ).hexdigest()
+                                ),
                                 admission_code="ADMISSION_DENIED",
                                 reason=str(error),
                             )
@@ -3357,7 +4027,7 @@ def execute_contract(
                             capacity_host_id=sidecar_reservation["host_id"],
                             capacity_generation=sidecar_reservation["capacity_generation"],
                             capacity_epoch=sidecar_reservation["capacity_epoch"],
-                            reservation_expires_at=sidecar_reservation["expires_at"],
+                                reservation_expires_at=sidecar_reservation["expires_at"],
                             state_dir=state_dir,
                         )
             prior = latest_sidecars(repo_root, state_dir=state_dir).get(sidecar_id)
@@ -3482,14 +4152,6 @@ def execute_contract(
     sidecar_polls = 0
     sidecar_policy = contract.get("sidecar_cohort", {}).get("policy", {}) if isinstance(contract.get("sidecar_cohort"), Mapping) else {}
     cohort_parent_ids = set(primary_bindings)
-    issued_sidecar_ids = {
-        str(spec["sidecar_id"]) for spec in sidecar_specs
-    } | {
-        sidecar_id
-        for sidecar_id, event in persisted_sidecars.items()
-        if event.get("parent_launch_instruction_id") in cohort_parent_ids
-    }
-    sidecar_count = len(issued_sidecar_ids)
     sidecar_budget_reserved = sum(int(spec["token_budget"]) for spec in sidecar_specs)
     wait_rotation = 0
     while active or sidecar_active:
@@ -3506,6 +4168,7 @@ def execute_contract(
             host_runtime_dir=host_runtime,
             execution_id=execution_id,
             capacity=capacity,
+            execution_adapter_identity=execution_adapter_identity,
         )
         poll_cycles += 1
         closure_target = contract.get("closure_target")
@@ -3693,6 +4356,19 @@ def execute_contract(
                                 authority_epoch=sidecar.parent.authority_epoch,
                                 state_dir=state_dir,
                             ):
+                                scheduler_grant_id = _scheduler_grant_for_reservation(
+                                    host_runtime_dir=host_runtime,
+                                    repo_root=repo_root,
+                                    capacity=capacity,
+                                    execution_id=execution_id,
+                                    execution_namespace=execution_namespace,
+                                    task=sidecar.parent.task,
+                                    execution_adapter_identity=(
+                                        execution_adapter_identity
+                                    ),
+                                    local_reservation_id=descendant_id,
+                                    now=admission_now,
+                                )
                                 descendant_reservation = reserve_global_host_session(
                                     host_runtime,
                                     repository=str(sidecar.parent.task["repository"]),
@@ -3706,6 +4382,8 @@ def execute_contract(
                                     actor_time=format_time(admission_now),
                                     expires_at=str(capacity["expires_at"]),
                                     now=admission_now,
+                                    execution_adapter_identity=execution_adapter_identity,
+                                    host_scheduler_grant_id=scheduler_grant_id,
                                 )
                                 _record_sidecar_authorized(
                                     repo_root,
@@ -3769,8 +4447,6 @@ def execute_contract(
                     descendant = _validate_sidecar_creation(created_raw, descendant_spec, sidecar.parent)
                     _record_sidecar_authorized(repo_root, sidecar.parent, descendant_id, "BOUND", adapter=adapter, parent_launch_instruction_id=parent_id, parent_sidecar_id=sidecar.sidecar_id, spec_digest=sidecar_spec_digest(descendant_spec), host_id=descendant.host_id, sidecar_task_id=descendant.task_id, cursor=descendant.cursor, capability_digest="sha256:" + sha256(descendant.capability.encode()).hexdigest(), token_budget_reserved=descendant_budget, state_dir=state_dir)
                     sidecar_active[descendant_id] = descendant
-                    issued_sidecar_ids = fresh_issued_ids | {descendant_id}
-                    sidecar_count = len(issued_sidecar_ids)
                     sidecar_budget_reserved += descendant_budget
                     decision = "ADMITTED"
                     denial = ""

@@ -126,7 +126,11 @@ Before a repository with existing attended cards or task bindings uses this vers
 quiesce its controllers and run the explicit evidence-preserving migration once:
 
 ```bash
-"${AUTOPILOT[@]}" runtime-authority-migrate \
+"${AUTOPILOT[@]}" runtime-authority-migrate --mode dry-run \
+  --actor <stable-operator-identity>
+"${AUTOPILOT[@]}" runtime-authority-migrate --mode apply \
+  --actor <stable-operator-identity>
+"${AUTOPILOT[@]}" runtime-authority-migrate --mode verify \
   --actor <stable-operator-identity>
 ```
 
@@ -140,6 +144,12 @@ bound readiness marker is published only after both bootstrap and attended migra
 complete, so ordinary commands cannot observe a half-initialized authority directory.
 The local `actor` label is audit provenance, not cryptographic authentication. The
 command does not cancel an external host session.
+
+Before READY only, `--mode rollback-before-ready --reason <reason>` installs an
+append-only `ABORTED_FENCED` receipt and prevents the CLI from resuming that exact
+operation. It deliberately does not restore retired claims, quarantined ledgers,
+attended authority, the repository registry, or the Git-common runtime locator: those
+are monotonic evidence, and reactivation would create split authority.
 
 Acquire scheduling evidence through the checked-in helper:
 
@@ -194,7 +204,13 @@ repository/target/plan identity, its exact wave, and an authenticated provider c
 Primary, sidecar, and validation reservations consume one per-user host budget across
 every registered repository; the current App Server ceiling is conservatively one unless
 stronger expiring capability evidence is sealed. A serial node occupies the primary wave alone. Active
-claims freeze replacement of the release; a target, plan, snapshot observation, or
+host demand is persisted in `host-scheduler.jsonl`. Deterministic weighted round-robin
+issues expiring single-use grant IDs, so a barrier wider than capacity advances in
+bounded batches and a small execution cannot starve behind a wide execution from either
+the same or another repository. No grant returns `WAITING_FOR_CAPACITY` with an
+authenticated wake observation; it never becomes an integrity failure or a request to
+open one session per ready sibling. Unused grant expiry restores only its exact candidate.
+Active claims freeze replacement of the release; a target, plan, snapshot observation, or
 reconciliation change invalidates it once claims settle. The public
 `run-round --release-id <exact-id>` path refuses stale or mismatched authority, requires
 no active worker claims, and preflights the exact receipt head for every released node

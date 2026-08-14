@@ -120,11 +120,14 @@ class SidecarExecutionTests(unittest.TestCase):
                 return "rejected"
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            outcomes = list(executor.map(settle, ("SUCCEEDED", "FAILED")))
+            # A PREPARED sidecar cannot truthfully succeed before it is bound
+            # to an external host.  Race two valid pre-spawn terminal outcomes
+            # to exercise serialization without fabricating host success.
+            outcomes = list(executor.map(settle, ("CANCELLED", "FAILED")))
         self.assertEqual(sorted(outcomes), ["accepted", "rejected"])
         events = sidecar_events(self.root)
         self.assertEqual(len(events), 2)
-        self.assertIn(events[-1]["state"], {"SUCCEEDED", "FAILED"})
+        self.assertIn(events[-1]["state"], {"CANCELLED", "FAILED"})
         self.assertEqual(active_sidecars(self.root), ())
 
     def test_capacity_denial_is_a_first_class_terminal_admission_receipt(self) -> None:

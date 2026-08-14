@@ -73,7 +73,21 @@ SNAPSHOT=("$PYTHON" "$REPO_ROOT/.autopilot/bin/github_snapshot.py" --repo-root "
 "${AUTOPILOT[@]}" orchestrate --host-id "$HOST_ID" \
   --request "USER MESSAGE" [--apply] --json
 "${AUTOPILOT[@]}" simple-prompt
-"${AUTOPILOT[@]}" runtime-authority-migrate --actor ACTOR
+"${AUTOPILOT[@]}" runtime-authority-migrate --mode dry-run --actor ACTOR
+"${AUTOPILOT[@]}" runtime-authority-migrate --mode apply --actor ACTOR
+"${AUTOPILOT[@]}" runtime-authority-migrate --mode verify --actor ACTOR
+"${AUTOPILOT[@]}" runtime-authority-migrate --mode rollback-before-ready \
+  --actor ACTOR --reason "abort and preserve pre-READY migration evidence"
+"${AUTOPILOT[@]}" host-runtime-upgrade --actor ACTOR \
+  --reason "install frozen host-kernel writer" \
+  --expected-host-kernel-generation CURRENT_HOST_KERNEL_GENERATION
+"${AUTOPILOT[@]}" host-runtime-recover-torn-tail \
+  --ledger-kind repository-registry --actor ACTOR \
+  --reason "recover an authenticated power-loss tail"
+"${AUTOPILOT[@]}" execution-kernel-upgrade \
+  --execution-id EXECUTION_ID \
+  --expected-identity-record-id CURRENT_EXECUTION_IDENTITY_RECORD_ID \
+  --actor ACTOR --reason "install frozen execution kernel"
 "${AUTOPILOT[@]}" prepare-launch INSTRUCTION_ID --host HOST --host-id "$HOST_ID" \
   --repository REPOSITORY \
   --node-id NODE_ID --lifecycle LIFECYCLE --branch BRANCH \
@@ -188,6 +202,17 @@ generation; active claims prevent replacement or invalidation until they settle.
 dispatcher again rather than reusing an old prompt. Claim admission and every hosted
 claim transition independently revalidate the exact current release before changing
 authority.
+
+Capacity admission is a durable host-kernel schedule, not an all-siblings barrier.
+Each execution records an exact DEMAND over candidate reservation IDs; deterministic
+weighted round-robin emits expiring, single-use GRANT capabilities. A thirteen-node
+ready barrier on four authenticated slots therefore advances as `4, 4, 4, 1` as
+permits return, while its downstream barrier remains closed until all thirteen settle.
+A continuously queued small execution receives a slot ahead of the next wide-execution
+turn, regardless of repository. Unavailable capacity returns the resumable typed state
+`WAITING_FOR_CAPACITY`; it is not an authority or integrity failure. Expired unused
+grants restore the exact unconsumed candidates, while consumed grants can never be
+replayed for another reservation.
 
 Target reconciliation evidence remains intentionally live and execution-scoped: a fresh
 dispatcher must inspect the configured singleton release target branch before releasing
@@ -365,6 +390,16 @@ aggregate session and validation reservations are host-wide and multi-repository
 does not claim OS-level CPU, memory, disk, network, CI, or process cancellation control;
 an authority fence cannot forcibly cancel an external chat. Those stronger capabilities
 require a separately governed execution provider.
+
+Ordinary writers reject a different host or execution kernel before mutation.  The two
+upgrade commands above are the only transition apertures: they require an exact
+predecessor CAS, an append-only generation record, and a host/repository/execution
+zero-activity cut.  They are crash-idempotent and reject downgrade or retired-writer
+replay; changing checkout bytes alone never grants writer authority.
+If a host JSONL append is torn by power loss, `host-runtime-recover-torn-tail`
+retains the exact tail bytes in immutable evidence before truncating to a fully
+validated prefix.  Complete-but-invalid records and ambiguous interior corruption
+remain fail-closed; capacity history additionally requires `--host-id`.
 
 Worker publication order is mandatory:
 

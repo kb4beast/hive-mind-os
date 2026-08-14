@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import importlib.util
 import json
 import os
@@ -877,7 +878,7 @@ class RuntimeIdentityTests(unittest.TestCase):
             template.write_bytes(template.read_bytes() + b"\nmutated kernel template\n")
             with self.assertRaisesRegex(
                 controller.ConfigurationError,
-                "another target or plan",
+                "execution kernel bytes changed",
             ):
                 controller.ControlPlane(root)
             after = {
@@ -902,7 +903,7 @@ class RuntimeIdentityTests(unittest.TestCase):
             learning.write_bytes(learning.read_bytes() + b"\n# stale kernel writer\n")
             with self.assertRaisesRegex(
                 controller.ConfigurationError,
-                "kernel bundle or interpreter policy changed",
+                "execution kernel bytes changed",
             ):
                 plane.record_blocker(
                     "BOOT-000",
@@ -1200,7 +1201,7 @@ class RuntimeIdentityTests(unittest.TestCase):
                     "observation_id": controller.digest_json(
                         {"kind": "fixture-other-target-snapshot-v1"}
                     ),
-                    "fetch_ref": "refs/heads/hive-mind-evidence/other-target",
+                    "fetch_ref": "refs/heads/hme/s/" + "1" * 64,
                     "branch_fetches": [],
                     "repository": plane.repository_identity["repository"],
                     "target_branch": other_branch,
@@ -1318,7 +1319,7 @@ class RuntimeIdentityTests(unittest.TestCase):
                 "execution_id": plane.execution_id,
                 "observation_epoch": 1,
                 "observation_id": observation_id,
-                "fetch_ref": "refs/heads/hive-mind-evidence/snapshot-fixture",
+                "fetch_ref": "refs/heads/hme/s/" + "2" * 64,
                 "branch_fetches": [],
                 "repository": plane.repository_identity["repository"],
                 "target_branch": plane.target_branch,
@@ -1424,7 +1425,7 @@ class RuntimeIdentityTests(unittest.TestCase):
                 ),
                 "receipt_heads": [],
                 "receipt_heads_digest": controller.digest_json([]),
-                "transaction_ref": "refs/heads/hive-mind-evidence/fixture-transaction",
+                "transaction_ref": "refs/heads/hme/t/" + "3" * 64,
                 "coordinator_id": "test:publisher",
                 "transaction_lease_nonce": "4" * 64,
                 "transaction_lease_id": controller.digest_json(
@@ -1492,6 +1493,26 @@ class RuntimeIdentityTests(unittest.TestCase):
             release_id = "sha256:" + "1" * 64
             transaction_id = "sha256:" + "2" * 64
             target_sha = "c" * 40
+            observed_at = "2030-01-01T00:00:00Z"
+            receipt_heads = [
+                {
+                    "node_id": "RECON-010",
+                    "branch": "recon-010",
+                    "expected_sha": "a" * 40,
+                    "observed_sha": "a" * 40,
+                }
+            ]
+            observation_key = controller.digest_json(
+                {
+                    "kind": "hive-mind-superseded-publication-observation-ref-key-v1",
+                    "execution_id": plane.execution_id,
+                    "publication_transaction_id": transaction_id,
+                    "expected_target_sha": current["target_sha"],
+                    "observed_target_sha": target_sha,
+                    "receipt_heads": receipt_heads,
+                    "observed_at": observed_at,
+                }
+            )
             material: dict[str, object] = {
                 "schema_version": 1,
                 "kind": (
@@ -1505,30 +1526,20 @@ class RuntimeIdentityTests(unittest.TestCase):
                 "expected_target_sha": current["target_sha"],
                 "pinned_sha": "b" * 40,
                 "observed_target_sha": target_sha,
-                "observation_ref": (
-                    "refs/heads/hive-mind-evidence/publication-observations/"
-                    f"{plane.execution_id.removeprefix('sha256:')}/"
-                    f"{transaction_id.removeprefix('sha256:')}/sealed"
+                "observation_ref": controller.publication_observation_evidence_ref(
+                    plane.execution_id,
+                    transaction_id,
+                    observation_key,
                 ),
                 "observation_ref_sha": target_sha,
-                "transaction_ref": (
-                    "refs/heads/hive-mind-evidence/publication-transactions/"
-                    "sealed"
-                ),
+                "transaction_ref": "refs/heads/hme/t/" + "3" * 64,
                 "observed_transaction_sha": "b" * 40,
-                "receipt_heads": [
-                    {
-                        "node_id": "RECON-010",
-                        "branch": "recon-010",
-                        "expected_sha": "a" * 40,
-                        "observed_sha": "a" * 40,
-                    }
-                ],
+                "receipt_heads": receipt_heads,
                 "execution_namespace": plane.execution_namespace,
                 "execution_id": plane.execution_id,
                 "release_id": release_id,
                 "publication_transaction_id": transaction_id,
-                "observed_at": "2030-01-01T00:00:00Z",
+                "observed_at": observed_at,
             }
             observation = {
                 **material,
@@ -2061,6 +2072,18 @@ class HostKernelCapacityTests(unittest.TestCase):
     ) -> Mapping[str, object]:
         generation = "sha256:" + generation_digit * 64
         now = self.clock()
+        attestation = controller.build_host_provider_attestation(
+            self.host_runtime,
+            host_id=self.host_id,
+            provider_identity_source="fixture:app-server-provider",
+            provider_identity_material={
+                "kind": "hive-mind-test-provider-attestation-v1",
+                "identity_token": self.provider_digest,
+            },
+        )
+        self.provider_attestation_digest = str(
+            attestation["provider_identity_digest"]
+        )
         with controller.runtime_file_lock(
             self.host_runtime / "locks" / "host-authority.lock"
         ):
@@ -2078,11 +2101,100 @@ class HostKernelCapacityTests(unittest.TestCase):
                 capability_source="fixture:external-capacity",
                 capability_digest="sha256:" + generation_digit * 64,
                 provider_identity_source="fixture:app-server-provider",
-                provider_identity_digest=self.provider_digest,
+                provider_identity_digest=attestation["provider_identity_digest"],
+                provider_attestation=attestation,
                 declarative=declarative,
                 now=now,
                 expected_generation=expected_generation,
             )
+
+    def execution_adapter_identity(
+        self,
+        *,
+        repository: str,
+        execution_id: str,
+        execution_namespace: str = "default",
+    ) -> Mapping[str, object]:
+        """Install one exact synthetic adapter wrapper for capacity-unit tests."""
+
+        provider = controller._host_provider_binding(
+            self.host_runtime, host_id=self.host_id
+        )
+        runtime_identity = controller.read_strict_canonical_json(
+            self.host_runtime / "host-runtime-identity.json",
+            label="test host runtime identity",
+        )
+        source_path = Path(controller.__file__).resolve()
+        source_digest = "sha256:" + hashlib.sha256(source_path.read_bytes()).hexdigest()
+        digest = "sha256:" + "e" * 64
+        raw_material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "hive-mind-codex-app-server-identity-v1",
+            "execution_namespace": execution_namespace,
+            "execution_id": execution_id,
+            "host_id": self.host_id,
+            "machine_user_id": runtime_identity["machine_user_id"],
+            "provider_identity_digest": provider["provider_identity_digest"],
+            "adapter_module_path": str(source_path),
+            "adapter_module_digest": source_digest,
+            "launcher_path": str(source_path),
+            "launcher_digest": source_digest,
+            "cli_module_path": None,
+            "cli_module_digest": None,
+            "executable_path": str(source_path),
+            "executable_digest": source_digest,
+            "executable_version": "test-fixture",
+            "schema_bundle_digest": digest,
+            "thread_start_schema_digest": digest,
+            "turn_start_schema_digest": digest,
+            "environment_root_digest": digest,
+            "behavior_environment_digest": digest,
+            "provider_config_digest": digest,
+            "execution_config_digest": digest,
+            "account_identity_digest": digest,
+            "effective_model": "test-model",
+            "effective_model_provider": "test-provider",
+            "transport": "stdio://",
+            "initialize_result_digest": digest,
+            "created_at": controller.format_time(self.clock()),
+        }
+        raw = {**raw_material, "record_id": controller.digest_json(raw_material)}
+        raw_path = (
+            self.host_runtime
+            / "execution-adapter-identities"
+            / f"{str(raw['record_id']).removeprefix('sha256:')}.json"
+        )
+        controller.exclusive_write_json_or_identical(raw_path, raw)
+        raw_bytes = raw_path.read_bytes()
+        binding_material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": controller.EXECUTION_ADAPTER_IDENTITY_KIND,
+            "execution_namespace": execution_namespace,
+            "execution_id": execution_id,
+            "repository": repository,
+            "host_id": self.host_id,
+            "provider_generation": provider["provider_generation"],
+            "provider_epoch": provider["provider_epoch"],
+            "provider_identity_digest": provider["provider_identity_digest"],
+            "adapter_identity_kind": raw["kind"],
+            "adapter_identity_record_id": raw["record_id"],
+            "adapter_identity_blob_digest": "sha256:"
+            + hashlib.sha256(raw_bytes).hexdigest(),
+            "adapter_identity_source_path": str(
+                raw_path.relative_to(self.host_runtime)
+            ).replace("\\", "/"),
+        }
+        binding = {
+            **binding_material,
+            "record_id": controller.digest_json(binding_material),
+        }
+        binding_path = (
+            self.host_runtime
+            / "execution-adapter-bindings"
+            / f"{str(binding['record_id']).removeprefix('sha256:')}.json"
+        )
+        controller.exclusive_write_json_or_identical(binding_path, binding)
+        return binding
 
     def reserve(
         self,
@@ -2099,19 +2211,68 @@ class HostKernelCapacityTests(unittest.TestCase):
         with controller.runtime_file_lock(
             self.host_runtime / "locks" / "host-authority.lock"
         ):
+            adapter_identity = (
+                None
+                if kind == "VALIDATION"
+                else self.execution_adapter_identity(
+                    repository=repository,
+                    execution_id=execution_id,
+                )
+            )
+            scheduler_grant_id = None
+            local_reservation_id = "sha256:" + local_digit * 64
+            if kind != "VALIDATION":
+                demand = controller.record_host_scheduler_demand(
+                    self.host_runtime,
+                    host_id=self.host_id,
+                    repository=repository,
+                    repository_transport_digest=controller.digest_json(
+                        {
+                            "kind": "test-repository-transport-v1",
+                            "repository": repository,
+                        }
+                    ),
+                    execution_namespace="default",
+                    execution_id=execution_id,
+                    plan_fingerprint="sha256:" + "f" * 64,
+                    capacity_generation=str(capacity["capacity_generation"]),
+                    execution_adapter_identity=adapter_identity,
+                    candidate_reservation_ids=[local_reservation_id],
+                    weight=1,
+                    actor="test:scheduler",
+                    recorded_at=controller.format_time(self.clock()),
+                )
+                schedule = controller.grant_host_scheduler_capacity(
+                    self.host_runtime,
+                    host_id=self.host_id,
+                    actor="test:scheduler",
+                    now=self.clock(),
+                )
+                matching_grants = [
+                    str(item["grant_id"])
+                    for item in schedule["outstanding_grants"]
+                    if item.get("demand_id") == demand.get("demand_id")
+                ]
+                if not matching_grants:
+                    raise controller.CapacityAdmissionDenied(
+                        "authenticated host capacity is exhausted"
+                    )
+                scheduler_grant_id = matching_grants[0]
             return controller.reserve_global_host_session(
                 self.host_runtime,
                 repository=repository,
                 execution_id=execution_id,
                 host_id=self.host_id,
                 capacity_generation=str(capacity["capacity_generation"]),
-                local_reservation_id="sha256:" + local_digit * 64,
+                local_reservation_id=local_reservation_id,
                 reservation_kind=kind,
                 resource_key=resource_key or "sha256:" + local_digit * 64,
                 write_scopes=(),
                 actor_time=controller.format_time(self.clock()),
                 expires_at=str(capacity["expires_at"]),
                 now=self.clock(),
+                execution_adapter_identity=adapter_identity,
+                host_scheduler_grant_id=scheduler_grant_id,
             )
 
     def install_dispatch_abort_receipt(
@@ -2201,6 +2362,16 @@ class HostKernelCapacityTests(unittest.TestCase):
             "provider_epoch": reservation["provider_epoch"],
             "capacity_generation": reservation["capacity_generation"],
             "capacity_epoch": reservation["capacity_epoch"],
+            "host_kernel_generation": reservation["host_kernel_generation"],
+            "execution_adapter_identity_record_id": reservation[
+                "execution_adapter_identity_record_id"
+            ],
+            "execution_adapter_identity_path": reservation[
+                "execution_adapter_identity_path"
+            ],
+            "execution_adapter_identity_blob_digest": reservation[
+                "execution_adapter_identity_blob_digest"
+            ],
             "reservations": [
                 {
                     "node_id": node_id,
@@ -2277,6 +2448,15 @@ class HostKernelCapacityTests(unittest.TestCase):
         with controller.runtime_file_lock(
             self.host_runtime / "locks" / "host-authority.lock"
         ):
+            peer_attestation = controller.build_host_provider_attestation(
+                self.host_runtime,
+                host_id="cli-selected-peer",
+                provider_identity_source="fixture:app-server-provider",
+                provider_identity_material={
+                    "kind": "hive-mind-test-provider-attestation-v1",
+                    "identity_token": self.provider_digest,
+                },
+            )
             with self.assertRaisesRegex(
                 controller.ConfigurationError, "provider cannot rotate"
             ):
@@ -2294,11 +2474,214 @@ class HostKernelCapacityTests(unittest.TestCase):
                     capability_source="fixture:external-capacity",
                     capability_digest="sha256:" + "6" * 64,
                     provider_identity_source="fixture:app-server-provider",
-                    provider_identity_digest=self.provider_digest,
+                    provider_identity_digest=peer_attestation[
+                        "provider_identity_digest"
+                    ],
+                    provider_attestation=peer_attestation,
                     declarative=False,
                     now=self.clock(),
                     expected_generation=None,
                 )
+
+    def test_persistent_scheduler_is_fair_and_grants_are_single_use(self) -> None:
+        capacity = self.publish(
+            generation_digit="4",
+            epoch=1,
+            maximum=4,
+            validation_slots=1,
+            expires_minutes=30,
+            expected_generation=None,
+        )
+        repository = "Example/Hive"
+        transport = "sha256:" + "9" * 64
+        small_repository = "Example/Independent"
+        small_transport = "sha256:" + "8" * 64
+        wide_execution = "sha256:" + "a" * 64
+        small_execution = "sha256:" + "b" * 64
+        wide_candidates = [
+            controller.digest_json(
+                {"kind": "test-wide-scheduler-candidate-v1", "slot": slot}
+            )
+            for slot in range(13)
+        ]
+        small_candidate = controller.digest_json(
+            {"kind": "test-small-scheduler-candidate-v1", "slot": 1}
+        )
+        with controller.runtime_file_lock(
+            self.host_runtime / "locks" / "host-authority.lock"
+        ):
+            wide_adapter = self.execution_adapter_identity(
+                repository=repository,
+                execution_id=wide_execution,
+                execution_namespace="wide",
+            )
+            small_adapter = self.execution_adapter_identity(
+                repository=small_repository,
+                execution_id=small_execution,
+                execution_namespace="small",
+            )
+            wide = controller.record_host_scheduler_demand(
+                self.host_runtime,
+                host_id=self.host_id,
+                repository=repository,
+                repository_transport_digest=transport,
+                execution_namespace="wide",
+                execution_id=wide_execution,
+                plan_fingerprint="sha256:" + "c" * 64,
+                capacity_generation=str(capacity["capacity_generation"]),
+                execution_adapter_identity=wide_adapter,
+                candidate_reservation_ids=wide_candidates,
+                weight=1,
+                actor="test:scheduler",
+                recorded_at=controller.format_time(self.clock()),
+            )
+            small = controller.record_host_scheduler_demand(
+                self.host_runtime,
+                host_id=self.host_id,
+                repository=small_repository,
+                repository_transport_digest=small_transport,
+                execution_namespace="small",
+                execution_id=small_execution,
+                plan_fingerprint="sha256:" + "d" * 64,
+                capacity_generation=str(capacity["capacity_generation"]),
+                execution_adapter_identity=small_adapter,
+                candidate_reservation_ids=[small_candidate],
+                weight=1,
+                actor="test:scheduler",
+                recorded_at=controller.format_time(self.clock()),
+            )
+            scheduled = controller.grant_host_scheduler_capacity(
+                self.host_runtime,
+                host_id=self.host_id,
+                actor="test:scheduler",
+                now=self.clock(),
+            )
+            by_demand: dict[str, list[Mapping[str, object]]] = {}
+            for grant in scheduled["outstanding_grants"]:
+                by_demand.setdefault(str(grant["demand_id"]), []).append(grant)
+            self.assertEqual(len(by_demand[str(wide["demand_id"])]), 3)
+            self.assertEqual(len(by_demand[str(small["demand_id"])]), 1)
+            small_grant = by_demand[str(small["demand_id"])][0]
+            with self.assertRaisesRegex(
+                controller.ConfigurationError, "scheduler grant"
+            ):
+                controller.reserve_global_host_session(
+                    self.host_runtime,
+                    repository=small_repository,
+                    execution_id=small_execution,
+                    host_id=self.host_id,
+                    capacity_generation=str(capacity["capacity_generation"]),
+                    local_reservation_id=small_candidate,
+                    reservation_kind="PRIMARY",
+                    resource_key="sha256:" + "e" * 64,
+                    write_scopes=(),
+                    actor_time=controller.format_time(self.clock()),
+                    expires_at=str(capacity["expires_at"]),
+                    now=self.clock(),
+                    execution_adapter_identity=small_adapter,
+                    host_scheduler_grant_id="sha256:" + "f" * 64,
+                )
+            reservation = controller.reserve_global_host_session(
+                self.host_runtime,
+                repository=small_repository,
+                execution_id=small_execution,
+                host_id=self.host_id,
+                capacity_generation=str(capacity["capacity_generation"]),
+                local_reservation_id=small_candidate,
+                reservation_kind="PRIMARY",
+                resource_key="sha256:" + "e" * 64,
+                write_scopes=(),
+                actor_time=controller.format_time(self.clock()),
+                expires_at=str(capacity["expires_at"]),
+                now=self.clock(),
+                execution_adapter_identity=small_adapter,
+                host_scheduler_grant_id=str(small_grant["grant_id"]),
+            )
+            self.assertEqual(
+                reservation["host_scheduler_grant_id"], small_grant["grant_id"]
+            )
+            with self.assertRaisesRegex(
+                controller.ConfigurationError, "already consumed"
+            ):
+                controller.reserve_global_host_session(
+                    self.host_runtime,
+                    repository=small_repository,
+                    execution_id=small_execution,
+                    host_id=self.host_id,
+                    capacity_generation=str(capacity["capacity_generation"]),
+                    local_reservation_id="sha256:" + "1" * 64,
+                    reservation_kind="PRIMARY",
+                    resource_key="sha256:" + "2" * 64,
+                    write_scopes=(),
+                    actor_time=controller.format_time(self.clock()),
+                    expires_at=str(capacity["expires_at"]),
+                    now=self.clock(),
+                    execution_adapter_identity=small_adapter,
+                    host_scheduler_grant_id=str(small_grant["grant_id"]),
+                )
+
+    def test_scheduler_expiry_restores_unconsumed_demand(self) -> None:
+        capacity = self.publish(
+            generation_digit="6",
+            epoch=1,
+            maximum=1,
+            validation_slots=0,
+            expires_minutes=30,
+            expected_generation=None,
+        )
+        repository = "Example/Hive"
+        execution_id = "sha256:" + "6" * 64
+        candidate = "sha256:" + "7" * 64
+        with controller.runtime_file_lock(
+            self.host_runtime / "locks" / "host-authority.lock"
+        ):
+            adapter = self.execution_adapter_identity(
+                repository=repository,
+                execution_id=execution_id,
+                execution_namespace="expiry",
+            )
+            demand = controller.record_host_scheduler_demand(
+                self.host_runtime,
+                host_id=self.host_id,
+                repository=repository,
+                repository_transport_digest="sha256:" + "8" * 64,
+                execution_namespace="expiry",
+                execution_id=execution_id,
+                plan_fingerprint="sha256:" + "9" * 64,
+                capacity_generation=str(capacity["capacity_generation"]),
+                execution_adapter_identity=adapter,
+                candidate_reservation_ids=[candidate],
+                weight=1,
+                actor="test:scheduler",
+                recorded_at=controller.format_time(self.clock()),
+            )
+            first = controller.grant_host_scheduler_capacity(
+                self.host_runtime,
+                host_id=self.host_id,
+                actor="test:scheduler",
+                now=self.clock(),
+                grant_seconds=60,
+            )
+            first_id = next(
+                str(item["grant_id"])
+                for item in first["outstanding_grants"]
+                if item.get("demand_id") == demand.get("demand_id")
+            )
+            self.clock.advance(minutes=2)
+            second = controller.grant_host_scheduler_capacity(
+                self.host_runtime,
+                host_id=self.host_id,
+                actor="test:scheduler",
+                now=self.clock(),
+                grant_seconds=60,
+            )
+            second_ids = {
+                str(item["grant_id"])
+                for item in second["outstanding_grants"]
+                if item.get("demand_id") == demand.get("demand_id")
+            }
+            self.assertNotIn(first_id, second_ids)
+            self.assertEqual(len(second_ids), 1)
 
     def test_declarative_capacity_is_conservative(self) -> None:
         with self.assertRaisesRegex(
@@ -2537,7 +2920,7 @@ class HostKernelCapacityTests(unittest.TestCase):
             "capability_source": capacity["capability_source"],
             "capability_digest": capacity["capability_digest"],
             "provider_identity_source": "fixture:app-server-provider",
-            "provider_identity_digest": self.provider_digest,
+            "provider_identity_digest": self.provider_attestation_digest,
             "actor": "test:capacity-renewer",
         }
         with controller.runtime_file_lock(
@@ -2628,7 +3011,7 @@ class HostKernelCapacityTests(unittest.TestCase):
             "capability_source": capacity["capability_source"],
             "capability_digest": capacity["capability_digest"],
             "provider_identity_source": "fixture:app-server-provider",
-            "provider_identity_digest": self.provider_digest,
+            "provider_identity_digest": self.provider_attestation_digest,
             "actor": "test:partial-capacity-renewer",
         }
         original_append = controller._append_host_reservation_unlocked
@@ -3054,6 +3437,18 @@ class HostKernelCapacityTests(unittest.TestCase):
             "observed_at": controller.format_time(self.clock()),
             "source_event_id": "sha256:" + "c" * 64,
         }
+        observation["adapter_observation_id"] = controller.digest_json(observation)
+        observation.update(
+            {
+                field: reservation[field]
+                for field in (
+                    "host_kernel_generation",
+                    "execution_adapter_identity_record_id",
+                    "execution_adapter_identity_path",
+                    "execution_adapter_identity_blob_digest",
+                )
+            }
+        )
         observation["observation_id"] = controller.digest_json(observation)
         with controller.runtime_file_lock(
             self.host_runtime / "locks" / "host-authority.lock"
@@ -3231,6 +3626,18 @@ class HostKernelCapacityTests(unittest.TestCase):
                 capacity_generation=str(reservation["capacity_generation"]),
                 capacity_epoch=int(reservation["capacity_epoch"]),
                 reservation_expires_at=str(reservation["expires_at"]),
+                host_kernel_generation=str(
+                    reservation["host_kernel_generation"]
+                ),
+                execution_adapter_identity_record_id=str(
+                    reservation["execution_adapter_identity_record_id"]
+                ),
+                execution_adapter_identity_path=str(
+                    reservation["execution_adapter_identity_path"]
+                ),
+                execution_adapter_identity_blob_digest=str(
+                    reservation["execution_adapter_identity_blob_digest"]
+                ),
                 state_dir=plane.execution_dir,
             )
         with controller.runtime_file_lock(
@@ -3290,6 +3697,623 @@ class HostKernelCapacityTests(unittest.TestCase):
                     execution_namespace=plane.execution_namespace,
                 )
 
+    def test_host_kernel_identity_is_checkout_path_independent(self) -> None:
+        identity = controller.host_kernel_identity()
+        self.assertEqual(
+            identity["components"],
+            [
+                {
+                    "path": ".autopilot/bin/controller.py",
+                    "digest": controller._LOADED_CONTROLLER_DIGEST,
+                }
+            ],
+        )
+        self.assertNotIn("executable_path", identity["interpreter"])
 
+    def test_execution_projection_without_history_is_not_laundered(self) -> None:
+        repo_root = self.base / "projection-only-execution"
+        install_fixture(repo_root)
+        ready_runtime(controller, repo_root)
+        plane = controller.ControlPlane(repo_root)
+        identity_path = plane.execution_dir / "execution-identity.json"
+        history_path = plane.execution_dir / "execution-kernel-history.jsonl"
+        identity = controller.read_strict_canonical_json(
+            identity_path, label="fixture execution identity"
+        )
+        history_path.unlink()
+        before = {
+            str(path.relative_to(plane.execution_dir)): path.read_bytes()
+            for path in plane.execution_dir.rglob("*")
+            if path.is_file()
+        }
+        with plane.host_lock(timeout_seconds=120.0):
+            with plane.arbiter_lock(timeout_seconds=120.0):
+                with self.assertRaisesRegex(
+                    controller.ConfigurationError,
+                    "no append-only kernel provenance",
+                ):
+                    controller.initialize_execution_namespace(
+                        plane.coordination_dir,
+                        identity,
+                        actor="test:projection-only",
+                        initialized_at=controller.format_time(self.clock()),
+                    )
+        after = {
+            str(path.relative_to(plane.execution_dir)): path.read_bytes()
+            for path in plane.execution_dir.rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after, before)
+
+    def test_host_initialization_does_not_adopt_stale_history_head(self) -> None:
+        identity_path = self.host_runtime / "host-runtime-identity.json"
+        identity_path.unlink()
+        loaded = dict(controller.host_kernel_identity())
+        loaded["bundle_digest"] = "sha256:" + "a" * 64
+        before_history = (
+            self.host_runtime / "host-kernel-history.jsonl"
+        ).read_bytes()
+        with mock.patch.object(controller, "host_kernel_identity", return_value=loaded):
+            with self.assertRaisesRegex(
+                controller.ConfigurationError,
+                "current-kernel initialization receipt",
+            ):
+                controller.initialize_host_runtime(self.host_runtime)
+        self.assertFalse(identity_path.exists())
+        self.assertEqual(
+            (self.host_runtime / "host-kernel-history.jsonl").read_bytes(),
+            before_history,
+        )
+
+    def test_host_upgrade_preflights_torn_provider_history_before_mutation(self) -> None:
+        self.publish(
+            generation_digit="2",
+            epoch=1,
+            maximum=1,
+            validation_slots=1,
+            expires_minutes=10,
+            expected_generation=None,
+        )
+        provider_history = self.host_runtime / "host-provider-history.jsonl"
+        with provider_history.open("ab") as handle:
+            handle.write(b'{"schema_version":')
+        identity_path = self.host_runtime / "host-runtime-identity.json"
+        kernel_history = self.host_runtime / "host-kernel-history.jsonl"
+        identity_before = identity_path.read_bytes()
+        history_before = kernel_history.read_bytes()
+        identity = controller.read_strict_canonical_json(
+            identity_path, label="fixture host identity"
+        )
+        successor_kernel = dict(controller.host_kernel_identity())
+        successor_kernel["bundle_digest"] = "sha256:" + "a" * 64
+        with mock.patch.object(
+            controller, "host_kernel_identity", return_value=successor_kernel
+        ):
+            with self.assertRaises(controller.ConfigurationError):
+                controller.upgrade_host_runtime_kernel(
+                    self.host_runtime,
+                    actor="test:blocked-upgrade",
+                    reason="torn provider history must be repaired first",
+                    expected_host_kernel_generation=str(
+                        identity["host_kernel_generation"]
+                    ),
+                    upgraded_at=controller.format_time(self.clock()),
+                )
+        self.assertEqual(identity_path.read_bytes(), identity_before)
+        self.assertEqual(kernel_history.read_bytes(), history_before)
+        self.assertFalse((self.host_runtime / controller.KERNEL_TRANSITION_POINTER).exists())
+
+    def test_host_upgrade_rotates_provider_and_capacity_from_strict_predecessor(self) -> None:
+        predecessor = self.publish(
+            generation_digit="7",
+            epoch=1,
+            maximum=1,
+            validation_slots=1,
+            expires_minutes=10,
+            expected_generation=None,
+        )
+        identity = controller.read_strict_canonical_json(
+            self.host_runtime / "host-runtime-identity.json",
+            label="fixture host identity",
+        )
+        predecessor_provider = controller.read_strict_canonical_json(
+            self.host_runtime / "host-provider.json",
+            label="fixture host provider",
+        )
+        successor_kernel = dict(controller.host_kernel_identity())
+        successor_kernel["bundle_digest"] = "sha256:" + "8" * 64
+        with mock.patch.object(
+            controller, "host_kernel_identity", return_value=successor_kernel
+        ):
+            upgraded = controller.upgrade_host_runtime_kernel(
+                self.host_runtime,
+                actor="test:host-kernel-upgrade",
+                reason="rotate an idle host writer and its dependent authority",
+                expected_host_kernel_generation=str(
+                    identity["host_kernel_generation"]
+                ),
+                upgraded_at=controller.format_time(self.clock()),
+            )
+            attestation = controller.build_host_provider_attestation(
+                self.host_runtime,
+                host_id=self.host_id,
+                provider_identity_source="fixture:app-server-provider",
+                provider_identity_material={
+                    "kind": "hive-mind-test-provider-attestation-v1",
+                    "identity_token": self.provider_digest,
+                },
+            )
+            with controller.runtime_file_lock(
+                self.host_runtime / "locks" / "host-authority.lock"
+            ):
+                structural = (
+                    controller.read_host_capacity_predecessor_for_writer_rotation(
+                        self.host_runtime,
+                        self.host_id,
+                        now=self.clock(),
+                    )
+                )
+                successor = controller.publish_host_capacity(
+                    self.host_runtime,
+                    host_id=self.host_id,
+                    capacity_generation="sha256:" + "8" * 64,
+                    capacity_epoch=2,
+                    max_total_sessions=1,
+                    validation_slots=1,
+                    issued_at=controller.format_time(self.clock()),
+                    expires_at=controller.format_time(
+                        self.clock() + timedelta(minutes=20)
+                    ),
+                    capability_source="fixture:external-capacity",
+                    capability_digest="sha256:" + "8" * 64,
+                    provider_identity_source="fixture:app-server-provider",
+                    provider_identity_digest=attestation[
+                        "provider_identity_digest"
+                    ],
+                    provider_attestation=attestation,
+                    declarative=False,
+                    now=self.clock(),
+                    expected_generation=str(
+                        structural["capacity_generation"]
+                    ),
+                )
+            live = controller.read_host_capacity(
+                self.host_runtime, self.host_id, now=self.clock()
+            )
+        self.assertEqual(structural["record_id"], predecessor["record_id"])
+        self.assertEqual(
+            successor["host_kernel_generation"],
+            upgraded["host_kernel_generation"],
+        )
+        self.assertNotEqual(
+            successor["provider_generation"],
+            predecessor_provider["provider_generation"],
+        )
+        self.assertEqual(live, successor)
+
+    def test_host_upgrade_exact_retry_finishes_before_stale_provider_preflight(self) -> None:
+        self.publish(
+            generation_digit="7",
+            epoch=1,
+            maximum=1,
+            validation_slots=1,
+            expires_minutes=10,
+            expected_generation=None,
+        )
+        identity = controller.read_strict_canonical_json(
+            self.host_runtime / "host-runtime-identity.json",
+            label="fixture host identity",
+        )
+        predecessor_generation = str(identity["host_kernel_generation"])
+        predecessor_provider = controller.read_strict_canonical_json(
+            self.host_runtime / "host-provider.json",
+            label="fixture host provider",
+        )
+        successor_kernel = dict(controller.host_kernel_identity())
+        successor_kernel["bundle_digest"] = "sha256:" + "9" * 64
+        actor = "test:host-kernel-retry"
+        reason = "finish an exact prepared successor before dependent rotation"
+        upgraded_at = controller.format_time(self.clock())
+        complete = controller._complete_kernel_transition
+
+        with mock.patch.object(
+            controller, "host_kernel_identity", return_value=successor_kernel
+        ):
+            with mock.patch.object(
+                controller,
+                "_complete_kernel_transition",
+                side_effect=RuntimeError("simulated crash before COMPLETE"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "simulated crash"):
+                    controller.upgrade_host_runtime_kernel(
+                        self.host_runtime,
+                        actor=actor,
+                        reason=reason,
+                        expected_host_kernel_generation=predecessor_generation,
+                        upgraded_at=upgraded_at,
+                    )
+            self.assertTrue(
+                (self.host_runtime / controller.KERNEL_TRANSITION_POINTER).is_file()
+            )
+            self.assertEqual(
+                controller.read_strict_canonical_json(
+                    self.host_runtime / "host-provider.json",
+                    label="stale predecessor provider",
+                )["host_kernel_generation"],
+                predecessor_provider["host_kernel_generation"],
+            )
+            with mock.patch.object(
+                controller, "_complete_kernel_transition", wraps=complete
+            ):
+                successor = controller.upgrade_host_runtime_kernel(
+                    self.host_runtime,
+                    actor=actor,
+                    reason=reason,
+                    expected_host_kernel_generation=predecessor_generation,
+                    upgraded_at=upgraded_at,
+                )
+            completed_retry = controller.upgrade_host_runtime_kernel(
+                self.host_runtime,
+                actor=actor,
+                reason=reason,
+                expected_host_kernel_generation=predecessor_generation,
+                upgraded_at=upgraded_at,
+            )
+
+        self.assertEqual(completed_retry, successor)
+        self.assertFalse(
+            (self.host_runtime / controller.KERNEL_TRANSITION_POINTER).exists()
+        )
+        self.assertEqual(
+            controller._host_kernel_history(
+                self.host_runtime,
+                machine_user_id=str(successor["machine_user_id"]),
+            )[-1]["identity"],
+            successor,
+        )
+
+    def test_capacity_history_missing_newline_is_receipt_repaired(self) -> None:
+        self.publish(
+            generation_digit="3",
+            epoch=1,
+            maximum=1,
+            validation_slots=1,
+            expires_minutes=10,
+            expected_generation=None,
+        )
+        history_path = (
+            controller.host_capacity_path(self.host_runtime, self.host_id).parent
+            / "capacity-history.jsonl"
+        )
+        raw = history_path.read_bytes()
+        self.assertTrue(raw.endswith(b"\n"))
+        history_path.write_bytes(raw[:-1])
+        receipt = controller.recover_host_authority_jsonl_torn_tail(
+            self.host_runtime,
+            ledger_kind="capacity-history",
+            host_id=self.host_id,
+            actor="test:newline-recovery",
+            reason="append lost only its final newline",
+            completed_at=controller.format_time(self.clock()),
+        )
+        self.assertIsNotNone(receipt)
+        self.assertEqual(receipt["action"], "APPEND_NEWLINE")
+        self.assertEqual(history_path.read_bytes(), raw)
+        self.assertEqual(len(controller._strict_capacity_history(history_path)), 1)
+
+    def test_torn_tail_prefix_proof_rejects_noncanonical_object_keys(self) -> None:
+        self.assertTrue(
+            controller._provably_incomplete_authority_json_tail(b'{"a": tru')
+        )
+        self.assertFalse(
+            controller._provably_incomplete_authority_json_tail(
+                b'{"a": 1, "a": '
+            )
+        )
+        self.assertFalse(
+            controller._provably_incomplete_authority_json_tail(
+                b'{"z": 1, "a": '
+            )
+        )
+        self.assertFalse(
+            controller._provably_incomplete_authority_json_tail(
+                b'{"z": 1, "a'
+            )
+        )
+
+    def test_provider_tail_recovery_retries_after_truncate_under_exact_capability(self) -> None:
+        self.publish(
+            generation_digit="4",
+            epoch=1,
+            maximum=1,
+            validation_slots=1,
+            expires_minutes=10,
+            expected_generation=None,
+        )
+        history_path = self.host_runtime / "host-provider-history.jsonl"
+        valid_prefix = history_path.read_bytes()
+        with history_path.open("ab") as handle:
+            handle.write(b'{"schema_version":')
+        truncate = controller._truncate_authenticated_authority_file
+
+        def crash_after_truncate(*args: object, **kwargs: object) -> None:
+            truncate(*args, **kwargs)
+            raise RuntimeError("simulated crash after durable truncation")
+
+        with mock.patch.object(
+            controller,
+            "_truncate_authenticated_authority_file",
+            side_effect=crash_after_truncate,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "simulated crash"):
+                controller.recover_host_authority_jsonl_torn_tail(
+                    self.host_runtime,
+                    ledger_kind="provider-history",
+                    actor="test:provider-recovery",
+                    reason="repair exact torn provider append",
+                    completed_at=controller.format_time(self.clock()),
+                )
+        self.assertEqual(history_path.read_bytes(), valid_prefix)
+        with self.assertRaises(controller.ConfigurationError):
+            controller.recover_host_authority_jsonl_torn_tail(
+                self.host_runtime,
+                ledger_kind="provider-history",
+                actor="test:different-recovery",
+                reason="repair exact torn provider append",
+                completed_at=controller.format_time(self.clock()),
+            )
+        completed = controller.recover_host_authority_jsonl_torn_tail(
+            self.host_runtime,
+            ledger_kind="provider-history",
+            actor="test:provider-recovery",
+            reason="repair exact torn provider append",
+            completed_at=controller.format_time(self.clock()),
+        )
+        self.assertEqual(completed["status"], "COMPLETE")
+        self.assertEqual(history_path.read_bytes(), valid_prefix)
+
+    def test_execution_upgrade_rejects_outer_terminal_wrapping_active_publication(self) -> None:
+        digest = "sha256:" + "d" * 64
+        transaction_material: dict[str, object] = {
+            field: None
+            for field in controller.PUBLICATION_TRANSACTION_FIELDS
+            if field != "record_id"
+        }
+        transaction_material.update(
+            {
+                "schema_version": 1,
+                "kind": controller.PUBLICATION_TRANSACTION_KIND,
+                "status": "PREPARED",
+                "transaction_key": digest,
+                "attempt_epoch": 1,
+                "nonce": "nonce",
+                "transaction_id": digest,
+                "execution_namespace": "default",
+                "execution_id": digest,
+                "release_id": digest,
+                "round_id": "R1",
+                "repository": "Example/Hive",
+                "target_branch": "hive-mind/integration",
+                "expected_target_sha": "a" * 40,
+                "authority_digest": digest,
+                "authority_baseline_digest": digest,
+                "receipt_heads": [],
+                "receipt_heads_digest": digest,
+                "coordinator_id": "test:coordinator",
+                "transaction_lease_nonce": "lease-nonce",
+                "transaction_lease_id": digest,
+                "lease_expires_at": "2030-01-01T00:10:00Z",
+                "outcome": None,
+                "detail": "prepared publication",
+                "actor": "test:publication",
+                "reserved_at": "2030-01-01T00:00:00Z",
+                "updated_at": "2030-01-01T00:00:00Z",
+                "completed_at": None,
+            }
+        )
+        transaction = {
+            **transaction_material,
+            "record_id": controller.digest_json(transaction_material),
+        }
+        resource_material = {
+            "schema_version": 1,
+            "kind": controller.PUBLICATION_RESERVATION_KIND,
+            "status": "PUBLISHED",
+            "transaction_id": digest,
+            "execution_id": digest,
+            "release_id": digest,
+            "repository": "Example/Hive",
+            "target_branch": "hive-mind/integration",
+            "expected_target_sha": "a" * 40,
+            "expires_at": "2030-01-01T00:10:00Z",
+            "outcome": None,
+            "transaction": transaction,
+        }
+        resource = {
+            **resource_material,
+            "record_id": controller.digest_json(resource_material),
+        }
+        with self.assertRaisesRegex(
+            controller.ConfigurationError,
+                "differs from its embedded transaction",
+            ):
+            controller._validate_publication_authority_cut(resource)
+
+    def test_execution_upgrade_zero_cut_rejects_invalid_dispatch_and_attended_authority(
+        self,
+    ) -> None:
+        repo_root = self.base / "execution-kernel-invalid-zero-cut"
+        install_fixture(repo_root)
+        ready_runtime(controller, repo_root)
+        plane = controller.ControlPlane(repo_root)
+        identity = controller.read_strict_canonical_json(
+            plane.execution_dir / "execution-identity.json",
+            label="fixture execution identity",
+        )
+        target_sha = "a" * 40
+        admission_material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "hive-mind-shared-dispatch-admission-v1",
+            "status": "INVALIDATED",
+            "execution_namespace": plane.execution_namespace,
+            "execution_id": plane.execution_id,
+            "admission_epoch": "invalid",
+            "release_id": None,
+            "repository": identity["repository"],
+            "target_branch": identity["target_branch"],
+            "target_sha": target_sha,
+            "target_generation": 1,
+            "target_watermark_record_id": "sha256:" + "1" * 64,
+            "plan_fingerprint": identity["plan_fingerprint"],
+            "github_snapshot_digest": None,
+            "reconciliation_digest": None,
+            "snapshot_observation_id": None,
+            "snapshot_observation_epoch": None,
+            "snapshot_observation_record_id": None,
+            "host_id": None,
+            "capacity_generation": None,
+            "capacity_epoch": None,
+            "capacity_record_id": None,
+            "session_cap": None,
+            "actor": "test:invalidated-admission",
+            "reason": "prove semantic validation is part of the zero cut",
+            "observed_target_sha": target_sha,
+            "recorded_at": controller.format_time(self.clock()),
+        }
+        admission = {
+            **admission_material,
+            "generation_id": controller.digest_json(admission_material),
+        }
+        admission_path = plane.execution_dir / "dispatcher-admission.json"
+        controller.atomic_write_json(admission_path, admission)
+        with controller.runtime_file_lock(
+            self.host_runtime / "locks" / "host-authority.lock"
+        ):
+            with self.assertRaisesRegex(
+                controller.ConfigurationError, "dispatcher admission is invalid"
+            ):
+                controller._execution_kernel_upgrade_activity_unlocked(
+                    repo_root,
+                    plane.coordination_dir,
+                    plane.execution_dir,
+                    identity,
+                    host_runtime_dir=self.host_runtime,
+                )
+
+        admission_path.unlink()
+        attended_path = plane.execution_dir / "host" / "attended-threads.json"
+        controller.atomic_write_json(
+            attended_path,
+            {"sha256:" + "2" * 64: {}},
+        )
+        with controller.runtime_file_lock(
+            self.host_runtime / "locks" / "host-authority.lock"
+        ):
+            with self.assertRaisesRegex(
+                controller.ConfigurationError, "attended authority is invalid"
+            ):
+                controller._execution_kernel_upgrade_activity_unlocked(
+                    repo_root,
+                    plane.coordination_dir,
+                    plane.execution_dir,
+                    identity,
+                    host_runtime_dir=self.host_runtime,
+                )
+
+    def test_execution_kernel_upgrade_is_append_only_and_rejects_downgrade(self) -> None:
+        repo_root = self.base / "execution-kernel-upgrade"
+        install_fixture(repo_root)
+        ready_runtime(controller, repo_root)
+        plane = controller.ControlPlane(repo_root)
+        current = controller.read_strict_canonical_json(
+            plane.execution_dir / "execution-identity.json",
+            label="fixture execution identity",
+        )
+        original_kernel = dict(controller.runtime_kernel_identity(repo_root))
+        successor_kernel = dict(original_kernel)
+        successor_kernel["bundle_digest"] = "sha256:" + "b" * 64
+        with mock.patch.object(
+            controller, "runtime_kernel_identity", return_value=successor_kernel
+        ):
+            successor = controller.upgrade_execution_namespace_kernel(
+                repo_root,
+                plane.coordination_dir,
+                host_runtime_dir=self.host_runtime,
+                execution_namespace=plane.execution_namespace,
+                execution_id=plane.execution_id,
+                actor="test:kernel-upgrade",
+                reason="install independently audited successor kernel",
+                expected_identity_record_id=str(current["record_id"]),
+                upgraded_at=controller.format_time(self.clock()),
+            )
+        self.assertEqual(successor["kernel_bundle_digest"], "sha256:" + "b" * 64)
+        history_path = plane.execution_dir / "execution-kernel-history.jsonl"
+        history_before = history_path.read_bytes()
+        history = controller._execution_kernel_history(plane.execution_dir)
+        self.assertEqual(len(history), 2)
+        self.assertEqual(
+            history[-1]["previous_identity_record_id"], current["record_id"]
+        )
+        with mock.patch.object(
+            controller, "runtime_kernel_identity", return_value=original_kernel
+        ):
+            with self.assertRaisesRegex(
+                controller.ConfigurationError,
+                "downgrade|retired",
+            ):
+                controller.upgrade_execution_namespace_kernel(
+                    repo_root,
+                    plane.coordination_dir,
+                    host_runtime_dir=self.host_runtime,
+                    execution_namespace=plane.execution_namespace,
+                    execution_id=plane.execution_id,
+                    actor="test:downgrade",
+                    reason="attempt stale reader replay",
+                    expected_identity_record_id=str(successor["record_id"]),
+                    upgraded_at=controller.format_time(self.clock()),
+                )
+        self.assertEqual(history_path.read_bytes(), history_before)
+
+    def test_runtime_lock_rank_rejects_indirect_inversion(self) -> None:
+        execution = self.base / "locks" / "executions" / ("a" * 64) / "locks"
+        validation = self.base / "locks" / "arbiter" / "locks" / (
+            "global-validation-lease.lock"
+        )
+        binding = execution / "task-bindings.lock"
+        with controller.runtime_file_lock(validation):
+            with self.assertRaisesRegex(
+                controller.ConfigurationError,
+                "lock order inversion",
+            ):
+                with controller.runtime_file_lock(binding):
+                    pass
+
+    def test_bootstrap_lock_rank_allows_host_bootstrap_arbiter_sequence(self) -> None:
+        root = self.base / "bootstrap-lock-order"
+        paths = (
+            root / "host" / "locks" / "host-authority.lock",
+            root / "repo" / "locks" / "runtime-authority-bootstrap-migration.lock",
+            root / "repo" / "arbiter" / "locks" / "arbiter-authority.lock",
+            root
+            / "repo"
+            / "executions"
+            / ("b" * 64)
+            / "locks"
+            / "dispatcher-admission.lock",
+            root
+            / "repo"
+            / "executions"
+            / ("b" * 64)
+            / "locks"
+            / "task-bindings.lock",
+        )
+        with controller.runtime_file_lock(paths[0]):
+            with controller.runtime_file_lock(paths[1]):
+                with controller.runtime_file_lock(paths[2]):
+                    with controller.runtime_file_lock(paths[3]):
+                        with controller.runtime_file_lock(paths[4]):
+                            self.assertTrue(
+                                controller.runtime_file_lock_is_held(paths[4])
+                            )
 if __name__ == "__main__":
     unittest.main()

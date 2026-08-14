@@ -1,3 +1,5 @@
+# The tested modules are intentionally imported after the fixture bin path is installed.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import contextlib
@@ -20,28 +22,43 @@ BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
+import controller as controller_module  # noqa: E402
+import orchestration as orchestration_module  # noqa: E402
 from autopilot import parser as autopilot_parser  # noqa: E402
 from autopilot import select_orchestration_status  # noqa: E402
-import controller as controller_module  # noqa: E402
 from fixture_support import ready_runtime  # noqa: E402
-import orchestration as orchestration_module  # noqa: E402
 from orchestration import (  # noqa: E402
     OrchestrationError,
-    assert_launch_authority as _assert_launch_authority_raw,
-    bind_launch as _bind_launch_raw,
-    binding_events as _binding_events_raw,
     build_orchestration_contract,
     derive_launch_identity,
-    fence_launch as _fence_launch_raw,
     infer_intent,
-    launch_binding as _launch_binding_raw,
-    launch_authority_guard as _launch_authority_guard_raw,
-    prepare_launch as _prepare_launch_raw,
-    record_host_progress,
-    release_terminal_launch as _release_terminal_launch_raw,
     should_publish_release,
     simple_prompt,
     validate_policy,
+)
+from orchestration import (
+    assert_launch_authority as _assert_launch_authority_raw,
+)
+from orchestration import (
+    bind_launch as _bind_launch_raw,
+)
+from orchestration import (
+    binding_events as _binding_events_raw,
+)
+from orchestration import (
+    fence_launch as _fence_launch_raw,
+)
+from orchestration import (
+    launch_authority_guard as _launch_authority_guard_raw,
+)
+from orchestration import (
+    launch_binding as _launch_binding_raw,
+)
+from orchestration import (
+    prepare_launch as _prepare_launch_raw,
+)
+from orchestration import (
+    release_terminal_launch as _release_terminal_launch_raw,
 )
 
 TEST_REPOSITORY = "test/repo"
@@ -176,6 +193,19 @@ def _prepare_launch(root, instruction_id, host, **kwargs):
     kwargs.setdefault("capacity_generation", "sha256:" + "d" * 64)
     kwargs.setdefault("capacity_epoch", 1)
     kwargs.setdefault("reservation_expires_at", "2099-01-01T00:00:00Z")
+    kwargs.setdefault("host_kernel_generation", "sha256:" + "c" * 64)
+    adapter_record_id = kwargs.setdefault(
+        "execution_adapter_identity_record_id", "sha256:" + "f" * 64
+    )
+    kwargs.setdefault(
+        "execution_adapter_identity_path",
+        "execution-adapter-bindings/"
+        + str(adapter_record_id).removeprefix("sha256:")
+        + ".json",
+    )
+    kwargs.setdefault(
+        "execution_adapter_identity_blob_digest", "sha256:" + "b" * 64
+    )
     with _dispatcher_authority(Path(root), state_dir):
         return _prepare_launch_raw(root, instruction_id, host, **kwargs)
 

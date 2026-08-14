@@ -56,6 +56,29 @@ class HostSchedulerTests(unittest.TestCase):
         self.assertEqual(result["grants"][0]["slots"], 4)
         self.assertEqual(result["ungranted"][0]["remaining_slots"], 9)
 
+    def test_thirteen_node_barrier_progresses_four_four_four_one(self) -> None:
+        wide = self.demand("execution-b", 13, epoch=1)
+        remaining = 13
+        batches: list[int] = []
+        downstream_ready = False
+        cursor = None
+        while remaining:
+            result = scheduler.weighted_round_robin(
+                [wide],
+                available_slots=4,
+                cursor_execution_id=cursor,
+                remaining_slots_by_demand_id={wide["demand_id"]: remaining},
+            )
+            granted = result["grants"][0]["slots"]
+            batches.append(granted)
+            remaining -= granted
+            cursor = result["cursor_execution_id"]
+            downstream_ready = remaining == 0
+            if remaining:
+                self.assertFalse(downstream_ready)
+        self.assertEqual(batches, [4, 4, 4, 1])
+        self.assertTrue(downstream_ready)
+
     def test_small_execution_cannot_starve_behind_wide_execution(self) -> None:
         wide = self.demand("execution-b", 13, epoch=1)
         small = self.demand("execution-c", 1, epoch=2)

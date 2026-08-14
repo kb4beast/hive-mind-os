@@ -10,7 +10,10 @@ from unittest import mock
 
 from fixture_support import copy_autopilot_fixture, ready_runtime
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
+BIN = Path(__file__).resolve().parents[1] / "bin"
+if str(BIN) not in sys.path:
+    sys.path.insert(0, str(BIN))
+MODULE_PATH = BIN / "controller.py"
 SPEC = importlib.util.spec_from_file_location("blocker_controller", MODULE_PATH)
 assert SPEC and SPEC.loader
 controller = importlib.util.module_from_spec(SPEC)

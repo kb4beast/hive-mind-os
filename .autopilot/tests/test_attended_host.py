@@ -198,6 +198,7 @@ class AttendedHostTests(unittest.TestCase):
     ) -> dict:
         instruction_id = instruction or self.instruction
         resource_key = resource or self.resource
+        adapter_record_id = "sha256:" + "b" * 64
         with self.plane.execution_lock("dispatcher-admission.lock"):
             return dict(
                 orchestration.prepare_launch(
@@ -233,6 +234,14 @@ class AttendedHostTests(unittest.TestCase):
                     capacity_generation="sha256:" + "d" * 64,
                     capacity_epoch=1,
                     reservation_expires_at="2099-01-01T00:00:00Z",
+                    host_kernel_generation="sha256:" + "c" * 64,
+                    execution_adapter_identity_record_id=adapter_record_id,
+                    execution_adapter_identity_path=(
+                        "execution-adapter-bindings/"
+                        + adapter_record_id.removeprefix("sha256:")
+                        + ".json"
+                    ),
+                    execution_adapter_identity_blob_digest="sha256:" + "a" * 64,
                     state_dir=self.plane.execution_dir,
                 )
             )
@@ -1324,6 +1333,12 @@ class AttendedHostTests(unittest.TestCase):
                 capacity_generation="sha256:" + "d" * 64,
                 capacity_epoch=1,
                 reservation_expires_at="2099-01-01T00:00:00Z",
+                host_kernel_generation="sha256:" + "c" * 64,
+                execution_adapter_identity_record_id="sha256:" + "b" * 64,
+                execution_adapter_identity_path=(
+                    "execution-adapter-bindings/" + "b" * 64 + ".json"
+                ),
+                execution_adapter_identity_blob_digest="sha256:" + "a" * 64,
                 state_dir=sibling_plane.execution_dir,
             )
         sibling_created = dict(

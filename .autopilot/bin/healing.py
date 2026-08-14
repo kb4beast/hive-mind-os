@@ -578,6 +578,7 @@ def heal_round(
     *,
     actor: str,
     host_id: str,
+    execution_adapter_identity: Mapping[str, object] | None = None,
     nodes: Sequence[str] | None = None,
     policy: Mapping[str, Any] | None = None,
     status: Mapping[str, Any] | None = None,
@@ -892,38 +893,64 @@ def heal_round(
             ok, detail = reconcile_with_snapshot(plane, actor=actor)
             record_action("reconcile", None, "APPLIED" if ok else "FAILED", detail)
         if policy["auto_redispatch"]:
-            try:
-                fresh = plane.dispatch(actor=actor, host_id=host_id)
-            except Exception as error:
-                record_action("dispatch", None, "FAILED", str(error))
-            else:
+            if not isinstance(execution_adapter_identity, Mapping):
+                withheld += 1
                 record_action(
                     "dispatch",
                     None,
-                    "APPLIED",
-                    f"release {str(fresh.get('release_id'))[:16]} wave "
-                    + (", ".join(fresh.get("released_wave", [])) or "empty"),
+                    "WITHHELD",
+                    "crash-exact autonomous host adapter authority is unavailable",
                 )
+            else:
+                try:
+                    fresh = plane.dispatch(
+                        actor=actor,
+                        host_id=host_id,
+                        execution_adapter_identity=execution_adapter_identity,
+                    )
+                except Exception as error:
+                    record_action("dispatch", None, "FAILED", str(error))
+                else:
+                    record_action(
+                        "dispatch",
+                        None,
+                        "APPLIED",
+                        f"release {str(fresh.get('release_id'))[:16]} wave "
+                        + (", ".join(fresh.get("released_wave", [])) or "empty"),
+                    )
     elif acting and not release_valid and policy["auto_redispatch"]:
         # Nothing needed repair, but no valid release exists either: a fresh
         # dispatch is the one lawful move that can authorize an unstarted node.
         unstarted = [d.node_id for d in diagnoses if d.verdict == "UNSTARTED"]
         if unstarted and not current.get("reconciliation_required"):
-            try:
-                fresh = plane.dispatch(actor=actor, host_id=host_id)
-            except Exception as error:
-                record_action("dispatch", None, "FAILED", str(error))
-            else:
-                wave = [str(item) for item in fresh.get("released_wave", [])]
+            if not isinstance(execution_adapter_identity, Mapping):
+                withheld += 1
                 record_action(
                     "dispatch",
                     None,
-                    "APPLIED",
-                    f"release {str(fresh.get('release_id'))[:16]} wave "
-                    + (", ".join(wave) or "empty"),
+                    "WITHHELD",
+                    "crash-exact autonomous host adapter authority is unavailable",
                 )
-                if any(node_id in wave for node_id in unstarted):
-                    healed += 1  # fresh authorization is a state change
+            else:
+                try:
+                    fresh = plane.dispatch(
+                        actor=actor,
+                        host_id=host_id,
+                        execution_adapter_identity=execution_adapter_identity,
+                    )
+                except Exception as error:
+                    record_action("dispatch", None, "FAILED", str(error))
+                else:
+                    wave = [str(item) for item in fresh.get("released_wave", [])]
+                    record_action(
+                        "dispatch",
+                        None,
+                        "APPLIED",
+                        f"release {str(fresh.get('release_id'))[:16]} wave "
+                        + (", ".join(wave) or "empty"),
+                    )
+                    if any(node_id in wave for node_id in unstarted):
+                        healed += 1  # fresh authorization is a state change
 
     fingerprint = _evidence_fingerprint(plane, diagnoses)
     report["evidence_fingerprint"] = fingerprint

@@ -841,19 +841,16 @@ class ValidationLeaseBreakTests(HealingFixture):
     def write_lease(self, *, expires_at: str) -> None:
         path = self.plane.validation_lease_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "node_id": NODE,
-                    "owner": "codex:departed-session",
-                    "expires_at": expires_at,
-                    "lease_id": "sha256:" + "1" * 64,
-                    "status": "ACTIVE",
-                }
-            )
-            + "\n",
-            encoding="utf-8",
+        controller.atomic_write_json(
+            path,
+            {
+                "schema_version": 1,
+                "node_id": NODE,
+                "owner": "codex:departed-session",
+                "expires_at": expires_at,
+                "lease_id": "sha256:" + "1" * 64,
+                "status": "ACTIVE",
+            },
         )
 
     def test_expired_lease_is_broken_and_archived(self) -> None:
@@ -889,7 +886,11 @@ class ValidationLeaseBreakTests(HealingFixture):
 
     def test_malformed_expiry_is_not_break_authority(self) -> None:
         self.write_lease(expires_at="not-a-time")
-        self.assertIsNone(healing._expired_lease(self.plane))
+        with self.assertRaisesRegex(
+            healing.HealingError,
+            "expiry is malformed",
+        ):
+            healing._expired_lease(self.plane)
         self.assertTrue(self.plane.validation_lease_path.is_file())
 
 

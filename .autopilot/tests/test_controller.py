@@ -197,6 +197,12 @@ class AutopilotControllerTests(unittest.TestCase):
                 capacity_generation="sha256:" + "3" * 64,
                 capacity_epoch=1,
                 reservation_expires_at="2030-01-01T02:00:00Z",
+                host_kernel_generation="sha256:" + "4" * 64,
+                execution_adapter_identity_record_id="sha256:" + "5" * 64,
+                execution_adapter_identity_path=(
+                    "execution-adapter-bindings/" + "5" * 64 + ".json"
+                ),
+                execution_adapter_identity_blob_digest="sha256:" + "6" * 64,
                 state_dir=self.plane.execution_dir,
             )
             bind_launch(

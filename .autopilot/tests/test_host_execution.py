@@ -31,23 +31,41 @@ from host_execution import (  # noqa: E402
     SIDECAR_EVENT_KIND,
     SIDECAR_RESULT_KIND,
     HostExecutionError,
+)
+from host_execution import (  # noqa: E402
     execute_contract as _execute_contract,
 )
 from orchestration import (  # noqa: E402
     bind_launch as _bind_launch,
+)
+from orchestration import (  # noqa: E402
     binding_events as _binding_events,
+)
+from orchestration import (  # noqa: E402
     derive_launch_identity,
+)
+from orchestration import (  # noqa: E402
     fence_launch as _fence_launch,
+)
+from orchestration import (  # noqa: E402
     launch_binding as _launch_binding,
+)
+from orchestration import (  # noqa: E402
     prepare_launch as _prepare_launch,
+)
+from orchestration import (  # noqa: E402
     release_terminal_launch as _release_terminal_launch,
 )
 from sidecar_execution import (  # noqa: E402
     active_sidecars as _active_sidecars,
+)
+from sidecar_execution import (  # noqa: E402
     make_descendant_spec,
     plan_sidecars,
-    sidecar_events as _sidecar_events,
     sidecar_spec_digest,
+)
+from sidecar_execution import (  # noqa: E402
+    sidecar_events as _sidecar_events,
 )
 
 TARGET = "release/test"
@@ -79,6 +97,33 @@ RELEASE_ID = "sha256:" + "f" * 64
 EXECUTION_ID = "sha256:e4721b27bb9e4d6370eb058a64d4d893981cc104a7a6a838f45a564cf0a579ff"
 EXECUTION_NAMESPACE = "default"
 _HOST_RUNTIMES: dict[Path, Path] = {}
+_EXECUTION_ADAPTER_IDENTITIES: dict[Path, Mapping[str, object]] = {}
+
+
+def _synthetic_effect_provenance() -> dict[str, str]:
+    record_id = "sha256:" + "6" * 64
+    return {
+        "host_kernel_generation": "sha256:" + "5" * 64,
+        "execution_adapter_identity_record_id": record_id,
+        "execution_adapter_identity_path": (
+            "execution-adapter-bindings/"
+            + record_id.removeprefix("sha256:")
+            + ".json"
+        ),
+        "execution_adapter_identity_blob_digest": "sha256:" + "7" * 64,
+    }
+
+
+def _synthetic_effect_fence() -> host_execution_module._EffectFence:
+    return host_execution_module._EffectFence(
+        instruction_id="sha256:" + "1" * 64,
+        resource_key="sha256:" + "2" * 64,
+        authority_epoch=1,
+        dispatch_release_id="sha256:" + "3" * 64,
+        dispatch_admission_epoch=1,
+        **_synthetic_effect_provenance(),
+        task={"authority_class": "WRITE_AUTHORIZED", "node_id": "NODE-0"},
+    )
 
 
 def _execution_dir(root: Path) -> Path:
@@ -119,7 +164,8 @@ def _resource(index: int) -> str:
 
 
 def prepare_launch(root, instruction_id, host, **kwargs):
-    execution_dir = _execution_dir(Path(root))
+    repo_root = Path(root).resolve()
+    execution_dir = _execution_dir(repo_root)
     kwargs.setdefault("state_dir", execution_dir)
     kwargs.setdefault("execution_id", EXECUTION_ID)
     kwargs.setdefault("execution_namespace", EXECUTION_NAMESPACE)
@@ -147,6 +193,30 @@ def prepare_launch(root, instruction_id, host, **kwargs):
     kwargs.setdefault("capacity_generation", "sha256:" + "b" * 64)
     kwargs.setdefault("capacity_epoch", 1)
     kwargs.setdefault("reservation_expires_at", "2099-01-01T00:00:00Z")
+    adapter_identity = _EXECUTION_ADAPTER_IDENTITIES[repo_root]
+    host_runtime = _HOST_RUNTIMES[repo_root]
+    host_identity = controller_module.read_strict_canonical_json(
+        host_runtime / "host-runtime-identity.json",
+        label="fixture host writer identity",
+    )
+    adapter_record_id = str(adapter_identity["record_id"])
+    adapter_path = (
+        host_runtime
+        / "execution-adapter-bindings"
+        / (adapter_record_id.removeprefix("sha256:") + ".json")
+    )
+    kwargs.setdefault(
+        "host_kernel_generation", host_identity["host_kernel_generation"]
+    )
+    kwargs.setdefault("execution_adapter_identity_record_id", adapter_record_id)
+    kwargs.setdefault(
+        "execution_adapter_identity_path",
+        str(adapter_path.relative_to(host_runtime)).replace("\\", "/"),
+    )
+    kwargs.setdefault(
+        "execution_adapter_identity_blob_digest",
+        "sha256:" + sha256(adapter_path.read_bytes()).hexdigest(),
+    )
     with controller_module.runtime_file_lock(
         execution_dir / "locks" / "dispatcher-admission.lock",
         timeout_seconds=120.0,
@@ -231,6 +301,11 @@ def execute_contract(root, contract, adapter, resolver, **kwargs):
     execution_dir = _execution_dir(repo_root)
     host_runtime = _HOST_RUNTIMES[repo_root]
     adapter.host_runtime_dir = host_runtime
+    adapter.repo_root = repo_root
+    adapter.execution_dir = execution_dir
+    adapter.execution_id = EXECUTION_ID
+    adapter.execution_namespace = EXECUTION_NAMESPACE
+    adapter_identity_source = adapter.host_provider_identity(repo_root=repo_root)
     candidate = json.loads(json.dumps(contract))
     release = candidate.setdefault("dispatch_release", {})
     release.setdefault("admission_epoch", 1)
@@ -242,6 +317,18 @@ def execute_contract(root, contract, adapter, resolver, **kwargs):
         host_runtime / "locks" / "host-authority.lock",
         timeout_seconds=120.0,
     ):
+        execution_adapter_identity = controller_module.install_execution_adapter_identity(
+            host_runtime,
+            repo_root=repo_root,
+            execution_dir=execution_dir,
+            execution_namespace=EXECUTION_NAMESPACE,
+            execution_id=EXECUTION_ID,
+            host_id="host-1",
+            adapter_identity_path=(
+                execution_dir / "host" / "codex-app-server-v1" / "identity.json"
+            ),
+            adapter_identity=adapter_identity_source,
+        )
         for task in candidate.get("tasks", []):
             if task.get("authority_class") != "WRITE_AUTHORIZED":
                 continue
@@ -252,6 +339,36 @@ def execute_contract(root, contract, adapter, resolver, **kwargs):
             )
             if isinstance(persisted, Mapping) and persisted.get("state") == "RELEASED":
                 continue
+            demand = controller_module.record_host_scheduler_demand(
+                host_runtime,
+                host_id="host-1",
+                repository=str(task["repository"]),
+                repository_transport_digest=str(
+                    controller_module.runtime_repository_identity(repo_root)[
+                        "transport_digest"
+                    ]
+                ),
+                execution_namespace=EXECUTION_NAMESPACE,
+                execution_id=EXECUTION_ID,
+                plan_fingerprint=str(task["plan_fingerprint"]),
+                capacity_generation=str(capacity["capacity_generation"]),
+                execution_adapter_identity=execution_adapter_identity,
+                candidate_reservation_ids=[str(task["launch_instruction_id"])],
+                weight=1,
+                actor="test:host-scheduler",
+                recorded_at=str(capacity["issued_at"]),
+            )
+            schedule = controller_module.grant_host_scheduler_capacity(
+                host_runtime,
+                host_id="host-1",
+                actor="test:host-scheduler",
+                now=controller_module.utc_now(),
+            )
+            grant = next(
+                item
+                for item in schedule["outstanding_grants"]
+                if item.get("demand_id") == demand.get("demand_id")
+            )
             permit = controller_module.reserve_global_host_session(
                 host_runtime,
                 repository=str(task["repository"]),
@@ -265,6 +382,8 @@ def execute_contract(root, contract, adapter, resolver, **kwargs):
                 actor_time=str(capacity["issued_at"]),
                 expires_at=str(capacity["expires_at"]),
                 now=controller_module.utc_now(),
+                execution_adapter_identity=execution_adapter_identity,
+                host_scheduler_grant_id=str(grant["grant_id"]),
             )
             permits.append(
                 {
@@ -395,6 +514,66 @@ class Adapter:
         self.dispatch_guards: list[tuple[str, str]] = []
         self.external_effects: list[tuple[str, int]] = []
         self.host_runtime_dir: Path | None = None
+
+    def host_provider_identity(self, *, repo_root: Path) -> Mapping[str, object]:
+        if self.host_runtime_dir is None:
+            raise AssertionError("test host runtime was not installed")
+        execution_dir = _execution_dir(Path(repo_root).resolve())
+        provider = controller_module._host_provider_binding(
+            self.host_runtime_dir, host_id=self.host_id
+        )
+        runtime_identity = controller_module.read_strict_canonical_json(
+            self.host_runtime_dir / "host-runtime-identity.json",
+            label="fixture host runtime identity",
+        )
+        source_path = Path(controller_module.__file__).resolve()
+        source_digest = "sha256:" + sha256(source_path.read_bytes()).hexdigest()
+        digest = "sha256:" + "e" * 64
+        material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "hive-mind-codex-app-server-identity-v1",
+            "execution_namespace": EXECUTION_NAMESPACE,
+            "execution_id": EXECUTION_ID,
+            "host_id": self.host_id,
+            "machine_user_id": runtime_identity["machine_user_id"],
+            "provider_identity_digest": provider["provider_identity_digest"],
+            "adapter_module_path": str(source_path),
+            "adapter_module_digest": source_digest,
+            "launcher_path": str(source_path),
+            "launcher_digest": source_digest,
+            "cli_module_path": None,
+            "cli_module_digest": None,
+            "executable_path": str(source_path),
+            "executable_digest": source_digest,
+            "executable_version": "test-fixture",
+            "schema_bundle_digest": digest,
+            "thread_start_schema_digest": digest,
+            "turn_start_schema_digest": digest,
+            "environment_root_digest": digest,
+            "behavior_environment_digest": digest,
+            "provider_config_digest": digest,
+            "execution_config_digest": digest,
+            "account_identity_digest": digest,
+            "effective_model": "test-model",
+            "effective_model_provider": "test-provider",
+            "transport": "stdio://",
+            "initialize_result_digest": digest,
+            "created_at": "2030-01-01T00:00:00Z",
+        }
+        identity = {
+            **material,
+            "record_id": controller_module.digest_json(material),
+        }
+        controller_module.atomic_write_json(
+            execution_dir / "host" / "codex-app-server-v1" / "identity.json",
+            identity,
+        )
+        self.provider_identity_digest = provider["provider_identity_digest"]
+        self.repo_root = Path(repo_root).resolve()
+        self.execution_dir = execution_dir
+        self.execution_id = EXECUTION_ID
+        self.execution_namespace = EXECUTION_NAMESPACE
+        return identity
 
     def host_lifecycle_authority(self, *, repo_root: Path) -> Mapping[str, object]:
         del repo_root
@@ -630,6 +809,15 @@ class HostExecutionTests(unittest.TestCase):
         self.host_runtime = self.root / "host-runtime"
         controller_module.initialize_host_runtime(self.host_runtime)
         now = controller_module.utc_now()
+        provider_attestation = controller_module.build_host_provider_attestation(
+            self.host_runtime,
+            host_id="host-1",
+            provider_identity_source="fixture:host-adapter",
+            provider_identity_material={
+                "kind": "hive-mind-test-host-provider-v1",
+                "identity_token": "sha256:" + "d" * 64,
+            },
+        )
         with controller_module.runtime_file_lock(
             self.host_runtime / "locks" / "host-authority.lock",
             timeout_seconds=120.0,
@@ -646,14 +834,43 @@ class HostExecutionTests(unittest.TestCase):
                 capability_source="fixture:authenticated-capacity",
                 capability_digest="sha256:" + "c" * 64,
                 provider_identity_source="fixture:host-adapter",
-                provider_identity_digest="sha256:" + "d" * 64,
+                provider_identity_digest=provider_attestation[
+                    "provider_identity_digest"
+                ],
+                provider_attestation=provider_attestation,
                 declarative=False,
                 now=now,
                 expected_generation=None,
             )
-        _HOST_RUNTIMES[self.root.resolve()] = self.host_runtime
+        repo_root = self.root.resolve()
+        _HOST_RUNTIMES[repo_root] = self.host_runtime
+        fixture_adapter = Adapter([])
+        fixture_adapter.host_runtime_dir = self.host_runtime
+        identity_source = fixture_adapter.host_provider_identity(repo_root=repo_root)
+        with controller_module.runtime_file_lock(
+            self.host_runtime / "locks" / "host-authority.lock",
+            timeout_seconds=120.0,
+        ):
+            _EXECUTION_ADAPTER_IDENTITIES[repo_root] = (
+                controller_module.install_execution_adapter_identity(
+                    self.host_runtime,
+                    repo_root=repo_root,
+                    execution_dir=_execution_dir(repo_root),
+                    execution_namespace=EXECUTION_NAMESPACE,
+                    execution_id=EXECUTION_ID,
+                    host_id="host-1",
+                    adapter_identity_path=(
+                        _execution_dir(repo_root)
+                        / "host"
+                        / "codex-app-server-v1"
+                        / "identity.json"
+                    ),
+                    adapter_identity=identity_source,
+                )
+            )
 
     def tearDown(self) -> None:
+        _EXECUTION_ADAPTER_IDENTITIES.pop(self.root.resolve(), None)
         _HOST_RUNTIMES.pop(self.root.resolve(), None)
         self.host_base_patch.stop()
         self.temporary.cleanup()
@@ -1217,14 +1434,7 @@ class HostEffectAmbiguityTests(unittest.TestCase):
                     "execution_id": plane.execution_id,
                 },
             )
-            binding = host_execution_module._EffectFence(
-                instruction_id="sha256:" + "1" * 64,
-                resource_key="sha256:" + "2" * 64,
-                authority_epoch=1,
-                dispatch_release_id="sha256:" + "3" * 64,
-                dispatch_admission_epoch=1,
-                task={"authority_class": "WRITE_AUTHORIZED", "node_id": "NODE-0"},
-            )
+            binding = _synthetic_effect_fence()
             idempotency_key = app_server_fixture.digest_text("accepted-create")
             attempts = 0
 
@@ -1242,7 +1452,21 @@ class HostEffectAmbiguityTests(unittest.TestCase):
             def admitted(*_args: object, **_kwargs: object):
                 yield None
 
-            with mock.patch.object(host_execution_module, "_effect_guard", admitted):
+            with mock.patch.object(
+                host_execution_module, "_effect_guard", admitted
+            ), mock.patch.object(
+                host_execution_module,
+                "require_host_runtime",
+                return_value=plane.host_runtime_dir,
+            ), mock.patch.object(
+                host_execution_module,
+                "_execution_adapter_snapshot",
+                return_value={"record_id": "sha256:" + "8" * 64},
+            ), mock.patch.object(
+                host_execution_module,
+                "_validate_effect_adapter_fence",
+                return_value={"record_id": "sha256:" + "8" * 64},
+            ):
                 with self.assertRaises(TimeoutError):
                     host_execution_module._perform_host_effect(
                         plane.repo_root,
@@ -1280,6 +1504,7 @@ class HostEffectAmbiguityTests(unittest.TestCase):
         effect = {
             "effect_kind": "CREATE_THREAD",
             "idempotency_key": effect_id,
+            **_synthetic_effect_provenance(),
         }
 
         def sealed(material: Mapping[str, object]) -> dict[str, object]:
@@ -1350,15 +1575,15 @@ class HostEffectAmbiguityTests(unittest.TestCase):
                 {"namespace": "default", "execution_id": execution_id},
             )
             valid = observation()
-            self.assertEqual(
-                host_execution_module._validate_effect_reconciliation(
-                    valid,
-                    effect=effect,
-                    state_dir=state_dir,
-                    expected_host_id=host_id,
-                ),
+            validated = host_execution_module._validate_effect_reconciliation(
                 valid,
+                effect=effect,
+                state_dir=state_dir,
+                expected_host_id=host_id,
             )
+            self.assertEqual(validated["adapter_observation_id"], valid["record_id"])
+            for field, expected in _synthetic_effect_provenance().items():
+                self.assertEqual(validated[field], expected)
             wrong_host_material = dict(external())
             wrong_host_material.pop("record_id")
             wrong_host_material["host_id"] = "app-server:other"
@@ -1408,14 +1633,13 @@ class HostEffectAmbiguityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "locks").mkdir(parents=True)
-            binding = host_execution_module._EffectFence(
-                instruction_id="sha256:" + "1" * 64,
-                resource_key="sha256:" + "2" * 64,
-                authority_epoch=1,
-                dispatch_release_id="sha256:" + "3" * 64,
-                dispatch_admission_epoch=1,
-                task={"authority_class": "WRITE_AUTHORIZED", "node_id": "NODE-0"},
-            )
+            binding = _synthetic_effect_fence()
+
+            class AmbiguousAdapter:
+                host_runtime_dir = root
+                host_id = "app-server:fixture"
+
+            adapter = AmbiguousAdapter()
 
             @contextmanager
             def admitted(*_args: object, **_kwargs: object):
@@ -1438,13 +1662,25 @@ class HostEffectAmbiguityTests(unittest.TestCase):
                         host_execution_module,
                         "utc_now",
                         return_value=datetime(2030, 1, 1, tzinfo=UTC),
+                    ), mock.patch.object(
+                        host_execution_module,
+                        "require_host_runtime",
+                        return_value=root,
+                    ), mock.patch.object(
+                        host_execution_module,
+                        "_execution_adapter_snapshot",
+                        return_value={"record_id": "sha256:" + "8" * 64},
+                    ), mock.patch.object(
+                        host_execution_module,
+                        "_validate_effect_adapter_fence",
+                        return_value={"record_id": "sha256:" + "8" * 64},
                     ):
                         with self.assertRaises(TimeoutError):
                             host_execution_module._perform_host_effect(
                                 root,
                                 binding,
                                 state_dir,
-                                adapter=object(),
+                                adapter=adapter,
                                 effect_kind=effect_kind,
                                 idempotency_key="sha256:" + str(index) * 64,
                                 request={"operation": effect_kind},
@@ -1457,7 +1693,7 @@ class HostEffectAmbiguityTests(unittest.TestCase):
                                 root,
                                 binding,
                                 state_dir,
-                                adapter=object(),
+                                adapter=adapter,
                                 effect_kind=effect_kind,
                                 idempotency_key="sha256:" + str(index) * 64,
                                 request={"operation": effect_kind},
@@ -1482,14 +1718,7 @@ class HostEffectAmbiguityTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            binding = host_execution_module._EffectFence(
-                instruction_id="sha256:" + "1" * 64,
-                resource_key="sha256:" + "2" * 64,
-                authority_epoch=1,
-                dispatch_release_id="sha256:" + "3" * 64,
-                dispatch_admission_epoch=1,
-                task={"authority_class": "WRITE_AUTHORIZED", "node_id": "NODE-0"},
-            )
+            binding = _synthetic_effect_fence()
 
             @contextmanager
             def admitted(*_args: object, **_kwargs: object):
@@ -1497,6 +1726,7 @@ class HostEffectAmbiguityTests(unittest.TestCase):
 
             class Reconciler:
                 host_id = "app-server:fixture"
+                host_runtime_dir = root
 
                 def read_effect_reconciliation(
                     self, *, effect_kind: str, idempotency_key: str
@@ -1560,6 +1790,18 @@ class HostEffectAmbiguityTests(unittest.TestCase):
                         host_execution_module,
                         "utc_now",
                         return_value=datetime(2030, 1, 1, tzinfo=UTC),
+                    ), mock.patch.object(
+                        host_execution_module,
+                        "require_host_runtime",
+                        return_value=root,
+                    ), mock.patch.object(
+                        host_execution_module,
+                        "_execution_adapter_snapshot",
+                        return_value={"record_id": "sha256:" + "8" * 64},
+                    ), mock.patch.object(
+                        host_execution_module,
+                        "_validate_effect_adapter_fence",
+                        return_value={"record_id": "sha256:" + "8" * 64},
                     ):
                         with self.assertRaises(TimeoutError):
                             host_execution_module._perform_host_effect(

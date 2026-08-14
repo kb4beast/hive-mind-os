@@ -80,11 +80,16 @@ def ready_runtime(
     """Explicitly migrate an empty production fixture to runtime readiness."""
 
     source_autopilot = Path(__file__).resolve().parents[1]
-    for relative in controller.KERNEL_TEMPLATE_COMPONENTS:
+    # Runtime readiness authenticates the complete loaded kernel, not just the
+    # prompt templates.  Lightweight fixtures therefore need a byte-identical
+    # copy of every missing kernel component; otherwise they would exercise an
+    # impossible production state in which authority is initialized by code
+    # that is absent from the selected checkout.
+    for relative in controller.KERNEL_BUNDLE_COMPONENTS:
         parts = Path(relative).parts
         source = source_autopilot.parent.joinpath(*parts)
         destination = repo_root.joinpath(*parts)
-        if not destination.exists():
+        if source.is_file() and not destination.exists():
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
     (repo_root / ".git").mkdir(exist_ok=True)

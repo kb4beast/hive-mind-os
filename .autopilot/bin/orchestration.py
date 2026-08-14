@@ -30,20 +30,21 @@ from controller import (
     digest_json,
     ensure_repository_runtime_identity,
     exclusive_write_bytes_or_identical,
-    require_execution_authority_dir,
     read_strict_canonical_json,
+    require_execution_authority_dir,
     resolve_host_runtime_dir,
     resolve_repository_state_dir,
     runtime_file_lock,
     runtime_file_lock_is_held,
 )
 from sidecar_execution import (
-    ACTIVE_SIDECAR_STATES,
     active_sidecars,
     fence_orphaned_sidecars,
-    orphan_sidecar_obligations as _sidecar_orphan_obligations,
     plan_sidecars,
     validate_sidecar_policy,
+)
+from sidecar_execution import (
+    orphan_sidecar_obligations as _sidecar_orphan_obligations,
 )
 
 INTENTS = ("BUILD_DAG", "START", "CONTINUE", "CHECK", "FINISH")
@@ -176,6 +177,10 @@ _BINDING_IDENTITY_FIELDS = frozenset(
         "capacity_generation",
         "capacity_epoch",
         "reservation_expires_at",
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
     }
 )
 _BINDING_RETRY_FIELDS = frozenset({"host", "attempt", "retry_of"})
@@ -200,19 +205,27 @@ _BINDING_CAPACITY_FIELDS = frozenset(
         "reservation_expires_at",
     }
 )
+_BINDING_ADAPTER_FIELDS = frozenset(
+    {
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
+    }
+)
 _BINDING_EXECUTION_FIELDS = frozenset(
     {"execution_id", "execution_namespace"}
 )
-_PRE_CAPACITY_BINDING_IDENTITY_FIELDS = (
-    _BINDING_IDENTITY_FIELDS - _BINDING_CAPACITY_FIELDS
+_PRE_ADAPTER_BINDING_IDENTITY_FIELDS = (
+    _BINDING_IDENTITY_FIELDS - _BINDING_ADAPTER_FIELDS
 )
-_PRE_EXECUTION_BINDING_IDENTITY_FIELDS = (
-    _BINDING_IDENTITY_FIELDS - _BINDING_EXECUTION_FIELDS
-)
-_PRE_EXECUTION_CAPACITY_BINDING_IDENTITY_FIELDS = (
-    _BINDING_IDENTITY_FIELDS
+_LEGACY_BINDING_IDENTITY_VARIANTS = (
+    _PRE_ADAPTER_BINDING_IDENTITY_FIELDS,
+    _PRE_ADAPTER_BINDING_IDENTITY_FIELDS - _BINDING_CAPACITY_FIELDS,
+    _PRE_ADAPTER_BINDING_IDENTITY_FIELDS - _BINDING_EXECUTION_FIELDS,
+    _PRE_ADAPTER_BINDING_IDENTITY_FIELDS
     - _BINDING_EXECUTION_FIELDS
-    - _BINDING_CAPACITY_FIELDS
+    - _BINDING_CAPACITY_FIELDS,
 )
 _BINDING_ALLOWED_BY_STATE = {
     "PREPARED": _BINDING_ENVELOPE_FIELDS | _BINDING_IDENTITY_FIELDS | _BINDING_RETRY_FIELDS,
@@ -290,25 +303,9 @@ _LEGACY_BINDING_SCHEMAS = frozenset(
             | _BINDING_TERMINAL_FIELDS
         ),
         *(
-            frozenset(
-                (allowed - _BINDING_IDENTITY_FIELDS)
-                | _PRE_CAPACITY_BINDING_IDENTITY_FIELDS
-            )
+            frozenset((allowed - _BINDING_IDENTITY_FIELDS) | legacy_identity)
             for allowed in _BINDING_ALLOWED_BY_STATE.values()
-        ),
-        *(
-            frozenset(
-                (allowed - _BINDING_IDENTITY_FIELDS)
-                | _PRE_EXECUTION_BINDING_IDENTITY_FIELDS
-            )
-            for allowed in _BINDING_ALLOWED_BY_STATE.values()
-        ),
-        *(
-            frozenset(
-                (allowed - _BINDING_IDENTITY_FIELDS)
-                | _PRE_EXECUTION_CAPACITY_BINDING_IDENTITY_FIELDS
-            )
-            for allowed in _BINDING_ALLOWED_BY_STATE.values()
+            for legacy_identity in _LEGACY_BINDING_IDENTITY_VARIANTS
         ),
     }
 )
@@ -534,6 +531,28 @@ def _validate_binding_event_schema(
             raise OrchestrationError(
                 f"task binding ledger line {index} has invalid host capacity fence"
             )
+        for digest_field in (
+            "host_kernel_generation",
+            "execution_adapter_identity_record_id",
+            "execution_adapter_identity_blob_digest",
+        ):
+            digest_value = event.get(digest_field)
+            if (
+                not isinstance(digest_value, str)
+                or DIGEST_TEXT.fullmatch(digest_value) is None
+            ):
+                raise OrchestrationError(
+                    f"task binding ledger line {index} has invalid {digest_field}"
+                )
+        adapter_record_id = str(event["execution_adapter_identity_record_id"])
+        if event.get("execution_adapter_identity_path") != (
+            "execution-adapter-bindings/"
+            + adapter_record_id.removeprefix("sha256:")
+            + ".json"
+        ):
+            raise OrchestrationError(
+                f"task binding ledger line {index} has invalid execution adapter evidence path"
+            )
 
 
 def _validate_binding_replay(events: Sequence[Mapping[str, object]]) -> None:
@@ -581,6 +600,12 @@ def _validate_binding_replay(events: Sequence[Mapping[str, object]]) -> None:
             if state not in legal[prior_state]:
                 raise OrchestrationError(
                     f"task binding ledger line {index} has impossible {prior_state} -> {state} transition"
+                )
+            if _BINDING_ADAPTER_FIELDS.issubset(prior) != _BINDING_ADAPTER_FIELDS.issubset(
+                event
+            ):
+                raise OrchestrationError(
+                    f"task binding ledger line {index} changes adapter provenance schema"
                 )
             for field in immutable_fields:
                 if field in prior and prior.get(field) != event.get(field):
@@ -786,7 +811,7 @@ def _binding_lock(
                 "task binding mutation requires caller-held dispatcher authority"
             )
     try:
-        if for_write and not ledger_path.exists():
+        if for_write and not ledger_path.exists() and not is_execution:
             # First writers serialize identity/lock/ledger publication through one
             # repository-wide barrier. Readers that observe this persistent lock
             # recheck the ledger under the same barrier instead of racing the first
@@ -846,8 +871,15 @@ def binding_events(
     *,
     state_dir: str | Path | None = None,
 ) -> tuple[Mapping[str, object], ...]:
+    directory = _authority_state_root(repo_root, state_dir)
     path = _binding_path(repo_root, state_dir)
     if path.exists():
+        with _binding_lock(repo_root, state_dir):
+            return _binding_events_unlocked(repo_root, state_dir)
+    # Explicit execution initialization seals the empty-ledger proof.  Never
+    # reacquire the lower-ranked repository initialization barrier from a
+    # compound execution authority cut.
+    if directory != resolve_repository_state_dir(repo_root):
         with _binding_lock(repo_root, state_dir):
             return _binding_events_unlocked(repo_root, state_dir)
     initialization_path = _state_path(
@@ -1107,6 +1139,9 @@ def _write_reservation(event: Mapping[str, object]) -> dict[str, object]:
         "resource_key",
         "dispatcher_release_id",
         "event_id",
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_blob_digest",
     )
     for field in required_digests:
         value = event.get(field)
@@ -1141,6 +1176,16 @@ def _write_reservation(event: Mapping[str, object]) -> dict[str, object]:
         "capacity_generation": event.get("capacity_generation"),
         "capacity_epoch": event.get("capacity_epoch"),
         "reservation_expires_at": event.get("reservation_expires_at"),
+        "host_kernel_generation": event.get("host_kernel_generation"),
+        "execution_adapter_identity_record_id": event.get(
+            "execution_adapter_identity_record_id"
+        ),
+        "execution_adapter_identity_path": event.get(
+            "execution_adapter_identity_path"
+        ),
+        "execution_adapter_identity_blob_digest": event.get(
+            "execution_adapter_identity_blob_digest"
+        ),
         "binding_event_id": event["event_id"],
         "state": event["state"],
     }
@@ -1234,6 +1279,25 @@ def active_host_reservations(
                     "launch_instruction_id": event.get("launch_instruction_id"),
                     "resource_key": event.get("resource_key"),
                     "authority_epoch": event.get("authority_epoch"),
+                    "host_reservation_id": event.get("host_reservation_id"),
+                    "capacity_host_id": event.get("capacity_host_id"),
+                    "capacity_generation": event.get("capacity_generation"),
+                    "capacity_epoch": event.get("capacity_epoch"),
+                    "reservation_expires_at": event.get(
+                        "reservation_expires_at"
+                    ),
+                    "host_kernel_generation": event.get(
+                        "host_kernel_generation"
+                    ),
+                    "execution_adapter_identity_record_id": event.get(
+                        "execution_adapter_identity_record_id"
+                    ),
+                    "execution_adapter_identity_path": event.get(
+                        "execution_adapter_identity_path"
+                    ),
+                    "execution_adapter_identity_blob_digest": event.get(
+                        "execution_adapter_identity_blob_digest"
+                    ),
                     "binding_event_id": event.get("event_id"),
                     "state": event.get("state"),
                 }
@@ -1255,6 +1319,19 @@ def active_host_reservations(
                 ("parent_authority_class", "authority_class"),
                 ("parent_dispatcher_release_id", "dispatcher_release_id"),
                 ("parent_dispatcher_admission_epoch", "dispatcher_admission_epoch"),
+                ("host_kernel_generation", "host_kernel_generation"),
+                (
+                    "execution_adapter_identity_record_id",
+                    "execution_adapter_identity_record_id",
+                ),
+                (
+                    "execution_adapter_identity_path",
+                    "execution_adapter_identity_path",
+                ),
+                (
+                    "execution_adapter_identity_blob_digest",
+                    "execution_adapter_identity_blob_digest",
+                ),
             ):
                 if sidecar.get(sidecar_field) != parent.get(parent_field):
                     raise OrchestrationError(
@@ -1281,6 +1358,18 @@ def active_host_reservations(
                     "capacity_epoch": sidecar.get("capacity_epoch"),
                     "reservation_expires_at": sidecar.get(
                         "reservation_expires_at"
+                    ),
+                    "host_kernel_generation": sidecar.get(
+                        "host_kernel_generation"
+                    ),
+                    "execution_adapter_identity_record_id": sidecar.get(
+                        "execution_adapter_identity_record_id"
+                    ),
+                    "execution_adapter_identity_path": sidecar.get(
+                        "execution_adapter_identity_path"
+                    ),
+                    "execution_adapter_identity_blob_digest": sidecar.get(
+                        "execution_adapter_identity_blob_digest"
                     ),
                     "sidecar_event_id": sidecar.get("event_id"),
                     "state": sidecar.get("state"),
@@ -1943,6 +2032,10 @@ def prepare_launch(
     capacity_generation: str,
     capacity_epoch: int,
     reservation_expires_at: str,
+    host_kernel_generation: str,
+    execution_adapter_identity_record_id: str,
+    execution_adapter_identity_path: str,
+    execution_adapter_identity_blob_digest: str,
     attempt: int = 1,
     retry_of: str | None = None,
     state_dir: str | Path | None = None,
@@ -1992,6 +2085,19 @@ def prepare_launch(
         or not reservation_expires_at.strip()
     ):
         raise OrchestrationError("launch requires an exact global host reservation fence")
+    for label, value in (
+        ("host kernel generation", host_kernel_generation),
+        ("execution adapter identity", execution_adapter_identity_record_id),
+        ("execution adapter identity blob", execution_adapter_identity_blob_digest),
+    ):
+        if not isinstance(value, str) or DIGEST_TEXT.fullmatch(value) is None:
+            raise OrchestrationError(f"launch requires an exact {label}")
+    if execution_adapter_identity_path != (
+        "execution-adapter-bindings/"
+        + execution_adapter_identity_record_id.removeprefix("sha256:")
+        + ".json"
+    ):
+        raise OrchestrationError("launch execution adapter evidence path is invalid")
     derived = derive_launch_identity(
         execution_id=execution_id,
         execution_namespace=execution_namespace,
@@ -2036,6 +2142,10 @@ def prepare_launch(
         "capacity_generation": capacity_generation,
         "capacity_epoch": capacity_epoch,
         "reservation_expires_at": reservation_expires_at,
+        "host_kernel_generation": host_kernel_generation,
+        "execution_adapter_identity_record_id": execution_adapter_identity_record_id,
+        "execution_adapter_identity_path": execution_adapter_identity_path,
+        "execution_adapter_identity_blob_digest": execution_adapter_identity_blob_digest,
     }
     with _binding_lock(repo_root, execution_directory, for_write=True):
         # Re-read trusted authority while holding the transition lock. This
@@ -2078,6 +2188,7 @@ def prepare_launch(
                 existing.get("resource_key") is None
                 or type(existing.get("authority_epoch")) is not int
                 or any(existing.get(field) is None for field in LAUNCH_IDENTITY_FIELDS)
+                or not _BINDING_IDENTITY_FIELDS.issubset(existing)
             ):
                 raise OrchestrationError(
                     "legacy active launch has no complete authority fence; explicitly "

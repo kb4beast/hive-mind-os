@@ -8,6 +8,7 @@ import errno
 import importlib.util
 import json
 import os
+import re
 import secrets
 import shutil
 import stat
@@ -17,7 +18,7 @@ import tempfile
 import threading
 from collections.abc import Mapping
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Sequence
@@ -27,22 +28,47 @@ from attended_host import AttendedCodexHost, EvidenceResolver
 from controller import (
     AUTHORITY_ID,
     FULL_SHA,
+    LEGACY_SEMANTIC_RECONCILIATION_MANIFEST,
     RUNTIME_BOOTSTRAP_LOCK,
+    RUNTIME_BOOTSTRAP_MANIFEST,
+    RUNTIME_READY_MANIFEST,
+    _inspect_noncanonical_authority,
+    _is_link_like,
+    _legacy_semantic_inventory,
+    _legacy_semantic_material,
+    _linked_worktree_roots,
+    _migration_material,
+    _plan_legacy_semantic_paths,
+    _plan_migration_paths,
+    _reject_link_components,
+    _validate_legacy_semantic_manifest,
+    _validate_migration_manifest,
     active_global_host_reservations,
     bind_host_repository_runtime,
     bootstrap_runtime_authority_migration,
+    build_host_provider_attestation,
+    exclusive_write_json_or_identical,
     execution_host_effect_obligations,
     format_time,
+    grant_host_scheduler_capacity,
     host_capacity_path,
     host_capacity_record_in_current_lineage,
+    host_scheduler_observation,
     initialize_execution_namespace,
     initialize_host_runtime,
     initialize_repository_runtime_authority,
+    install_execution_adapter_identity,
     parse_strict_canonical_json_bytes,
     parse_time,
+    publication_observation_evidence_ref,
     publish_host_capacity,
+    read_current_host_runtime_identity,
+    read_host_capacity_predecessor_for_writer_rotation,
+    read_strict_canonical_json,
     reconcile_legacy_worktree_execution_authority,
     reconcile_pending_host_capacity_renewal,
+    record_host_scheduler_demand,
+    recover_host_authority_jsonl_torn_tail,
     release_global_host_session,
     renew_host_capacity_authority,
     require_execution_authority_dir,
@@ -53,8 +79,11 @@ from controller import (
     runtime_file_lock,
     runtime_file_lock_is_held,
     runtime_kernel_identity,
+    runtime_repository_identity,
     stage_repository_runtime_authority,
     strict_jsonl_records,
+    upgrade_execution_namespace_kernel,
+    upgrade_host_runtime_kernel,
     validate_repository_runtime_ready_chain,
 )
 from dag_standard import (
@@ -626,6 +655,10 @@ EXPLORER_RETIREMENT = {
 }
 
 
+class HostCapacityWaiting(AutopilotError):
+    """Authenticated scheduler demand exists but owns no current slot grant."""
+
+
 class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
     """CLI plane with sealed, fail-closed RECON receipt repairs.
 
@@ -692,7 +725,12 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         hook_payload = b"hive-mind-git-hooks-disabled-v1\n"
         if not hooks_path.exists():
             descriptor = os.open(
-                hooks_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+                hooks_path,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_BINARY", 0),
+                0o600,
             )
             try:
                 os.write(descriptor, hook_payload)
@@ -775,11 +813,13 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
 
     @property
     def snapshot_observation_archive_dir(self) -> Path:
-        return self.execution_dir / "github-snapshot-observation-archive"
+        legacy = self.execution_dir / "github-snapshot-observation-archive"
+        return legacy if legacy.exists() else self.execution_dir / "oa"
 
     @property
     def snapshot_candidate_dir(self) -> Path:
-        return self.execution_dir / "github-snapshot-candidates"
+        legacy = self.execution_dir / "github-snapshot-candidates"
+        return legacy if legacy.exists() else self.execution_dir / "sc"
 
     @property
     def github_snapshot_path(self) -> Path:
@@ -1282,22 +1322,20 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             or AUTHORITY_ID.fullmatch(selected_execution_id) is None
         ):
             raise AutopilotError("publication transaction id is invalid")
-        return (
-            "refs/heads/hive-mind-evidence/transactions/"
-            f"{selected_execution_id.removeprefix('sha256:')}/"
-            f"{transaction_id.removeprefix('sha256:')}"
+        reference_id = digest_json(
+            {
+                "kind": "hive-mind-publication-transaction-evidence-ref-v1",
+                "execution_id": selected_execution_id,
+                "transaction_id": transaction_id,
+            }
         )
+        return "refs/heads/hme/t/" + reference_id.removeprefix("sha256:")
 
     def _assert_execution_evidence_ref(self, reference: str) -> None:
-        execution_key = self.execution_id.removeprefix("sha256:")
-        allowed = (
-            f"refs/heads/hive-mind-evidence/transactions/{execution_key}/",
-            f"refs/heads/hive-mind-evidence/snapshot-observations/{execution_key}/",
-            f"refs/heads/hive-mind-evidence/publication-observations/{execution_key}/",
-        )
+        allowed = re.compile(r"refs/heads/hme/(?:t|s|b|p)/[0-9a-f]{64}")
         if (
             not isinstance(reference, str)
-            or not any(reference.startswith(prefix) for prefix in allowed)
+            or allowed.fullmatch(reference) is None
             or any(character in reference for character in " \t\r\n\0~^:?*[\\")
             or ".." in reference
             or reference.endswith("/")
@@ -1525,28 +1563,34 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             if not candidate.is_file() or self._is_link_like(candidate):
                 unavailable_reason = "NATIVE_CODEX_SANDBOX_LINK_BACKED"
             else:
-                version_process = subprocess.run(
-                    [str(candidate), "--version"],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    timeout=30,
-                    env={
-                        key: value
-                        for key, value in os.environ.items()
-                        if not key.upper().startswith(("GIT_", "PYTHON"))
-                    },
-                )
-                observed_version = version_process.stdout.strip()
-                if (
-                    version_process.returncode != 0
-                    or not observed_version
-                    or len(observed_version) > 256
-                ):
-                    unavailable_reason = "NATIVE_CODEX_SANDBOX_VERSION_UNAUTHENTICATED"
+                try:
+                    version_process = subprocess.run(
+                        [str(candidate), "--version"],
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        timeout=30,
+                        env={
+                            key: value
+                            for key, value in os.environ.items()
+                            if not key.upper().startswith(("GIT_", "PYTHON"))
+                        },
+                    )
+                except (OSError, subprocess.SubprocessError):
+                    unavailable_reason = "NATIVE_CODEX_SANDBOX_EXECUTION_UNAVAILABLE"
                 else:
-                    executable = candidate
-                    version = observed_version
+                    observed_version = version_process.stdout.strip()
+                    if (
+                        version_process.returncode != 0
+                        or not observed_version
+                        or len(observed_version) > 256
+                    ):
+                        unavailable_reason = (
+                            "NATIVE_CODEX_SANDBOX_VERSION_UNAUTHENTICATED"
+                        )
+                    else:
+                        executable = candidate
+                        version = observed_version
         # Codex 0.146's Windows restricted-token profile gives a useful
         # filesystem boundary, but its disable-network flag has been observed
         # permitting direct sockets on this host.  No untrusted test may run
@@ -1960,6 +2004,21 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             "local_reservation_id": host_reservation.get("local_reservation_id"),
             "reservation_kind": host_reservation.get("reservation_kind"),
         }
+        if "host_kernel_generation" in host_reservation:
+            reservation_identity.update(
+                {
+                    "host_kernel_generation": host_reservation.get(
+                        "host_kernel_generation"
+                    ),
+                    "execution_adapter_identity_record_id": host_reservation.get(
+                        "execution_adapter_identity_record_id"
+                    ),
+                }
+            )
+        if "host_scheduler_grant_id" in host_reservation:
+            reservation_identity["host_scheduler_grant_id"] = (
+                host_reservation.get("host_scheduler_grant_id")
+            )
         if (
             reservation_event_id != digest_json(reservation_material)
             or AUTHORITY_ID.fullmatch(str(reservation_event_id)) is None
@@ -4426,12 +4485,10 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             or AUTHORITY_ID.fullmatch(observation_key) is None
         ):
             raise AutopilotError("publication target observation identity is invalid")
-        execution_key = self.execution_id.removeprefix("sha256:")
-        transaction_key = transaction_id.removeprefix("sha256:")
-        observation_ref = (
-            "refs/heads/hive-mind-evidence/publication-observations/"
-            f"{execution_key}/{transaction_key}/"
-            f"{observation_key.removeprefix('sha256:')}"
+        observation_ref = publication_observation_evidence_ref(
+            self.execution_id,
+            transaction_id,
+            observation_key,
         )
         self._assert_execution_evidence_ref(observation_ref)
         local = self._local_ref_sha(observation_ref)
@@ -4513,10 +4570,21 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         if not isinstance(observation_ref, str):
             raise AutopilotError(f"{label} observation ref is invalid")
         self._assert_execution_evidence_ref(observation_ref)
-        required_prefix = (
-            "refs/heads/hive-mind-evidence/publication-observations/"
-            f"{self.execution_id.removeprefix('sha256:')}/"
-            f"{str(transaction['transaction_id']).removeprefix('sha256:')}/"
+        observation_key = digest_json(
+            {
+                "kind": "hive-mind-superseded-publication-observation-ref-key-v1",
+                "execution_id": self.execution_id,
+                "publication_transaction_id": transaction["transaction_id"],
+                "expected_target_sha": expected_target_sha,
+                "observed_target_sha": observed_target_sha,
+                "receipt_heads": normalized_receipts,
+                "observed_at": observation.get("observed_at"),
+            }
+        )
+        required_observation_ref = publication_observation_evidence_ref(
+            self.execution_id,
+            str(transaction["transaction_id"]),
+            observation_key,
         )
         try:
             parse_time(observation.get("observed_at"))
@@ -4539,8 +4607,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             or observation.get("pinned_sha") != transaction.get("pinned_sha")
             or observation.get("observed_target_sha") != observed_target_sha
             or observation.get("observation_ref_sha") != observed_target_sha
-            or not observation_ref.startswith(required_prefix)
-            or observation_ref == required_prefix
+            or observation_ref != required_observation_ref
             or observation.get("transaction_ref")
             != transaction.get("transaction_ref")
             or observation.get("observed_transaction_sha")
@@ -6532,11 +6599,15 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             or AUTHORITY_ID.fullmatch(observation_id) is None
         ):
             raise AutopilotError("snapshot observation fetch authority is invalid")
-        return (
-            "refs/heads/hive-mind-evidence/snapshot-observations/"
-            f"{execution_id.removeprefix('sha256:')}/"
-            f"{observation_epoch:020d}-{observation_id.removeprefix('sha256:')}"
+        reference_id = digest_json(
+            {
+                "kind": "hive-mind-snapshot-observation-evidence-ref-v1",
+                "execution_id": execution_id,
+                "observation_epoch": observation_epoch,
+                "observation_id": observation_id,
+            }
         )
+        return "refs/heads/hme/s/" + reference_id.removeprefix("sha256:")
 
     @staticmethod
     def _snapshot_branch_fetch_ref(
@@ -6546,13 +6617,17 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         node_id: str,
         branch: str,
     ) -> str:
-        namespace = ControlPlane._snapshot_fetch_ref(
-            execution_id, observation_epoch, observation_id
+        reference_id = digest_json(
+            {
+                "kind": "hive-mind-snapshot-branch-evidence-ref-v1",
+                "execution_id": execution_id,
+                "observation_epoch": observation_epoch,
+                "observation_id": observation_id,
+                "node_id": node_id,
+                "branch": branch,
+            }
         )
-        suffix = digest_json({"node_id": node_id, "branch": branch}).removeprefix(
-            "sha256:"
-        )
-        return f"{namespace}/branches/{suffix}"
+        return "refs/heads/hme/b/" + reference_id.removeprefix("sha256:")
 
     def _snapshot_branch_fetches(
         self, observation_epoch: int, observation_id: str
@@ -6635,12 +6710,17 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         path = self._secure_execution_path(relative)
         self._ensure_authority_directory(self.execution_dir, path.parent)
         path = self._secure_execution_path(relative)
-        temporary = path.parent / f".{path.name}.{secrets.token_hex(16)}.tmp"
+        # Keep the O_EXCL private name short enough for ordinary Windows path
+        # limits even when the immutable evidence filename is already a digest.
+        temporary = path.parent / f".{secrets.token_hex(8)}.tmp"
         descriptor: int | None = None
         try:
             descriptor = os.open(
                 temporary,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_BINARY", 0),
                 0o600,
             )
             with os.fdopen(descriptor, "wb", closefd=True) as handle:
@@ -6727,6 +6807,19 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             or AUTHORITY_ID.fullmatch(snapshot_digest) is None
         ):
             raise AutopilotError("snapshot candidate artifact authority is invalid")
+        artifact_id = digest_json(
+            {
+                "kind": "hive-mind-snapshot-candidate-artifact-v1",
+                "observation_id": observation_id,
+                "snapshot_digest": snapshot_digest,
+            }
+        )
+        return f"sc/{artifact_id.removeprefix('sha256:')}.json"
+
+    @staticmethod
+    def _legacy_snapshot_candidate_artifact(
+        observation_id: str, snapshot_digest: str
+    ) -> str:
         return (
             "github-snapshot-candidates/"
             f"{observation_id.removeprefix('sha256:')}/"
@@ -6739,9 +6832,15 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         """Adopt only the one exact artifact left before INSTALLING was durable."""
 
         observation_id = str(observation.get("observation_id"))
+        candidate_root = self.snapshot_candidate_dir
+        using_legacy_layout = candidate_root.name == "github-snapshot-candidates"
         directory = self._secure_execution_path(
-            Path("github-snapshot-candidates")
-            / observation_id.removeprefix("sha256:")
+            candidate_root.relative_to(self.execution_dir)
+            / (
+                observation_id.removeprefix("sha256:")
+                if using_legacy_layout
+                else ""
+            )
         )
         if not directory.exists():
             return None
@@ -6749,28 +6848,50 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             raise AutopilotError(
                 "pending GitHub snapshot candidate directory is not private authority"
             )
-        entries = sorted(directory.iterdir(), key=lambda item: item.name)
-        if len(entries) != 1:
+        matches: list[tuple[Path, Mapping[str, Any], str]] = []
+        for path in sorted(directory.iterdir(), key=lambda item: item.name):
+            if self._is_link_like(path) or not path.is_file():
+                raise AutopilotError("pending snapshot candidate artifact is invalid")
+            candidate = self._strict_json_file(
+                path, label="pending immutable GitHub snapshot candidate"
+            )
+            issues = self._snapshot_candidate_issues(candidate, observation)
+            if issues or not isinstance(candidate, Mapping):
+                if using_legacy_layout:
+                    raise AutopilotError(
+                        "pending immutable GitHub snapshot candidate is invalid: "
+                        + "; ".join(issues)
+                    )
+                continue
+            snapshot_digest = digest_json(candidate)
+            expected = self._secure_execution_path(
+                self._snapshot_candidate_artifact(observation_id, snapshot_digest)
+            )
+            legacy_expected = self._secure_execution_path(
+                self._legacy_snapshot_candidate_artifact(
+                    observation_id, snapshot_digest
+                )
+            )
+            if path in {expected, legacy_expected}:
+                matches.append((path, candidate, snapshot_digest))
+        if len(matches) != 1:
+            if not matches:
+                return None
             raise AutopilotError(
                 "pending snapshot recovery requires exactly one immutable candidate"
             )
-        path = entries[0]
-        if self._is_link_like(path) or not path.is_file():
-            raise AutopilotError("pending snapshot candidate artifact is invalid")
-        candidate = self._strict_json_file(
-            path, label="pending immutable GitHub snapshot candidate"
-        )
-        issues = self._snapshot_candidate_issues(candidate, observation)
-        if issues or not isinstance(candidate, Mapping):
-            raise AutopilotError(
-                "pending immutable GitHub snapshot candidate is invalid: "
-                + "; ".join(issues)
-            )
-        snapshot_digest = digest_json(candidate)
-        expected = self._secure_execution_path(
-            self._snapshot_candidate_artifact(observation_id, snapshot_digest)
-        )
-        if path != expected:
+        path, candidate, snapshot_digest = matches[0]
+        expected_paths = {
+            self._secure_execution_path(
+                self._snapshot_candidate_artifact(observation_id, snapshot_digest)
+            ),
+            self._secure_execution_path(
+                self._legacy_snapshot_candidate_artifact(
+                    observation_id, snapshot_digest
+                )
+            ),
+        }
+        if path not in expected_paths:
             raise AutopilotError(
                 "pending snapshot candidate path differs from its canonical digest"
             )
@@ -6943,7 +7064,12 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 expected_artifact = ControlPlane._snapshot_candidate_artifact(
                     observation_id, snapshot_digest
                 )
-                if candidate_artifact != expected_artifact:
+                legacy_artifact = (
+                    ControlPlane._legacy_snapshot_candidate_artifact(
+                        observation_id, snapshot_digest
+                    )
+                )
+                if candidate_artifact not in {expected_artifact, legacy_artifact}:
                     issues.append(
                         "shared GitHub snapshot observation candidate artifact is invalid"
                     )
@@ -8706,6 +8832,12 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             expected_artifact = self._snapshot_candidate_artifact(
                 observation_id, snapshot_digest
             )
+            if observation.get("candidate_artifact") == (
+                self._legacy_snapshot_candidate_artifact(
+                    observation_id, snapshot_digest
+                )
+            ):
+                expected_artifact = str(observation["candidate_artifact"])
             if status_before in {"INSTALLING", "INSTALLED"} and (
                 observation.get("snapshot_digest") != snapshot_digest
                 or observation.get("candidate_artifact") != expected_artifact
@@ -9699,6 +9831,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         *,
         actor: str,
         host_id: str,
+        execution_adapter_identity: Mapping[str, object],
         requested_nodes: Sequence[str] = (),
     ) -> Mapping[str, Any]:
         """Reserve host slots and publish one execution-scoped release atomically."""
@@ -9716,6 +9849,14 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 host_id=host_id,
                 now=self.clock(),
             )
+            self._dispatcher_adapter_coordinates(
+                execution_adapter_identity,
+                capacity=capacity,
+                repository=repository,
+                host_id=host_id,
+                execution_namespace=self.execution_namespace,
+                execution_id=self.execution_id,
+            )
             host_reservations = active_global_host_reservations(
                 self.host_runtime_dir
             )
@@ -9728,11 +9869,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             if item.get("execution_id") == self.execution_id
             and item.get("host_id") == host_id
         ]
-        available = int(capacity["max_total_sessions"]) - len(
-            [item for item in occupied if item.get("execution_id") != self.execution_id]
-        )
-        if available < 1:
-            raise AutopilotError("authenticated host capacity is exhausted")
+        capacity_limit = int(capacity["max_total_sessions"])
 
         if own:
             with self.host_lock(timeout_seconds=120.0):
@@ -9774,6 +9911,13 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                             exact_permits = (
                                 current.get("host_id") == host_id
                                 and expected_ids == active_ids
+                                and all(
+                                    item.get(
+                                        "execution_adapter_identity_record_id"
+                                    )
+                                    == execution_adapter_identity.get("record_id")
+                                    for item in current_own
+                                )
                                 and current.get("capacity_generation")
                                 == current_capacity.get("capacity_generation")
                                 and current.get("capacity_epoch")
@@ -9817,15 +9961,18 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
 
         # Build all expensive local evidence outside global locks. Existing exact
         # permits use their first reservation time so a crash retry is deterministic.
-        with self.execution_lock("dispatcher-admission.lock", timeout_seconds=120.0):
-            draft = self._build_dispatch_release_unlocked(
-                actor=actor,
-                host_id=host_id,
-                capacity=capacity,
-                session_cap=available,
-                issued_at=issued_at,
-                requested_nodes=requested_nodes,
-            )
+        with self.arbiter_lock(timeout_seconds=120.0):
+            with self.execution_lock(
+                "dispatcher-admission.lock", timeout_seconds=120.0
+            ):
+                draft = self._build_dispatch_release_unlocked(
+                    actor=actor,
+                    host_id=host_id,
+                    capacity=capacity,
+                    session_cap=capacity_limit,
+                    issued_at=issued_at,
+                    requested_nodes=requested_nodes,
+                )
 
         reserved: list[Mapping[str, Any]] = []
         newly_reserved: list[Mapping[str, Any]] = []
@@ -9877,6 +10024,13 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                         if (
                             concurrent_release.get("host_id") == host_id
                             and release_permits == inventory_permits
+                            and all(
+                                item.get(
+                                    "execution_adapter_identity_record_id"
+                                )
+                                == execution_adapter_identity.get("record_id")
+                                for item in current_own
+                            )
                             and (
                                 not requested
                                 or requested
@@ -9887,39 +10041,85 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                         raise AutopilotError(
                             "another dispatcher completed a different live admission"
                         )
-                    available_now = int(capacity["max_total_sessions"]) - len(
-                        [
-                            item
-                            for item in current_occupied
-                            if item.get("execution_id") != self.execution_id
-                        ]
-                    )
-                    if available_now != available:
-                        raise AutopilotError(
-                            "host capacity availability changed during dispatcher admission"
-                        )
-                    repeated = self._build_dispatch_release_unlocked(
+                    repeated_full = self._build_dispatch_release_unlocked(
                         actor=actor,
                         host_id=host_id,
                         capacity=capacity,
-                        session_cap=available,
+                        session_cap=capacity_limit,
                         issued_at=issued_at,
                         requested_nodes=requested_nodes,
                     )
-                    if repeated != draft:
+                    if repeated_full != draft:
                         raise AutopilotError(
                             "dispatcher evidence changed before host reservation"
                         )
                     self._assert_no_execution_launch_reservations(
                         "dispatcher pre-launch admission"
                     )
-                    wave = list(draft["released_wave"])
+                    full_coordinates = self._primary_reservation_coordinates(draft)
+                    demand = record_host_scheduler_demand(
+                        self.host_runtime_dir,
+                        host_id=host_id,
+                        repository=repository,
+                        repository_transport_digest=str(
+                            self.repository_identity["transport_digest"]
+                        ),
+                        execution_namespace=self.execution_namespace,
+                        execution_id=self.execution_id,
+                        plan_fingerprint=self.expected_plan_fingerprint,
+                        capacity_generation=str(capacity["capacity_generation"]),
+                        execution_adapter_identity=execution_adapter_identity,
+                        candidate_reservation_ids=[
+                            str(item["local_reservation_id"])
+                            for item in full_coordinates
+                        ],
+                        weight=1,
+                        actor=actor,
+                        recorded_at=issued_at,
+                    )
+                    scheduler = grant_host_scheduler_capacity(
+                        self.host_runtime_dir,
+                        host_id=host_id,
+                        actor=actor,
+                        now=self.clock(),
+                    )
+                    grants_by_local = {
+                        str(item["local_reservation_id"]): item
+                        for item in scheduler["outstanding_grants"]
+                        if isinstance(item, Mapping)
+                        and item.get("demand_id") == demand.get("demand_id")
+                    }
+                    selected_coordinates = [
+                        item
+                        for item in full_coordinates
+                        if str(item["local_reservation_id"]) in grants_by_local
+                    ]
+                    if not selected_coordinates:
+                        raise HostCapacityWaiting(
+                            "authenticated demand is queued without a current host grant"
+                        )
+                    selected_nodes = [
+                        str(item["node_id"]) for item in selected_coordinates
+                    ]
+                    repeated = self._build_dispatch_release_unlocked(
+                        actor=actor,
+                        host_id=host_id,
+                        capacity=capacity,
+                        session_cap=capacity_limit,
+                        issued_at=issued_at,
+                        requested_nodes=selected_nodes,
+                    )
+                    wave = list(repeated["released_wave"])
                     expected_coordinates = self._primary_reservation_coordinates(
-                        draft
+                        repeated
                     )
                     admission_intent, prospective_release = (
                         self._dispatcher_admission_intent(
-                            draft, expected_coordinates, capacity
+                            repeated,
+                            expected_coordinates,
+                            capacity,
+                            execution_adapter_identity,
+                            grants_by_local,
                         )
                     )
                     admission_intent = self._write_dispatcher_admission_intent(
@@ -9986,6 +10186,14 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                                 actor_time=issued_at,
                                 expires_at=format_time(expires_at),
                                 now=self.clock(),
+                                execution_adapter_identity=(
+                                    execution_adapter_identity
+                                ),
+                                host_scheduler_grant_id=str(
+                                    grants_by_local[
+                                        str(coordinate["local_reservation_id"])
+                                    ]["grant_id"]
+                                ),
                             )
                             reserved.append(created)
                             newly_reserved.append(created)
@@ -10227,9 +10435,9 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 "requested dispatcher wave exceeds authenticated available host "
                 f"capacity of {session_cap}"
             )
-        if requested_nodes and requested != frontier:
+        if requested_nodes and requested != frontier[: len(requested)]:
             raise AutopilotError(
-                "requested dispatcher wave is not the exact authenticated compiled frontier: "
+                "requested dispatcher wave is not an exact authenticated frontier prefix: "
                 + (", ".join(frontier) or "<quiescent>")
             )
         unavailable = [node_id for node_id in frontier if node_id not in eligible]
@@ -10238,7 +10446,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 "authenticated compiled frontier is not fully eligible: "
                 + ", ".join(unavailable)
             )
-        wave = frontier
+        wave = requested if requested_nodes else frontier
         verdicts = self._candidate_verdicts(base_status, wave)
         directive, action = self._action_sentence(wave)
         record: dict[str, Any] = {
@@ -10334,13 +10542,116 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         return result
 
     @staticmethod
+    def _dispatcher_adapter_coordinates(
+        execution_adapter_identity: Mapping[str, object],
+        *,
+        capacity: Mapping[str, object],
+        repository: str,
+        host_id: str,
+        execution_namespace: str | None = None,
+        execution_id: str | None = None,
+    ) -> dict[str, object]:
+        if not isinstance(execution_adapter_identity, Mapping):
+            raise AutopilotError(
+                "dispatcher requires an immutable execution adapter identity"
+            )
+        record = dict(execution_adapter_identity)
+        material = dict(record)
+        record_id = material.pop("record_id", None)
+        expected_path = (
+            "execution-adapter-bindings/"
+            + str(record_id).removeprefix("sha256:")
+            + ".json"
+        )
+        blob_digest = "sha256:" + sha256(
+            (
+                json.dumps(
+                    record,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    indent=2,
+                    allow_nan=False,
+                )
+                + "\n"
+            ).encode("utf-8")
+        ).hexdigest()
+        if (
+            set(record)
+            != {
+                "schema_version",
+                "kind",
+                "execution_namespace",
+                "execution_id",
+                "repository",
+                "host_id",
+                "provider_generation",
+                "provider_epoch",
+                "provider_identity_digest",
+                "adapter_identity_kind",
+                "adapter_identity_record_id",
+                "adapter_identity_blob_digest",
+                "adapter_identity_source_path",
+                "record_id",
+            }
+            or record.get("schema_version") != 1
+            or record.get("kind") != "hive-mind-execution-adapter-identity-v1"
+            or record_id != digest_json(material)
+            or AUTHORITY_ID.fullmatch(str(record_id)) is None
+            or record.get("repository") != repository
+            or record.get("host_id") != host_id
+            or (
+                execution_namespace is not None
+                and record.get("execution_namespace") != execution_namespace
+            )
+            or (
+                execution_id is not None
+                and record.get("execution_id") != execution_id
+            )
+            or record.get("provider_generation")
+            != capacity.get("provider_generation")
+            or record.get("provider_epoch") != capacity.get("provider_epoch")
+            or AUTHORITY_ID.fullmatch(
+                str(record.get("provider_identity_digest"))
+            )
+            is None
+            or record.get("adapter_identity_kind")
+            != "hive-mind-codex-app-server-identity-v1"
+            or AUTHORITY_ID.fullmatch(
+                str(record.get("adapter_identity_record_id"))
+            )
+            is None
+            or record.get("adapter_identity_source_path")
+            != "execution-adapter-identities/"
+            + str(record.get("adapter_identity_record_id")).removeprefix(
+                "sha256:"
+            )
+            + ".json"
+            or AUTHORITY_ID.fullmatch(
+                str(record.get("adapter_identity_blob_digest"))
+            )
+            is None
+            or AUTHORITY_ID.fullmatch(blob_digest) is None
+        ):
+            raise AutopilotError(
+                "dispatcher execution adapter identity differs from host authority"
+            )
+        return {
+            "host_kernel_generation": capacity["host_kernel_generation"],
+            "execution_adapter_identity_record_id": record_id,
+            "execution_adapter_identity_path": expected_path,
+            "execution_adapter_identity_blob_digest": blob_digest,
+        }
+
+    @staticmethod
     def _primary_host_reservation_id(
         draft: Mapping[str, Any],
         coordinate: Mapping[str, Any],
         capacity: Mapping[str, Any],
+        execution_adapter_identity: Mapping[str, object],
+        host_scheduler_grant_id: str | None = None,
     ) -> str:
-        return digest_json(
-            {
+        adapter_record_id = execution_adapter_identity.get("record_id")
+        identity: dict[str, object] = {
                 "kind": "hive-mind-host-reservation-key-v1",
                 "repository": draft["repository"],
                 "execution_id": draft["execution_id"],
@@ -10349,8 +10660,12 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 "capacity_generation": draft["capacity_generation"],
                 "local_reservation_id": coordinate["local_reservation_id"],
                 "reservation_kind": "PRIMARY",
-            }
-        )
+                "host_kernel_generation": capacity["host_kernel_generation"],
+                "execution_adapter_identity_record_id": adapter_record_id,
+        }
+        if host_scheduler_grant_id is not None:
+            identity["host_scheduler_grant_id"] = host_scheduler_grant_id
+        return digest_json(identity)
 
     def _dispatcher_admission_intent_path(self, release_admission_id: str) -> Path:
         if AUTHORITY_ID.fullmatch(release_admission_id) is None:
@@ -10371,7 +10686,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
     def _validated_dispatcher_admission_intent(
         self, value: object, *, label: str
     ) -> dict[str, Any]:
-        fields = {
+        legacy_fields = {
             "schema_version",
             "kind",
             "execution_namespace",
@@ -10396,9 +10711,27 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             "issued_at",
             "record_id",
         }
-        if not isinstance(value, Mapping) or set(value) != fields:
+        current_fields = legacy_fields | {
+            "host_kernel_generation",
+            "execution_adapter_identity_record_id",
+            "execution_adapter_identity_path",
+            "execution_adapter_identity_blob_digest",
+        }
+        scheduler_fields = current_fields
+        if not isinstance(value, Mapping):
             raise AutopilotError(f"{label} has an invalid exact schema")
         intent = dict(value)
+        schema_version = intent.get("schema_version")
+        if (
+            schema_version == 1
+            and set(intent) != legacy_fields
+            or schema_version == 2
+            and set(intent) != current_fields
+            or schema_version == 3
+            and set(intent) != scheduler_fields
+            or schema_version not in {1, 2, 3}
+        ):
+            raise AutopilotError(f"{label} has an invalid exact schema")
         material = dict(intent)
         record_id = material.pop("record_id", None)
         reservations = intent.get("reservations")
@@ -10406,7 +10739,6 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         if (
             record_id != digest_json(material)
             or AUTHORITY_ID.fullmatch(str(record_id)) is None
-            or intent.get("schema_version") != 1
             or intent.get("kind") != DISPATCH_ADMISSION_INTENT_KIND
             or intent.get("execution_namespace") != self.execution_namespace
             or intent.get("execution_id") != self.execution_id
@@ -10442,21 +10774,45 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             or not isinstance(release, Mapping)
         ):
             raise AutopilotError(f"{label} authority binding is invalid")
+        if schema_version in {2, 3}:
+            adapter_record_id = intent.get(
+                "execution_adapter_identity_record_id"
+            )
+            if (
+                AUTHORITY_ID.fullmatch(
+                    str(intent.get("host_kernel_generation"))
+                )
+                is None
+                or AUTHORITY_ID.fullmatch(str(adapter_record_id)) is None
+                or intent.get("execution_adapter_identity_path")
+                != "execution-adapter-bindings/"
+                + str(adapter_record_id).removeprefix("sha256:")
+                + ".json"
+                or AUTHORITY_ID.fullmatch(
+                    str(intent.get("execution_adapter_identity_blob_digest"))
+                )
+                is None
+            ):
+                raise AutopilotError(
+                    f"{label} execution adapter authority is invalid"
+                )
         try:
             parse_time(intent.get("issued_at"))
         except Exception as error:
             raise AutopilotError(f"{label} issue time is malformed") from error
         seen: set[str] = set()
         for reservation in reservations:
+            reservation_fields = {
+                "node_id",
+                "resource_key",
+                "local_reservation_id",
+                "reservation_id",
+            }
+            if schema_version == 3:
+                reservation_fields.add("host_scheduler_grant_id")
             if (
                 not isinstance(reservation, Mapping)
-                or set(reservation)
-                != {
-                    "node_id",
-                    "resource_key",
-                    "local_reservation_id",
-                    "reservation_id",
-                }
+                or set(reservation) != reservation_fields
                 or not isinstance(reservation.get("node_id"), str)
                 or any(
                     AUTHORITY_ID.fullmatch(str(reservation.get(field))) is None
@@ -10464,6 +10820,11 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                         "resource_key",
                         "local_reservation_id",
                         "reservation_id",
+                        *(
+                            ("host_scheduler_grant_id",)
+                            if schema_version == 3
+                            else ()
+                        ),
                     )
                 )
                 or reservation.get("reservation_id") in seen
@@ -10482,6 +10843,27 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                         "local_reservation_id"
                     ],
                     "reservation_kind": "PRIMARY",
+                    **(
+                        {
+                            "host_kernel_generation": intent[
+                                "host_kernel_generation"
+                            ],
+                            "execution_adapter_identity_record_id": intent[
+                                "execution_adapter_identity_record_id"
+                            ],
+                        }
+                        if schema_version in {2, 3}
+                        else {}
+                    ),
+                    **(
+                        {
+                            "host_scheduler_grant_id": reservation[
+                                "host_scheduler_grant_id"
+                            ]
+                        }
+                        if schema_version == 3
+                        else {}
+                    ),
                 }
             )
             if reservation.get("reservation_id") != expected_reservation_id:
@@ -10535,14 +10917,35 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         draft: Mapping[str, Any],
         coordinates: Sequence[Mapping[str, Any]],
         capacity: Mapping[str, Any],
+        execution_adapter_identity: Mapping[str, object],
+        scheduler_grants: Mapping[str, Mapping[str, object]],
     ) -> tuple[dict[str, Any], dict[str, Any]]:
+        adapter_coordinates = self._dispatcher_adapter_coordinates(
+            execution_adapter_identity,
+            capacity=capacity,
+            repository=str(draft["repository"]),
+            host_id=str(draft["host_id"]),
+            execution_namespace=self.execution_namespace,
+            execution_id=self.execution_id,
+        )
         reservations = [
             {
                 "node_id": coordinate["node_id"],
                 "resource_key": coordinate["resource_key"],
                 "local_reservation_id": coordinate["local_reservation_id"],
+                "host_scheduler_grant_id": scheduler_grants[
+                    str(coordinate["local_reservation_id"])
+                ]["grant_id"],
                 "reservation_id": self._primary_host_reservation_id(
-                    draft, coordinate, capacity
+                    draft,
+                    coordinate,
+                    capacity,
+                    execution_adapter_identity,
+                    str(
+                        scheduler_grants[
+                            str(coordinate["local_reservation_id"])
+                        ]["grant_id"]
+                    ),
                 ),
             }
             for coordinate in coordinates
@@ -10558,7 +10961,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         ]
         release["release_id"] = digest_json(release)
         material: dict[str, Any] = {
-            "schema_version": 1,
+            "schema_version": 3,
             "kind": DISPATCH_ADMISSION_INTENT_KIND,
             "execution_namespace": self.execution_namespace,
             "execution_id": self.execution_id,
@@ -10578,6 +10981,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             "provider_epoch": capacity["provider_epoch"],
             "capacity_generation": draft["capacity_generation"],
             "capacity_epoch": draft["capacity_epoch"],
+            **adapter_coordinates,
             "reservations": reservations,
             "release": release,
             "actor": draft["actor"],
@@ -10660,6 +11064,18 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             != validated_intent.get("provider_generation")
             or reservation.get("capacity_generation")
             != validated_intent.get("capacity_generation")
+            or (
+                validated_intent.get("schema_version") == 2
+                and any(
+                    reservation.get(field) != validated_intent.get(field)
+                    for field in (
+                        "host_kernel_generation",
+                        "execution_adapter_identity_record_id",
+                        "execution_adapter_identity_path",
+                        "execution_adapter_identity_blob_digest",
+                    )
+                )
+            )
         ):
             raise AutopilotError(
                 "dispatcher pre-launch abort differs from its exact admission intent"
@@ -11034,6 +11450,12 @@ def parser() -> argparse.ArgumentParser:
     dispatch = commands.add_parser("dispatch")
     dispatch.add_argument("--actor", required=True)
     dispatch.add_argument("--host-id", required=True)
+    dispatch.add_argument(
+        "--host-adapter",
+        choices=("app-server", "attended"),
+        default="app-server",
+    )
+    dispatch.add_argument("--wait-seconds", type=int, default=60)
     dispatch.add_argument("--node", action="append", default=[])
     dispatch.add_argument(
         "--plan",
@@ -11171,6 +11593,12 @@ def parser() -> argparse.ArgumentParser:
     orchestrate.add_argument("--actor", default="autopilot:orchestrator")
     orchestrate.add_argument("--host-id", required=True)
     orchestrate.add_argument(
+        "--host-adapter",
+        choices=("app-server", "attended"),
+        default="app-server",
+    )
+    orchestrate.add_argument("--wait-seconds", type=int, default=60)
+    orchestrate.add_argument(
         "--apply",
         action="store_true",
         help="Publish a safe release when inferred intent and live state allow it",
@@ -11246,6 +11674,12 @@ def parser() -> argparse.ArgumentParser:
     heal = commands.add_parser("heal")
     heal.add_argument("--actor", default="autopilot:healer")
     heal.add_argument("--host-id", required=True)
+    heal.add_argument(
+        "--host-adapter",
+        choices=("app-server", "attended"),
+        default="app-server",
+    )
+    heal.add_argument("--wait-seconds", type=int, default=60)
     heal.add_argument("--node", action="append", default=[])
     heal.add_argument(
         "--dry-run",
@@ -11325,13 +11759,52 @@ def parser() -> argparse.ArgumentParser:
 
     runtime_migrate = commands.add_parser("runtime-authority-migrate")
     runtime_migrate.add_argument("--actor", required=True)
+    runtime_migrate.add_argument(
+        "--mode",
+        choices=("dry-run", "apply", "verify", "rollback-before-ready"),
+        default="apply",
+    )
+    runtime_migrate.add_argument(
+        "--reason",
+        help="Required for rollback-before-ready; recorded in the abort receipt",
+    )
 
     execution_init = commands.add_parser("execution-init")
     execution_init.add_argument("--namespace", required=True)
     execution_init.add_argument("--actor", required=True)
 
+    execution_kernel_upgrade = commands.add_parser("execution-kernel-upgrade")
+    execution_kernel_upgrade.add_argument("--execution-id", required=True)
+    execution_kernel_upgrade.add_argument(
+        "--expected-identity-record-id", required=True
+    )
+    execution_kernel_upgrade.add_argument("--actor", required=True)
+    execution_kernel_upgrade.add_argument("--reason", required=True)
+
     host_init = commands.add_parser("host-runtime-init")
     host_init.add_argument("--actor", required=True)
+
+    host_upgrade = commands.add_parser("host-runtime-upgrade")
+    host_upgrade.add_argument("--actor", required=True)
+    host_upgrade.add_argument("--reason", required=True)
+    host_upgrade.add_argument("--expected-host-kernel-generation")
+
+    host_tail_recovery = commands.add_parser("host-runtime-recover-torn-tail")
+    host_tail_recovery.add_argument(
+        "--ledger-kind",
+        required=True,
+        choices=(
+            "repository-registry",
+            "provider-history",
+            "capacity-history",
+            "reservation-history",
+            "scheduler-history",
+            "host-kernel-history",
+        ),
+    )
+    host_tail_recovery.add_argument("--host-id")
+    host_tail_recovery.add_argument("--actor", required=True)
+    host_tail_recovery.add_argument("--reason", required=True)
 
     add_dag_standard_arguments(commands)
 
@@ -11487,7 +11960,12 @@ def _load_host_adapter(
     adapter_name: str,
     host_id: str,
     wait_seconds: int,
-) -> tuple[HostCapability, object | None, str]:
+) -> tuple[
+    HostCapability,
+    object | None,
+    str,
+    Mapping[str, object] | None,
+]:
     """Resolve only an explicitly selected, identity-bound host capability."""
 
     if adapter_name == "attended":
@@ -11495,6 +11973,7 @@ def _load_host_adapter(
             HostCapability.ATTENDED_CARD_ONLY,
             None,
             "the attended card adapter cannot authenticate autonomous host lifecycle",
+            None,
         )
     if adapter_name != "app-server":
         raise AutopilotError(f"unknown host adapter: {adapter_name}")
@@ -11512,6 +11991,7 @@ def _load_host_adapter(
             HostCapability.NO_LAUNCH,
             None,
             "the authenticated Codex App Server adapter is not installed",
+            None,
         )
     adapter, module_digest, provider_identity, lifecycle = loaded
     try:
@@ -11528,6 +12008,22 @@ def _load_host_adapter(
             provider_identity=provider_identity,
             lifecycle=lifecycle,
         )
+        with plane.host_lock(timeout_seconds=120.0):
+            execution_adapter_identity = install_execution_adapter_identity(
+                plane.host_runtime_dir,
+                repo_root=plane.repo_root,
+                execution_dir=plane.execution_dir,
+                execution_namespace=plane.execution_namespace,
+                execution_id=plane.execution_id,
+                host_id=host_id,
+                adapter_identity_path=(
+                    plane.execution_dir
+                    / "host"
+                    / "codex-app-server-v1"
+                    / "identity.json"
+                ),
+                adapter_identity=provider_identity,
+            )
         capacity_provider = getattr(adapter, "host_capacity_authority", None)
         if not callable(capacity_provider) or capacity_provider(
             repo_root=plane.repo_root
@@ -11547,11 +12043,13 @@ def _load_host_adapter(
             "Codex App Server lifecycle is authenticated, but its installed "
             "thread/start protocol has no crash-exact idempotency authority; "
             "autonomous launch is withheld",
+            execution_adapter_identity,
         )
     return (
         HostCapability.AUTHENTICATED_LIFECYCLE,
         adapter,
         "authenticated Codex App Server lifecycle adapter",
+        execution_adapter_identity,
     )
 
 
@@ -11661,6 +12159,11 @@ def _supervisor_wait_observation_fingerprint(
             }
 
     with plane._host_arbiter_execution_guard():
+        scheduler_observation = host_scheduler_observation(
+            plane.host_runtime_dir,
+            host_id=_canonical_app_server_host_id(plane),
+            execution_id=plane.execution_id,
+        )
         publication_after = plane._current_publication_resource()
         transaction_after = (
             publication_after[1] if publication_after is not None else None
@@ -11755,6 +12258,7 @@ def _supervisor_wait_observation_fingerprint(
             "target_watermark_record_id": target_watermark.get("record_id"),
             "authority_digest": authority_digest,
             "authority_error": authority_error,
+            "host_scheduler_observation": scheduler_observation,
         }
     return digest_json(material)
 
@@ -12540,6 +13044,7 @@ def _supervisor_controller_step(
     *,
     context: StepContext,
     host_id: str,
+    execution_adapter_identity: Mapping[str, object],
     actor: str,
     request: str,
     launch_authorized: bool,
@@ -12595,7 +13100,11 @@ def _supervisor_controller_step(
                         evidence=status,
                     ),
                 )
-            release = plane.dispatch(actor=actor, host_id=host_id)
+            release = plane.dispatch(
+                actor=actor,
+                host_id=host_id,
+                execution_adapter_identity=execution_adapter_identity,
+            )
             status = plane.status()
         if not isinstance(release, Mapping) or plane._release_issues(release):
             raise AutopilotError("controller could not authenticate a dispatcher release")
@@ -12660,6 +13169,17 @@ def _supervisor_controller_step(
             EvidenceResolver(),
             state_dir=plane.execution_dir,
             host_runtime_dir=plane.host_runtime_dir,
+        )
+    except HostCapacityWaiting as error:
+        return StepResult(
+            disposition=StepDisposition.WAITING_FOR_CAPACITY,
+            detail=str(error),
+            wait_condition=_supervisor_wait_condition(
+                plane,
+                frontier_id=context.frontier_id,
+                release_id="sha256:" + "0" * 64,
+                evidence={"scheduler_wait": str(error)},
+            ),
         )
     except Exception as error:
         return StepResult(
@@ -12737,6 +13257,10 @@ APP_SERVER_CONSERVATIVE_CAPACITY_SOURCE = (
 APP_SERVER_MAX_TOTAL_SESSIONS = 1
 APP_SERVER_VALIDATION_SLOTS = 1
 APP_SERVER_MAX_EVIDENCED_SESSIONS = 256
+RUNTIME_MIGRATION_OPERATION_KIND = "hive-mind-runtime-migration-operation-v1"
+RUNTIME_MIGRATION_ABORT_KIND = "hive-mind-runtime-migration-abort-v1"
+RUNTIME_MIGRATION_COMPLETE_KIND = "hive-mind-runtime-migration-complete-v1"
+RUNTIME_MIGRATION_OPERATION_ROOT = "runtime-authority-migration-operations"
 HOST_LIFECYCLE_OBSERVATION_FIELDS = {
     "schema_version",
     "kind",
@@ -12797,24 +13321,47 @@ APP_SERVER_CAPACITY_CAPABILITY_FIELDS = {
 }
 
 
+def _app_server_global_provider_material(
+    record: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Return only machine-user App Server identity shared across executions."""
+
+    return {
+        "kind": "hive-mind-codex-app-server-provider-identity-v1",
+        **{
+            field: record.get(field)
+            for field in (
+                "machine_user_id",
+                "launcher_path",
+                "launcher_digest",
+                "cli_module_path",
+                "cli_module_digest",
+                "executable_path",
+                "executable_digest",
+                "executable_version",
+                "schema_bundle_digest",
+                "thread_start_schema_digest",
+                "turn_start_schema_digest",
+                "environment_root_digest",
+                "behavior_environment_digest",
+                "provider_config_digest",
+                "account_identity_digest",
+                "transport",
+                "initialize_result_digest",
+            )
+        },
+    }
+
+
 def _canonical_app_server_host_id(plane: ControlPlane) -> str:
     """Derive one App Server provider id from sealed machine-user authority."""
 
-    path = plane.host_runtime_dir / "host-runtime-identity.json"
-    value = plane._strict_json_file(path, label="host runtime identity")
-    material = dict(value) if isinstance(value, Mapping) else {}
-    record_id = material.pop("record_id", None)
-    if (
-        not isinstance(value, Mapping)
-        or set(value)
-        != {"schema_version", "kind", "machine_user_id", "record_id"}
-        or value.get("schema_version") != 1
-        or value.get("kind") != "hive-mind-host-runtime-identity-v1"
-        or not isinstance(value.get("machine_user_id"), str)
-        or AUTHORITY_ID.fullmatch(str(value["machine_user_id"])) is None
-        or record_id != digest_json(material)
-    ):
-        raise AutopilotError("host runtime identity cannot authenticate App Server")
+    with plane.host_lock(timeout_seconds=120.0):
+        value = read_current_host_runtime_identity(plane.host_runtime_dir)
+    if AUTHORITY_ID.fullmatch(str(value.get("machine_user_id"))) is None:
+        raise AutopilotError(
+            "host writer identity cannot authenticate the App Server provider"
+        )
     return digest_json(
         {
             "kind": "hive-mind-codex-app-server-provider-v1",
@@ -12841,46 +13388,16 @@ def _app_server_provider_identity(
     record = dict(value)
     material = dict(record)
     record_id = material.pop("record_id", None)
-    runtime_identity = plane._strict_json_file(
-        plane.host_runtime_dir / "host-runtime-identity.json",
-        label="host runtime identity",
-    )
-    machine_user_id = (
-        runtime_identity.get("machine_user_id")
-        if isinstance(runtime_identity, Mapping)
-        else None
-    )
-    provider_material = {
-        field: record.get(field)
-        for field in (
-            "machine_user_id",
-            "launcher_path",
-            "launcher_digest",
-            "cli_module_path",
-            "cli_module_digest",
-            "executable_path",
-            "executable_digest",
-            "executable_version",
-            "schema_bundle_digest",
-            "thread_start_schema_digest",
-            "turn_start_schema_digest",
-            "environment_root_digest",
-            "behavior_environment_digest",
-            "provider_config_digest",
-            "account_identity_digest",
-            "transport",
-            "initialize_result_digest",
+    with plane.host_lock(timeout_seconds=120.0):
+        runtime_identity = read_current_host_runtime_identity(
+            plane.host_runtime_dir
         )
-    }
-    provider_material = {
-        "kind": "hive-mind-codex-app-server-provider-identity-v1",
-        **provider_material,
-    }
+    machine_user_id = runtime_identity.get("machine_user_id")
+    provider_material = _app_server_global_provider_material(record)
     provider_identity_digest = digest_json(provider_material)
     if (
         record.get("schema_version") != 1
-        or record.get("kind")
-        != "hive-mind-codex-app-server-provider-identity-v1"
+        or record.get("kind") != "hive-mind-codex-app-server-identity-v1"
         or record.get("execution_namespace") != plane.execution_namespace
         or record.get("execution_id") != plane.execution_id
         or record.get("host_id") != host_id
@@ -13152,6 +13669,14 @@ def _ensure_app_server_capacity(
             "declarative": declarative,
         }
     )
+    provider_attestation = build_host_provider_attestation(
+        plane.host_runtime_dir,
+        host_id=host_id,
+        provider_identity_source=APP_SERVER_PROVIDER_IDENTITY_SOURCE,
+        provider_identity_material=_app_server_global_provider_material(
+            provider_identity
+        ),
+    )
     with plane.host_lock(timeout_seconds=120.0):
         evidence_path = (
             plane.host_runtime_dir
@@ -13163,19 +13688,31 @@ def _ensure_app_server_capacity(
         )
         path = host_capacity_path(plane.host_runtime_dir, host_id)
         current: Mapping[str, object] | None = None
+        retired_writer_predecessor = False
         if path.is_file() and not plane._is_link_like(path):
             # This is both a read and the idempotent completion point for a
             # history-first renewal that crashed after replacing current.json
             # but before extending every sealed live permit.  No fast return is
             # safe until that exact reservation cut has been reconciled.
-            current = reconcile_pending_host_capacity_renewal(
-                plane.host_runtime_dir,
-                host_id=host_id,
-                now=now,
-            )
+            try:
+                current = reconcile_pending_host_capacity_renewal(
+                    plane.host_runtime_dir,
+                    host_id=host_id,
+                    now=now,
+                )
+            except ConfigurationError as reconciliation_error:
+                try:
+                    current = read_host_capacity_predecessor_for_writer_rotation(
+                        plane.host_runtime_dir,
+                        host_id,
+                        now=now,
+                    )
+                except ConfigurationError:
+                    raise reconciliation_error
+                retired_writer_predecessor = True
         elif path.exists():
             raise AutopilotError("installed host capacity path is invalid")
-        if current is not None:
+        if current is not None and not retired_writer_predecessor:
             try:
                 current_expires = parse_time(current.get("expires_at"))
             except Exception as error:
@@ -13217,9 +13754,16 @@ def _ensure_app_server_capacity(
                 )
             capacity_epoch = int(current["capacity_epoch"]) + 1
             expected_generation = str(current["capacity_generation"])
-        else:
+        elif current is None:
             capacity_epoch = 1
             expected_generation = None
+        else:
+            # A successful structural predecessor read is intentionally not an
+            # admission capability.  It exists only so the new canonical host
+            # writer can rotate provider/capacity authority after a zero-active
+            # kernel upgrade without trusting stale writer semantics.
+            capacity_epoch = int(current["capacity_epoch"]) + 1
+            expected_generation = str(current["capacity_generation"])
         capacity_generation = digest_json(
             {
                 "kind": "hive-mind-declarative-host-capacity-generation-v1",
@@ -13243,6 +13787,7 @@ def _ensure_app_server_capacity(
             capability_digest=capability_digest,
             provider_identity_source=APP_SERVER_PROVIDER_IDENTITY_SOURCE,
             provider_identity_digest=str(provider_identity_digest),
+            provider_attestation=provider_attestation,
             declarative=declarative,
             now=now,
             expected_generation=expected_generation,
@@ -13345,6 +13890,7 @@ def _recover_expired_app_server_reservations(
         reservation: Mapping[str, object],
         repository_binding: Mapping[str, object],
         execution_identity: Mapping[str, object],
+        execution_adapter_identity: Mapping[str, object],
         repo_root: Path,
         execution_dir: Path,
     ) -> object | None:
@@ -13357,6 +13903,18 @@ def _recover_expired_app_server_reservations(
             or reservation.get("execution_id") != execution_id
             or repository_binding.get("repository")
             != execution_identity.get("repository")
+            or execution_adapter_identity.get("record_id")
+            != reservation.get("execution_adapter_identity_record_id")
+            or execution_adapter_identity.get("execution_id") != execution_id
+            or execution_adapter_identity.get("execution_namespace") != namespace
+            or execution_adapter_identity.get("repository")
+            != repository_binding.get("repository")
+            or execution_adapter_identity.get("host_id")
+            != reservation.get("host_id")
+            or execution_adapter_identity.get("provider_generation")
+            != reservation.get("provider_generation")
+            or execution_adapter_identity.get("provider_epoch")
+            != reservation.get("provider_epoch")
         ):
             return None
         try:
@@ -13705,6 +14263,598 @@ def _supervisor_fixed_point_verifier(
     )
 
 
+def _runtime_migration_plan(
+    repo_root: Path,
+    coordination_dir: Path,
+    *,
+    now: datetime,
+) -> Mapping[str, object]:
+    """Build one deterministic, read-only plan for both migration reducers."""
+
+    repository_identity = runtime_repository_identity(repo_root)
+    if not isinstance(repository_identity, Mapping):
+        raise AutopilotError(
+            "runtime migration planning requires canonical repository identity"
+        )
+    semantic_roots, semantic_entries = _legacy_semantic_inventory(
+        repo_root,
+        coordination_dir,
+        repository_identity=repository_identity,
+    )
+    bootstrap_roots, bootstrap_sources = _inspect_noncanonical_authority(
+        repo_root,
+        coordination_dir,
+        now=now,
+    )
+    semantic_inventory = [str(item) for item in semantic_roots]
+    bootstrap_inventory = [str(item) for item in bootstrap_roots]
+    if semantic_inventory != bootstrap_inventory:
+        raise AutopilotError(
+            "runtime migration worktree inventory changed during dry-run"
+        )
+    semantic_material = _legacy_semantic_material(
+        repository_identity,
+        semantic_inventory,
+        semantic_entries,
+    )
+    bootstrap_material = _migration_material(
+        repository_identity,
+        bootstrap_inventory,
+        bootstrap_sources,
+    )
+    semantic_id = digest_json(semantic_material)
+    bootstrap_id = digest_json(bootstrap_material)
+    planned_semantic = [
+        {
+            key: value
+            for key, value in _plan_legacy_semantic_paths(
+                coordination_dir, semantic_id, entry
+            ).items()
+            if key not in {"source_bytes_base64", "rollback"}
+        }
+        for entry in semantic_entries
+    ]
+    planned_bootstrap = [
+        {
+            key: value
+            for key, value in _plan_migration_paths(
+                coordination_dir, bootstrap_id, source
+            ).items()
+            if key not in {"source_bytes_base64", "rollback"}
+        }
+        for source in bootstrap_sources
+    ]
+    operation_material: dict[str, object] = {
+        "kind": "hive-mind-runtime-migration-operation-key-v1",
+        "repository_identity": dict(repository_identity),
+        "coordination_dir": str(coordination_dir),
+        "worktree_inventory": semantic_inventory,
+        "semantic_reconciliation_id": semantic_id,
+        "bootstrap_migration_id": bootstrap_id,
+    }
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": "hive-mind-runtime-migration-plan-v1",
+        "operation_id": digest_json(operation_material),
+        "repository_identity": dict(repository_identity),
+        "coordination_dir": str(coordination_dir),
+        "worktree_inventory": semantic_inventory,
+        "semantic_reconciliation_id": semantic_id,
+        "semantic_entries": planned_semantic,
+        "bootstrap_migration_id": bootstrap_id,
+        "bootstrap_sources": planned_bootstrap,
+        "rollback_disposition": "ABORT_AND_PRESERVE_ONLY",
+    }
+    return _validated_runtime_migration_plan(
+        {**material, "plan_id": digest_json(material)}
+    )
+
+
+def _validated_runtime_migration_plan(
+    value: object,
+) -> Mapping[str, object]:
+    fields = {
+        "schema_version",
+        "kind",
+        "operation_id",
+        "repository_identity",
+        "coordination_dir",
+        "worktree_inventory",
+        "semantic_reconciliation_id",
+        "semantic_entries",
+        "bootstrap_migration_id",
+        "bootstrap_sources",
+        "rollback_disposition",
+        "plan_id",
+    }
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise AutopilotError("runtime migration plan schema is ambiguous")
+    material = dict(value)
+    plan_id = material.pop("plan_id", None)
+    operation_material = {
+        "kind": "hive-mind-runtime-migration-operation-key-v1",
+        "repository_identity": value.get("repository_identity"),
+        "coordination_dir": value.get("coordination_dir"),
+        "worktree_inventory": value.get("worktree_inventory"),
+        "semantic_reconciliation_id": value.get(
+            "semantic_reconciliation_id"
+        ),
+        "bootstrap_migration_id": value.get("bootstrap_migration_id"),
+    }
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != "hive-mind-runtime-migration-plan-v1"
+        or value.get("rollback_disposition") != "ABORT_AND_PRESERVE_ONLY"
+        or not isinstance(value.get("repository_identity"), Mapping)
+        or not isinstance(value.get("coordination_dir"), str)
+        or not Path(str(value["coordination_dir"])).is_absolute()
+        or not isinstance(value.get("worktree_inventory"), list)
+        or any(
+            not isinstance(item, str) or not Path(item).is_absolute()
+            for item in value["worktree_inventory"]
+        )
+        or not isinstance(value.get("semantic_entries"), list)
+        or not all(
+            isinstance(item, Mapping) for item in value["semantic_entries"]
+        )
+        or not isinstance(value.get("bootstrap_sources"), list)
+        or not all(
+            isinstance(item, Mapping) for item in value["bootstrap_sources"]
+        )
+        or any(
+            AUTHORITY_ID.fullmatch(str(value.get(field))) is None
+            for field in (
+                "operation_id",
+                "semantic_reconciliation_id",
+                "bootstrap_migration_id",
+            )
+        )
+        or value.get("operation_id") != digest_json(operation_material)
+        or plan_id != digest_json(material)
+    ):
+        raise AutopilotError("runtime migration plan is invalid")
+    return dict(value)
+
+
+def _runtime_migration_operation_path(
+    coordination_dir: Path, operation_id: str
+) -> Path:
+    if AUTHORITY_ID.fullmatch(operation_id) is None:
+        raise AutopilotError("runtime migration operation id is invalid")
+    return (
+        coordination_dir
+        / RUNTIME_MIGRATION_OPERATION_ROOT
+        / (operation_id.removeprefix("sha256:") + ".operation.json")
+    )
+
+
+def _validated_runtime_migration_operation(
+    value: object,
+    *,
+    plan: Mapping[str, object] | None = None,
+) -> Mapping[str, object]:
+    fields = {
+        "schema_version",
+        "kind",
+        "status",
+        "operation_id",
+        "plan",
+        "actor",
+        "prepared_at",
+        "record_id",
+    }
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise AutopilotError("runtime migration operation schema is ambiguous")
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    embedded = value.get("plan")
+    validated_plan = _validated_runtime_migration_plan(embedded)
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != RUNTIME_MIGRATION_OPERATION_KIND
+        or value.get("status") != "PREPARED"
+        or value.get("operation_id") != validated_plan.get("operation_id")
+        or AUTHORITY_ID.fullmatch(str(value.get("operation_id"))) is None
+        or not isinstance(value.get("actor"), str)
+        or not str(value["actor"]).strip()
+        or record_id != digest_json(material)
+    ):
+        raise AutopilotError("runtime migration operation is invalid")
+    try:
+        parse_time(value.get("prepared_at"))
+    except Exception as error:
+        raise AutopilotError(
+            "runtime migration operation timestamp is invalid"
+        ) from error
+    if plan is not None and validated_plan != plan:
+        raise AutopilotError("runtime migration operation plan changed")
+    return dict(value)
+
+
+def _install_runtime_migration_operation(
+    coordination_dir: Path,
+    plan: Mapping[str, object],
+    *,
+    actor: str,
+    prepared_at: str,
+) -> Mapping[str, object]:
+    path = _runtime_migration_operation_path(
+        coordination_dir, str(plan["operation_id"])
+    )
+    if path.exists() or _is_link_like(path):
+        return _validated_runtime_migration_operation(
+            read_strict_canonical_json(path, label="runtime migration operation"),
+            plan=plan,
+        )
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": RUNTIME_MIGRATION_OPERATION_KIND,
+        "status": "PREPARED",
+        "operation_id": plan["operation_id"],
+        "plan": dict(plan),
+        "actor": actor,
+        "prepared_at": prepared_at,
+    }
+    operation = {**material, "record_id": digest_json(material)}
+    exclusive_write_json_or_identical(path, operation)
+    return _validated_runtime_migration_operation(
+        read_strict_canonical_json(path, label="runtime migration operation"),
+        plan=plan,
+    )
+
+
+def _runtime_migration_abort_path(
+    coordination_dir: Path, operation_id: str
+) -> Path:
+    return _runtime_migration_operation_path(
+        coordination_dir, operation_id
+    ).with_suffix(".abort.json")
+
+
+def _runtime_migration_abort(
+    coordination_dir: Path,
+    operation: Mapping[str, object],
+) -> Mapping[str, object] | None:
+    path = _runtime_migration_abort_path(
+        coordination_dir, str(operation["operation_id"])
+    )
+    if not path.exists() and not _is_link_like(path):
+        return None
+    value = read_strict_canonical_json(
+        path, label="runtime migration abort receipt"
+    )
+    fields = {
+        "schema_version",
+        "kind",
+        "status",
+        "operation_id",
+        "operation_record_id",
+        "inverse_restoration_permitted",
+        "retired_authority_preserved",
+        "actor",
+        "reason",
+        "recorded_at",
+        "record_id",
+    }
+    material = dict(value) if isinstance(value, Mapping) else {}
+    record_id = material.pop("record_id", None)
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != fields
+        or value.get("schema_version") != 1
+        or value.get("kind") != RUNTIME_MIGRATION_ABORT_KIND
+        or value.get("status") != "ABORTED_FENCED"
+        or value.get("operation_id") != operation.get("operation_id")
+        or value.get("operation_record_id") != operation.get("record_id")
+        or value.get("inverse_restoration_permitted") is not False
+        or value.get("retired_authority_preserved") is not True
+        or not isinstance(value.get("actor"), str)
+        or not str(value["actor"]).strip()
+        or not isinstance(value.get("reason"), str)
+        or not str(value["reason"]).strip()
+        or record_id != digest_json(material)
+    ):
+        raise AutopilotError("runtime migration abort receipt is invalid")
+    try:
+        parse_time(value.get("recorded_at"))
+    except Exception as error:
+        raise AutopilotError(
+            "runtime migration abort timestamp is invalid"
+        ) from error
+    return dict(value)
+
+
+def _runtime_migration_completion_path(
+    coordination_dir: Path, operation_id: str
+) -> Path:
+    return _runtime_migration_operation_path(
+        coordination_dir, operation_id
+    ).with_suffix(".complete.json")
+
+
+def _validated_runtime_migration_completion(
+    value: object,
+    *,
+    operation: Mapping[str, object],
+    semantic_reconciliation_id: str | None = None,
+    bootstrap_migration_id: str | None = None,
+    ready_record_id: str | None = None,
+) -> Mapping[str, object]:
+    fields = {
+        "schema_version",
+        "kind",
+        "status",
+        "operation_id",
+        "operation_record_id",
+        "semantic_reconciliation_id",
+        "bootstrap_migration_id",
+        "ready_record_id",
+        "actor",
+        "completed_at",
+        "record_id",
+    }
+    material = dict(value) if isinstance(value, Mapping) else {}
+    record_id = material.pop("record_id", None)
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != fields
+        or value.get("schema_version") != 1
+        or value.get("kind") != RUNTIME_MIGRATION_COMPLETE_KIND
+        or value.get("status") != "COMPLETE"
+        or value.get("operation_id") != operation.get("operation_id")
+        or value.get("operation_record_id") != operation.get("record_id")
+        or AUTHORITY_ID.fullmatch(
+            str(value.get("semantic_reconciliation_id"))
+        )
+        is None
+        or AUTHORITY_ID.fullmatch(str(value.get("bootstrap_migration_id")))
+        is None
+        or AUTHORITY_ID.fullmatch(str(value.get("ready_record_id"))) is None
+        or (
+            semantic_reconciliation_id is not None
+            and value.get("semantic_reconciliation_id")
+            != semantic_reconciliation_id
+        )
+        or (
+            bootstrap_migration_id is not None
+            and value.get("bootstrap_migration_id") != bootstrap_migration_id
+        )
+        or (
+            ready_record_id is not None
+            and value.get("ready_record_id") != ready_record_id
+        )
+        or not isinstance(value.get("actor"), str)
+        or not str(value["actor"]).strip()
+        or record_id != digest_json(material)
+    ):
+        raise AutopilotError("runtime migration completion is invalid")
+    try:
+        parse_time(value.get("completed_at"))
+    except Exception as error:
+        raise AutopilotError(
+            "runtime migration completion timestamp is invalid"
+        ) from error
+    return dict(value)
+
+
+def _complete_runtime_migration_operation(
+    coordination_dir: Path,
+    operation: Mapping[str, object],
+    *,
+    semantic_reconciliation_id: str,
+    bootstrap_migration_id: str,
+    ready_record_id: str,
+    actor: str,
+    completed_at: str,
+) -> Mapping[str, object]:
+    path = _runtime_migration_completion_path(
+        coordination_dir, str(operation["operation_id"])
+    )
+    if path.exists() or _is_link_like(path):
+        return _validated_runtime_migration_completion(
+            read_strict_canonical_json(
+                path, label="runtime migration completion"
+            ),
+            operation=operation,
+            semantic_reconciliation_id=semantic_reconciliation_id,
+            bootstrap_migration_id=bootstrap_migration_id,
+            ready_record_id=ready_record_id,
+        )
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": RUNTIME_MIGRATION_COMPLETE_KIND,
+        "status": "COMPLETE",
+        "operation_id": operation["operation_id"],
+        "operation_record_id": operation["record_id"],
+        "semantic_reconciliation_id": semantic_reconciliation_id,
+        "bootstrap_migration_id": bootstrap_migration_id,
+        "ready_record_id": ready_record_id,
+        "actor": actor,
+        "completed_at": completed_at,
+    }
+    completion = {**material, "record_id": digest_json(material)}
+    exclusive_write_json_or_identical(path, completion)
+    return _validated_runtime_migration_completion(
+        read_strict_canonical_json(path, label="runtime migration completion"),
+        operation=operation,
+        semantic_reconciliation_id=semantic_reconciliation_id,
+        bootstrap_migration_id=bootstrap_migration_id,
+        ready_record_id=ready_record_id,
+    )
+
+
+def _active_runtime_migration_operation(
+    repo_root: Path,
+    coordination_dir: Path,
+) -> Mapping[str, object] | None:
+    operation_root = coordination_dir / RUNTIME_MIGRATION_OPERATION_ROOT
+    if not operation_root.exists() and not _is_link_like(operation_root):
+        return None
+    safe_root = _reject_link_components(
+        operation_root, label="runtime migration operation directory"
+    )
+    if not safe_root.is_dir():
+        raise AutopilotError("runtime migration operation path is not a directory")
+    repository_identity = runtime_repository_identity(repo_root)
+    active: list[Mapping[str, object]] = []
+    for path in sorted(safe_root.glob("*.operation.json"), key=lambda item: item.name):
+        operation = _validated_runtime_migration_operation(
+            read_strict_canonical_json(path, label="runtime migration operation")
+        )
+        plan = operation["plan"]
+        if (
+            not isinstance(plan, Mapping)
+            or plan.get("repository_identity") != repository_identity
+            or plan.get("coordination_dir") != str(coordination_dir)
+        ):
+            raise AutopilotError(
+                "runtime migration operation belongs to another authority"
+            )
+        completion_path = _runtime_migration_completion_path(
+            coordination_dir, str(operation["operation_id"])
+        )
+        if completion_path.exists() or _is_link_like(completion_path):
+            if not isinstance(plan, Mapping):
+                raise AutopilotError(
+                    "runtime migration completion lost its sealed plan"
+                )
+            ready_chain = validate_repository_runtime_ready_chain(
+                repo_root, coordination_dir
+            )
+            ready = ready_chain.get("ready")
+            if not isinstance(ready, Mapping):
+                raise AutopilotError(
+                    "runtime migration completion lacks a valid READY chain"
+                )
+            _validated_runtime_migration_completion(
+                read_strict_canonical_json(
+                    completion_path, label="runtime migration completion"
+                ),
+                operation=operation,
+                semantic_reconciliation_id=str(
+                    plan.get("semantic_reconciliation_id")
+                ),
+                bootstrap_migration_id=str(plan.get("bootstrap_migration_id")),
+                ready_record_id=str(ready.get("record_id")),
+            )
+            continue
+        if _runtime_migration_abort(coordination_dir, operation) is None:
+            active.append(operation)
+    if len(active) > 1:
+        raise AutopilotError(
+            "multiple nonterminal runtime migration operations are installed"
+        )
+    return active[0] if active else None
+
+
+def _verify_runtime_migration(
+    repo_root: Path, coordination_dir: Path
+) -> Mapping[str, object]:
+    ready_path = coordination_dir / RUNTIME_READY_MANIFEST
+    if ready_path.exists() or _is_link_like(ready_path):
+        return {
+            "schema_version": 1,
+            "kind": "hive-mind-runtime-migration-verification-v1",
+            "status": "READY",
+            "ready_chain": dict(
+                validate_repository_runtime_ready_chain(
+                    repo_root, coordination_dir
+                )
+            ),
+        }
+    repository_identity = runtime_repository_identity(repo_root)
+    if not isinstance(repository_identity, Mapping):
+        raise AutopilotError(
+            "runtime migration verification requires repository identity"
+        )
+    current_inventory = [str(item) for item in _linked_worktree_roots(repo_root)]
+    manifests: dict[str, object] = {}
+    aborted_operations: list[Mapping[str, object]] = []
+    operation_root = coordination_dir / RUNTIME_MIGRATION_OPERATION_ROOT
+    if operation_root.exists() or _is_link_like(operation_root):
+        safe_operation_root = _reject_link_components(
+            operation_root, label="runtime migration operation directory"
+        )
+        if not safe_operation_root.is_dir():
+            raise AutopilotError(
+                "runtime migration operation path is not a directory"
+            )
+        for path in sorted(
+            safe_operation_root.glob("*.operation.json"),
+            key=lambda item: item.name,
+        ):
+            operation = _validated_runtime_migration_operation(
+                read_strict_canonical_json(
+                    path, label="runtime migration operation"
+                )
+            )
+            abort = _runtime_migration_abort(coordination_dir, operation)
+            if abort is not None:
+                aborted_operations.append(
+                    {"operation": dict(operation), "abort": dict(abort)}
+                )
+    semantic_path = coordination_dir / LEGACY_SEMANTIC_RECONCILIATION_MANIFEST
+    if semantic_path.exists() or semantic_path.is_symlink():
+        semantic = read_strict_canonical_json(
+            semantic_path, label="legacy semantic reconciliation manifest"
+        )
+        if not isinstance(semantic, Mapping) or semantic.get("status") != "COMPLETE":
+            raise AutopilotError(
+                "legacy semantic reconciliation is not complete"
+            )
+        semantic_inventory = semantic.get("worktree_inventory")
+        if not isinstance(semantic_inventory, list) or any(
+            not isinstance(item, str) or not Path(item).is_absolute()
+            for item in semantic_inventory
+        ):
+            raise AutopilotError(
+                "legacy semantic reconciliation inventory is invalid"
+            )
+        _validate_legacy_semantic_manifest(
+            semantic,
+            repository_identity=repository_identity,
+            inventory=semantic_inventory,
+            coordination_dir=coordination_dir,
+        )
+        manifests["semantic_reconciliation"] = dict(semantic)
+    bootstrap_path = coordination_dir / RUNTIME_BOOTSTRAP_MANIFEST
+    if bootstrap_path.exists() or bootstrap_path.is_symlink():
+        bootstrap = read_strict_canonical_json(
+            bootstrap_path, label="runtime bootstrap migration manifest"
+        )
+        if not isinstance(bootstrap, Mapping) or bootstrap.get("status") != "COMPLETE":
+            raise AutopilotError("runtime bootstrap migration is not complete")
+        bootstrap_inventory = bootstrap.get("worktree_inventory")
+        if not isinstance(bootstrap_inventory, list) or any(
+            not isinstance(item, str) or not Path(item).is_absolute()
+            for item in bootstrap_inventory
+        ):
+            raise AutopilotError(
+                "runtime bootstrap migration inventory is invalid"
+            )
+        _validate_migration_manifest(
+            bootstrap,
+            repository_identity=repository_identity,
+            inventory=bootstrap_inventory,
+            coordination_dir=coordination_dir,
+        )
+        manifests["bootstrap_migration"] = dict(bootstrap)
+    if not manifests and not aborted_operations:
+        raise AutopilotError("no applied runtime migration evidence exists")
+    return {
+        "schema_version": 1,
+        "kind": "hive-mind-runtime-migration-verification-v1",
+        "status": (
+            "ABORTED_FENCED"
+            if aborted_operations
+            else "PRE_READY_COMPLETE"
+        ),
+        "manifests": manifests,
+        "aborted_operations": aborted_operations,
+        "current_worktree_inventory": current_inventory,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     adapter_to_close: object | None = None
@@ -13737,6 +14887,237 @@ def main(argv: list[str] | None = None) -> int:
                     sort_keys=True,
                 )
             )
+            return 0
+        if args.command == "host-runtime-upgrade":
+            # Like execution-kernel upgrade, this is an explicit bootstrap
+            # aperture.  Every ordinary host writer must reject a stale kernel;
+            # only this zero-active-reservation CAS may replace it.
+            identity = upgrade_host_runtime_kernel(
+                args.host_runtime_dir,
+                actor=args.actor,
+                reason=args.reason,
+                expected_host_kernel_generation=(
+                    args.expected_host_kernel_generation
+                ),
+            )
+            print(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "hive-mind-host-kernel-upgrade-result-v1",
+                        "host_runtime_dir": str(
+                            resolve_host_runtime_dir(args.host_runtime_dir)
+                        ),
+                        "actor": args.actor,
+                        "reason": args.reason,
+                        "identity": dict(identity),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "host-runtime-recover-torn-tail":
+            receipt = recover_host_authority_jsonl_torn_tail(
+                args.host_runtime_dir,
+                ledger_kind=args.ledger_kind,
+                actor=args.actor,
+                reason=args.reason,
+                host_id=args.host_id,
+            )
+            print(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "hive-mind-host-torn-tail-recovery-result-v1",
+                        "host_runtime_dir": str(
+                            resolve_host_runtime_dir(args.host_runtime_dir)
+                        ),
+                        "ledger_kind": args.ledger_kind,
+                        "host_id": args.host_id,
+                        "outcome": "RECOVERED" if receipt is not None else "CLEAN",
+                        "receipt": dict(receipt) if receipt is not None else None,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "execution-kernel-upgrade":
+            # A kernel mismatch is exactly what this command is authorized to
+            # repair.  Do not construct ControlPlane first: ordinary plane
+            # construction authenticates the installed kernel and must reject
+            # the new checkout until this zero-activity CAS succeeds.
+            repo_root = Path(args.repo_root).resolve()
+            coordination_dir = resolve_repository_state_dir(
+                repo_root, args.state_dir
+            )
+            host_runtime_dir = resolve_host_runtime_dir(args.host_runtime_dir)
+            identity = upgrade_execution_namespace_kernel(
+                repo_root,
+                coordination_dir,
+                host_runtime_dir=host_runtime_dir,
+                execution_namespace=args.execution_namespace,
+                execution_id=args.execution_id,
+                actor=args.actor,
+                reason=args.reason,
+                expected_identity_record_id=args.expected_identity_record_id,
+            )
+            print(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "hive-mind-execution-kernel-upgrade-result-v1",
+                        "execution_namespace": args.execution_namespace,
+                        "execution_id": args.execution_id,
+                        "coordination_dir": str(coordination_dir),
+                        "host_runtime_dir": str(host_runtime_dir),
+                        "actor": args.actor,
+                        "reason": args.reason,
+                        "identity": dict(identity),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "runtime-authority-migrate" and args.mode != "apply":
+            repo_root = Path(args.repo_root).resolve()
+            coordination_dir = resolve_repository_state_dir(
+                repo_root, args.state_dir
+            )
+            if args.mode == "verify":
+                print(
+                    json.dumps(
+                        _verify_runtime_migration(repo_root, coordination_dir),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0
+            ready_path = coordination_dir / RUNTIME_READY_MANIFEST
+            if ready_path.exists() or _is_link_like(ready_path):
+                if args.mode == "rollback-before-ready":
+                    raise AutopilotError(
+                        "rollback-before-ready is forbidden after READY publication"
+                    )
+                print(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "kind": "hive-mind-runtime-migration-dry-run-v1",
+                            "status": "ALREADY_READY",
+                            "plan": None,
+                            "resumes_operation": None,
+                            "verification": _verify_runtime_migration(
+                                repo_root, coordination_dir
+                            ),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0
+            existing_operation = _active_runtime_migration_operation(
+                repo_root, coordination_dir
+            )
+            plan = (
+                dict(existing_operation["plan"])
+                if isinstance(existing_operation, Mapping)
+                and isinstance(existing_operation.get("plan"), Mapping)
+                else _runtime_migration_plan(
+                    repo_root,
+                    coordination_dir,
+                    now=datetime.now(UTC),
+                )
+            )
+            if args.mode == "dry-run":
+                print(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "kind": "hive-mind-runtime-migration-dry-run-v1",
+                            "status": "DRY_RUN",
+                            "plan": dict(plan),
+                            "resumes_operation": (
+                                dict(existing_operation)
+                                if isinstance(existing_operation, Mapping)
+                                else None
+                            ),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0
+            if not isinstance(args.reason, str) or not args.reason.strip():
+                raise AutopilotError(
+                    "rollback-before-ready requires a nonempty --reason"
+                )
+            host_runtime_dir = resolve_host_runtime_dir(args.host_runtime_dir)
+            host_lock = host_runtime_dir / "locks" / "host-authority.lock"
+            with runtime_file_lock(host_lock, timeout_seconds=120.0):
+                read_current_host_runtime_identity(host_runtime_dir)
+                with runtime_file_lock(
+                    coordination_dir / RUNTIME_BOOTSTRAP_LOCK,
+                    timeout_seconds=120.0,
+                ):
+                    recorded_at = format_time(datetime.now(UTC))
+                    locked_operation = _active_runtime_migration_operation(
+                        repo_root, coordination_dir
+                    )
+                    if (
+                        isinstance(locked_operation, Mapping)
+                        and locked_operation.get("plan") != plan
+                    ):
+                        raise AutopilotError(
+                            "runtime migration operation changed while rollback waited"
+                        )
+                    operation = (
+                        locked_operation
+                        if isinstance(locked_operation, Mapping)
+                        else _install_runtime_migration_operation(
+                            coordination_dir,
+                            plan,
+                            actor=args.actor,
+                            prepared_at=recorded_at,
+                        )
+                    )
+                    existing_abort = _runtime_migration_abort(
+                        coordination_dir, operation
+                    )
+                    if existing_abort is None:
+                        abort_material: dict[str, object] = {
+                            "schema_version": 1,
+                            "kind": RUNTIME_MIGRATION_ABORT_KIND,
+                            "status": "ABORTED_FENCED",
+                            "operation_id": operation["operation_id"],
+                            "operation_record_id": operation["record_id"],
+                            "inverse_restoration_permitted": False,
+                            "retired_authority_preserved": True,
+                            "actor": args.actor,
+                            "reason": args.reason,
+                            "recorded_at": recorded_at,
+                        }
+                        abort = {
+                            **abort_material,
+                            "record_id": digest_json(abort_material),
+                        }
+                        exclusive_write_json_or_identical(
+                            _runtime_migration_abort_path(
+                                coordination_dir,
+                                str(operation["operation_id"]),
+                            ),
+                            abort,
+                        )
+                        existing_abort = _runtime_migration_abort(
+                            coordination_dir, operation
+                        )
+                    if existing_abort is None:
+                        raise AutopilotError(
+                            "runtime migration abort receipt was not installed"
+                        )
+            print(json.dumps(existing_abort, indent=2, sort_keys=True))
             return 0
         execution_namespace = (
             args.namespace if args.command == "execution-init" else args.execution_namespace
@@ -13877,9 +15258,26 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "dispatch":
             if args.plan:
                 plane.authenticate_dispatch_plan_assertion(Path(args.plan))
+            capability, adapter, adapter_detail, adapter_identity = _load_host_adapter(
+                plane,
+                adapter_name=args.host_adapter,
+                host_id=args.host_id,
+                wait_seconds=args.wait_seconds,
+            )
+            adapter_to_close = adapter
+            if (
+                capability is not HostCapability.AUTHENTICATED_LIFECYCLE
+                or adapter is None
+                or not isinstance(adapter_identity, Mapping)
+            ):
+                raise AutopilotError(
+                    "dispatcher requires crash-exact autonomous host authority: "
+                    + adapter_detail
+                )
             result = plane.dispatch(
                 actor=args.actor,
                 host_id=args.host_id,
+                execution_adapter_identity=adapter_identity,
                 requested_nodes=args.node,
             )
             if args.json_output:
@@ -14213,6 +15611,24 @@ def main(argv: list[str] | None = None) -> int:
                             reservation_expires_at=str(
                                 host_reservation["expires_at"]
                             ),
+                            host_kernel_generation=str(
+                                host_reservation["host_kernel_generation"]
+                            ),
+                            execution_adapter_identity_record_id=str(
+                                host_reservation[
+                                    "execution_adapter_identity_record_id"
+                                ]
+                            ),
+                            execution_adapter_identity_path=str(
+                                host_reservation[
+                                    "execution_adapter_identity_path"
+                                ]
+                            ),
+                            execution_adapter_identity_blob_digest=str(
+                                host_reservation[
+                                    "execution_adapter_identity_blob_digest"
+                                ]
+                            ),
                             state_dir=plane.execution_dir,
                         )
             print(json.dumps(prepared, indent=2, sort_keys=True))
@@ -14282,11 +15698,52 @@ def main(argv: list[str] | None = None) -> int:
             # locks are staged under the bootstrap lock, attended legacy state is
             # migrated under its exact standard lock, and only then can ordinary
             # production readers/writers observe a ready authority runtime.
-            ready_path = plane.coordination_dir / "runtime-authority-ready.json"
+            ready_path = plane.coordination_dir / RUNTIME_READY_MANIFEST
             if ready_path.exists() or plane._is_link_like(ready_path):
                 chain = validate_repository_runtime_ready_chain(
                     plane.repo_root, plane.coordination_dir
                 )
+                migration_completion: Mapping[str, object] | None = None
+                pending_operation = _active_runtime_migration_operation(
+                    plane.repo_root, plane.coordination_dir
+                )
+                if isinstance(pending_operation, Mapping):
+                    pending_plan = pending_operation.get("plan")
+                    if not isinstance(pending_plan, Mapping):
+                        raise AutopilotError(
+                            "runtime migration recovery lost its sealed plan"
+                        )
+                    with plane.host_lock(timeout_seconds=120.0):
+                        with runtime_file_lock(
+                            plane.coordination_dir / RUNTIME_BOOTSTRAP_LOCK,
+                            timeout_seconds=120.0,
+                        ):
+                            locked_chain = validate_repository_runtime_ready_chain(
+                                plane.repo_root, plane.coordination_dir
+                            )
+                            if locked_chain != chain:
+                                raise AutopilotError(
+                                    "runtime READY chain changed during migration recovery"
+                                )
+                            migration_completion = (
+                                _complete_runtime_migration_operation(
+                                    plane.coordination_dir,
+                                    pending_operation,
+                                    semantic_reconciliation_id=str(
+                                        pending_plan[
+                                            "semantic_reconciliation_id"
+                                        ]
+                                    ),
+                                    bootstrap_migration_id=str(
+                                        pending_plan["bootstrap_migration_id"]
+                                    ),
+                                    ready_record_id=str(
+                                        chain["ready"]["record_id"]
+                                    ),
+                                    actor=args.actor,
+                                    completed_at=format_time(plane.clock()),
+                                )
+                            )
                 print(
                     json.dumps(
                         {
@@ -14304,6 +15761,11 @@ def main(argv: list[str] | None = None) -> int:
                             "default_execution_adoption_digest": chain[
                                 "default_execution_adoption_digest"
                             ],
+                            "operation_completion": (
+                                dict(migration_completion)
+                                if isinstance(migration_completion, Mapping)
+                                else None
+                            ),
                             "outcome": "ALREADY_READY",
                         },
                         indent=2,
@@ -14311,21 +15773,63 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
                 return 0
-            with plane.host_lock(timeout_seconds=120.0):
-                bind_host_repository_runtime(
-                    plane.host_runtime_dir,
-                    repository=str(plane.control["target"]["repository"]),
-                    coordination_dir=plane.coordination_dir,
-                    repo_root=plane.repo_root,
-                    transport_digest=str(
-                        plane.repository_identity["transport_digest"]
-                    ),
-                    bound_at=format_time(plane.clock()),
+            existing_operation = _active_runtime_migration_operation(
+                plane.repo_root, plane.coordination_dir
+            )
+            migration_plan = (
+                dict(existing_operation["plan"])
+                if isinstance(existing_operation, Mapping)
+                and isinstance(existing_operation.get("plan"), Mapping)
+                else _runtime_migration_plan(
+                    plane.repo_root,
+                    plane.coordination_dir,
+                    now=plane.clock(),
                 )
+            )
+            with plane.host_lock(timeout_seconds=120.0):
                 with runtime_file_lock(
                     plane.coordination_dir / RUNTIME_BOOTSTRAP_LOCK,
                     timeout_seconds=120.0,
                 ):
+                    locked_operation = _active_runtime_migration_operation(
+                        plane.repo_root, plane.coordination_dir
+                    )
+                    if (
+                        isinstance(locked_operation, Mapping)
+                        and locked_operation.get("plan") != migration_plan
+                    ):
+                        raise AutopilotError(
+                            "runtime migration operation changed before apply"
+                        )
+                    operation = (
+                        locked_operation
+                        if isinstance(locked_operation, Mapping)
+                        else _install_runtime_migration_operation(
+                            plane.coordination_dir,
+                            migration_plan,
+                            actor=args.actor,
+                            prepared_at=format_time(plane.clock()),
+                        )
+                    )
+                    if _runtime_migration_abort(
+                        plane.coordination_dir, operation
+                    ) is not None:
+                        raise AutopilotError(
+                            "runtime migration operation was append-only aborted; "
+                            "preserved authority will not be reactivated"
+                        )
+                    bind_host_repository_runtime(
+                        plane.host_runtime_dir,
+                        repository=str(
+                            plane.control["target"]["repository"]
+                        ),
+                        coordination_dir=plane.coordination_dir,
+                        repo_root=plane.repo_root,
+                        transport_digest=str(
+                            plane.repository_identity["transport_digest"]
+                        ),
+                        bound_at=format_time(plane.clock()),
+                    )
                     legacy_authority_reconciliation = (
                         reconcile_legacy_worktree_execution_authority(
                             plane.repo_root,
@@ -14335,12 +15839,24 @@ def main(argv: list[str] | None = None) -> int:
                             clock=plane.clock,
                         )
                     )
+                    if legacy_authority_reconciliation.get(
+                        "reconciliation_id"
+                    ) != migration_plan.get("semantic_reconciliation_id"):
+                        raise AutopilotError(
+                            "semantic reconciliation differs from the sealed migration plan"
+                        )
                     bootstrap_migration = bootstrap_runtime_authority_migration(
                         plane.repo_root,
                         plane.coordination_dir,
                         actor=args.actor,
                         clock=plane.clock,
                     )
+                    if bootstrap_migration.get(
+                        "migration_id"
+                    ) != migration_plan.get("bootstrap_migration_id"):
+                        raise AutopilotError(
+                            "bootstrap migration differs from the sealed migration plan"
+                        )
                     stage_repository_runtime_authority(
                         plane.repo_root,
                         plane.coordination_dir,
@@ -14369,10 +15885,43 @@ def main(argv: list[str] | None = None) -> int:
                                 plane.coordination_dir,
                                 attended_migration=attended_migration,
                             )
+                            ready = read_strict_canonical_json(
+                                plane.coordination_dir / RUNTIME_READY_MANIFEST,
+                                label="runtime authority READY receipt",
+                            )
+                            if (
+                                not isinstance(ready, Mapping)
+                                or AUTHORITY_ID.fullmatch(
+                                    str(ready.get("record_id"))
+                                )
+                                is None
+                            ):
+                                raise AutopilotError(
+                                    "runtime authority READY receipt is invalid"
+                                )
+                            migration_completion = (
+                                _complete_runtime_migration_operation(
+                                    plane.coordination_dir,
+                                    operation,
+                                    semantic_reconciliation_id=str(
+                                        legacy_authority_reconciliation[
+                                            "reconciliation_id"
+                                        ]
+                                    ),
+                                    bootstrap_migration_id=str(
+                                        bootstrap_migration["migration_id"]
+                                    ),
+                                    ready_record_id=str(ready["record_id"]),
+                                    actor=args.actor,
+                                    completed_at=format_time(plane.clock()),
+                                )
+                            )
             print(
                 json.dumps(
                     {
                         "coordination_dir": str(plane.coordination_dir),
+                        "operation": dict(operation),
+                        "operation_completion": dict(migration_completion),
                         "runtime_identity": dict(runtime_identity),
                         "legacy_worktree_authority_reconciliation": dict(
                             legacy_authority_reconciliation
@@ -14421,7 +15970,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.command == "run-reconcile-unknown":
-            capability, adapter, adapter_detail = _load_host_adapter(
+            capability, adapter, adapter_detail, _adapter_identity = _load_host_adapter(
                 plane,
                 adapter_name=args.host_adapter,
                 host_id=args.host_id,
@@ -14511,7 +16060,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 4
             return 2
         if args.command == "run":
-            capability, adapter, adapter_detail = _load_host_adapter(
+            capability, adapter, adapter_detail, adapter_identity = _load_host_adapter(
                 plane,
                 adapter_name=args.host_adapter,
                 host_id=args.host_id,
@@ -14530,6 +16079,7 @@ def main(argv: list[str] | None = None) -> int:
                     adapter,
                     context=context,
                     host_id=args.host_id,
+                    execution_adapter_identity=adapter_identity,
                     actor=args.actor,
                     request=args.request,
                     launch_authorized=(
@@ -14662,12 +16212,32 @@ def main(argv: list[str] | None = None) -> int:
                 "ROUND_VALIDATED_LOCAL",
             } else 1
         if args.command == "heal":
+            healing_adapter_identity: Mapping[str, object] | None = None
+            if not args.dry_run:
+                (
+                    capability,
+                    adapter,
+                    _adapter_detail,
+                    loaded_adapter_identity,
+                ) = _load_host_adapter(
+                    plane,
+                    adapter_name=args.host_adapter,
+                    host_id=args.host_id,
+                    wait_seconds=args.wait_seconds,
+                )
+                adapter_to_close = adapter
+                if (
+                    capability is HostCapability.AUTHENTICATED_LIFECYCLE
+                    and isinstance(loaded_adapter_identity, Mapping)
+                ):
+                    healing_adapter_identity = loaded_adapter_identity
             print(
                 json.dumps(
                     heal_round(
                         plane,
                         actor=args.actor,
                         host_id=args.host_id,
+                        execution_adapter_identity=healing_adapter_identity,
                         nodes=args.node or None,
                         apply=not args.dry_run,
                     ),
@@ -14728,7 +16298,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.command == "execute-wave":
-            capability, host, adapter_detail = _load_host_adapter(
+            capability, host, adapter_detail, adapter_identity = _load_host_adapter(
                 plane,
                 adapter_name=args.host_adapter,
                 host_id=args.host_id,
@@ -14755,7 +16325,15 @@ def main(argv: list[str] | None = None) -> int:
                 return 3
             status, decision = select_orchestration_status(plane, args.request)
             if args.apply and should_publish_release(decision, status):
-                plane.dispatch(actor=args.actor, host_id=args.host_id)
+                if not isinstance(adapter_identity, Mapping):
+                    raise AutopilotError(
+                        "wave dispatch lacks immutable execution adapter authority"
+                    )
+                plane.dispatch(
+                    actor=args.actor,
+                    host_id=args.host_id,
+                    execution_adapter_identity=adapter_identity,
+                )
                 status = plane.status()
             # The attended host has no sidecar API; the wave runs without its
             # optional sidecar cohort rather than refusing to run at all.
@@ -14775,6 +16353,7 @@ def main(argv: list[str] | None = None) -> int:
                     plane,
                     actor=args.actor,
                     host_id=args.host_id,
+                    execution_adapter_identity=adapter_identity,
                     status=status,
                 )
                 print(f"HEAL: {healed['disposition']}")
@@ -14819,7 +16398,33 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "orchestrate":
             status, decision = select_orchestration_status(plane, args.request)
             if args.apply and should_publish_release(decision, status):
-                plane.dispatch(actor=args.actor, host_id=args.host_id)
+                (
+                    capability,
+                    adapter,
+                    adapter_detail,
+                    adapter_identity,
+                ) = _load_host_adapter(
+                    plane,
+                    adapter_name=args.host_adapter,
+                    host_id=args.host_id,
+                    wait_seconds=args.wait_seconds,
+                )
+                adapter_to_close = adapter
+                if (
+                    capability is not HostCapability.AUTHENTICATED_LIFECYCLE
+                    or adapter is None
+                    or not isinstance(adapter_identity, Mapping)
+                ):
+                    raise AutopilotError(
+                        "orchestration dispatch requires crash-exact autonomous "
+                        "host authority: "
+                        + adapter_detail
+                    )
+                plane.dispatch(
+                    actor=args.actor,
+                    host_id=args.host_id,
+                    execution_adapter_identity=adapter_identity,
+                )
                 status = plane.status()
             result = build_orchestration_contract(
                 plane,

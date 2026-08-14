@@ -12,17 +12,20 @@ auto-dispatching healer rewrote the same invalid wave on every pass.
 from __future__ import annotations
 
 import contextlib
+import functools
+import hashlib
 import importlib.util
 import io
 import json
 import multiprocessing
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import timedelta
 from pathlib import Path
 from unittest import mock
@@ -49,6 +52,15 @@ controller = sys.modules["controller"]
 SERIAL = "MIGRATION-460"          # parallel_safe: false in the sealed plan
 PARALLEL = ("SELFHEAL-450", "CHALLENGER-510", "POISON-540")
 TEST_HOST_MAX_TOTAL_SESSIONS = 8
+
+
+def _remove_readonly_path(
+    function: Callable[[str], object], path: str, _error: object
+) -> None:
+    """Let Windows delete immutable Git pack evidence in disposable clones."""
+
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
 
 
 def _begin_observation_process(
@@ -109,7 +121,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
-        control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
+        controller.atomic_write_json(control_path, control)
         subprocess.run(
             (
                 "git", "-C", str(self.root), "symbolic-ref", "HEAD",
@@ -123,8 +135,43 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             self.root, host_runtime_dir=self.host_runtime
         )
         self.host_id = autopilot._canonical_app_server_host_id(self.plane)
-        self.provider_identity_digest = autopilot.digest_json(
-            {"fixture": "authenticated-test-host-provider"}
+        self.adapter_source_path = Path(controller.__file__).resolve()
+        self.adapter_source_digest = "sha256:" + hashlib.sha256(
+            self.adapter_source_path.read_bytes()
+        ).hexdigest()
+        self.adapter_bundle_digest = "sha256:" + "e" * 64
+        runtime_identity = controller.read_strict_canonical_json(
+            self.host_runtime / "host-runtime-identity.json",
+            label="test host runtime identity",
+        )
+        provider_identity_material = {
+            "kind": "hive-mind-codex-app-server-provider-identity-v1",
+            "machine_user_id": runtime_identity["machine_user_id"],
+            "launcher_path": str(self.adapter_source_path),
+            "launcher_digest": self.adapter_source_digest,
+            "cli_module_path": None,
+            "cli_module_digest": None,
+            "executable_path": str(self.adapter_source_path),
+            "executable_digest": self.adapter_source_digest,
+            "executable_version": "test-fixture",
+            "schema_bundle_digest": self.adapter_bundle_digest,
+            "thread_start_schema_digest": self.adapter_bundle_digest,
+            "turn_start_schema_digest": self.adapter_bundle_digest,
+            "environment_root_digest": self.adapter_bundle_digest,
+            "behavior_environment_digest": self.adapter_bundle_digest,
+            "provider_config_digest": self.adapter_bundle_digest,
+            "account_identity_digest": self.adapter_bundle_digest,
+            "transport": "stdio://",
+            "initialize_result_digest": self.adapter_bundle_digest,
+        }
+        provider_attestation = controller.build_host_provider_attestation(
+            self.host_runtime,
+            host_id=self.host_id,
+            provider_identity_source=autopilot.APP_SERVER_PROVIDER_IDENTITY_SOURCE,
+            provider_identity_material=provider_identity_material,
+        )
+        self.provider_identity_digest = str(
+            provider_attestation["provider_identity_digest"]
         )
         with self.plane.host_lock():
             controller.bind_host_repository_runtime(
@@ -157,6 +204,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                     autopilot.APP_SERVER_PROVIDER_IDENTITY_SOURCE
                 ),
                 provider_identity_digest=self.provider_identity_digest,
+                provider_attestation=provider_attestation,
                 declarative=False,
                 now=now,
                 expected_generation=None,
@@ -193,7 +241,74 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                     source_observation=initial_observation,
                     actor="test:runtime-initializer",
                 )
+            self.execution_adapter_identity = (
+                self._install_execution_adapter_identity_fixture(self.plane)
+            )
+        self.plane.dispatch = functools.partial(  # type: ignore[method-assign]
+            self.plane.dispatch,
+            execution_adapter_identity=self.execution_adapter_identity,
+        )
         self._make_eligible([SERIAL])
+
+    def _install_execution_adapter_identity_fixture(
+        self, plane: object
+    ) -> Mapping[str, object]:
+        runtime_identity = controller.read_strict_canonical_json(
+            self.host_runtime / "host-runtime-identity.json",
+            label="test host runtime identity",
+        )
+        raw_material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "hive-mind-codex-app-server-identity-v1",
+            "execution_namespace": plane.execution_namespace,
+            "execution_id": plane.execution_id,
+            "host_id": self.host_id,
+            "machine_user_id": runtime_identity["machine_user_id"],
+            "provider_identity_digest": self.provider_identity_digest,
+            "adapter_module_path": str(self.adapter_source_path),
+            "adapter_module_digest": self.adapter_source_digest,
+            "launcher_path": str(self.adapter_source_path),
+            "launcher_digest": self.adapter_source_digest,
+            "cli_module_path": None,
+            "cli_module_digest": None,
+            "executable_path": str(self.adapter_source_path),
+            "executable_digest": self.adapter_source_digest,
+            "executable_version": "test-fixture",
+            "schema_bundle_digest": self.adapter_bundle_digest,
+            "thread_start_schema_digest": self.adapter_bundle_digest,
+            "turn_start_schema_digest": self.adapter_bundle_digest,
+            "environment_root_digest": self.adapter_bundle_digest,
+            "behavior_environment_digest": self.adapter_bundle_digest,
+            "provider_config_digest": self.adapter_bundle_digest,
+            "execution_config_digest": self.adapter_bundle_digest,
+            "account_identity_digest": self.adapter_bundle_digest,
+            "effective_model": "test-model",
+            "effective_model_provider": "test-provider",
+            "transport": "stdio://",
+            "initialize_result_digest": self.adapter_bundle_digest,
+            "created_at": controller.format_time(plane.clock()),
+        }
+        raw = {
+            **raw_material,
+            "record_id": controller.digest_json(raw_material),
+        }
+        raw_path = (
+            plane.execution_dir
+            / "host"
+            / "codex-app-server-v1"
+            / "identity.json"
+        )
+        controller.exclusive_write_json_or_identical(raw_path, raw)
+        return controller.install_execution_adapter_identity(
+            self.host_runtime,
+            repo_root=plane.repo_root,
+            execution_dir=plane.execution_dir,
+            execution_namespace=plane.execution_namespace,
+            execution_id=plane.execution_id,
+            host_id=self.host_id,
+            adapter_identity_path=raw_path,
+            adapter_identity=raw,
+        )
 
     def _seed_installed_observation(
         self,
@@ -451,17 +566,37 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         selected.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
         selected._reconciliation_digest = lambda: "sha256:" + "1" * 64  # type: ignore[method-assign]
         selected._recovery_issues = lambda: ()  # type: ignore[method-assign]
+        selected._snapshot_branch_fetches = (  # type: ignore[method-assign]
+            lambda observation_epoch, observation_id: [
+                {
+                    "node_id": node_id,
+                    "branch": str(selected.node(node_id)["branch"]),
+                    "fetch_ref": selected._snapshot_branch_fetch_ref(
+                        selected.execution_id,
+                        observation_epoch,
+                        observation_id,
+                        node_id,
+                        str(selected.node(node_id)["branch"]),
+                    ),
+                }
+                for node_id in sorted(selected._nodes)
+                if isinstance(selected.node(node_id).get("branch"), str)
+                and str(selected.node(node_id)["branch"]).strip()
+            ]
+        )
         observation = self._seed_installed_observation(selected)
         snapshot_digest = str(observation["snapshot_digest"])
         selected._snapshot_digest = lambda: snapshot_digest  # type: ignore[method-assign]
         if selected._dispatcher_generation() is None:
-            with selected.execution_lock("dispatcher-admission.lock"):
-                selected._invalidate_dispatcher_admission_unlocked(
-                    actor="test:evidence-seed",
-                    reason="install deterministic shared fixture evidence",
-                    github_snapshot_digest=snapshot_digest,
-                    reconciliation_digest="sha256:" + "1" * 64,
-                )
+            with selected.host_lock():
+                with selected.arbiter_lock():
+                    with selected.execution_lock("dispatcher-admission.lock"):
+                        selected._invalidate_dispatcher_admission_unlocked(
+                            actor="test:evidence-seed",
+                            reason="install deterministic shared fixture evidence",
+                            github_snapshot_digest=snapshot_digest,
+                            reconciliation_digest="sha256:" + "1" * 64,
+                        )
 
     def _linked_divergent_plane(self) -> object:
         subprocess.run(
@@ -564,6 +699,19 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             check=True,
         )
         self.plane.control["verify_git_objects"] = True
+        base_observation = self._seed_installed_observation(
+            self.plane,
+            force=True,
+        )
+        with self.plane.arbiter_lock():
+            watermark = self.plane.repository_target_watermark()
+            self.plane.advance_repository_target_watermark_from_snapshot(
+                expected_generation=int(watermark["target_generation"]),
+                expected_target_sha=str(watermark["target_sha"]),
+                target_sha=base,
+                source_observation=base_observation,
+                actor="test:install-base-target",
+            )
         observation = dict(
             self.plane.begin_github_snapshot_observation(actor="test:remote-reader")
         )
@@ -998,11 +1146,14 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         self,
         capability: Mapping[str, object] | None = None,
     ) -> tuple[object, str, Mapping[str, object], Mapping[str, object]]:
-        module_digest = autopilot.digest_json({"fixture": "adapter-module"})
-        provider_identity = {
-            "adapter_module_digest": module_digest,
-            "provider_identity_digest": self.provider_identity_digest,
-        }
+        provider_identity = controller.read_strict_canonical_json(
+            self.plane.execution_dir
+            / "host"
+            / "codex-app-server-v1"
+            / "identity.json",
+            label="test execution adapter identity",
+        )
+        module_digest = str(provider_identity["adapter_module_digest"])
         lifecycle_material = {
             "schema_version": 1,
             "kind": "hive-mind-host-lifecycle-capability-v1",
@@ -1171,7 +1322,9 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         self.plane._compiled_frontier = (  # type: ignore[method-assign]
             lambda _status, max_sessions: eligible[:max_sessions]
         )
-        self.plane.node = lambda _node_id: {  # type: ignore[method-assign]
+        original_node = self.plane.node
+        self.plane.node = lambda node_id: {  # type: ignore[method-assign]
+            **original_node(node_id),
             "parallel_safe": True,
             "critical_path_importance": 1,
             "downstream_unlock_value": 1,
@@ -1185,12 +1338,80 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         self.assertEqual(
             release["session_cap"], TEST_HOST_MAX_TOTAL_SESSIONS
         )
-        with self.assertRaisesRegex(autopilot.AutopilotError, "session cap"):
+        with self.assertRaisesRegex(autopilot.AutopilotError, "host capacity"):
             self.plane.dispatch(
                 actor="test:dispatcher",
                 host_id=self.host_id,
                 requested_nodes=eligible,
             )
+
+    def test_supervisor_reports_capacity_contention_as_a_durable_wait(self) -> None:
+        wait = autopilot.WaitCondition(
+            observation_fingerprint="sha256:" + "e" * 64,
+            resume_token="sha256:" + "f" * 64,
+        )
+        context = autopilot.StepContext(
+            execution_dir=self.plane.execution_dir,
+            execution_id=self.plane.execution_id,
+            execution_namespace=self.plane.execution_namespace,
+            plan_fingerprint=self.plane.expected_plan_fingerprint,
+            initial_frontier_id=self.plane.expected_plan_fingerprint,
+            epoch=1,
+            transaction_id="sha256:" + "1" * 64,
+            attempt_id="sha256:" + "2" * 64,
+            frontier_id=self.plane.expected_plan_fingerprint,
+            completed_frontiers=(),
+            host_capability=autopilot.HostCapability.AUTHENTICATED_LIFECYCLE,
+        )
+        with (
+            mock.patch.object(
+                self.plane,
+                "_snapshot_observation_dispatch_issues",
+                return_value=(),
+            ),
+            mock.patch.object(
+                self.plane,
+                "_current_publication_resource",
+                return_value=None,
+            ),
+            mock.patch.object(self.plane, "current_release", return_value=None),
+            mock.patch.object(
+                self.plane,
+                "_release_issues",
+                return_value=("no active release",),
+            ),
+            mock.patch.object(self.plane, "status", return_value={"complete": False}),
+            mock.patch.object(
+                self.plane,
+                "dispatch",
+                side_effect=autopilot.HostCapacityWaiting(
+                    "authenticated scheduler has no free grant"
+                ),
+            ),
+            mock.patch.object(autopilot, "_refresh_supervisor_snapshot"),
+            mock.patch.object(autopilot, "_recover_supervisor_expired_validation_lease"),
+            mock.patch.object(
+                autopilot,
+                "_supervisor_wait_condition",
+                return_value=wait,
+            ),
+        ):
+            result = autopilot._supervisor_controller_step(
+                self.plane,
+                object(),
+                context=context,
+                host_id=self.host_id,
+                execution_adapter_identity={},
+                actor="test:supervisor",
+                request="advance the exact plan",
+                launch_authorized=True,
+            )
+        self.assertEqual(
+            result.disposition,
+            autopilot.StepDisposition.WAITING_FOR_CAPACITY,
+        )
+        self.assertEqual(result.wait_condition, wait)
+        self.assertIn("no free grant", result.detail)
 
     def test_app_server_without_capacity_evidence_is_limited_to_one(self) -> None:
         adapter, module_digest, provider, lifecycle = self._capacity_policy_inputs()
@@ -1686,9 +1907,27 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             "repository": "fixture/foreign-repository",
             "coordination_dir": str(Path(self.temporary.name) / "foreign-state"),
         }
+        execution_adapter_identity = {
+            "record_id": autopilot.digest_json({"fixture": "foreign-adapter"}),
+            "execution_id": execution_id,
+            "execution_namespace": "foreign",
+            "repository": "fixture/foreign-repository",
+            "host_id": self.host_id,
+            "provider_generation": autopilot.digest_json(
+                {"fixture": "foreign-provider"}
+            ),
+            "provider_epoch": 1,
+        }
         reservation = {
             "execution_id": execution_id,
             "host_id": self.host_id,
+            "execution_adapter_identity_record_id": execution_adapter_identity[
+                "record_id"
+            ],
+            "provider_generation": execution_adapter_identity[
+                "provider_generation"
+            ],
+            "provider_epoch": 1,
         }
 
         class ForeignPlane:
@@ -1726,6 +1965,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                         reservation=reservation,
                         repository_binding=repository_binding,
                         execution_identity=execution_identity,
+                        execution_adapter_identity=execution_adapter_identity,
                         repo_root=foreign_root,
                         execution_dir=foreign_execution_dir,
                     )
@@ -1779,7 +2019,30 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             "repository": "fixture/foreign-error-repository",
             "coordination_dir": str(Path(self.temporary.name) / "foreign-error-state"),
         }
-        reservation = {"execution_id": execution_id, "host_id": self.host_id}
+        execution_adapter_identity = {
+            "record_id": autopilot.digest_json(
+                {"fixture": "foreign-error-adapter"}
+            ),
+            "execution_id": execution_id,
+            "execution_namespace": "foreign-error",
+            "repository": "fixture/foreign-error-repository",
+            "host_id": self.host_id,
+            "provider_generation": autopilot.digest_json(
+                {"fixture": "foreign-error-provider"}
+            ),
+            "provider_epoch": 1,
+        }
+        reservation = {
+            "execution_id": execution_id,
+            "host_id": self.host_id,
+            "execution_adapter_identity_record_id": execution_adapter_identity[
+                "record_id"
+            ],
+            "provider_generation": execution_adapter_identity[
+                "provider_generation"
+            ],
+            "provider_epoch": 1,
+        }
 
         class ForeignPlane:
             pass
@@ -1813,6 +2076,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                     reservation=reservation,
                     repository_binding=repository_binding,
                     execution_identity=execution_identity,
+                    execution_adapter_identity=execution_adapter_identity,
                     repo_root=foreign_root,
                     execution_dir=foreign_execution_dir,
                 ),
@@ -2310,6 +2574,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             sibling.dispatch(
                 actor="test:stale-worktree",
                 host_id=self.host_id,
+                execution_adapter_identity=self.execution_adapter_identity,
                 requested_nodes=[PARALLEL[0]],
             )
 
@@ -2372,6 +2637,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             sibling.dispatch(
                 actor="test:secondary",
                 host_id=self.host_id,
+                execution_adapter_identity=self.execution_adapter_identity,
                 requested_nodes=[PARALLEL[0]],
             )
         self.assertEqual(self.plane.current_release()["release_id"], release["release_id"])
@@ -2474,6 +2740,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             sibling.dispatch(
                 actor="test:stale-sibling",
                 host_id=self.host_id,
+                execution_adapter_identity=self.execution_adapter_identity,
                 requested_nodes=[SERIAL],
             )
         replacement = self.plane.dispatch(
@@ -2650,11 +2917,15 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         replay = self.root / "old-snapshot.json"
         replay.write_text(json.dumps(self._candidate(older)), encoding="utf-8")
         expired = dict(older)
-        expired["expires_at"] = "2000-01-01T00:00:00+00:00"
+        began = autopilot.parse_time(str(older["began_at"]))
+        expired["expires_at"] = controller.format_time(
+            began + timedelta(seconds=1)
+        )
         autopilot.atomic_write_json(
             self.plane.snapshot_observation_path,
             self.plane._seal_snapshot_observation(expired),
         )
+        self.plane.clock = lambda: began + timedelta(seconds=2)  # type: ignore[method-assign]
         newer = dict(
             self.plane.begin_github_snapshot_observation(actor="test:newer")
         )
@@ -3018,7 +3289,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             unknown, actor="test:remote-adjudicator-after-revert"
         )
         self.assertEqual(resolved["status"], "PUBLISH_UNKNOWN")
-        self.assertIn("RETRYABLE_UNKNOWN", resolved["detail"])
+        self.assertIn("indeterminate", resolved["detail"])
 
     def test_unknown_publication_remains_fenced_when_remote_advanced_ambiguously(self) -> None:
         unknown, _expected, _pinned, heads = self._seed_unknown_publication()
@@ -3283,7 +3554,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         )
 
     def test_prepared_publication_resumes_from_an_independent_clone(self) -> None:
-        """Clone B publishes only after fetching clone A's immutable txn ref."""
+        """Clone B recovers the immutable pin without bypassing validation."""
 
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
@@ -3323,7 +3594,27 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             capture_output=True,
         )
         subprocess.run(
-            ("git", "clone", "--quiet", str(bare), str(clone_a)),
+            (
+                "git",
+                "-C",
+                str(bare),
+                "symbolic-ref",
+                "HEAD",
+                f"refs/heads/{control['target']['branch']}",
+            ),
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            (
+                "git",
+                "-c",
+                "core.autocrlf=false",
+                "clone",
+                "--quiet",
+                str(bare),
+                str(clone_a),
+            ),
             check=True,
             capture_output=True,
         )
@@ -3382,8 +3673,38 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             check=True,
             capture_output=True,
         )
-        pinned = subprocess.run(
+        receipt_sha = subprocess.run(
             ("git", "-C", str(clone_a), "rev-parse", "HEAD"),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        receipt_tree = subprocess.run(
+            (
+                "git",
+                "-C",
+                str(clone_a),
+                "rev-parse",
+                f"{receipt_sha}^{{tree}}",
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        pinned = subprocess.run(
+            (
+                "git",
+                "-C",
+                str(clone_a),
+                "commit-tree",
+                receipt_tree,
+                "-p",
+                expected,
+                "-p",
+                receipt_sha,
+                "-m",
+                "canonical private publication pin",
+            ),
             check=True,
             capture_output=True,
             text=True,
@@ -3397,7 +3718,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                 "push",
                 "--quiet",
                 "origin",
-                f"{pinned}:refs/heads/{receipt_branch}",
+                f"{receipt_sha}:refs/heads/{receipt_branch}",
             ),
             check=True,
             capture_output=True,
@@ -3406,7 +3727,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             prepared_only=True,
             expected_sha=expected,
             pinned_sha=pinned,
-            receipt_sha=pinned,
+            receipt_sha=receipt_sha,
             plane=plane_a,
         )
         transaction_ref = str(prepared["transaction_ref"])
@@ -3421,34 +3742,17 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             ),
             check=True,
         )
-        source_round_calls = 0
-
-        def crash_after_remote_evidence(_release_id: str) -> Mapping[str, object]:
-            nonlocal source_round_calls
-            source_round_calls += 1
-            if source_round_calls == 2:
-                raise RuntimeError("simulated clone A loss after transaction ref")
-            return {}
-
-        digest_pair = (
-            str(prepared["authority_digest"]),
-            str(prepared["authority_baseline_digest"]),
-        )
         with mock.patch.object(
             plane_a,
-            "round_authority_snapshot",
-            side_effect=crash_after_remote_evidence,
+            "_adopt_prepared_publication_pin",
+            side_effect=RuntimeError("simulated clone A loss after transaction ref"),
         ):
-            with mock.patch.object(
-                plane_a, "_round_authority_digests", return_value=digest_pair
-            ):
-                with mock.patch.object(plane_a, "_release_issues", return_value=()):
-                    with self.assertRaisesRegex(RuntimeError, "clone A loss"):
-                        plane_a.publish_pinned_transaction(
-                            prepared,
-                            pinned_sha=pinned,
-                            actor="test:clone-a-publisher",
-                        )
+            with self.assertRaisesRegex(RuntimeError, "clone A loss"):
+                plane_a.pin_publication_transaction(
+                    prepared,
+                    pinned_sha=pinned,
+                    actor="test:clone-a-publisher",
+                )
         self.assertEqual(
             plane_a._current_publication_resource()[1]["status"], "PREPARED"
         )
@@ -3476,10 +3780,18 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             ).stdout.strip(),
             expected,
         )
-        shutil.rmtree(clone_a)
+        shutil.rmtree(clone_a, onexc=_remove_readonly_path)
 
         subprocess.run(
-            ("git", "clone", "--quiet", str(bare), str(clone_b)),
+            (
+                "git",
+                "-c",
+                "core.autocrlf=false",
+                "clone",
+                "--quiet",
+                str(bare),
+                str(clone_b),
+            ),
             check=True,
             capture_output=True,
         )
@@ -3543,19 +3855,15 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         durable_pin = plane_b._current_publication_resource()[1]
         self.assertEqual(durable_pin["status"], "PINNED")
         self.assertEqual(durable_pin["pinned_sha"], pinned)
-        with mock.patch.object(
-            plane_b, "round_authority_snapshot", return_value={}
+        with self.assertRaisesRegex(
+            autopilot.AutopilotError,
+            "exact VALIDATED capability",
         ):
-            with mock.patch.object(
-                plane_b, "_round_authority_digests", return_value=digest_pair
-            ):
-                with mock.patch.object(plane_b, "_release_issues", return_value=()):
-                    published = plane_b.publish_pinned_transaction(
-                        installed_prepared,
-                        pinned_sha=pinned,
-                        actor="test:clone-b-publisher",
-                    )
-        self.assertEqual(published["status"], "PUBLISHED")
+            plane_b.publish_pinned_transaction(
+                durable_pin,
+                pinned_sha=pinned,
+                actor="test:clone-b-publisher",
+            )
         self.assertEqual(
             subprocess.run(
                 (
@@ -3569,7 +3877,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip(),
-            pinned,
+            expected,
         )
 
     def test_terminal_execution_rejects_publication_before_any_authority_effect(self) -> None:
@@ -4119,7 +4427,27 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             capture_output=True,
         )
         subprocess.run(
-            ("git", "clone", "--quiet", str(bare), str(clone_a)),
+            (
+                "git",
+                "-C",
+                str(bare),
+                "symbolic-ref",
+                "HEAD",
+                f"refs/heads/{control['target']['branch']}",
+            ),
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            (
+                "git",
+                "-c",
+                "core.autocrlf=false",
+                "clone",
+                "--quiet",
+                str(bare),
+                str(clone_a),
+            ),
             check=True,
             capture_output=True,
         )
@@ -4156,6 +4484,16 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         ) -> subprocess.CompletedProcess[str]:
             nonlocal crashed
             command = tuple(str(item) for item in arguments)
+            if "snapshot-observation-begin" in command:
+                reservation = plane_a.begin_github_snapshot_observation(
+                    actor="autopilot:github-snapshot"
+                )
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    json.dumps(reservation, sort_keys=True) + "\n",
+                    "",
+                )
             if "install-github-snapshot" not in command:
                 return real_run(list(command), cwd=cwd, check=check)
             source_index = command.index("install-github-snapshot") + 1
@@ -4214,10 +4552,18 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             ).stdout.strip(),
             target_sha,
         )
-        shutil.rmtree(clone_a)
+        shutil.rmtree(clone_a, onexc=_remove_readonly_path)
 
         subprocess.run(
-            ("git", "clone", "--quiet", str(bare), str(clone_b)),
+            (
+                "git",
+                "-c",
+                "core.autocrlf=false",
+                "clone",
+                "--quiet",
+                str(bare),
+                str(clone_b),
+            ),
             check=True,
             capture_output=True,
         )
@@ -4385,6 +4731,9 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                         controller.initialize_execution_namespace(
                             plane.coordination_dir, plane.execution_identity
                         )
+                    malformed_adapter_identity = (
+                        self._install_execution_adapter_identity_fixture(plane)
+                    )
                 self._make_eligible([SERIAL], plane=plane)
                 plane._compiled_frontier = (  # type: ignore[method-assign]
                     autopilot.ControlPlane._compiled_frontier.__get__(
@@ -4397,6 +4746,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                     plane.dispatch(
                         actor=f"test:{case}",
                         host_id=self.host_id,
+                        execution_adapter_identity=malformed_adapter_identity,
                     )
                 self.assertEqual(inventory(plane.execution_dir), before_execution)
                 self.assertEqual(inventory(plane.host_runtime_dir), before_host)

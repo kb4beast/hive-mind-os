@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import builtins
+import codecs
 import fnmatch
 import getpass
 import json
@@ -29,6 +30,8 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 from urllib.parse import urlparse
+
+import host_scheduler as host_scheduler_policy
 
 SCHEMA_VERSION = 1
 FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -178,9 +181,18 @@ _STATUS_READ_ONLY_GIT_COMMANDS = frozenset(
     {"cat-file", "diff", "log", "merge-base", "rev-parse", "show"}
 )
 AUTHORITY_ID = re.compile(r"sha256:[0-9a-f]{64}\Z")
+_LOADED_CONTROLLER_PATH = Path(__file__).resolve()
+_LOADED_CONTROLLER_DIGEST = "sha256:" + sha256(
+    _LOADED_CONTROLLER_PATH.read_bytes()
+).hexdigest()
 if not hasattr(builtins, "_hive_mind_runtime_lock_local_v1"):
     setattr(builtins, "_hive_mind_runtime_lock_local_v1", threading.local())
 _RUNTIME_LOCK_LOCAL = getattr(builtins, "_hive_mind_runtime_lock_local_v1")
+if not hasattr(builtins, "_hive_mind_loaded_kernel_identities_v1"):
+    setattr(builtins, "_hive_mind_loaded_kernel_identities_v1", {})
+_LOADED_RUNTIME_KERNEL_IDENTITIES = getattr(
+    builtins, "_hive_mind_loaded_kernel_identities_v1"
+)
 
 
 class AutopilotError(RuntimeError):
@@ -508,6 +520,64 @@ def bind_repository_runtime_root(
     return locator
 
 
+def runtime_lock_order_key(path: str | Path) -> tuple[int, str]:
+    """Return the one process-wide authority lock order.
+
+    The path, rather than the importing module, determines the authority plane.
+    This keeps linked worktrees and separately imported controller modules on the
+    same ordering contract.  Unknown locks may be held alone but cannot be mixed
+    into an authority transaction until their rank is deliberately registered.
+    """
+
+    absolute = _absolute_without_resolving(path)
+    normalized = os.path.normcase(os.path.normpath(str(absolute)))
+    name = absolute.name.casefold()
+    parts = tuple(part.casefold() for part in absolute.parts)
+    execution_scoped = any(
+        part == "executions"
+        and index + 2 < len(parts)
+        and re.fullmatch(r"[0-9a-f]{64}", parts[index + 1]) is not None
+        and parts[index + 2] == "locks"
+        for index, part in enumerate(parts)
+    )
+    if name in {"github-snapshot-coordinator.lock", "execution-supervisor.lock"}:
+        rank = 5
+    elif name == "host-authority.lock":
+        rank = 10
+    elif name == "runtime-authority-bootstrap-migration.lock":
+        rank = 20
+    elif name == "arbiter-authority.lock":
+        rank = 30
+    elif name == "host-reservations.lock":
+        rank = 35
+    elif execution_scoped:
+        rank = {
+            "dispatcher-admission.lock": 50,
+            "authority-ledger-initialization.lock": 60,
+            "task-bindings.lock": 70,
+            "sidecar-bindings.lock": 80,
+            "attended-host.lock": 110,
+            "runtime-identity.lock": 130,
+        }.get(name, 1000)
+    else:
+        # Pre-READY migration locks occupy their own ordered plane between the
+        # raw repository arbiter and initialized execution authority.
+        rank = {
+            "dispatcher-admission.lock": 40,
+            "authority-ledger-initialization.lock": 41,
+            "task-bindings.lock": 42,
+            "sidecar-bindings.lock": 43,
+            # This is the migration-only repository-root attended ledger.  It
+            # must be frozen before default-execution locks are materialized;
+            # the execution-scoped attended lock retains its late rank above.
+            "attended-host.lock": 44,
+            "claim-authority.lock": 90,
+            "global-validation-lease.lock": 100,
+            "runtime-identity.lock": 130,
+        }.get(name, 1000)
+    return rank, normalized
+
+
 @contextmanager
 def runtime_file_lock(
     path: str | Path,
@@ -519,8 +589,6 @@ def runtime_file_lock(
     lock_path = _reject_link_components(path, label="runtime lock path")
     if timeout_seconds <= 0:
         raise ConfigurationError("runtime lock timeout must be positive")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = _reject_link_components(lock_path, label="runtime lock path")
     lock_key = os.path.normcase(os.path.normpath(str(lock_path)))
     held = getattr(_RUNTIME_LOCK_LOCAL, "held", None)
     if held is None:
@@ -533,8 +601,40 @@ def runtime_file_lock(
         finally:
             held[lock_key] -= 1
         return
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    held_order = getattr(_RUNTIME_LOCK_LOCAL, "held_order", None)
+    if held_order is None:
+        held_order = []
+        _RUNTIME_LOCK_LOCAL.held_order = held_order
+    requested_order = runtime_lock_order_key(lock_path)
+    if held_order:
+        prior_order = held_order[-1]
+        if prior_order[0] == 1000 or requested_order[0] == 1000:
+            raise ConfigurationError(
+                "unclassified runtime locks cannot be combined with authority locks"
+            )
+        if requested_order < prior_order:
+            raise ConfigurationError(
+                "runtime lock order inversion: "
+                f"requested {lock_path} after {prior_order[1]}"
+            )
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = _reject_link_components(lock_path, label="runtime lock path")
+    flags = (
+        os.O_RDWR
+        | os.O_CREAT
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_BINARY", 0)
+    )
     descriptor = os.open(lock_path, flags, 0o600)
+    try:
+        _verify_open_regular_file_identity(
+            descriptor,
+            lock_path,
+            label="runtime lock path",
+        )
+    except BaseException:
+        os.close(descriptor)
+        raise
     locked = False
     deadline = time.monotonic() + timeout_seconds
     while not locked:
@@ -559,20 +659,37 @@ def runtime_file_lock(
                 raise ConfigurationError(f"runtime lock timed out: {lock_path}")
             time.sleep(0.01)
     held[lock_key] = 1
+    held_order.append(requested_order)
     try:
+        _verify_open_regular_file_identity(
+            descriptor,
+            lock_path,
+            label="runtime lock path",
+        )
         yield
     finally:
         held.pop(lock_key, None)
-        os.lseek(descriptor, 0, os.SEEK_SET)
-        if os.name == "nt":
-            import msvcrt
+        if not held_order or held_order[-1] != requested_order:
+            os.close(descriptor)
+            raise ConfigurationError("runtime lock ownership stack is corrupted")
+        held_order.pop()
+        try:
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            if os.name == "nt":
+                import msvcrt
 
-            msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
 
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-        os.close(descriptor)
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+            _verify_open_regular_file_identity(
+                descriptor,
+                lock_path,
+                label="runtime lock path",
+            )
+        finally:
+            os.close(descriptor)
 
 
 def runtime_file_lock_is_held(path: str | Path) -> bool:
@@ -681,7 +798,7 @@ def digest_json(value: object) -> str:
 
 def read_json(path: Path) -> Any:
     try:
-        raw = _read_regular_authority_bytes(path, label="host repository registry")
+        raw = _read_regular_authority_bytes(path, label=f"JSON file {path}")
         # UTF-8 is the only admitted text encoding.  In particular, do not let
         # ``utf-8-sig`` silently turn a BOM-bearing authority file into a peer
         # representation of the same object.
@@ -774,7 +891,10 @@ def atomic_write_json(path: Path, value: object) -> None:
         encoding="utf-8",
         newline="\n",
         dir=path.parent,
-        prefix=f".{path.name}.",
+        # Keep the temporary basename independent of a content-addressed target
+        # name.  Repeating a 64-byte digest here crosses legacy Windows MAX_PATH
+        # even when the final authority path itself is valid.
+        prefix=".tmp.",
         delete=False,
     ) as temporary:
         temporary.write(encoded)
@@ -816,7 +936,7 @@ def exclusive_write_bytes_or_identical(path: Path, payload: bytes) -> bool:
     with tempfile.NamedTemporaryFile(
         "wb",
         dir=path.parent,
-        prefix=f".{path.name}.",
+        prefix=".tmp.",
         delete=False,
     ) as temporary:
         temporary.write(payload)
@@ -1029,14 +1149,18 @@ KERNEL_BUNDLE_COMPONENTS = (
     ".autopilot/bin/sealed_recovery.py",
     ".autopilot/bin/durable_controller.py",
     ".autopilot/bin/dag_standard.py",
+    ".autopilot/bin/hermetic_ci.py",
+    ".autopilot/bin/host_scheduler.py",
     ".autopilot/orchestration-policy.json",
     ".autopilot/workflow-policy.json",
     *KERNEL_TEMPLATE_COMPONENTS,
 )
 
 
-def runtime_kernel_identity(repo_root: str | Path) -> Mapping[str, object]:
-    """Seal the executable FSM bundle and interpreter policy for one execution."""
+def _runtime_kernel_identity_from_disk(
+    repo_root: str | Path,
+) -> Mapping[str, object]:
+    """Compute the exact on-disk FSM bundle without granting writer authority."""
 
     root = _reject_link_components(repo_root, label="repository root").resolve()
     components: list[Mapping[str, object]] = []
@@ -1083,12 +1207,58 @@ def runtime_kernel_identity(repo_root: str | Path) -> Mapping[str, object]:
         "components": components,
         "interpreter_policy_digest": interpreter_policy_digest,
     }
-    return {
+    identity = {
         "schema_version": 1,
         **bundle_material,
         "bundle_digest": digest_json(bundle_material),
         "interpreter": interpreter,
     }
+    controller_component = next(
+        (
+            item
+            for item in components
+            if item.get("path") == ".autopilot/bin/controller.py"
+        ),
+        None,
+    )
+    if (
+        not isinstance(controller_component, Mapping)
+        or controller_component.get("digest") != _LOADED_CONTROLLER_DIGEST
+    ):
+        raise ConfigurationError(
+            "the loaded controller differs from the selected repository kernel; "
+            "restart from the selected checkout before mutating authority"
+        )
+    return identity
+
+
+def runtime_kernel_identity(repo_root: str | Path) -> Mapping[str, object]:
+    """Return this process's immutable execution-kernel writer identity.
+
+    Re-reading bytes alone is not a writer fence: a long-lived interpreter can
+    continue executing the old state machine after its files are replaced.  The
+    first authenticated bundle observed for a repository is therefore pinned to
+    the loaded process.  Later disk drift fails closed; an explicit upgrade must
+    be launched by a fresh interpreter loaded from the successor checkout.
+    """
+
+    root = _reject_link_components(repo_root, label="repository root").resolve()
+    cache_key = (
+        str(_LOADED_CONTROLLER_PATH),
+        _LOADED_CONTROLLER_DIGEST,
+        os.path.normcase(str(root)),
+    )
+    current = _runtime_kernel_identity_from_disk(root)
+    cached = _LOADED_RUNTIME_KERNEL_IDENTITIES.get(cache_key)
+    if cached is None:
+        _LOADED_RUNTIME_KERNEL_IDENTITIES[cache_key] = dict(current)
+        return dict(current)
+    if not isinstance(cached, Mapping) or dict(cached) != dict(current):
+        raise ConfigurationError(
+            "execution kernel bytes changed after this process loaded; "
+            "restart before initialization, upgrade, or mutation"
+        )
+    return dict(cached)
 
 
 def execution_namespace_identity(
@@ -1151,6 +1321,800 @@ def execution_namespace_identity(
     }
     identity["record_id"] = digest_json(identity)
     return identity
+
+
+EXECUTION_IDENTITY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "execution_id",
+        "namespace",
+        "repository",
+        "repository_transport_digest",
+        "canonical_remote_fetch",
+        "canonical_remote_push",
+        "target_branch",
+        "plan_fingerprint",
+        "kernel_bundle_digest",
+        "interpreter_policy_digest",
+        "record_id",
+    }
+)
+EXECUTION_KERNEL_HISTORY_KIND = "hive-mind-execution-kernel-generation-event-v1"
+EXECUTION_KERNEL_TRANSITION_KIND = "hive-mind-execution-kernel-transition-v1"
+KERNEL_TRANSITION_COMPLETE_KIND = "hive-mind-kernel-transition-complete-v1"
+KERNEL_TRANSITION_DIRECTORY = "kt"
+KERNEL_TRANSITION_POINTER = "kt.json"
+KERNEL_TRANSITION_RECOVERY_DIRECTORY = "kr"
+PUBLICATION_RESERVATION_KIND = "hive-mind-publication-reservation-v1"
+PUBLICATION_TRANSACTION_KIND = "hive-mind-publication-transaction-v1"
+PUBLICATION_ACTIVE_STATUSES = frozenset(
+    {"PREPARED", "PINNED", "VALIDATED", "PUBLISHING", "PUBLISH_UNKNOWN"}
+)
+PUBLICATION_TERMINAL_STATUSES = frozenset(
+    {
+        "PUBLISHED",
+        "SUPERSEDED_INTEGRATED",
+        "REJECTED",
+        "VALIDATION_FAILED",
+        "RECOVERY_REQUIRED",
+        "NO_PUSH",
+        "INTEGRATION_CONFLICT",
+        "EXPIRED_FENCED",
+    }
+)
+PUBLICATION_RESOURCE_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "status",
+        "transaction_id",
+        "execution_id",
+        "release_id",
+        "repository",
+        "target_branch",
+        "expected_target_sha",
+        "expires_at",
+        "outcome",
+        "transaction",
+        "record_id",
+    }
+)
+PUBLICATION_TRANSACTION_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "status",
+        "transaction_key",
+        "attempt_epoch",
+        "nonce",
+        "transaction_id",
+        "execution_namespace",
+        "execution_id",
+        "release_id",
+        "round_id",
+        "repository",
+        "target_branch",
+        "expected_target_sha",
+        "authority_digest",
+        "authority_baseline_digest",
+        "receipt_heads",
+        "receipt_heads_digest",
+        "transaction_ref",
+        "coordinator_id",
+        "transaction_lease_nonce",
+        "transaction_lease_id",
+        "lease_expires_at",
+        "publishing_lease_nonce",
+        "publishing_lease_id",
+        "publishing_lease_expires_at",
+        "pinned_sha",
+        "validation_evidence",
+        "outcome",
+        "detail",
+        "actor",
+        "reserved_at",
+        "updated_at",
+        "completed_at",
+        "record_id",
+    }
+)
+EXECUTION_KERNEL_HISTORY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "state",
+        "identity",
+        "actor",
+        "reason",
+        "recorded_at",
+        "previous_identity_record_id",
+        "previous_event_id",
+        "event_id",
+    }
+)
+KERNEL_TRANSITION_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "authority_plane",
+        "state",
+        "predecessor_record_id",
+        "predecessor_generation",
+        "previous_event_id",
+        "successor_identity",
+        "history_event",
+        "history_payload_digest",
+        "history_payload_bytes",
+        "actor",
+        "reason",
+        "prepared_at",
+        "transition_id",
+        "record_id",
+    }
+)
+
+
+def _validate_execution_identity_document(value: object) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != EXECUTION_IDENTITY_FIELDS:
+        raise ConfigurationError("execution namespace identity schema is ambiguous")
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != EXECUTION_IDENTITY_KIND
+        or AUTHORITY_ID.fullmatch(str(value.get("execution_id"))) is None
+        or EXECUTION_NAMESPACE.fullmatch(str(value.get("namespace"))) is None
+        or not isinstance(value.get("repository"), str)
+        or not str(value["repository"]).strip()
+        or AUTHORITY_ID.fullmatch(
+            str(value.get("repository_transport_digest"))
+        )
+        is None
+        or not isinstance(value.get("canonical_remote_fetch"), str)
+        or not isinstance(value.get("canonical_remote_push"), str)
+        or not isinstance(value.get("target_branch"), str)
+        or not str(value["target_branch"]).strip()
+        or AUTHORITY_ID.fullmatch(str(value.get("plan_fingerprint"))) is None
+        or AUTHORITY_ID.fullmatch(str(value.get("kernel_bundle_digest"))) is None
+        or AUTHORITY_ID.fullmatch(
+            str(value.get("interpreter_policy_digest"))
+        )
+        is None
+        or record_id != digest_json(material)
+    ):
+        raise ConfigurationError("execution namespace identity is invalid")
+    expected_id = digest_json(
+        {
+            "kind": EXECUTION_NAMESPACE_KEY_KIND,
+            "repository": value["repository"],
+            "repository_transport_digest": value[
+                "repository_transport_digest"
+            ],
+            "namespace": value["namespace"],
+        }
+    )
+    if value.get("execution_id") != expected_id:
+        raise ConfigurationError("execution namespace path identity is noncanonical")
+    return dict(value)
+
+
+def _execution_kernel_history(
+    execution_dir: str | Path,
+    *,
+    raw_override: bytes | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    path = Path(execution_dir) / "execution-kernel-history.jsonl"
+    records = (
+        _strict_jsonl_records_bytes(
+            raw_override, label="execution-kernel generation history"
+        )
+        if raw_override is not None
+        else strict_jsonl_records(path, label="execution-kernel generation history")
+    )
+    previous_event_id: str | None = None
+    previous_identity: Mapping[str, object] | None = None
+    seen_kernels: set[tuple[str, str]] = set()
+    events: list[Mapping[str, object]] = []
+    for index, event in enumerate(records, 1):
+        if set(event) != EXECUTION_KERNEL_HISTORY_FIELDS:
+            raise ConfigurationError(
+                f"execution-kernel history line {index} schema is ambiguous"
+            )
+        material = dict(event)
+        event_id = material.pop("event_id", None)
+        identity = _validate_execution_identity_document(event.get("identity"))
+        try:
+            parse_time(event.get("recorded_at"))
+        except (TypeError, ValueError) as error:
+            raise ConfigurationError(
+                f"execution-kernel history line {index} time is invalid"
+            ) from error
+        kernel_key = (
+            str(identity["kernel_bundle_digest"]),
+            str(identity["interpreter_policy_digest"]),
+        )
+        if (
+            event.get("schema_version") != 1
+            or event.get("kind") != EXECUTION_KERNEL_HISTORY_KIND
+            or event.get("state") != "INSTALLED"
+            or not isinstance(event.get("actor"), str)
+            or not str(event["actor"]).strip()
+            or not isinstance(event.get("reason"), str)
+            or not str(event["reason"]).strip()
+            or event.get("previous_event_id") != previous_event_id
+            or event.get("previous_identity_record_id")
+            != (
+                previous_identity.get("record_id")
+                if previous_identity is not None
+                else None
+            )
+            or event_id != digest_json(material)
+            or (
+                previous_identity is not None
+                and any(
+                    identity.get(field) != previous_identity.get(field)
+                    for field in EXECUTION_IDENTITY_FIELDS
+                    - {
+                        "kernel_bundle_digest",
+                        "interpreter_policy_digest",
+                        "record_id",
+                    }
+                )
+            )
+            or kernel_key in seen_kernels
+        ):
+            raise ConfigurationError(
+                f"execution-kernel history line {index} is invalid or replays a retired kernel"
+            )
+        previous_event_id = str(event_id)
+        previous_identity = identity
+        seen_kernels.add(kernel_key)
+        events.append(dict(event))
+    return tuple(events)
+
+
+def _execution_kernel_generation_event(
+    identity: Mapping[str, object],
+    *,
+    actor: str,
+    reason: str,
+    recorded_at: str,
+    history: Sequence[Mapping[str, object]],
+) -> Mapping[str, object]:
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": EXECUTION_KERNEL_HISTORY_KIND,
+        "state": "INSTALLED",
+        "identity": dict(identity),
+        "actor": actor,
+        "reason": reason,
+        "recorded_at": recorded_at,
+        "previous_identity_record_id": (
+            history[-1]["identity"]["record_id"] if history else None
+        ),
+        "previous_event_id": history[-1]["event_id"] if history else None,
+    }
+    return {**material, "event_id": digest_json(material)}
+
+
+def _append_execution_kernel_generation(
+    execution_dir: Path,
+    identity: Mapping[str, object],
+    *,
+    actor: str,
+    reason: str,
+    recorded_at: str,
+    history: Sequence[Mapping[str, object]],
+) -> Mapping[str, object]:
+    event = _execution_kernel_generation_event(
+        identity,
+        actor=actor,
+        reason=reason,
+        recorded_at=recorded_at,
+        history=history,
+    )
+    _append_canonical_jsonl(
+        execution_dir / "execution-kernel-history.jsonl", event
+    )
+    return event
+
+
+def _canonical_jsonl_payload(value: Mapping[str, object]) -> bytes:
+    return (
+        json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
+
+
+def _validate_kernel_transition(
+    value: object,
+    *,
+    kind: str,
+    authority_plane: str,
+    identity_validator: Callable[[object], Mapping[str, object]],
+) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != KERNEL_TRANSITION_FIELDS:
+        raise ConfigurationError("kernel transition PREPARED schema is ambiguous")
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    successor = identity_validator(value.get("successor_identity"))
+    event = value.get("history_event")
+    if not isinstance(event, Mapping):
+        raise ConfigurationError("kernel transition history event is missing")
+    payload = _canonical_jsonl_payload(event)
+    transition_material = {
+        "kind": kind,
+        "authority_plane": authority_plane,
+        "predecessor_record_id": value.get("predecessor_record_id"),
+        "predecessor_generation": value.get("predecessor_generation"),
+        "previous_event_id": value.get("previous_event_id"),
+        "successor_identity_record_id": successor.get("record_id"),
+        "history_event_id": event.get("event_id"),
+        "actor": value.get("actor"),
+        "reason": value.get("reason"),
+    }
+    for optional_digest in (
+        value.get("predecessor_record_id"),
+        value.get("predecessor_generation"),
+        value.get("previous_event_id"),
+    ):
+        if optional_digest is not None and AUTHORITY_ID.fullmatch(
+            str(optional_digest)
+        ) is None:
+            raise ConfigurationError("kernel transition predecessor is invalid")
+    try:
+        parse_time(value.get("prepared_at"))
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError("kernel transition time is invalid") from error
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != kind
+        or value.get("authority_plane") != authority_plane
+        or value.get("state") != "PREPARED"
+        or not isinstance(value.get("actor"), str)
+        or not str(value["actor"]).strip()
+        or not isinstance(value.get("reason"), str)
+        or not str(value["reason"]).strip()
+        or value.get("history_payload_digest")
+        != "sha256:" + sha256(payload).hexdigest()
+        or value.get("history_payload_bytes") != len(payload)
+        or value.get("transition_id") != digest_json(transition_material)
+        or record_id != digest_json(material)
+    ):
+        raise ConfigurationError("kernel transition PREPARED receipt is invalid")
+    return dict(value)
+
+
+def _prepare_kernel_transition(
+    authority_dir: Path,
+    *,
+    kind: str,
+    authority_plane: str,
+    predecessor_record_id: str | None,
+    predecessor_generation: str | None,
+    previous_event_id: str | None,
+    successor_identity: Mapping[str, object],
+    history_event: Mapping[str, object],
+    actor: str,
+    reason: str,
+    prepared_at: str,
+    identity_validator: Callable[[object], Mapping[str, object]],
+) -> Mapping[str, object]:
+    payload = _canonical_jsonl_payload(history_event)
+    transition_material = {
+        "kind": kind,
+        "authority_plane": authority_plane,
+        "predecessor_record_id": predecessor_record_id,
+        "predecessor_generation": predecessor_generation,
+        "previous_event_id": previous_event_id,
+        "successor_identity_record_id": successor_identity["record_id"],
+        "history_event_id": history_event["event_id"],
+        "actor": actor,
+        "reason": reason,
+    }
+    transition_id = digest_json(transition_material)
+    prepared_material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": kind,
+        "authority_plane": authority_plane,
+        "state": "PREPARED",
+        "predecessor_record_id": predecessor_record_id,
+        "predecessor_generation": predecessor_generation,
+        "previous_event_id": previous_event_id,
+        "successor_identity": dict(successor_identity),
+        "history_event": dict(history_event),
+        "history_payload_digest": "sha256:" + sha256(payload).hexdigest(),
+        "history_payload_bytes": len(payload),
+        "actor": actor,
+        "reason": reason,
+        "prepared_at": prepared_at,
+        "transition_id": transition_id,
+    }
+    prepared = {
+        **prepared_material,
+        "record_id": digest_json(prepared_material),
+    }
+    transitions = authority_dir / KERNEL_TRANSITION_DIRECTORY
+    transitions.mkdir(parents=True, exist_ok=True)
+    _reject_link_components(
+        transitions, label="kernel transition authority directory"
+    )
+    if not transitions.is_dir():
+        raise ConfigurationError(
+            "kernel transition authority path is not a directory"
+        )
+    prepared_path = transitions / (
+        transition_id.removeprefix("sha256:") + ".p"
+    )
+    pointer_path = authority_dir / KERNEL_TRANSITION_POINTER
+    # The pointer is the exclusive contender CAS.  Publishing it first means a
+    # crash cannot leave an undiscoverable immutable intent and let a retry mint
+    # a second timestamp/event for the same predecessor.  The immutable twin is
+    # installed immediately after and is also repaired by the finisher.
+    exclusive_write_json_or_identical(pointer_path, prepared)
+    exclusive_write_json_or_identical(prepared_path, prepared)
+    installed = _validate_kernel_transition(
+        read_strict_canonical_json(
+            pointer_path, label="kernel transition PREPARED pointer"
+        ),
+        kind=kind,
+        authority_plane=authority_plane,
+        identity_validator=identity_validator,
+    )
+    if installed != prepared:
+        raise ConfigurationError("another kernel transition owns this predecessor")
+    return prepared
+
+
+def _read_kernel_transition(
+    authority_dir: Path,
+    *,
+    kind: str,
+    authority_plane: str,
+    identity_validator: Callable[[object], Mapping[str, object]],
+) -> Mapping[str, object] | None:
+    pointer_path = authority_dir / KERNEL_TRANSITION_POINTER
+    if not pointer_path.exists() and not _is_link_like(pointer_path):
+        return None
+    return _validate_kernel_transition(
+        read_strict_canonical_json(
+            pointer_path, label="kernel transition PREPARED pointer"
+        ),
+        kind=kind,
+        authority_plane=authority_plane,
+        identity_validator=identity_validator,
+    )
+
+
+def _validate_execution_kernel_transition(value: object) -> Mapping[str, object]:
+    prepared = _validate_kernel_transition(
+        value,
+        kind=EXECUTION_KERNEL_TRANSITION_KIND,
+        authority_plane="EXECUTION",
+        identity_validator=_validate_execution_identity_document,
+    )
+    event = prepared["history_event"]
+    assert isinstance(event, Mapping)
+    material = dict(event)
+    event_id = material.pop("event_id", None)
+    if (
+        set(event) != EXECUTION_KERNEL_HISTORY_FIELDS
+        or event.get("schema_version") != 1
+        or event.get("kind") != EXECUTION_KERNEL_HISTORY_KIND
+        or event.get("state") != "INSTALLED"
+        or event.get("identity") != prepared.get("successor_identity")
+        or event.get("actor") != prepared.get("actor")
+        or event.get("reason") != prepared.get("reason")
+        or event.get("recorded_at") != prepared.get("prepared_at")
+        or event.get("previous_identity_record_id")
+        != prepared.get("predecessor_record_id")
+        or prepared.get("predecessor_generation") is not None
+        or event.get("previous_event_id") != prepared.get("previous_event_id")
+        or event_id != digest_json(material)
+    ):
+        raise ConfigurationError("execution-kernel transition event is invalid")
+    return prepared
+
+
+def _ensure_kernel_transition_immutable(
+    authority_dir: Path, prepared: Mapping[str, object]
+) -> None:
+    path = authority_dir / KERNEL_TRANSITION_DIRECTORY / (
+        str(prepared["transition_id"]).removeprefix("sha256:")
+        + ".p"
+    )
+    exclusive_write_json_or_identical(path, prepared)
+    if read_strict_canonical_json(
+        path, label="immutable kernel transition PREPARED receipt"
+    ) != prepared:
+        raise ConfigurationError("immutable kernel transition receipt changed")
+
+
+def _prepare_execution_kernel_transition(
+    execution_dir: Path,
+    successor: Mapping[str, object],
+    *,
+    predecessor: Mapping[str, object] | None,
+    history: Sequence[Mapping[str, object]],
+    actor: str,
+    reason: str,
+    recorded_at: str,
+) -> Mapping[str, object]:
+    event = _execution_kernel_generation_event(
+        successor,
+        actor=actor,
+        reason=reason,
+        recorded_at=recorded_at,
+        history=history,
+    )
+    prepared = _prepare_kernel_transition(
+        execution_dir,
+        kind=EXECUTION_KERNEL_TRANSITION_KIND,
+        authority_plane="EXECUTION",
+        predecessor_record_id=(
+            predecessor.get("record_id") if predecessor is not None else None
+        ),
+        predecessor_generation=None,
+        previous_event_id=history[-1].get("event_id") if history else None,
+        successor_identity=successor,
+        history_event=event,
+        actor=actor,
+        reason=reason,
+        prepared_at=recorded_at,
+        identity_validator=_validate_execution_identity_document,
+    )
+    return _validate_execution_kernel_transition(prepared)
+
+
+def _finish_execution_kernel_transition(
+    execution_dir: Path,
+    identity_path: Path,
+    prepared: Mapping[str, object],
+) -> Mapping[str, object]:
+    prepared = _validate_execution_kernel_transition(prepared)
+    _ensure_kernel_transition_immutable(execution_dir, prepared)
+    _repair_or_append_prepared_kernel_event(
+        execution_dir / "execution-kernel-history.jsonl",
+        prepared,
+        validate_prefix=lambda raw: _execution_kernel_history(
+            execution_dir, raw_override=raw
+        ),
+    )
+    successor = _validate_execution_identity_document(
+        prepared["successor_identity"]
+    )
+    atomic_write_json(identity_path, successor)
+    installed = _validate_execution_identity_document(
+        read_strict_canonical_json(
+            identity_path,
+            label="execution-kernel successor identity",
+            expected_fields=EXECUTION_IDENTITY_FIELDS,
+        )
+    )
+    if installed != successor:
+        raise ConfigurationError("execution-kernel successor projection changed")
+    _complete_kernel_transition(execution_dir, prepared)
+    return installed
+
+
+def _repair_or_append_prepared_kernel_event(
+    history_path: Path,
+    prepared: Mapping[str, object],
+    *,
+    validate_prefix: Callable[[bytes], Sequence[Mapping[str, object]]],
+) -> tuple[Mapping[str, object], ...]:
+    """Install exactly the PREPARED event, recovering only its exact torn bytes."""
+
+    event = prepared["history_event"]
+    if not isinstance(event, Mapping):
+        raise ConfigurationError("kernel transition has no history event")
+    candidate = _canonical_jsonl_payload(event)
+    recovery_dir = history_path.parent / KERNEL_TRANSITION_RECOVERY_DIRECTORY
+    if recovery_dir.exists() or _is_link_like(recovery_dir):
+        _reject_link_components(
+            recovery_dir, label="kernel transition recovery directory"
+        )
+        if not recovery_dir.is_dir():
+            raise ConfigurationError(
+                "kernel transition recovery path is not a directory"
+            )
+        for receipt_path in sorted(recovery_dir.glob("*.r")):
+            receipt = read_strict_canonical_json(
+                receipt_path, label="kernel transition torn-tail receipt"
+            )
+            fields = {
+                "schema_version",
+                "kind",
+                "transition_id",
+                "prepared_record_id",
+                "history_path",
+                "prefix_digest",
+                "tail_digest",
+                "tail_bytes",
+                "archive_path",
+                "record_id",
+            }
+            receipt_material = (
+                dict(receipt) if isinstance(receipt, Mapping) else {}
+            )
+            receipt_record_id = receipt_material.pop("record_id", None)
+            tail_digest = receipt.get("tail_digest") if isinstance(receipt, Mapping) else None
+            expected_archive = (
+                KERNEL_TRANSITION_RECOVERY_DIRECTORY
+                + "/"
+                + str(tail_digest).removeprefix("sha256:")
+                + ".b"
+            )
+            expected_receipt_id = digest_json(
+                {
+                    "kind": "hive-mind-kernel-transition-tail-evidence-v1",
+                    "transition_id": receipt.get("transition_id"),
+                    "tail_digest": tail_digest,
+                }
+            )
+            if (
+                not isinstance(receipt, Mapping)
+                or set(receipt) != fields
+                or receipt.get("schema_version") != 1
+                or receipt.get("kind")
+                != "hive-mind-kernel-transition-torn-tail-recovery-v1"
+                or AUTHORITY_ID.fullmatch(str(receipt.get("transition_id"))) is None
+                or AUTHORITY_ID.fullmatch(
+                    str(receipt.get("prepared_record_id"))
+                )
+                is None
+                or receipt.get("history_path") != history_path.name
+                or AUTHORITY_ID.fullmatch(str(receipt.get("prefix_digest"))) is None
+                or AUTHORITY_ID.fullmatch(str(tail_digest)) is None
+                or type(receipt.get("tail_bytes")) is not int
+                or int(receipt["tail_bytes"]) < 1
+                or receipt.get("archive_path") != expected_archive
+                or receipt_record_id != digest_json(receipt_material)
+                or receipt_path.name
+                != expected_receipt_id.removeprefix("sha256:") + ".r"
+            ):
+                raise ConfigurationError(
+                    "kernel transition torn-tail receipt is invalid"
+                )
+            archive_path = history_path.parent / expected_archive
+            archived = _read_regular_authority_bytes(
+                archive_path, label="kernel transition torn-tail evidence"
+            )
+            if (
+                "sha256:" + sha256(archived).hexdigest() != tail_digest
+                or len(archived) != receipt["tail_bytes"]
+            ):
+                raise ConfigurationError(
+                    "kernel transition torn-tail evidence changed"
+                )
+            same_transition = receipt.get("transition_id") == prepared.get(
+                "transition_id"
+            )
+            if same_transition and (
+                receipt.get("prepared_record_id") != prepared.get("record_id")
+                or not candidate[:-1].startswith(archived)
+            ):
+                raise ConfigurationError(
+                    "kernel transition torn-tail evidence conflicts with PREPARED bytes"
+                )
+    raw = (
+        _read_regular_authority_bytes(history_path, label="kernel generation history")
+        if history_path.exists() or _is_link_like(history_path)
+        else b""
+    )
+    prefix = raw
+    tail = b""
+    if raw and not raw.endswith(b"\n"):
+        split = raw.rfind(b"\n") + 1
+        prefix, tail = raw[:split], raw[split:]
+    prefix_records = tuple(validate_prefix(prefix))
+    previous_event_id = (
+        prefix_records[-1].get("event_id") if prefix_records else None
+    )
+    expected_previous = prepared.get("previous_event_id")
+    if previous_event_id != expected_previous:
+        # A complete exact candidate is an idempotent append receipt.
+        if (
+            not tail
+            and prefix_records
+            and prefix_records[-1].get("event_id") == event.get("event_id")
+        ):
+            return prefix_records
+        raise ConfigurationError(
+            "kernel transition history head differs from its PREPARED predecessor"
+        )
+    # Authenticate the complete prospective ledger before touching the torn
+    # bytes.  This runs the full state-machine reducer, including retired-kernel
+    # replay and legacy-evidence checks, so a self-sealed but semantically
+    # impossible PREPARED pointer cannot corrupt a valid prefix.
+    candidate_records = tuple(validate_prefix(prefix + candidate))
+    if (
+        len(candidate_records) != len(prefix_records) + 1
+        or candidate_records[-1].get("event_id") != event.get("event_id")
+    ):
+        raise ConfigurationError(
+            "kernel transition candidate does not extend the authenticated history"
+        )
+    if tail:
+        candidate_without_newline = candidate[:-1]
+        if not candidate_without_newline.startswith(tail):
+            raise ConfigurationError(
+                "kernel history torn bytes do not belong to the PREPARED event"
+            )
+        tail_digest = "sha256:" + sha256(tail).hexdigest()
+        archive_path = recovery_dir / (
+            tail_digest.removeprefix("sha256:") + ".b"
+        )
+        exclusive_write_bytes_or_identical(archive_path, tail)
+        receipt_material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "hive-mind-kernel-transition-torn-tail-recovery-v1",
+            "transition_id": prepared["transition_id"],
+            "prepared_record_id": prepared["record_id"],
+            "history_path": history_path.name,
+            "prefix_digest": "sha256:" + sha256(prefix).hexdigest(),
+            "tail_digest": tail_digest,
+            "tail_bytes": len(tail),
+            "archive_path": str(archive_path.relative_to(history_path.parent)).replace(
+                "\\", "/"
+            ),
+        }
+        receipt = {
+            **receipt_material,
+            "record_id": digest_json(receipt_material),
+        }
+        recovery_receipt_id = digest_json(
+            {
+                "kind": "hive-mind-kernel-transition-tail-evidence-v1",
+                "transition_id": prepared["transition_id"],
+                "tail_digest": tail_digest,
+            }
+        )
+        exclusive_write_json_or_identical(
+            recovery_dir / (recovery_receipt_id.removeprefix("sha256:") + ".r"),
+            receipt,
+        )
+        _truncate_authenticated_authority_file(
+            history_path, expected=raw, prefix=prefix
+        )
+    _append_canonical_jsonl(history_path, event)
+    installed = tuple(validate_prefix(_read_regular_authority_bytes(
+        history_path, label="kernel generation history"
+    )))
+    if not installed or installed[-1].get("event_id") != event.get("event_id"):
+        raise ConfigurationError("kernel transition history append was not durable")
+    return installed
+
+
+def _complete_kernel_transition(
+    authority_dir: Path,
+    prepared: Mapping[str, object],
+) -> Mapping[str, object]:
+    complete_material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": KERNEL_TRANSITION_COMPLETE_KIND,
+        "authority_plane": prepared["authority_plane"],
+        "transition_id": prepared["transition_id"],
+        "prepared_record_id": prepared["record_id"],
+        "successor_identity_record_id": prepared["successor_identity"]["record_id"],
+        "history_event_id": prepared["history_event"]["event_id"],
+        "completed_at": prepared["prepared_at"],
+    }
+    complete = {**complete_material, "record_id": digest_json(complete_material)}
+    complete_path = authority_dir / KERNEL_TRANSITION_DIRECTORY / (
+        str(prepared["transition_id"]).removeprefix("sha256:") + ".c"
+    )
+    exclusive_write_json_or_identical(complete_path, complete)
+    pointer_path = authority_dir / KERNEL_TRANSITION_POINTER
+    installed_pointer = read_strict_canonical_json(
+        pointer_path, label="kernel transition PREPARED pointer"
+    )
+    if installed_pointer != prepared:
+        raise ConfigurationError("kernel transition pointer changed before completion")
+    pointer_path.unlink()
+    _fsync_parent_directory(pointer_path.parent)
+    return complete
 
 
 def execution_namespace_dir(
@@ -1227,6 +2191,17 @@ def require_execution_namespace(
         or record_id != digest_json(material)
     ):
         raise ConfigurationError("execution namespace identity digest is invalid")
+    _validate_execution_identity_document(installed)
+    transition_path = directory / KERNEL_TRANSITION_POINTER
+    if transition_path.exists() or _is_link_like(transition_path):
+        raise ConfigurationError(
+            "execution-kernel transition is PREPARED; retry the exact upgrade"
+        )
+    history = _execution_kernel_history(directory)
+    if not history or history[-1].get("identity") != installed:
+        raise ConfigurationError(
+            "execution namespace identity has no exact append-only kernel generation"
+        )
     if installed != expected:
         raise ConfigurationError(
             "execution namespace name is already bound to another target or plan"
@@ -1323,6 +2298,17 @@ def require_execution_authority_dir(
         ).encode("utf-8")
     ):
         raise ConfigurationError("execution authority identity is invalid")
+    _validate_execution_identity_document(value)
+    transition_path = supplied / KERNEL_TRANSITION_POINTER
+    if transition_path.exists() or _is_link_like(transition_path):
+        raise ConfigurationError(
+            "execution-kernel transition is PREPARED; ordinary writers are fenced"
+        )
+    history = _execution_kernel_history(supplied)
+    if not history or history[-1].get("identity") != value:
+        raise ConfigurationError(
+            "execution authority identity differs from its kernel history"
+        )
     repository_identity = runtime_repository_identity(repo_root)
     if repository_identity is None or any(
         value.get(field) != repository_identity.get(expected_field)
@@ -1373,8 +2359,27 @@ def assert_execution_authority_open(execution_dir: str | Path) -> None:
 def initialize_execution_namespace(
     coordination_dir: str | Path,
     expected: Mapping[str, object],
+    *,
+    actor: str = "execution-namespace-initialize",
+    initialized_at: str | None = None,
 ) -> Path:
-    """Explicitly publish one execution identity under global arbiter authority."""
+    """Explicitly publish one execution identity and its writer generation.
+
+    The history append precedes the replaceable current projection.  A crash in
+    that interval is recovered by adopting the one exact pending genesis event;
+    ordinary readers refuse the incomplete pair and never lazily manufacture it.
+    """
+
+    identity = _validate_execution_identity_document(expected)
+    if not isinstance(actor, str) or not actor.strip():
+        raise ConfigurationError("execution namespace initialization actor is required")
+    recorded_at = initialized_at or format_time(utc_now())
+    try:
+        parse_time(recorded_at)
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError(
+            "execution namespace initialization time is invalid"
+        ) from error
 
     root = _reject_link_components(
         coordination_dir, label="repository runtime root"
@@ -1384,32 +2389,925 @@ def initialize_execution_namespace(
         raise ConfigurationError(
             "execution namespace initialization requires global arbiter authority"
         )
-    execution_id = expected.get("execution_id")
+    execution_id = identity.get("execution_id")
     if not isinstance(execution_id, str):
         raise ConfigurationError("execution namespace identity is malformed")
     directory = execution_namespace_dir(root, execution_id)
     identity_path = directory / "execution-identity.json"
-    if identity_path.exists() or _is_link_like(identity_path):
-        _reject_link_components(identity_path, label="execution identity")
-        installed = read_json(identity_path)
-        if installed != expected:
-            raise ConfigurationError(
-                "execution namespace name is already bound to another target or plan"
-            )
-    else:
-        exclusive_write_json_or_identical(identity_path, expected)
+    # Materialize every declared lock before publishing authority.  They are
+    # acquired only one at a time under the outer arbiter lock, so their tuple
+    # ranks cannot invert one another during explicit initialization.
     for lock_name in EXECUTION_LOCKS:
         with runtime_file_lock(directory / "locks" / lock_name):
             pass
-    return require_execution_namespace(root, expected)
+    with runtime_file_lock(directory / "locks" / "dispatcher-admission.lock"):
+        installed: Mapping[str, object] | None = None
+        if identity_path.exists() or _is_link_like(identity_path):
+            installed = read_strict_canonical_json(
+                identity_path,
+                label="execution namespace identity",
+                expected_fields=EXECUTION_IDENTITY_FIELDS,
+            )
+            installed = _validate_execution_identity_document(installed)
+            if installed != identity:
+                raise ConfigurationError(
+                    "execution namespace name is already bound to another target or plan"
+                )
+        pending_path = directory / KERNEL_TRANSITION_POINTER
+        pending: Mapping[str, object] | None = None
+        if pending_path.exists() or _is_link_like(pending_path):
+            pending = _validate_execution_kernel_transition(
+                read_strict_canonical_json(
+                    pending_path,
+                    label="execution namespace pending kernel transition",
+                )
+            )
+            if (
+                pending.get("predecessor_record_id") is not None
+                or pending.get("successor_identity") != identity
+                or pending.get("actor") != actor.strip()
+                or pending.get("reason")
+                != "initial execution-kernel writer generation"
+            ):
+                raise ConfigurationError(
+                    "execution namespace pending initialization differs from this retry"
+                )
+            installed = _finish_execution_kernel_transition(
+                directory, identity_path, pending
+            )
+        history = _execution_kernel_history(directory)
+        if history:
+            # An installed namespace may legitimately have any number of
+            # append-only kernel generations.  Only an absent current
+            # projection is the genesis crash boundary, in which case exactly
+            # one history row may be adopted.
+            if history[-1].get("identity") != identity or (
+                installed is None and len(history) != 1
+            ):
+                raise ConfigurationError(
+                    "execution namespace kernel history conflicts with initialization"
+                )
+        else:
+            if installed is not None:
+                raise ConfigurationError(
+                    "execution namespace identity has no append-only kernel provenance"
+                )
+            pending = _prepare_execution_kernel_transition(
+                directory,
+                identity,
+                predecessor=None,
+                history=history,
+                actor=actor.strip(),
+                reason="initial execution-kernel writer generation",
+                recorded_at=recorded_at,
+            )
+            installed = _finish_execution_kernel_transition(
+                directory, identity_path, pending
+            )
+        if installed is None:
+            atomic_write_json(identity_path, identity)
+    return require_execution_namespace(root, identity)
+
+
+def _validate_publication_authority_cut(
+    value: object,
+) -> tuple[Mapping[str, object], Mapping[str, object]]:
+    """Authenticate the exact publication projection and embedded transaction."""
+
+    if not isinstance(value, Mapping) or set(value) != PUBLICATION_RESOURCE_FIELDS:
+        raise ConfigurationError("publication reservation exact schema is invalid")
+    resource_material = dict(value)
+    resource_record_id = resource_material.pop("record_id", None)
+    transaction = value.get("transaction")
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != PUBLICATION_RESERVATION_KIND
+        or AUTHORITY_ID.fullmatch(str(resource_record_id)) is None
+        or resource_record_id != digest_json(resource_material)
+        or not isinstance(transaction, Mapping)
+        or set(transaction) != PUBLICATION_TRANSACTION_FIELDS
+    ):
+        raise ConfigurationError("publication reservation seal is invalid")
+    transaction_material = dict(transaction)
+    transaction_record_id = transaction_material.pop("record_id", None)
+    status = transaction.get("status")
+    if (
+        transaction.get("schema_version") != 1
+        or transaction.get("kind") != PUBLICATION_TRANSACTION_KIND
+        or status not in PUBLICATION_ACTIVE_STATUSES | PUBLICATION_TERMINAL_STATUSES
+        or AUTHORITY_ID.fullmatch(str(transaction_record_id)) is None
+        or transaction_record_id != digest_json(transaction_material)
+        or any(
+            AUTHORITY_ID.fullmatch(str(transaction.get(field))) is None
+            for field in (
+                "transaction_key",
+                "transaction_id",
+                "execution_id",
+                "release_id",
+                "authority_digest",
+                "authority_baseline_digest",
+                "receipt_heads_digest",
+                "transaction_lease_id",
+            )
+        )
+        or not isinstance(transaction.get("execution_namespace"), str)
+        or EXECUTION_NAMESPACE.fullmatch(
+            str(transaction["execution_namespace"])
+        )
+        is None
+        or type(transaction.get("attempt_epoch")) is not int
+        or int(transaction["attempt_epoch"]) < 1
+        or not isinstance(transaction.get("repository"), str)
+        or not str(transaction["repository"]).strip()
+        or not isinstance(transaction.get("target_branch"), str)
+        or not str(transaction["target_branch"]).strip()
+        or FULL_SHA.fullmatch(str(transaction.get("expected_target_sha"))) is None
+        or not isinstance(transaction.get("actor"), str)
+        or not str(transaction["actor"]).strip()
+        or not isinstance(transaction.get("detail"), str)
+    ):
+        raise ConfigurationError("publication transaction is invalid")
+    for field in ("reserved_at", "updated_at", "lease_expires_at"):
+        try:
+            parse_time(transaction.get(field))
+        except (TypeError, ValueError) as error:
+            raise ConfigurationError(
+                "publication transaction time is invalid"
+            ) from error
+    if status in PUBLICATION_TERMINAL_STATUSES:
+        try:
+            parse_time(transaction.get("completed_at"))
+        except (TypeError, ValueError) as error:
+            raise ConfigurationError(
+                "terminal publication transaction lacks completion time"
+            ) from error
+    elif transaction.get("completed_at") is not None:
+        raise ConfigurationError(
+            "active publication transaction claims terminal completion"
+        )
+    expected_resource = {
+        "status": transaction["status"],
+        "transaction_id": transaction["transaction_id"],
+        "execution_id": transaction["execution_id"],
+        "release_id": transaction["release_id"],
+        "repository": transaction["repository"],
+        "target_branch": transaction["target_branch"],
+        "expected_target_sha": transaction["expected_target_sha"],
+        "expires_at": transaction["lease_expires_at"],
+        "outcome": transaction["outcome"],
+    }
+    if any(value.get(field) != expected for field, expected in expected_resource.items()):
+        raise ConfigurationError(
+            "publication reservation differs from its embedded transaction"
+        )
+    return dict(value), dict(transaction)
+
+
+def _execution_kernel_upgrade_activity_unlocked(
+    repo_root: Path,
+    coordination_dir: Path,
+    execution_dir: Path,
+    identity: Mapping[str, object],
+    *,
+    host_runtime_dir: Path,
+) -> tuple[str, ...]:
+    """Return exact zero-activity blockers while all authority locks are held."""
+
+    from orchestration import (
+        _active_binding_events_unlocked,
+        _validate_binding_event_schema,
+        _validate_binding_replay,
+    )
+    from sidecar_execution import (
+        ACTIVE_SIDECAR_STATES,
+        _validate_sidecar_replay,
+    )
+    from sidecar_execution import (
+        _validate_event_schema as _validate_sidecar_event_schema,
+    )
+
+    blockers: list[str] = []
+    execution_id = str(identity["execution_id"])
+    global_active = tuple(
+        item
+        for item in active_global_host_reservations(host_runtime_dir)
+        if item.get("repository") == identity.get("repository")
+        and item.get("execution_id") == execution_id
+    )
+    if global_active:
+        blockers.append("GLOBAL_HOST_RESERVATION")
+    scheduler_events = _host_scheduler_events_unlocked(host_runtime_dir)
+    if scheduler_events:
+        scheduler = _host_scheduler_projection_unlocked(
+            host_runtime_dir,
+            host_id=str(scheduler_events[-1]["host_id"]),
+        )
+        if any(
+            demand.get("execution_id") == execution_id
+            and scheduler["remaining_candidates"].get(demand_id)
+            for demand_id, demand in scheduler["demands"].items()
+        ):
+            blockers.append("HOST_SCHEDULER_DEMAND")
+        if any(
+            grant.get("execution_id") == execution_id
+            for grant in scheduler["outstanding_grants"].values()
+        ):
+            blockers.append("HOST_SCHEDULER_GRANT")
+
+    binding_records = strict_jsonl_records(
+        execution_dir / "task-bindings.jsonl",
+        label="execution-kernel upgrade task binding ledger",
+    )
+    for index, event in enumerate(binding_records, 1):
+        _validate_binding_event_schema(event, index)
+    _validate_binding_replay(binding_records)
+    if _active_binding_events_unlocked(binding_records):
+        blockers.append("ACTIVE_LAUNCH_BINDING")
+    binding_instruction_ids = {
+        str(event["launch_instruction_id"]) for event in binding_records
+    }
+
+    dispatcher_release_path = execution_dir / "dispatcher-release.json"
+    if dispatcher_release_path.exists() or _is_link_like(dispatcher_release_path):
+        release = read_strict_canonical_json(
+            dispatcher_release_path,
+            label="execution-kernel upgrade dispatcher release",
+            expected_fields=DISPATCH_RELEASE_FIELDS,
+        )
+        release_material = dict(release)
+        release_id = release_material.pop("release_id", None)
+        if (
+            release.get("schema_version") != 1
+            or release.get("kind") != "hive-mind-autopilot-dispatch-release-v1"
+            or release.get("execution_id") != execution_id
+            or release.get("execution_namespace") != identity.get("namespace")
+            or release.get("repository") != identity.get("repository")
+            or release.get("target_branch") != identity.get("target_branch")
+            or release.get("plan_fingerprint") != identity.get("plan_fingerprint")
+            or release_id != digest_json(release_material)
+        ):
+            raise ConfigurationError(
+                "execution-kernel upgrade dispatcher release is invalid"
+            )
+        blockers.append("DISPATCH_RELEASE_AUTHORITY")
+
+    dispatcher_admission_path = execution_dir / "dispatcher-admission.json"
+    if dispatcher_admission_path.exists() or _is_link_like(
+        dispatcher_admission_path
+    ):
+        admission = read_strict_canonical_json(
+            dispatcher_admission_path,
+            label="execution-kernel upgrade dispatcher admission",
+        )
+        common_fields = {
+            "schema_version",
+            "kind",
+            "status",
+            "execution_namespace",
+            "execution_id",
+            "admission_epoch",
+            "release_id",
+            "repository",
+            "target_branch",
+            "target_sha",
+            "target_generation",
+            "target_watermark_record_id",
+            "plan_fingerprint",
+            "github_snapshot_digest",
+            "reconciliation_digest",
+            "snapshot_observation_id",
+            "snapshot_observation_epoch",
+            "snapshot_observation_record_id",
+            "host_id",
+            "capacity_generation",
+            "capacity_epoch",
+            "capacity_record_id",
+            "session_cap",
+            "generation_id",
+            "recorded_at",
+        }
+        if admission.get("status") == "INVALIDATED":
+            common_fields |= {"actor", "reason", "observed_target_sha"}
+        admission_material = dict(admission)
+        generation_id = admission_material.pop("generation_id", None)
+        status = admission.get("status")
+        release_id = admission.get("release_id")
+        snapshot_digest = admission.get("github_snapshot_digest")
+        reconciliation_digest = admission.get("reconciliation_digest")
+        capacity_values = (
+            admission.get("host_id"),
+            admission.get("capacity_generation"),
+            admission.get("capacity_epoch"),
+            admission.get("capacity_record_id"),
+            admission.get("session_cap"),
+        )
+        observation_values = (
+            admission.get("snapshot_observation_id"),
+            admission.get("snapshot_observation_epoch"),
+            admission.get("snapshot_observation_record_id"),
+        )
+        semantic_invalid = (
+            type(admission.get("admission_epoch")) is not int
+            or int(admission.get("admission_epoch", 0)) < 1
+            or (
+                release_id is not None
+                and AUTHORITY_ID.fullmatch(str(release_id)) is None
+            )
+            or not isinstance(admission.get("repository"), str)
+            or not str(admission.get("repository", "")).strip()
+            or not isinstance(admission.get("target_branch"), str)
+            or not str(admission.get("target_branch", "")).strip()
+            or FULL_SHA.fullmatch(str(admission.get("target_sha"))) is None
+            or type(admission.get("target_generation")) is not int
+            or int(admission.get("target_generation", 0)) < 1
+            or AUTHORITY_ID.fullmatch(
+                str(admission.get("target_watermark_record_id"))
+            )
+            is None
+            or AUTHORITY_ID.fullmatch(str(admission.get("plan_fingerprint")))
+            is None
+            or (
+                snapshot_digest is not None
+                and AUTHORITY_ID.fullmatch(str(snapshot_digest)) is None
+            )
+            or (
+                reconciliation_digest is not None
+                and AUTHORITY_ID.fullmatch(str(reconciliation_digest)) is None
+            )
+            or (
+                status == "ACTIVE"
+                and (snapshot_digest is None or reconciliation_digest is None)
+            )
+            or (
+                (status == "ACTIVE" or any(item is not None for item in capacity_values))
+                and (
+                    not isinstance(capacity_values[0], str)
+                    or not str(capacity_values[0]).strip()
+                    or AUTHORITY_ID.fullmatch(str(capacity_values[1])) is None
+                    or type(capacity_values[2]) is not int
+                    or int(capacity_values[2]) < 1
+                    or AUTHORITY_ID.fullmatch(str(capacity_values[3])) is None
+                    or type(capacity_values[4]) is not int
+                    or int(capacity_values[4]) < 1
+                )
+            )
+            or (
+                (status == "ACTIVE" or any(item is not None for item in observation_values))
+                and (
+                    AUTHORITY_ID.fullmatch(str(observation_values[0])) is None
+                    or type(observation_values[1]) is not int
+                    or int(observation_values[1]) < 1
+                    or AUTHORITY_ID.fullmatch(str(observation_values[2])) is None
+                )
+            )
+        )
+        if status == "INVALIDATED":
+            semantic_invalid = semantic_invalid or (
+                not isinstance(admission.get("actor"), str)
+                or not str(admission.get("actor", "")).strip()
+                or not isinstance(admission.get("reason"), str)
+                or not str(admission.get("reason", "")).strip()
+                or FULL_SHA.fullmatch(
+                    str(admission.get("observed_target_sha"))
+                )
+                is None
+                or admission.get("observed_target_sha")
+                != admission.get("target_sha")
+            )
+        try:
+            parse_time(admission.get("recorded_at"))
+        except (TypeError, ValueError):
+            semantic_invalid = True
+        if (
+            set(admission) != common_fields
+            or admission.get("schema_version") != 1
+            or admission.get("kind")
+            != "hive-mind-shared-dispatch-admission-v1"
+            or status not in {"ACTIVE", "INVALIDATED"}
+            or admission.get("execution_id") != execution_id
+            or admission.get("execution_namespace") != identity.get("namespace")
+            or admission.get("repository") != identity.get("repository")
+            or admission.get("target_branch") != identity.get("target_branch")
+            or admission.get("plan_fingerprint") != identity.get("plan_fingerprint")
+            or generation_id != digest_json(admission_material)
+            or semantic_invalid
+        ):
+            raise ConfigurationError(
+                "execution-kernel upgrade dispatcher admission is invalid"
+            )
+        if status == "ACTIVE":
+            blockers.append("DISPATCH_ADMISSION_AUTHORITY")
+
+    attended_path = execution_dir / "host" / "attended-threads.json"
+    if attended_path.exists() or _is_link_like(attended_path):
+        from attended_host import AttendedCodexHost, AttendedHostError
+
+        class _AttendedExecutionPlane:
+            pass
+
+        attended_plane = _AttendedExecutionPlane()
+        attended_plane.repo_root = repo_root
+        attended_plane.state_dir = execution_dir
+        attended_plane.coordination_dir = coordination_dir
+        attended_plane.execution_dir = execution_dir
+        attended_host = AttendedCodexHost(attended_plane)
+        try:
+            attended, _migrated, _cards = attended_host._ledger_unlocked(
+                allow_legacy=False
+            )
+        except (AttendedHostError, OSError) as error:
+            raise ConfigurationError(
+                f"execution-kernel upgrade attended authority is invalid: {error}"
+            ) from error
+        for instruction_id, entry in attended.items():
+            if (
+                AUTHORITY_ID.fullmatch(str(instruction_id)) is None
+                or not isinstance(entry, Mapping)
+            ):
+                raise ConfigurationError(
+                    "execution-kernel upgrade attended registry is invalid"
+                )
+            if str(instruction_id) not in binding_instruction_ids:
+                blockers.append("ATTENDED_HOST_AUTHORITY")
+                break
+
+    sidecar_records = strict_jsonl_records(
+        execution_dir / "sidecar-bindings.jsonl",
+        label="execution-kernel upgrade sidecar ledger",
+    )
+    for index, event in enumerate(sidecar_records, 1):
+        _validate_sidecar_event_schema(event, index)
+    _validate_sidecar_replay(sidecar_records)
+    latest_sidecars: dict[str, Mapping[str, object]] = {}
+    for event in sidecar_records:
+        latest_sidecars[str(event["sidecar_id"])] = event
+    if any(
+        event.get("state") in ACTIVE_SIDECAR_STATES
+        for event in latest_sidecars.values()
+    ):
+        blockers.append("ACTIVE_SIDECAR_BINDING")
+
+    if execution_host_effect_obligations(execution_dir):
+        blockers.append("HOST_EFFECT_RECOVERY_REQUIRED")
+
+    claims_dir = coordination_dir / "arbiter" / "claims"
+    if claims_dir.exists() or _is_link_like(claims_dir):
+        _reject_link_components(claims_dir, label="execution-kernel upgrade claims")
+        if not claims_dir.is_dir():
+            raise ConfigurationError("claim authority directory is not a directory")
+        for path in sorted(claims_dir.iterdir(), key=lambda item: item.name):
+            if not path.is_file() or path.suffix != ".json":
+                raise ConfigurationError(
+                    "claim authority directory contains an unclassified entry"
+                )
+            claim, _expires, _raw = read_claim_authority_file(path)
+            if claim.get("execution_id") == execution_id:
+                blockers.append("CLAIM_AUTHORITY")
+                break
+
+    validation_key = digest_json(
+        {
+            "kind": "hive-mind-validation-resource-key-v1",
+            "repository": identity["repository"],
+            "repository_transport_digest": identity[
+                "repository_transport_digest"
+            ],
+            "target_branch": identity["target_branch"],
+        }
+    )
+    validation_path = (
+        coordination_dir
+        / "arbiter"
+        / "validation-leases"
+        / (validation_key.removeprefix("sha256:") + ".json")
+    )
+    if validation_path.exists() or _is_link_like(validation_path):
+        # A keyed lease may protect a peer execution on the same target.  It is
+        # still activity for this zero-activity writer transition and must be
+        # terminalized by its normal recovery path first.
+        read_strict_canonical_json(
+            validation_path, label="execution-kernel upgrade validation lease"
+        )
+        blockers.append("VALIDATION_AUTHORITY")
+
+    publication_key = digest_json(
+        {
+            "kind": "hive-mind-publication-resource-v1",
+            "repository": identity["repository"],
+            "target_branch": identity["target_branch"],
+        }
+    )
+    publication_path = (
+        coordination_dir
+        / "arbiter"
+        / "publication-reservations"
+        / (publication_key.removeprefix("sha256:") + ".json")
+    )
+    if publication_path.exists() or _is_link_like(publication_path):
+        publication = read_strict_canonical_json(
+            publication_path,
+            label="execution-kernel upgrade publication reservation",
+        )
+        publication, transaction = _validate_publication_authority_cut(publication)
+        if (
+            transaction.get("execution_id") == execution_id
+            and publication.get("status") in PUBLICATION_ACTIVE_STATUSES
+        ):
+            blockers.append("PUBLICATION_AUTHORITY")
+
+    terminal_fence = execution_dir / "plan-terminal-fence.json"
+    if terminal_fence.exists() or _is_link_like(terminal_fence):
+        read_strict_canonical_json(
+            terminal_fence, label="execution-kernel upgrade terminal fence"
+        )
+        blockers.append("PLAN_TERMINAL_FENCE")
+    return tuple(sorted(set(blockers)))
+
+
+def upgrade_execution_namespace_kernel(
+    repo_root: str | Path,
+    coordination_dir: str | Path,
+    *,
+    host_runtime_dir: str | Path,
+    execution_namespace: str,
+    execution_id: str,
+    actor: str,
+    reason: str,
+    expected_identity_record_id: str,
+    upgraded_at: str | None = None,
+) -> Mapping[str, object]:
+    """CAS-install this checkout's execution kernel at a strict zero-activity cut."""
+
+    if EXECUTION_NAMESPACE.fullmatch(execution_namespace) is None:
+        raise ConfigurationError("execution-kernel upgrade namespace is invalid")
+    if AUTHORITY_ID.fullmatch(execution_id) is None:
+        raise ConfigurationError("execution-kernel upgrade id is invalid")
+    if AUTHORITY_ID.fullmatch(expected_identity_record_id) is None:
+        raise ConfigurationError("execution-kernel upgrade identity CAS is invalid")
+    if not isinstance(actor, str) or not actor.strip():
+        raise ConfigurationError("execution-kernel upgrade actor is required")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ConfigurationError("execution-kernel upgrade reason is required")
+    recorded_at = upgraded_at or format_time(utc_now())
+    try:
+        parse_time(recorded_at)
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError("execution-kernel upgrade time is invalid") from error
+
+    root = _reject_link_components(repo_root, label="repository root").resolve()
+    supplied_coordination = _reject_link_components(
+        coordination_dir, label="repository runtime root"
+    ).resolve()
+    canonical_coordination = resolve_repository_state_dir(root)
+    if supplied_coordination != canonical_coordination:
+        raise ConfigurationError("execution-kernel upgrade selected a peer runtime root")
+    ensure_repository_runtime_identity(root, supplied_coordination, create=False)
+    host_root = require_host_runtime(host_runtime_dir)
+    execution_dir = execution_namespace_dir(supplied_coordination, execution_id)
+    identity_path = execution_dir / "execution-identity.json"
+    if not identity_path.is_file() or _is_link_like(identity_path):
+        raise ConfigurationError("execution namespace is absent")
+    required_locks = tuple(execution_dir / "locks" / name for name in EXECUTION_LOCKS)
+    if any(not path.is_file() or _is_link_like(path) for path in required_locks):
+        raise ConfigurationError("execution namespace lock set is incomplete")
+
+    with runtime_file_lock(host_root / "locks" / "host-authority.lock", timeout_seconds=120.0):
+        # Freshly validate the host writer after acquiring its authority.
+        _host_runtime_identity_unlocked(host_root)
+        with runtime_file_lock(
+            supplied_coordination / "arbiter" / "locks" / "arbiter-authority.lock",
+            timeout_seconds=120.0,
+        ):
+            with runtime_file_lock(
+                execution_dir / "locks" / "dispatcher-admission.lock",
+                timeout_seconds=120.0,
+            ):
+                current_value = read_strict_canonical_json(
+                    identity_path,
+                    label="execution-kernel upgrade current identity",
+                    expected_fields=EXECUTION_IDENTITY_FIELDS,
+                )
+                current = _validate_execution_identity_document(current_value)
+                if (
+                    current.get("execution_id") != execution_id
+                    or current.get("namespace") != execution_namespace
+                ):
+                    raise ConfigurationError(
+                        "execution-kernel upgrade identity coordinates changed"
+                    )
+                requested_kernel = runtime_kernel_identity(root)
+                requested_pair = (
+                    str(requested_kernel["bundle_digest"]),
+                    str(requested_kernel["interpreter_policy_digest"]),
+                )
+                pending_path = execution_dir / KERNEL_TRANSITION_POINTER
+                pending: Mapping[str, object] | None = None
+                if pending_path.exists() or _is_link_like(pending_path):
+                    pending = _validate_execution_kernel_transition(
+                        read_strict_canonical_json(
+                            pending_path,
+                            label="pending execution-kernel upgrade",
+                        )
+                    )
+                    pending_successor = pending["successor_identity"]
+                    assert isinstance(pending_successor, Mapping)
+                    if (
+                        pending.get("actor") != actor.strip()
+                        or pending.get("reason") != reason.strip()
+                        or pending.get("predecessor_record_id")
+                        != expected_identity_record_id
+                        or (
+                            str(pending_successor["kernel_bundle_digest"]),
+                            str(pending_successor["interpreter_policy_digest"]),
+                        )
+                        != requested_pair
+                        or current.get("record_id")
+                        not in {
+                            pending.get("predecessor_record_id"),
+                            pending_successor.get("record_id"),
+                        }
+                    ):
+                        raise ConfigurationError(
+                            "pending execution-kernel upgrade differs from this retry"
+                        )
+                    _repair_or_append_prepared_kernel_event(
+                        execution_dir / "execution-kernel-history.jsonl",
+                        pending,
+                        validate_prefix=lambda raw: _execution_kernel_history(
+                            execution_dir, raw_override=raw
+                        ),
+                    )
+                history = _execution_kernel_history(execution_dir)
+                if not history:
+                    raise ConfigurationError(
+                        "execution-kernel upgrade requires an initialized generation history"
+                    )
+                latest_identity = dict(history[-1]["identity"])
+                history_ahead = latest_identity != current
+                if history_ahead:
+                    if (
+                        history[-1].get("previous_identity_record_id")
+                        != current.get("record_id")
+                        or len(history) < 2
+                        or history[-2].get("identity") != current
+                    ):
+                        raise ConfigurationError(
+                            "execution-kernel history is ambiguously ahead of its projection"
+                        )
+                elif history[-1].get("identity") != current:
+                    raise ConfigurationError(
+                        "execution-kernel projection differs from its history"
+                    )
+
+                current_pair = (
+                    str(current["kernel_bundle_digest"]),
+                    str(current["interpreter_policy_digest"]),
+                )
+                if (
+                    current_pair == requested_pair
+                    and not history_ahead
+                    and pending is None
+                ):
+                    exact_current_cas = (
+                        expected_identity_record_id == current.get("record_id")
+                    )
+                    completed_retry_cas = (
+                        expected_identity_record_id
+                        == history[-1].get("previous_identity_record_id")
+                        and history[-1].get("identity") == current
+                        and history[-1].get("actor") == actor.strip()
+                        and history[-1].get("reason") == reason.strip()
+                    )
+                    if not exact_current_cas and not completed_retry_cas:
+                        raise ConfigurationError(
+                            "execution-kernel upgrade identity CAS mismatch"
+                        )
+                    return current
+
+                if pending is not None:
+                    successor = dict(pending["successor_identity"])
+                    if history[-1].get("event_id") != pending[
+                        "history_event"
+                    ].get("event_id"):
+                        raise ConfigurationError(
+                            "pending execution-kernel event is not the history head"
+                        )
+                elif history_ahead:
+                    if (
+                        latest_identity.get("kernel_bundle_digest")
+                        != requested_kernel.get("bundle_digest")
+                        or latest_identity.get("interpreter_policy_digest")
+                        != requested_kernel.get("interpreter_policy_digest")
+                        or history[-1].get("actor") != actor.strip()
+                        or history[-1].get("reason") != reason.strip()
+                        or expected_identity_record_id != current.get("record_id")
+                    ):
+                        raise ConfigurationError(
+                            "pending execution-kernel upgrade differs from this retry"
+                        )
+                    successor = latest_identity
+                else:
+                    if expected_identity_record_id != current.get("record_id"):
+                        raise ConfigurationError(
+                            "execution-kernel upgrade identity CAS mismatch"
+                        )
+                    if any(
+                        (
+                            event["identity"]["kernel_bundle_digest"],
+                            event["identity"]["interpreter_policy_digest"],
+                        )
+                        == requested_pair
+                        for event in history
+                    ):
+                        raise ConfigurationError(
+                            "execution-kernel downgrade or retired-writer replay is prohibited"
+                        )
+                    successor = execution_namespace_identity(
+                        runtime_repository_identity(root) or {},
+                        kernel_identity=requested_kernel,
+                        namespace=execution_namespace,
+                        target_branch=str(current["target_branch"]),
+                        plan_fingerprint=str(current["plan_fingerprint"]),
+                    )
+                    for field in EXECUTION_IDENTITY_FIELDS - {
+                        "kernel_bundle_digest",
+                        "interpreter_policy_digest",
+                        "record_id",
+                    }:
+                        if successor.get(field) != current.get(field):
+                            raise ConfigurationError(
+                                "execution-kernel successor mutates execution identity"
+                            )
+
+                with runtime_file_lock(
+                    execution_dir / "locks" / "task-bindings.lock",
+                    timeout_seconds=120.0,
+                ):
+                    with runtime_file_lock(
+                        execution_dir / "locks" / "sidecar-bindings.lock",
+                        timeout_seconds=120.0,
+                    ):
+                        with runtime_file_lock(
+                            supplied_coordination
+                            / "arbiter"
+                            / "locks"
+                            / "claim-authority.lock",
+                            timeout_seconds=120.0,
+                        ):
+                            with runtime_file_lock(
+                                supplied_coordination
+                                / "arbiter"
+                                / "locks"
+                                / "global-validation-lease.lock",
+                                timeout_seconds=120.0,
+                            ):
+                                with runtime_file_lock(
+                                    execution_dir
+                                    / "locks"
+                                    / "attended-host.lock",
+                                    timeout_seconds=120.0,
+                                ):
+                                    blockers = _execution_kernel_upgrade_activity_unlocked(
+                                        root,
+                                        supplied_coordination,
+                                        execution_dir,
+                                        current,
+                                        host_runtime_dir=host_root,
+                                    )
+                                    if blockers:
+                                        raise ConfigurationError(
+                                            "execution-kernel upgrade requires zero activity: "
+                                            + ", ".join(blockers)
+                                        )
+                                    if pending is not None:
+                                        return _finish_execution_kernel_transition(
+                                            execution_dir, identity_path, pending
+                                        )
+                                    if not history_ahead:
+                                        pending = _prepare_execution_kernel_transition(
+                                            execution_dir,
+                                            successor,
+                                            predecessor=current,
+                                            history=history,
+                                            actor=actor.strip(),
+                                            reason=reason.strip(),
+                                            recorded_at=recorded_at,
+                                        )
+                                        return _finish_execution_kernel_transition(
+                                            execution_dir, identity_path, pending
+                                        )
+                                    atomic_write_json(identity_path, successor)
+                                    return dict(successor)
 
 
 HOST_CAPACITY_KIND = "hive-mind-host-capacity-v1"
 HOST_RESERVATION_EVENT_KIND = "hive-mind-host-reservation-event-v1"
+HOST_SCHEDULER_EVENT_KIND = "hive-mind-host-scheduler-event-v1"
+HOST_SCHEDULER_EVENT_STATES = frozenset({"DEMAND", "GRANT", "EXPIRY"})
 HOST_CAPACITY_HISTORY_KIND = "hive-mind-host-capacity-history-event-v1"
 HOST_RUNTIME_IDENTITY_KIND = "hive-mind-host-runtime-identity-v1"
+HOST_KERNEL_HISTORY_KIND = "hive-mind-host-kernel-generation-event-v1"
+HOST_KERNEL_TRANSITION_KIND = "hive-mind-host-kernel-transition-v1"
+HOST_KERNEL_BUNDLE_KIND = "hive-mind-host-kernel-bundle-v1"
 HOST_PROVIDER_BINDING_KIND = "hive-mind-host-provider-binding-v1"
-HOST_PROVIDER_FIELDS = frozenset(
+HOST_PROVIDER_ATTESTATION_KIND = "hive-mind-host-provider-attestation-v1"
+HOST_RUNTIME_IDENTITY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "machine_user_id",
+        "host_kernel_generation",
+        "host_kernel_epoch",
+        "host_kernel_bundle_digest",
+        "interpreter_policy_digest",
+        "installed_at",
+        "previous_host_kernel_generation",
+        "previous_host_kernel_record_id",
+        "record_id",
+    }
+)
+HOST_KERNEL_HISTORY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "state",
+        "identity",
+        "actor",
+        "reason",
+        "recorded_at",
+        "legacy_predecessor_record_id",
+        "legacy_predecessor_path",
+        "legacy_predecessor_blob_digest",
+        "previous_event_id",
+        "event_id",
+    }
+)
+HOST_PROVIDER_ATTESTATION_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "machine_user_id",
+        "host_id",
+        "provider_identity_source",
+        "provider_identity_material",
+        "provider_identity_digest",
+        "record_id",
+    }
+)
+EXECUTION_ADAPTER_IDENTITY_KIND = "hive-mind-execution-adapter-identity-v1"
+EXECUTION_ADAPTER_IDENTITY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "execution_namespace",
+        "execution_id",
+        "repository",
+        "host_id",
+        "provider_generation",
+        "provider_epoch",
+        "provider_identity_digest",
+        "adapter_identity_kind",
+        "adapter_identity_record_id",
+        "adapter_identity_blob_digest",
+        "adapter_identity_source_path",
+        "record_id",
+    }
+)
+CODEX_APP_SERVER_IDENTITY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "execution_namespace",
+        "execution_id",
+        "host_id",
+        "machine_user_id",
+        "provider_identity_digest",
+        "adapter_module_path",
+        "adapter_module_digest",
+        "launcher_path",
+        "launcher_digest",
+        "cli_module_path",
+        "cli_module_digest",
+        "executable_path",
+        "executable_digest",
+        "executable_version",
+        "schema_bundle_digest",
+        "thread_start_schema_digest",
+        "turn_start_schema_digest",
+        "environment_root_digest",
+        "behavior_environment_digest",
+        "provider_config_digest",
+        "execution_config_digest",
+        "account_identity_digest",
+        "effective_model",
+        "effective_model_provider",
+        "transport",
+        "initialize_result_digest",
+        "created_at",
+        "record_id",
+    }
+)
+HOST_PROVIDER_LEGACY_FIELDS = frozenset(
     {
         "schema_version",
         "kind",
@@ -1425,11 +3323,41 @@ HOST_PROVIDER_FIELDS = frozenset(
         "record_id",
     }
 )
+HOST_PROVIDER_FIELDS = HOST_PROVIDER_LEGACY_FIELDS | frozenset(
+    {
+        "host_kernel_generation",
+        "provider_attestation_record_id",
+        "provider_attestation_path",
+        "provider_attestation_blob_digest",
+    }
+)
 HOST_RESERVATION_STATES = frozenset(
     {"RESERVED", "RENEWED", "RELEASED", "EXPIRED_FENCED"}
 )
 HOST_RESERVATION_ACTIVE_STATES = frozenset({"RESERVED", "RENEWED"})
 HOST_RESERVATION_KINDS = frozenset({"PRIMARY", "SIDECAR", "VALIDATION"})
+HOST_CAPACITY_LEGACY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "host_id",
+        "provider_generation",
+        "provider_epoch",
+        "capacity_generation",
+        "capacity_epoch",
+        "max_total_sessions",
+        "validation_slots",
+        "issued_at",
+        "expires_at",
+        "capability_source",
+        "capability_digest",
+        "declarative",
+        "record_id",
+    }
+)
+HOST_CAPACITY_FIELDS = HOST_CAPACITY_LEGACY_FIELDS | frozenset(
+    {"host_kernel_generation"}
+)
 PRE_LAUNCH_ABORT_KIND = "hive-mind-dispatcher-pre-launch-abort-v1"
 VALIDATION_TERMINAL_RECEIPT_KIND = (
     "hive-mind-validation-host-reservation-terminal-receipt-v1"
@@ -1486,7 +3414,7 @@ VALIDATION_NEVER_ACQUIRED_FIELDS = frozenset(
     }
 )
 DISPATCH_ADMISSION_INTENT_KIND = "hive-mind-dispatcher-admission-intent-v1"
-DISPATCH_ADMISSION_INTENT_FIELDS = frozenset(
+LEGACY_DISPATCH_ADMISSION_INTENT_FIELDS = frozenset(
     {
         "schema_version",
         "kind",
@@ -1511,6 +3439,15 @@ DISPATCH_ADMISSION_INTENT_FIELDS = frozenset(
         "actor",
         "issued_at",
         "record_id",
+    }
+)
+DISPATCH_ADMISSION_INTENT_FIELDS = frozenset(
+    {
+        *LEGACY_DISPATCH_ADMISSION_INTENT_FIELDS,
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
     }
 )
 DISPATCH_RELEASE_FIELDS = frozenset(
@@ -1672,7 +3609,7 @@ def _machine_user_identity(*, create: bool = False) -> str:
             path, {**material, "record_id": digest_json(material)}
         )
     try:
-        raw = _read_regular_authority_bytes(path, label="host capacity history")
+        raw = _read_regular_authority_bytes(path, label="sealed machine-user identity")
         value = json.loads(
             raw.decode("utf-8"),
             object_pairs_hook=_strict_json_pairs,
@@ -1761,6 +3698,492 @@ def resolve_host_runtime_dir(
     return requested if requested is not None else (base / "host-runtime").resolve()
 
 
+def host_kernel_identity() -> Mapping[str, object]:
+    """Return the immutable loaded identity of the machine-user authority writer.
+
+    Repository executions may run different application revisions concurrently,
+    but only the controller revision sealed into the host runtime may mutate the
+    machine-user capacity/registry FSM.  The controller digest was captured when
+    this module loaded and is compared with the path at every authority open.  A
+    file replacement therefore cannot make already-loaded old code impersonate
+    the successor writer generation.
+    """
+
+    controller_path = _reject_link_components(
+        Path(__file__), label="host-kernel controller module"
+    ).resolve()
+    if not controller_path.is_file():
+        raise ConfigurationError("host-kernel controller module is unavailable")
+    controller_bytes = _read_regular_authority_bytes(
+        controller_path, label="host-kernel controller module"
+    )
+    if (
+        controller_path != _LOADED_CONTROLLER_PATH
+        or "sha256:" + sha256(controller_bytes).hexdigest()
+        != _LOADED_CONTROLLER_DIGEST
+    ):
+        raise ConfigurationError(
+            "host-kernel controller bytes changed after this process loaded; "
+            "restart before opening machine-user authority"
+        )
+    executable = _reject_link_components(
+        Path(sys.executable), label="host-kernel Python executable"
+    ).resolve()
+    if not executable.is_file():
+        raise ConfigurationError("host-kernel Python executable is unavailable")
+    executable_bytes = _read_regular_authority_bytes(
+        executable, label="host-kernel Python executable"
+    )
+    interpreter_material: dict[str, object] = {
+        "kind": "hive-mind-host-kernel-interpreter-policy-v1",
+        "implementation": sys.implementation.name,
+        "cache_tag": sys.implementation.cache_tag,
+        "version": [
+            sys.version_info.major,
+            sys.version_info.minor,
+            sys.version_info.micro,
+        ],
+        "byteorder": sys.byteorder,
+        "optimize": sys.flags.optimize,
+        "executable_digest": "sha256:" + sha256(executable_bytes).hexdigest(),
+    }
+    interpreter_policy_digest = digest_json(interpreter_material)
+    bundle_material: dict[str, object] = {
+        "kind": HOST_KERNEL_BUNDLE_KIND,
+        "components": [
+            {
+                # The machine-user writer is shared by linked worktrees and
+                # independent clones.  Its semantic identity is the logical
+                # component plus exact bytes, never a checkout-specific path.
+                "path": ".autopilot/bin/controller.py",
+                "digest": _LOADED_CONTROLLER_DIGEST,
+            }
+        ],
+        "interpreter_policy_digest": interpreter_policy_digest,
+    }
+    return {
+        "schema_version": 1,
+        **bundle_material,
+        "bundle_digest": digest_json(bundle_material),
+        "interpreter": interpreter_material,
+    }
+
+
+def _validate_host_runtime_identity(
+    value: object,
+    *,
+    machine_user_id: str,
+) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != HOST_RUNTIME_IDENTITY_FIELDS:
+        raise ConfigurationError("host-global runtime identity schema is ambiguous")
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    try:
+        parse_time(value.get("installed_at"))
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError("host-global runtime installation time is invalid") from error
+    previous_generation = value.get("previous_host_kernel_generation")
+    previous_record = value.get("previous_host_kernel_record_id")
+    epoch = value.get("host_kernel_epoch")
+    generation_material = {
+        "kind": "hive-mind-host-kernel-generation-key-v1",
+        "machine_user_id": value.get("machine_user_id"),
+        "host_kernel_epoch": epoch,
+        "host_kernel_bundle_digest": value.get("host_kernel_bundle_digest"),
+        "interpreter_policy_digest": value.get("interpreter_policy_digest"),
+    }
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != HOST_RUNTIME_IDENTITY_KIND
+        or value.get("machine_user_id") != machine_user_id
+        or type(epoch) is not int
+        or int(epoch) < 1
+        or AUTHORITY_ID.fullmatch(str(value.get("host_kernel_bundle_digest"))) is None
+        or AUTHORITY_ID.fullmatch(str(value.get("interpreter_policy_digest"))) is None
+        or value.get("host_kernel_generation") != digest_json(generation_material)
+        or ((previous_generation is None) != (previous_record is None))
+        or (
+            int(epoch) == 1
+            and (previous_generation is not None or previous_record is not None)
+        )
+        or (
+            int(epoch) > 1
+            and (
+                AUTHORITY_ID.fullmatch(str(previous_generation)) is None
+                or AUTHORITY_ID.fullmatch(str(previous_record)) is None
+            )
+        )
+        or record_id != digest_json(material)
+    ):
+        raise ConfigurationError("host-global runtime identity is invalid")
+    return dict(value)
+
+
+def _host_kernel_history(
+    host_runtime_dir: str | Path,
+    *,
+    machine_user_id: str,
+    raw_override: bytes | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    path = Path(host_runtime_dir) / "host-kernel-history.jsonl"
+    records = (
+        _strict_jsonl_records_bytes(
+            raw_override, label="host-kernel generation history"
+        )
+        if raw_override is not None
+        else strict_jsonl_records(path, label="host-kernel generation history")
+    )
+    previous_event_id: str | None = None
+    previous_identity: Mapping[str, object] | None = None
+    seen_bundles: set[tuple[str, str]] = set()
+    events: list[Mapping[str, object]] = []
+    for index, raw in enumerate(records, 1):
+        if set(raw) != HOST_KERNEL_HISTORY_FIELDS:
+            raise ConfigurationError(
+                f"host-kernel generation history line {index} schema is ambiguous"
+            )
+        material = dict(raw)
+        event_id = material.pop("event_id", None)
+        identity = _validate_host_runtime_identity(
+            raw.get("identity"), machine_user_id=machine_user_id
+        )
+        try:
+            parse_time(raw.get("recorded_at"))
+        except (TypeError, ValueError) as error:
+            raise ConfigurationError(
+                f"host-kernel generation history line {index} time is invalid"
+            ) from error
+        bundle_key = (
+            str(identity["host_kernel_bundle_digest"]),
+            str(identity["interpreter_policy_digest"]),
+        )
+        expected_epoch = 1 if previous_identity is None else int(
+            previous_identity["host_kernel_epoch"]
+        ) + 1
+        if (
+            raw.get("schema_version") != 1
+            or raw.get("kind") != HOST_KERNEL_HISTORY_KIND
+            or raw.get("state") != "INSTALLED"
+            or not isinstance(raw.get("actor"), str)
+            or not str(raw["actor"]).strip()
+            or not isinstance(raw.get("reason"), str)
+            or not str(raw["reason"]).strip()
+            or raw.get("previous_event_id") != previous_event_id
+            or event_id != digest_json(material)
+            or identity.get("host_kernel_epoch") != expected_epoch
+            or identity.get("previous_host_kernel_generation")
+            != (
+                previous_identity.get("host_kernel_generation")
+                if previous_identity is not None
+                else None
+            )
+            or identity.get("previous_host_kernel_record_id")
+            != (previous_identity.get("record_id") if previous_identity is not None else None)
+            or (bundle_key in seen_bundles and previous_identity is not None)
+        ):
+            raise ConfigurationError(
+                f"host-kernel generation history line {index} is invalid or replays a retired writer"
+            )
+        legacy_id = raw.get("legacy_predecessor_record_id")
+        legacy_path = raw.get("legacy_predecessor_path")
+        legacy_blob = raw.get("legacy_predecessor_blob_digest")
+        if any(item is not None for item in (legacy_id, legacy_path, legacy_blob)):
+            if (
+                index != 1
+                or not all(
+                    isinstance(item, str) and AUTHORITY_ID.fullmatch(item) is not None
+                    for item in (legacy_id, legacy_blob)
+                )
+                or not isinstance(legacy_path, str)
+                or legacy_path
+                != "legacy-host-runtime-identities/"
+                + str(legacy_id).removeprefix("sha256:")
+                + ".json"
+            ):
+                raise ConfigurationError(
+                    "host-kernel legacy predecessor evidence is invalid"
+                )
+            evidence_path = Path(host_runtime_dir) / legacy_path
+            evidence_bytes = _read_regular_authority_bytes(
+                evidence_path, label="legacy host-runtime identity evidence"
+            )
+            evidence = parse_strict_canonical_json_bytes(
+                evidence_bytes, label="legacy host-runtime identity evidence"
+            )
+            evidence_material = dict(evidence) if isinstance(evidence, Mapping) else {}
+            evidence_record_id = evidence_material.pop("record_id", None)
+            if (
+                not isinstance(evidence, Mapping)
+                or set(evidence)
+                != {"schema_version", "kind", "machine_user_id", "record_id"}
+                or evidence.get("schema_version") != 1
+                or evidence.get("kind") != HOST_RUNTIME_IDENTITY_KIND
+                or evidence.get("machine_user_id") != machine_user_id
+                or evidence_record_id != legacy_id
+                or evidence_record_id != digest_json(evidence_material)
+                or "sha256:" + sha256(evidence_bytes).hexdigest() != legacy_blob
+            ):
+                raise ConfigurationError(
+                    "host-kernel legacy predecessor evidence changed"
+                )
+        seen_bundles.add(bundle_key)
+        previous_event_id = str(event_id)
+        previous_identity = identity
+        events.append(dict(raw))
+    return tuple(events)
+
+
+def _new_host_runtime_identity(
+    *,
+    machine_user_id: str,
+    kernel: Mapping[str, object],
+    epoch: int,
+    installed_at: str,
+    previous: Mapping[str, object] | None,
+) -> Mapping[str, object]:
+    generation_material: dict[str, object] = {
+        "kind": "hive-mind-host-kernel-generation-key-v1",
+        "machine_user_id": machine_user_id,
+        "host_kernel_epoch": epoch,
+        "host_kernel_bundle_digest": kernel["bundle_digest"],
+        "interpreter_policy_digest": kernel["interpreter_policy_digest"],
+    }
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": HOST_RUNTIME_IDENTITY_KIND,
+        "machine_user_id": machine_user_id,
+        "host_kernel_generation": digest_json(generation_material),
+        "host_kernel_epoch": epoch,
+        "host_kernel_bundle_digest": kernel["bundle_digest"],
+        "interpreter_policy_digest": kernel["interpreter_policy_digest"],
+        "installed_at": installed_at,
+        "previous_host_kernel_generation": (
+            previous.get("host_kernel_generation") if previous is not None else None
+        ),
+        "previous_host_kernel_record_id": (
+            previous.get("record_id") if previous is not None else None
+        ),
+    }
+    return {**material, "record_id": digest_json(material)}
+
+
+def _host_kernel_generation_event(
+    identity: Mapping[str, object],
+    *,
+    actor: str,
+    reason: str,
+    recorded_at: str,
+    history: Sequence[Mapping[str, object]],
+    legacy_predecessor: Mapping[str, object] | None = None,
+) -> Mapping[str, object]:
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": HOST_KERNEL_HISTORY_KIND,
+        "state": "INSTALLED",
+        "identity": dict(identity),
+        "actor": actor,
+        "reason": reason,
+        "recorded_at": recorded_at,
+        "legacy_predecessor_record_id": (
+            legacy_predecessor.get("record_id")
+            if legacy_predecessor is not None
+            else None
+        ),
+        "legacy_predecessor_path": (
+            legacy_predecessor.get("path")
+            if legacy_predecessor is not None
+            else None
+        ),
+        "legacy_predecessor_blob_digest": (
+            legacy_predecessor.get("blob_digest")
+            if legacy_predecessor is not None
+            else None
+        ),
+        "previous_event_id": history[-1]["event_id"] if history else None,
+    }
+    return {**material, "event_id": digest_json(material)}
+
+
+def _append_host_kernel_generation(
+    host_runtime_dir: Path,
+    identity: Mapping[str, object],
+    *,
+    actor: str,
+    reason: str,
+    recorded_at: str,
+    history: Sequence[Mapping[str, object]],
+    legacy_predecessor: Mapping[str, object] | None = None,
+) -> Mapping[str, object]:
+    event = _host_kernel_generation_event(
+        identity,
+        actor=actor,
+        reason=reason,
+        recorded_at=recorded_at,
+        history=history,
+        legacy_predecessor=legacy_predecessor,
+    )
+    _append_canonical_jsonl(host_runtime_dir / "host-kernel-history.jsonl", event)
+    return event
+
+
+def _validate_host_kernel_transition(
+    value: object,
+    *,
+    machine_user_id: str,
+) -> Mapping[str, object]:
+    prepared = _validate_kernel_transition(
+        value,
+        kind=HOST_KERNEL_TRANSITION_KIND,
+        authority_plane="HOST",
+        identity_validator=lambda raw: _validate_host_runtime_identity(
+            raw, machine_user_id=machine_user_id
+        ),
+    )
+    event = prepared["history_event"]
+    assert isinstance(event, Mapping)
+    material = dict(event)
+    event_id = material.pop("event_id", None)
+    successor = prepared["successor_identity"]
+    assert isinstance(successor, Mapping)
+    legacy = event.get("legacy_predecessor_record_id") is not None
+    if (
+        set(event) != HOST_KERNEL_HISTORY_FIELDS
+        or event.get("schema_version") != 1
+        or event.get("kind") != HOST_KERNEL_HISTORY_KIND
+        or event.get("state") != "INSTALLED"
+        or event.get("identity") != successor
+        or event.get("actor") != prepared.get("actor")
+        or event.get("reason") != prepared.get("reason")
+        or event.get("recorded_at") != prepared.get("prepared_at")
+        or event.get("previous_event_id") != prepared.get("previous_event_id")
+        or (
+            legacy
+            and (
+                prepared.get("predecessor_generation") is not None
+                or successor.get("previous_host_kernel_record_id") is not None
+                or successor.get("previous_host_kernel_generation") is not None
+                or event.get("legacy_predecessor_record_id")
+                != prepared.get("predecessor_record_id")
+            )
+        )
+        or (
+            not legacy
+            and (
+                successor.get("previous_host_kernel_record_id")
+                != prepared.get("predecessor_record_id")
+                or successor.get("previous_host_kernel_generation")
+                != prepared.get("predecessor_generation")
+                or any(
+                    event.get(field) is not None
+                    for field in (
+                        "legacy_predecessor_record_id",
+                        "legacy_predecessor_path",
+                        "legacy_predecessor_blob_digest",
+                    )
+                )
+            )
+        )
+        or event_id != digest_json(material)
+    ):
+        raise ConfigurationError("host-kernel transition event is invalid")
+    return prepared
+
+
+def _prepare_host_kernel_transition(
+    host_runtime_dir: Path,
+    successor: Mapping[str, object],
+    *,
+    predecessor: Mapping[str, object] | None,
+    history: Sequence[Mapping[str, object]],
+    actor: str,
+    reason: str,
+    recorded_at: str,
+    legacy_predecessor: Mapping[str, object] | None = None,
+) -> Mapping[str, object]:
+    event = _host_kernel_generation_event(
+        successor,
+        actor=actor,
+        reason=reason,
+        recorded_at=recorded_at,
+        history=history,
+        legacy_predecessor=legacy_predecessor,
+    )
+    predecessor_record_id = (
+        predecessor.get("record_id")
+        if predecessor is not None
+        else (
+            legacy_predecessor.get("record_id")
+            if legacy_predecessor is not None
+            else None
+        )
+    )
+    prepared = _prepare_kernel_transition(
+        host_runtime_dir,
+        kind=HOST_KERNEL_TRANSITION_KIND,
+        authority_plane="HOST",
+        predecessor_record_id=(
+            str(predecessor_record_id)
+            if predecessor_record_id is not None
+            else None
+        ),
+        predecessor_generation=(
+            str(predecessor["host_kernel_generation"])
+            if predecessor is not None
+            else None
+        ),
+        previous_event_id=history[-1].get("event_id") if history else None,
+        successor_identity=successor,
+        history_event=event,
+        actor=actor,
+        reason=reason,
+        prepared_at=recorded_at,
+        identity_validator=lambda raw: _validate_host_runtime_identity(
+            raw, machine_user_id=str(successor["machine_user_id"])
+        ),
+    )
+    return _validate_host_kernel_transition(
+        prepared, machine_user_id=str(successor["machine_user_id"])
+    )
+
+
+def _finish_host_kernel_transition(
+    host_runtime_dir: Path,
+    identity_path: Path,
+    prepared: Mapping[str, object],
+    *,
+    machine_user_id: str,
+) -> Mapping[str, object]:
+    prepared = _validate_host_kernel_transition(
+        prepared, machine_user_id=machine_user_id
+    )
+    _ensure_kernel_transition_immutable(host_runtime_dir, prepared)
+    _repair_or_append_prepared_kernel_event(
+        host_runtime_dir / "host-kernel-history.jsonl",
+        prepared,
+        validate_prefix=lambda raw: _host_kernel_history(
+            host_runtime_dir,
+            machine_user_id=machine_user_id,
+            raw_override=raw,
+        ),
+    )
+    successor = _validate_host_runtime_identity(
+        prepared["successor_identity"], machine_user_id=machine_user_id
+    )
+    atomic_write_json(identity_path, successor)
+    installed = _validate_host_runtime_identity(
+        read_strict_canonical_json(
+            identity_path,
+            label="host-kernel successor identity",
+            expected_fields=HOST_RUNTIME_IDENTITY_FIELDS,
+        ),
+        machine_user_id=machine_user_id,
+    )
+    if installed != successor:
+        raise ConfigurationError("host-kernel successor projection changed")
+    _complete_kernel_transition(host_runtime_dir, prepared)
+    return installed
+
+
 def initialize_host_runtime(
     host_runtime_dir: str | Path | None = None,
 ) -> Mapping[str, object]:
@@ -1784,16 +4207,126 @@ def initialize_host_runtime(
     }
     exclusive_write_json_or_identical(base / "host-runtime-root.json", locator)
     directory.mkdir(parents=True, exist_ok=True)
-    identity_material: dict[str, object] = {
-        "schema_version": 1,
-        "kind": HOST_RUNTIME_IDENTITY_KIND,
-        "machine_user_id": machine_user_id,
-    }
-    identity = {**identity_material, "record_id": digest_json(identity_material)}
-    exclusive_write_json_or_identical(directory / "host-runtime-identity.json", identity)
-    with runtime_file_lock(directory / "locks" / "host-authority.lock"):
-        pass
-    return identity
+    lock_path = directory / "locks" / "host-authority.lock"
+    with runtime_file_lock(lock_path):
+        identity_path = directory / "host-runtime-identity.json"
+        transition_path = directory / KERNEL_TRANSITION_POINTER
+        if transition_path.exists() or _is_link_like(transition_path):
+            pending = _validate_host_kernel_transition(
+                read_strict_canonical_json(
+                    transition_path,
+                    label="pending host-runtime initialization",
+                ),
+                machine_user_id=machine_user_id,
+            )
+            successor = pending["successor_identity"]
+            assert isinstance(successor, Mapping)
+            kernel = host_kernel_identity()
+            if (
+                pending.get("predecessor_record_id") is not None
+                or pending.get("predecessor_generation") is not None
+                or pending.get("actor") != "host-runtime-initialize"
+                or pending.get("reason")
+                != "initial canonical machine-user host-kernel writer"
+                or successor.get("host_kernel_bundle_digest")
+                != kernel.get("bundle_digest")
+                or successor.get("interpreter_policy_digest")
+                != kernel.get("interpreter_policy_digest")
+            ):
+                raise ConfigurationError(
+                    "host runtime has a pending upgrade; retry the exact upgrade command"
+                )
+            return _finish_host_kernel_transition(
+                directory,
+                identity_path,
+                pending,
+                machine_user_id=machine_user_id,
+            )
+        if identity_path.exists() or _is_link_like(identity_path):
+            installed = read_strict_canonical_json(
+                identity_path,
+                label="host-global runtime identity",
+            )
+            try:
+                identity = _validate_host_runtime_identity(
+                    installed, machine_user_id=machine_user_id
+                )
+            except ConfigurationError as error:
+                raise ConfigurationError(
+                    "legacy or invalid host runtime requires explicit zero-activity host-kernel upgrade"
+                ) from error
+            history = _host_kernel_history(
+                directory, machine_user_id=machine_user_id
+            )
+            if not history or history[-1].get("identity") != identity:
+                raise ConfigurationError(
+                    "host runtime identity has no exact append-only kernel history"
+                )
+            current_kernel = host_kernel_identity()
+            if (
+                identity.get("host_kernel_bundle_digest")
+                != current_kernel.get("bundle_digest")
+                or identity.get("interpreter_policy_digest")
+                != current_kernel.get("interpreter_policy_digest")
+            ):
+                raise ConfigurationError(
+                    "host runtime is bound to another writer generation; explicit zero-activity upgrade is required"
+                )
+            return identity
+        history = _host_kernel_history(directory, machine_user_id=machine_user_id)
+        if history:
+            if len(history) != 1:
+                raise ConfigurationError(
+                    "host-kernel history is ahead of an absent current identity"
+                )
+            genesis = history[0]
+            identity = dict(genesis["identity"])
+            loaded_kernel = host_kernel_identity()
+            if (
+                genesis.get("actor") != "host-runtime-initialize"
+                or genesis.get("reason")
+                != "initial canonical machine-user host-kernel writer"
+                or genesis.get("legacy_predecessor_record_id") is not None
+                or genesis.get("legacy_predecessor_path") is not None
+                or genesis.get("legacy_predecessor_blob_digest") is not None
+                or identity.get("host_kernel_epoch") != 1
+                or identity.get("previous_host_kernel_generation") is not None
+                or identity.get("previous_host_kernel_record_id") is not None
+                or identity.get("host_kernel_bundle_digest")
+                != loaded_kernel.get("bundle_digest")
+                or identity.get("interpreter_policy_digest")
+                != loaded_kernel.get("interpreter_policy_digest")
+            ):
+                raise ConfigurationError(
+                    "absent host-runtime projection has no exact current-kernel "
+                    "initialization receipt"
+                )
+        else:
+            installed_at = format_time(utc_now())
+            identity = _new_host_runtime_identity(
+                machine_user_id=machine_user_id,
+                kernel=host_kernel_identity(),
+                epoch=1,
+                installed_at=installed_at,
+                previous=None,
+            )
+            pending = _prepare_host_kernel_transition(
+                directory,
+                identity,
+                predecessor=None,
+                history=history,
+                actor="host-runtime-initialize",
+                reason="initial canonical machine-user host-kernel writer",
+                recorded_at=installed_at,
+            )
+            return _finish_host_kernel_transition(
+                directory,
+                identity_path,
+                pending,
+                machine_user_id=machine_user_id,
+            )
+        atomic_write_json(identity_path, identity)
+        return _validate_host_runtime_identity(identity, machine_user_id=machine_user_id)
 
 
 def require_host_runtime(host_runtime_dir: str | Path | None = None) -> Path:
@@ -1804,19 +4337,695 @@ def require_host_runtime(host_runtime_dir: str | Path | None = None) -> Path:
         raise ConfigurationError(
             "host-global runtime is absent; run explicit host-runtime initialization"
         )
-    value = read_json(identity_path)
-    material = dict(value) if isinstance(value, Mapping) else {}
-    record_id = material.pop("record_id", None)
+    machine_user_id = _machine_user_identity()
+    value = read_strict_canonical_json(
+        identity_path,
+        label="host-global runtime identity",
+        expected_fields=HOST_RUNTIME_IDENTITY_FIELDS,
+    )
+    identity = _validate_host_runtime_identity(
+        value, machine_user_id=machine_user_id
+    )
+    transition_path = directory / KERNEL_TRANSITION_POINTER
+    if transition_path.exists() or _is_link_like(transition_path):
+        raise ConfigurationError(
+            "host-kernel transition is PREPARED; retry or recover the exact upgrade"
+        )
+    if _pending_host_torn_tail_recoveries(directory):
+        raise ConfigurationError(
+            "host authority has an incomplete torn-tail recovery; complete it before mutation"
+        )
+    history = _host_kernel_history(directory, machine_user_id=machine_user_id)
+    if not history or history[-1].get("identity") != identity:
+        raise ConfigurationError(
+            "host-global runtime identity differs from its append-only writer history"
+        )
+    current_kernel = host_kernel_identity()
     if (
-        not isinstance(value, Mapping)
-        or set(value) != {"schema_version", "kind", "machine_user_id", "record_id"}
-        or value.get("schema_version") != 1
-        or value.get("kind") != HOST_RUNTIME_IDENTITY_KIND
-        or value.get("machine_user_id") != _machine_user_identity()
+        identity.get("host_kernel_bundle_digest") != current_kernel.get("bundle_digest")
+        or identity.get("interpreter_policy_digest")
+        != current_kernel.get("interpreter_policy_digest")
+    ):
+        raise ConfigurationError(
+            "stale host-kernel writer generation cannot mutate machine-user authority"
+        )
+    return directory
+
+
+def _preflight_host_stores_for_kernel_upgrade(
+    host_runtime_dir: Path,
+    *,
+    current_writer: Mapping[str, object] | None,
+) -> tuple[Mapping[str, object], ...]:
+    """Strictly reduce every host-global ledger before rotating its writer.
+
+    A successor must never strand a torn or history-ahead store that only the
+    predecessor can classify.  This helper performs no writes and is called
+    under ``host-authority.lock`` before legacy evidence or PREPARED transition
+    publication.
+    """
+
+    _host_repository_registry_events(host_runtime_dir)
+    reservations = _host_reservation_events_unlocked(host_runtime_dir)
+    scheduler_events = _host_scheduler_events_unlocked(host_runtime_dir)
+    if scheduler_events:
+        scheduler = _host_scheduler_projection_unlocked(
+            host_runtime_dir,
+            host_id=str(scheduler_events[-1]["host_id"]),
+        )
+        if scheduler["outstanding_grants"] or any(
+            scheduler["remaining_candidates"].values()
+        ):
+            raise ConfigurationError(
+                "host scheduler demand or grant authority blocks kernel upgrade"
+            )
+
+    provider_path = host_runtime_dir / "host-provider.json"
+    provider_history_path = host_runtime_dir / "host-provider-history.jsonl"
+    provider_present = any(
+        path.exists() or _is_link_like(path)
+        for path in (provider_path, provider_history_path)
+    )
+    if provider_present:
+        if current_writer is None:
+            raise ConfigurationError(
+                "legacy host runtime has provider authority requiring explicit recovery"
+            )
+        if not provider_path.is_file() or _is_link_like(provider_path):
+            raise ConfigurationError("host provider projection is unavailable")
+        provider_value = read_strict_canonical_json(
+            provider_path, label="host-kernel upgrade provider projection"
+        )
+        if not isinstance(provider_value, Mapping) or not isinstance(
+            provider_value.get("host_id"), str
+        ):
+            raise ConfigurationError("host provider projection is invalid")
+        _host_provider_binding(
+            host_runtime_dir,
+            host_id=str(provider_value["host_id"]),
+            _writer_override=current_writer,
+        )
+        provider_history = strict_jsonl_records(
+            provider_history_path,
+            label="host provider generation history",
+        )
+        if not provider_history or provider_history[-1] != provider_value:
+            raise ConfigurationError(
+                "host provider transition is incomplete before kernel upgrade"
+            )
+
+    hosts_root = host_runtime_dir / "hosts"
+    if hosts_root.exists() or _is_link_like(hosts_root):
+        _reject_link_components(hosts_root, label="host capacity authority root")
+        if not hosts_root.is_dir():
+            raise ConfigurationError("host capacity authority root is not a directory")
+        for host_directory in sorted(hosts_root.iterdir(), key=lambda item: item.name):
+            _reject_link_components(
+                host_directory, label="host capacity authority directory"
+            )
+            if (
+                not host_directory.is_dir()
+                or re.fullmatch(r"[0-9a-f]{64}", host_directory.name) is None
+            ):
+                raise ConfigurationError(
+                    "host capacity authority contains an unclassified entry"
+                )
+            capacity_path = host_directory / "capacity.json"
+            history_path = host_directory / "capacity-history.jsonl"
+            if not capacity_path.is_file() or _is_link_like(capacity_path):
+                raise ConfigurationError(
+                    "host capacity generation lacks its current projection"
+                )
+            value = read_strict_canonical_json(
+                capacity_path, label="host-kernel upgrade capacity projection"
+            )
+            if not isinstance(value, Mapping) or not isinstance(
+                value.get("host_id"), str
+            ):
+                raise ConfigurationError("host capacity projection is invalid")
+            host_id = str(value["host_id"])
+            if host_capacity_path(host_runtime_dir, host_id).parent != host_directory:
+                raise ConfigurationError("host capacity directory key is invalid")
+            capacity = validate_host_capacity(
+                value,
+                host_id=host_id,
+                now=datetime.max.replace(tzinfo=UTC),
+                require_live=False,
+            )
+            if not history_path.is_file() or _is_link_like(history_path):
+                raise ConfigurationError("host capacity has no append-only history")
+            history = _strict_capacity_history(history_path)
+            if (
+                not history
+                or history[-1].get("capacity_record_id")
+                != capacity.get("record_id")
+            ):
+                raise ConfigurationError(
+                    "host capacity transition is incomplete before kernel upgrade"
+                )
+    return reservations
+
+
+def upgrade_host_runtime_kernel(
+    host_runtime_dir: str | Path | None = None,
+    *,
+    actor: str,
+    reason: str,
+    expected_host_kernel_generation: str | None,
+    upgraded_at: str | None = None,
+) -> Mapping[str, object]:
+    """Install this controller as the sole host-global writer at zero activity.
+
+    The function intentionally authenticates the existing projection without
+    calling :func:`require_host_runtime`, because a legitimate successor must be
+    able to open a runtime whose current generation rejects it.  All other host
+    APIs retain the fresh writer check and cannot use this bootstrap aperture.
+    """
+
+    if not isinstance(actor, str) or not actor.strip():
+        raise ConfigurationError("host-kernel upgrade actor is required")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ConfigurationError("host-kernel upgrade reason is required")
+    actor = actor.strip()
+    reason = reason.strip()
+    recorded_at = upgraded_at or format_time(utc_now())
+    try:
+        parse_time(recorded_at)
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError("host-kernel upgrade time is invalid") from error
+    directory = resolve_host_runtime_dir(host_runtime_dir)
+    identity_path = directory / "host-runtime-identity.json"
+    if not identity_path.is_file() or _is_link_like(identity_path):
+        raise ConfigurationError("host runtime must be initialized before upgrade")
+    machine_user_id = _machine_user_identity()
+    with runtime_file_lock(directory / "locks" / "host-authority.lock"):
+        if _pending_host_torn_tail_recoveries(directory):
+            raise ConfigurationError(
+                "host-kernel upgrade requires completion of pending torn-tail recovery"
+            )
+        raw = _read_regular_authority_bytes(
+            identity_path, label="host-runtime identity selected for upgrade"
+        )
+        value = parse_strict_canonical_json_bytes(
+            raw, label="host-runtime identity selected for upgrade"
+        )
+        legacy: Mapping[str, object] | None = None
+        try:
+            current = _validate_host_runtime_identity(
+                value, machine_user_id=machine_user_id
+            )
+        except ConfigurationError:
+            material = dict(value) if isinstance(value, Mapping) else {}
+            legacy_record_id = material.pop("record_id", None)
+            if (
+                not isinstance(value, Mapping)
+                or set(value)
+                != {"schema_version", "kind", "machine_user_id", "record_id"}
+                or value.get("schema_version") != 1
+                or value.get("kind") != HOST_RUNTIME_IDENTITY_KIND
+                or value.get("machine_user_id") != machine_user_id
+                or legacy_record_id != digest_json(material)
+                or expected_host_kernel_generation is not None
+            ):
+                raise ConfigurationError(
+                    "host-kernel upgrade predecessor identity is invalid or CAS-mismatched"
+                )
+            legacy_path = (
+                directory
+                / "legacy-host-runtime-identities"
+                / (str(legacy_record_id).removeprefix("sha256:") + ".json")
+            )
+            legacy = {
+                "record_id": legacy_record_id,
+                "path": str(legacy_path.relative_to(directory)).replace("\\", "/"),
+                "blob_digest": "sha256:" + sha256(raw).hexdigest(),
+            }
+            current = None
+        requested_kernel = host_kernel_identity()
+        requested_key = (
+            str(requested_kernel["bundle_digest"]),
+            str(requested_kernel["interpreter_policy_digest"]),
+        )
+        transition_path = directory / KERNEL_TRANSITION_POINTER
+        if transition_path.exists() or _is_link_like(transition_path):
+            # PREPARED is the durable zero-activity capability.  Once it is
+            # published every ordinary host writer is fenced, so an exact
+            # retry must finish that transition before consulting provider or
+            # capacity projections that still legitimately name the
+            # predecessor kernel.
+            prepared_transition = _validate_host_kernel_transition(
+                read_strict_canonical_json(
+                    transition_path, label="pending host-kernel upgrade"
+                ),
+                machine_user_id=machine_user_id,
+            )
+            successor = prepared_transition["successor_identity"]
+            assert isinstance(successor, Mapping)
+            current_matches = (
+                current is not None
+                and current.get("record_id")
+                in {
+                    prepared_transition.get("predecessor_record_id"),
+                    successor.get("record_id"),
+                }
+            )
+            legacy_matches = (
+                current is None
+                and legacy is not None
+                and prepared_transition.get("predecessor_record_id")
+                == legacy.get("record_id")
+            )
+            if (
+                prepared_transition.get("actor") != actor
+                or prepared_transition.get("reason") != reason
+                or prepared_transition.get("predecessor_generation")
+                != expected_host_kernel_generation
+                or (
+                    str(successor["host_kernel_bundle_digest"]),
+                    str(successor["interpreter_policy_digest"]),
+                )
+                != requested_key
+                or not (current_matches or legacy_matches)
+            ):
+                raise ConfigurationError(
+                    "pending host-kernel upgrade differs from this retry"
+                )
+            return _finish_host_kernel_transition(
+                directory,
+                identity_path,
+                prepared_transition,
+                machine_user_id=machine_user_id,
+            )
+
+        retry_history = _host_kernel_history(
+            directory, machine_user_id=machine_user_id
+        )
+        if current is not None and retry_history:
+            current_key = (
+                str(current["host_kernel_bundle_digest"]),
+                str(current["interpreter_policy_digest"]),
+            )
+            head = retry_history[-1]
+            if head.get("identity") == current and current_key == requested_key:
+                if expected_host_kernel_generation == current.get(
+                    "host_kernel_generation"
+                ):
+                    return current
+                if (
+                    expected_host_kernel_generation
+                    == current.get("previous_host_kernel_generation")
+                    and head.get("actor") == actor
+                    and head.get("reason") == reason
+                ):
+                    # Lost-response retry after COMPLETE is authenticated by
+                    # the exact predecessor CAS and immutable history row.  It
+                    # is read-only and must remain possible after ordinary
+                    # provider/capacity activity resumes.
+                    return current
+        reservation_events = _preflight_host_stores_for_kernel_upgrade(
+            directory, current_writer=current
+        )
+        latest_reservations: dict[str, Mapping[str, object]] = {}
+        for reservation_event in reservation_events:
+            latest_reservations[str(reservation_event["reservation_id"])] = (
+                reservation_event
+            )
+        if any(
+            event.get("state") in HOST_RESERVATION_ACTIVE_STATES
+            for event in latest_reservations.values()
+        ):
+            raise ConfigurationError(
+                "host-kernel upgrade requires zero active or unreconciled reservations"
+            )
+        if legacy is not None:
+            # Legacy bytes become durable evidence only after every read-only
+            # writer/ledger/zero-activity preflight succeeds.  A rejected or
+            # stale upgrade therefore leaves no authority-shaped artifact.
+            exclusive_write_bytes_or_identical(
+                directory / str(legacy["path"]), raw
+            )
+        transition_path = directory / KERNEL_TRANSITION_POINTER
+        prepared_transition: Mapping[str, object] | None = None
+        if transition_path.exists() or _is_link_like(transition_path):
+            prepared_transition = _validate_host_kernel_transition(
+                read_strict_canonical_json(
+                    transition_path, label="pending host-kernel upgrade"
+                ),
+                machine_user_id=machine_user_id,
+            )
+            successor = prepared_transition["successor_identity"]
+            assert isinstance(successor, Mapping)
+            expected_predecessor_record = (
+                prepared_transition.get("predecessor_record_id")
+                if current is not None
+                and current.get("record_id")
+                in {
+                    prepared_transition.get("predecessor_record_id"),
+                    successor.get("record_id"),
+                }
+                else legacy.get("record_id") if legacy is not None else None
+            )
+            if (
+                prepared_transition.get("actor") != actor.strip()
+                or prepared_transition.get("reason") != reason.strip()
+                or prepared_transition.get("predecessor_record_id")
+                != expected_predecessor_record
+                or prepared_transition.get("predecessor_generation")
+                != expected_host_kernel_generation
+                or (
+                    str(successor["host_kernel_bundle_digest"]),
+                    str(successor["interpreter_policy_digest"]),
+                )
+                != requested_key
+                or (
+                    current is not None
+                    and current.get("record_id")
+                    not in {
+                        prepared_transition.get("predecessor_record_id"),
+                        successor.get("record_id"),
+                    }
+                )
+            ):
+                raise ConfigurationError(
+                    "pending host-kernel upgrade differs from this retry"
+                )
+            _ensure_kernel_transition_immutable(directory, prepared_transition)
+            _repair_or_append_prepared_kernel_event(
+                directory / "host-kernel-history.jsonl",
+                prepared_transition,
+                validate_prefix=lambda history_raw: _host_kernel_history(
+                    directory,
+                    machine_user_id=machine_user_id,
+                    raw_override=history_raw,
+                ),
+            )
+        history = _host_kernel_history(
+            directory, machine_user_id=machine_user_id
+        )
+        history_ahead = False
+        legacy_history_ahead = False
+        if current is not None:
+            if not history:
+                raise ConfigurationError(
+                    "host-kernel upgrade predecessor differs from its history"
+                )
+            latest_identity = history[-1].get("identity")
+            history_ahead = latest_identity != current
+            if history_ahead and (
+                len(history) < 2
+                or history[-2].get("identity") != current
+                or latest_identity.get("previous_host_kernel_generation")
+                != current.get("host_kernel_generation")
+                or latest_identity.get("previous_host_kernel_record_id")
+                != current.get("record_id")
+            ):
+                raise ConfigurationError(
+                    "host-kernel history is ambiguously ahead of its projection"
+                )
+        elif history:
+            # Legacy adoption is also history-first.  A crash after the first
+            # generation was appended leaves the legacy projection in place;
+            # only the one exact event that cites the immutable legacy bytes may
+            # be adopted.  No other history shape is classifiable.
+            if (
+                legacy is None
+                or len(history) != 1
+                or history[0].get("legacy_predecessor_record_id")
+                != legacy.get("record_id")
+                or history[0].get("legacy_predecessor_path") != legacy.get("path")
+                or history[0].get("legacy_predecessor_blob_digest")
+                != legacy.get("blob_digest")
+            ):
+                raise ConfigurationError(
+                    "legacy host-kernel projection conflicts with an existing generation history"
+                )
+            legacy_history_ahead = True
+        if current is not None:
+            current_key = (
+                str(current["host_kernel_bundle_digest"]),
+                str(current["interpreter_policy_digest"]),
+            )
+            exact_current_cas = (
+                expected_host_kernel_generation
+                == current.get("host_kernel_generation")
+            )
+            completed_retry_cas = (
+                not history_ahead
+                and expected_host_kernel_generation
+                == current.get("previous_host_kernel_generation")
+                and current_key == requested_key
+                and history[-1].get("identity") == current
+                and history[-1].get("actor") == actor.strip()
+                and history[-1].get("reason") == reason.strip()
+            )
+            if not exact_current_cas and not completed_retry_cas:
+                raise ConfigurationError("host-kernel upgrade generation CAS mismatch")
+        elif expected_host_kernel_generation is not None:
+            raise ConfigurationError("host-kernel upgrade generation CAS mismatch")
+        if current is not None and (
+            (
+                str(current["host_kernel_bundle_digest"]),
+                str(current["interpreter_policy_digest"]),
+            )
+            == requested_key
+            and not history_ahead
+            and prepared_transition is None
+        ):
+            return current
+        if any(
+            (
+                str(event["identity"]["host_kernel_bundle_digest"]),
+                str(event["identity"]["interpreter_policy_digest"]),
+            )
+            == requested_key
+            for event in (
+                history[:-1]
+                if (history_ahead or legacy_history_ahead)
+                else history
+            )
+        ):
+            raise ConfigurationError(
+                "host-kernel downgrade or retired-writer replay is prohibited"
+            )
+        if prepared_transition is not None:
+            identity = dict(prepared_transition["successor_identity"])
+            if history[-1].get("event_id") != prepared_transition[
+                "history_event"
+            ].get("event_id"):
+                raise ConfigurationError(
+                    "pending host-kernel event is not the history head"
+                )
+        elif history_ahead or legacy_history_ahead:
+            pending = dict(history[-1]["identity"])
+            if (
+                pending.get("host_kernel_bundle_digest")
+                != requested_kernel.get("bundle_digest")
+                or pending.get("interpreter_policy_digest")
+                != requested_kernel.get("interpreter_policy_digest")
+                or history[-1].get("actor") != actor.strip()
+                or history[-1].get("reason") != reason.strip()
+                or (
+                    current is not None
+                    and expected_host_kernel_generation
+                    != current.get("host_kernel_generation")
+                )
+            ):
+                raise ConfigurationError(
+                    "pending host-kernel upgrade differs from this retry"
+                )
+            identity = pending
+        else:
+            identity = _new_host_runtime_identity(
+                machine_user_id=machine_user_id,
+                kernel=requested_kernel,
+                epoch=(1 if current is None else int(current["host_kernel_epoch"]) + 1),
+                installed_at=recorded_at,
+                previous=current,
+            )
+            prepared_transition = _prepare_host_kernel_transition(
+                directory,
+                identity,
+                predecessor=current,
+                history=history,
+                actor=actor,
+                reason=reason,
+                recorded_at=recorded_at,
+                legacy_predecessor=legacy,
+            )
+        if prepared_transition is not None:
+            return _finish_host_kernel_transition(
+                directory,
+                identity_path,
+                prepared_transition,
+                machine_user_id=machine_user_id,
+            )
+        atomic_write_json(identity_path, identity)
+        return _validate_host_runtime_identity(identity, machine_user_id=machine_user_id)
+
+
+def _host_runtime_identity_unlocked(host_runtime_dir: Path) -> Mapping[str, object]:
+    """Return the already-authenticated current writer under host authority."""
+
+    if not runtime_file_lock_is_held(
+        host_runtime_dir / "locks" / "host-authority.lock"
+    ):
+        raise ConfigurationError("host writer identity requires host authority")
+    machine_user_id = _machine_user_identity()
+    value = read_strict_canonical_json(
+        host_runtime_dir / "host-runtime-identity.json",
+        label="host-global runtime identity",
+        expected_fields=HOST_RUNTIME_IDENTITY_FIELDS,
+    )
+    identity = _validate_host_runtime_identity(
+        value, machine_user_id=machine_user_id
+    )
+    transition_path = host_runtime_dir / KERNEL_TRANSITION_POINTER
+    if transition_path.exists() or _is_link_like(transition_path):
+        raise ConfigurationError(
+            "host-kernel transition is PREPARED; ordinary writers are fenced"
+        )
+    if _pending_host_torn_tail_recoveries(host_runtime_dir):
+        raise ConfigurationError(
+            "host authority has an incomplete torn-tail recovery; ordinary writers are fenced"
+        )
+    history = _host_kernel_history(
+        host_runtime_dir, machine_user_id=machine_user_id
+    )
+    if not history or history[-1].get("identity") != identity:
+        raise ConfigurationError(
+            "host writer projection differs from append-only kernel history"
+        )
+    current_kernel = host_kernel_identity()
+    if (
+        identity.get("host_kernel_bundle_digest") != current_kernel.get("bundle_digest")
+        or identity.get("interpreter_policy_digest")
+        != current_kernel.get("interpreter_policy_digest")
+    ):
+        raise ConfigurationError("stale host-kernel writer cannot publish evidence")
+    return identity
+
+
+def read_current_host_runtime_identity(
+    host_runtime_dir: str | Path | None = None,
+) -> Mapping[str, object]:
+    """Return the current host writer while the caller holds host authority.
+
+    This is the public replacement for consumers that used to infer a host id
+    by permissively parsing ``host-runtime-identity.json`` themselves.  It
+    authenticates the loaded writer, full append-only generation history, and
+    the caller-held canonical host lock before exposing ``machine_user_id`` or
+    generation coordinates.
+    """
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError(
+            "current host writer read requires caller-held host authority"
+        )
+    return dict(_host_runtime_identity_unlocked(root))
+
+
+def _validate_host_provider_attestation(
+    value: object,
+    *,
+    machine_user_id: str,
+    host_id: str,
+) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != HOST_PROVIDER_ATTESTATION_FIELDS:
+        raise ConfigurationError("host provider attestation schema is ambiguous")
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    provider_material = value.get("provider_identity_material")
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != HOST_PROVIDER_ATTESTATION_KIND
+        or value.get("machine_user_id") != machine_user_id
+        or value.get("host_id") != host_id
+        or not isinstance(value.get("provider_identity_source"), str)
+        or not str(value["provider_identity_source"]).strip()
+        or not isinstance(provider_material, Mapping)
+        or not provider_material
+        or value.get("provider_identity_digest") != digest_json(provider_material)
+        or AUTHORITY_ID.fullmatch(str(value.get("provider_identity_digest"))) is None
         or record_id != digest_json(material)
     ):
-        raise ConfigurationError("host-global runtime identity is invalid")
-    return directory
+        raise ConfigurationError("host provider attestation is invalid")
+    return dict(value)
+
+
+def build_host_provider_attestation(
+    host_runtime_dir: str | Path,
+    *,
+    host_id: str,
+    provider_identity_source: str,
+    provider_identity_material: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Build the exact immutable global subset supplied by a host adapter."""
+
+    root = require_host_runtime(host_runtime_dir)
+    runtime_identity = read_strict_canonical_json(
+        root / "host-runtime-identity.json",
+        label="host-global runtime identity",
+        expected_fields=HOST_RUNTIME_IDENTITY_FIELDS,
+    )
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": HOST_PROVIDER_ATTESTATION_KIND,
+        "machine_user_id": runtime_identity["machine_user_id"],
+        "host_id": host_id,
+        "provider_identity_source": provider_identity_source,
+        "provider_identity_material": dict(provider_identity_material),
+        "provider_identity_digest": digest_json(provider_identity_material),
+    }
+    return _validate_host_provider_attestation(
+        {**material, "record_id": digest_json(material)},
+        machine_user_id=str(runtime_identity["machine_user_id"]),
+        host_id=host_id,
+    )
+
+
+def install_host_provider_attestation(
+    host_runtime_dir: str | Path,
+    *,
+    host_id: str,
+    provider_attestation: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Persist the exact host-global provider subset as immutable evidence.
+
+    Execution-local model/config/module identity is intentionally excluded from
+    ``provider_identity_material``.  It is sealed separately for each execution;
+    the provider generation represents only the account/executable/configuration
+    that is genuinely shared by every repository on this machine-user kernel.
+    """
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError("provider attestation requires host authority")
+    writer = _host_runtime_identity_unlocked(root)
+    validated = _validate_host_provider_attestation(
+        provider_attestation,
+        machine_user_id=str(writer["machine_user_id"]),
+        host_id=host_id,
+    )
+    record_id = str(validated["record_id"])
+    path = (
+        root
+        / "provider-attestations"
+        / (record_id.removeprefix("sha256:") + ".json")
+    )
+    exclusive_write_json_or_identical(path, validated)
+    raw = _read_regular_authority_bytes(path, label="host provider attestation")
+    if parse_strict_canonical_json_bytes(
+        raw,
+        label="host provider attestation",
+        expected_fields=HOST_PROVIDER_ATTESTATION_FIELDS,
+    ) != validated:
+        raise ConfigurationError("host provider attestation changed after installation")
+    return {
+        **validated,
+        "evidence_path": str(path.relative_to(root)).replace("\\", "/"),
+        "evidence_blob_digest": "sha256:" + sha256(raw).hexdigest(),
+    }
 
 
 def _host_provider_binding(
@@ -1827,17 +5036,50 @@ def _host_provider_binding(
     bound_at: str | None = None,
     provider_identity_source: str | None = None,
     provider_identity_digest: str | None = None,
+    provider_attestation: Mapping[str, object] | None = None,
+    _history_raw_override: bytes | None = None,
+    _allow_pending_history: bool = False,
+    _writer_override: Mapping[str, object] | None = None,
 ) -> Mapping[str, object]:
     """Read or CAS-rotate the authenticated machine-user provider generation."""
 
     if not isinstance(host_id, str) or not host_id.strip():
         raise ConfigurationError("host provider id is required")
-    path = host_runtime_dir / "host-provider.json"
-    history_path = host_runtime_dir / "host-provider-history.jsonl"
+    if _writer_override is None:
+        root = require_host_runtime(host_runtime_dir)
+        writer = read_strict_canonical_json(
+            root / "host-runtime-identity.json",
+            label="host-global runtime identity",
+            expected_fields=HOST_RUNTIME_IDENTITY_FIELDS,
+        )
+        writer = _validate_host_runtime_identity(
+            writer, machine_user_id=_machine_user_identity()
+        )
+    else:
+        root = _reject_link_components(
+            host_runtime_dir, label="host runtime authority"
+        ).resolve()
+        if create:
+            raise ConfigurationError(
+                "a recovery writer override cannot mutate provider authority"
+            )
+        if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+            raise ConfigurationError(
+                "provider recovery validation requires host authority"
+            )
+        writer = _validate_host_runtime_identity(
+            _writer_override, machine_user_id=_machine_user_identity()
+        )
+    path = root / "host-provider.json"
+    history_path = root / "host-provider-history.jsonl"
 
     def validate(value: object) -> Mapping[str, object]:
-        if not isinstance(value, Mapping) or set(value) != HOST_PROVIDER_FIELDS:
+        if not isinstance(value, Mapping) or frozenset(value) not in {
+            HOST_PROVIDER_LEGACY_FIELDS,
+            HOST_PROVIDER_FIELDS,
+        }:
             raise ConfigurationError("host provider generation schema is ambiguous")
+        legacy = frozenset(value) == HOST_PROVIDER_LEGACY_FIELDS
         material = dict(value)
         record_id = material.pop("record_id", None)
         generation_material = {
@@ -1848,6 +5090,10 @@ def _host_provider_binding(
             "provider_identity_source": value.get("provider_identity_source"),
             "provider_identity_digest": value.get("provider_identity_digest"),
         }
+        if not legacy:
+            generation_material["host_kernel_generation"] = value.get(
+                "host_kernel_generation"
+            )
         try:
             parse_time(value.get("bound_at"))
         except (TypeError, ValueError) as error:
@@ -1877,21 +5123,69 @@ def _host_provider_binding(
                     or AUTHORITY_ID.fullmatch(str(previous_record)) is None
                 )
             )
+            or (
+                not legacy
+                and AUTHORITY_ID.fullmatch(
+                    str(value.get("host_kernel_generation"))
+                )
+                is None
+            )
             or record_id != digest_json(material)
         ):
             raise ConfigurationError("host provider generation is invalid")
+        if not legacy:
+            attestation_id = value.get("provider_attestation_record_id")
+            attestation_path = value.get("provider_attestation_path")
+            attestation_blob = value.get("provider_attestation_blob_digest")
+            if (
+                AUTHORITY_ID.fullmatch(str(attestation_id)) is None
+                or attestation_path
+                != "provider-attestations/"
+                + str(attestation_id).removeprefix("sha256:")
+                + ".json"
+                or AUTHORITY_ID.fullmatch(str(attestation_blob)) is None
+            ):
+                raise ConfigurationError("host provider attestation fence is invalid")
+            evidence_path = root / str(attestation_path)
+            evidence_raw = _read_regular_authority_bytes(
+                evidence_path, label="host provider attestation evidence"
+            )
+            evidence = parse_strict_canonical_json_bytes(
+                evidence_raw,
+                label="host provider attestation evidence",
+                expected_fields=HOST_PROVIDER_ATTESTATION_FIELDS,
+            )
+            validated_evidence = _validate_host_provider_attestation(
+                evidence,
+                machine_user_id=str(value["machine_user_id"]),
+                host_id=str(value["host_id"]),
+            )
+            if (
+                validated_evidence.get("record_id") != attestation_id
+                or validated_evidence.get("provider_identity_source")
+                != value.get("provider_identity_source")
+                or validated_evidence.get("provider_identity_digest")
+                != value.get("provider_identity_digest")
+                or "sha256:" + sha256(evidence_raw).hexdigest() != attestation_blob
+            ):
+                raise ConfigurationError("host provider attestation evidence changed")
         return dict(value)
 
-    history = (
-        tuple(
-            validate(item)
-            for item in strict_jsonl_records(
+    history_records = (
+        _strict_jsonl_records_bytes(
+            _history_raw_override,
+            label="host provider generation history",
+        )
+        if _history_raw_override is not None
+        else (
+            strict_jsonl_records(
                 history_path, label="host provider generation history"
             )
+            if history_path.is_file()
+            else ()
         )
-        if history_path.is_file()
-        else ()
     )
+    history = tuple(validate(item) for item in history_records)
     previous: Mapping[str, object] | None = None
     for index, item in enumerate(history, 1):
         if previous is None:
@@ -1917,9 +5211,7 @@ def _host_provider_binding(
     current: Mapping[str, object] | None = None
     if path.is_file():
         current_value = read_strict_canonical_json(
-            path,
-            label="host provider generation",
-            expected_fields=HOST_PROVIDER_FIELDS,
+            path, label="host provider generation"
         )
         current = validate(current_value)
         if not history:
@@ -1954,9 +5246,15 @@ def _host_provider_binding(
             raise ConfigurationError(
                 "host provider differs from the machine-user capacity authority"
             )
-        if history[-1] != current:
+        if history[-1] != current and not _allow_pending_history:
             raise ConfigurationError(
                 "host provider rotation is incomplete and requires the new provider"
+            )
+        if current.get("host_kernel_generation") != writer.get(
+            "host_kernel_generation"
+        ):
+            raise ConfigurationError(
+                "host provider is bound to a retired host-kernel writer; rotate it explicitly"
             )
         return current
     if not create:
@@ -1966,13 +5264,15 @@ def _host_provider_binding(
             or current.get("provider_identity_source") != provider_identity_source
             or current.get("provider_identity_digest") != provider_identity_digest
             or history[-1] != current
+            or current.get("host_kernel_generation")
+            != writer.get("host_kernel_generation")
         ):
             raise ConfigurationError(
                 "host provider differs from the machine-user capacity authority"
             )
         return current
     if not runtime_file_lock_is_held(
-        host_runtime_dir / "locks" / "host-authority.lock"
+        root / "locks" / "host-authority.lock"
     ):
         raise ConfigurationError("host provider rotation requires host authority")
     if (
@@ -1981,6 +5281,7 @@ def _host_provider_binding(
         or not provider_identity_source.strip()
         or not isinstance(provider_identity_digest, str)
         or AUTHORITY_ID.fullmatch(provider_identity_digest) is None
+        or provider_attestation is None
     ):
         raise ConfigurationError(
             "host provider requires authenticated identity provenance"
@@ -1989,12 +5290,35 @@ def _host_provider_binding(
         parse_time(bound_at)
     except (TypeError, ValueError) as error:
         raise ConfigurationError("host provider binding time is invalid") from error
+    installed_attestation = install_host_provider_attestation(
+        root,
+        host_id=host_id,
+        provider_attestation=provider_attestation,
+    )
+    if (
+        installed_attestation.get("provider_identity_source")
+        != provider_identity_source
+        or installed_attestation.get("provider_identity_digest")
+        != provider_identity_digest
+    ):
+        raise ConfigurationError(
+            "host provider attestation differs from requested provider identity"
+        )
+    attestation_coordinates = {
+        "provider_attestation_record_id": installed_attestation["record_id"],
+        "provider_attestation_path": installed_attestation["evidence_path"],
+        "provider_attestation_blob_digest": installed_attestation[
+            "evidence_blob_digest"
+        ],
+    }
     if current is not None and all(
         current.get(field) == expected
         for field, expected in {
             "host_id": host_id,
             "provider_identity_source": provider_identity_source,
             "provider_identity_digest": provider_identity_digest,
+            "host_kernel_generation": writer["host_kernel_generation"],
+            **attestation_coordinates,
         }.items()
     ):
         if history[-1] != current:
@@ -2006,12 +5330,14 @@ def _host_provider_binding(
         item.get("host_id") == host_id
         and item.get("provider_identity_source") == provider_identity_source
         and item.get("provider_identity_digest") == provider_identity_digest
+        and item.get("host_kernel_generation")
+        == writer.get("host_kernel_generation")
         for item in history[:-1]
     ):
         raise ConfigurationError("host provider downgrade or replay is prohibited")
     if current is not None:
         latest_reservations: dict[str, Mapping[str, object]] = {}
-        for event in _host_reservation_events_unlocked(host_runtime_dir):
+        for event in _host_reservation_events_unlocked(root):
             latest_reservations[str(event["reservation_id"])] = event
         if any(
             event.get("state") in HOST_RESERVATION_ACTIVE_STATES
@@ -2028,6 +5354,8 @@ def _host_provider_binding(
                 "host_id": host_id,
                 "provider_identity_source": provider_identity_source,
                 "provider_identity_digest": provider_identity_digest,
+                "host_kernel_generation": writer["host_kernel_generation"],
+                **attestation_coordinates,
             }.items()
         ):
             raise ConfigurationError(
@@ -2043,6 +5371,7 @@ def _host_provider_binding(
             "provider_epoch": epoch,
             "provider_identity_source": provider_identity_source,
             "provider_identity_digest": provider_identity_digest,
+            "host_kernel_generation": writer["host_kernel_generation"],
         }
         material: dict[str, object] = {
             "schema_version": 1,
@@ -2053,6 +5382,7 @@ def _host_provider_binding(
             "provider_epoch": epoch,
             "provider_identity_source": provider_identity_source,
             "provider_identity_digest": provider_identity_digest,
+            "host_kernel_generation": writer["host_kernel_generation"],
             "bound_at": bound_at,
             "previous_provider_generation": (
                 current.get("provider_generation") if current is not None else None
@@ -2060,6 +5390,7 @@ def _host_provider_binding(
             "previous_provider_record_id": (
                 current.get("record_id") if current is not None else None
             ),
+            **attestation_coordinates,
         }
         candidate = validate({**material, "record_id": digest_json(material)})
         _append_canonical_jsonl(history_path, candidate)
@@ -2067,22 +5398,299 @@ def _host_provider_binding(
     return validate(candidate)
 
 
+def _validate_codex_app_server_execution_identity(
+    value: object,
+    *,
+    execution_namespace: str,
+    execution_id: str,
+    host_id: str,
+    machine_user_id: str,
+    provider_identity_digest: str,
+    verify_live_sources: bool = False,
+) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != CODEX_APP_SERVER_IDENTITY_FIELDS:
+        raise ConfigurationError("execution adapter identity schema is ambiguous")
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    try:
+        parse_time(value.get("created_at"))
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError("execution adapter identity time is invalid") from error
+    digest_fields = {
+        "adapter_module_digest",
+        "launcher_digest",
+        "executable_digest",
+        "schema_bundle_digest",
+        "thread_start_schema_digest",
+        "turn_start_schema_digest",
+        "environment_root_digest",
+        "behavior_environment_digest",
+        "provider_config_digest",
+        "execution_config_digest",
+        "account_identity_digest",
+        "initialize_result_digest",
+    }
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != "hive-mind-codex-app-server-identity-v1"
+        or value.get("execution_namespace") != execution_namespace
+        or value.get("execution_id") != execution_id
+        or value.get("host_id") != host_id
+        or value.get("machine_user_id") != machine_user_id
+        or value.get("provider_identity_digest") != provider_identity_digest
+        or any(
+            AUTHORITY_ID.fullmatch(str(value.get(field))) is None
+            for field in digest_fields
+        )
+        or not isinstance(value.get("effective_model"), str)
+        or not str(value["effective_model"]).strip()
+        or not (
+            value.get("effective_model_provider") is None
+            or (
+                isinstance(value.get("effective_model_provider"), str)
+                and str(value["effective_model_provider"]).strip()
+            )
+        )
+        or value.get("transport") != "stdio://"
+        or record_id != digest_json(material)
+    ):
+        raise ConfigurationError("execution adapter identity is invalid")
+    for path_field, digest_field, optional in (
+        ("adapter_module_path", "adapter_module_digest", False),
+        ("launcher_path", "launcher_digest", False),
+        ("cli_module_path", "cli_module_digest", True),
+        ("executable_path", "executable_digest", False),
+    ):
+        raw_path = value.get(path_field)
+        raw_digest = value.get(digest_field)
+        if optional and raw_path is None and raw_digest is None:
+            continue
+        if (
+            not isinstance(raw_path, str)
+            or not Path(raw_path).is_absolute()
+            or AUTHORITY_ID.fullmatch(str(raw_digest)) is None
+        ):
+            raise ConfigurationError(
+                f"execution adapter identity {path_field} provenance is invalid"
+            )
+        if verify_live_sources:
+            source = _reject_link_components(
+                raw_path, label=f"execution adapter {path_field}"
+            ).resolve()
+            source_bytes = _read_regular_authority_bytes(
+                source, label=f"execution adapter {path_field}"
+            )
+            if "sha256:" + sha256(source_bytes).hexdigest() != raw_digest:
+                raise ConfigurationError(
+                    f"execution adapter identity {path_field} bytes changed"
+                )
+    return dict(value)
+
+
+def _validate_execution_adapter_identity_binding(
+    host_runtime_dir: Path,
+    value: object,
+) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != EXECUTION_ADAPTER_IDENTITY_FIELDS:
+        raise ConfigurationError("execution adapter binding schema is ambiguous")
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    source_record_id = value.get("adapter_identity_record_id")
+    source_path = value.get("adapter_identity_source_path")
+    source_blob = value.get("adapter_identity_blob_digest")
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != EXECUTION_ADAPTER_IDENTITY_KIND
+        or EXECUTION_NAMESPACE.fullmatch(
+            str(value.get("execution_namespace"))
+        )
+        is None
+        or AUTHORITY_ID.fullmatch(str(value.get("execution_id"))) is None
+        or not isinstance(value.get("repository"), str)
+        or not str(value["repository"]).strip()
+        or not isinstance(value.get("host_id"), str)
+        or not str(value["host_id"]).strip()
+        or AUTHORITY_ID.fullmatch(str(value.get("provider_generation"))) is None
+        or type(value.get("provider_epoch")) is not int
+        or int(value["provider_epoch"]) < 1
+        or AUTHORITY_ID.fullmatch(
+            str(value.get("provider_identity_digest"))
+        )
+        is None
+        or value.get("adapter_identity_kind")
+        != "hive-mind-codex-app-server-identity-v1"
+        or AUTHORITY_ID.fullmatch(str(source_record_id)) is None
+        or source_path
+        != "execution-adapter-identities/"
+        + str(source_record_id).removeprefix("sha256:")
+        + ".json"
+        or AUTHORITY_ID.fullmatch(str(source_blob)) is None
+        or record_id != digest_json(material)
+    ):
+        raise ConfigurationError("execution adapter binding is invalid")
+    source_file = host_runtime_dir / str(source_path)
+    source_raw = _read_regular_authority_bytes(
+        source_file, label="execution adapter identity evidence"
+    )
+    source = parse_strict_canonical_json_bytes(
+        source_raw,
+        label="execution adapter identity evidence",
+        expected_fields=CODEX_APP_SERVER_IDENTITY_FIELDS,
+    )
+    _validate_codex_app_server_execution_identity(
+        source,
+        execution_namespace=str(value["execution_namespace"]),
+        execution_id=str(value["execution_id"]),
+        host_id=str(value["host_id"]),
+        machine_user_id=_machine_user_identity(),
+        provider_identity_digest=str(value["provider_identity_digest"]),
+    )
+    if (
+        source.get("record_id") != source_record_id
+        or "sha256:" + sha256(source_raw).hexdigest() != source_blob
+    ):
+        raise ConfigurationError("execution adapter identity evidence changed")
+    return dict(value)
+
+
+def install_execution_adapter_identity(
+    host_runtime_dir: str | Path,
+    *,
+    repo_root: str | Path,
+    execution_dir: str | Path,
+    execution_namespace: str,
+    execution_id: str,
+    host_id: str,
+    adapter_identity_path: str | Path,
+    adapter_identity: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Seal the exact execution-local adapter identity into host evidence."""
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError("execution adapter installation requires host authority")
+    execution = require_execution_authority_dir(
+        repo_root,
+        execution_dir,
+        execution_id=execution_id,
+        execution_namespace=execution_namespace,
+    )
+    source_path = _reject_link_components(
+        adapter_identity_path, label="execution adapter identity source"
+    ).resolve()
+    expected_source = (
+        execution / "host" / "codex-app-server-v1" / "identity.json"
+    ).resolve()
+    if source_path != expected_source:
+        raise ConfigurationError(
+            "execution adapter identity must come from the authenticated execution root"
+        )
+    source_raw = _read_regular_authority_bytes(
+        source_path, label="execution adapter identity source"
+    )
+    source = parse_strict_canonical_json_bytes(
+        source_raw,
+        label="execution adapter identity source",
+        expected_fields=CODEX_APP_SERVER_IDENTITY_FIELDS,
+    )
+    if source != adapter_identity:
+        raise ConfigurationError("execution adapter identity differs from installed bytes")
+    provider = _host_provider_binding(root, host_id=host_id)
+    execution_manifest = read_strict_canonical_json(
+        execution / "execution-identity.json",
+        label="execution namespace identity",
+    )
+    repository = (
+        execution_manifest.get("repository")
+        if isinstance(execution_manifest, Mapping)
+        else None
+    )
+    validated_source = _validate_codex_app_server_execution_identity(
+        source,
+        execution_namespace=execution_namespace,
+        execution_id=execution_id,
+        host_id=host_id,
+        machine_user_id=_machine_user_identity(),
+        provider_identity_digest=str(provider["provider_identity_digest"]),
+        verify_live_sources=True,
+    )
+    source_record_id = str(validated_source["record_id"])
+    installed_source = (
+        root
+        / "execution-adapter-identities"
+        / (source_record_id.removeprefix("sha256:") + ".json")
+    )
+    exclusive_write_bytes_or_identical(installed_source, source_raw)
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": EXECUTION_ADAPTER_IDENTITY_KIND,
+        "execution_namespace": execution_namespace,
+        "execution_id": execution_id,
+        "repository": repository,
+        "host_id": host_id,
+        "provider_generation": provider["provider_generation"],
+        "provider_epoch": provider["provider_epoch"],
+        "provider_identity_digest": provider["provider_identity_digest"],
+        "adapter_identity_kind": validated_source["kind"],
+        "adapter_identity_record_id": source_record_id,
+        "adapter_identity_blob_digest": "sha256:" + sha256(source_raw).hexdigest(),
+        "adapter_identity_source_path": str(
+            installed_source.relative_to(root)
+        ).replace("\\", "/"),
+    }
+    binding = {**material, "record_id": digest_json(material)}
+    binding_path = (
+        root
+        / "execution-adapter-bindings"
+        / (str(binding["record_id"]).removeprefix("sha256:") + ".json")
+    )
+    exclusive_write_json_or_identical(binding_path, binding)
+    return _validate_execution_adapter_identity_binding(root, binding)
+
+
+def read_execution_adapter_identity(
+    host_runtime_dir: str | Path,
+    record_id: str,
+) -> Mapping[str, object]:
+    """Dereference one immutable adapter binding under caller-held host authority."""
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError("execution adapter read requires host authority")
+    if AUTHORITY_ID.fullmatch(record_id) is None:
+        raise ConfigurationError("execution adapter identity id is invalid")
+    path = (
+        root
+        / "execution-adapter-bindings"
+        / (record_id.removeprefix("sha256:") + ".json")
+    )
+    value = read_strict_canonical_json(
+        path,
+        label="execution adapter binding",
+        expected_fields=EXECUTION_ADAPTER_IDENTITY_FIELDS,
+    )
+    validated = _validate_execution_adapter_identity_binding(root, value)
+    if validated.get("record_id") != record_id:
+        raise ConfigurationError("execution adapter binding id is mismatched")
+    return validated
+
+
 def _host_repository_registry_events(
     host_runtime_dir: str | Path,
+    *,
+    raw_override: bytes | None = None,
 ) -> tuple[Mapping[str, object], ...]:
     path = Path(host_runtime_dir) / "repository-registry.jsonl"
-    if not path.exists() and not _is_link_like(path):
+    if raw_override is None and not path.exists() and not _is_link_like(path):
         return ()
-    _reject_link_components(path, label="host repository registry")
-    if not path.is_file():
-        raise ConfigurationError("host repository registry is not a regular file")
-    try:
-        raw = _read_regular_authority_bytes(path, label="host reservation ledger")
-        text = raw.decode("utf-8")
-    except (OSError, UnicodeError) as error:
-        raise ConfigurationError("host repository registry is unreadable") from error
-    if raw and not raw.endswith(b"\n"):
-        raise ConfigurationError("host repository registry has a torn final append")
+    if raw_override is None:
+        _reject_link_components(path, label="host repository registry")
+        if not path.is_file():
+            raise ConfigurationError("host repository registry is not a regular file")
+        raw = _read_regular_authority_bytes(path, label="host repository registry")
+    else:
+        raw = raw_override
+    records = _strict_jsonl_records_bytes(raw, label="host repository registry")
     legacy_fields = {
         "schema_version",
         "kind",
@@ -2094,23 +5702,27 @@ def _host_repository_registry_events(
         "event_id",
     }
     current_fields = legacy_fields | {"checkout_roots"}
+    kernel_fields = current_fields | {"host_kernel_generation"}
     previous: str | None = None
     seen: dict[str, Mapping[str, object]] = {}
     seen_transport: dict[str, Mapping[str, object]] = {}
     events: list[Mapping[str, object]] = []
-    for index, line in enumerate(text.splitlines(), 1):
-        event = _strict_canonical_json_line(
-            line, label=f"host repository registry line {index}"
-        )
+    for index, event in enumerate(records, 1):
         material = dict(event)
         event_id = material.pop("event_id", None)
         if (
-            set(event) not in {frozenset(legacy_fields), frozenset(current_fields)}
+            frozenset(event)
+            not in {
+                frozenset(legacy_fields),
+                frozenset(current_fields),
+                frozenset(kernel_fields),
+            }
             or event.get("schema_version") != 1
             or event.get("kind")
             not in {
                 "hive-mind-host-repository-binding-v1",
                 "hive-mind-host-repository-binding-v2",
+                "hive-mind-host-repository-binding-v3",
             }
             or (
                 event.get("kind") == "hive-mind-host-repository-binding-v1"
@@ -2119,6 +5731,17 @@ def _host_repository_registry_events(
             or (
                 event.get("kind") == "hive-mind-host-repository-binding-v2"
                 and set(event) != current_fields
+            )
+            or (
+                event.get("kind") == "hive-mind-host-repository-binding-v3"
+                and set(event) != kernel_fields
+            )
+            or (
+                event.get("kind") == "hive-mind-host-repository-binding-v3"
+                and AUTHORITY_ID.fullmatch(
+                    str(event.get("host_kernel_generation"))
+                )
+                is None
             )
             or not isinstance(event.get("repository"), str)
             or not str(event.get("repository")).strip()
@@ -2212,6 +5835,7 @@ def bind_host_repository_runtime(
     root = require_host_runtime(host_runtime_dir)
     if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
         raise ConfigurationError("repository registry binding requires host authority")
+    writer = _host_runtime_identity_unlocked(root)
     if (
         not repository.strip()
         or not isinstance(transport_digest, str)
@@ -2268,17 +5892,22 @@ def bind_host_repository_runtime(
             set(str(item) for item in existing.get("checkout_roots", []))
             | {str(checkout_root)}
         )
-        if roots == existing.get("checkout_roots"):
+        if (
+            roots == existing.get("checkout_roots")
+            and existing.get("host_kernel_generation")
+            == writer.get("host_kernel_generation")
+        ):
             return existing
     else:
         roots = [str(checkout_root)]
     material: dict[str, object] = {
         "schema_version": 1,
-        "kind": "hive-mind-host-repository-binding-v2",
+        "kind": "hive-mind-host-repository-binding-v3",
         "repository": repository,
         "transport_digest": transport_digest,
         "coordination_dir": str(directory),
         "checkout_roots": roots,
+        "host_kernel_generation": writer["host_kernel_generation"],
         "bound_at": bound_at,
         "previous_event_id": events[-1]["event_id"] if events else None,
     }
@@ -2323,25 +5952,10 @@ def validate_host_capacity(
 ) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise ConfigurationError("host capacity is missing or malformed")
-    expected_fields = {
-        "schema_version",
-        "kind",
-        "host_id",
-        "provider_generation",
-        "provider_epoch",
-        "capacity_generation",
-        "capacity_epoch",
-        "max_total_sessions",
-        "validation_slots",
-        "issued_at",
-        "expires_at",
-        "capability_source",
-        "capability_digest",
-        "declarative",
-        "record_id",
-    }
-    if set(value) != expected_fields:
+    field_set = frozenset(value)
+    if field_set not in {HOST_CAPACITY_LEGACY_FIELDS, HOST_CAPACITY_FIELDS}:
         raise ConfigurationError("host capacity schema is ambiguous")
+    legacy = field_set == HOST_CAPACITY_LEGACY_FIELDS
     material = dict(value)
     record_id = material.pop("record_id")
     if (
@@ -2351,6 +5965,13 @@ def validate_host_capacity(
         or AUTHORITY_ID.fullmatch(str(value.get("provider_generation"))) is None
         or type(value.get("provider_epoch")) is not int
         or int(value["provider_epoch"]) < 1
+        or (
+            not legacy
+            and AUTHORITY_ID.fullmatch(
+                str(value.get("host_kernel_generation"))
+            )
+            is None
+        )
         or record_id != digest_json(material)
     ):
         raise ConfigurationError("host capacity identity or digest is invalid")
@@ -2405,14 +6026,23 @@ def _read_host_capacity_record(
     now: datetime,
     require_live: bool,
     require_current_provider: bool = True,
+    _writer_override: Mapping[str, object] | None = None,
 ) -> Mapping[str, object]:
-    root = require_host_runtime(host_runtime_dir)
-    provider = _host_provider_binding(root, host_id=host_id)
+    root = (
+        require_host_runtime(host_runtime_dir)
+        if _writer_override is None
+        else _reject_link_components(
+            host_runtime_dir, label="host runtime authority"
+        ).resolve()
+    )
+    provider = _host_provider_binding(
+        root, host_id=host_id, _writer_override=_writer_override
+    )
     path = host_capacity_path(root, host_id)
     if not path.is_file() or _is_link_like(path):
         raise ConfigurationError("authenticated host capacity is missing")
     try:
-        raw = path.read_bytes()
+        raw = _read_regular_authority_bytes(path, label="authenticated host capacity")
         value = json.loads(
             raw.decode("utf-8"),
             object_pairs_hook=_strict_json_pairs,
@@ -2437,6 +6067,8 @@ def _read_host_capacity_record(
     current_provider = (
         validated.get("provider_generation") == provider.get("provider_generation")
         and validated.get("provider_epoch") == provider.get("provider_epoch")
+        and validated.get("host_kernel_generation")
+        == provider.get("host_kernel_generation")
     )
     immediate_predecessor = (
         validated.get("provider_generation")
@@ -2463,6 +6095,59 @@ def read_host_capacity(
     )
 
 
+def read_host_capacity_predecessor_for_writer_rotation(
+    host_runtime_dir: str | Path,
+    host_id: str,
+    *,
+    now: datetime,
+) -> Mapping[str, object]:
+    """Read an exact retired-writer capacity predecessor for successor CAS.
+
+    This is deliberately not an admission read.  It requires current host-writer
+    authority, authenticates the replaceable projection against the complete
+    append-only history, and permits the provider/kernel coordinates to be stale
+    only so ``publish_host_capacity`` can rotate them.  Callers must never return
+    this record as live capacity or attempt same-generation renewal with it.
+    """
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError(
+            "capacity predecessor rotation read requires host authority"
+        )
+    writer = _host_runtime_identity_unlocked(root)
+    path = host_capacity_path(root, host_id)
+    if not path.is_file() or _is_link_like(path):
+        raise ConfigurationError("capacity predecessor projection is unavailable")
+    value = read_strict_canonical_json(
+        path, label="capacity predecessor projection"
+    )
+    predecessor = validate_host_capacity(
+        value,
+        host_id=host_id,
+        now=now,
+        require_live=False,
+    )
+    history_path = path.parent / "capacity-history.jsonl"
+    if not history_path.is_file() or _is_link_like(history_path):
+        raise ConfigurationError("capacity predecessor has no append-only history")
+    history = _strict_capacity_history(history_path)
+    if (
+        not history
+        or history[-1].get("capacity_record_id") != predecessor.get("record_id")
+    ):
+        raise ConfigurationError(
+            "capacity predecessor differs from its append-only history"
+        )
+    if predecessor.get("host_kernel_generation") == writer.get(
+        "host_kernel_generation"
+    ):
+        raise ConfigurationError(
+            "current-writer capacity must use ordinary admission or renewal reads"
+        )
+    return predecessor
+
+
 def publish_host_capacity(
     host_runtime_dir: str | Path,
     *,
@@ -2477,6 +6162,7 @@ def publish_host_capacity(
     capability_digest: str,
     provider_identity_source: str,
     provider_identity_digest: str,
+    provider_attestation: Mapping[str, object],
     declarative: bool,
     now: datetime,
     expected_generation: str | None,
@@ -2492,6 +6178,7 @@ def publish_host_capacity(
         bound_at=issued_at,
         provider_identity_source=provider_identity_source,
         provider_identity_digest=provider_identity_digest,
+        provider_attestation=provider_attestation,
     )
     material: dict[str, object] = {
         "schema_version": 1,
@@ -2499,6 +6186,7 @@ def publish_host_capacity(
         "host_id": host_id,
         "provider_generation": provider["provider_generation"],
         "provider_epoch": provider["provider_epoch"],
+        "host_kernel_generation": provider["host_kernel_generation"],
         "capacity_generation": capacity_generation,
         "capacity_epoch": capacity_epoch,
         "max_total_sessions": max_total_sessions,
@@ -2711,6 +6399,7 @@ def publish_host_capacity(
         "host_id": host_id,
         "provider_generation": validated["provider_generation"],
         "provider_epoch": validated["provider_epoch"],
+        "host_kernel_generation": validated["host_kernel_generation"],
         "capacity_generation": capacity_generation,
         "capacity_epoch": capacity_epoch,
         "capacity_record_id": validated["record_id"],
@@ -2807,19 +6496,27 @@ def _verify_open_regular_file_identity(
     named_identity = (named.st_dev, named.st_ino)
     if (
         opened_identity != named_identity
-        or any(type(item) is not int or item < 0 for item in opened_identity)
+        or any(type(item) is not int or item <= 0 for item in opened_identity)
     ):
         raise ConfigurationError(f"opened {label} no longer names the requested path")
 
 
-def _strict_capacity_history(path: Path) -> tuple[Mapping[str, object], ...]:
+def _strict_capacity_history(
+    path: Path,
+    *,
+    raw_override: bytes | None = None,
+) -> tuple[Mapping[str, object], ...]:
     try:
-        raw = path.read_bytes()
-        text = raw.decode("utf-8")
-    except (OSError, UnicodeError) as error:
+        raw = (
+            raw_override
+            if raw_override is not None
+            else _read_regular_authority_bytes(path, label="host capacity history")
+        )
+        records = _strict_jsonl_records_bytes(
+            raw, label="host capacity history"
+        )
+    except (OSError, ConfigurationError) as error:
         raise ConfigurationError(f"cannot read host capacity history: {error}") from error
-    if raw and not raw.endswith(b"\n"):
-        raise ConfigurationError("host capacity history has a torn final append")
     legacy_fields = {
         "schema_version",
         "kind",
@@ -2845,21 +6542,44 @@ def _strict_capacity_history(path: Path) -> tuple[Mapping[str, object], ...]:
         "active_reservation_event_ids",
         "renewal_actor",
     }
+    current_legacy_fields = legacy_fields | {"host_kernel_generation"}
+    current_rotation_fields = rotation_fields | {"host_kernel_generation"}
+    current_candidate_fields = candidate_fields | {"host_kernel_generation"}
+    current_renewal_fields = renewal_fields | {"host_kernel_generation"}
+    rotation_schemas = {
+        frozenset(rotation_fields),
+        frozenset(candidate_fields),
+        frozenset(renewal_fields),
+        frozenset(current_rotation_fields),
+        frozenset(current_candidate_fields),
+        frozenset(current_renewal_fields),
+    }
+    candidate_schemas = {
+        frozenset(candidate_fields),
+        frozenset(renewal_fields),
+        frozenset(current_candidate_fields),
+        frozenset(current_renewal_fields),
+    }
+    renewal_schemas = {
+        frozenset(renewal_fields),
+        frozenset(current_renewal_fields),
+    }
     prior_event: str | None = None
     prior_generation: str | None = None
     prior_capacity_record_id: str | None = None
     prior_epoch = 0
     events: list[Mapping[str, object]] = []
-    for index, line in enumerate(text.splitlines(), 1):
-        value = _strict_canonical_json_line(
-            line, label=f"host capacity history line {index}"
-        )
+    for index, value in enumerate(records, 1):
         field_set = frozenset(value)
         if field_set not in {
             frozenset(legacy_fields),
             frozenset(rotation_fields),
             frozenset(candidate_fields),
             frozenset(renewal_fields),
+            frozenset(current_legacy_fields),
+            frozenset(current_rotation_fields),
+            frozenset(current_candidate_fields),
+            frozenset(current_renewal_fields),
         }:
             raise ConfigurationError(
                 f"host capacity history line {index} schema is invalid"
@@ -2877,6 +6597,13 @@ def _strict_capacity_history(path: Path) -> tuple[Mapping[str, object], ...]:
             or AUTHORITY_ID.fullmatch(str(value.get("provider_generation"))) is None
             or type(value.get("provider_epoch")) is not int
             or int(value["provider_epoch"]) < 1
+            or (
+                "host_kernel_generation" in value
+                and AUTHORITY_ID.fullmatch(
+                    str(value.get("host_kernel_generation"))
+                )
+                is None
+            )
             or type(value.get("capacity_epoch")) is not int
             or int(value["capacity_epoch"]) != expected_epoch
             or (
@@ -2891,11 +6618,7 @@ def _strict_capacity_history(path: Path) -> tuple[Mapping[str, object], ...]:
             raise ConfigurationError(
                 f"host capacity history line {index} lineage is invalid"
             )
-        if field_set in {
-            frozenset(rotation_fields),
-            frozenset(candidate_fields),
-            frozenset(renewal_fields),
-        }:
+        if field_set in rotation_schemas:
             if (
                 value.get("rotation_reason")
                 not in {
@@ -2930,13 +6653,13 @@ def _strict_capacity_history(path: Path) -> tuple[Mapping[str, object], ...]:
                 )
                 or (
                     value.get("rotation_reason") == "SAME_POLICY_RENEWAL"
-                    and field_set != frozenset(renewal_fields)
+                    and field_set not in renewal_schemas
                 )
             ):
                 raise ConfigurationError(
                     f"host capacity history line {index} rotation receipt is invalid"
                 )
-        if field_set == frozenset(renewal_fields):
+        if field_set in renewal_schemas:
             if (
                 value.get("rotation_reason") != "SAME_POLICY_RENEWAL"
                 or AUTHORITY_ID.fullmatch(
@@ -2958,7 +6681,7 @@ def _strict_capacity_history(path: Path) -> tuple[Mapping[str, object], ...]:
                 raise ConfigurationError(
                     f"host capacity history line {index} renewal evidence is invalid"
                 )
-        if field_set in {frozenset(candidate_fields), frozenset(renewal_fields)}:
+        if field_set in candidate_schemas:
             candidate = validate_host_capacity(
                 value.get("capacity_record"),
                 host_id=str(value.get("host_id")),
@@ -2972,6 +6695,8 @@ def _strict_capacity_history(path: Path) -> tuple[Mapping[str, object], ...]:
                 or candidate.get("provider_generation")
                 != value.get("provider_generation")
                 or candidate.get("provider_epoch") != value.get("provider_epoch")
+                or candidate.get("host_kernel_generation")
+                != value.get("host_kernel_generation")
                 or candidate.get("record_id") != value.get("capacity_record_id")
             ):
                 raise ConfigurationError(
@@ -3005,6 +6730,570 @@ def _strict_canonical_json_line(line: str, *, label: str) -> Mapping[str, object
 
 def _host_reservation_path(host_runtime_dir: str | Path) -> Path:
     return Path(host_runtime_dir).resolve() / "host-reservations.jsonl"
+
+
+def _host_scheduler_path(host_runtime_dir: str | Path) -> Path:
+    return Path(host_runtime_dir).resolve() / "host-scheduler.jsonl"
+
+
+def _host_scheduler_events_unlocked(
+    host_runtime_dir: str | Path,
+    *,
+    raw_override: bytes | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    path = _host_scheduler_path(host_runtime_dir)
+    if raw_override is None and not path.is_file():
+        return ()
+    raw = (
+        raw_override
+        if raw_override is not None
+        else _read_regular_authority_bytes(path, label="host scheduler ledger")
+    )
+    records = _strict_jsonl_records_bytes(raw, label="host scheduler ledger")
+    fields = {
+        "schema_version",
+        "kind",
+        "state",
+        "host_id",
+        "host_kernel_generation",
+        "capacity_generation",
+        "payload",
+        "actor",
+        "recorded_at",
+        "previous_event_id",
+        "event_id",
+    }
+    previous: str | None = None
+    events: list[Mapping[str, object]] = []
+    demand_ids: set[str] = set()
+    demands: dict[str, Mapping[str, object]] = {}
+    grant_ids: set[str] = set()
+    expired_ids: set[str] = set()
+    for index, event in enumerate(records, 1):
+        material = dict(event)
+        event_id = material.pop("event_id", None)
+        state = event.get("state")
+        payload = event.get("payload")
+        try:
+            parse_time(event.get("recorded_at"))
+        except (TypeError, ValueError) as error:
+            raise ConfigurationError(
+                f"host scheduler ledger line {index} time is invalid"
+            ) from error
+        if (
+            set(event) != fields
+            or event.get("schema_version") != 1
+            or event.get("kind") != HOST_SCHEDULER_EVENT_KIND
+            or state not in HOST_SCHEDULER_EVENT_STATES
+            or not isinstance(event.get("host_id"), str)
+            or not str(event["host_id"]).strip()
+            or AUTHORITY_ID.fullmatch(
+                str(event.get("host_kernel_generation"))
+            )
+            is None
+            or AUTHORITY_ID.fullmatch(str(event.get("capacity_generation")))
+            is None
+            or not isinstance(event.get("actor"), str)
+            or not str(event["actor"]).strip()
+            or event.get("previous_event_id") != previous
+            or event_id != digest_json(material)
+            or not isinstance(payload, Mapping)
+        ):
+            raise ConfigurationError(
+                f"host scheduler ledger line {index} is invalid"
+            )
+        try:
+            if state == "DEMAND":
+                if set(payload) != {"demand"} or not isinstance(
+                    payload.get("demand"), Mapping
+                ):
+                    raise host_scheduler_policy.HostSchedulerError(
+                        "host scheduling demand payload is invalid"
+                    )
+                demand = host_scheduler_policy.validate_demand(payload["demand"])
+                demand_id = str(demand["demand_id"])
+                if demand_id in demand_ids:
+                    raise host_scheduler_policy.HostSchedulerError(
+                        "host scheduling demand is duplicated"
+                    )
+                if any(
+                    demand.get(field) != event.get(field)
+                    for field in (
+                        "host_id",
+                        "host_kernel_generation",
+                        "capacity_generation",
+                    )
+                ):
+                    raise host_scheduler_policy.HostSchedulerError(
+                        "host scheduling demand envelope differs"
+                    )
+                demand_ids.add(demand_id)
+                demands[demand_id] = demand
+            elif state == "GRANT":
+                if set(payload) != {"schedule", "grants"} or not isinstance(
+                    payload.get("schedule"), Mapping
+                ) or not isinstance(payload.get("grants"), list):
+                    raise host_scheduler_policy.HostSchedulerError(
+                        "host scheduling grant payload is invalid"
+                    )
+                schedule = host_scheduler_policy.validate_schedule(
+                    payload["schedule"]
+                )
+                if any(
+                    str(item) not in demand_ids
+                    for item in schedule["demand_ids"]
+                ):
+                    raise host_scheduler_policy.HostSchedulerError(
+                        "host scheduling grant cites an unknown demand"
+                    )
+                grants_by_demand: dict[str, int] = {}
+                for raw_grant in payload["grants"]:
+                    if not isinstance(raw_grant, Mapping):
+                        raise host_scheduler_policy.HostSchedulerError(
+                            "host scheduling grant is not an object"
+                        )
+                    grant = host_scheduler_policy.validate_grant(raw_grant)
+                    grant_id = str(grant["grant_id"])
+                    if grant_id in grant_ids or str(grant["demand_id"]) not in demand_ids:
+                        raise host_scheduler_policy.HostSchedulerError(
+                            "host scheduling grant is duplicated or orphaned"
+                        )
+                    if any(
+                        grant.get(field) != event.get(field)
+                        for field in (
+                            "host_id",
+                            "host_kernel_generation",
+                            "capacity_generation",
+                        )
+                    ) or grant.get("schedule_id") != schedule.get("schedule_id"):
+                        raise host_scheduler_policy.HostSchedulerError(
+                            "host scheduling grant envelope differs"
+                        )
+                    demand = demands[str(grant["demand_id"])]
+                    if (
+                        grant.get("execution_id") != demand.get("execution_id")
+                        or grant.get("local_reservation_id")
+                        not in demand.get("candidate_reservation_ids", ())
+                        or parse_time(grant.get("expires_at"))
+                        <= parse_time(grant.get("issued_at"))
+                    ):
+                        raise host_scheduler_policy.HostSchedulerError(
+                            "host scheduling grant differs from its demand"
+                        )
+                    grants_by_demand[str(grant["demand_id"])] = (
+                        grants_by_demand.get(str(grant["demand_id"]), 0) + 1
+                    )
+                    grant_ids.add(grant_id)
+                expected_counts = {
+                    str(row["demand_id"]): int(row["slots"])
+                    for row in schedule["grants"]
+                }
+                if grants_by_demand != expected_counts:
+                    raise host_scheduler_policy.HostSchedulerError(
+                        "host scheduling grant tokens differ from allocation"
+                    )
+            else:
+                if (
+                    set(payload) != {"grant_ids", "reason"}
+                    or not isinstance(payload.get("grant_ids"), list)
+                    or not payload["grant_ids"]
+                    or len(payload["grant_ids"]) != len(set(payload["grant_ids"]))
+                    or any(
+                        AUTHORITY_ID.fullmatch(str(item)) is None
+                        or str(item) not in grant_ids
+                        or str(item) in expired_ids
+                        for item in payload["grant_ids"]
+                    )
+                    or not isinstance(payload.get("reason"), str)
+                    or not str(payload["reason"]).strip()
+                ):
+                    raise host_scheduler_policy.HostSchedulerError(
+                        "host scheduling expiry payload is invalid"
+                    )
+                expired_ids.update(str(item) for item in payload["grant_ids"])
+        except host_scheduler_policy.HostSchedulerError as error:
+            raise ConfigurationError(
+                f"host scheduler ledger line {index} is invalid: {error}"
+            ) from error
+        previous = str(event_id)
+        events.append(event)
+    return tuple(events)
+
+
+def _append_host_scheduler_event_unlocked(
+    host_runtime_dir: str | Path,
+    *,
+    state: str,
+    host_id: str,
+    host_kernel_generation: str,
+    capacity_generation: str,
+    payload: Mapping[str, object],
+    actor: str,
+    recorded_at: str,
+    events: Sequence[Mapping[str, object]],
+) -> Mapping[str, object]:
+    material: dict[str, object] = {
+        "schema_version": 1,
+        "kind": HOST_SCHEDULER_EVENT_KIND,
+        "state": state,
+        "host_id": host_id,
+        "host_kernel_generation": host_kernel_generation,
+        "capacity_generation": capacity_generation,
+        "payload": dict(payload),
+        "actor": actor,
+        "recorded_at": recorded_at,
+        "previous_event_id": events[-1]["event_id"] if events else None,
+    }
+    event = {**material, "event_id": digest_json(material)}
+    _append_canonical_jsonl(_host_scheduler_path(host_runtime_dir), event)
+    return event
+
+
+def _host_scheduler_projection_unlocked(
+    host_runtime_dir: str | Path,
+    *,
+    host_id: str,
+) -> Mapping[str, object]:
+    events = list(_host_scheduler_events_unlocked(host_runtime_dir))
+    demands: dict[str, Mapping[str, object]] = {}
+    grants: dict[str, Mapping[str, object]] = {}
+    expired: set[str] = set()
+    cursor: str | None = None
+    for event in events:
+        payload = event["payload"]
+        assert isinstance(payload, Mapping)
+        if event["state"] == "DEMAND":
+            demand = payload["demand"]
+            assert isinstance(demand, Mapping)
+            demands[str(demand["demand_id"])] = demand
+        elif event["state"] == "GRANT":
+            schedule = payload["schedule"]
+            assert isinstance(schedule, Mapping)
+            raw_cursor = schedule.get("cursor_execution_id")
+            cursor = str(raw_cursor) if raw_cursor is not None else cursor
+            for grant in payload["grants"]:
+                assert isinstance(grant, Mapping)
+                grants[str(grant["grant_id"])] = grant
+        else:
+            expired.update(str(item) for item in payload["grant_ids"])
+    consumed = {
+        str(event["host_scheduler_grant_id"])
+        for event in _host_reservation_events_unlocked(host_runtime_dir)
+        if event.get("host_scheduler_grant_id") is not None
+    }
+    unknown = consumed - set(grants)
+    if unknown:
+        raise ConfigurationError(
+            "host reservation ledger consumes an unknown scheduler grant"
+        )
+    outstanding = {
+        grant_id: grant
+        for grant_id, grant in grants.items()
+        if grant_id not in expired and grant_id not in consumed
+    }
+    active_grant_ids = set(grants) - expired
+    remaining_candidates: dict[str, list[str]] = {}
+    for demand_id, demand in demands.items():
+        allocated = {
+            str(grant["local_reservation_id"])
+            for grant_id, grant in grants.items()
+            if str(grant["demand_id"]) == demand_id
+            and grant_id in active_grant_ids
+        }
+        remaining_candidates[demand_id] = [
+            str(item)
+            for item in demand["candidate_reservation_ids"]
+            if str(item) not in allocated
+        ]
+    return {
+        "events": events,
+        "demands": demands,
+        "grants": grants,
+        "expired_grant_ids": expired,
+        "consumed_grant_ids": consumed,
+        "outstanding_grants": outstanding,
+        "remaining_candidates": remaining_candidates,
+        "cursor_execution_id": cursor,
+        "host_id": host_id,
+    }
+
+
+def record_host_scheduler_demand(
+    host_runtime_dir: str | Path,
+    *,
+    host_id: str,
+    repository: str,
+    repository_transport_digest: str,
+    execution_namespace: str,
+    execution_id: str,
+    plan_fingerprint: str,
+    capacity_generation: str,
+    execution_adapter_identity: Mapping[str, object],
+    candidate_reservation_ids: Sequence[str],
+    weight: int,
+    actor: str,
+    recorded_at: str,
+) -> Mapping[str, object]:
+    """Persist one exact execution demand under caller-held host authority."""
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError("host scheduler demand requires host authority")
+    if not isinstance(actor, str) or not actor.strip():
+        raise ConfigurationError("host scheduler demand actor is required")
+    try:
+        recorded = parse_time(recorded_at)
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError("host scheduler demand time is invalid") from error
+    writer = _host_runtime_identity_unlocked(root)
+    capacity = read_host_capacity(root, host_id, now=recorded)
+    if capacity.get("capacity_generation") != capacity_generation:
+        raise ConfigurationError("host scheduler demand capacity is stale")
+    adapter_record_id = str(execution_adapter_identity.get("record_id"))
+    installed_adapter = read_execution_adapter_identity(root, adapter_record_id)
+    adapter_path = (
+        root
+        / "execution-adapter-bindings"
+        / (adapter_record_id.removeprefix("sha256:") + ".json")
+    )
+    adapter_raw = _read_regular_authority_bytes(
+        adapter_path, label="host scheduler execution adapter"
+    )
+    if (
+        installed_adapter != execution_adapter_identity
+        or installed_adapter.get("execution_namespace") != execution_namespace
+        or installed_adapter.get("execution_id") != execution_id
+        or installed_adapter.get("host_id") != host_id
+        or installed_adapter.get("repository") != repository
+    ):
+        raise ConfigurationError("host scheduler demand adapter fence differs")
+    projection = _host_scheduler_projection_unlocked(root, host_id=host_id)
+    open_demands = [
+        demand
+        for demand_id, demand in projection["demands"].items()
+        if demand.get("execution_id") == execution_id
+        and projection["remaining_candidates"].get(demand_id)
+    ]
+    candidate_ids = list(candidate_reservation_ids)
+    stable = {
+        "repository": repository,
+        "repository_transport_digest": repository_transport_digest,
+        "execution_namespace": execution_namespace,
+        "execution_id": execution_id,
+        "plan_fingerprint": plan_fingerprint,
+        "host_kernel_generation": writer["host_kernel_generation"],
+        "capacity_generation": capacity_generation,
+        "execution_adapter_identity_record_id": adapter_record_id,
+        "execution_adapter_identity_path": str(adapter_path.relative_to(root)).replace(
+            "\\", "/"
+        ),
+        "execution_adapter_identity_blob_digest": "sha256:"
+        + sha256(adapter_raw).hexdigest(),
+        "candidate_reservation_ids": candidate_ids,
+        "requested_slots": len(candidate_ids),
+        "weight": weight,
+    }
+    for existing in open_demands:
+        if all(existing.get(field) == value for field, value in stable.items()):
+            return existing
+        if set(existing.get("candidate_reservation_ids", ())) & set(candidate_ids):
+            raise ConfigurationError(
+                "execution has overlapping outstanding host scheduling demands"
+            )
+    demand = host_scheduler_policy.make_demand(
+        host_id=host_id,
+        repository=repository,
+        repository_transport_digest=repository_transport_digest,
+        execution_namespace=execution_namespace,
+        execution_id=execution_id,
+        plan_fingerprint=plan_fingerprint,
+        host_kernel_generation=str(writer["host_kernel_generation"]),
+        capacity_generation=capacity_generation,
+        execution_adapter_identity_record_id=adapter_record_id,
+        execution_adapter_identity_path=str(adapter_path.relative_to(root)).replace(
+            "\\", "/"
+        ),
+        execution_adapter_identity_blob_digest="sha256:"
+        + sha256(adapter_raw).hexdigest(),
+        candidate_reservation_ids=candidate_ids,
+        requested_slots=len(candidate_ids),
+        weight=weight,
+        enqueued_epoch=1
+        + sum(event.get("state") == "DEMAND" for event in projection["events"]),
+    )
+    events = list(projection["events"])
+    _append_host_scheduler_event_unlocked(
+        root,
+        state="DEMAND",
+        host_id=host_id,
+        host_kernel_generation=str(writer["host_kernel_generation"]),
+        capacity_generation=capacity_generation,
+        payload={"demand": demand},
+        actor=actor,
+        recorded_at=recorded_at,
+        events=events,
+    )
+    return demand
+
+
+def grant_host_scheduler_capacity(
+    host_runtime_dir: str | Path,
+    *,
+    host_id: str,
+    actor: str,
+    now: datetime,
+    grant_seconds: int = 300,
+) -> Mapping[str, object]:
+    """Expire unused grants and issue a deterministic work-conserving schedule."""
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError("host scheduler grant requires host authority")
+    if (
+        not isinstance(actor, str)
+        or not actor.strip()
+        or type(grant_seconds) is not int
+        or not 1 <= grant_seconds <= 900
+    ):
+        raise ConfigurationError("host scheduler grant lifetime is invalid")
+    writer = _host_runtime_identity_unlocked(root)
+    capacity = read_host_capacity(root, host_id, now=now)
+    projection = _host_scheduler_projection_unlocked(root, host_id=host_id)
+    events = list(projection["events"])
+    expired_now = sorted(
+        grant_id
+        for grant_id, grant in projection["outstanding_grants"].items()
+        if parse_time(grant["expires_at"]) <= now
+    )
+    if expired_now:
+        event = _append_host_scheduler_event_unlocked(
+            root,
+            state="EXPIRY",
+            host_id=host_id,
+            host_kernel_generation=str(writer["host_kernel_generation"]),
+            capacity_generation=str(capacity["capacity_generation"]),
+            payload={
+                "grant_ids": expired_now,
+                "reason": "unused scheduler grant reached its sealed expiry",
+            },
+            actor=actor,
+            recorded_at=format_time(now),
+            events=events,
+        )
+        events.append(event)
+        projection = _host_scheduler_projection_unlocked(root, host_id=host_id)
+    active = active_global_host_reservations(root)
+    unexpired_outstanding = {
+        grant_id: grant
+        for grant_id, grant in projection["outstanding_grants"].items()
+        if parse_time(grant["expires_at"]) > now
+    }
+    available = max(
+        0,
+        int(capacity["max_total_sessions"])
+        - len(active)
+        - len(unexpired_outstanding),
+    )
+    current_demands = [
+        demand
+        for demand_id, demand in projection["demands"].items()
+        if projection["remaining_candidates"].get(demand_id)
+        and demand.get("host_id") == host_id
+        and demand.get("host_kernel_generation")
+        == writer.get("host_kernel_generation")
+        and demand.get("capacity_generation")
+        == capacity.get("capacity_generation")
+    ]
+    remaining_counts = {
+        str(demand["demand_id"]): len(
+            projection["remaining_candidates"][str(demand["demand_id"])]
+        )
+        for demand in current_demands
+    }
+    if current_demands:
+        schedule = host_scheduler_policy.weighted_round_robin(
+            current_demands,
+            available_slots=available,
+            cursor_execution_id=projection["cursor_execution_id"],
+            remaining_slots_by_demand_id=remaining_counts,
+        )
+    else:
+        schedule = host_scheduler_policy.weighted_round_robin(
+            [], available_slots=0, cursor_execution_id=None
+        )
+    new_grants: list[Mapping[str, object]] = []
+    if schedule["grants"]:
+        expiry = min(
+            parse_time(capacity["expires_at"]),
+            now + timedelta(seconds=grant_seconds),
+        )
+        new_grants = host_scheduler_policy.make_grant_tokens(
+            schedule,
+            current_demands,
+            remaining_candidates_by_demand_id=projection["remaining_candidates"],
+            issued_at=format_time(now),
+            expires_at=format_time(expiry),
+        )
+        _append_host_scheduler_event_unlocked(
+            root,
+            state="GRANT",
+            host_id=host_id,
+            host_kernel_generation=str(writer["host_kernel_generation"]),
+            capacity_generation=str(capacity["capacity_generation"]),
+            payload={"schedule": schedule, "grants": new_grants},
+            actor=actor,
+            recorded_at=format_time(now),
+            events=list(projection["events"]),
+        )
+        projection = _host_scheduler_projection_unlocked(root, host_id=host_id)
+    return {
+        "schedule": schedule,
+        "new_grants": list(new_grants),
+        "outstanding_grants": list(projection["outstanding_grants"].values()),
+        "scheduler_event_id": (
+            projection["events"][-1]["event_id"]
+            if projection["events"]
+            else None
+        ),
+    }
+
+
+def host_scheduler_observation(
+    host_runtime_dir: str | Path,
+    *,
+    host_id: str,
+    execution_id: str,
+) -> Mapping[str, object]:
+    """Return a digest-bound read-only wake observation under the host lock."""
+
+    root = require_host_runtime(host_runtime_dir)
+    if not runtime_file_lock_is_held(root / "locks" / "host-authority.lock"):
+        raise ConfigurationError("host scheduler observation requires host authority")
+    projection = _host_scheduler_projection_unlocked(root, host_id=host_id)
+    open_demand_ids = sorted(
+        demand_id
+        for demand_id, demand in projection["demands"].items()
+        if demand.get("execution_id") == execution_id
+        and projection["remaining_candidates"].get(demand_id)
+    )
+    outstanding_grant_ids = sorted(
+        grant_id
+        for grant_id, grant in projection["outstanding_grants"].items()
+        if grant.get("execution_id") == execution_id
+    )
+    material: dict[str, object] = {
+        "kind": "hive-mind-host-scheduler-observation-v1",
+        "host_id": host_id,
+        "execution_id": execution_id,
+        "event_id": (
+            projection["events"][-1]["event_id"]
+            if projection["events"]
+            else None
+        ),
+        "open_demand_ids": open_demand_ids,
+        "outstanding_grant_ids": outstanding_grant_ids,
+    }
+    return {**material, "observation_id": digest_json(material)}
 
 
 def _validate_pre_launch_abort_receipt(
@@ -3455,7 +7744,18 @@ def _validate_dispatcher_admission_intent(
 ) -> Mapping[str, object]:
     """Strictly validate the immutable dispatcher transaction that owns permits."""
 
-    if set(value) != DISPATCH_ADMISSION_INTENT_FIELDS:
+    intent_fields = set(value)
+    schema_version = value.get("schema_version")
+    is_current = (
+        intent_fields == DISPATCH_ADMISSION_INTENT_FIELDS
+        and schema_version in {2, 3}
+    )
+    is_scheduler = is_current and schema_version == 3
+    is_legacy = (
+        intent_fields == LEGACY_DISPATCH_ADMISSION_INTENT_FIELDS
+        and schema_version == 1
+    )
+    if not is_current and not is_legacy:
         raise ConfigurationError("dispatcher admission intent schema is ambiguous")
     material = dict(value)
     record_id = material.pop("record_id", None)
@@ -3466,8 +7766,7 @@ def _validate_dispatcher_admission_intent(
     except (TypeError, ValueError) as error:
         raise ConfigurationError("dispatcher admission intent time is invalid") from error
     if (
-        value.get("schema_version") != 1
-        or value.get("kind") != DISPATCH_ADMISSION_INTENT_KIND
+        value.get("kind") != DISPATCH_ADMISSION_INTENT_KIND
         or value.get("execution_id") != execution_id
         or value.get("execution_namespace") != execution_namespace
         or EXECUTION_NAMESPACE.fullmatch(execution_namespace) is None
@@ -3496,6 +7795,32 @@ def _validate_dispatcher_admission_intent(
                 "capacity_generation",
             )
         )
+        or (
+            is_current
+            and (
+                AUTHORITY_ID.fullmatch(
+                    str(value.get("host_kernel_generation"))
+                )
+                is None
+                or AUTHORITY_ID.fullmatch(
+                    str(value.get("execution_adapter_identity_record_id"))
+                )
+                is None
+                or AUTHORITY_ID.fullmatch(
+                    str(value.get("execution_adapter_identity_blob_digest"))
+                )
+                is None
+                or not isinstance(
+                    value.get("execution_adapter_identity_path"), str
+                )
+                or not str(value["execution_adapter_identity_path"]).startswith(
+                    "execution-adapter-bindings/"
+                )
+                or Path(str(value["execution_adapter_identity_path"])).is_absolute()
+                or ".."
+                in Path(str(value["execution_adapter_identity_path"])).parts
+            )
+        )
         or not isinstance(value.get("actor"), str)
         or not str(value["actor"]).strip()
         or record_id != digest_json(material)
@@ -3507,15 +7832,17 @@ def _validate_dispatcher_admission_intent(
         raise ConfigurationError("dispatcher admission intent is invalid")
     seen: set[str] = set()
     for reservation in reservations:
+        reservation_fields = {
+            "node_id",
+            "resource_key",
+            "local_reservation_id",
+            "reservation_id",
+        }
+        if is_scheduler:
+            reservation_fields.add("host_scheduler_grant_id")
         if (
             not isinstance(reservation, Mapping)
-            or set(reservation)
-            != {
-                "node_id",
-                "resource_key",
-                "local_reservation_id",
-                "reservation_id",
-            }
+            or set(reservation) != reservation_fields
             or not isinstance(reservation.get("node_id"), str)
             or not str(reservation["node_id"]).strip()
             or any(
@@ -3524,6 +7851,7 @@ def _validate_dispatcher_admission_intent(
                     "resource_key",
                     "local_reservation_id",
                     "reservation_id",
+                    *(("host_scheduler_grant_id",) if is_scheduler else ()),
                 )
             )
             or str(reservation["reservation_id"]) in seen
@@ -3532,8 +7860,7 @@ def _validate_dispatcher_admission_intent(
                 "dispatcher admission intent reservation inventory is invalid"
             )
         seen.add(str(reservation["reservation_id"]))
-        expected_reservation_id = digest_json(
-            {
+        reservation_identity: dict[str, object] = {
                 "kind": "hive-mind-host-reservation-key-v1",
                 "repository": value["repository"],
                 "execution_id": execution_id,
@@ -3542,8 +7869,21 @@ def _validate_dispatcher_admission_intent(
                 "capacity_generation": value["capacity_generation"],
                 "local_reservation_id": reservation["local_reservation_id"],
                 "reservation_kind": "PRIMARY",
-            }
-        )
+        }
+        if is_current:
+            reservation_identity.update(
+                {
+                    "host_kernel_generation": value["host_kernel_generation"],
+                    "execution_adapter_identity_record_id": value[
+                        "execution_adapter_identity_record_id"
+                    ],
+                }
+            )
+        if is_scheduler:
+            reservation_identity["host_scheduler_grant_id"] = reservation[
+                "host_scheduler_grant_id"
+            ]
+        expected_reservation_id = digest_json(reservation_identity)
         if reservation.get("reservation_id") != expected_reservation_id:
             raise ConfigurationError(
                 "dispatcher admission intent reservation digest is invalid"
@@ -3688,7 +8028,6 @@ def _verify_pre_launch_abort_negative_cut(
                 intent_value = read_strict_canonical_json(
                     intent_path,
                     label="dispatcher admission intent",
-                    expected_fields=DISPATCH_ADMISSION_INTENT_FIELDS,
                 )
                 if not isinstance(intent_value, Mapping):
                     raise ConfigurationError(
@@ -3873,6 +8212,15 @@ def _verify_local_terminal_event_cut(
                     != reservation.get("capacity_generation")
                     or local_terminal_event.get("host_reservation_id")
                     != reservation.get("reservation_id")
+                    or any(
+                        local_terminal_event.get(field) != reservation.get(field)
+                        for field in (
+                            "host_kernel_generation",
+                            "execution_adapter_identity_record_id",
+                            "execution_adapter_identity_path",
+                            "execution_adapter_identity_blob_digest",
+                        )
+                    )
                 ):
                     raise ConfigurationError(
                         "local terminal event does not match the authoritative ledger"
@@ -3883,20 +8231,24 @@ def _verify_local_terminal_event_cut(
 
 def _host_reservation_events_unlocked(
     host_runtime_dir: str | Path,
+    *,
+    raw_override: bytes | None = None,
 ) -> tuple[Mapping[str, object], ...]:
     path = _host_reservation_path(host_runtime_dir)
-    if not path.is_file():
+    if raw_override is None and not path.is_file():
         return ()
     try:
-        raw = path.read_bytes()
-        text = raw.decode("utf-8")
-    except (OSError, UnicodeError) as error:
+        raw = (
+            raw_override
+            if raw_override is not None
+            else _read_regular_authority_bytes(path, label="host reservation ledger")
+        )
+        records = _strict_jsonl_records_bytes(raw, label="host reservation ledger")
+    except (OSError, ConfigurationError) as error:
         raise ConfigurationError(f"cannot read host reservation ledger: {error}") from error
-    if raw and not raw.endswith(b"\n"):
-        raise ConfigurationError("host reservation ledger has a torn final append")
     previous: str | None = None
     events: list[Mapping[str, object]] = []
-    reserve_fields = {
+    legacy_reserve_fields = {
         "schema_version",
         "kind",
         "state",
@@ -3917,6 +8269,15 @@ def _host_reservation_events_unlocked(
         "previous_event_id",
         "event_id",
     }
+    authority_provenance_fields = {
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
+    }
+    scheduler_provenance_fields = {"host_scheduler_grant_id"}
+    pre_scheduler_reserve_fields = legacy_reserve_fields | authority_provenance_fields
+    reserve_fields = pre_scheduler_reserve_fields | scheduler_provenance_fields
     release_fields = reserve_fields | {
         "released_at",
         "release_actor",
@@ -3931,6 +8292,25 @@ def _host_reservation_events_unlocked(
         "renewal_count",
     }
     renewed_release_fields = renewal_fields | {
+        "released_at",
+        "release_actor",
+        "release_reason",
+        "external_cancellation",
+    }
+    pre_scheduler_release_fields = pre_scheduler_reserve_fields | {
+        "released_at",
+        "release_actor",
+        "release_reason",
+        "external_cancellation",
+    }
+    pre_scheduler_renewal_fields = pre_scheduler_reserve_fields | {
+        "renewed_at",
+        "renewal_actor",
+        "renewal_reason",
+        "prior_expires_at",
+        "renewal_count",
+    }
+    pre_scheduler_renewed_release_fields = pre_scheduler_renewal_fields | {
         "released_at",
         "release_actor",
         "release_reason",
@@ -3959,18 +8339,6 @@ def _host_reservation_events_unlocked(
         "validation_terminal_evidence_type",
         "validation_terminal_status",
     }
-    evidenced_release_fields = release_fields | terminal_release_evidence_fields
-    renewed_evidenced_release_fields = (
-        renewed_release_fields | terminal_release_evidence_fields
-    )
-    pre_launch_release_fields = release_fields | pre_launch_abort_fields
-    renewed_pre_launch_release_fields = (
-        renewed_release_fields | pre_launch_abort_fields
-    )
-    validation_release_fields = release_fields | validation_terminal_evidence_fields
-    renewed_validation_release_fields = (
-        renewed_release_fields | validation_terminal_evidence_fields
-    )
     recovery_evidence_fields = {
         "lifecycle_observation_id",
         "lifecycle_observation_path",
@@ -3979,50 +8347,133 @@ def _host_reservation_events_unlocked(
         "lifecycle_host_id",
         "local_terminal_event_id",
     }
-    recovery_fields = release_fields | recovery_evidence_fields
-    renewed_recovery_fields = renewed_release_fields | recovery_evidence_fields
+    legacy_release_fields = legacy_reserve_fields | {
+        "released_at",
+        "release_actor",
+        "release_reason",
+        "external_cancellation",
+    }
+    legacy_renewal_fields = legacy_reserve_fields | {
+        "renewed_at",
+        "renewal_actor",
+        "renewal_reason",
+        "prior_expires_at",
+        "renewal_count",
+    }
+    legacy_renewed_release_fields = legacy_renewal_fields | {
+        "released_at",
+        "release_actor",
+        "release_reason",
+        "external_cancellation",
+    }
+
+    def _schema_variants(
+        current_base: set[str],
+        pre_scheduler_base: set[str],
+        legacy_base: set[str],
+        extra: set[str],
+    ) -> tuple[set[str], set[str], set[str]]:
+        return (
+            current_base | extra,
+            pre_scheduler_base | extra,
+            legacy_base | extra,
+        )
+
+    evidenced_release_fields = _schema_variants(
+        release_fields,
+        pre_scheduler_release_fields,
+        legacy_release_fields,
+        terminal_release_evidence_fields,
+    )
+    renewed_evidenced_release_fields = _schema_variants(
+        renewed_release_fields,
+        pre_scheduler_renewed_release_fields,
+        legacy_renewed_release_fields,
+        terminal_release_evidence_fields,
+    )
+    pre_launch_release_fields = _schema_variants(
+        release_fields,
+        pre_scheduler_release_fields,
+        legacy_release_fields,
+        pre_launch_abort_fields,
+    )
+    renewed_pre_launch_release_fields = _schema_variants(
+        renewed_release_fields,
+        pre_scheduler_renewed_release_fields,
+        legacy_renewed_release_fields,
+        pre_launch_abort_fields,
+    )
+    validation_release_fields = _schema_variants(
+        release_fields,
+        pre_scheduler_release_fields,
+        legacy_release_fields,
+        validation_terminal_evidence_fields,
+    )
+    renewed_validation_release_fields = _schema_variants(
+        renewed_release_fields,
+        pre_scheduler_renewed_release_fields,
+        legacy_renewed_release_fields,
+        validation_terminal_evidence_fields,
+    )
+    recovery_fields = _schema_variants(
+        release_fields,
+        pre_scheduler_release_fields,
+        legacy_release_fields,
+        recovery_evidence_fields,
+    )
+    renewed_recovery_fields = _schema_variants(
+        renewed_release_fields,
+        pre_scheduler_renewed_release_fields,
+        legacy_renewed_release_fields,
+        recovery_evidence_fields,
+    )
     latest: dict[str, Mapping[str, object]] = {}
-    for index, line in enumerate(text.splitlines(), 1):
-        try:
-            value = json.loads(
-                line,
-                object_pairs_hook=_strict_json_pairs,
-                parse_constant=_reject_json_constant,
-            )
-        except (json.JSONDecodeError, ValueError) as error:
-            raise ConfigurationError(
-                f"host reservation ledger line {index} is malformed"
-            ) from error
-        if not isinstance(value, Mapping):
-            raise ConfigurationError(
-                f"host reservation ledger line {index} must be an object"
-            )
-        if line != json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False):
-            raise ConfigurationError(
-                f"host reservation ledger line {index} is noncanonical"
-            )
+    for index, value in enumerate(records, 1):
         state = value.get("state")
         valid_schemas = {
-            "RESERVED": (reserve_fields,),
-            "RENEWED": (renewal_fields,),
+            "RESERVED": (
+                reserve_fields,
+                pre_scheduler_reserve_fields,
+                legacy_reserve_fields,
+            ),
+            "RENEWED": (
+                renewal_fields,
+                pre_scheduler_reserve_fields
+                | {
+                    "renewed_at",
+                    "renewal_actor",
+                    "renewal_reason",
+                    "prior_expires_at",
+                    "renewal_count",
+                },
+                legacy_renewal_fields,
+            ),
             "RELEASED": (
                 release_fields,
+                pre_scheduler_release_fields,
+                legacy_release_fields,
                 renewed_release_fields,
-                evidenced_release_fields,
-                renewed_evidenced_release_fields,
-                pre_launch_release_fields,
-                renewed_pre_launch_release_fields,
-                validation_release_fields,
-                renewed_validation_release_fields,
+                pre_scheduler_renewed_release_fields,
+                legacy_renewed_release_fields,
+                *evidenced_release_fields,
+                *renewed_evidenced_release_fields,
+                *pre_launch_release_fields,
+                *renewed_pre_launch_release_fields,
+                *validation_release_fields,
+                *renewed_validation_release_fields,
             ),
             # The release-shaped EXPIRED_FENCED schema is an explicitly
             # enumerated pre-lifecycle-evidence legacy row. New writers cannot
             # emit it; replay preserves evidence without silently broadening it.
             "EXPIRED_FENCED": (
                 release_fields,
+                pre_scheduler_release_fields,
+                legacy_release_fields,
                 renewed_release_fields,
-                recovery_fields,
-                renewed_recovery_fields,
+                pre_scheduler_renewed_release_fields,
+                legacy_renewed_release_fields,
+                *recovery_fields,
+                *renewed_recovery_fields,
             ),
         }
         if state not in HOST_RESERVATION_STATES or not any(
@@ -4046,6 +8497,8 @@ def _host_reservation_events_unlocked(
             raise ConfigurationError(
                 f"host reservation ledger line {index} identity is invalid"
             )
+        current_schema = authority_provenance_fields.issubset(value)
+        scheduler_schema = scheduler_provenance_fields.issubset(value)
         identity = {
             "kind": "hive-mind-host-reservation-key-v1",
             "repository": value.get("repository"),
@@ -4056,6 +8509,21 @@ def _host_reservation_events_unlocked(
             "local_reservation_id": value.get("local_reservation_id"),
             "reservation_kind": value.get("reservation_kind"),
         }
+        if current_schema:
+            identity.update(
+                {
+                    "host_kernel_generation": value.get(
+                        "host_kernel_generation"
+                    ),
+                    "execution_adapter_identity_record_id": value.get(
+                        "execution_adapter_identity_record_id"
+                    ),
+                }
+            )
+        if scheduler_schema:
+            identity["host_scheduler_grant_id"] = value.get(
+                "host_scheduler_grant_id"
+            )
         if reservation_id != digest_json(identity):
             raise ConfigurationError(
                 f"host reservation ledger line {index} reservation digest is invalid"
@@ -4088,6 +8556,77 @@ def _host_reservation_events_unlocked(
             raise ConfigurationError(
                 f"host reservation ledger line {index} coordinates are invalid"
             )
+        if current_schema:
+            adapter_record_id = value.get("execution_adapter_identity_record_id")
+            adapter_path = value.get("execution_adapter_identity_path")
+            adapter_blob = value.get("execution_adapter_identity_blob_digest")
+            if AUTHORITY_ID.fullmatch(
+                str(value.get("host_kernel_generation"))
+            ) is None:
+                raise ConfigurationError(
+                    f"host reservation ledger line {index} has no writer generation"
+                )
+            if value.get("reservation_kind") == "VALIDATION":
+                if any(
+                    item is not None
+                    for item in (adapter_record_id, adapter_path, adapter_blob)
+                ):
+                    raise ConfigurationError(
+                        f"host reservation ledger line {index} gives internal validation an external adapter"
+                    )
+            else:
+                if (
+                    AUTHORITY_ID.fullmatch(str(adapter_record_id)) is None
+                    or adapter_path
+                    != "execution-adapter-bindings/"
+                    + str(adapter_record_id).removeprefix("sha256:")
+                    + ".json"
+                    or AUTHORITY_ID.fullmatch(str(adapter_blob)) is None
+                ):
+                    raise ConfigurationError(
+                        f"host reservation ledger line {index} adapter fence is invalid"
+                    )
+                adapter_file = Path(host_runtime_dir) / str(adapter_path)
+                adapter_raw = _read_regular_authority_bytes(
+                    adapter_file,
+                    label="host reservation execution adapter evidence",
+                )
+                adapter_binding = parse_strict_canonical_json_bytes(
+                    adapter_raw,
+                    label="host reservation execution adapter evidence",
+                    expected_fields=EXECUTION_ADAPTER_IDENTITY_FIELDS,
+                )
+                validated_adapter = _validate_execution_adapter_identity_binding(
+                    Path(host_runtime_dir), adapter_binding
+                )
+                if (
+                    validated_adapter.get("record_id") != adapter_record_id
+                    or "sha256:" + sha256(adapter_raw).hexdigest() != adapter_blob
+                    or any(
+                        validated_adapter.get(field) != value.get(field)
+                        for field in (
+                            "repository",
+                            "execution_id",
+                            "host_id",
+                            "provider_generation",
+                            "provider_epoch",
+                        )
+                    )
+                ):
+                    raise ConfigurationError(
+                        f"host reservation ledger line {index} adapter evidence changed"
+                    )
+        if scheduler_schema:
+            grant_id = value.get("host_scheduler_grant_id")
+            if value.get("reservation_kind") == "VALIDATION":
+                if grant_id is not None:
+                    raise ConfigurationError(
+                        f"host reservation ledger line {index} gives validation a scheduler grant"
+                    )
+            elif AUTHORITY_ID.fullmatch(str(grant_id)) is None:
+                raise ConfigurationError(
+                    f"host reservation ledger line {index} scheduler grant is invalid"
+                )
         try:
             reserved = parse_time(value.get("reserved_at"))
             expires = parse_time(value.get("expires_at"))
@@ -4538,6 +9077,1043 @@ def global_host_reservation_record(
     )
 
 
+HOST_AUTHORITY_TORN_TAIL_RECOVERY_KIND = (
+    "hive-mind-host-authority-torn-tail-recovery-v1"
+)
+HOST_AUTHORITY_TORN_TAIL_COMPLETE_KIND = (
+    "hive-mind-host-authority-torn-tail-complete-v1"
+)
+HOST_AUTHORITY_TORN_TAIL_ACTIONS = frozenset({"TRUNCATE", "APPEND_NEWLINE"})
+HOST_AUTHORITY_TORN_TAIL_PREPARED_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "status",
+        "ledger_kind",
+        "ledger_path",
+        "host_id",
+        "raw_digest",
+        "prefix_digest",
+        "tail_digest",
+        "tail_bytes",
+        "action",
+        "output_digest",
+        "archive_path",
+        "host_kernel_generation",
+        "host_kernel_record_id",
+        "actor",
+        "reason",
+        "recovery_id",
+        "record_id",
+    }
+)
+HOST_AUTHORITY_TORN_TAIL_COMPLETE_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "status",
+        "recovery_id",
+        "prepared_record_id",
+        "ledger_kind",
+        "ledger_path",
+        "prefix_digest",
+        "output_digest",
+        "action",
+        "archive_path",
+        "completed_by",
+        "completed_at",
+        "record_id",
+    }
+)
+
+
+def _pending_host_torn_tail_recoveries(
+    host_runtime_dir: Path,
+) -> tuple[Path, ...]:
+    recovery_base = host_runtime_dir / "torn-tail-recoveries"
+    if not recovery_base.exists() and not _is_link_like(recovery_base):
+        return ()
+    _reject_link_components(
+        recovery_base, label="host torn-tail recovery authority"
+    )
+    if not recovery_base.is_dir():
+        raise ConfigurationError(
+            "host torn-tail recovery authority is not a directory"
+        )
+    pending: list[Path] = []
+    for prepared_path in sorted(recovery_base.glob("*/*.prepared.json")):
+        prepared = read_strict_canonical_json(
+            prepared_path, label="host torn-tail PREPARED fence"
+        )
+        prepared_material = (
+            dict(prepared) if isinstance(prepared, Mapping) else {}
+        )
+        prepared_record_id = prepared_material.pop("record_id", None)
+        recovery_id = prepared.get("recovery_id") if isinstance(prepared, Mapping) else None
+        recovery_material = (
+            {
+                key: prepared[key]
+                for key in (
+                    "ledger_kind",
+                    "ledger_path",
+                    "host_id",
+                    "raw_digest",
+                    "prefix_digest",
+                    "tail_digest",
+                    "tail_bytes",
+                    "action",
+                    "output_digest",
+                    "host_kernel_generation",
+                    "host_kernel_record_id",
+                )
+            }
+            if isinstance(prepared, Mapping)
+            and HOST_AUTHORITY_TORN_TAIL_PREPARED_FIELDS.issubset(prepared)
+            else {}
+        )
+        ledger_kind = prepared.get("ledger_kind") if isinstance(prepared, Mapping) else None
+        ledger_path = prepared.get("ledger_path") if isinstance(prepared, Mapping) else None
+        expected_directory = (
+            recovery_base
+            / digest_json({"kind": ledger_kind, "path": ledger_path}).removeprefix(
+                "sha256:"
+            )
+            if isinstance(ledger_kind, str) and isinstance(ledger_path, str)
+            else None
+        )
+        expected_archive = (
+            str(
+                (
+                    prepared_path.parent
+                    / (
+                        str(prepared.get("tail_digest")).removeprefix("sha256:")
+                        + ".bin"
+                    )
+                ).relative_to(host_runtime_dir)
+            ).replace("\\", "/")
+            if isinstance(prepared, Mapping)
+            and AUTHORITY_ID.fullmatch(str(prepared.get("tail_digest")))
+            else None
+        )
+        if (
+            not isinstance(prepared, Mapping)
+            or set(prepared) != HOST_AUTHORITY_TORN_TAIL_PREPARED_FIELDS
+            or prepared.get("schema_version") != 1
+            or prepared.get("kind") != HOST_AUTHORITY_TORN_TAIL_RECOVERY_KIND
+            or prepared.get("status") != "PREPARED"
+            or ledger_kind
+            not in {
+                "repository-registry",
+                "provider-history",
+                "capacity-history",
+                "reservation-history",
+                "scheduler-history",
+                "host-kernel-history",
+            }
+            or not isinstance(ledger_path, str)
+            or Path(ledger_path).is_absolute()
+            or ".." in Path(ledger_path).parts
+            or prepared.get("action") not in HOST_AUTHORITY_TORN_TAIL_ACTIONS
+            or AUTHORITY_ID.fullmatch(str(prepared.get("raw_digest"))) is None
+            or AUTHORITY_ID.fullmatch(str(prepared.get("prefix_digest"))) is None
+            or AUTHORITY_ID.fullmatch(str(prepared.get("tail_digest"))) is None
+            or AUTHORITY_ID.fullmatch(str(prepared.get("output_digest"))) is None
+            or AUTHORITY_ID.fullmatch(
+                str(prepared.get("host_kernel_generation"))
+            )
+            is None
+            or AUTHORITY_ID.fullmatch(str(prepared.get("host_kernel_record_id")))
+            is None
+            or type(prepared.get("tail_bytes")) is not int
+            or int(prepared["tail_bytes"]) < 1
+            or not isinstance(prepared.get("actor"), str)
+            or not str(prepared["actor"]).strip()
+            or not isinstance(prepared.get("reason"), str)
+            or not str(prepared["reason"]).strip()
+            or AUTHORITY_ID.fullmatch(str(recovery_id)) is None
+            or recovery_id != digest_json(recovery_material)
+            or prepared_record_id != digest_json(prepared_material)
+            or expected_directory is None
+            or prepared_path.parent != expected_directory
+            or prepared_path.name
+            != str(recovery_id).removeprefix("sha256:") + ".prepared.json"
+            or prepared.get("archive_path") != expected_archive
+        ):
+            raise ConfigurationError("host torn-tail PREPARED fence is invalid")
+        archive_path = host_runtime_dir / str(prepared["archive_path"])
+        archive = _read_regular_authority_bytes(
+            archive_path, label="host torn-tail PREPARED archive"
+        )
+        if (
+            len(archive) != prepared.get("tail_bytes")
+            or "sha256:" + sha256(archive).hexdigest()
+            != prepared.get("tail_digest")
+        ):
+            raise ConfigurationError("host torn-tail PREPARED archive changed")
+        complete_path = prepared_path.with_name(
+            str(recovery_id).removeprefix("sha256:") + ".complete.json"
+        )
+        if not complete_path.exists() and not _is_link_like(complete_path):
+            pending.append(prepared_path)
+            continue
+        complete = read_strict_canonical_json(
+            complete_path, label="host torn-tail COMPLETE fence"
+        )
+        complete_material = (
+            dict(complete) if isinstance(complete, Mapping) else {}
+        )
+        complete_record_id = complete_material.pop("record_id", None)
+        if (
+            not isinstance(complete, Mapping)
+            or set(complete) != HOST_AUTHORITY_TORN_TAIL_COMPLETE_FIELDS
+            or complete.get("schema_version") != 1
+            or complete.get("kind") != HOST_AUTHORITY_TORN_TAIL_COMPLETE_KIND
+            or complete.get("status") != "COMPLETE"
+            or complete.get("recovery_id") != recovery_id
+            or complete.get("prepared_record_id") != prepared.get("record_id")
+            or complete.get("ledger_kind") != prepared.get("ledger_kind")
+            or complete.get("ledger_path") != prepared.get("ledger_path")
+            or complete.get("prefix_digest") != prepared.get("prefix_digest")
+            or complete.get("output_digest") != prepared.get("output_digest")
+            or complete.get("action") != prepared.get("action")
+            or complete.get("archive_path") != prepared.get("archive_path")
+            or not isinstance(complete.get("completed_by"), str)
+            or not str(complete["completed_by"]).strip()
+            or complete_record_id != digest_json(complete_material)
+        ):
+            raise ConfigurationError("host torn-tail COMPLETE fence is invalid")
+        try:
+            parse_time(complete.get("completed_at"))
+        except (TypeError, ValueError) as error:
+            raise ConfigurationError(
+                "host torn-tail COMPLETE fence time is invalid"
+            ) from error
+    return tuple(pending)
+
+
+def _provably_incomplete_authority_json_tail(tail: bytes) -> bool:
+    """Return true only for a syntactic prefix of canonical one-line JSON.
+
+    ``JSONDecodeError.pos`` is not a prefix proof (for example ``{"a" x``
+    reports an error at EOF-adjacent input).  This small recursive recognizer
+    distinguishes an actually incomplete token/container from invalid complete
+    syntax and also verifies the syntax preceding a partial UTF-8 code point.
+    """
+
+    if not tail or not tail.startswith(b"{"):
+        return False
+
+    decoder = codecs.getincrementaldecoder("utf-8")("strict")
+    try:
+        text = decoder.decode(tail, final=False)
+    except UnicodeDecodeError:
+        return False
+    pending_utf8 = bool(decoder.getstate()[0])
+
+    class Incomplete(Exception):
+        def __init__(self, string_prefix: str | None = None) -> None:
+            super().__init__()
+            self.string_prefix = string_prefix
+
+    class Invalid(Exception):
+        pass
+
+    length = len(text)
+
+    def need(position: int) -> str:
+        if position >= length:
+            raise Incomplete
+        return text[position]
+
+    def parse_string(position: int) -> int:
+        start = position
+        if need(position) != '"':
+            raise Invalid
+        position += 1
+        decoded_prefix: list[str] = []
+        while True:
+            if position >= length:
+                raise Incomplete("".join(decoded_prefix))
+            character = text[position]
+            if character == '"':
+                end = position + 1
+                token = text[start:end]
+                try:
+                    decoded = json.loads(token)
+                    canonical = json.dumps(
+                        decoded,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    )
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    raise Invalid
+                if not isinstance(decoded, str) or token != canonical:
+                    raise Invalid
+                return end
+            if ord(character) < 0x20:
+                raise Invalid
+            if character != "\\":
+                decoded_prefix.append(character)
+                position += 1
+                continue
+            position += 1
+            if position >= length:
+                raise Incomplete("".join(decoded_prefix))
+            escape = text[position]
+            simple_escapes = {
+                '"': '"',
+                "\\": "\\",
+                "b": "\b",
+                "f": "\f",
+                "n": "\n",
+                "r": "\r",
+                "t": "\t",
+            }
+            if escape in simple_escapes:
+                decoded_prefix.append(simple_escapes[escape])
+                position += 1
+                continue
+            if escape != "u":
+                raise Invalid
+            position += 1
+            digits: list[str] = []
+            for _ in range(4):
+                if position >= length:
+                    raise Incomplete("".join(decoded_prefix))
+                if text[position] not in "0123456789abcdef":
+                    raise Invalid
+                digits.append(text[position])
+                position += 1
+            codepoint = int("".join(digits), 16)
+            if codepoint >= 0x20 or codepoint in {8, 9, 10, 12, 13}:
+                raise Invalid
+            decoded_prefix.append(chr(codepoint))
+
+    def parse_number(position: int) -> int:
+        if need(position) == "-":
+            position += 1
+            need(position)
+        if need(position) == "0":
+            position += 1
+            if position < length and text[position].isdigit():
+                raise Invalid
+        elif need(position) in "123456789":
+            while position < length and text[position].isdigit():
+                position += 1
+        else:
+            raise Invalid
+        if position < length and text[position] == ".":
+            position += 1
+            if position >= length:
+                raise Incomplete
+            if not text[position].isdigit():
+                raise Invalid
+            while position < length and text[position].isdigit():
+                position += 1
+        if position < length and text[position] in "eE":
+            position += 1
+            if position >= length:
+                raise Incomplete
+            if text[position] in "+-":
+                position += 1
+                if position >= length:
+                    raise Incomplete
+            if not text[position].isdigit():
+                raise Invalid
+            while position < length and text[position].isdigit():
+                position += 1
+        return position
+
+    def parse_value(position: int) -> int:
+        character = need(position)
+        if character == '"':
+            return parse_string(position)
+        if character == "{":
+            return parse_object(position)
+        if character == "[":
+            return parse_array(position)
+        if character in "-0123456789":
+            return parse_number(position)
+        for literal in ("true", "false", "null"):
+            available = text[position : min(length, position + len(literal))]
+            if literal.startswith(available):
+                if len(available) < len(literal):
+                    raise Incomplete
+                return position + len(literal)
+        raise Invalid
+
+    def canonical_separator(position: int) -> int:
+        if position >= length:
+            raise Incomplete
+        if text[position] != " ":
+            raise Invalid
+        return position + 1
+
+    def parse_object(position: int) -> int:
+        if need(position) != "{":
+            raise Invalid
+        position += 1
+        if position >= length:
+            raise Incomplete
+        if text[position] == "}":
+            return position + 1
+        keys: set[str] = set()
+        previous_key: str | None = None
+        while True:
+            key_start = position
+            try:
+                position = parse_string(position)
+            except Incomplete as error:
+                prefix = error.string_prefix
+                if (
+                    previous_key is not None
+                    and prefix is not None
+                    and prefix < previous_key
+                    and not previous_key.startswith(prefix)
+                ):
+                    raise Invalid
+                raise
+            try:
+                key = json.loads(text[key_start:position])
+            except (json.JSONDecodeError, TypeError, ValueError):
+                raise Invalid
+            if (
+                not isinstance(key, str)
+                or key in keys
+                or (previous_key is not None and key <= previous_key)
+            ):
+                raise Invalid
+            keys.add(key)
+            previous_key = key
+            if need(position) != ":":
+                raise Invalid
+            position = canonical_separator(position + 1)
+            position = parse_value(position)
+            if position >= length:
+                raise Incomplete
+            if text[position] == "}":
+                return position + 1
+            if text[position] != ",":
+                raise Invalid
+            position = canonical_separator(position + 1)
+
+    def parse_array(position: int) -> int:
+        if need(position) != "[":
+            raise Invalid
+        position += 1
+        if position >= length:
+            raise Incomplete
+        if text[position] == "]":
+            return position + 1
+        while True:
+            position = parse_value(position)
+            if position >= length:
+                raise Incomplete
+            if text[position] == "]":
+                return position + 1
+            if text[position] != ",":
+                raise Invalid
+            position = canonical_separator(position + 1)
+
+    def classify(candidate: str) -> str:
+        nonlocal text, length
+        original_text, original_length = text, length
+        text, length = candidate, len(candidate)
+        try:
+            end = parse_object(0)
+            return "COMPLETE" if end == length else "INVALID"
+        except Incomplete:
+            return "INCOMPLETE"
+        except Invalid:
+            return "INVALID"
+        finally:
+            text, length = original_text, original_length
+
+    classification = classify(text)
+    if classification != "INCOMPLETE":
+        return False
+    if pending_utf8 and classify(text + "x") == "INVALID":
+        return False
+    return True
+
+
+def _truncate_authenticated_authority_file(
+    path: Path,
+    *,
+    expected: bytes,
+    prefix: bytes,
+) -> None:
+    flags = (
+        os.O_RDWR
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_BINARY", 0)
+    )
+    descriptor = os.open(path, flags)
+    try:
+        _verify_open_regular_file_identity(
+            descriptor, path, label="host torn-tail recovery ledger"
+        )
+        chunks: list[bytes] = []
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        if b"".join(chunks) != expected:
+            raise ConfigurationError(
+                "host authority ledger changed during torn-tail recovery"
+            )
+        os.ftruncate(descriptor, len(prefix))
+        os.fsync(descriptor)
+        _verify_open_regular_file_identity(
+            descriptor, path, label="host torn-tail recovery ledger"
+        )
+    finally:
+        os.close(descriptor)
+    _fsync_parent_directory(path.parent)
+
+
+def _append_authenticated_authority_suffix(
+    path: Path,
+    *,
+    expected: bytes,
+    suffix: bytes,
+) -> None:
+    """Append an exact recovery suffix after revalidating handle, path and bytes."""
+
+    if not suffix:
+        raise ConfigurationError("host authority recovery suffix is empty")
+    flags = (
+        os.O_RDWR
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_BINARY", 0)
+    )
+    descriptor = os.open(path, flags)
+    try:
+        _verify_open_regular_file_identity(
+            descriptor, path, label="host torn-tail recovery ledger"
+        )
+        chunks: list[bytes] = []
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        if b"".join(chunks) != expected:
+            raise ConfigurationError(
+                "host authority ledger changed during torn-tail recovery"
+            )
+        os.lseek(descriptor, 0, os.SEEK_END)
+        offset = 0
+        while offset < len(suffix):
+            written = os.write(descriptor, suffix[offset:])
+            if written <= 0:
+                raise ConfigurationError(
+                    "host authority recovery append made no progress"
+                )
+            offset += written
+        os.fsync(descriptor)
+        _verify_open_regular_file_identity(
+            descriptor, path, label="host torn-tail recovery ledger"
+        )
+    finally:
+        os.close(descriptor)
+    _fsync_parent_directory(path.parent)
+
+
+def recover_host_authority_jsonl_torn_tail(
+    host_runtime_dir: str | Path,
+    *,
+    ledger_kind: str,
+    actor: str,
+    reason: str,
+    host_id: str | None = None,
+    completed_at: str | None = None,
+) -> Mapping[str, object] | None:
+    """Recover one provably incomplete host-global JSONL append.
+
+    Exact tail bytes and a PREPARED receipt are fsynced before an opened-handle
+    identity-checked truncation.  A second immutable COMPLETE receipt makes every
+    crash boundary deterministic.  Complete-but-unterminated JSON, malformed
+    interior lines and semantically invalid prefixes remain unrecoverable.
+    """
+
+    if ledger_kind not in {
+        "repository-registry",
+        "provider-history",
+        "capacity-history",
+        "reservation-history",
+        "scheduler-history",
+        "host-kernel-history",
+    }:
+        raise ConfigurationError("host torn-tail ledger kind is invalid")
+    if not isinstance(actor, str) or not actor.strip():
+        raise ConfigurationError("host torn-tail recovery actor is required")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ConfigurationError("host torn-tail recovery reason is required")
+    actor = actor.strip()
+    reason = reason.strip()
+    root = resolve_host_runtime_dir(host_runtime_dir)
+    identity_path = root / "host-runtime-identity.json"
+    lock_path = root / "locks" / "host-authority.lock"
+    if not identity_path.is_file() or not lock_path.is_file():
+        raise ConfigurationError("host runtime is absent")
+    machine_user_id = _machine_user_identity()
+    writer = _validate_host_runtime_identity(
+        read_strict_canonical_json(
+            identity_path,
+            label="host torn-tail recovery writer",
+            expected_fields=HOST_RUNTIME_IDENTITY_FIELDS,
+        ),
+        machine_user_id=machine_user_id,
+    )
+    current_kernel = host_kernel_identity()
+    writer_matches_loaded_kernel = (
+        writer.get("host_kernel_bundle_digest")
+        == current_kernel.get("bundle_digest")
+        and writer.get("interpreter_policy_digest")
+        == current_kernel.get("interpreter_policy_digest")
+    )
+    if ledger_kind == "repository-registry":
+        path = root / "repository-registry.jsonl"
+    elif ledger_kind == "provider-history":
+        path = root / "host-provider-history.jsonl"
+    elif ledger_kind == "reservation-history":
+        path = root / "host-reservations.jsonl"
+    elif ledger_kind == "scheduler-history":
+        if not isinstance(host_id, str) or not host_id.strip():
+            raise ConfigurationError(
+                "scheduler history recovery requires an authenticated host id"
+            )
+        path = root / "host-scheduler.jsonl"
+    elif ledger_kind == "host-kernel-history":
+        path = root / "host-kernel-history.jsonl"
+    else:
+        if not isinstance(host_id, str) or not host_id.strip():
+            raise ConfigurationError(
+                "capacity history recovery requires an authenticated host id"
+            )
+        path = host_capacity_path(root, host_id).parent / "capacity-history.jsonl"
+    if not path.is_file() or _is_link_like(path):
+        raise ConfigurationError("selected host authority ledger is unavailable")
+    relative_path = str(path.relative_to(root)).replace("\\", "/")
+    recovery_root = root / "torn-tail-recoveries" / digest_json(
+        {"kind": ledger_kind, "path": relative_path}
+    ).removeprefix("sha256:")
+
+    def validate_prefix(prefix: bytes) -> tuple[Mapping[str, object], ...]:
+        if ledger_kind == "repository-registry":
+            return _host_repository_registry_events(root, raw_override=prefix)
+        if ledger_kind == "reservation-history":
+            return _host_reservation_events_unlocked(root, raw_override=prefix)
+        if ledger_kind == "scheduler-history":
+            events = _host_scheduler_events_unlocked(root, raw_override=prefix)
+            if host_id is not None and any(
+                event.get("host_id") != host_id for event in events
+            ):
+                raise ConfigurationError(
+                    "scheduler-history prefix belongs to another host"
+                )
+            return events
+        if ledger_kind == "capacity-history":
+            assert host_id is not None
+            history = _strict_capacity_history(path, raw_override=prefix)
+            if any(event.get("host_id") != host_id for event in history):
+                raise ConfigurationError(
+                    "capacity-history prefix belongs to another authenticated host"
+                )
+            current_path = host_capacity_path(root, host_id)
+            current: Mapping[str, object] | None = None
+            if current_path.exists() or _is_link_like(current_path):
+                current = _read_host_capacity_record(
+                    root,
+                    host_id,
+                    now=datetime.max.replace(tzinfo=UTC),
+                    require_live=False,
+                    require_current_provider=False,
+                    _writer_override=writer,
+                )
+            if current is None:
+                if history and (
+                    len(history) != 1
+                    or history[0].get("previous_capacity_generation") is not None
+                ):
+                    raise ConfigurationError(
+                        "capacity-history prefix is ahead of an absent current projection"
+                    )
+                return history
+            if not history:
+                raise ConfigurationError(
+                    "capacity current projection has no authenticated history prefix"
+                )
+            head = history[-1]
+            if head.get("capacity_record_id") == current.get("record_id"):
+                return history
+            pending_successor = (
+                len(history) >= 2
+                and history[-2].get("capacity_record_id")
+                == current.get("record_id")
+                and head.get("previous_capacity_generation")
+                == current.get("capacity_generation")
+            )
+            if not pending_successor:
+                raise ConfigurationError(
+                    "capacity-history prefix differs from its current projection"
+                )
+            return history
+        if ledger_kind == "host-kernel-history":
+            history = _host_kernel_history(
+                root,
+                machine_user_id=machine_user_id,
+                raw_override=prefix,
+            )
+            if not history or history[-1].get("identity") != writer:
+                raise ConfigurationError(
+                    "host-kernel valid prefix does not authenticate current writer"
+                )
+            return history
+        provider_path = root / "host-provider.json"
+        if not prefix:
+            if provider_path.exists() or _is_link_like(provider_path):
+                raise ConfigurationError(
+                    "provider current record has no complete history prefix"
+                )
+            return ()
+        provider = read_strict_canonical_json(
+            provider_path, label="host provider current generation"
+        )
+        if not isinstance(provider, Mapping) or not isinstance(
+            provider.get("host_id"), str
+        ):
+            raise ConfigurationError("host provider current generation is invalid")
+        _host_provider_binding(
+            root,
+            host_id=str(provider["host_id"]),
+            _history_raw_override=prefix,
+            _allow_pending_history=True,
+            _writer_override=writer,
+        )
+        return _strict_jsonl_records_bytes(
+            prefix, label="host provider generation history"
+        )
+
+    def validate_prepared(value: object) -> Mapping[str, object]:
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != HOST_AUTHORITY_TORN_TAIL_PREPARED_FIELDS
+        ):
+            raise ConfigurationError("host torn-tail PREPARED receipt schema is invalid")
+        material = dict(value)
+        record_id = material.pop("record_id", None)
+        recovery_material = {
+            key: value[key]
+            for key in (
+                "ledger_kind",
+                "ledger_path",
+                "host_id",
+                "raw_digest",
+                "prefix_digest",
+                "tail_digest",
+                "tail_bytes",
+                "action",
+                "output_digest",
+                "host_kernel_generation",
+                "host_kernel_record_id",
+            )
+        }
+        expected_host_id = (
+            host_id
+            if ledger_kind in {"capacity-history", "scheduler-history"}
+            else None
+        )
+        expected_archive = (
+            str(
+                (
+                    recovery_root
+                    / (str(value.get("tail_digest")).removeprefix("sha256:") + ".bin")
+                ).relative_to(root)
+            ).replace("\\", "/")
+            if AUTHORITY_ID.fullmatch(str(value.get("tail_digest"))) is not None
+            else None
+        )
+        if (
+            value.get("schema_version") != 1
+            or value.get("kind") != HOST_AUTHORITY_TORN_TAIL_RECOVERY_KIND
+            or value.get("status") != "PREPARED"
+            or value.get("ledger_kind") != ledger_kind
+            or value.get("ledger_path") != relative_path
+            or value.get("host_id") != expected_host_id
+            or value.get("archive_path") != expected_archive
+            or value.get("host_kernel_generation")
+            != writer.get("host_kernel_generation")
+            or value.get("host_kernel_record_id") != writer.get("record_id")
+            or value.get("action") not in HOST_AUTHORITY_TORN_TAIL_ACTIONS
+            or AUTHORITY_ID.fullmatch(str(value.get("raw_digest"))) is None
+            or AUTHORITY_ID.fullmatch(str(value.get("prefix_digest"))) is None
+            or AUTHORITY_ID.fullmatch(str(value.get("tail_digest"))) is None
+            or AUTHORITY_ID.fullmatch(str(value.get("output_digest"))) is None
+            or type(value.get("tail_bytes")) is not int
+            or int(value["tail_bytes"]) < 1
+            or value.get("actor") != actor
+            or value.get("reason") != reason
+            or value.get("recovery_id") != digest_json(recovery_material)
+            or record_id != digest_json(material)
+        ):
+            raise ConfigurationError("host torn-tail PREPARED receipt is invalid")
+        return dict(value)
+
+    def complete_recovery(
+        prepared: Mapping[str, object], output: bytes
+    ) -> Mapping[str, object]:
+        archive_path = root / str(prepared["archive_path"])
+        archive = _read_regular_authority_bytes(
+            archive_path, label="host torn-tail archived bytes"
+        )
+        if (
+            "sha256:" + sha256(archive).hexdigest() != prepared.get("tail_digest")
+            or len(archive) != prepared.get("tail_bytes")
+        ):
+            raise ConfigurationError("host torn-tail archive evidence changed")
+        complete_path = recovery_root / (
+            str(prepared["recovery_id"]).removeprefix("sha256:") + ".complete.json"
+        )
+        if complete_path.exists() or _is_link_like(complete_path):
+            installed = read_strict_canonical_json(
+                complete_path, label="host torn-tail COMPLETE receipt"
+            )
+            installed_material = dict(installed) if isinstance(installed, Mapping) else {}
+            installed_record_id = installed_material.pop("record_id", None)
+            if (
+                not isinstance(installed, Mapping)
+                or set(installed) != HOST_AUTHORITY_TORN_TAIL_COMPLETE_FIELDS
+                or installed.get("schema_version") != 1
+                or installed.get("kind")
+                != HOST_AUTHORITY_TORN_TAIL_COMPLETE_KIND
+                or installed.get("status") != "COMPLETE"
+                or installed.get("recovery_id") != prepared.get("recovery_id")
+                or installed.get("prepared_record_id") != prepared.get("record_id")
+                or installed.get("ledger_kind") != ledger_kind
+                or installed.get("ledger_path") != relative_path
+                or installed.get("prefix_digest")
+                != prepared.get("prefix_digest")
+                or installed.get("output_digest")
+                != "sha256:" + sha256(output).hexdigest()
+                or installed.get("output_digest")
+                != prepared.get("output_digest")
+                or installed.get("action") != prepared.get("action")
+                or installed.get("archive_path") != prepared.get("archive_path")
+                or installed_record_id != digest_json(installed_material)
+            ):
+                raise ConfigurationError("host torn-tail COMPLETE receipt is invalid")
+            parse_time(installed.get("completed_at"))
+            return dict(installed)
+        completion_time = completed_at or format_time(utc_now())
+        parse_time(completion_time)
+        complete_material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": HOST_AUTHORITY_TORN_TAIL_COMPLETE_KIND,
+            "status": "COMPLETE",
+            "recovery_id": prepared["recovery_id"],
+            "prepared_record_id": prepared["record_id"],
+            "ledger_kind": ledger_kind,
+            "ledger_path": relative_path,
+            "prefix_digest": prepared["prefix_digest"],
+            "output_digest": prepared["output_digest"],
+            "action": prepared["action"],
+            "archive_path": prepared["archive_path"],
+            "completed_by": actor,
+            "completed_at": completion_time,
+        }
+        complete = {**complete_material, "record_id": digest_json(complete_material)}
+        exclusive_write_json_or_identical(complete_path, complete)
+        installed = read_strict_canonical_json(
+            complete_path,
+            label="host torn-tail COMPLETE receipt",
+            expected_fields=set(complete),
+        )
+        if installed != complete:
+            raise ConfigurationError("host torn-tail COMPLETE receipt changed")
+        return complete
+
+    with runtime_file_lock(lock_path, timeout_seconds=120.0):
+        # The pre-lock check is only a fast rejection.  A waiter may have been
+        # queued behind a host-kernel upgrade, so authenticate the writer again
+        # after acquiring authority and require the same generation/record that
+        # selected this recovery operation.  A retired process writes zero
+        # bytes even if it began waiting while it was current.
+        locked_writer = _validate_host_runtime_identity(
+            read_strict_canonical_json(
+                identity_path,
+                label="host torn-tail locked writer",
+                expected_fields=HOST_RUNTIME_IDENTITY_FIELDS,
+            ),
+            machine_user_id=machine_user_id,
+        )
+        if (root / KERNEL_TRANSITION_POINTER).exists() or _is_link_like(
+            root / KERNEL_TRANSITION_POINTER
+        ):
+            raise ConfigurationError(
+                "host-kernel transition prevents unrelated torn-tail recovery"
+            )
+        locked_kernel = host_kernel_identity()
+        if (
+            locked_writer.get("host_kernel_generation")
+            != writer.get("host_kernel_generation")
+            or locked_writer.get("record_id") != writer.get("record_id")
+        ):
+            raise ConfigurationError(
+                "host-kernel writer changed while torn-tail recovery waited"
+            )
+        writer = locked_writer
+        writer_matches_loaded_kernel = (
+            locked_writer.get("host_kernel_bundle_digest")
+            == locked_kernel.get("bundle_digest")
+            and locked_writer.get("interpreter_policy_digest")
+            == locked_kernel.get("interpreter_policy_digest")
+        )
+        if ledger_kind != "host-kernel-history":
+            writer_history = _host_kernel_history(
+                root, machine_user_id=machine_user_id
+            )
+            if not writer_history or writer_history[-1].get("identity") != writer:
+                raise ConfigurationError(
+                    "host-kernel history is pending; unrelated recovery is fenced"
+                )
+        raw = _read_regular_authority_bytes(path, label="host authority torn-tail ledger")
+        if not raw or raw.endswith(b"\n"):
+            validate_prefix(raw)
+            if not recovery_root.is_dir():
+                return None
+            pending: list[Mapping[str, object]] = []
+            for prepared_path in sorted(recovery_root.glob("*.prepared.json")):
+                candidate = validate_prepared(
+                    read_strict_canonical_json(
+                        prepared_path, label="host torn-tail PREPARED receipt"
+                    )
+                )
+                if candidate.get("output_digest") == (
+                    "sha256:" + sha256(raw).hexdigest()
+                ):
+                    complete_path = recovery_root / (
+                        str(candidate["recovery_id"]).removeprefix("sha256:")
+                        + ".complete.json"
+                    )
+                    if complete_path.exists() or _is_link_like(complete_path):
+                        complete_recovery(candidate, raw)
+                        continue
+                    pending.append(candidate)
+            if not pending:
+                return None
+            if len(pending) != 1:
+                raise ConfigurationError(
+                    "host torn-tail recovery has ambiguous PREPARED receipts"
+                )
+            return complete_recovery(pending[0], raw)
+        split = raw.rfind(b"\n") + 1
+        prefix = raw[:split]
+        tail = raw[split:]
+        if _provably_incomplete_authority_json_tail(tail):
+            action = "TRUNCATE"
+            output = prefix
+            validate_prefix(prefix)
+        else:
+            # Losing only the final newline is a normal append crash boundary.
+            # It is recoverable only when the exact completed row extends the
+            # authenticated reducer; malformed or semantically impossible JSON
+            # remains fail-closed.
+            action = "APPEND_NEWLINE"
+            output = raw + b"\n"
+            try:
+                validate_prefix(output)
+            except ConfigurationError as error:
+                raise ConfigurationError(
+                    "host authority final bytes are neither a provable JSON prefix "
+                    "nor an authenticated complete record missing its newline"
+                ) from error
+        raw_digest = "sha256:" + sha256(raw).hexdigest()
+        prefix_digest = "sha256:" + sha256(prefix).hexdigest()
+        tail_digest = "sha256:" + sha256(tail).hexdigest()
+        archive_path = recovery_root / (tail_digest.removeprefix("sha256:") + ".bin")
+        archive_relative = str(archive_path.relative_to(root)).replace("\\", "/")
+        recovery_material = {
+            "ledger_kind": ledger_kind,
+            "ledger_path": relative_path,
+            "host_id": (
+                host_id
+                if ledger_kind in {"capacity-history", "scheduler-history"}
+                else None
+            ),
+            "raw_digest": raw_digest,
+            "prefix_digest": prefix_digest,
+            "tail_digest": tail_digest,
+            "tail_bytes": len(tail),
+            "action": action,
+            "output_digest": "sha256:" + sha256(output).hexdigest(),
+            "host_kernel_generation": writer["host_kernel_generation"],
+            "host_kernel_record_id": writer["record_id"],
+        }
+        prepared_material: dict[str, object] = {
+            "schema_version": 1,
+            "kind": HOST_AUTHORITY_TORN_TAIL_RECOVERY_KIND,
+            "status": "PREPARED",
+            **recovery_material,
+            "archive_path": archive_relative,
+            "actor": actor,
+            "reason": reason,
+            "recovery_id": digest_json(recovery_material),
+        }
+        prepared = {
+            **prepared_material,
+            "record_id": digest_json(prepared_material),
+        }
+        prepared_path = recovery_root / (
+            str(prepared["recovery_id"]).removeprefix("sha256:")
+            + ".prepared.json"
+        )
+        if not writer_matches_loaded_kernel and not (
+            prepared_path.exists() or _is_link_like(prepared_path)
+        ):
+            raise ConfigurationError(
+                "a successor host kernel may complete only an existing exact "
+                "torn-tail recovery capability"
+            )
+        exclusive_write_bytes_or_identical(archive_path, tail)
+        if _read_regular_authority_bytes(
+            archive_path, label="host torn-tail archived bytes"
+        ) != tail:
+            raise ConfigurationError("host torn-tail archive bytes changed")
+        exclusive_write_json_or_identical(prepared_path, prepared)
+        validate_prepared(
+            read_strict_canonical_json(
+                prepared_path, label="host torn-tail PREPARED receipt"
+            )
+        )
+        if _read_regular_authority_bytes(
+            path, label="host authority torn-tail ledger"
+        ) != raw:
+            raise ConfigurationError(
+                "host authority ledger changed before torn-tail truncation"
+            )
+        if action == "TRUNCATE":
+            _truncate_authenticated_authority_file(
+                path, expected=raw, prefix=prefix
+            )
+        else:
+            _append_authenticated_authority_suffix(
+                path, expected=raw, suffix=b"\n"
+            )
+        if _read_regular_authority_bytes(
+            path, label="host authority recovered ledger"
+        ) != output:
+            raise ConfigurationError("host authority recovery mutation was not durable")
+        validate_prefix(output)
+        return complete_recovery(prepared, output)
+
+
 def _scope_conflicts(first: Sequence[str], second: Sequence[str]) -> bool:
     try:
         return any(scopes_overlap(left, right) for left in first for right in second)
@@ -4559,15 +10135,22 @@ def reserve_global_host_session(
     actor_time: str,
     expires_at: str,
     now: datetime,
+    execution_adapter_identity: Mapping[str, object] | None = None,
+    host_scheduler_grant_id: str | None = None,
     policy_cap: int | None = None,
 ) -> Mapping[str, object]:
     root = require_host_runtime(host_runtime_dir)
     lock_path = root / "locks" / "host-authority.lock"
     if not runtime_file_lock_is_held(lock_path):
         raise ConfigurationError("host reservation requires outer host authority")
+    writer = _host_runtime_identity_unlocked(root)
     capacity = read_host_capacity(root, host_id, now=now)
     if capacity.get("capacity_generation") != capacity_generation:
         raise ConfigurationError("host reservation capacity generation is stale")
+    if capacity.get("host_kernel_generation") != writer.get(
+        "host_kernel_generation"
+    ):
+        raise ConfigurationError("host reservation capacity uses a retired writer")
     capacity_epoch = int(capacity["capacity_epoch"])
     maximum = int(capacity["max_total_sessions"])
     if policy_cap is not None:
@@ -4597,6 +10180,100 @@ def reserve_global_host_session(
     if reservation_kind == "VALIDATION":
         if normalized_scopes:
             raise ConfigurationError("validation reservations cannot own write scopes")
+        adapter_coordinates: dict[str, object] = {
+            "execution_adapter_identity_record_id": None,
+            "execution_adapter_identity_path": None,
+            "execution_adapter_identity_blob_digest": None,
+        }
+        if host_scheduler_grant_id is not None:
+            raise ConfigurationError(
+                "internal validation cannot consume an external scheduler grant"
+            )
+    else:
+        if not isinstance(execution_adapter_identity, Mapping):
+            raise ConfigurationError(
+                "external host reservation requires an execution adapter identity"
+            )
+        adapter_record_id = execution_adapter_identity.get("record_id")
+        if AUTHORITY_ID.fullmatch(str(adapter_record_id)) is None:
+            raise ConfigurationError("execution adapter identity id is invalid")
+        installed_adapter = read_execution_adapter_identity(
+            root, str(adapter_record_id)
+        )
+        if installed_adapter != execution_adapter_identity or any(
+            installed_adapter.get(field) != expected
+            for field, expected in {
+                "repository": repository,
+                "execution_id": execution_id,
+                "host_id": host_id,
+                "provider_generation": capacity["provider_generation"],
+                "provider_epoch": capacity["provider_epoch"],
+            }.items()
+        ):
+            raise ConfigurationError(
+                "execution adapter identity differs from reservation authority"
+            )
+        adapter_path = (
+            root
+            / "execution-adapter-bindings"
+            / (str(adapter_record_id).removeprefix("sha256:") + ".json")
+        )
+        adapter_raw = _read_regular_authority_bytes(
+            adapter_path, label="execution adapter binding evidence"
+        )
+        adapter_coordinates = {
+            "execution_adapter_identity_record_id": adapter_record_id,
+            "execution_adapter_identity_path": str(
+                adapter_path.relative_to(root)
+            ).replace("\\", "/"),
+            "execution_adapter_identity_blob_digest": "sha256:"
+            + sha256(adapter_raw).hexdigest(),
+        }
+        if AUTHORITY_ID.fullmatch(str(host_scheduler_grant_id)) is None:
+            raise ConfigurationError(
+                "primary and sidecar reservations require an exact scheduler grant"
+            )
+        scheduler = _host_scheduler_projection_unlocked(root, host_id=host_id)
+        grant = scheduler["outstanding_grants"].get(str(host_scheduler_grant_id))
+        if not isinstance(grant, Mapping):
+            raise ConfigurationError(
+                "host scheduler grant is absent, expired, or already consumed"
+            )
+        demand = scheduler["demands"].get(str(grant.get("demand_id")))
+        if (
+            not isinstance(demand, Mapping)
+            or parse_time(grant.get("expires_at")) <= now
+            or any(
+                grant.get(field) != expected
+                for field, expected in {
+                    "host_id": host_id,
+                    "host_kernel_generation": writer["host_kernel_generation"],
+                    "capacity_generation": capacity_generation,
+                    "execution_id": execution_id,
+                    "local_reservation_id": local_reservation_id,
+                }.items()
+            )
+            or any(
+                demand.get(field) != expected
+                for field, expected in {
+                    "host_id": host_id,
+                    "repository": repository,
+                    "execution_id": execution_id,
+                    "host_kernel_generation": writer["host_kernel_generation"],
+                    "capacity_generation": capacity_generation,
+                    "execution_adapter_identity_record_id": adapter_record_id,
+                    "execution_adapter_identity_path": adapter_coordinates[
+                        "execution_adapter_identity_path"
+                    ],
+                    "execution_adapter_identity_blob_digest": adapter_coordinates[
+                        "execution_adapter_identity_blob_digest"
+                    ],
+                }.items()
+            )
+        ):
+            raise ConfigurationError(
+                "host scheduler grant differs from reservation authority"
+            )
     reservation_id = digest_json(
         {
             "kind": "hive-mind-host-reservation-key-v1",
@@ -4607,6 +10284,11 @@ def reserve_global_host_session(
             "capacity_generation": capacity_generation,
             "local_reservation_id": local_reservation_id,
             "reservation_kind": reservation_kind,
+            "host_kernel_generation": writer["host_kernel_generation"],
+            "execution_adapter_identity_record_id": adapter_coordinates[
+                "execution_adapter_identity_record_id"
+            ],
+            "host_scheduler_grant_id": host_scheduler_grant_id,
         }
     )
     events = list(_host_reservation_events_unlocked(root))
@@ -4624,6 +10306,23 @@ def reserve_global_host_session(
         for key, event in latest.items()
         if event.get("state") in HOST_RESERVATION_ACTIVE_STATES
     }
+    logical_matches = [
+        event
+        for event in active.values()
+        if event.get("repository") == repository
+        and event.get("execution_id") == execution_id
+        and event.get("local_reservation_id") == local_reservation_id
+        and event.get("reservation_kind") == reservation_kind
+    ]
+    if any(event.get("reservation_id") != reservation_id for event in logical_matches):
+        raise ConfigurationError(
+            "an active legacy or retired-writer permit already owns these local coordinates; "
+            "explicitly reconcile it before reserving a successor"
+        )
+    if len(logical_matches) > 1:
+        raise ConfigurationError(
+            "host reservation ledger contains duplicate active logical coordinates"
+        )
     existing = active.get(reservation_id)
     candidate = {
         "state": "RESERVED",
@@ -4636,6 +10335,9 @@ def reserve_global_host_session(
         "provider_epoch": capacity["provider_epoch"],
         "capacity_generation": capacity_generation,
         "capacity_epoch": capacity_epoch,
+        "host_kernel_generation": writer["host_kernel_generation"],
+        **adapter_coordinates,
+        "host_scheduler_grant_id": host_scheduler_grant_id,
         "local_reservation_id": local_reservation_id,
         "resource_key": resource_key,
         "write_scopes": normalized_scopes,
@@ -4650,7 +10352,18 @@ def reserve_global_host_session(
     # host-id partition. The provider binding above permits only its one sealed
     # host id, and every repository/execution consumes the same aggregate.
     kernel_active = list(active.values())
-    if len(kernel_active) >= maximum:
+    scheduler_outstanding = _host_scheduler_projection_unlocked(
+        root, host_id=host_id
+    )["outstanding_grants"]
+    if len(kernel_active) + len(scheduler_outstanding) > maximum:
+        raise ConfigurationError(
+            "host reservation and scheduler grant authority exceed capacity"
+        )
+    if reservation_kind == "VALIDATION" and (
+        len(kernel_active) + len(scheduler_outstanding) >= maximum
+    ):
+        raise CapacityAdmissionDenied("authenticated host capacity is exhausted")
+    if reservation_kind != "VALIDATION" and len(kernel_active) >= maximum:
         raise CapacityAdmissionDenied("authenticated host capacity is exhausted")
     if reservation_kind == "VALIDATION":
         validation_active = [
@@ -4688,6 +10401,7 @@ def renew_global_host_session(
     renewed_at: str,
     expires_at: str,
     now: datetime,
+    execution_adapter_identity: Mapping[str, object] | None = None,
 ) -> Mapping[str, object]:
     """Extend one live permit under the same authenticated capacity generation."""
 
@@ -4721,6 +10435,60 @@ def renew_global_host_session(
         raise ConfigurationError("host reservation renewal fence mismatch")
     if prior.get("state") not in HOST_RESERVATION_ACTIVE_STATES:
         raise ConfigurationError("only an active host reservation can be renewed")
+    writer = _host_runtime_identity_unlocked(root)
+    provider = _host_provider_binding(root, host_id=str(prior["host_id"]))
+    adapter_record_id = prior.get("execution_adapter_identity_record_id")
+    if prior.get("reservation_kind") == "VALIDATION":
+        if execution_adapter_identity is not None or adapter_record_id is not None:
+            raise ConfigurationError(
+                "internal validation renewal cannot claim an external adapter"
+            )
+    else:
+        if not isinstance(execution_adapter_identity, Mapping) or not isinstance(
+            adapter_record_id, str
+        ):
+            raise ConfigurationError(
+                "host reservation renewal requires its exact execution adapter identity"
+            )
+        installed_adapter = read_execution_adapter_identity(root, adapter_record_id)
+        adapter_path = (
+            root
+            / "execution-adapter-bindings"
+            / (adapter_record_id.removeprefix("sha256:") + ".json")
+        )
+        adapter_raw = _read_regular_authority_bytes(
+            adapter_path, label="host reservation renewal adapter identity"
+        )
+        if (
+            dict(execution_adapter_identity) != installed_adapter
+            or any(
+                prior.get(field) != installed_adapter.get(expected_field)
+                for field, expected_field in (
+                    ("execution_adapter_identity_record_id", "record_id"),
+                    ("repository", "repository"),
+                    ("execution_id", "execution_id"),
+                    ("host_id", "host_id"),
+                    ("provider_generation", "provider_generation"),
+                    ("provider_epoch", "provider_epoch"),
+                )
+            )
+            or prior.get("execution_adapter_identity_path")
+            != str(adapter_path.relative_to(root)).replace("\\", "/")
+            or prior.get("execution_adapter_identity_blob_digest")
+            != "sha256:" + sha256(adapter_raw).hexdigest()
+            or prior.get("host_kernel_generation")
+            != writer.get("host_kernel_generation")
+            or provider.get("host_kernel_generation")
+            != writer.get("host_kernel_generation")
+            or provider.get("provider_generation")
+            != prior.get("provider_generation")
+            or provider.get("provider_epoch") != prior.get("provider_epoch")
+            or provider.get("provider_identity_digest")
+            != installed_adapter.get("provider_identity_digest")
+        ):
+            raise ConfigurationError(
+                "host reservation renewal adapter or writer fence changed"
+            )
     try:
         renewed_time = parse_time(renewed_at)
         requested_expiry = parse_time(expires_at)
@@ -4737,6 +10505,11 @@ def renew_global_host_session(
     if (
         capacity.get("capacity_generation") != capacity_generation
         or int(capacity["capacity_epoch"]) != int(prior["capacity_epoch"])
+        or capacity.get("host_kernel_generation")
+        != writer.get("host_kernel_generation")
+        or capacity.get("provider_generation")
+        != provider.get("provider_generation")
+        or capacity.get("provider_epoch") != provider.get("provider_epoch")
     ):
         raise ConfigurationError("host reservation renewal capacity fence is stale")
     if requested_expiry > parse_time(capacity.get("expires_at")):
@@ -5147,6 +10920,7 @@ def renew_host_capacity_authority(
                 "host_id": host_id,
                 "provider_generation": candidate["provider_generation"],
                 "provider_epoch": candidate["provider_epoch"],
+                "host_kernel_generation": candidate["host_kernel_generation"],
                 "capacity_generation": capacity_generation,
                 "capacity_epoch": candidate["capacity_epoch"],
                 "capacity_record_id": candidate["record_id"],
@@ -5615,7 +11389,7 @@ def validate_host_lifecycle_observation(
     reservation: Mapping[str, object],
     now: datetime,
 ) -> Mapping[str, object]:
-    expected_fields = {
+    legacy_fields = {
         "schema_version",
         "kind",
         "host_id",
@@ -5632,7 +11406,20 @@ def validate_host_lifecycle_observation(
         "source_event_id",
         "observation_id",
     }
-    if set(value) != expected_fields:
+    provenance_fields = {
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
+        "adapter_observation_id",
+    }
+    expected_fields = legacy_fields | provenance_fields
+    reservation_has_provenance = isinstance(
+        reservation.get("execution_adapter_identity_record_id"), str
+    )
+    if set(value) != (
+        expected_fields if reservation_has_provenance else legacy_fields
+    ):
         raise ConfigurationError("host lifecycle observation schema is invalid")
     material = dict(value)
     observation_id = material.pop("observation_id", None)
@@ -5655,6 +11442,33 @@ def validate_host_lifecycle_observation(
         if value.get(field) != expected:
             raise ConfigurationError(
                 f"host lifecycle observation has mismatched {field}"
+            )
+    if reservation_has_provenance:
+        for field in (
+            "host_kernel_generation",
+            "execution_adapter_identity_record_id",
+            "execution_adapter_identity_path",
+            "execution_adapter_identity_blob_digest",
+        ):
+            if value.get(field) != reservation.get(field):
+                raise ConfigurationError(
+                    f"host lifecycle observation has mismatched {field}"
+                )
+        adapter_material = {
+            field: value[field]
+            for field in legacy_fields
+            if field != "observation_id"
+        }
+        if (
+            AUTHORITY_ID.fullmatch(
+                str(value.get("adapter_observation_id"))
+            )
+            is None
+            or value.get("adapter_observation_id")
+            != digest_json(adapter_material)
+        ):
+            raise ConfigurationError(
+                "host lifecycle observation adapter source provenance is invalid"
             )
     if any(
         not isinstance(value.get(field), str) or not str(value[field]).strip()
@@ -6186,6 +12000,10 @@ PLAN_TERMINAL_FENCE_FIELDS = frozenset(
     }
 )
 EXECUTION_NAMESPACE = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}\Z")
+EXECUTION_COORDINATOR_LOCKS = (
+    "github-snapshot-coordinator.lock",
+    "execution-supervisor.lock",
+)
 EXECUTION_LOCKS = (
     "authority-ledger-initialization.lock",
     "dispatcher-admission.lock",
@@ -7077,6 +12895,8 @@ def _legacy_semantic_inventory(
     from sidecar_execution import (
         ACTIVE_SIDECAR_STATES,
         SidecarPolicyError,
+    )
+    from sidecar_execution import (
         _events_unlocked as _sidecar_events_unlocked,
     )
 
@@ -7741,7 +13561,7 @@ def reconcile_legacy_worktree_execution_authority(
                 lock_paths.add(state / "locks" / name)
                 lock_paths.add(source_root / ".autopilot" / name)
         with ExitStack() as legacy_locks:
-            for path in sorted(lock_paths, key=str):
+            for path in sorted(lock_paths, key=runtime_lock_order_key):
                 legacy_locks.enter_context(
                     runtime_file_lock(path, timeout_seconds=120.0)
                 )
@@ -8939,9 +14759,22 @@ def strict_jsonl_records(
         raise ConfigurationError(f"{label} is not a regular file")
     try:
         raw = _read_regular_authority_bytes(path, label=label)
-        text = raw.decode("utf-8")
-    except (OSError, UnicodeError, ConfigurationError) as error:
+    except (OSError, ConfigurationError) as error:
         raise ConfigurationError(f"{label} is unreadable: {error}") from error
+    return _strict_jsonl_records_bytes(raw, label=label)
+
+
+def _strict_jsonl_records_bytes(
+    raw: bytes,
+    *,
+    label: str,
+) -> tuple[Mapping[str, Any], ...]:
+    """Validate already authenticated JSONL bytes without touching a path."""
+
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeError as error:
+        raise ConfigurationError(f"{label} is not UTF-8: {error}") from error
     if raw and not raw.endswith(b"\n"):
         raise ConfigurationError(
             f"{label} has a torn final append; explicit recovery is required"
@@ -9271,6 +15104,27 @@ def _read_initial_remote_target_observation_unlocked(
     return validated
 
 
+def publication_observation_evidence_ref(
+    execution_id: str,
+    publication_transaction_id: str,
+    observation_key: str,
+) -> str:
+    """Derive one short, opaque, execution-bound GitHub-compatible evidence ref."""
+
+    for value in (execution_id, publication_transaction_id, observation_key):
+        if AUTHORITY_ID.fullmatch(value) is None:
+            raise ConfigurationError("publication observation ref authority is invalid")
+    reference_id = digest_json(
+        {
+            "kind": "hive-mind-publication-observation-evidence-ref-v1",
+            "execution_id": execution_id,
+            "publication_transaction_id": publication_transaction_id,
+            "observation_key": observation_key,
+        }
+    )
+    return "refs/heads/hme/p/" + reference_id.removeprefix("sha256:")
+
+
 def _validate_superseded_publication_target_observation(
     value: Mapping[str, object],
     *,
@@ -9330,10 +15184,21 @@ def _validate_superseded_publication_target_observation(
             "namespace": namespace,
         }
     )
-    observation_prefix = (
-        "refs/heads/hive-mind-evidence/publication-observations/"
-        f"{execution_id.removeprefix('sha256:')}/"
-        f"{publication_transaction_id.removeprefix('sha256:')}/"
+    observation_key = digest_json(
+        {
+            "kind": "hive-mind-superseded-publication-observation-ref-key-v1",
+            "execution_id": execution_id,
+            "publication_transaction_id": publication_transaction_id,
+            "expected_target_sha": expected_target_sha,
+            "observed_target_sha": target_sha,
+            "receipt_heads": [dict(item) for item in receipt_heads],
+            "observed_at": value.get("observed_at"),
+        }
+    )
+    expected_observation_ref = publication_observation_evidence_ref(
+        execution_id,
+        publication_transaction_id,
+        observation_key,
     )
     try:
         parse_time(value.get("observed_at"))
@@ -9354,9 +15219,7 @@ def _validate_superseded_publication_target_observation(
         or FULL_SHA.fullmatch(str(value.get("pinned_sha"))) is None
         or value.get("observation_ref_sha") != target_sha
         or value.get("observed_transaction_sha") != value.get("pinned_sha")
-        or not isinstance(value.get("observation_ref"), str)
-        or not str(value["observation_ref"]).startswith(observation_prefix)
-        or str(value["observation_ref"]) == observation_prefix
+        or value.get("observation_ref") != expected_observation_ref
         or not isinstance(value.get("transaction_ref"), str)
         or not str(value["transaction_ref"]).startswith("refs/")
         or namespace is None
@@ -10290,14 +16153,173 @@ def _advance_repository_target_watermark_unlocked(
     )
 
 
+def validate_host_effect_reconciliation_evidence(
+    value: object,
+    *,
+    effect: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Replay one adapter observation enriched with the exact writer fence."""
+
+    raw_fields = {
+        "schema_version",
+        "kind",
+        "execution_namespace",
+        "execution_id",
+        "host_id",
+        "effect_kind",
+        "idempotency_key",
+        "outcome",
+        "external_identity",
+        "result",
+        "unobserved_host_lifecycle_items",
+        "observed_at",
+    }
+    provenance_fields = {
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
+        "adapter_observation_id",
+    }
+    expected_fields = raw_fields | provenance_fields | {"record_id"}
+    if not isinstance(value, Mapping) or set(value) != expected_fields:
+        raise ConfigurationError(
+            "host-effect reconciliation evidence schema is invalid"
+        )
+    material = dict(value)
+    record_id = material.pop("record_id", None)
+    raw_material = {field: value[field] for field in raw_fields}
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind")
+        != "hive-mind-host-effect-reconciliation-observation-v1"
+        or record_id != digest_json(material)
+        or value.get("adapter_observation_id") != digest_json(raw_material)
+        or value.get("effect_kind") != effect.get("effect_kind")
+        or value.get("idempotency_key") != effect.get("idempotency_key")
+        or any(
+            value.get(field) != effect.get(field)
+            for field in (
+                "host_kernel_generation",
+                "execution_adapter_identity_record_id",
+                "execution_adapter_identity_path",
+                "execution_adapter_identity_blob_digest",
+            )
+        )
+        or value.get("outcome") not in {"COMPLETED", "UNKNOWN"}
+    ):
+        raise ConfigurationError(
+            "host-effect reconciliation evidence identity is invalid"
+        )
+    try:
+        parse_time(value.get("observed_at"))
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError(
+            "host-effect reconciliation evidence time is invalid"
+        ) from error
+    external_fields = {
+        "schema_version",
+        "kind",
+        "execution_namespace",
+        "execution_id",
+        "host_id",
+        "effect_kind",
+        "idempotency_key",
+        "external_id",
+        "record_id",
+    }
+    item_fields = {
+        "schema_version",
+        "kind",
+        "execution_namespace",
+        "execution_id",
+        "host_id",
+        "effect_kind",
+        "idempotency_key",
+        "item_type",
+        "item_identity",
+        "record_id",
+    }
+    external = value.get("external_identity")
+    if not isinstance(external, Mapping) or set(external) != external_fields:
+        raise ConfigurationError(
+            "host-effect reconciliation external identity schema is invalid"
+        )
+    external_material = dict(external)
+    external_record_id = external_material.pop("record_id", None)
+    coordinate_fields = (
+        "execution_namespace",
+        "execution_id",
+        "host_id",
+        "effect_kind",
+        "idempotency_key",
+    )
+    if (
+        external.get("schema_version") != 1
+        or external.get("kind")
+        != "hive-mind-host-effect-external-identity-v1"
+        or external_record_id != digest_json(external_material)
+        or any(external.get(field) != value.get(field) for field in coordinate_fields)
+    ):
+        raise ConfigurationError(
+            "host-effect reconciliation external identity is invalid"
+        )
+    items = value.get("unobserved_host_lifecycle_items")
+    if not isinstance(items, list):
+        raise ConfigurationError(
+            "host-effect reconciliation unresolved inventory is invalid"
+        )
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, Mapping) or set(item) != item_fields:
+            raise ConfigurationError(
+                "host-effect reconciliation unresolved item schema is invalid"
+            )
+        item_material = dict(item)
+        item_id = item_material.pop("record_id", None)
+        if (
+            item.get("schema_version") != 1
+            or item.get("kind")
+            != "hive-mind-unobserved-host-lifecycle-item-v1"
+            or item.get("item_type") not in {"THREAD", "TURN", "EFFECT"}
+            or not isinstance(item.get("item_identity"), str)
+            or not str(item["item_identity"]).strip()
+            or item_id != digest_json(item_material)
+            or any(item.get(field) != value.get(field) for field in coordinate_fields)
+            or str(item_id) in seen
+        ):
+            raise ConfigurationError(
+                "host-effect reconciliation unresolved item is invalid"
+            )
+        seen.add(str(item_id))
+    external_id = external.get("external_id")
+    result = value.get("result")
+    if value.get("outcome") == "COMPLETED":
+        if (
+            not isinstance(external_id, str)
+            or not external_id.strip()
+            or not isinstance(result, Mapping)
+            or items
+        ):
+            raise ConfigurationError(
+                "completed host-effect reconciliation is incomplete"
+            )
+    elif external_id is not None or result is not None or not items:
+        raise ConfigurationError(
+            "unknown host-effect reconciliation fabricates terminal evidence"
+        )
+    return dict(value)
+
+
 def validate_host_effect_ledger_records(
     records: Sequence[Mapping[str, object]],
     *,
     launch_instruction_id: str,
+    execution_dir: str | Path | None = None,
 ) -> tuple[Mapping[str, object], ...]:
     """Validate the canonical external-effect state machine once for all readers."""
 
-    fields = {
+    legacy_fields = {
         "schema_version",
         "kind",
         "state",
@@ -10321,6 +16343,13 @@ def validate_host_effect_ledger_records(
         "previous_event_id",
         "event_id",
     }
+    adapter_fields = {
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
+    }
+    fields = legacy_fields | adapter_fields
     identity_fields = {
         "effect_id",
         "operation_lease_id",
@@ -10335,7 +16364,7 @@ def validate_host_effect_ledger_records(
         "request_digest",
         "prepared_at",
         "lease_expires_at",
-    }
+    } | adapter_fields
     effect_kinds = {
         "CREATE_THREAD",
         "SEND_PRIMARY_MESSAGE",
@@ -10351,7 +16380,8 @@ def validate_host_effect_ledger_records(
         material = dict(record)
         event_id = material.pop("event_id", None)
         if (
-            set(record) != fields
+            frozenset(record)
+            not in {frozenset(fields), frozenset(legacy_fields)}
             or record.get("schema_version") != 1
             or record.get("kind") != "hive-mind-host-effect-event-v1"
             or record.get("state")
@@ -10363,6 +16393,28 @@ def validate_host_effect_ledger_records(
             raise ConfigurationError(
                 f"host-effect intent ledger line {index} has invalid lineage"
             )
+        has_adapter_identity = adapter_fields.issubset(record)
+        if has_adapter_identity:
+            for field in (
+                "host_kernel_generation",
+                "execution_adapter_identity_record_id",
+                "execution_adapter_identity_blob_digest",
+            ):
+                if AUTHORITY_ID.fullmatch(str(record.get(field))) is None:
+                    raise ConfigurationError(
+                        f"host-effect intent ledger line {index} has invalid {field}"
+                    )
+            adapter_record_id = str(
+                record["execution_adapter_identity_record_id"]
+            )
+            if record.get("execution_adapter_identity_path") != (
+                "execution-adapter-bindings/"
+                + adapter_record_id.removeprefix("sha256:")
+                + ".json"
+            ):
+                raise ConfigurationError(
+                    f"host-effect intent ledger line {index} has invalid adapter evidence path"
+                )
         for field in (
             "effect_id",
             "operation_lease_id",
@@ -10409,6 +16461,13 @@ def validate_host_effect_ledger_records(
             "idempotency_key": record["idempotency_key"],
             "request_digest": record["request_digest"],
         }
+        if has_adapter_identity:
+            effect_material.update(
+                {
+                    field: record[field]
+                    for field in sorted(adapter_fields)
+                }
+            )
         if record.get("effect_id") != digest_json(effect_material):
             raise ConfigurationError(
                 f"host-effect intent ledger line {index} has invalid effect digest"
@@ -10484,6 +16543,27 @@ def validate_host_effect_ledger_records(
                 raise ConfigurationError(
                     f"host-effect intent ledger line {index} has invalid reconciliation evidence"
                 )
+            if observation_id is not None and has_adapter_identity:
+                if execution_dir is None:
+                    raise ConfigurationError(
+                        "current host-effect reconciliation requires its execution root"
+                    )
+                evidence_path = (
+                    Path(execution_dir).resolve()
+                    / "host-effect-reconciliations"
+                    / (str(observation_id).removeprefix("sha256:") + ".json")
+                )
+                evidence = read_strict_canonical_json(
+                    evidence_path,
+                    label="host-effect reconciliation evidence",
+                )
+                validated_evidence = validate_host_effect_reconciliation_evidence(
+                    evidence, effect=record
+                )
+                if validated_evidence.get("record_id") != observation_id:
+                    raise ConfigurationError(
+                        f"host-effect intent ledger line {index} reconciliation evidence changed"
+                    )
             if state == "COMPLETED":
                 if (
                     AUTHORITY_ID.fullmatch(str(record.get("result_digest"))) is None
@@ -10539,6 +16619,7 @@ def execution_host_effect_obligations(
         records = validate_host_effect_ledger_records(
             strict_jsonl_records(path, label="host-effect intent ledger"),
             launch_instruction_id="sha256:" + path.stem,
+            execution_dir=root,
         )
         for event in records:
             latest[str(event["effect_id"])] = event
@@ -10923,7 +17004,26 @@ class ControlPlane:
             )
         # Minimal fixtures without a configured repository identity retain an
         # isolated lock surface; production repositories never initialize here.
+        if path.parent.parent == self.execution_dir:
+            return self._execution_runtime_lock(
+                path, timeout_seconds=timeout_seconds
+            )
         return runtime_file_lock(path, timeout_seconds=timeout_seconds)
+
+    @contextmanager
+    def _execution_runtime_lock(
+        self, path: Path, *, timeout_seconds: float
+    ):
+        """Acquire an execution lock, then reauthenticate the writer generation.
+
+        The pre-acquisition path check is not a fence: a stale process can wait
+        behind an upgrade and otherwise write after the successor releases the
+        same lock.  The second check occurs while the selected lock is owned.
+        """
+
+        with runtime_file_lock(path, timeout_seconds=timeout_seconds):
+            self._fresh_execution_authority()
+            yield
 
     def runtime_read_lock(self, name: str, *, timeout_seconds: float = 10.0):
         if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*\.lock", name):
@@ -10942,6 +17042,10 @@ class ControlPlane:
         if not path.is_file():
             raise ConfigurationError(
                 "runtime read lock is absent; run an explicit authority migration"
+            )
+        if path.parent.parent == self.execution_dir:
+            return self._execution_runtime_lock(
+                path, timeout_seconds=timeout_seconds
             )
         return runtime_file_lock(path, timeout_seconds=timeout_seconds)
 
@@ -11008,18 +17112,21 @@ class ControlPlane:
             raise ConfigurationError("bootstrap arbiter staged lock is unavailable")
         return runtime_file_lock(path, timeout_seconds=timeout_seconds)
 
+    @contextmanager
     def host_lock(self, *, timeout_seconds: float = 10.0):
         directory = require_host_runtime(self.host_runtime_dir)
-        return runtime_file_lock(
+        with runtime_file_lock(
             directory / "locks" / "host-authority.lock",
             timeout_seconds=timeout_seconds,
-        )
+        ):
+            _host_runtime_identity_unlocked(directory)
+            yield
 
     def execution_lock(self, name: str, *, timeout_seconds: float = 10.0):
-        if name not in EXECUTION_LOCKS:
+        if name not in EXECUTION_LOCKS + EXECUTION_COORDINATOR_LOCKS:
             raise ConfigurationError("execution lock name is invalid")
         directory = self._fresh_execution_authority()
-        return runtime_file_lock(
+        return self._execution_runtime_lock(
             directory / "locks" / name, timeout_seconds=timeout_seconds
         )
 
@@ -15364,6 +21471,23 @@ class ControlPlane:
                 with self.execution_lock(
                     "dispatcher-admission.lock", timeout_seconds=120.0
                 ):
+                    installed_before_cut = self._read_plan_terminal_fence_unlocked()
+                    if installed_before_cut is not None:
+                        if installed_before_cut.get("release_id") != release_id:
+                            raise AutopilotError(
+                                "execution is terminal under another dispatcher release"
+                            )
+                        return installed_before_cut
+                    # Every claim, validation, launch/effect and publication
+                    # admission is serialized by dispatcher authority.  Capture
+                    # the binding -> claim -> validation inventory while this
+                    # outer fence remains held, then reacquire only the tail to
+                    # install the immutable terminal record.  This avoids the
+                    # former validation -> binding inversion without opening a
+                    # post-cut admission window.
+                    snapshot = self.round_authority_snapshot(
+                        release_id, _observed_status=observed_status
+                    )
                     with self._validation_authority_locks():
                         installed = self._read_plan_terminal_fence_unlocked()
                         if installed is not None:
@@ -15372,9 +21496,6 @@ class ControlPlane:
                                     "execution is terminal under another dispatcher release"
                                 )
                             return installed
-                        snapshot = self.round_authority_snapshot(
-                            release_id, _observed_status=observed_status
-                        )
                         if snapshot.get("authority_digest") != expected_authority_digest:
                             raise AutopilotError(
                                 "round authority changed before terminal fencing"
@@ -15615,6 +21736,7 @@ class ControlPlane:
                                     "round status target differs from dispatcher authority"
                                 )
             local_ids: set[str] = set()
+            local_by_reservation_id: dict[str, Mapping[str, object]] = {}
             for item in hosts:
                 reservation_id = item.get("host_reservation_id")
                 if not isinstance(reservation_id, str) or AUTHORITY_ID.fullmatch(
@@ -15623,7 +21745,12 @@ class ControlPlane:
                     raise AutopilotError(
                         "execution host reservation lacks its global reservation id"
                     )
+                if reservation_id in local_by_reservation_id:
+                    raise AutopilotError(
+                        "execution host inventory duplicates a global reservation id"
+                    )
                 local_ids.add(reservation_id)
+                local_by_reservation_id[reservation_id] = item
             execution_globals = tuple(
                 item
                 for item in global_reservations
@@ -15631,6 +21758,11 @@ class ControlPlane:
             )
             global_ids = {
                 str(item.get("reservation_id"))
+                for item in execution_globals
+                if item.get("reservation_kind") in {"PRIMARY", "SIDECAR"}
+            }
+            global_by_reservation_id = {
+                str(item.get("reservation_id")): item
                 for item in execution_globals
                 if item.get("reservation_kind") in {"PRIMARY", "SIDECAR"}
             }
@@ -15643,6 +21775,27 @@ class ControlPlane:
                 obligations.append(
                     {"kind": "ORPHAN_GLOBAL_RESERVATION", "reservation_id": orphan}
                 )
+            for shared_id in sorted(local_ids & global_ids):
+                local_item = local_by_reservation_id[shared_id]
+                global_item = global_by_reservation_id[shared_id]
+                mismatched = tuple(
+                    field
+                    for field in (
+                        "host_kernel_generation",
+                        "execution_adapter_identity_record_id",
+                        "execution_adapter_identity_path",
+                        "execution_adapter_identity_blob_digest",
+                    )
+                    if local_item.get(field) != global_item.get(field)
+                )
+                if mismatched:
+                    obligations.append(
+                        {
+                            "kind": "HOST_RESERVATION_PROVENANCE_MISMATCH",
+                            "reservation_id": shared_id,
+                            "fields": list(mismatched),
+                        }
+                    )
             obligations.extend(
                 {
                     "kind": "ORPHAN_SIDECAR",
@@ -15965,7 +22118,11 @@ class ControlPlane:
                 raise ClaimError(
                     "privileged internal claims cannot carry hosted launch authority"
                 )
-            yield None
+            with self.execution_lock(
+                "dispatcher-admission.lock", timeout_seconds=120.0
+            ):
+                assert_execution_authority_open(self.execution_dir)
+                yield None
             return
         if (
             not isinstance(launch_instruction_id, str)

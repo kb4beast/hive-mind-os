@@ -55,7 +55,7 @@ _SIDECAR_ENVELOPE_FIELDS = frozenset(
         "event_id",
     }
 )
-_SIDECAR_AUTHORITY_FIELDS = frozenset(
+_SIDECAR_LEGACY_AUTHORITY_FIELDS = frozenset(
     {
         "parent_launch_instruction_id",
         "parent_sidecar_id",
@@ -70,6 +70,17 @@ _SIDECAR_AUTHORITY_FIELDS = frozenset(
         "capacity_epoch",
         "reservation_expires_at",
     }
+)
+_SIDECAR_ADAPTER_FIELDS = frozenset(
+    {
+        "host_kernel_generation",
+        "execution_adapter_identity_record_id",
+        "execution_adapter_identity_path",
+        "execution_adapter_identity_blob_digest",
+    }
+)
+_SIDECAR_AUTHORITY_FIELDS = (
+    _SIDECAR_LEGACY_AUTHORITY_FIELDS | _SIDECAR_ADAPTER_FIELDS
 )
 _SIDECAR_BINDING_FIELDS = frozenset(
     {
@@ -168,6 +179,10 @@ _SIDECAR_ALLOWED_BY_STATE = {
         | _SIDECAR_ORPHAN_FIELDS
     ),
 }
+_LEGACY_SIDECAR_ALLOWED_BY_STATE = {
+    state: (fields - _SIDECAR_AUTHORITY_FIELDS) | _SIDECAR_LEGACY_AUTHORITY_FIELDS
+    for state, fields in _SIDECAR_ALLOWED_BY_STATE.items()
+}
 
 
 class SidecarPolicyError(ValueError):
@@ -238,14 +253,28 @@ def _validate_event_schema(event: Mapping[str, object], index: int | str) -> Non
     state = event.get("state")
     if not isinstance(state, str) or state not in _SIDECAR_ALLOWED_BY_STATE:
         raise SidecarPolicyError(f"sidecar ledger line {index} has an invalid state")
-    allowed = _SIDECAR_ALLOWED_BY_STATE[state]
+    has_adapter_identity = _SIDECAR_ADAPTER_FIELDS.issubset(event)
+    has_partial_adapter_identity = bool(_SIDECAR_ADAPTER_FIELDS.intersection(event))
+    if has_partial_adapter_identity and not has_adapter_identity:
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has partial adapter provenance"
+        )
+    allowed = (
+        _SIDECAR_ALLOWED_BY_STATE[state]
+        if has_adapter_identity
+        else _LEGACY_SIDECAR_ALLOWED_BY_STATE[state]
+    )
     unexpected = sorted(set(event) - allowed)
     if unexpected:
         raise SidecarPolicyError(
             f"sidecar ledger line {index} has unexpected {state} fields: "
             + ", ".join(unexpected)
         )
-    required = _SIDECAR_ENVELOPE_FIELDS | _SIDECAR_AUTHORITY_FIELDS
+    required = _SIDECAR_ENVELOPE_FIELDS | (
+        _SIDECAR_AUTHORITY_FIELDS
+        if has_adapter_identity
+        else _SIDECAR_LEGACY_AUTHORITY_FIELDS
+    )
     if state == "SKIPPED_CAPACITY":
         # Admission lost the aggregate host-capacity race, so no reservation
         # exists.  The denial still binds the exact capacity generation and
@@ -373,6 +402,26 @@ def _validate_event_schema(event: Mapping[str, object], index: int | str) -> Non
         raise SidecarPolicyError(
             f"sidecar ledger line {index} has invalid host capacity fence"
         )
+    if has_adapter_identity:
+        for digest_field in (
+            "host_kernel_generation",
+            "execution_adapter_identity_record_id",
+            "execution_adapter_identity_blob_digest",
+        ):
+            value = event.get(digest_field)
+            if not isinstance(value, str) or DIGEST_TEXT.fullmatch(value) is None:
+                raise SidecarPolicyError(
+                    f"sidecar ledger line {index} has invalid {digest_field}"
+                )
+        adapter_record_id = str(event["execution_adapter_identity_record_id"])
+        if event.get("execution_adapter_identity_path") != (
+            "execution-adapter-bindings/"
+            + adapter_record_id.removeprefix("sha256:")
+            + ".json"
+        ):
+            raise SidecarPolicyError(
+                f"sidecar ledger line {index} has invalid execution adapter evidence path"
+            )
     if state == "ORPHANED":
         if event.get("external_cancellation") != "NOT_CLAIMED":
             raise SidecarPolicyError(
@@ -440,6 +489,12 @@ def _validate_sidecar_replay(events: Sequence[Mapping[str, object]]) -> None:
             if state not in legal[prior_state]:
                 raise SidecarPolicyError(
                     f"sidecar ledger line {index} has impossible {prior_state} -> {state} transition"
+                )
+            if _SIDECAR_ADAPTER_FIELDS.issubset(prior) != _SIDECAR_ADAPTER_FIELDS.issubset(
+                event
+            ):
+                raise SidecarPolicyError(
+                    f"sidecar ledger line {index} changes adapter provenance schema"
                 )
             for field in immutable:
                 if prior.get(field) is not None and prior.get(field) != event.get(field):
@@ -560,7 +615,7 @@ def _ledger_lock(
                 "sidecar mutation requires caller-held dispatcher authority"
             )
     try:
-        if for_write and not ledger_path.exists():
+        if for_write and not ledger_path.exists() and not is_execution:
             with runtime_file_lock(initialization_path):
                 with runtime_file_lock(lock_path):
                     if is_execution:
@@ -616,8 +671,16 @@ def sidecar_events(
     *,
     state_dir: str | Path | None = None,
 ) -> tuple[Mapping[str, object], ...]:
+    directory = _authority_state_root(repo_root, state_dir)
     path = _managed(repo_root, state_dir, "sidecar-bindings.jsonl")
     if path.exists():
+        with _ledger_lock(repo_root, state_dir):
+            return _events_unlocked(repo_root, state_dir)
+    # Execution ledgers and their locks are installed by the explicit namespace
+    # transaction.  An absent ledger is an authenticated empty store and must not
+    # reacquire the lower-ranked repository initialization barrier while a caller
+    # holds task-binding authority.
+    if directory != resolve_repository_state_dir(repo_root):
         with _ledger_lock(repo_root, state_dir):
             return _events_unlocked(repo_root, state_dir)
     initialization_path = _managed(
