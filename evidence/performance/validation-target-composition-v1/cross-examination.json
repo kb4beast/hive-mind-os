@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "kind": "vtc-cross-examination-v1",
+  "node_id": "VTC-CROSS-020",
+  "phase": "cross",
+  "recorded_at": "2026-08-13",
+  "source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "binding_check": "Static Git object observation of the quoted commit^{tree} expression produced the sealed tree. The two historical FPC tuples remain rejected and were not normalized or used as source evidence."
+  },
+  "scope": {
+    "root_ci_rerun": false,
+    "candidate_execution": false,
+    "code_or_test_change": false,
+    "plan_change": false,
+    "main_or_remote_effect": false,
+    "method": "Read-only examination of sealed VTC/FPCR/FPP/FPC receipts, their retained transcript, and Git object metadata."
+  },
+  "inventory_cross_examination": {
+    "discovery_claim": {
+      "tests_discovered": 1059,
+      "ordered_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+      "receipt": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e"
+    },
+    "sole_execution_claim": {
+      "tests_run": 1050,
+      "failures": 28,
+      "skipped": 8,
+      "wall_time_seconds": 1130.917,
+      "receipt": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66"
+    },
+    "findings": [
+      "The sealed receipts establish different aggregate quantities: 1,059 discovery IDs and 1,050 tests reported run. Their arithmetic delta is nine.",
+      "The eight skipped tests cannot be used to explain the nine-test delta: unittest's reported run total normally includes skipped test cases, and no sealed ID-level execution ledger maps any discovery ID to a collection omission, skip, load failure, or execution result.",
+      "The retained transcript is a text transcript with aggregate totals and individual diagnostic fragments, not a machine-checked ordered execution inventory bound to the discovery vector. Static reading of that transcript is not a substitute for an ID-level reconciliation.",
+      "Accordingly, neither 1,059 nor 1,050 is rejected as a historical observation, but the relationship between them remains a material unresolved finding. This node does not rerun the sole execution to resolve it."
+    ],
+    "status": "unresolved_fail_closed"
+  },
+  "candidate_component_cross_examination": {
+    "fixture_api": {
+      "historical_failure_surface": "test_autopilot_fixture_seed.FixtureSeedAPISurfaceTests.test_future_fixture_api_is_available",
+      "missing_symbols": [
+        "ContentAddressedFixtureSeed",
+        "FixtureIntegrityError",
+        "FixturePolicyError"
+      ],
+      "observed_failure_count": 1,
+      "candidate_status": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 is rejected, non-promotable, and may not be reused or relabeled."
+    },
+    "git_commit_observation_api": {
+      "historical_failure_surface": "test_doctor_git_fact_batching.GitCommitObservationContract tests 01 through 26 plus 23b",
+      "missing_symbols": [
+        "GitCommitObservation",
+        "GitCommitObservationError",
+        "_git_commit_observation",
+        "_parse_git_commit_batch"
+      ],
+      "observed_failure_count": 27,
+      "baseline_static_observation": "Those symbols are absent from b789's .autopilot/bin tree.",
+      "candidate_status": "d02c2d2 is non-promoted and explicitly not a validation-target candidate. It is not a descendant of b789 and therefore cannot be treated as an applicable source-preserving component without a separately authorized proposal."
+    },
+    "separation_findings": [
+      "The failure surfaces are disjoint in the sealed transcript: one fixture API-surface failure and 27 GitCommitObservation contract-API failures. A fixture-only result cannot establish root-CI sufficiency.",
+      "The preserved d02c2d2 tree differs from b789 in controller, durable-controller, and fixture-support paths. That mixed difference set is counterevidence to calling it a clean GCO-only composition input.",
+      "Neither rejected 41950 nor non-promoted d02 supplies a validated composed candidate for b789. Combining historical artifacts would bypass the source binding and is forbidden."
+    ],
+    "status": "separate_components_not_causally_sufficient"
+  },
+  "adverse_evidence_retained": {
+    "fpp": [
+      "evidence/courts/CASE-FIXTURE-PREREQUISITE-OPENING.json",
+      "evidence/performance/fixture-prerequisite-v1/causality.json"
+    ],
+    "fpc": [
+      "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-APPEAL-OPENING.json",
+      "evidence/performance/fixture-prerequisite-causality-appeal-v1/discovery-analysis.json"
+    ],
+    "fpcr": [
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/cross-examination.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/integration.json",
+      "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-QUALIFICATION.json"
+    ],
+    "rule": "These remain adverse historical evidence only; none authorizes implementation, promotion, performance, or a knowledge-baseline retry."
+  },
+  "conclusion": "DEFER and fail closed. Exact b789/b909 source identity is confirmed, while the 1,059-versus-1,050 inventory delta is not reconciled and fixture/GitCommitObservation requirements remain distinct, non-sufficient historical components. The VTC Judge cannot truthfully find zero unresolved material findings from this record. No implementation proposal, candidate reuse, CI retry, promotion, performance conclusion, or knowledge BASELINE retry is authorized.",
+  "receipt_digest": "sha256:8c45e4e64ca2a2094670030193856611a4cc2545becb03cc244d3823e5a28488"
+}
