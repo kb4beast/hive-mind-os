@@ -100,6 +100,7 @@ def main() -> int:
                 "--output",
                 str(bundle),
             ),
+            cwd=EXAMPLE_ROOT.parents[1] / "src",
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

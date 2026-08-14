@@ -150,7 +150,12 @@ class MissionLoopAdversarialTests(unittest.TestCase):
         self._git("init", "--quiet")
         self._git("config", "user.name", "Test Maintainer")
         self._git("config", "user.email", "maintainer@example.invalid")
-        (self.repository / "app.py").write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+        self._git("config", "core.autocrlf", "false")
+        (self.repository / "app.py").write_text(
+            "def value() -> int:\n    return 1\n",
+            encoding="utf-8",
+            newline="",
+        )
         (self.repository / "check_value.py").write_text(
             "from app import value\nassert value() == 2\n", encoding="utf-8"
         )

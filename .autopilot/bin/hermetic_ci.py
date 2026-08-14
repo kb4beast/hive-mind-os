@@ -202,13 +202,30 @@ def _child_environment(home: Path) -> dict[str, str]:
             "USERPROFILE": str(home),
             "PYTHONNOUSERSITE": "1",
             "PYTHONDONTWRITEBYTECODE": "1",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_TERMINAL_PROMPT": "0",
         }
     )
     for key in tuple(environment):
         if key.upper().startswith(("PYTHONPATH", "OPENAI_", "GITHUB_", "GH_")):
             environment.pop(key, None)
+    return environment
+
+
+def _clone_environment(home: Path) -> dict[str, str]:
+    """Return the child environment plus Git-only clone hardening.
+
+    Candidate tests must not inherit ``GIT_*`` variables: authority-bearing Git
+    adapters deliberately reject inherited Git injection.  The parent clone and
+    checkout still disable ambient Git configuration and prompting explicitly.
+    """
+
+    environment = _child_environment(home)
+    environment.update(
+        {
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+    )
     return environment
 
 
@@ -298,6 +315,7 @@ def run_frozen_candidate(args: argparse.Namespace) -> tuple[dict[str, Any], int]
         home = temporary_root / "home"
         home.mkdir()
         environment = _child_environment(home)
+        clone_environment = _clone_environment(home)
         clone_command = [
             str(git_path),
             "-c",
@@ -315,10 +333,14 @@ def run_frozen_candidate(args: argparse.Namespace) -> tuple[dict[str, Any], int]
             text=True,
             encoding="utf-8",
             errors="strict",
-            env=environment,
+            env=clone_environment,
         )
-        _git(clone, ("checkout", "--detach", commit), environment=environment)
-        if _git(clone, ("rev-parse", "HEAD^{tree}"), environment=environment).stdout.strip() != tree:
+        _git(clone, ("checkout", "--detach", commit), environment=clone_environment)
+        if _git(
+            clone,
+            ("rev-parse", "HEAD^{tree}"),
+            environment=clone_environment,
+        ).stdout.strip() != tree:
             raise HermeticTestError("disposable clone tree differs from the frozen candidate")
         discovery, discovered, discovery_timed_out = _run_child(
             clone=clone,

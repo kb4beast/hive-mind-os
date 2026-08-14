@@ -411,7 +411,7 @@ class LocalCompatibilityFirewallTests(unittest.TestCase):
                 "import sys; import hive_mind_os.cli; "
                 "raise SystemExit(int('hive_mind_os.brain_kernel.closeout' in sys.modules))",
             ),
-            cwd=ROOT,
+            cwd=ROOT / "src",
             capture_output=True,
             text=True,
             check=False,

@@ -240,9 +240,11 @@ class StandaloneVerificationTests(unittest.TestCase):
         self.assertFalse(marker.exists())
 
     def test_rejects_lfs_pointer_content_and_publishes_nothing(self) -> None:
-        (self.repository / "large.bin").write_text(
-            "version https://git-lfs.github.com/spec/v1\noid sha256:" + "0" * 64 + "\nsize 1\n",
-            encoding="ascii",
+        (self.repository / "large.bin").write_bytes(
+            (
+                "version https://git-lfs.github.com/spec/v1\n"
+                "oid sha256:" + "0" * 64 + "\nsize 1\n"
+            ).encode("ascii")
         )
         self._commit("add lfs pointer", "large.bin")
         output = self.root / "lfs-bundle"

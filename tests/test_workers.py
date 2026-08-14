@@ -48,6 +48,7 @@ class WorkerTests(unittest.TestCase):
                 )
                 process = subprocess.Popen(
                     [sys.executable, "-c", script, str(self.root), str(marker)],
+                    cwd=Path(__file__).resolve().parents[1] / "src",
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
