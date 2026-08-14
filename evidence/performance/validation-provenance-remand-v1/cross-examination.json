@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "kind": "vpr-cross-examination-v1",
+  "node_id": "VPR-CROSS-020",
+  "phase": "cross",
+  "recorded_at": "2026-08-13",
+  "examiner": {
+    "identity": "codex:vpr-cross-020",
+    "seat": "cross-examiner-distinct",
+    "self_approval": false,
+    "role": "curator"
+  },
+  "scope": {
+    "method": "Read-only inspection of the sealed VPR contract and retained VTC/FPCR JSON receipts and transcript; static text accounting only.",
+    "code_or_test_change": false,
+    "unittest_discovery_or_ci": false,
+    "candidate_execution": false,
+    "plan_change": false,
+    "main_or_remote_effect": false
+  },
+  "source_binding": {
+    "required_commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "required_tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "binding_status": "The sealed VPR verifier passed against the exact quoted commit/tree. This cross-examination treats only that pair as observed; it does not normalize either rejected FPC tuple.",
+    "rejected_historical_fpc_tuples": [
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c",
+        "status": "rejected"
+      },
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "4f20bd2",
+        "status": "rejected"
+      }
+    ]
+  },
+  "retained_input_bindings": {
+    "opening_court": {
+      "path": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-OPENING.json",
+      "sealed_receipt_digest": "sha256:82d23d9165c67b4e6f2d5a104d354bfd4307a1f1aee3d2d16d2da57abab5c213"
+    },
+    "fpcr_discovery": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "sealed_receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e",
+      "claimed_count": 1059,
+      "claimed_ordered_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893"
+    },
+    "fpcr_transcript": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "sealed_receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66",
+      "sealed_document_digest": "sha256:fa47790899393221d3c99d5e26096a4faa48c909fc0195cf2108ffbe791868e3",
+      "reported_tests_run": 1050,
+      "reported_failures": 28,
+      "reported_skipped": 8
+    },
+    "vtc_cross": {
+      "path": "evidence/performance/validation-target-composition-v1/cross-examination.json",
+      "sealed_receipt_digest": "sha256:8c45e4e64ca2a2094670030193856611a4cc2545becb03cc244d3823e5a28488"
+    }
+  },
+  "parser_and_vector_findings": {
+    "ordered_discovery_vector": "The retained FPCR discovery receipt exposes only count, first ID, last ID, and an ordered-ID digest. It contains no ordered_ids vector. The VTC discovery receipt also contains no ordered_ids vector. A digest cannot be inverted into the required unique ordered set, so no retained input permits the sealed parser to establish coverage of all 1,059 IDs.",
+    "transcript_header_accounting": {
+      "reported_tests_run": 1050,
+      "canonical_header_lines_observed": 1049,
+      "distinct_canonical_header_ids_observed": 1049,
+      "duplicate_canonical_header_ids_observed": 0,
+      "difference_from_reported_run_total": 1,
+      "interpretation": "Static header accounting is not an outcome ledger and cannot infer the missing reported test or assign it an ID."
+    },
+    "terminal_label_ambiguity": {
+      "default_terminal_labels_observed": {
+        "ok": 986,
+        "FAIL": 28
+      },
+      "header_lines_with_nondefault_inline_text": 35,
+      "nondefault_categories": {
+        "warning_text_attached_to_header": 27,
+        "skip_reason_attached_to_header": 8
+      },
+      "finding": "The sealed state machine permits warning lines only while a header is awaiting a terminal label, and accepts a custom label only when explicitly declared. Here warning/reason text is attached on the header line; no custom label declaration binds those strings. Treating them as terminal outcomes, silently stripping them, or converting reason-bearing skipped labels to skipped would invent semantics."
+    },
+    "bijection_result": "inconclusive_fail_closed",
+    "reason": "Neither an ordered discovery vector nor a transcript that cleanly binds every reported outcome through the sealed vocabulary is retained. The necessary exactly-once mapping cannot be proven."
+  },
+  "authority_and_candidate_findings": {
+    "implementation_authority": false,
+    "finding": "Even a successful ledger could reduce provenance uncertainty only. An inconclusive ledger supplies no new authority for implementation, CI, candidate execution, promotion, performance, or knowledge BASELINE-000 retry.",
+    "historical_candidates": {
+      "fixture_41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378": "rejected, non-promotable, and ineligible for reuse, relabeling, qualification, or composition.",
+      "gco_d02c2d2": "non-promoted, not a validation-target candidate, and ineligible for reuse, relabeling, qualification, or composition."
+    },
+    "remaining_adverse_facts": [
+      "The sole retained corrected-source execution reports 28 failures.",
+      "The 1059 discovery claim and 1050 reported-run claim remain unbound at per-ID outcome level.",
+      "VTC and FPCR adverse findings remain retained and are not cured by this cross-examination."
+    ]
+  },
+  "conclusion": "INCONCLUSIVE / DEFER. The source pair is sealed, but the retained inputs do not permit a machine-checkable bijection from the 1,059 claimed ordered discovery IDs to terminal outcomes in the sole transcript. The ledger must be called inconclusive and cannot affect implementation authority. No candidate, CI, promotion, performance, or baseline retry is authorized.",
+  "receipt_digest_algorithm": "sha256(canonical JSON of this receipt excluding receipt_digest, UTF-8, sorted keys, compact separators)",
+  "receipt_digest": "sha256:fc959f1cb2a47fe6d8623818b9b75d2061432e327b40549a1d76fa30801ea571"
+}
