@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "kind": "vpr-ledger-replay-v1",
+  "node_id": "VPR-LEDGER-010",
+  "phase": "ledger-replay",
+  "recorded_at": "2026-08-13",
+  "source": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "sealed_algorithm": {
+    "implementation": "docs/execution/dags/validation-provenance-remand-v1/specs.py:parse_outcome_ledger",
+    "states": ["IDLE", "AWAITING_TERMINAL"],
+    "requires": [
+      "a non-empty unique ordered discovery vector",
+      "a terminal label from the fixed default vocabulary or explicitly supplied custom vocabulary",
+      "exactly one terminal outcome for every discovery ID"
+    ],
+    "forbids": [
+      "inferred discovery IDs",
+      "post-hoc custom-label declaration",
+      "duplicate or unknown header bindings",
+      "missing discovery-ID outcomes"
+    ]
+  },
+  "replay_inputs": {
+    "discovery_count": 1059,
+    "discovery_order_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+    "discovery_vector_available": false,
+    "transcript_receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66",
+    "transcript_canonical_document_digest": "sha256:fa47790899393221d3c99d5e26096a4faa48c909fc0195cf2108ffbe791868e3",
+    "custom_labels_declared_in_retained_evidence": []
+  },
+  "replay": {
+    "executed": false,
+    "result": "inconclusive_fail_closed",
+    "blocking_precondition": "The ordered discovery vector is unavailable; a count and digest cannot serve as the parser's discovery_ids argument.",
+    "secondary_blocker": "35 canonical headers have labels outside the parser's default terminal vocabulary, while retained evidence declares no custom-label vocabulary.",
+    "first_secondary_blocker": {
+      "line": 71,
+      "classification": "undeclared diagnostic label on canonical header",
+      "sealed_parser_effect": "LedgerParseError: unknown terminal label if a vector were supplied."
+    },
+    "no_substitution_performed": true,
+    "no_outcome_mapping_produced": true
+  },
+  "historical_transcript_accounting": {
+    "canonical_header_lines": 1049,
+    "default_inline_terminal_headers": 1014,
+    "separate_ok_terminal_lines": 27,
+    "undeclared_diagnostic_header_labels": 27,
+    "undeclared_skipped_with_reason_header_labels": 8,
+    "warning_prefix_lines": 61,
+    "unparsed_or_idle_ignored_lines": 870,
+    "unparsed_or_idle_ignored_spans": 81,
+    "aggregate_summary_is_not_a_ledger": "The transcript reports 1,050 tests run, 28 failures, and eight skips, but aggregates cannot establish a bijection to an unavailable 1,059-ID ordered vector."
+  },
+  "authority_boundary": {
+    "only_reduces_provenance_uncertainty_if_complete": true,
+    "provenance_uncertainty_reduced": false,
+    "implementation": false,
+    "candidate_use": false,
+    "ci_execution": false,
+    "promotion_or_performance_claim": false,
+    "knowledge_baseline_retry": false
+  },
+  "retained_adverse_status": {
+    "fixture_candidate_41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378": "rejected; no reuse, relabeling, qualification, or composition",
+    "gco_candidate_d02c2d2": "non-promoted; no reuse, relabeling, qualification, or composition",
+    "sole_execution": "adverse historical evidence only; it was not rerun"
+  },
+  "receipt_digest": "sha256:c6fdb81cd1854e12fbecd5369c18ff56a02f4d4c55b515995814548468e00e15"
+}

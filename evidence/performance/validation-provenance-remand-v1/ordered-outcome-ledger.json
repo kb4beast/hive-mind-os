@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "kind": "vpr-ordered-outcome-ledger-v1",
+  "node_id": "VPR-LEDGER-010",
+  "phase": "ledger",
+  "recorded_at": "2026-08-13",
+  "authority": {
+    "implementation": false,
+    "candidate_execution": false,
+    "root_ci_rerun": false,
+    "test_execution": false,
+    "performance_conclusion": false,
+    "promotion": false,
+    "knowledge_baseline_retry": false,
+    "main_or_remote_effect": false
+  },
+  "source_binding": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "validation": "git rev-parse b789b68e7d6a741e0b85a3ac33cbce846e1e32c9^{tree} returned the sealed tree",
+    "rejected_historical_fpc_tuples": [
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c",
+        "status": "rejected"
+      },
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "4f20bd2cbe9c3df8b1cf4a28557f330dd401df40",
+        "status": "rejected"
+      }
+    ]
+  },
+  "input_validation": {
+    "fpcr_discovery": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e",
+      "reported_discovery_count": 1059,
+      "ordered_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893",
+      "ordered_vector_retained": false
+    },
+    "fpcr_transcript": {
+      "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66",
+      "canonical_document_digest": "sha256:fa47790899393221d3c99d5e26096a4faa48c909fc0195cf2108ffbe791868e3",
+      "sole_execution_summary": {
+        "tests_run": 1050,
+        "failures": 28,
+        "skipped": 8,
+        "timed_out": false,
+        "wall_time_seconds": 1130.917
+      }
+    },
+    "vtc_discovery": {
+      "path": "evidence/performance/validation-target-composition-v1/discovery-analysis.json",
+      "receipt_digest": "sha256:d556380b3b61093d5833b0020504d0ff32d603b03eafecb0757455b674303038",
+      "limitation_confirmed": "The retained receipt binds the discovery count and digest but not the ordered 1,059-ID vector."
+    }
+  },
+  "sealed_parser_evaluation": {
+    "parser": "docs/execution/dags/validation-provenance-remand-v1/specs.py:parse_outcome_ledger",
+    "required_precondition": "A non-empty, unique ordered discovery-ID vector is required before transcript parsing.",
+    "precondition_status": "not_satisfied",
+    "parser_invoked": false,
+    "reason_parser_was_not_invoked": "The retained inputs contain only the 1,059 count and ordered-vector digest, not the vector required by the sealed parser. Supplying a reconstructed or substituted vector would invent unavailable evidence.",
+    "result": "inconclusive_fail_closed",
+    "unproven_properties": [
+      "every retained discovery ID binds exactly once",
+      "no transcript header names an ID outside the discovery vector",
+      "no retained discovery ID is missing from terminal outcomes",
+      "the transcript order is the committed discovery order"
+    ]
+  },
+  "transcript_preflight_observations": {
+    "total_lines": 2007,
+    "canonical_header_lines": 1049,
+    "inline_default_labels": 1014,
+    "separate_default_terminal_lines": {
+      "ok": 27,
+      "FAIL": 0,
+      "ERROR": 0,
+      "skipped": 0,
+      "expected failure": 0,
+      "unexpected success": 0
+    },
+    "warning_prefix_lines": 61,
+    "undeclared_inline_labels": {
+      "total": 35,
+      "warning_or_diagnostic": 27,
+      "skip_with_reason": 8,
+      "first": {
+        "line": 71,
+        "id": "test_autonomous_os.AutonomousBrainTests.test_bounded_supervision_handles_pr_feedback_and_local_human_commits",
+        "label_kind": "DeprecationWarning diagnostic appended to a canonical test header"
+      }
+    },
+    "unparsed_or_idle_ignored_spans": {
+      "lines": 870,
+      "contiguous_spans": 81,
+      "first_span": [72, 74],
+      "last_span": [1277, 2007],
+      "description": "These include warning continuation text, traceback and summary material, and trailing non-test output. The parser may ignore such material only while idle; their presence does not create terminal bindings."
+    },
+    "additional_fail_closed_condition": "Even if the unavailable vector were supplied, the sealed parser admits only its default labels plus explicitly declared custom labels. No retained declaration maps the 27 diagnostic labels or eight skipped-with-reason labels to allowed custom terminal labels."
+  },
+  "ledger": {
+    "ordered_ids": null,
+    "outcomes": null,
+    "counts": null,
+    "status": "not_produced",
+    "reason": "A complete bijective ledger cannot be proven from the retained data without reconstructing the unavailable discovery vector or declaring historical labels after the fact."
+  },
+  "candidate_status": {
+    "fixture_candidate_41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378": "rejected and ineligible for reuse, relabeling, qualification, or composition",
+    "gco_candidate_d02c2d2": "non-promoted and ineligible for reuse, relabeling, qualification, or composition"
+  },
+  "conclusion": "INCONCLUSIVE and fail closed. The retained transcript is authentic evidence for the sole adverse historical execution, but it cannot be evaluated into an ordered, exactly-once outcome ledger because the required 1,059-ID discovery vector was not retained. Independently, the transcript carries undeclared diagnostic and skipped-with-reason inline labels that the sealed parser cannot accept absent predeclared vocabulary. This evidence node grants no implementation, candidate, CI, performance, promotion, baseline-retry, main, or remote authority.",
+  "receipt_digest": "sha256:a2cb4cc638099e829a17e9e661bd593934150962b651a870e2fafab648e00b79"
+}
