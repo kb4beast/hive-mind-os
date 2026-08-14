@@ -11,18 +11,17 @@ it never writes authority in the source repository.
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Iterable
-
 
 FULL_SHA256 = "sha256:" + "0" * 64
 CHILD_MARKER = "HIVE_MIND_HERMETIC_RESULT="

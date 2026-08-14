@@ -13,7 +13,6 @@ import json
 import re
 from typing import Any, Mapping, Sequence
 
-
 AUTHORITY_ID = re.compile(r"sha256:[0-9a-f]{64}")
 DEMAND_KIND = "hive-mind-host-dispatch-demand-v1"
 SCHEDULE_KIND = "hive-mind-host-capacity-schedule-v1"
