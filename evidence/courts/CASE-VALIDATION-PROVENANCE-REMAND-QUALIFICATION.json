@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION",
+  "node_id": "VPR-JUDGE-040",
+  "recorded_at": "2026-08-13",
+  "subject": "Whether the evidence-only validation provenance remand reduced the retained discovery-to-outcome provenance uncertainty",
+  "judge": {
+    "identity": "codex:vpr-judge-040",
+    "seat": "judge-distinct-from-all-vpr-roles",
+    "worktree": "C:/Repos/HiveMind/hive-mind-os-vpr-judge-040",
+    "branch": "codex/vpr-judge-040",
+    "self_approval": false,
+    "independent_from": [
+      "VPR-SEAL-000",
+      "VPR-LEDGER-010",
+      "VPR-CROSS-020",
+      "VPR-INTEGRATE-030",
+      "VTC-JUDGE-040"
+    ]
+  },
+  "authority": {
+    "predecessor": "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json",
+    "predecessor_disposition": "defer",
+    "current_authorization": "bounded evidence-only remand for an ordered fail-closed provenance ledger",
+    "implementation_authority_before_judgment": false,
+    "strict_limit": "This remand cannot authorize implementation, candidate use or execution, CI, promotion, a performance conclusion, or knowledge-BASELINE-000 retry."
+  },
+  "sealed_plan": {
+    "path": "docs/execution/dags/validation-provenance-remand-v1/manifest.json",
+    "plan_digest": "sha256:a9f2cd4687b05b16cae4a383b85f01be705caa2503b83e29c54e69f4348ad443",
+    "node_count": 5,
+    "required_verifier": "python docs/execution/dags/validation-provenance-remand-v1/verify_plan.py",
+    "verifier_result": "verified true; five parser adversarial cases passed"
+  },
+  "source_binding": {
+    "observed_commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "observed_tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "binding_status": "Retained VPR receipts observe only this exact commit/tree pair.",
+    "rejected_historical_fpc_tuples": [
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c",
+        "status": "rejected"
+      },
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "4f20bd2cbe9c3df8b1cf4a28557f330dd401df40",
+        "status": "rejected"
+      }
+    ],
+    "rule": "No rejected tuple is normalized, repaired, or treated as the observed source."
+  },
+  "evidence_considered": {
+    "integration": {
+      "path": "evidence/performance/validation-provenance-remand-v1/integration.json",
+      "receipt_digest": "sha256:0ae06b988ebaa72e9c8d5a87b35a54ca00adcec6af4d92d1f67084a58753989e",
+      "result": "inconclusive_fail_closed"
+    },
+    "ordered_outcome_ledger": {
+      "path": "evidence/performance/validation-provenance-remand-v1/ordered-outcome-ledger.json",
+      "receipt_digest": "sha256:a2cb4cc638099e829a17e9e661bd593934150962b651a870e2fafab648e00b79",
+      "result": "inconclusive_fail_closed"
+    },
+    "ledger_replay": {
+      "path": "evidence/performance/validation-provenance-remand-v1/ledger-replay.json",
+      "receipt_digest": "sha256:c6fdb81cd1854e12fbecd5369c18ff56a02f4d4c55b515995814548468e00e15",
+      "result": "inconclusive_fail_closed"
+    },
+    "cross_examination": {
+      "path": "evidence/performance/validation-provenance-remand-v1/cross-examination.json",
+      "receipt_digest": "sha256:fc959f1cb2a47fe6d8623818b9b75d2061432e327b40549a1d76fa30801ea571",
+      "result": "inconclusive_fail_closed"
+    },
+    "vtc_qualification": {
+      "path": "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json",
+      "receipt_digest": "sha256:82d23d9165c67b4e6f2d5a104d354bfd4307a1f1aee3d2d16d2da57abab5c213",
+      "result": "defer"
+    }
+  },
+  "findings": {
+    "provenance_reduction": {
+      "reduced": false,
+      "resolved": false,
+      "reason": "The sealed parser requires a non-empty unique ordered 1,059-ID discovery vector. Retained FPCR and VTC receipts preserve only a count and an ordered-vector digest, not the vector; reconstruction or substitution would invent evidence."
+    },
+    "independent_convergence": "The Explorer ledger and replay both fail closed before parsing, and the independent Cross-Examiner agrees that no exactly-once mapping can be proven.",
+    "remaining_material_findings": [
+      "No retained ordered discovery-ID vector is available for the sealed parser.",
+      "The sole transcript has 1,049 distinct canonical headers while its summary reports 1,050 tests run; the extra reported outcome cannot be identified or bound to an ID.",
+      "Thirty-five canonical headers contain diagnostic or skipped-with-reason inline labels outside the sealed default vocabulary, and retained evidence declares no custom-label vocabulary.",
+      "The sole corrected-source execution remains adverse: 1,050 tests run, 28 failures, and eight skips.",
+      "Fixture candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 is rejected and GCO candidate d02c2d2 is non-promoted; neither may be reused, relabeled, qualified, or composed."
+    ],
+    "zero_unresolved_material_findings": false
+  },
+  "adverse_evidence_and_dissent_retained": {
+    "retained": [
+      "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-QUALIFICATION.json",
+      "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/cross-examination.json",
+      "evidence/performance/validation-target-composition-v1/discovery-analysis.json",
+      "evidence/performance/validation-target-composition-v1/cross-examination.json",
+      "evidence/performance/validation-target-composition-v1/integration.json",
+      "evidence/performance/validation-provenance-remand-v1/ordered-outcome-ledger.json",
+      "evidence/performance/validation-provenance-remand-v1/ledger-replay.json",
+      "evidence/performance/validation-provenance-remand-v1/cross-examination.json",
+      "evidence/performance/validation-provenance-remand-v1/integration.json",
+      "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json"
+    ],
+    "dissent": "The VTC aggregate accounting remains a bounded count-level explanation only. It cannot replace the unavailable ordered vector, identify the unmatched reported outcome, or establish a passing validation target."
+  },
+  "verdict": {
+    "disposition": "defer",
+    "scope": "Only whether the VPR remand reduced retained validation provenance uncertainty.",
+    "rationale": "It did not. Both independent remand receipts are inconclusive and fail closed; the material provenance and applicability findings remain unresolved.",
+    "implementation_authority_granted": false,
+    "candidate_execution_authorized": false,
+    "ci_or_test_execution_authorized": false,
+    "promotion_or_performance_claim_authorized": false,
+    "knowledge_baseline_retry_authorized": false,
+    "completion_claim": false
+  },
+  "limited_future_authority": {
+    "authorized_now": "A separate, newly sealed, forward-looking receipt-capture design court may be opened. It may design evidence-retention requirements that would prevent recurrence; it is not authorized to implement them.",
+    "why_limited_authority_is_supported": "The specific failures identify missing future-retention controls: the ordered discovery vector, exact per-ID terminal-outcome ledger, declared label vocabulary, and reconciliation between transcript headers and summary counts.",
+    "mandatory_boundary": [
+      "The court must remain design-only and must not write production code, tests, fixtures, controllers, or .autopilot/plan.json.",
+      "It must not execute CI, unittest discovery, candidates, or performance measurements.",
+      "It must preserve all adverse evidence and treat b789/b909 only as historical input, not a passing target.",
+      "It must not reuse, relabel, qualify, or compose 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 or d02c2d2.",
+      "Any implementation requires a later, separately sealed authority after independent review of the design."
+    ],
+    "not_authorized": "No receipt-capture implementation, validation candidate, CI rerun, promotion, performance claim, or knowledge-baseline retry is opened by this judgment."
+  },
+  "prohibitions_reaffirmed": [
+    "No code, test, fixture, GitCommitObservation, controller, durable-controller, or .autopilot/plan.json change.",
+    "No CI rerun, unittest discovery, candidate execution, promotion, performance conclusion, or knowledge-BASELINE-000 retry.",
+    "No main checkout/update or remote effect.",
+    "No reuse, relabeling, qualification, or composition of 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 or d02c2d2."
+  ],
+  "rollback": {
+    "action": "This Judge changes no code or prior evidence. Revert only this receipt if an authorized correction is required; retain all adverse evidence append-only."
+  },
+  "receipt_digest": "sha256:2fd564cc32f4e84eff94865c62a439476465795f53f6ee8a5028a42a037b5fdb"
+}
