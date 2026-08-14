@@ -19,8 +19,9 @@ state changed and the loop should re-observe immediately.  WAITING carries the
 exact time at which waiting stops being provably useful, so a poll before then
 is by construction pointless unless a worker pushes.  OPEN_SESSIONS names the
 operator cards that are the one thing code cannot do on an attended host.
-STUCK_HUMAN carries the evidence only a human can move.  QUIESCENT means no
-candidate needs anything.
+STUCK_HUMAN carries the evidence only a human can move.  NO_REPAIR means this
+healer has no authorized state change; only the round driver may declare
+PLAN_QUIESCENT after checking the complete plan and residual runtime authority.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from typing import Any
 
 import learning
 from controller import (
+    AutopilotError,
     RECEIPT_COMMIT_EMAIL,
     append_jsonl,
     digest_json,
@@ -573,6 +575,7 @@ def heal_round(
     status: Mapping[str, Any] | None = None,
     apply: bool = True,
     allow_push: bool = True,
+    max_sessions: int = 8,
 ) -> dict[str, Any]:
     """Diagnose every candidate node and apply each provable repair once.
 
@@ -583,6 +586,11 @@ def heal_round(
     ``apply=False`` the same report is produced with every action withheld.
     """
 
+    if max_sessions < 1:
+        raise AutopilotError("max_sessions must be at least 1")
+    requested_round = None if nodes is None else tuple(dict.fromkeys(nodes))
+    if requested_round is not None and len(requested_round) > max_sessions:
+        raise AutopilotError("healing node scope exceeds the host session cap")
     policy = dict(policy or load_policy(plane.ap_root))
     report: dict[str, Any] = {
         "kind": "hive-mind-autopilot-heal-report-v1",
@@ -593,7 +601,7 @@ def heal_round(
         "diagnoses": [],
         "waiting": [],
         "stuck": [],
-        "disposition": "QUIESCENT",
+        "disposition": "NO_REPAIR",
         "wake_at": None,
     }
     if not policy["enabled"]:
@@ -839,7 +847,11 @@ def heal_round(
             record_action("reconcile", None, "APPLIED" if ok else "FAILED", detail)
         if policy["auto_redispatch"]:
             try:
-                fresh = plane.dispatch(actor=actor)
+                fresh = plane.dispatch(
+                    actor=actor,
+                    requested_nodes=requested_round or (),
+                    max_sessions=max_sessions,
+                )
             except Exception as error:
                 record_action("dispatch", None, "FAILED", str(error))
             else:
@@ -856,7 +868,11 @@ def heal_round(
         unstarted = [d.node_id for d in diagnoses if d.verdict == "UNSTARTED"]
         if unstarted and not current.get("reconciliation_required"):
             try:
-                fresh = plane.dispatch(actor=actor)
+                fresh = plane.dispatch(
+                    actor=actor,
+                    requested_nodes=requested_round or (),
+                    max_sessions=max_sessions,
+                )
             except Exception as error:
                 record_action("dispatch", None, "FAILED", str(error))
             else:
@@ -908,7 +924,7 @@ def heal_round(
         report["open_sessions"] = open_sessions
     elif report["waiting"] or refused:
         # A refused action means the evidence moved under us — the world is
-        # live, so the honest disposition is WAITING, never QUIESCENT.
+        # live, so the honest disposition is WAITING, never NO_REPAIR.
         report["disposition"] = "WAITING"
         if report["waiting"]:
             report["wake_at"] = min(item["wake_at"] for item in report["waiting"])
@@ -917,5 +933,7 @@ def heal_round(
     elif report["stuck"]:
         report["disposition"] = "STUCK_HUMAN"
     else:
-        report["disposition"] = "QUIESCENT"
+        # This is deliberately not plan quiescence. It means only that the
+        # healer has no authorized mutation for the evidence it observed.
+        report["disposition"] = "NO_REPAIR"
     return report

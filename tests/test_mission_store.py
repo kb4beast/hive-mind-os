@@ -556,6 +556,71 @@ def _case_effect_interrupted_before_receipt_reconciles_from_write_ahead_record(
         resumed.close()
 
 
+def _case_competing_effect_claim_and_missing_wal_fail_closed(tmp_path: Path) -> None:
+    state_dir = tmp_path / "state"
+    mission_id = "MISSION-WAL-CAS-1201"
+    store = MissionStore(state_dir)
+    try:
+        _register(store, mission_id)
+        checkpoint = store.checkpoint_for_intent(
+            mission_id,
+            _delivery_intent(
+                mission_id,
+                "ACT-WAL-CAS-1201-push",
+                "IDEMPOTENCY-WAL-CAS-1201-push",
+            ),
+        )
+        store.begin_effect(mission_id, checkpoint.step_index)
+        with _assert_raises(StoreIntegrityError, match="already claimed"):
+            store.begin_effect(mission_id, checkpoint.step_index)
+
+        store.effect_intent_path(
+            mission_id,
+            checkpoint.intent_digest,
+        ).unlink()
+        with _assert_raises(StoreIntegrityError, match="missing its write-ahead"):
+            store.unreconciled_effects(mission_id)
+    finally:
+        store.close()
+
+
+def _case_receipt_tamper_and_path_traversal_fail_closed(tmp_path: Path) -> None:
+    state_dir = tmp_path / "state"
+    mission_id = "MISSION-WAL-RECEIPT-1202"
+    store = MissionStore(state_dir)
+    try:
+        with _assert_raises(StoreIntegrityError, match="safe path segment"):
+            store.mission_root("../outside")
+
+        _register(store, mission_id)
+        checkpoint = store.checkpoint_for_intent(
+            mission_id,
+            _delivery_intent(
+                mission_id,
+                "ACT-WAL-RECEIPT-1202-push",
+                "IDEMPOTENCY-WAL-RECEIPT-1202-push",
+            ),
+        )
+        store.begin_effect(mission_id, checkpoint.step_index)
+        outcome = {"value": {"pushed": True}, "records": []}
+        reference = store.write_effect_receipt(checkpoint, outcome, ())
+        receipt_path = state_dir / Path(*reference["path"].split("/"))
+        wrapper = json.loads(receipt_path.read_text(encoding="utf-8"))
+        wrapper["outcome"] = {"value": {"pushed": False}, "records": []}
+        _atomic_write(
+            receipt_path,
+            (json.dumps(wrapper, sort_keys=True, separators=(",", ":")) + "\n").encode(
+                "utf-8"
+            ),
+        )
+        with _assert_raises(StoreIntegrityError, match="digest does not match"):
+            store.complete_step(checkpoint, reference, outcome)
+        assert store.checkpoint(mission_id, checkpoint.step_index).state == "intent"
+        assert store.idempotency_count(mission_id) == 0
+    finally:
+        store.close()
+
+
 def _persist_receipt_under_path_length(root: Path, final_length: int) -> None:
     store = MissionStore(root / "s")
     try:
@@ -660,6 +725,8 @@ for _case in (
     _case_cli_lists_and_resumes_interrupted_mission,
     _case_raw_effect_receipt_is_adopted_without_reexecution,
     _case_effect_interrupted_before_receipt_reconciles_from_write_ahead_record,
+    _case_competing_effect_claim_and_missing_wal_fail_closed,
+    _case_receipt_tamper_and_path_traversal_fail_closed,
     _case_receipt_persists_when_the_legacy_temporary_name_exceeds_max_path,
     _case_durable_write_survives_a_name_at_the_component_limit,
 ):

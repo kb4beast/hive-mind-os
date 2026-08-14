@@ -133,6 +133,45 @@ class AttendedHostTests(unittest.TestCase):
             "sha256:" + attended._digest(created["capability"]),
         )
 
+    def test_corrupt_ledger_fails_closed_instead_of_resetting(self) -> None:
+        self.create()
+        self.host.ledger_path.write_text("{", encoding="utf-8")
+        with self.assertRaises(attended.AttendedHostError):
+            self.host.lookup_thread(idempotency_key=INSTRUCTION)
+
+    def test_duplicate_ledger_key_fails_closed(self) -> None:
+        self.host.host_dir.mkdir(parents=True, exist_ok=True)
+        self.host.ledger_path.write_text('{"x":{},"x":{}}\n', encoding="utf-8")
+        with self.assertRaisesRegex(attended.AttendedHostError, "duplicate key"):
+            self.host.pending_cards()
+
+    def test_identical_create_reuses_one_durable_binding(self) -> None:
+        first = self.create()
+        ledger_before = self.host.ledger_path.read_bytes()
+        card = self.host.cards_dir / f"{NODE}.md"
+        card_before = card.read_bytes()
+        second = self.create()
+        self.assertEqual(first["task_id"], second["task_id"])
+        ledger = json.loads(self.host.ledger_path.read_text(encoding="utf-8"))
+        self.assertEqual(list(ledger), [INSTRUCTION])
+        self.assertEqual(ledger_before, self.host.ledger_path.read_bytes())
+        self.assertEqual(card_before, card.read_bytes())
+
+    def test_idempotency_key_cannot_be_reused_for_different_instructions(self) -> None:
+        self.create()
+        with self.assertRaisesRegex(attended.AttendedHostError, "different launch"):
+            self.host.create_thread(
+                title=f"Hive Mind {NODE}",
+                prompt="competing instructions",
+                idempotency_key=INSTRUCTION,
+            )
+
+    def test_task_binding_rejects_a_traversing_node_id(self) -> None:
+        with self.assertRaisesRegex(attended.AttendedHostError, "unsafe"):
+            self.host.bind_tasks(
+                [{"launch_instruction_id": "launch:escape", "node_id": "../escape"}]
+            )
+
     def test_receipt_commit_is_the_only_success_evidence(self) -> None:
         created = self.create()
         self.push_node_head(email=attended.RECEIPT_IDENTITY)

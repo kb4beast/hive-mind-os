@@ -61,14 +61,15 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         self.plane = autopilot.ControlPlane(self.root)
         self._make_eligible([SERIAL, *PARALLEL])
 
-    def _make_eligible(self, eligible: list[str]) -> None:
+    def _make_eligible(self, eligible: list[str], *, active: tuple[str, ...] = ()) -> None:
         """Report exactly these nodes as ready, leaving the real plan intact."""
 
         rows = [{"node_id": node_id, "state": "READY"} for node_id in eligible]
+        rows += [{"node_id": node_id, "state": "CLAIMED"} for node_id in active]
         rows += [
             {"node_id": node_id, "state": "COMPLETE"}
             for node_id in self.plane._nodes
-            if node_id not in eligible
+            if node_id not in eligible and node_id not in active
         ]
         status = {"ready": list(eligible), "nodes": rows}
         self.plane._base_status = lambda: dict(status)  # type: ignore[method-assign]
@@ -76,6 +77,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         self.plane._reconciliation_digest = lambda: "sha256:" + "1" * 64  # type: ignore[method-assign]
         self.plane._snapshot_digest = lambda: "sha256:" + "2" * 64  # type: ignore[method-assign]
         self.plane._recovery_issues = lambda: ()  # type: ignore[method-assign]
+        self.plane.active_claims = lambda: {node_id: {"node_id": node_id} for node_id in active}  # type: ignore[method-assign]
 
     def test_a_serial_node_is_never_seated_beside_parallel_siblings(self) -> None:
         release = self.plane.dispatch(actor="test:dispatcher")
@@ -97,11 +99,12 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             f"dispatch wrote a self-invalidating release for wave {release['released_wave']}",
         )
 
-    def test_priority_wins_so_a_serial_node_is_not_starved(self) -> None:
-        release = self.plane.dispatch(actor="test:dispatcher")
-        # MIGRATION-460 carries the highest critical_path_importance of this set,
-        # so it must take the round rather than being skipped forever.
-        self.assertEqual(list(release["released_wave"]), [SERIAL])
+    def test_compiled_order_governs_and_serial_work_remains_releasable(self) -> None:
+        first = self.plane.dispatch(actor="test:dispatcher")
+        self.assertEqual(list(first["released_wave"]), list(PARALLEL))
+        self._make_eligible([SERIAL])
+        second = self.plane.dispatch(actor="test:dispatcher")
+        self.assertEqual(list(second["released_wave"]), [SERIAL])
 
     def test_parallel_only_eligibility_still_waves_together(self) -> None:
         self._make_eligible(list(PARALLEL))
@@ -109,10 +112,41 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         self.assertEqual(sorted(release["released_wave"]), sorted(PARALLEL))
         self.assertEqual(tuple(self.plane._release_issues(release)), ())
 
+    def test_default_dispatch_never_exceeds_runtime_capacity(self) -> None:
+        self._make_eligible(list(PARALLEL))
+        release = self.plane.dispatch(actor="test:dispatcher", max_sessions=2)
+        self.assertEqual(list(release["released_wave"]), list(PARALLEL[:2]))
+        self.assertEqual(release["session_cap"], 2)
+
+    def test_explicit_release_above_capacity_is_refused(self) -> None:
+        self._make_eligible(list(PARALLEL))
+        with self.assertRaisesRegex(autopilot.AutopilotError, "above the 2-session cap"):
+            self.plane.dispatch(
+                actor="test:dispatcher",
+                requested_nodes=list(PARALLEL),
+                max_sessions=2,
+            )
+
+    def test_identical_valid_dispatch_is_a_read_only_retry(self) -> None:
+        self._make_eligible(list(PARALLEL))
+        first = self.plane.dispatch(actor="test:dispatcher", max_sessions=2)
+        history = self.plane.state_dir / "dispatcher-releases.jsonl"
+        before = history.read_bytes()
+        second = self.plane.dispatch(actor="test:other", max_sessions=2)
+        self.assertEqual(first["release_id"], second["release_id"])
+        self.assertEqual(before, history.read_bytes())
+
+    def test_crash_resume_stays_inside_the_active_compiled_round(self) -> None:
+        self._make_eligible(list(PARALLEL[1:]), active=(PARALLEL[0],))
+        release = self.plane.dispatch(actor="test:dispatcher", max_sessions=3)
+        self.assertEqual(list(release["round_nodes"]), list(PARALLEL))
+        self.assertEqual(list(release["released_wave"]), list(PARALLEL[1:]))
+        self.assertTrue(str(release["frontier_id"]).startswith("sha256:"))
+
     def test_requesting_a_serial_node_with_a_sibling_is_refused(self) -> None:
         with self.assertRaises(autopilot.AutopilotError) as raised:
             self.plane.dispatch(actor="test:dispatcher", requested_nodes=[SERIAL, PARALLEL[0]])
-        self.assertIn("serial node", str(raised.exception))
+        self.assertIn("compiled frontier", str(raised.exception))
 
 
 if __name__ == "__main__":

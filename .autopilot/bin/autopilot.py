@@ -13,7 +13,13 @@ from typing import Any, Sequence
 
 from attended_host import AttendedCodexHost, EvidenceResolver
 from controller import FULL_SHA, format_time
-from dag_standard import add_dag_standard_arguments, run_dag_standard_command
+from dag_standard import (
+    DagStandardError,
+    add_dag_standard_arguments,
+    load_plan_graph,
+    run_dag_standard_command,
+    select_frontier,
+)
 from durable_controller import (
     AutopilotError,
     ClaimError,
@@ -531,12 +537,20 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 issues.append("dispatcher release was issued before receipt retirement recovery")
         return tuple(dict.fromkeys(issues))
 
-    def dispatch(self, *, actor: str, requested_nodes: Sequence[str] = ()) -> Mapping[str, Any]:
+    def dispatch(
+        self,
+        *,
+        actor: str,
+        requested_nodes: Sequence[str] = (),
+        max_sessions: int = 8,
+    ) -> Mapping[str, Any]:
         recovery_issues = self._recovery_issues()
         if recovery_issues:
             raise AutopilotError("; ".join(recovery_issues))
         if not actor.strip():
             raise AutopilotError("dispatcher actor is required")
+        if max_sessions < 1:
+            raise AutopilotError("dispatcher max_sessions must be at least 1")
         if self.target_requires_reconciliation():
             raise AutopilotError("dispatcher release is forbidden until live target reconciliation completes")
         reconciliation_digest = self._reconciliation_digest()
@@ -546,11 +560,43 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         base_status = self._base_status()
         ready = base_status.get("ready", [])
         eligible = [str(item) for item in ready] if isinstance(ready, list) else []
+        rows = base_status.get("nodes", [])
+        completed = [
+            str(row.get("node_id"))
+            for row in rows
+            if isinstance(row, Mapping) and row.get("state") == "COMPLETE"
+        ] if isinstance(rows, list) else []
+        active = tuple(self.active_claims())
+        try:
+            frontier = select_frontier(
+                load_plan_graph(self.plan_path),
+                completed_nodes=completed,
+                active_nodes=active,
+                max_sessions=max_sessions,
+                command_prefix="dispatch",
+                repo_root=self.repo_root,
+            )
+        except DagStandardError as error:
+            raise AutopilotError(f"cannot select a durable dispatch frontier: {error}") from error
+        releasable = [node_id for node_id in frontier.release_nodes if node_id in eligible]
+        if not releasable:
+            raise AutopilotError(
+                f"{frontier.state}: current compiled frontier has no eligible inactive nodes"
+            )
         if requested_nodes:
             wave = list(dict.fromkeys(str(item) for item in requested_nodes))
+            if len(wave) > max_sessions:
+                raise AutopilotError(
+                    f"requested release has {len(wave)} nodes above the {max_sessions}-session cap"
+                )
             unavailable = [node_id for node_id in wave if node_id not in eligible]
             if unavailable:
                 raise AutopilotError("dispatcher cannot release non-eligible nodes: " + ", ".join(unavailable))
+            if wave != releasable:
+                raise AutopilotError(
+                    "requested release does not match the first incomplete compiled frontier: "
+                    + ", ".join(releasable)
+                )
             for index, first in enumerate(wave):
                 for second in wave[index + 1:]:
                     if not bool(self.node(first).get("parallel_safe")) or not bool(
@@ -562,39 +608,32 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                     if self._nodes_conflict(first, second):
                         raise AutopilotError(f"requested parallel release conflicts: {first} vs {second}")
         else:
-            # A node with parallel_safe=false is released ALONE. Selecting on
-            # lock-disjointness alone would seat it beside parallel siblings,
-            # and _release_issues rejects exactly that pairing — so the release
-            # would be invalid the moment it was written, `ready` would stay
-            # empty, and an auto-dispatching healer would rewrite the same
-            # invalid wave on every pass. Highest priority first, so a serial
-            # node still wins its own round instead of being starved.
-            wave = []
-            ordered = sorted(
-                eligible,
-                key=lambda node_id: (
-                    -int(self.node(node_id).get("critical_path_importance", 0)),
-                    -int(self.node(node_id).get("downstream_unlock_value", 0)),
-                    node_id,
-                ),
-            )
-            for node_id in ordered:
-                if not wave:
-                    wave.append(node_id)
-                    continue
-                if not bool(self.node(node_id).get("parallel_safe")):
-                    continue
-                if any(not bool(self.node(chosen).get("parallel_safe")) for chosen in wave):
-                    continue
-                if all(not self._nodes_conflict(node_id, chosen) for chosen in wave):
-                    wave.append(node_id)
+            wave = releasable
         verdicts = self._candidate_verdicts(base_status, wave)
         directive, action = self._action_sentence(wave)
+        if self.current_release_path.is_file():
+            existing = read_json(self.current_release_path)
+            if (
+                isinstance(existing, Mapping)
+                and not self._release_issues(existing)
+                and existing.get("target_sha") == self.current_target_sha()
+                and existing.get("plan_fingerprint") == self.expected_plan_fingerprint
+                and existing.get("reconciliation_digest") == reconciliation_digest
+                and existing.get("github_snapshot_digest") == snapshot_digest
+                and existing.get("released_wave") == wave
+                and existing.get("session_cap") == max_sessions
+                and existing.get("frontier_id") == frontier.frontier_id
+            ):
+                return existing
         record: dict[str, Any] = {
             "schema_version": 1, "kind": RELEASE_KIND, "actor": actor,
             "target_sha": self.current_target_sha(), "plan_fingerprint": self.expected_plan_fingerprint,
             "reconciliation_digest": reconciliation_digest, "github_snapshot_digest": snapshot_digest,
             "released_wave": wave, "directive": directive, "action": action, "verdicts": verdicts,
+            "session_cap": max_sessions,
+            "frontier_id": frontier.frontier_id,
+            "round_id": frontier.round_id,
+            "round_nodes": list(frontier.round_nodes),
             "issued_at": format_time(self.clock()),
             "receipt_retirement_execution_digest": digest_json(self._execution()) if self._execution() is not None else None,
         }
@@ -714,6 +753,7 @@ def parser() -> argparse.ArgumentParser:
     dispatch = commands.add_parser("dispatch")
     dispatch.add_argument("--actor", required=True)
     dispatch.add_argument("--node", action="append", default=[])
+    dispatch.add_argument("--max-sessions", type=int, default=8)
     dispatch.add_argument("--json", action="store_true", dest="json_output")
 
     claim = commands.add_parser("claim")
@@ -808,6 +848,7 @@ def parser() -> argparse.ArgumentParser:
     orchestrate = commands.add_parser("orchestrate")
     orchestrate.add_argument("--request", default="")
     orchestrate.add_argument("--actor", default="autopilot:orchestrator")
+    orchestrate.add_argument("--max-sessions", type=int, default=8)
     orchestrate.add_argument(
         "--apply",
         action="store_true",
@@ -818,6 +859,7 @@ def parser() -> argparse.ArgumentParser:
     wave = commands.add_parser("execute-wave")
     wave.add_argument("--request", default="execute the dag")
     wave.add_argument("--actor", default="autopilot:orchestrator")
+    wave.add_argument("--max-sessions", type=int, default=8)
     wave.add_argument(
         "--apply",
         action="store_true",
@@ -857,6 +899,7 @@ def parser() -> argparse.ArgumentParser:
     heal = commands.add_parser("heal")
     heal.add_argument("--actor", default="autopilot:healer")
     heal.add_argument("--node", action="append", default=[])
+    heal.add_argument("--max-sessions", type=int, default=8)
     heal.add_argument(
         "--dry-run",
         action="store_true",
@@ -980,7 +1023,7 @@ def select_orchestration_status(
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
-        if args.command in {"dag-rounds", "dag-lint"}:
+        if args.command in {"dag-rounds", "dag-frontier", "dag-lint"}:
             # Plan-only analysis: deliberately does not construct a live control
             # plane so any repository's plan.json can be compiled and linted.
             return run_dag_standard_command(args)
@@ -1029,7 +1072,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(str(action or "Do not open any worker sessions yet"))
             return 0
         if args.command == "dispatch":
-            result = plane.dispatch(actor=args.actor, requested_nodes=args.node)
+            result = plane.dispatch(
+                actor=args.actor,
+                requested_nodes=args.node,
+                max_sessions=args.max_sessions,
+            )
             if args.json_output:
                 print(json.dumps(result, indent=2, sort_keys=True))
             else:
@@ -1251,6 +1298,7 @@ def main(argv: list[str] | None = None) -> int:
                         actor=args.actor,
                         nodes=args.node or None,
                         apply=not args.dry_run,
+                        max_sessions=args.max_sessions,
                     ),
                     indent=2,
                     sort_keys=True,
@@ -1311,7 +1359,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "execute-wave":
             status, decision = select_orchestration_status(plane, args.request)
             if args.apply and should_publish_release(decision, status):
-                plane.dispatch(actor=args.actor)
+                plane.dispatch(actor=args.actor, max_sessions=args.max_sessions)
                 status = plane.status()
             # The attended host has no sidecar API; the wave runs without its
             # optional sidecar cohort rather than refusing to run at all.
@@ -1322,7 +1370,12 @@ def main(argv: list[str] | None = None) -> int:
                 # A withheld wave is exactly what healing exists for: repair the
                 # defunct evidence, refresh authority, and rebuild the contract
                 # once before conceding.
-                healed = heal_round(plane, actor=args.actor, status=status)
+                healed = heal_round(
+                    plane,
+                    actor=args.actor,
+                    status=status,
+                    max_sessions=args.max_sessions,
+                )
                 print(f"HEAL: {healed['disposition']}")
                 for action in healed["actions"]:
                     print(
@@ -1353,7 +1406,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "orchestrate":
             status, decision = select_orchestration_status(plane, args.request)
             if args.apply and should_publish_release(decision, status):
-                plane.dispatch(actor=args.actor)
+                plane.dispatch(actor=args.actor, max_sessions=args.max_sessions)
                 status = plane.status()
             result = build_orchestration_contract(
                 plane,
@@ -1378,6 +1431,7 @@ def main(argv: list[str] | None = None) -> int:
         AutopilotError,
         ClaimError,
         ConfigurationError,
+        DagStandardError,
         OrchestrationError,
         ReceiptError,
     ) as error:

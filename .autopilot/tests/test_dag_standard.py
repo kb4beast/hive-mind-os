@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -32,6 +33,7 @@ from dag_standard import (  # noqa: E402
     lint_exit_code,
     lint_plan,
     load_plan_graph,
+    select_frontier,
 )
 
 TEST_PREFIX = "python bin/autopilot.py --repo-root . dispatch"
@@ -1200,6 +1202,56 @@ class RoundCompilationTests(unittest.TestCase):
             2,
         )
 
+    def test_frontier_advances_capacity_waves_without_releasing_the_level(self) -> None:
+        graph = graph_of(*(node(f"N{index}") for index in range(8)))
+        first = select_frontier(graph, max_sessions=3, command_prefix=TEST_PREFIX)
+        self.assertEqual(first.state, "ROUND_READY")
+        self.assertEqual(first.round_nodes, ("N0", "N1", "N2"))
+        self.assertEqual(first.release_nodes, first.round_nodes)
+        second = select_frontier(
+            graph,
+            completed_nodes=first.round_nodes,
+            max_sessions=3,
+            command_prefix=TEST_PREFIX,
+        )
+        self.assertEqual(second.round_nodes, ("N3", "N4", "N5"))
+        self.assertEqual(second.release_nodes, second.round_nodes)
+
+    def test_frontier_resumes_only_unaccepted_inactive_members(self) -> None:
+        graph = graph_of(*(node(f"N{index}") for index in range(4)))
+        frontier = select_frontier(
+            graph,
+            completed_nodes=("N0",),
+            active_nodes=("N1",),
+            max_sessions=3,
+            command_prefix=TEST_PREFIX,
+        )
+        self.assertEqual(frontier.round_nodes, ("N0", "N1", "N2"))
+        self.assertEqual(frontier.completed_nodes, ("N0",))
+        self.assertEqual(frontier.active_nodes, ("N1",))
+        self.assertEqual(frontier.release_nodes, ("N2",))
+
+    def test_frontier_rejects_active_work_outside_current_round(self) -> None:
+        graph = graph_of(*(node(f"N{index}") for index in range(4)))
+        with self.assertRaisesRegex(DagStandardError, "outside the first incomplete"):
+            select_frontier(
+                graph,
+                active_nodes=("N3",),
+                max_sessions=3,
+                command_prefix=TEST_PREFIX,
+            )
+
+    def test_frontier_is_quiescent_only_after_every_round_is_complete(self) -> None:
+        graph = graph_of(*(node(f"N{index}") for index in range(4)))
+        frontier = select_frontier(
+            graph,
+            completed_nodes=graph.node_ids,
+            max_sessions=3,
+            command_prefix=TEST_PREFIX,
+        )
+        self.assertEqual(frontier.state, "PLAN_QUIESCENT")
+        self.assertEqual(frontier.release_nodes, ())
+
     def test_conflicting_nodes_never_share_a_round(self) -> None:
         graph = graph_of(
             node("ALPHA", file_locks=["src/shared/**"]),
@@ -1263,8 +1315,34 @@ class DispatchCommandTests(unittest.TestCase):
         )
         self.assertEqual(
             rounds[0].command,
-            f"{TEST_PREFIX} --actor acme:integrator --node ALPHA --node BETA",
+            f"{TEST_PREFIX} --actor acme:integrator --max-sessions 8 "
+            "--node ALPHA --node BETA",
         )
+
+    def test_external_round_command_is_a_runnable_frontier_assertion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan = root / "custom-plan.json"
+            plan.write_text(
+                json.dumps({"schema_version": 1, "nodes": [node("ALPHA"), node("BETA")]}),
+                encoding="utf-8",
+            )
+            rounds = compile_rounds(
+                load_plan_graph(plan),
+                max_sessions=1,
+                repo_root=root,
+            )
+            completed = subprocess.run(
+                rounds[1].command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("ROUND_READY: R2 release BETA", completed.stdout)
+        self.assertIn("dag-frontier", rounds[1].command)
+        self.assertNotIn(" dispatch --plan", rounds[1].command)
 
     def test_the_cli_command_names_the_repository_holding_the_plan(self) -> None:
         import autopilot

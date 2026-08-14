@@ -16,12 +16,16 @@ operator still has to open.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import stat
 import time
 from collections.abc import Callable, Mapping, Sequence
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 HOST_ID = "codex-attended"
 CAPABILITY = "durable_user_owned_task"
@@ -31,6 +35,8 @@ EVENT_KIND = "hive-mind-host-event-v1"
 ACK_KIND = "hive-mind-host-message-ack-v1"
 RECEIPT_IDENTITY = "autopilot-receipt@hive-mind.invalid"
 CLAIM_IDENTITY = "autopilot-claim@hive-mind.invalid"
+MAX_LEDGER_BYTES = 1024 * 1024
+LEDGER_LOCK_TIMEOUT_SECONDS = 10.0
 
 
 class AttendedHostError(RuntimeError):
@@ -39,6 +45,15 @@ class AttendedHostError(RuntimeError):
 
 def _digest(value: str) -> str:
     return sha256(value.encode("utf-8")).hexdigest()
+
+
+def _object_without_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise AttendedHostError(f"attended ledger contains duplicate key {key!r}")
+        value[key] = item
+    return value
 
 
 class AttendedCodexHost:
@@ -68,20 +83,127 @@ class AttendedCodexHost:
 
     # ------------------------------------------------------------------ ledger
 
-    def _ledger(self) -> dict[str, Any]:
+    @contextlib.contextmanager
+    def _ledger_lock(self):
+        self.host_dir.mkdir(parents=True, exist_ok=True)
+        path = self.host_dir / "attended-threads.lock"
+        if path.is_symlink():
+            raise AttendedHostError("attended ledger lock may not be a symlink")
+        descriptor = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        locked = False
+        deadline = time.monotonic() + LEDGER_LOCK_TIMEOUT_SECONDS
+        try:
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b"0")
+                os.fsync(descriptor)
+            while not locked:
+                try:
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    if os.name == "nt":
+                        import msvcrt
+
+                        msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    locked = True
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise AttendedHostError("attended ledger is locked by another controller") from None
+                    time.sleep(0.01)
+            yield
+        finally:
+            if locked:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+            os.close(descriptor)
+
+    def _ledger_unlocked(self) -> dict[str, Any]:
         if not self.ledger_path.is_file():
             return {}
+        metadata = os.lstat(self.ledger_path)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+            or metadata.st_size > MAX_LEDGER_BYTES
+        ):
+            raise AttendedHostError("attended ledger must be a bounded regular file")
         try:
-            value = json.loads(self.ledger_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
-        return value if isinstance(value, dict) else {}
+            body = self.ledger_path.read_bytes()
+            value = json.loads(
+                body.decode("utf-8"),
+                object_pairs_hook=_object_without_duplicates,
+                parse_constant=lambda item: (_ for _ in ()).throw(
+                    AttendedHostError(f"attended ledger contains non-finite constant {item}")
+                ),
+            )
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise AttendedHostError(f"attended ledger is invalid: {error}") from error
+        if len(body) != metadata.st_size or not isinstance(value, dict):
+            raise AttendedHostError("attended ledger changed while reading or is not an object")
+        required = {
+            "host_id", "task_id", "cursor", "capability", "capability_digest",
+            "node_id", "title", "card", "card_digest",
+        }
+        for instruction, entry in value.items():
+            if not isinstance(instruction, str) or not instruction or not isinstance(entry, Mapping):
+                raise AttendedHostError("attended ledger entry identity is invalid")
+            if set(entry) != required:
+                raise AttendedHostError("attended ledger entry has missing or unexpected fields")
+            if (
+                entry.get("host_id") != HOST_ID
+                or entry.get("task_id") != "attended-" + _digest(instruction)[:32]
+                or entry.get("cursor") != CURSOR
+                or entry.get("capability") != CAPABILITY
+                or entry.get("capability_digest") != "sha256:" + _digest(CAPABILITY)
+            ):
+                raise AttendedHostError("attended ledger entry does not bind its launch identity")
+            if not all(
+                isinstance(entry.get(key), str) and str(entry[key]).strip()
+                for key in ("node_id", "title", "card", "card_digest")
+            ):
+                raise AttendedHostError(
+                    "attended ledger entry has empty node, title, card, or digest fields"
+                )
+            if entry["card_digest"][:7] != "sha256:" or len(entry["card_digest"]) != 71:
+                raise AttendedHostError("attended ledger card digest is invalid")
+            card = (self.repo_root / str(entry["card"])).resolve()
+            try:
+                card.relative_to(self.cards_dir.resolve())
+            except ValueError as error:
+                raise AttendedHostError("attended ledger card escapes the managed card directory") from error
+        return value
 
-    def _write_ledger(self, value: Mapping[str, Any]) -> None:
+    def _ledger(self) -> dict[str, Any]:
+        with self._ledger_lock():
+            return self._ledger_unlocked()
+
+    def _write_ledger_unlocked(self, value: Mapping[str, Any]) -> None:
         self.host_dir.mkdir(parents=True, exist_ok=True)
-        self.ledger_path.write_text(
-            json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        body = (json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+        if len(body) > MAX_LEDGER_BYTES:
+            raise AttendedHostError("attended ledger exceeds its size bound")
+        temporary = self.ledger_path.with_name(
+            f".{self.ledger_path.name}.{os.getpid()}.{uuid4().hex}.tmp"
         )
+        try:
+            with open(temporary, "xb") as handle:
+                handle.write(body)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self.ledger_path)
+        except OSError as error:
+            raise AttendedHostError(f"cannot atomically persist attended ledger: {error}") from error
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def bind_tasks(self, tasks: Sequence[Mapping[str, object]]) -> None:
         """Record which node each launch instruction belongs to.
@@ -95,6 +217,14 @@ class AttendedCodexHost:
             instruction = task.get("launch_instruction_id")
             node_id = task.get("node_id")
             if isinstance(instruction, str) and isinstance(node_id, str):
+                if (
+                    not instruction.strip()
+                    or not node_id.strip()
+                    or node_id in {".", ".."}
+                    or "/" in node_id
+                    or "\\" in node_id
+                ):
+                    raise AttendedHostError("task binding has an unsafe instruction or node id")
                 self._nodes[instruction] = node_id
 
     def pending_cards(self) -> tuple[Mapping[str, Any], ...]:
@@ -164,30 +294,62 @@ class AttendedCodexHost:
             raise AttendedHostError("an attended session card requires a title and prompt")
         task_id = "attended-" + _digest(idempotency_key)[:32]
         node_id = self._nodes.get(idempotency_key, "")
-        ledger = self._ledger()
-        existing = ledger.get(idempotency_key)
-        if isinstance(existing, Mapping) and existing.get("task_id") != task_id:
-            raise AttendedHostError("attended ledger conflicts with the launch identity")
-        self.cards_dir.mkdir(parents=True, exist_ok=True)
-        card_name = f"{node_id or task_id}.md"
-        card_path = self.cards_dir / card_name
-        card_path.write_text(
-            f"# {title}\n\n"
-            f"Open one Codex session named exactly `{title}` and paste everything\n"
-            f"below the rule. Do not add instructions of your own.\n\n---\n\n{prompt}\n",
-            encoding="utf-8",
-        )
-        ledger[idempotency_key] = {
-            "host_id": HOST_ID,
-            "task_id": task_id,
-            "cursor": CURSOR,
-            "capability": CAPABILITY,
-            "capability_digest": "sha256:" + _digest(CAPABILITY),
-            "node_id": node_id,
-            "title": title,
-            "card": str(card_path.relative_to(self.repo_root)),
-        }
-        self._write_ledger(ledger)
+        if not node_id:
+            raise AttendedHostError("launch instruction is not bound to a node")
+        with self._ledger_lock():
+            ledger = self._ledger_unlocked()
+            self.cards_dir.mkdir(parents=True, exist_ok=True)
+            card_name = f"{node_id}.md"
+            card_path = self.cards_dir / card_name
+            card_body = (
+                f"# {title}\n\n"
+                f"Open one Codex session named exactly `{title}` and paste everything\n"
+                f"below the rule. Do not add instructions of your own.\n\n---\n\n{prompt}\n"
+            ).encode("utf-8")
+            entry = {
+                "host_id": HOST_ID,
+                "task_id": task_id,
+                "cursor": CURSOR,
+                "capability": CAPABILITY,
+                "capability_digest": "sha256:" + _digest(CAPABILITY),
+                "node_id": node_id,
+                "title": title,
+                "card": str(card_path.relative_to(self.repo_root)),
+                "card_digest": "sha256:" + sha256(card_body).hexdigest(),
+            }
+            existing = ledger.get(idempotency_key)
+            if existing is not None:
+                if not isinstance(existing, Mapping) or dict(existing) != entry:
+                    raise AttendedHostError(
+                        "attended ledger idempotency key binds different launch instructions"
+                    )
+                if (
+                    not card_path.is_file()
+                    or "sha256:" + sha256(card_path.read_bytes()).hexdigest()
+                    != entry["card_digest"]
+                ):
+                    raise AttendedHostError("attended session card is missing or corrupt")
+                return {
+                    "kind": CREATE_KIND,
+                    "host_id": HOST_ID,
+                    "task_id": task_id,
+                    "cursor": CURSOR,
+                    "capability": CAPABILITY,
+                    "idempotency_key": idempotency_key,
+                }
+            card_temporary = card_path.with_name(
+                f".{card_path.name}.{os.getpid()}.{uuid4().hex}.tmp"
+            )
+            try:
+                with open(card_temporary, "xb") as handle:
+                    handle.write(card_body)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(card_temporary, card_path)
+            finally:
+                card_temporary.unlink(missing_ok=True)
+            ledger[idempotency_key] = entry
+            self._write_ledger_unlocked(ledger)
         return {
             "kind": CREATE_KIND,
             "host_id": HOST_ID,

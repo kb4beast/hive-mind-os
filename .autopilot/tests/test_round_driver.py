@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fixture_support import copy_autopilot_fixture
 
@@ -195,6 +196,58 @@ class RoundDriverTests(unittest.TestCase):
             ],
         }
         self.assertEqual(driver.completed_nodes(status), {"BOOT-000"})
+
+    def test_partial_round_resume_does_not_reselect_completed_members(self) -> None:
+        compiled = driver.Round(
+            round_id="R-PARTIAL",
+            level=2,
+            nodes=("A", "B", "C"),
+            parallel_safe=True,
+            reason="capacity round",
+            command="dispatch",
+        )
+        status = {
+            "nodes": [
+                {"node_id": "A", "state": "COMPLETE"},
+                {"node_id": "B", "state": "READY"},
+                {"node_id": "C", "state": "READY"},
+            ]
+        }
+        with patch.object(driver, "compile_rounds", return_value=(compiled,)):
+            selected = driver.select_round(self.plane, status, max_sessions=3)
+        assert selected is not None
+        self.assertEqual(selected.nodes, ("B", "C"))
+        self.assertIn("resuming only unaccepted", selected.reason)
+
+    def test_plan_quiescence_requires_no_residual_runtime_authority(self) -> None:
+        status = {"nodes": [], "active_validation_lease": None}
+        with patch.object(driver, "select_round", return_value=None):
+            with patch.object(self.plane, "status", return_value=status):
+                with patch.object(self.plane, "active_claims", return_value={}):
+                    result = driver.drive_round(
+                        self.plane,
+                        actor="test:driver",
+                        push=False,
+                        heal=False,
+                    )
+        self.assertEqual(result["disposition"], "PLAN_QUIESCENT")
+
+    def test_completed_plan_with_a_live_claim_is_waiting_not_quiescent(self) -> None:
+        status = {"nodes": [], "active_validation_lease": None}
+        with patch.object(driver, "select_round", return_value=None):
+            with patch.object(self.plane, "status", return_value=status):
+                with patch.object(
+                    self.plane,
+                    "active_claims",
+                    return_value={"A": {"node_id": "A"}},
+                ):
+                    result = driver.drive_round(
+                        self.plane,
+                        actor="test:driver",
+                        push=False,
+                        heal=False,
+                    )
+        self.assertEqual(result["disposition"], "WAITING")
 
     def test_driver_refuses_to_select_before_reconciliation(self) -> None:
         class UnreconciledPlane:

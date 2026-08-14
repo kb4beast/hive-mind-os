@@ -43,7 +43,11 @@ class KernelStore:
             self.connection = sqlite3.connect(self.path, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         try:
-            if not self.read_only:
+            if self.read_only:
+                with self._lock:
+                    self._validate_open_locked(require_schema=True)
+                    list(self._events_locked())
+            else:
                 with self._lock, self.connection:
                     self._bootstrap_locked()
                     self._rebuild_locked()
@@ -59,6 +63,20 @@ class KernelStore:
 
     def _bootstrap_locked(self) -> None:
         self.connection.execute("PRAGMA foreign_keys=ON")
+        tables = {
+            str(row["name"])
+            for row in self.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        if tables:
+            if "kernel_metadata" not in tables:
+                raise KernelIntegrityError("kernel store has tables but no schema metadata")
+            row = self.connection.execute(
+                "SELECT value FROM kernel_metadata WHERE key='schema_version'"
+            ).fetchone()
+            if row is None or str(row["value"]) != _SCHEMA_VERSION:
+                raise KernelIntegrityError("kernel store schema version is unsupported")
         self.connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS kernel_metadata (
@@ -173,9 +191,62 @@ class KernelStore:
                 """
             )
         self.connection.execute(
-            "INSERT OR REPLACE INTO kernel_metadata VALUES('schema_version', ?)",
+            "INSERT OR IGNORE INTO kernel_metadata VALUES('schema_version', ?)",
             (_SCHEMA_VERSION,),
         )
+        self._validate_open_locked(require_schema=True)
+
+    def _validate_open_locked(self, *, require_schema: bool) -> None:
+        """Reject corrupt/incoherent durable state without repairing it."""
+
+        quick = [str(row[0]) for row in self.connection.execute("PRAGMA quick_check")]
+        if quick != ["ok"]:
+            raise KernelIntegrityError("kernel store failed SQLite integrity check")
+        foreign = self.connection.execute("PRAGMA foreign_key_check").fetchall()
+        if foreign:
+            raise KernelIntegrityError("kernel store failed foreign-key validation")
+        if require_schema:
+            try:
+                row = self.connection.execute(
+                    "SELECT value FROM kernel_metadata WHERE key='schema_version'"
+                ).fetchone()
+            except sqlite3.DatabaseError as error:
+                raise KernelIntegrityError("kernel store schema metadata is missing") from error
+            if row is None or str(row["value"]) != _SCHEMA_VERSION:
+                raise KernelIntegrityError("kernel store schema version is unsupported")
+        allowed = {"pending", "executing", "receipt_recorded", "reconciliation_required"}
+        try:
+            outbox = self.connection.execute("SELECT * FROM effect_outbox").fetchall()
+        except sqlite3.DatabaseError as error:
+            raise KernelIntegrityError("kernel effect store schema is invalid") from error
+        for row in outbox:
+            state = str(row["state"])
+            if state not in allowed:
+                raise KernelIntegrityError("kernel effect store contains an invalid state")
+            try:
+                intent = json.loads(str(row["intent_json"]))
+            except (TypeError, json.JSONDecodeError) as error:
+                raise KernelIntegrityError("kernel effect intent JSON is corrupt") from error
+            if canonical_bytes(intent).decode("utf-8") != str(row["intent_json"]):
+                raise KernelIntegrityError("kernel effect intent JSON is not canonical")
+            attempts = int(row["attempt_count"])
+            receipt_digest = row["receipt_digest"]
+            reason = row["reconciliation_reason"]
+            if state == "pending" and (attempts != 0 or receipt_digest is not None):
+                raise KernelIntegrityError("pending effect has incoherent execution state")
+            if state == "executing" and (attempts < 1 or receipt_digest is not None):
+                raise KernelIntegrityError("executing effect has incoherent execution state")
+            if state == "receipt_recorded" and receipt_digest is None:
+                raise KernelIntegrityError("recorded effect has no receipt digest")
+            if state == "reconciliation_required" and not isinstance(reason, str):
+                raise KernelIntegrityError("ambiguous effect has no reconciliation reason")
+            if receipt_digest is not None:
+                receipt = self.connection.execute(
+                    "SELECT intent_digest FROM effect_receipts WHERE receipt_digest=?",
+                    (receipt_digest,),
+                ).fetchone()
+                if receipt is None or receipt["intent_digest"] != row["intent_digest"]:
+                    raise KernelIntegrityError("effect receipt linkage is corrupt")
 
     def append(
         self,
@@ -341,6 +412,7 @@ class KernelStore:
         stored_previous = cast(str | None, row["previous_digest"])
         return (
             all(row[name] == value for name, value in fields.items())
+            and stored_previous == event.previous_digest
             and canonical_bytes(payload) == canonical_bytes(dict(event.payload))
             and row["digest"] == event.digest_for(stored_previous)
         )

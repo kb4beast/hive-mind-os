@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import threading
 import unittest
 from pathlib import Path
 
-from hive_mind_os.scheduler import ManualClock, Scheduler, StaleLeaseError
+from hive_mind_os.scheduler import (
+    ManualClock,
+    Scheduler,
+    SchedulerIntegrityError,
+    StaleLeaseError,
+)
 
 
 class SchedulerTests(unittest.TestCase):
@@ -153,6 +159,56 @@ class SchedulerTests(unittest.TestCase):
         second = self._enqueue()
         self.assertEqual(first.id, second.id)
         self.assertEqual(len(self.scheduler.jobs()), 1)
+
+    def test_enqueue_identity_does_not_collapse_two_missions(self) -> None:
+        first = self.scheduler.enqueue("test", {"value": "same"}, mission_id="A")
+        second = self.scheduler.enqueue("test", {"value": "same"}, mission_id="B")
+        self.assertNotEqual(first.id, second.id)
+        self.assertEqual(len(self.scheduler.jobs()), 2)
+
+    def test_enqueue_identity_includes_retry_and_start_contract(self) -> None:
+        baseline = self.scheduler.enqueue(
+            "test", {"value": "same"}, mission_id="A", max_attempts=2
+        )
+        retries = self.scheduler.enqueue(
+            "test", {"value": "same"}, mission_id="A", max_attempts=3
+        )
+        delayed = self.scheduler.enqueue(
+            "test", {"value": "same"}, mission_id="A", max_attempts=2, not_before=200
+        )
+        self.assertEqual(len({baseline.id, retries.id, delayed.id}), 3)
+
+    def test_claim_can_be_scoped_to_one_mission(self) -> None:
+        self.scheduler.enqueue("test", {"value": "A"}, mission_id="A")
+        expected = self.scheduler.enqueue("test", {"value": "B"}, mission_id="B")
+        claimed = self.scheduler.claim("worker-B", mission_id="B")
+        assert claimed is not None
+        self.assertEqual(claimed.id, expected.id)
+
+    def test_incoherent_lease_fails_closed_on_restart(self) -> None:
+        job = self._enqueue()
+        self.scheduler.close()
+        connection = sqlite3.connect(self.root / "scheduler.sqlite3")
+        connection.execute(
+            "UPDATE jobs SET state='leased',attempts=1 WHERE id=?",
+            (job.id,),
+        )
+        connection.commit()
+        connection.close()
+        with self.assertRaisesRegex(SchedulerIntegrityError, "incomplete lease"):
+            Scheduler(self.root, clock=self.clock)
+
+    def test_completion_cannot_rebind_a_job_to_another_mission(self) -> None:
+        self._enqueue()
+        claimed = self.scheduler.claim("worker")
+        assert claimed is not None and claimed.lease_token is not None
+        with self.assertRaisesRegex(SchedulerIntegrityError, "differs"):
+            self.scheduler.complete(
+                claimed.id,
+                claimed.lease_token,
+                mission_id="another-mission",
+            )
+        self.assertEqual(self.scheduler.get(claimed.id).state, "leased")
 
 
 if __name__ == "__main__":

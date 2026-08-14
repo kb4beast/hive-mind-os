@@ -19,7 +19,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -114,8 +114,15 @@ def select_round(
     graph = load_plan_graph(plan_path or Path(plane.ap_root) / "plan.json")
     complete = completed_nodes(status)
     for candidate in compile_rounds(graph, max_sessions=max_sessions):
-        if not set(candidate.nodes) <= complete:
-            return candidate
+        remaining = tuple(node for node in candidate.nodes if node not in complete)
+        if remaining:
+            if remaining == candidate.nodes:
+                return candidate
+            return replace(
+                candidate,
+                nodes=remaining,
+                reason=candidate.reason + "; resuming only unaccepted members",
+            )
     return None
 
 
@@ -400,8 +407,22 @@ def drive_round(
             return finish("RECONCILE_REQUIRED")
     round_ = select_round(plane, status, max_sessions=max_sessions)
     if round_ is None:
-        report.record("select", None, "QUIESCENT", "every compiled round is complete")
-        return finish("QUIESCENT")
+        claims = plane.active_claims() if hasattr(plane, "active_claims") else {}
+        lease = status.get("active_validation_lease")
+        if claims or lease is not None:
+            detail = (
+                f"all rounds are complete but {len(claims)} active claim(s) and "
+                f"{'an active' if lease is not None else 'no'} validation lease remain"
+            )
+            report.record("select", None, "WAITING", detail)
+            return finish("WAITING")
+        report.record(
+            "select",
+            None,
+            "PLAN_QUIESCENT",
+            "every compiled round is complete and no runtime authority remains active",
+        )
+        return finish("PLAN_QUIESCENT")
     report.round_id = round_.round_id
     report.nodes = round_.nodes
     report.record(
@@ -418,7 +439,11 @@ def drive_round(
         if not heal:
             return finish("PENDING")
         healed = healing.heal_round(
-            plane, actor=actor, nodes=round_.nodes, allow_push=push
+            plane,
+            actor=actor,
+            nodes=round_.nodes,
+            allow_push=push,
+            max_sessions=max_sessions,
         )
         for action in healed.get("actions", []):
             report.record(
@@ -428,9 +453,8 @@ def drive_round(
                 f"{action.get('kind')}: {action.get('detail')}",
             )
         disposition = str(healed.get("disposition"))
-        if disposition == "QUIESCENT":
-            # The healer found nothing to repair, but this round is not whole:
-            # QUIESCENT here would read as plan-complete, which it is not.
+        if disposition == "NO_REPAIR":
+            # The healer found nothing to repair, but this round is not whole.
             disposition = "PENDING"
         report.record(
             "heal",

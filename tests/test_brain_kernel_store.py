@@ -156,6 +156,54 @@ class KernelStoreTests(unittest.TestCase):
         self.assertEqual(1, len(store.events()))
         store.close()
 
+    def test_idempotency_retry_must_bind_the_same_predecessor(self) -> None:
+        store = KernelStore()
+        created = event("EVENT-1", "mission.created", None)
+        store.append(created, idempotency_key="create-one")
+        competing = event("EVENT-1", "mission.created", "f" * 64)
+        with self.assertRaisesRegex(KernelIntegrityError, "different event"):
+            store.append(competing, idempotency_key="create-one")
+        self.assertEqual(1, len(store.events()))
+        store.close()
+
+    def test_unknown_schema_version_fails_without_rewriting_it(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / DATABASE_FILENAME
+            store = KernelStore(path)
+            store.close()
+            connection = sqlite3.connect(path)
+            connection.execute(
+                "UPDATE kernel_metadata SET value='999' WHERE key='schema_version'"
+            )
+            connection.commit()
+            connection.close()
+            with self.assertRaisesRegex(KernelIntegrityError, "schema version"):
+                KernelStore(path)
+            connection = sqlite3.connect(path)
+            observed = connection.execute(
+                "SELECT value FROM kernel_metadata WHERE key='schema_version'"
+            ).fetchone()[0]
+            connection.close()
+            self.assertEqual(observed, "999")
+
+    def test_invalid_effect_state_fails_on_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / DATABASE_FILENAME
+            store = KernelStore(path)
+            store.enqueue_effect(
+                idempotency_key="effect-one",
+                intent_digest="sha256:" + "1" * 64,
+                intent={"operation": "test"},
+                recorded_at=TIME,
+            )
+            store.connection.execute(
+                "UPDATE effect_outbox SET state='garbage'"
+            )
+            store.connection.commit()
+            store.close()
+            with self.assertRaisesRegex(KernelIntegrityError, "invalid state"):
+                KernelStore(path)
+
     def test_batch_append_is_atomic_and_exact_retry_is_read_only(self) -> None:
         store = KernelStore()
         first = event("EVENT-1", "mission.created", None)

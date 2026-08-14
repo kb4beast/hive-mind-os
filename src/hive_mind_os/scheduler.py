@@ -56,6 +56,10 @@ class StaleLeaseError(RuntimeError):
     """A worker attempted to mutate a job after losing its lease."""
 
 
+class SchedulerIntegrityError(RuntimeError):
+    """The durable queue or immutable job identity is inconsistent."""
+
+
 def _canonical_json(value: Mapping[str, Any]) -> str:
     return json.dumps(
         dict(value),
@@ -91,7 +95,11 @@ class Scheduler:
             check_same_thread=False,
         )
         self._connection.row_factory = sqlite3.Row
-        self._initialize()
+        try:
+            self._initialize()
+        except BaseException:
+            self._connection.close()
+            raise
 
     def _initialize(self) -> None:
         self._connection.executescript(
@@ -104,6 +112,7 @@ class Scheduler:
                 kind TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 payload_digest TEXT NOT NULL UNIQUE,
+                enqueue_spec_json TEXT,
                 state TEXT NOT NULL CHECK(
                     state IN ('ready','leased','done','dead-letter')
                 ),
@@ -122,6 +131,67 @@ class Scheduler:
             ON jobs(state,not_before,lease_expiry,created_at);
             """
         )
+        columns = {
+            str(row["name"])
+            for row in self._connection.execute("PRAGMA table_info(jobs)")
+        }
+        if "enqueue_spec_json" not in columns:
+            self._connection.execute("ALTER TABLE jobs ADD COLUMN enqueue_spec_json TEXT")
+        self._validate_open()
+
+    def _validate_open(self) -> None:
+        quick = [str(row[0]) for row in self._connection.execute("PRAGMA quick_check")]
+        if quick != ["ok"]:
+            raise SchedulerIntegrityError("scheduler failed SQLite integrity check")
+        if self._connection.execute("PRAGMA foreign_key_check").fetchall():
+            raise SchedulerIntegrityError("scheduler failed foreign-key validation")
+        for row in self._connection.execute("SELECT * FROM jobs"):
+            try:
+                payload = json.loads(str(row["payload_json"]))
+            except (TypeError, json.JSONDecodeError) as error:
+                raise SchedulerIntegrityError("scheduler payload JSON is corrupt") from error
+            if not isinstance(payload, dict) or _canonical_json(payload) != row["payload_json"]:
+                raise SchedulerIntegrityError("scheduler payload JSON is not canonical")
+            spec_json = row["enqueue_spec_json"]
+            if spec_json is not None:
+                try:
+                    spec = json.loads(str(spec_json))
+                except (TypeError, json.JSONDecodeError) as error:
+                    raise SchedulerIntegrityError("scheduler enqueue identity is corrupt") from error
+                if not isinstance(spec, dict) or _canonical_json(spec) != spec_json:
+                    raise SchedulerIntegrityError("scheduler enqueue identity is not canonical")
+                expected_digest = "sha256:" + sha256(str(spec_json).encode("utf-8")).hexdigest()
+                if row["payload_digest"] != expected_digest:
+                    raise SchedulerIntegrityError("scheduler enqueue identity digest is corrupt")
+                if (
+                    spec.get("kind") != row["kind"]
+                    or spec.get("payload") != payload
+                    or spec.get("max_attempts") != row["max_attempts"]
+                    or (
+                        spec.get("mission_id") is not None
+                        and spec.get("mission_id") != row["mission_id"]
+                    )
+                ):
+                    raise SchedulerIntegrityError("scheduler row differs from its enqueue identity")
+                requested = spec.get("not_before")
+                if requested is not None and float(requested) != float(row["not_before"]):
+                    raise SchedulerIntegrityError("scheduler start time differs from enqueue identity")
+            state = str(row["state"])
+            lease = (row["lease_owner"], row["lease_token"], row["lease_expiry"])
+            attempts = int(row["attempts"])
+            maximum = int(row["max_attempts"])
+            if attempts < 0 or maximum < 1 or attempts > maximum:
+                raise SchedulerIntegrityError("scheduler attempt counters are incoherent")
+            if state == "leased":
+                if (
+                    attempts < 1
+                    or not all(value is not None for value in lease)
+                    or not str(row["lease_owner"]).strip()
+                    or not str(row["lease_token"]).strip()
+                ):
+                    raise SchedulerIntegrityError("leased job has incomplete lease authority")
+            elif any(value is not None for value in lease):
+                raise SchedulerIntegrityError("unleased job retains lease authority")
 
     def close(self) -> None:
         self._connection.close()
@@ -138,7 +208,16 @@ class Scheduler:
         if not kind.strip() or max_attempts < 1:
             raise ValueError("job kind and positive max_attempts are required")
         encoded = _canonical_json(payload)
-        digest_value = sha256((kind + "\0" + encoded).encode()).hexdigest()
+        enqueue_spec = _canonical_json(
+            {
+                "kind": kind,
+                "payload": dict(payload),
+                "max_attempts": max_attempts,
+                "not_before": not_before,
+                "mission_id": mission_id,
+            }
+        )
+        digest_value = sha256(enqueue_spec.encode("utf-8")).hexdigest()
         digest = f"sha256:{digest_value}"
         now = self.clock.now()
         job_id = f"JOB-{uuid4()}"
@@ -146,15 +225,17 @@ class Scheduler:
             self._connection.execute(
                 """
                 INSERT OR IGNORE INTO jobs(
-                    id,kind,payload_json,payload_digest,state,attempts,max_attempts,
+                    id,kind,payload_json,payload_digest,enqueue_spec_json,
+                    state,attempts,max_attempts,
                     not_before,mission_id,created_at,updated_at
-                ) VALUES(?,?,?,?, 'ready',0,?,?,?,?,?)
+                ) VALUES(?,?,?,?,?, 'ready',0,?,?,?,?,?)
                 """,
                 (
                     job_id,
                     kind,
                     encoded,
                     digest,
+                    enqueue_spec,
                     max_attempts,
                     now if not_before is None else not_before,
                     mission_id,
@@ -167,9 +248,17 @@ class Scheduler:
                 (digest,),
             ).fetchone()
         assert row is not None
+        if row["enqueue_spec_json"] != enqueue_spec:
+            raise SchedulerIntegrityError("scheduler digest collision binds another job spec")
         return self._job(row)
 
-    def claim(self, owner: str) -> Job | None:
+    def claim(
+        self,
+        owner: str,
+        *,
+        mission_id: str | None = None,
+        kind: str | None = None,
+    ) -> Job | None:
         if not owner.strip():
             raise ValueError("worker owner is required")
         now = self.clock.now()
@@ -197,6 +286,8 @@ class Scheduler:
                     """
                     SELECT id FROM jobs
                     WHERE attempts < max_attempts
+                      AND (? IS NULL OR mission_id=?)
+                      AND (? IS NULL OR kind=?)
                       AND (
                         (state='ready' AND not_before<=?)
                         OR (state='leased' AND lease_expiry<?)
@@ -204,7 +295,7 @@ class Scheduler:
                     ORDER BY created_at,id
                     LIMIT 1
                     """,
-                    (now, now),
+                    (mission_id, mission_id, kind, kind, now, now),
                 ).fetchone()
                 if row is None:
                     self._connection.execute("COMMIT")
@@ -253,10 +344,21 @@ class Scheduler:
     ) -> Job:
         now = self.clock.now()
         with self._lock:
+            current = self.get(job_id)
+            if (
+                current.state != "leased"
+                or current.lease_token != lease_token
+                or current.lease_expiry is None
+                or current.lease_expiry < now
+            ):
+                raise StaleLeaseError("completion rejected for stale lease")
+            if current.mission_id is not None and current.mission_id != mission_id:
+                raise SchedulerIntegrityError("completion mission differs from queued mission")
             row = self._connection.execute(
                 """
                 UPDATE jobs
-                SET state='done',mission_id=?,lease_owner=NULL,lease_token=NULL,
+                SET state='done',mission_id=COALESCE(mission_id,?),
+                    lease_owner=NULL,lease_token=NULL,
                     lease_expiry=NULL,updated_at=?
                 WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
                 RETURNING *
@@ -285,6 +387,12 @@ class Scheduler:
                 or current.lease_expiry < now
             ):
                 raise StaleLeaseError("failure rejected for stale lease")
+            if (
+                mission_id is not None
+                and current.mission_id is not None
+                and current.mission_id != mission_id
+            ):
+                raise SchedulerIntegrityError("failure mission differs from queued mission")
             dead = current.attempts >= current.max_attempts
             not_before = now + self.backoff_seconds * (2 ** (current.attempts - 1))
             row = self._connection.execute(

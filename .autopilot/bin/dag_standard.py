@@ -13,9 +13,16 @@ answers two questions that a generated DAG cannot answer about itself:
     a level wider than the host session cap must be split again, and a level
     whose members cannot honestly be proven before a durability node in the same
     level has been integrated must be split once more. This compiler turns
-    levels into rounds and prints the exact dispatch command for each round so
-    no operator ever relies on greedy wave selection (which can pick a serial
-    node first and cap the wave at a single session).
+    levels into rounds. Conventional resident plans receive an exact dispatch
+    command. External plans receive an executable ``dag-frontier`` assertion
+    whose JSON must be consumed by their host adapter; it never pretends that a
+    foreign plan can be mutated through the resident control plane.
+
+``dag-frontier``
+    Selects the first incomplete compiled round from durable accepted/active
+    node identities. It emits only inactive members that fit the runtime cap,
+    refuses active work outside that round, and reports plan quiescence only
+    after every node is accepted and none remains active.
 
 ``dag-lint``
     Validates a plan against the generic authoring standard: graph validity,
@@ -39,6 +46,7 @@ divergence makes the compiler more conservative, never less.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -556,6 +564,50 @@ class Round:
         }
 
 
+@dataclass(frozen=True)
+class Frontier:
+    """The sole resumable dispatch frontier under one host-capacity lease."""
+
+    state: str
+    max_sessions: int
+    round_id: str | None
+    level: int | None
+    round_nodes: tuple[str, ...]
+    completed_nodes: tuple[str, ...]
+    active_nodes: tuple[str, ...]
+    release_nodes: tuple[str, ...]
+    reason: str
+
+    @property
+    def frontier_id(self) -> str:
+        material = {
+            "state": self.state,
+            "max_sessions": self.max_sessions,
+            "round_id": self.round_id,
+            "level": self.level,
+            "round_nodes": self.round_nodes,
+            "completed_nodes": self.completed_nodes,
+            "active_nodes": self.active_nodes,
+            "release_nodes": self.release_nodes,
+        }
+        body = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return "sha256:" + hashlib.sha256(body).hexdigest()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "frontier_id": self.frontier_id,
+            "state": self.state,
+            "max_sessions": self.max_sessions,
+            "round_id": self.round_id,
+            "level": self.level,
+            "round_nodes": list(self.round_nodes),
+            "completed_nodes": list(self.completed_nodes),
+            "active_nodes": list(self.active_nodes),
+            "release_nodes": list(self.release_nodes),
+            "reason": self.reason,
+        }
+
+
 def _render_path(path: Path) -> str:
     absolute = Path(os.path.abspath(path))
     try:
@@ -592,8 +644,9 @@ def dispatch_command_prefix(
     A hardcoded ``--repo-root .`` is wrong in a generic clone: it silently
     targets whatever directory the operator happened to be standing in. The
     prefix is derived from the plan being compiled (or, failing that, from how
-    this process was actually launched), and carries ``--plan`` whenever the plan
-    does not sit at the conventional location under the repository root.
+    this process was actually launched). A foreign plan is routed to the pure
+    frontier contract instead of passing an unsupported ``--plan`` argument to
+    the resident mutating dispatcher.
     """
 
     plan = Path(plan_path) if plan_path is not None else None
@@ -608,14 +661,44 @@ def dispatch_command_prefix(
         sibling = Path(__file__).resolve().with_name("autopilot.py")
         if sibling.is_file():
             script = sibling
-    parts = ["python", _render_path(script), "--repo-root", _render_path(root), "dispatch"]
+    parts = ["python", _render_path(script), "--repo-root", _render_path(root)]
     if plan is not None and not _same_file(plan, root / ".autopilot" / "plan.json"):
-        parts.extend(["--plan", _render_path(plan)])
+        parts.extend(["dag-frontier", "--plan", _render_path(plan)])
+    else:
+        parts.append("dispatch")
     return " ".join(parts)
 
 
-def _dispatch_command(prefix: str, actor: str, nodes: Sequence[str]) -> str:
-    return " ".join((prefix, "--actor", actor, *(f"--node {node}" for node in nodes)))
+def _dispatch_command(
+    prefix: str,
+    actor: str,
+    nodes: Sequence[str],
+    *,
+    max_sessions: int,
+    completed_before: Sequence[str] = (),
+) -> str:
+    if " dag-frontier " in f" {prefix} ":
+        return " ".join(
+            (
+                prefix,
+                "--actor",
+                actor,
+                "--max-sessions",
+                str(max_sessions),
+                *(f"--complete {node}" for node in completed_before),
+                *(f"--expect-release {node}" for node in nodes),
+            )
+        )
+    return " ".join(
+        (
+            prefix,
+            "--actor",
+            actor,
+            "--max-sessions",
+            str(max_sessions),
+            *(f"--node {node}" for node in nodes),
+        )
+    )
 
 
 def semantic_ordering_constraints(
@@ -831,7 +914,11 @@ def compile_rounds(
                     reason + deferral_note,
                     actor,
                     command_prefix,
-                    deferred,
+                    max_sessions=max_sessions,
+                    completed_before=tuple(
+                        prior for item in rounds for prior in item.nodes
+                    ),
+                    deferred_after=deferred,
                 )
             )
         for node_id in serial:
@@ -844,10 +931,111 @@ def compile_rounds(
                     "serial node released alone (parallel_safe: false)" + deferral_note,
                     actor,
                     command_prefix,
-                    deferred,
+                    max_sessions=max_sessions,
+                    completed_before=tuple(
+                        prior for item in rounds for prior in item.nodes
+                    ),
+                    deferred_after=deferred,
                 )
             )
     return tuple(rounds)
+
+
+def select_frontier(
+    graph: PlanGraph,
+    *,
+    completed_nodes: Sequence[str] = (),
+    active_nodes: Sequence[str] = (),
+    max_sessions: int = DEFAULT_MAX_SESSIONS,
+    actor: str | None = None,
+    semantic_ordering: bool = True,
+    command_prefix: str | None = None,
+    repo_root: Path | None = None,
+) -> Frontier:
+    """Select the first incomplete compiled round without redispatching work.
+
+    ``completed_nodes`` must come from the caller's durable acceptance authority;
+    this function never manufactures completion. ``active_nodes`` are durable
+    launch/lease records. They consume capacity and may occur only in the current
+    compiled round. The returned release set therefore excludes both accepted and
+    already-active work and can safely be replayed after a controller crash.
+    """
+
+    if max_sessions < 1:
+        raise DagStandardError("max_sessions must be at least 1")
+    known = set(graph.node_ids)
+    completed = tuple(dict.fromkeys(str(item) for item in completed_nodes))
+    active = tuple(dict.fromkeys(str(item) for item in active_nodes))
+    unknown = sorted((set(completed) | set(active)) - known)
+    if unknown:
+        raise DagStandardError("frontier state names unknown nodes: " + ", ".join(unknown))
+    overlap = sorted(set(completed) & set(active))
+    if overlap:
+        raise DagStandardError("completed nodes cannot remain active: " + ", ".join(overlap))
+    if len(active) > max_sessions:
+        raise DagStandardError("active node count exceeds the host session cap")
+
+    completed_set = set(completed)
+    rounds = compile_rounds(
+        graph,
+        max_sessions=max_sessions,
+        actor=actor,
+        semantic_ordering=semantic_ordering,
+        command_prefix=command_prefix,
+        repo_root=repo_root,
+    )
+    current = next(
+        (item for item in rounds if not set(item.nodes) <= completed_set),
+        None,
+    )
+    if current is None:
+        if active:
+            raise DagStandardError("active nodes remain after every compiled round is complete")
+        return Frontier(
+            state="PLAN_QUIESCENT",
+            max_sessions=max_sessions,
+            round_id=None,
+            level=None,
+            round_nodes=(),
+            completed_nodes=tuple(sorted(completed_set)),
+            active_nodes=(),
+            release_nodes=(),
+            reason="every compiled round is accepted and no work remains active",
+        )
+
+    current_set = set(current.nodes)
+    outside = sorted(set(active) - current_set)
+    if outside:
+        raise DagStandardError(
+            "active nodes exist outside the first incomplete compiled round: "
+            + ", ".join(outside)
+        )
+    active_in_order = tuple(node for node in current.nodes if node in set(active))
+    accepted_in_round = tuple(node for node in current.nodes if node in completed_set)
+    pending = tuple(
+        node
+        for node in current.nodes
+        if node not in completed_set and node not in set(active_in_order)
+    )
+    available = max_sessions - len(active_in_order)
+    release = pending[:available]
+    state = "ROUND_READY" if release else "ROUND_ACTIVE"
+    reason = (
+        f"{current.round_id} is the first incomplete compiled round; "
+        f"{len(active_in_order)} active, {len(accepted_in_round)} accepted, "
+        f"{len(release)} releasable under cap {max_sessions}"
+    )
+    return Frontier(
+        state=state,
+        max_sessions=max_sessions,
+        round_id=current.round_id,
+        level=current.level,
+        round_nodes=current.nodes,
+        completed_nodes=accepted_in_round,
+        active_nodes=active_in_order,
+        release_nodes=release,
+        reason=reason,
+    )
 
 
 def _make_round(
@@ -858,6 +1046,9 @@ def _make_round(
     reason: str,
     actor: str | None,
     command_prefix: str,
+    *,
+    max_sessions: int,
+    completed_before: tuple[str, ...] = (),
     deferred_after: tuple[str, ...] = (),
 ) -> Round:
     round_id = f"R{index}"
@@ -868,7 +1059,13 @@ def _make_round(
         nodes=nodes,
         parallel_safe=parallel_safe,
         reason=reason,
-        command=_dispatch_command(command_prefix, resolved_actor, nodes),
+        command=_dispatch_command(
+            command_prefix,
+            resolved_actor,
+            nodes,
+            max_sessions=max_sessions,
+            completed_before=completed_before,
+        ),
         deferred_after=deferred_after,
     )
 
@@ -1895,6 +2092,21 @@ def add_dag_standard_arguments(commands: Any) -> None:
         default=True,
     )
 
+    frontier = commands.add_parser("dag-frontier")
+    frontier.add_argument("--json", action="store_true", dest="json_output")
+    frontier.add_argument("--max-sessions", type=int, default=DEFAULT_MAX_SESSIONS)
+    frontier.add_argument("--actor")
+    frontier.add_argument("--plan")
+    frontier.add_argument("--complete", action="append", default=[])
+    frontier.add_argument("--active", action="append", default=[])
+    frontier.add_argument("--expect-release", action="append", default=[])
+    frontier.add_argument(
+        "--no-semantic-ordering",
+        action="store_false",
+        dest="semantic_ordering",
+        default=True,
+    )
+
     lint = commands.add_parser("dag-lint")
     lint.add_argument("--json", action="store_true", dest="json_output")
     lint.add_argument("--strict", action="store_true")
@@ -1932,7 +2144,7 @@ def _print_findings(findings: Sequence[Finding]) -> None:
 
 
 def run_dag_standard_command(args: argparse.Namespace) -> int:
-    """Execute ``dag-rounds`` / ``dag-lint`` without a live control plane."""
+    """Execute pure DAG analysis/frontier commands without a live control plane."""
 
     plan_path = resolve_plan_path(args)
     graph = load_plan_graph(plan_path)
@@ -1963,6 +2175,34 @@ def run_dag_standard_command(args: argparse.Namespace) -> int:
             )
         else:
             _print_rounds(rounds, args.max_sessions)
+        return 0
+    if args.command == "dag-frontier":
+        frontier = select_frontier(
+            graph,
+            completed_nodes=getattr(args, "complete", ()),
+            active_nodes=getattr(args, "active", ()),
+            max_sessions=args.max_sessions,
+            actor=getattr(args, "actor", None),
+            semantic_ordering=semantic_ordering,
+            command_prefix=dispatch_command_prefix(
+                plan_path=plan_path, repo_root=repo_root
+            ),
+            repo_root=repo_root,
+        )
+        document = frontier.to_dict()
+        expected = tuple(getattr(args, "expect_release", ()))
+        if expected and tuple(frontier.release_nodes) != expected:
+            raise DagStandardError(
+                "compiled frontier release differs from the asserted external round"
+            )
+        if args.json_output:
+            print(json.dumps(document, indent=2, sort_keys=True))
+        else:
+            print(
+                f"{document['state']}: {document['round_id'] or '-'} "
+                f"release {' '.join(document['release_nodes']) or '-'}"
+            )
+            print(str(document["reason"]))
         return 0
     if args.command == "dag-lint":
         findings = lint_plan(

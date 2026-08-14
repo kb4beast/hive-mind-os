@@ -23,6 +23,7 @@ from hashlib import sha256
 from pathlib import Path
 from threading import RLock
 from typing import Any, Mapping, Sequence
+from uuid import uuid4
 
 from .autonomy import AutonomyBudget
 from .contracts import (
@@ -82,6 +83,29 @@ def _canonical_json(value: Any) -> str:
     )
 
 
+def _strict_json_document(content: bytes, *, label: str) -> dict[str, Any]:
+    """Decode one canonical JSON object and reject duplicate-key ambiguity."""
+
+    def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise StoreIntegrityError(f"{label} contains duplicate key {key!r}")
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(content.decode("utf-8"), object_pairs_hook=reject_duplicates)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise StoreIntegrityError(f"{label} is not valid UTF-8 JSON") from error
+    if not isinstance(value, dict):
+        raise StoreIntegrityError(f"{label} must be a JSON object")
+    canonical = (_canonical_json(value) + "\n").encode("utf-8")
+    if content != canonical:
+        raise StoreIntegrityError(f"{label} is not canonical JSON")
+    return value
+
+
 _EXTENDED_PREFIX = "\\\\?\\"
 
 
@@ -98,9 +122,9 @@ def _system_path(path: Path) -> str:
 
 
 def _temporary_name(name: str) -> str:
-    """A sibling temporary name that is never longer than the name it replaces."""
+    """A collision-resistant sibling name preserving long-name path bounds."""
 
-    marker = f"~{os.getpid():x}~"
+    marker = f"~{uuid4().hex[:12]}~"
     if len(marker) >= len(name):
         return f"{marker}{name}"
     candidate = f"{marker}{name[len(marker):]}"
@@ -125,6 +149,12 @@ def _atomic_write(path: Path, content: bytes) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, _system_path(path))
+        if os.name != "nt":
+            descriptor = os.open(_system_path(path.parent), os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
     finally:
         if os.path.exists(temporary):
             os.remove(temporary)
@@ -344,7 +374,19 @@ class MissionStore:
         self._connection.close()
 
     def mission_root(self, mission_id: str) -> Path:
-        return self.state_dir / "missions" / mission_id
+        if (
+            not isinstance(mission_id, str)
+            or not mission_id.strip()
+            or mission_id in {".", ".."}
+            or "/" in mission_id
+            or "\\" in mission_id
+        ):
+            raise StoreIntegrityError("mission id is not a safe path segment")
+        root = (self.state_dir / "missions").resolve()
+        target = (root / mission_id).resolve()
+        if not target.is_relative_to(root):
+            raise StoreIntegrityError("mission path escapes the durable state root")
+        return target
 
     def register_mission(
         self,
@@ -650,7 +692,9 @@ class MissionStore:
             if row is None or row["state"] != "intent":
                 raise StoreIntegrityError("effect began outside an intent checkpoint")
             if int(row["execution_count"]) > 0:
-                return record
+                raise StoreIntegrityError(
+                    "effect execution is already claimed; reconcile its durable write-ahead record"
+                )
             cursor = self._connection.execute(
                 """
                 UPDATE checkpoints
@@ -673,7 +717,9 @@ class MissionStore:
                 continue
             record = self.find_effect_intent(checkpoint)
             if record is None:
-                continue
+                raise StoreIntegrityError(
+                    "claimed effect is missing its write-ahead record"
+                )
             if self.find_effect_receipt(checkpoint) is not None:
                 continue
             pending.append(record)
@@ -756,16 +802,98 @@ class MissionStore:
         )
         if _file_exists(path):
             existing = _read_bytes(path)
-            existing_wrapper = json.loads(existing)
-            if existing_wrapper.get("intent_digest") != checkpoint.intent_digest:
-                raise StoreIntegrityError("checkpoint receipt path was reused")
             encoded = existing
         else:
             _atomic_write(path, encoded)
-        return {
+        reference = {
             "path": path.relative_to(self.state_dir).as_posix(),
             "digest": sha256_digest(encoded),
         }
+        self._validated_receipt_wrapper(
+            checkpoint,
+            reference,
+            expected_outcome=outcome,
+        )
+        return reference
+
+    def _validated_receipt_wrapper(
+        self,
+        checkpoint: StepCheckpoint,
+        reference: Mapping[str, str],
+        *,
+        expected_outcome: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Load one receipt only after path, digest, schema, and intent binding pass."""
+
+        if set(reference) != {"path", "digest"}:
+            raise StoreIntegrityError("receipt reference must contain exactly path and digest")
+        relative = reference.get("path")
+        digest = reference.get("digest")
+        if not isinstance(relative, str) or not relative:
+            raise StoreIntegrityError("receipt reference path is invalid")
+        if not isinstance(digest, str) or not digest.startswith("sha256:"):
+            raise StoreIntegrityError("receipt reference digest is invalid")
+        normalized = relative.replace("\\", "/")
+        parts = Path(normalized).parts
+        if Path(normalized).is_absolute() or ".." in parts or "." in parts:
+            raise StoreIntegrityError("receipt reference path is unsafe")
+        root = self.state_dir.resolve()
+        path = (root / Path(*parts)).resolve()
+        if not path.is_relative_to(root):
+            raise StoreIntegrityError("receipt reference escapes the durable state root")
+        expected_path = (
+            self.mission_root(checkpoint.mission_id)
+            / "checkpoint-receipts"
+            / f"{checkpoint.intent_digest.removeprefix('sha256:')}.json"
+        ).resolve()
+        if path != expected_path:
+            raise StoreIntegrityError("receipt reference does not name the checkpoint receipt")
+        cursor = path
+        while cursor != root:
+            if cursor.is_symlink():
+                raise StoreIntegrityError("receipt reference traverses a symbolic link")
+            cursor = cursor.parent
+        content = _read_bytes(path)
+        if digest != sha256_digest(content):
+            raise StoreIntegrityError("receipt reference digest does not match its file")
+        wrapper = _strict_json_document(content, label="checkpoint receipt")
+        if set(wrapper) != {"intent_digest", "outcome", "records", "receipt"}:
+            raise StoreIntegrityError("checkpoint receipt wrapper has unknown or missing fields")
+        if wrapper.get("intent_digest") != checkpoint.intent_digest:
+            raise StoreIntegrityError("effect receipt belongs to another intent")
+        if not isinstance(wrapper.get("outcome"), dict) or not isinstance(
+            wrapper.get("records"), list
+        ):
+            raise StoreIntegrityError("checkpoint receipt payload has invalid types")
+        if expected_outcome is not None and wrapper["outcome"] != dict(expected_outcome):
+            raise StoreIntegrityError("checkpoint receipt outcome differs from the completed step")
+        receipt = wrapper.get("receipt")
+        if not isinstance(receipt, dict):
+            raise StoreIntegrityError("checkpoint receipt contract is missing")
+        validation = validate_contract("tool-receipt", receipt)
+        if not validation.valid:
+            raise StoreIntegrityError(
+                "checkpoint receipt violates schema: " + "; ".join(validation.issues)
+            )
+        expected_receipt_bindings = {
+            "mission_id": checkpoint.mission_id,
+            "action_id": checkpoint.intent["action_id"],
+            "actor_id": checkpoint.intent["actor_id"],
+            "policy_decision_ref": checkpoint.intent["policy_decision_ref"],
+            "lease_id": checkpoint.intent["lease_id"],
+            "action_kind": checkpoint.intent["kind"],
+            "action_digest": checkpoint.intent_digest,
+        }
+        mismatched = [
+            key
+            for key, expected in expected_receipt_bindings.items()
+            if receipt.get(key) != expected
+        ]
+        if mismatched:
+            raise StoreIntegrityError(
+                "checkpoint receipt does not bind its intent: " + ", ".join(mismatched)
+            )
+        return wrapper
 
     def find_effect_receipt(
         self,
@@ -779,13 +907,11 @@ class MissionStore:
         if not _file_exists(path):
             return None
         content = _read_bytes(path)
-        wrapper = json.loads(content)
-        if wrapper.get("intent_digest") != checkpoint.intent_digest:
-            raise StoreIntegrityError("effect receipt belongs to another intent")
         reference = {
             "path": path.relative_to(self.state_dir).as_posix(),
             "digest": sha256_digest(content),
         }
+        wrapper = self._validated_receipt_wrapper(checkpoint, reference)
         return reference, wrapper
 
     def complete_step(
@@ -796,9 +922,40 @@ class MissionStore:
         *,
         budget: AutonomyBudget | None = None,
     ) -> None:
+        self._validated_receipt_wrapper(
+            checkpoint,
+            reference,
+            expected_outcome=outcome,
+        )
         encoded_reference = _canonical_json(dict(reference))
         encoded_outcome = _canonical_json(dict(outcome))
         with self._lock, self._connection:
+            current = self._connection.execute(
+                """
+                SELECT state,intent_digest,execution_count,outcome_json,receipt_ref_json
+                FROM checkpoints
+                WHERE mission_id=? AND step_index=?
+                """,
+                (checkpoint.mission_id, checkpoint.step_index),
+            ).fetchone()
+            if (
+                current is not None
+                and current["state"] == "completed"
+                and current["intent_digest"] == checkpoint.intent_digest
+                and int(current["execution_count"]) == 1
+                and current["outcome_json"] == encoded_outcome
+                and current["receipt_ref_json"] == encoded_reference
+            ):
+                return
+            if (
+                current is None
+                or current["state"] != "intent"
+                or current["intent_digest"] != checkpoint.intent_digest
+                or int(current["execution_count"]) != 1
+            ):
+                raise StoreIntegrityError(
+                    "completed effect is not the uniquely claimed current checkpoint"
+                )
             existing = self._connection.execute(
                 "SELECT * FROM idempotency WHERE intent_digest=?",
                 (checkpoint.intent_digest,),
@@ -823,11 +980,12 @@ class MissionStore:
                 or existing["receipt_ref_json"] != encoded_reference
             ):
                 raise StoreIntegrityError("idempotency digest maps to another effect")
-            self._connection.execute(
+            cursor = self._connection.execute(
                 """
                 UPDATE checkpoints
                 SET state='completed',outcome_json=?,receipt_ref_json=?
                 WHERE mission_id=? AND step_index=? AND intent_digest=?
+                    AND state='intent' AND execution_count=1
                 """,
                 (
                     encoded_outcome,
@@ -837,6 +995,8 @@ class MissionStore:
                     checkpoint.intent_digest,
                 ),
             )
+            if cursor.rowcount != 1:
+                raise StoreIntegrityError("checkpoint completion lost its compare-and-swap")
             if budget is not None:
                 self._connection.execute(
                     "UPDATE missions SET budget_json=? WHERE mission_id=?",
@@ -955,10 +1115,11 @@ class MissionStore:
         for checkpoint in checkpoints:
             if checkpoint.receipt_reference is None:
                 continue
-            path = self.state_dir / Path(
-                *checkpoint.receipt_reference["path"].split("/")
+            wrapper = self._validated_receipt_wrapper(
+                checkpoint,
+                checkpoint.receipt_reference,
+                expected_outcome=checkpoint.outcome,
             )
-            wrapper = json.loads(_read_bytes(path).decode("utf-8"))
             wrappers.append(wrapper)
         state = self._state_document(
             mission_id,
