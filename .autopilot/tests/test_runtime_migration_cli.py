@@ -30,6 +30,27 @@ autopilot = _load_autopilot()
 
 
 class RuntimeMigrationCliTests(unittest.TestCase):
+    def test_operation_evidence_paths_are_bounded_and_content_addressed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            coordination = Path(temp).resolve() / ("x" * 120)
+            operation_id = "sha256:" + "1" * 64
+
+            operation_path = autopilot._runtime_migration_operation_path(
+                coordination, operation_id
+            )
+            abort_path = autopilot._runtime_migration_abort_path(
+                coordination, operation_id
+            )
+            completion_path = autopilot._runtime_migration_completion_path(
+                coordination, operation_id
+            )
+
+            self.assertEqual(operation_path.parent.name, "mo")
+            self.assertEqual(operation_path.name, "1" * 20 + ".op.json")
+            self.assertEqual(abort_path.name, "1" * 20 + ".abort.json")
+            self.assertEqual(completion_path.name, "1" * 20 + ".complete.json")
+            self.assertLess(len(str(operation_path)), len(str(coordination)) + 40)
+
     def test_completion_replay_is_exact_and_plan_bound(self) -> None:
         operation = {
             "operation_id": "sha256:" + "1" * 64,

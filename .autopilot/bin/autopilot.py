@@ -32,6 +32,7 @@ from controller import (
     RUNTIME_BOOTSTRAP_LOCK,
     RUNTIME_BOOTSTRAP_MANIFEST,
     RUNTIME_READY_MANIFEST,
+    _compact_authority_path_id,
     _inspect_noncanonical_authority,
     _is_link_like,
     _legacy_semantic_inventory,
@@ -13260,7 +13261,7 @@ APP_SERVER_MAX_EVIDENCED_SESSIONS = 256
 RUNTIME_MIGRATION_OPERATION_KIND = "hive-mind-runtime-migration-operation-v1"
 RUNTIME_MIGRATION_ABORT_KIND = "hive-mind-runtime-migration-abort-v1"
 RUNTIME_MIGRATION_COMPLETE_KIND = "hive-mind-runtime-migration-complete-v1"
-RUNTIME_MIGRATION_OPERATION_ROOT = "runtime-authority-migration-operations"
+RUNTIME_MIGRATION_OPERATION_ROOT = "mo"
 HOST_LIFECYCLE_OBSERVATION_FIELDS = {
     "schema_version",
     "kind",
@@ -14424,7 +14425,7 @@ def _runtime_migration_operation_path(
     return (
         coordination_dir
         / RUNTIME_MIGRATION_OPERATION_ROOT
-        / (operation_id.removeprefix("sha256:") + ".operation.json")
+        / (_compact_authority_path_id(operation_id) + ".op.json")
     )
 
 
@@ -14506,9 +14507,11 @@ def _install_runtime_migration_operation(
 def _runtime_migration_abort_path(
     coordination_dir: Path, operation_id: str
 ) -> Path:
-    return _runtime_migration_operation_path(
-        coordination_dir, operation_id
-    ).with_suffix(".abort.json")
+    return (
+        coordination_dir
+        / RUNTIME_MIGRATION_OPERATION_ROOT
+        / (_compact_authority_path_id(operation_id) + ".abort.json")
+    )
 
 
 def _runtime_migration_abort(
@@ -14567,9 +14570,11 @@ def _runtime_migration_abort(
 def _runtime_migration_completion_path(
     coordination_dir: Path, operation_id: str
 ) -> Path:
-    return _runtime_migration_operation_path(
-        coordination_dir, operation_id
-    ).with_suffix(".complete.json")
+    return (
+        coordination_dir
+        / RUNTIME_MIGRATION_OPERATION_ROOT
+        / (_compact_authority_path_id(operation_id) + ".complete.json")
+    )
 
 
 def _validated_runtime_migration_completion(
@@ -14697,10 +14702,14 @@ def _active_runtime_migration_operation(
         raise AutopilotError("runtime migration operation path is not a directory")
     repository_identity = runtime_repository_identity(repo_root)
     active: list[Mapping[str, object]] = []
-    for path in sorted(safe_root.glob("*.operation.json"), key=lambda item: item.name):
+    for path in sorted(safe_root.glob("*.op.json"), key=lambda item: item.name):
         operation = _validated_runtime_migration_operation(
             read_strict_canonical_json(path, label="runtime migration operation")
         )
+        if path != _runtime_migration_operation_path(
+            coordination_dir, str(operation["operation_id"])
+        ):
+            raise AutopilotError("runtime migration operation path is invalid")
         plan = operation["plan"]
         if (
             not isinstance(plan, Mapping)
@@ -14780,7 +14789,7 @@ def _verify_runtime_migration(
                 "runtime migration operation path is not a directory"
             )
         for path in sorted(
-            safe_operation_root.glob("*.operation.json"),
+            safe_operation_root.glob("*.op.json"),
             key=lambda item: item.name,
         ):
             operation = _validated_runtime_migration_operation(
@@ -14788,6 +14797,10 @@ def _verify_runtime_migration(
                     path, label="runtime migration operation"
                 )
             )
+            if path != _runtime_migration_operation_path(
+                coordination_dir, str(operation["operation_id"])
+            ):
+                raise AutopilotError("runtime migration operation path is invalid")
             abort = _runtime_migration_abort(coordination_dir, operation)
             if abort is not None:
                 aborted_operations.append(

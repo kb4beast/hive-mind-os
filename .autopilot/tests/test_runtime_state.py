@@ -4273,6 +4273,13 @@ class HostKernelCapacityTests(unittest.TestCase):
                 upgraded_at=controller.format_time(self.clock()),
             )
         self.assertEqual(successor["kernel_bundle_digest"], "sha256:" + "b" * 64)
+        self.assertEqual(len(plane.execution_dir.name), 20)
+        transition_receipts = sorted((plane.execution_dir / "kt").glob("*"))
+        self.assertTrue(transition_receipts)
+        self.assertTrue(
+            all(len(path.stem) == 20 for path in transition_receipts),
+            transition_receipts,
+        )
         history_path = plane.execution_dir / "execution-kernel-history.jsonl"
         history_before = history_path.read_bytes()
         history = controller._execution_kernel_history(plane.execution_dir)

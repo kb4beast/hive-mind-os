@@ -181,6 +181,16 @@ _STATUS_READ_ONLY_GIT_COMMANDS = frozenset(
     {"cat-file", "diff", "log", "merge-base", "rev-parse", "show"}
 )
 AUTHORITY_ID = re.compile(r"sha256:[0-9a-f]{64}\Z")
+
+
+def _compact_authority_path_id(authority_id: str) -> str:
+    """Bound authority filenames while their documents retain the full digest."""
+
+    if AUTHORITY_ID.fullmatch(authority_id) is None:
+        raise ConfigurationError("authority path identity is invalid")
+    return authority_id.removeprefix("sha256:")[:20]
+
+
 _LOADED_CONTROLLER_PATH = Path(__file__).resolve()
 _LOADED_CONTROLLER_DIGEST = "sha256:" + sha256(
     _LOADED_CONTROLLER_PATH.read_bytes()
@@ -536,7 +546,8 @@ def runtime_lock_order_key(path: str | Path) -> tuple[int, str]:
     execution_scoped = any(
         part == "executions"
         and index + 2 < len(parts)
-        and re.fullmatch(r"[0-9a-f]{64}", parts[index + 1]) is not None
+        and re.fullmatch(r"(?:[0-9a-f]{20}|[0-9a-f]{64})", parts[index + 1])
+        is not None
         and parts[index + 2] == "locks"
         for index, part in enumerate(parts)
     )
@@ -1744,9 +1755,7 @@ def _prepare_kernel_transition(
         raise ConfigurationError(
             "kernel transition authority path is not a directory"
         )
-    prepared_path = transitions / (
-        transition_id.removeprefix("sha256:") + ".p"
-    )
+    prepared_path = transitions / (_compact_authority_path_id(transition_id) + ".p")
     pointer_path = authority_dir / KERNEL_TRANSITION_POINTER
     # The pointer is the exclusive contender CAS.  Publishing it first means a
     # crash cannot leave an undiscoverable immutable intent and let a retry mint
@@ -1821,8 +1830,7 @@ def _ensure_kernel_transition_immutable(
     authority_dir: Path, prepared: Mapping[str, object]
 ) -> None:
     path = authority_dir / KERNEL_TRANSITION_DIRECTORY / (
-        str(prepared["transition_id"]).removeprefix("sha256:")
-        + ".p"
+        _compact_authority_path_id(str(prepared["transition_id"])) + ".p"
     )
     exclusive_write_json_or_identical(path, prepared)
     if read_strict_canonical_json(
@@ -1943,7 +1951,7 @@ def _repair_or_append_prepared_kernel_event(
             expected_archive = (
                 KERNEL_TRANSITION_RECOVERY_DIRECTORY
                 + "/"
-                + str(tail_digest).removeprefix("sha256:")
+                + _compact_authority_path_id(str(tail_digest))
                 + ".b"
             )
             expected_receipt_id = digest_json(
@@ -1972,7 +1980,7 @@ def _repair_or_append_prepared_kernel_event(
                 or receipt.get("archive_path") != expected_archive
                 or receipt_record_id != digest_json(receipt_material)
                 or receipt_path.name
-                != expected_receipt_id.removeprefix("sha256:") + ".r"
+                != _compact_authority_path_id(expected_receipt_id) + ".r"
             ):
                 raise ConfigurationError(
                     "kernel transition torn-tail receipt is invalid"
@@ -2044,7 +2052,7 @@ def _repair_or_append_prepared_kernel_event(
             )
         tail_digest = "sha256:" + sha256(tail).hexdigest()
         archive_path = recovery_dir / (
-            tail_digest.removeprefix("sha256:") + ".b"
+            _compact_authority_path_id(tail_digest) + ".b"
         )
         exclusive_write_bytes_or_identical(archive_path, tail)
         receipt_material: dict[str, object] = {
@@ -2072,7 +2080,7 @@ def _repair_or_append_prepared_kernel_event(
             }
         )
         exclusive_write_json_or_identical(
-            recovery_dir / (recovery_receipt_id.removeprefix("sha256:") + ".r"),
+            recovery_dir / (_compact_authority_path_id(recovery_receipt_id) + ".r"),
             receipt,
         )
         _truncate_authenticated_authority_file(
@@ -2103,7 +2111,7 @@ def _complete_kernel_transition(
     }
     complete = {**complete_material, "record_id": digest_json(complete_material)}
     complete_path = authority_dir / KERNEL_TRANSITION_DIRECTORY / (
-        str(prepared["transition_id"]).removeprefix("sha256:") + ".c"
+        _compact_authority_path_id(str(prepared["transition_id"])) + ".c"
     )
     exclusive_write_json_or_identical(complete_path, complete)
     pointer_path = authority_dir / KERNEL_TRANSITION_POINTER
@@ -2126,7 +2134,7 @@ def execution_namespace_dir(
     directory = _reject_link_components(
         coordination_dir, label="repository runtime root"
     ).resolve()
-    return directory / "executions" / execution_id.removeprefix("sha256:")
+    return directory / "executions" / _compact_authority_path_id(execution_id)
 
 
 def require_execution_namespace(
@@ -12509,9 +12517,7 @@ def _migration_root_id(root: str) -> str:
 def _migration_storage_id(authority_id: str) -> str:
     """Return a compact path component while the manifest retains the full id."""
 
-    if AUTHORITY_ID.fullmatch(authority_id) is None:
-        raise ConfigurationError("migration storage identity is invalid")
-    return authority_id.removeprefix("sha256:")[:20]
+    return _compact_authority_path_id(authority_id)
 
 
 def _migration_evidence_name(source: Mapping[str, Any]) -> str:

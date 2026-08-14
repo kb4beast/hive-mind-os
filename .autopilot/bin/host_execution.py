@@ -27,6 +27,7 @@ from controller import (
     assert_execution_authority_open,
     digest_json,
     exclusive_write_json_or_identical,
+    execution_namespace_dir,
     fence_expired_global_host_session,
     format_time,
     global_host_reservation_record,
@@ -2900,10 +2901,9 @@ def reconcile_global_expired_host_reservations(
             execution_id = str(reservation.get("execution_id"))
             if _DIGEST.fullmatch(execution_id) is None:
                 raise HostExecutionError("global reservation execution id is invalid")
-            execution_dir = (
-                registered_coordination
-                / "executions"
-                / execution_id.removeprefix("sha256:")
+            execution_dir = execution_namespace_dir(
+                registered_coordination,
+                execution_id,
             )
             identity = read_strict_canonical_json(
                 execution_dir / "execution-identity.json",
