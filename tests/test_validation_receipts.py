@@ -107,6 +107,24 @@ class ValidationReceiptCaptureTests(unittest.TestCase):
         )
         self.assertTrue(all(item.reason_code == "missing-required-api" for item in receipt.terminal_ledger))
 
+    def test_a_validation_failure_finishes_the_same_ledger_without_recovery(self) -> None:
+        capture = ValidationReceiptCapture(
+            session_id="018f8d4a-0000-7000-8000-000000000004",
+            label_vocabulary={"pass": TerminalKind.PASS, "fail": TerminalKind.FAIL},
+            source_commit=COMMIT,
+            source_tree=TREE,
+            runner_contract_digest=CONTRACT,
+        )
+        capture.seal_discovery(self.records()[:2])
+        capture.record_outcome(TerminalOutcome(0, "tests.alpha.test_one", TerminalKind.FAIL, "fail", 0))
+        capture.record_outcome(TerminalOutcome(1, "tests.beta.test_two", TerminalKind.PASS, "pass", 1))
+
+        receipt = capture.finalize()
+
+        self.assertEqual(receipt.validation_state, "VALIDATED_FAILED")
+        self.assertEqual(len(receipt.terminal_ledger), 2)
+        self.assertTrue(receipt.verify())
+
     def test_unknown_label_or_foreign_or_out_of_order_outcome_is_rejected(self) -> None:
         capture = self.capture()
         capture.seal_discovery(self.records()[:2])
