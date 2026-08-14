@@ -25,7 +25,9 @@ DEMAND_FIELDS = frozenset(
         "execution_namespace",
         "execution_id",
         "plan_fingerprint",
+        "host_kernel_generation",
         "capacity_generation",
+        "execution_adapter_identity_record_id",
         "requested_slots",
         "weight",
         "enqueued_epoch",
@@ -55,7 +57,9 @@ def make_demand(
     execution_namespace: str,
     execution_id: str,
     plan_fingerprint: str,
+    host_kernel_generation: str,
     capacity_generation: str,
+    execution_adapter_identity_record_id: str,
     requested_slots: int,
     weight: int,
     enqueued_epoch: int,
@@ -68,7 +72,9 @@ def make_demand(
         "execution_namespace": execution_namespace,
         "execution_id": execution_id,
         "plan_fingerprint": plan_fingerprint,
+        "host_kernel_generation": host_kernel_generation,
         "capacity_generation": capacity_generation,
+        "execution_adapter_identity_record_id": execution_adapter_identity_record_id,
         "requested_slots": requested_slots,
         "weight": weight,
         "enqueued_epoch": enqueued_epoch,
@@ -88,7 +94,9 @@ def validate_demand(value: Mapping[str, Any]) -> dict[str, Any]:
         "repository_transport_digest",
         "execution_id",
         "plan_fingerprint",
+        "host_kernel_generation",
         "capacity_generation",
+        "execution_adapter_identity_record_id",
     ):
         if not isinstance(value.get(field), str) or AUTHORITY_ID.fullmatch(
             str(value[field])
@@ -218,4 +226,3 @@ def weighted_round_robin(
         "demand_ids": [str(item["demand_id"]) for item in ordered],
     }
     return {**material, "schedule_id": digest(material)}
-
