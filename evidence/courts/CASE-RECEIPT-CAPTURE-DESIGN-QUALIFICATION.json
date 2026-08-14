@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-RECEIPT-CAPTURE-DESIGN-QUALIFICATION",
+  "node_id": "RCD-JUDGE-040",
+  "recorded_at": "2026-08-13",
+  "subject": "Whether the forward-looking native validation-receipt design is sufficiently specified to open a later implementation-proposal DAG",
+  "judge": {
+    "identity": "codex:rcd-judge-040",
+    "role": "orchestrator",
+    "seat": "judge-distinct-from-all-rcd-roles",
+    "worktree": "C:/Repos/HiveMind/hive-mind-os-rcd-judge-040",
+    "branch": "codex/rcd-judge-040",
+    "self_approval": false,
+    "independent_from": [
+      "RCD-SEAL-000",
+      "RCD-ARCH-010",
+      "RCD-CROSS-020",
+      "RCD-INTEGRATE-030"
+    ]
+  },
+  "authority": {
+    "predecessor": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+    "predecessor_disposition": "defer",
+    "current_authorization": "forward-looking receipt-capture design court only",
+    "judge_gate": "A separate native implementation-proposal DAG may be opened only after zero unresolved material design findings; this Judge may never authorize implementation directly.",
+    "implementation_authority_before_judgment": false
+  },
+  "sealed_plan": {
+    "path": "docs/execution/dags/receipt-capture-design-v1/manifest.json",
+    "plan_digest": "sha256:7606b7c159cc89feac0815df6ae24f216461daedfe1d79aef12f108656b310ab",
+    "node_count": 5,
+    "required_verifier": "python docs/execution/dags/receipt-capture-design-v1/verify_plan.py",
+    "verifier_result": "verified true; plan_id receipt-capture-design-v1; five nodes"
+  },
+  "evidence_considered": {
+    "opening": "evidence/courts/CASE-RECEIPT-CAPTURE-DESIGN-OPENING.json",
+    "architecture": {
+      "path": "evidence/architecture/receipt-capture-design-v1/architecture.json",
+      "node_id": "RCD-ARCH-010",
+      "result": "forward-looking contract with explicit non-retroactivity and bounded recovery design"
+    },
+    "cross_examination": {
+      "path": "evidence/architecture/receipt-capture-design-v1/cross-examination.json",
+      "node_id": "RCD-CROSS-020",
+      "receipt_digest": "sha256:6117a6baa6726835b19742c8e850a19444889dcbf2876c4b584576d9d00ac18f"
+    },
+    "integration": {
+      "path": "evidence/architecture/receipt-capture-design-v1/integration.json",
+      "node_id": "RCD-INTEGRATE-030",
+      "receipt_digest": "sha256:2e01c94f2d9526664d7469f43a3c965c67f8b1c1ac598f5b17322d87a076ee29",
+      "result": "DEFER_FAIL_CLOSED with three unresolved material findings"
+    }
+  },
+  "findings": {
+    "zero_unresolved_material_findings": false,
+    "unresolved_material_finding_count": 3,
+    "material_findings": [
+      {
+        "id": "RCD-MF-001",
+        "subject": "Protected raw-stream storage, access, encryption, and deletion",
+        "finding": "The design separates redacted repository artifacts from a protected raw spool, but it does not choose a precise protected-store threat model, encryption/key authority, access procedure, retention boundary, or deletion/cryptographic-erasure model.",
+        "required_resolution": "Specify a repository-safe protected-stream storage and lifecycle contract, including explicit authorities, threat model, access controls, retention, legal-hold/tombstone behavior, deletion/erasure semantics, and fail-closed behavior."
+      },
+      {
+        "id": "RCD-MF-002",
+        "subject": "Executable receipt grammar, vocabulary, canonicalization, and storage interface",
+        "finding": "The JSONL event model and parser rules are narrative. No versioned executable grammar, complete terminal-label vocabulary, canonicalization test vectors, or independently reviewable durable-storage interface is sealed.",
+        "required_resolution": "Specify versioned executable grammar and vocabulary artifacts, canonicalization vectors, parser error behavior, and a bounded durable-storage interface suitable for independent review."
+      },
+      {
+        "id": "RCD-MF-003",
+        "subject": "Privacy-safe reproducible environment and interpreter identity",
+        "finding": "The design requires an allowlisted environment-name-to-digest map and interpreter metadata, but leaves exact fields, normalization, identity-digest procedure, redaction boundaries, and reproducibility/leakage cases open.",
+        "required_resolution": "Specify a field-level environment allowlist, normalization and redaction rules, executable/interpreter identity-digest procedure, and held-out privacy-leakage and reproducibility cases."
+      }
+    ],
+    "resolved_design_strengths": [
+      "Ordered discovery vector and exactly-one terminal outcome accounting are explicitly designed.",
+      "Historical evidence is not reconstructed, normalized, or upgraded.",
+      "Atomic receipt finalization, append-only linkage, bounded recovery, and candidate-applicability boundaries are specified at a design level.",
+      "The architecture and integration retain rejected candidate restrictions and do not grant implementation authority."
+    ],
+    "adverse_evidence_retained": [
+      "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+      "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json",
+      "evidence/performance/validation-provenance-remand-v1/integration.json",
+      "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+      "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json",
+      "Rejected fixture candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378",
+      "Non-promoted GCO candidate d02c2d2"
+    ]
+  },
+  "verdict": {
+    "disposition": "defer",
+    "rationale": "The sealed Judge gate requires zero unresolved material design findings before even a separate implementation-proposal DAG may be opened. The independently integrated record retains three material unresolved specifications. The necessary predicate is false.",
+    "implementation_authority_granted": false,
+    "implementation_proposal_dag_authorized": false,
+    "candidate_execution_authorized": false,
+    "ci_or_test_execution_authorized": false,
+    "promotion_or_performance_claim_authorized": false,
+    "historical_evidence_repair_authorized": false,
+    "completion_claim": false
+  },
+  "limited_future_authority": {
+    "authorized_now": "Only a separate, newly sealed, non-implementation receipt-capture design-spec completion court may be opened to resolve exactly RCD-MF-001, RCD-MF-002, and RCD-MF-003.",
+    "required_scope": [
+      "Protected raw-stream storage/access/encryption/deletion specification",
+      "Executable grammar/vocabulary/canonicalization/storage-interface specification",
+      "Privacy-safe reproducible environment allowlist and interpreter/executable identity specification"
+    ],
+    "mandatory_conditions": [
+      "Bind and retain this qualification, the integrated design, cross-examination, predecessor judgment, and all adverse evidence.",
+      "Remain design-specification only; resolve no additional subject without separate authority.",
+      "Use a distinct Judge and require zero unresolved material findings before any later implementation-proposal decision.",
+      "Do not reconstruct or upgrade historical evidence."
+    ],
+    "not_authorized": [
+      "Production code, tests, fixtures, controllers, durable-controller, or .autopilot/plan.json changes",
+      "CI, unittest discovery, candidate execution, performance measurement, promotion, or knowledge-baseline retry",
+      "Reuse, relabeling, qualification, or composition of 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 or d02c2d2",
+      "main checkout/update or remote effects"
+    ]
+  },
+  "rollback": {
+    "action": "Revert only this Judge receipt if an authorized correction is required.",
+    "preservation": "Retain the design, cross-examination, integration, predecessor records, rejected-candidate restrictions, dissent, and all adverse conclusions append-only."
+  },
+  "receipt_digest_algorithm": "sha256(canonical JSON of this receipt excluding receipt_digest, UTF-8, sorted keys, compact separators)",
+  "receipt_digest": "sha256:684b925f1d22b83029a3797cf7f3b86ce89a1de5529ad9a6849a1659d01aeeea"
+}
