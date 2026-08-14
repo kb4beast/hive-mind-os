@@ -450,6 +450,32 @@ class LinkedWorktreeRuntimeStateTests(unittest.TestCase):
             (self.first.coordination_dir / "runtime-identity.json").is_file()
         )
 
+    def test_bootstrap_migration_archive_is_windows_path_length_safe(self) -> None:
+        claim_path, claim_bytes = self.write_legacy_claim()
+        coordination = self.primary.parent
+        for index in range(2):
+            coordination /= f"external-runtime-authority-{index}-" + "x" * 28
+        coordination.mkdir(parents=True)
+        self.assertGreater(len(str(coordination)), 130)
+
+        migration = controller.bootstrap_runtime_authority_migration(
+            self.primary,
+            coordination,
+            actor="test:long-path-migrator",
+            clock=self.clock,
+        )
+
+        self.assertEqual(migration["status"], "COMPLETE")
+        self.assertFalse(claim_path.exists())
+        source = migration["sources"][0]
+        archive = Path(source["archive_path"])
+        retired = Path(source["retired_path"])
+        self.assertEqual(archive.read_bytes(), claim_bytes)
+        self.assertEqual(retired.read_bytes(), claim_bytes)
+        self.assertLess(len(str(archive)), 260)
+        self.assertLess(len(str(retired)), 260)
+        self.assertNotIn(migration["migration_id"].removeprefix("sha256:"), str(archive))
+
     def test_bootstrap_prepared_manifest_resumes_after_archive_crash(self) -> None:
         claim_path, claim_bytes = self.write_legacy_claim()
         original_retire = controller._retire_migration_source

@@ -12,7 +12,7 @@ Status: immutable implementation candidate pending final verification and promot
 
 Implementation hashes:
 
-- `controller.py`: `3010BC89FB4086F2477C0057C6AC3A5E29DDB74F58CE4244BA030C6B6FD61227`
+- `controller.py`: `17F23FD82A754E8E9F5914E43B2E1F8BD1E0DA1535984261F1323C7BF525AA5D`
 - `autopilot.py`: `7FFF44B917CFF8E20C616577FD181440FE343893829C38180BD9B87E52D73F2E`
 - `host_execution.py`: `046449420E79926D89DD35208FEF49E754E4C9F7E29E4BD403E0AB552CA204CC`
 - `orchestration.py`: `872B180C70A5F44D2F5192E2EFDD6C2B50F0325DD1F08154C834B7CE962C21B6`
@@ -62,6 +62,8 @@ fresh autonomous launch and adversarial private publication fail-closed.
 10. Migration exposes idempotent `dry-run`, `apply`, `verify`, and
     `rollback-before-ready` modes. Rollback is intentionally abort-and-preserve:
     append-only fenced/quarantined legacy authority is never unsafely reactivated.
+    Archive and retired-evidence layouts use bounded digest components, retain the
+    full identities in their sealed manifests, and reject any compact-path collision.
 11. Generated commands and all governed prompt templates carry absolute repository,
     state, host-runtime, namespace, plan, and host coordinates. Healing and snapshot
     child processes authenticate the returned execution identity.

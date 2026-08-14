@@ -12506,6 +12506,43 @@ def _migration_root_id(root: str) -> str:
     return sha256(os.path.normcase(root).encode("utf-8")).hexdigest()[:20]
 
 
+def _migration_storage_id(authority_id: str) -> str:
+    """Return a compact path component while the manifest retains the full id."""
+
+    if AUTHORITY_ID.fullmatch(authority_id) is None:
+        raise ConfigurationError("migration storage identity is invalid")
+    return authority_id.removeprefix("sha256:")[:20]
+
+
+def _migration_evidence_name(source: Mapping[str, Any]) -> str:
+    """Name one migration blob without reproducing an unbounded source path."""
+
+    relative = str(source.get("relative_path"))
+    source_digest = str(source.get("source_digest"))
+    if (
+        not relative
+        or AUTHORITY_ID.fullmatch(source_digest) is None
+        or Path(relative).is_absolute()
+        or ".." in Path(relative).parts
+    ):
+        raise ConfigurationError("migration evidence identity is invalid")
+    material = (relative + "\0" + source_digest).encode("utf-8")
+    return sha256(material).hexdigest()[:20] + ".bin"
+
+
+def _assert_distinct_migration_paths(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    label: str,
+) -> None:
+    """Fail closed if compact path tokens collide within one sealed cut."""
+
+    for field in ("archive_path", "retired_path"):
+        values = [str(record.get(field)) for record in records]
+        if len(values) != len(set(values)):
+            raise ConfigurationError(f"{label} {field} paths collide")
+
+
 def _inspect_noncanonical_authority(
     repo_root: Path,
     coordination_dir: Path,
@@ -12647,22 +12684,20 @@ def _plan_migration_paths(
     source: Mapping[str, Any],
 ) -> dict[str, Any]:
     root = Path(str(source["source_root"]))
-    relative = Path(str(source["relative_path"]))
     archive = (
         coordination_dir
-        / "runtime-authority-migrations"
-        / migration_id.replace(":", "-")
-        / "archives"
+        / "ma"
+        / _migration_storage_id(migration_id)
         / _migration_root_id(str(root))
-        / relative
+        / _migration_evidence_name(source)
     )
     retired = (
         root
         / ".autopilot"
         / "state"
-        / "runtime-authority-retired"
-        / migration_id.replace(":", "-")
-        / relative
+        / "rr"
+        / _migration_storage_id(migration_id)
+        / _migration_evidence_name(source)
     )
     return {
         **source,
@@ -12778,6 +12813,10 @@ def _validate_migration_manifest(
             ) from error
         if "sha256:" + sha256(payload).hexdigest() != source.get("source_digest"):
             raise ConfigurationError("runtime bootstrap migration source digest changed")
+    _assert_distinct_migration_paths(
+        sources,
+        label="runtime bootstrap migration",
+    )
     return sources
 
 
@@ -13128,19 +13167,18 @@ def _plan_legacy_semantic_paths(
     relative = Path(str(entry["relative_path"]))
     archive = (
         coordination_dir
-        / "runtime-authority-semantic-reconciliations"
-        / reconciliation_id.replace(":", "-")
-        / "archives"
+        / "ms"
+        / _migration_storage_id(reconciliation_id)
         / _migration_root_id(str(root))
-        / relative
+        / _migration_evidence_name(entry)
     )
     retired = (
         root
         / ".autopilot"
         / "state"
-        / "runtime-authority-retired"
-        / reconciliation_id.replace(":", "-")
-        / relative
+        / "rr"
+        / _migration_storage_id(reconciliation_id)
+        / _migration_evidence_name(entry)
     )
     destination: str | None = None
     quarantine: str | None = None
@@ -13318,6 +13356,10 @@ def _validate_legacy_semantic_manifest(
             raise ConfigurationError(
                 "legacy semantic reconciliation source digest changed"
             )
+    _assert_distinct_migration_paths(
+        entries,
+        label="legacy semantic reconciliation",
+    )
     return entries
 
 
@@ -13531,6 +13573,10 @@ def reconcile_legacy_worktree_execution_authority(
                 )
                 for entry in inspected
             ]
+            _assert_distinct_migration_paths(
+                entries,
+                label="legacy semantic reconciliation",
+            )
             manifest = {
                 "schema_version": 1,
                 "kind": LEGACY_SEMANTIC_RECONCILIATION_KIND,
@@ -13750,6 +13796,10 @@ def bootstrap_runtime_authority_migration(
                 _plan_migration_paths(directory, migration_id, source)
                 for source in inspected
             ]
+            _assert_distinct_migration_paths(
+                sources,
+                label="runtime bootstrap migration",
+            )
             manifest = {
                 "schema_version": 1,
                 "kind": RUNTIME_BOOTSTRAP_MIGRATION_KIND,
