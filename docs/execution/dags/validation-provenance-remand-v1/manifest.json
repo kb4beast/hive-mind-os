@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "kind": "validation-provenance-remand-v1-seal",
+  "baseline": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "rejected_tuples": [
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"},
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "4f20bd2"}
+  ],
+  "expected_node_ids": ["VPR-SEAL-000", "VPR-LEDGER-010", "VPR-CROSS-020", "VPR-INTEGRATE-030", "VPR-JUDGE-040"],
+  "expected_dependencies": {
+    "VPR-SEAL-000": [],
+    "VPR-LEDGER-010": ["VPR-SEAL-000"],
+    "VPR-CROSS-020": ["VPR-SEAL-000"],
+    "VPR-INTEGRATE-030": ["VPR-LEDGER-010", "VPR-CROSS-020"],
+    "VPR-JUDGE-040": ["VPR-INTEGRATE-030"]
+  },
+  "expected_plan_digest": "sha256:a9f2cd4687b05b16cae4a383b85f01be705caa2503b83e29c54e69f4348ad443",
+  "parser_contract": "warnings may interleave; custom labels are explicit; every retained discovery ID binds exactly once or fails closed",
+  "prohibitions": ["code", "tests", "fixtures", "GitCommitObservation", "controller", "durable-controller", "CI", "candidate execution", "performance", "promotion", ".autopilot/plan.json", "main", "remotes", "knowledge BASELINE-000"],
+  "predecessor": "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json"
+}
