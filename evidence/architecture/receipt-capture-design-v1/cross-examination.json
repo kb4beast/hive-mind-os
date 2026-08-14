@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "kind": "receipt-capture-design-cross-examination-v1",
+  "node_id": "RCD-CROSS-020",
+  "phase": "cross",
+  "recorded_at": "2026-08-13",
+  "examiner": {
+    "identity": "codex:rcd-cross-020",
+    "seat": "cross-examiner-distinct",
+    "role": "curator",
+    "self_approval": false
+  },
+  "scope": {
+    "method": "Read-only review of the sealed RCD contract, predecessor and adverse receipts, and existing receipt/redaction primitives. No command that discovers or executes tests was run.",
+    "design_only": true,
+    "code_or_test_change": false,
+    "ci_or_unittest_discovery": false,
+    "candidate_execution": false,
+    "performance_measurement": false,
+    "plan_change": false,
+    "main_or_remote_effect": false
+  },
+  "authority": {
+    "authority_commit": "89f1a44a9687d351eae52633d015fc55948005fd",
+    "authority_tree": "bb649cca210b0fa2d2161395e33e6a3b58041b76",
+    "predecessor": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+    "boundary": "This review is forward-looking design evidence. It neither repairs the b789/b909 historical record nor authorizes an implementation or validation retry.",
+    "historical_candidates": {
+      "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378": "rejected; not reusable, relabelable, qualifiable, or composable",
+      "d02c2d2": "non-promoted; not reusable, relabelable, qualifiable, or composable"
+    }
+  },
+  "design_assessment": {
+    "secrets_and_ip_retention": {
+      "risk": "Raw stdout/stderr can contain credentials, access tokens, repository URLs, proprietary source fragments, customer identifiers, absolute workstation paths, and hostile control bytes. A digest of an unsafe retained blob does not make retention safe.",
+      "mandatory_controls": [
+        "Capture must begin with a deny-by-default data classification and a versioned, hashed redaction policy; a receipt must state policy version, redaction outcome, and whether any stream was withheld.",
+        "Secret detection must run before persistence and must fail closed on undecodable, over-limit, binary, or secret-like input; no unredacted fallback, debug copy, exception payload, or temporary artifact may survive outside the trusted receipt store.",
+        "The durable receipt must retain only permitted normalized fields and stream digests by default. Any separately retained redacted excerpt requires an explicit byte limit, source label, redaction map digest without sensitive originals, and retention class.",
+        "Repository/worktree identity must be represented by stable opaque IDs and content digests where practical; absolute local paths, environment values, command arguments, and remote URLs are prohibited unless each field is explicitly allowlisted and redacted.",
+        "Retention, access, deletion, and export rules must be policy-bound. Cross-repository learning may consume only an abstract, reviewed lesson packet; it may not export transcript bodies, paths, proprietary labels, or secret-bearing raw streams."
+      ],
+      "red_line": "No design that stores raw output, a recoverable redaction sidecar, or arbitrary environment/command text in a repository-visible or shared receipt may advance."
+    },
+    "malicious_output_and_parser_injection": {
+      "risk": "Test names and output are untrusted data. ANSI escapes, carriage returns, Unicode confusables, forged summary lines, giant lines, embedded JSON, duplicated headers, and output resembling a later receipt can alter a permissive parser or mislead a reviewer.",
+      "mandatory_controls": [
+        "Define one finite, versioned grammar over byte-bounded records. Decode with a specified error policy, normalize line endings once, reject control characters and ambiguous Unicode in structural tokens, and never execute, interpolate, or reparse output as configuration or JSON.",
+        "Keep parser state separate from display text. A terminal outcome is accepted only when grammar, ordered ID, attempt identity, and declared vocabulary agree; unknown, duplicate, out-of-order, or malformed records produce an explicit capture failure rather than inferred success or skip.",
+        "Hash each raw captured stream before redaction only if policy permits an internal protected store; the durable public receipt must additionally hash the redacted canonical representation and identify which hash is usable by which verifier.",
+        "Impose deterministic limits for total bytes, line bytes, record count, nesting, and parser time. Limit exhaustion, invalid UTF-8, or redaction/parser disagreement must yield a terminal capture-error outcome, not a truncated success claim."
+      ],
+      "red_line": "No regex-only or best-effort parser may infer outcomes from arbitrary output, and no result label may be accepted outside the receipt's predeclared hashed vocabulary."
+    },
+    "outcome_and_binding_completeness": {
+      "risk": "The prior 1,059 versus 1,050 ambiguity demonstrates that aggregate totals and transcript snippets cannot prove which discovered IDs ran, skipped during loading, were suppressed by class lifecycle, failed to start, or were duplicated.",
+      "mandatory_controls": [
+        "Seal the complete ordered discovery vector before execution, including test ID spelling, discovery mechanism/version, vector digest, count, and duplicate check. The recorder must not derive the vector retrospectively from output.",
+        "Emit exactly one terminal outcome per sealed ID, with distinct labels for passed, failed, errored, skipped, expected-failure, unexpected-success, load-error, lifecycle/class-skip, cancelled, timeout, capture-error, and not-started-after-abort where applicable. The label vocabulary and semantics must be declared and hashed before capture.",
+        "Bind every outcome to the attempt ID, vector index, test ID, source commit and tree, interpreter executable/version/hash, OS/platform, normalized environment allowlist digest, working-directory identity, command grammar/version, and recorder/parser/redaction versions. Missing any binding invalidates the receipt for comparison or promotion.",
+        "Reconcile at commit time: vector count equals terminal-ledger count; every index is unique and in range; per-label counts sum to the ledger count; framework summary counts are recorded as observed claims and either match declared mapping rules or produce a fail-closed discrepancy."
+      ],
+      "red_line": "A summary total, a per-ID subset, or a synthesized lifecycle skip may never substitute for a one-to-one sealed-vector ledger."
+    },
+    "atomicity_toctou_and_integrity": {
+      "risk": "Discovery, source inspection, execution, stream capture, redaction, and receipt commit can observe different trees or mutable worktree state. Partial writes and replacement of files after hashing can create a receipt whose parts never coexisted.",
+      "mandatory_controls": [
+        "Resolve and record immutable commit and tree objects before discovery, then verify HEAD/tree and all bound executable/test inputs at capture start and before publication. Refuse dirty, detached-from-binding, changed-index, or changed-worktree states unless an explicitly supported immutable snapshot mechanism supplies equivalent object digests.",
+        "Use a per-attempt immutable directory under a trusted root, exclusive create/no-follow semantics, restrictive permissions, and write-ahead state. Write canonical payloads to same-volume temporary files, fsync file and parent directory, verify hashes after write, then atomically rename a manifest last.",
+        "The manifest must bind every child artifact by relative portable path, content digest, byte count, schema version, and attempt ID. Readers accept only a complete manifest whose commit marker exists and whose all members verify; incomplete or orphaned files are quarantined, not reused.",
+        "Prevent symlink/reparse traversal and path escape for all artifact paths; never trust caller-selected filenames, CWD, PATH, or mutable environment to resolve the recorder, interpreter, or storage root."
+      ],
+      "red_line": "A receipt is invalid if discovery and execution can cross a source/tree boundary, or if readers can observe a partially written or path-substituted artifact."
+    },
+    "crash_retry_and_failure_budget": {
+      "risk": "A process can die after executing work but before recording an outcome; automatic retries can overwrite adverse evidence, double-count outcomes, or turn infrastructure failure into apparent flakiness.",
+      "mandatory_controls": [
+        "Persist an attempt state machine with monotonic transitions: created, vector-sealed, running, stream-closed, reconciled, committed, or terminally-aborted. State transitions are append-only, authenticated by the manifest chain, and carry reason codes.",
+        "A resumed invocation must either verify and continue the same immutable attempt only when no terminal outcome was published, or create a new attempt linked to the predecessor. It must never delete, overwrite, merge, or silently replace an incomplete/adverse attempt.",
+        "Timeout, signal, storage error, parser error, redaction error, source mismatch, and retry exhaustion each produce explicit terminal attempt status and per-ID not-started/capture-error accounting. They are evidence, never silently retried into success.",
+        "Define bounded retry and storage budgets in sealed policy. Exceeding either budget requires an escalation receipt with no promotion/implementation conclusion; retries need independent review when they might change the observed outcome."
+      ],
+      "red_line": "No retry policy may discard a failed, incomplete, or privacy-rejected attempt or present a later attempt as the sole outcome."
+    },
+    "reuse_across_repositories_and_worktrees": {
+      "risk": "A general Hive Mind tool must not mistake same paths, branch names, Python versions, or checkout contents for the same repository or candidate. Cross-worktree receipt reuse can leak information and mix unrelated authority.",
+      "mandatory_controls": [
+        "Namespace every receipt by repository identity, immutable object format/repository fingerprint, source commit/tree, worktree snapshot identity, policy realm, and recorder schema. Do not use display repository names, branch names, or absolute paths as authority keys.",
+        "Verify that a receipt's repository fingerprint and all source/tree/executable/environment bindings equal the consuming invocation before any reuse. A digest match alone is insufficient across repositories or worktrees.",
+        "Only share redacted aggregate lessons through an explicit export policy and independently verified abstraction boundary; operational receipts remain local to their repository/policy realm by default.",
+        "Treat a worktree moved, copied, rebased, dirty, linked, or containing a different Git object database as a new capture context unless exact immutable binding is proven."
+      ],
+      "red_line": "No cached result, receipt, candidate, or learning record may be promoted across repository or worktree identity on filename, branch, timestamp, or partial-tree similarity."
+    },
+    "candidate_applicability_and_mixed_trees": {
+      "risk": "The retained 41950 and d02 records demonstrate that independently preserved historical changes may have overlapping or unrelated tree differences. Composing them would create an unsealed third candidate and erase causal boundaries.",
+      "mandatory_controls": [
+        "Candidate applicability is a separate, explicit assertion that binds parent commit/tree, full candidate commit/tree, complete changed-path set, diff digests, dependency closure, and validation target. It must be evaluated before any candidate receipt is considered comparable.",
+        "A recorder must record one source tree per attempt. It may record comparisons among separately sealed attempts but may never label a union, cherry-pick, cache hit, or mixed worktree as an observed candidate without a new immutable commit/tree and explicit authority.",
+        "Receipt comparison must fail closed when candidate parentage, source binding, interpreter, discovery vector, policy, or required API surface differs. A reusable cache key must include all of these bindings.",
+        "The historical candidates 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 and d02c2d2 remain adverse inputs only. This design review neither removes their restrictions nor supplies a path to compose them."
+      ],
+      "red_line": "No mixed tree or historical candidate composition can be named, measured, or promoted as a validation target without a separate sealed authority and immutable source binding."
+    }
+  },
+  "mandatory_acceptance_tests_for_later_proposal": [
+    "Deterministic vector test: a fixed discovery fixture yields a canonical ordered vector digest; duplicate, missing, reordered, or post-start discovery IDs are rejected before execution.",
+    "Ledger bijection property test: generated combinations of pass, fail, error, lifecycle/class skip, load error, cancellation, timeout, and abort produce exactly one allowed terminal outcome per sealed ID; duplicate, absent, and foreign outcomes fail closed.",
+    "Vocabulary/grammar test: unknown labels, forged summary lines, ANSI/control sequences, CR overwrite, Unicode confusables, embedded JSON, malformed UTF-8, oversize lines, duplicate headers, and adversarial reason text cannot alter a terminal outcome or execute parser-controlled behavior.",
+    "Binding/TOCTOU integration test: mutate HEAD, index, worktree, executable, interpreter identity, or allowlisted environment between sealing and commit; recorder refuses publication and retains an aborted attempt with reason.",
+    "Atomicity crash matrix: inject faults before and after every state transition, temp write, fsync, hash check, rename, and manifest commit; a reader sees either no receipt or one internally complete verifiable receipt, never a partial success.",
+    "Privacy test: seed representative credentials, proprietary strings, paths, URLs, control bytes, binary output, and secret-like error messages in stdout/stderr/env/exception paths; persisted artifacts and logs contain no recoverable original while the receipt records fail-closed classification.",
+    "Retry/idempotency test: retry after each injected failure; prior attempts remain immutable and linked, no outcome is double-counted, retry budget exhaustion escalates, and later success cannot hide an earlier failure.",
+    "Cross-repository/worktree test: identical paths/branch names but different repository fingerprints, trees, object databases, worktrees, policy realms, or interpreters cannot reuse a receipt; exact same bindings may verify only through content-addressed read-only access.",
+    "Candidate applicability test: isolated candidate, different-parent candidate, and synthetic mixed-tree candidate all require exact full binding; the latter two cannot masquerade as the sealed candidate, and historical 41950/d02 remain rejected/non-promoted.",
+    "Summary reconciliation test: framework totals that disagree with the ledger, including counts that include class skips or load errors differently, produce an explicit discrepancy and fail closed rather than a passing aggregate."
+  ],
+  "adversarial_cases_that_must_be_held_out": [
+    "A stream that forges the final summary after a legitimate-looking pass sequence.",
+    "A class-level SkipTest before method execution, with its IDs present in discovery, mixed with method-level skips and load errors.",
+    "A malicious symlink/reparse-point receipt directory and replacement of a temp artifact between digest and rename.",
+    "Crash after a test executed but before its outcome is durable, followed by a retry using changed source or environment.",
+    "A receipt copied from a different repository/worktree with matching test names and a deliberately reused branch name.",
+    "A redaction rule that would erase a structural delimiter or leave a secret split across line/chunk boundaries.",
+    "A proposed comparison that attempts to compose or relabel 41950 and d02."
+  ],
+  "material_open_findings": [
+    "The Architect's contract must choose and precisely specify protected raw-stream storage, if any, including encryption/access authority and a deletion model; this cross-examination does not endorse raw retention.",
+    "The future proposal must provide an executable parser grammar, full label semantics, canonicalization algorithm, and durable storage abstraction rather than relying on narrative controls.",
+    "The future proposal must define which environment fields are allowlisted and how interpreter/executable identities are made reproducible without leaking host data.",
+    "No implementation authority is supplied by this cross-examination. The RCD Integrator and a distinct Judge must decide whether all material findings are resolved before only a later proposal DAG can open."
+  ],
+  "conclusion": "DEFER / fail closed. A durable receipt recorder is supportable only as a narrowly bound, privacy-first, grammar-defined, atomic append-only evidence system. The listed red lines and held-out adversarial tests are mandatory gates for any later separately sealed implementation proposal. This node makes no implementation, candidate, CI, performance, promotion, or historical-evidence claim.",
+  "receipt_digest_algorithm": "sha256(canonical JSON of this receipt excluding receipt_digest, UTF-8, sorted keys, compact separators)",
+  "receipt_digest": "sha256:6117a6baa6726835b19742c8e850a19444889dcbf2876c4b584576d9d00ac18f"
+}
