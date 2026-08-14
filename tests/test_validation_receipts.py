@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from hive_mind_os.validation_receipts import (
@@ -11,13 +12,12 @@ from hive_mind_os.validation_receipts import (
     DiscoveryRecord,
     ReceiptStore,
     RecoveryCase,
-    RecoveryStore,
     RecoveryState,
+    RecoveryStore,
     TerminalKind,
     TerminalOutcome,
     ValidationReceiptCapture,
 )
-
 
 COMMIT = "a" * 40
 TREE = "b" * 40
@@ -45,10 +45,14 @@ class ValidationReceiptCaptureTests(unittest.TestCase):
         return (
             DiscoveryRecord(0, "tests.alpha.test_one", "selected"),
             DiscoveryRecord(1, "tests.beta.test_two", "selected"),
-            DiscoveryRecord(2, "tests.gamma.test_three", "excluded_by_declared_selector"),
+            DiscoveryRecord(
+                2, "tests.gamma.test_three", "excluded_by_declared_selector"
+            ),
         )
 
-    def test_seals_complete_ordered_vector_and_requires_one_terminal_outcome_per_id(self) -> None:
+    def test_seals_complete_ordered_vector_and_requires_one_terminal_outcome_per_id(
+        self,
+    ) -> None:
         capture = self.capture()
         capture.seal_discovery(self.records())
         capture.record_outcome(
@@ -71,7 +75,9 @@ class ValidationReceiptCaptureTests(unittest.TestCase):
         receipt = capture.finalize()
 
         self.assertEqual(receipt.discovery_vector, self.records())
-        self.assertEqual([item.discovery_id for item in receipt.terminal_ledger], [0, 1, 2])
+        self.assertEqual(
+            [item.discovery_id for item in receipt.terminal_ledger], [0, 1, 2]
+        )
         self.assertTrue(receipt.discovery_vector_digest.startswith("sha256:"))
         self.assertTrue(receipt.verify())
 
@@ -103,12 +109,40 @@ class ValidationReceiptCaptureTests(unittest.TestCase):
         receipt = capture.finalize()
 
         self.assertEqual(
-            [(item.discovery_id, item.terminal_kind) for item in receipt.terminal_ledger],
+            [
+                (item.discovery_id, item.terminal_kind)
+                for item in receipt.terminal_ledger
+            ],
             [(0, TerminalKind.SKIP_CLASS), (1, TerminalKind.SKIP_CLASS)],
         )
-        self.assertTrue(all(item.reason_code == "missing-required-api" for item in receipt.terminal_ledger))
+        self.assertTrue(
+            all(
+                item.reason_code == "missing-required-api"
+                for item in receipt.terminal_ledger
+            )
+        )
 
-    def test_a_validation_failure_finishes_the_same_ledger_without_recovery(self) -> None:
+    def test_class_skip_prevalidates_the_whole_batch(self) -> None:
+        capture = self.capture()
+        capture.seal_discovery(self.records()[:2])
+        with self.assertRaises(ValueError):
+            capture.record_class_skip(
+                discovery_ids=(0, 99),
+                terminal_label="class-skip",
+                event_ordinal=0,
+                reason_code="missing-required-api",
+            )
+        capture.record_class_skip(
+            discovery_ids=(0, 1),
+            terminal_label="class-skip",
+            event_ordinal=0,
+            reason_code="missing-required-api",
+        )
+        self.assertEqual(len(capture.finalize().terminal_ledger), 2)
+
+    def test_a_validation_failure_finishes_the_same_ledger_without_recovery(
+        self,
+    ) -> None:
         capture = ValidationReceiptCapture(
             session_id="018f8d4a-0000-7000-8000-000000000004",
             label_vocabulary={"pass": TerminalKind.PASS, "fail": TerminalKind.FAIL},
@@ -117,8 +151,12 @@ class ValidationReceiptCaptureTests(unittest.TestCase):
             runner_contract_digest=CONTRACT,
         )
         capture.seal_discovery(self.records()[:2])
-        capture.record_outcome(TerminalOutcome(0, "tests.alpha.test_one", TerminalKind.FAIL, "fail", 0))
-        capture.record_outcome(TerminalOutcome(1, "tests.beta.test_two", TerminalKind.PASS, "pass", 1))
+        capture.record_outcome(
+            TerminalOutcome(0, "tests.alpha.test_one", TerminalKind.FAIL, "fail", 0)
+        )
+        capture.record_outcome(
+            TerminalOutcome(1, "tests.beta.test_two", TerminalKind.PASS, "pass", 1)
+        )
 
         receipt = capture.finalize()
 
@@ -132,11 +170,15 @@ class ValidationReceiptCaptureTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             capture.record_outcome(
-                TerminalOutcome(0, "tests.alpha.test_one", TerminalKind.PASS, "invented", 0)
+                TerminalOutcome(
+                    0, "tests.alpha.test_one", TerminalKind.PASS, "invented", 0
+                )
             )
         with self.assertRaises(ValueError):
             capture.record_outcome(
-                TerminalOutcome(99, "tests.not.discovered", TerminalKind.PASS, "pass", 0)
+                TerminalOutcome(
+                    99, "tests.not.discovered", TerminalKind.PASS, "pass", 0
+                )
             )
 
         capture.record_outcome(
@@ -173,9 +215,13 @@ class ReceiptStoreTests(unittest.TestCase):
             source_tree=TREE,
             runner_contract_digest=CONTRACT,
         )
-        capture.seal_discovery((DiscoveryRecord(0, "tests.atomic.test_receipt", "selected"),))
+        capture.seal_discovery(
+            (DiscoveryRecord(0, "tests.atomic.test_receipt", "selected"),)
+        )
         capture.record_outcome(
-            TerminalOutcome(0, "tests.atomic.test_receipt", TerminalKind.PASS, "pass", 0)
+            TerminalOutcome(
+                0, "tests.atomic.test_receipt", TerminalKind.PASS, "pass", 0
+            )
         )
         receipt = capture.finalize()
 
@@ -189,9 +235,34 @@ class ReceiptStoreTests(unittest.TestCase):
             receipt_file.write_text("{}", encoding="utf-8")
             self.assertFalse(store.verify(reference))
 
+    def test_store_rejects_self_hashed_but_semantically_invalid_receipt(self) -> None:
+        capture = ValidationReceiptCapture(
+            session_id="018f8d4a-0000-7000-8000-000000000006",
+            label_vocabulary={"pass": TerminalKind.PASS},
+            source_commit=COMMIT,
+            source_tree=TREE,
+            runner_contract_digest=CONTRACT,
+        )
+        capture.seal_discovery(
+            (DiscoveryRecord(0, "tests.semantic.test_one", "selected"),)
+        )
+        capture.record_outcome(
+            TerminalOutcome(0, "tests.semantic.test_one", TerminalKind.PASS, "pass", 0)
+        )
+        receipt = capture.finalize()
+        invalid = replace(
+            receipt,
+            terminal_ledger=(replace(receipt.terminal_ledger[0], test_id="foreign"),),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ValueError):
+                ReceiptStore(Path(temporary)).commit(invalid)
+
 
 class RecoveryCaseTests(unittest.TestCase):
-    def test_recovery_is_bounded_append_only_and_escalates_repeated_blockers(self) -> None:
+    def test_recovery_is_bounded_append_only_and_escalates_repeated_blockers(
+        self,
+    ) -> None:
         recovery = RecoveryCase(
             case_id="RECOVERY-001",
             predecessor_receipt_digest="sha256:" + "d" * 64,
@@ -203,10 +274,14 @@ class RecoveryCaseTests(unittest.TestCase):
 
         recovery.diagnose("parser:unknown-label")
         recovery.remediate("parser:unknown-label", remediation_id="redaction-policy-v2")
-        successor = recovery.revalidate(new_session_id="018f8d4a-0000-7000-8000-000000000003")
+        successor = recovery.revalidate(
+            new_session_id="018f8d4a-0000-7000-8000-000000000003"
+        )
 
         self.assertEqual(recovery.state, RecoveryState.REVALIDATE)
-        self.assertEqual(successor.predecessor_receipt_digest, recovery.predecessor_receipt_digest)
+        self.assertEqual(
+            successor.predecessor_receipt_digest, recovery.predecessor_receipt_digest
+        )
         self.assertNotEqual(successor.session_id, recovery.session_id)
         self.assertEqual(recovery.history[0].state, RecoveryState.BLOCKED)
 
@@ -218,20 +293,46 @@ class RecoveryCaseTests(unittest.TestCase):
 
     def test_recovery_reload_preserves_history_and_cannot_reset_budget(self) -> None:
         recovery = RecoveryCase("RECOVERY-RELOAD", "sha256:" + "d" * 64)
-        recovery.diagnose("parser:unknown-label")
-        recovery.remediate("parser:unknown-label", remediation_id="grammar-v2")
-        recovery.revalidate(new_session_id="018f8d4a-0000-7000-8000-000000000005")
         with tempfile.TemporaryDirectory() as temporary:
             store = RecoveryStore(temporary)
             store.checkpoint(recovery)
+            store.diagnose("RECOVERY-RELOAD", "parser:unknown-label")
+            store.remediate(
+                "RECOVERY-RELOAD", "parser:unknown-label", remediation_id="grammar-v2"
+            )
+            store.revalidate(
+                "RECOVERY-RELOAD", new_session_id="018f8d4a-0000-7000-8000-000000000005"
+            )
             resumed = store.load_latest("RECOVERY-RELOAD")
-            resumed.block("parser:unknown-label")
+            resumed = store.block("RECOVERY-RELOAD", "parser:unknown-label")
         self.assertEqual(resumed.state, RecoveryState.ESCALATED)
         self.assertEqual(resumed.escalation_reason, "repeated-blocker-signature")
 
+    def test_recovery_store_rejects_a_tampered_checkpoint_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            store = RecoveryStore(temporary)
+            case = RecoveryCase("RECOVERY-TAMPER", "sha256:" + "d" * 64)
+            first = store.checkpoint(case)
+            store.diagnose("RECOVERY-TAMPER", "parser:unknown-label")
+            first.write_text("{}", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                store.load_latest("RECOVERY-TAMPER")
+
+    def test_recovery_store_rejects_skipped_or_rewritten_transitions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            store = RecoveryStore(temporary)
+            case = RecoveryCase("RECOVERY-ORDER", "sha256:" + "d" * 64)
+            store.checkpoint(case)
+            case.diagnose("parser:unknown-label")
+            case.remediate("parser:unknown-label", remediation_id="grammar-v2")
+            with self.assertRaises(ValueError):
+                store.checkpoint(case)
+
 
 class CandidateApplicabilityTests(unittest.TestCase):
-    def test_candidate_requires_exact_binding_and_rejected_status_can_never_apply(self) -> None:
+    def test_candidate_requires_exact_binding_and_rejected_status_can_never_apply(
+        self,
+    ) -> None:
         candidate = CandidateApplicability(
             candidate_id="fixture-v2",
             candidate_commit="e" * 40,
@@ -246,24 +347,42 @@ class CandidateApplicabilityTests(unittest.TestCase):
             status=CandidateStatus.ELIGIBLE,
             required_validation_contract_digest=CONTRACT,
             rollback_reference="rollback:fixture-v2",
+            authority_evidence_digest="sha256:" + "2" * 64,
         )
 
-        self.assertTrue(candidate.applies_to(
-            candidate_commit="e" * 40,
-            candidate_tree="f" * 40,
-            target_commit=COMMIT,
-            target_tree=TREE,
-            composition="standalone",
-            validation_contract_digest=CONTRACT,
-        ))
-        self.assertFalse(candidate.applies_to(
-            candidate_commit="e" * 40,
-            candidate_tree="0" * 40,
-            target_commit=COMMIT,
-            target_tree=TREE,
-            composition="standalone",
-            validation_contract_digest=CONTRACT,
-        ))
+        self.assertTrue(
+            candidate.applies_to(
+                candidate_commit="e" * 40,
+                candidate_tree="f" * 40,
+                target_commit=COMMIT,
+                target_tree=TREE,
+                composition="standalone",
+                validation_contract_digest=CONTRACT,
+                authority_evidence_digest="sha256:" + "2" * 64,
+            )
+        )
+        self.assertFalse(
+            candidate.applies_to(
+                candidate_commit="e" * 40,
+                candidate_tree="0" * 40,
+                target_commit=COMMIT,
+                target_tree=TREE,
+                composition="standalone",
+                validation_contract_digest=CONTRACT,
+                authority_evidence_digest="sha256:" + "2" * 64,
+            )
+        )
+        self.assertFalse(
+            candidate.applies_to(
+                candidate_commit="e" * 40,
+                candidate_tree="f" * 40,
+                target_commit=COMMIT,
+                target_tree=TREE,
+                composition="standalone",
+                validation_contract_digest=CONTRACT,
+                authority_evidence_digest="sha256:" + "3" * 64,
+            )
+        )
 
         rejected = CandidateApplicability(
             candidate_id="historical-rejected-fixture",
@@ -279,15 +398,19 @@ class CandidateApplicabilityTests(unittest.TestCase):
             status=CandidateStatus.REJECTED,
             required_validation_contract_digest=CONTRACT,
             rollback_reference="rollback:fixture-v2",
+            authority_evidence_digest="sha256:" + "2" * 64,
         )
-        self.assertFalse(rejected.applies_to(
-            candidate_commit="e" * 40,
-            candidate_tree="f" * 40,
-            target_commit=COMMIT,
-            target_tree=TREE,
-            composition="standalone",
-            validation_contract_digest=CONTRACT,
-        ))
+        self.assertFalse(
+            rejected.applies_to(
+                candidate_commit="e" * 40,
+                candidate_tree="f" * 40,
+                target_commit=COMMIT,
+                target_tree=TREE,
+                composition="standalone",
+                validation_contract_digest=CONTRACT,
+                authority_evidence_digest="sha256:" + "2" * 64,
+            )
+        )
 
 
 if __name__ == "__main__":
