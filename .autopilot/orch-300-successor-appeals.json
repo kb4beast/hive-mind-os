@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "appeals_id": "appeals-orch-300-atomic-store-successor-ordering-20260811",
+  "node_id": "ORCH-300",
+  "decision": "ADAPT",
+  "preserves_court_disposition": "ADAPT",
+  "court_disposition_digest": "sha256:d27adbf38f7469af9a8af40bdf6b46540e182663750db95fbcc2112c3e023b5f",
+  "appeals_judge_identity": "appeals:orch-300-independent-atomic-store-successor-judge",
+  "finding": "Retire v1 dispatch authority immediately; after this overlay is integrated, require fresh authenticated state and create a new first-parent-dbb8, second-parent-current-release claim. The rolled-back eee claim is never ancestry, a receipt, or a reusable lease.",
+  "constraints": [
+    "Never widen the generic ORCH node contract or authorize caller-selected scope.",
+    "Never reuse, merge, archive, publish, or complete eee7171f.",
+    "Never implement product changes before an exact v2 START NOW and fresh claim.",
+    "Never advance the singleton release while another sealed repair claim is active."
+  ],
+  "rollback": "If the fresh v2 claim remains the exact PR and branch head, restore dbb8cb under one CAS lease; otherwise preserve evidence and require a separately judged appeal."
+}

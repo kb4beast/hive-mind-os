@@ -11,6 +11,8 @@ import fnmatch
 import json
 import os
 import re
+import secrets
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +25,8 @@ from urllib.parse import urlparse
 
 SCHEMA_VERSION = 1
 FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
+VALIDATION_TOKEN = re.compile(r"[0-9a-f]{64}\Z")
+MAX_VALIDATION_LEASE_MINUTES = 120
 ROLE_NAMES = (
     "orchestrator",
     "explorer",
@@ -329,6 +333,7 @@ class ControlPlane:
         repo_root: str | Path,
         *,
         clock: Callable[[], datetime] = utc_now,
+        validation_mutex_root: str | Path | None = None,
     ) -> None:
         self.repo_root = Path(repo_root).resolve()
         self.ap_root = self.repo_root / ".autopilot"
@@ -346,7 +351,6 @@ class ControlPlane:
         self.blockers_dir = self.state_dir / "blockers"
         self.questions_dir = self.state_dir / "questions"
         self.subtask_waves_dir = self.state_dir / "subtask-waves"
-        self.validation_lease_path = self.state_dir / "global-validation-lease.json"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -368,6 +372,182 @@ class ControlPlane:
             for node in _require_list(self.plan.get("nodes"), "plan.nodes")
             if isinstance(node, Mapping) and "id" in node
         }
+        self._held_validation_leases: dict[tuple[str, str], tuple[str, str]] = {}
+        self._trusted_tool_paths: dict[str, str] = {}
+        self._fixture_validation_mutex_root = (
+            Path(validation_mutex_root).absolute()
+            if validation_mutex_root is not None
+            else None
+        )
+        if self._fixture_validation_mutex_root is not None:
+            if self.verify_git_objects:
+                raise ConfigurationError(
+                    "validation_mutex_root requires disabled Git-object verification"
+                )
+            if self._git(("rev-parse", "--git-common-dir"), check=False).returncode == 0:
+                raise ConfigurationError(
+                    "validation_mutex_root injection is forbidden in a Git worktree"
+                )
+
+    @staticmethod
+    def _exact_mutex_text(value: object, label: str) -> str:
+        if (
+            type(value) is not str
+            or not value
+            or value != value.strip()
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        ):
+            raise AutopilotError(f"{label} must be exact nonblank text without controls")
+        return value
+
+    @staticmethod
+    def _path_is_link_or_junction(path: Path) -> bool:
+        if path.is_symlink():
+            return True
+        is_junction = getattr(path, "is_junction", None)
+        return bool(is_junction and is_junction())
+
+    @staticmethod
+    def _fsync_directory(directory: Path) -> None:
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        try:
+            descriptor = os.open(directory, flags)
+        except OSError:
+            # Windows has no portable directory-fsync handle. Every lease file is
+            # still fsynced; Unix additionally persists namespace transitions.
+            return
+        try:
+            os.fsync(descriptor)
+        except OSError:
+            if os.name != "nt":
+                raise
+        finally:
+            os.close(descriptor)
+
+    @classmethod
+    def _ensure_validation_mutex_namespace(cls, mutex_dir: Path) -> None:
+        for directory in (mutex_dir.parent, mutex_dir):
+            if directory.exists():
+                if cls._path_is_link_or_junction(directory) or not directory.is_dir():
+                    raise AutopilotError(
+                        "global validation mutex namespace is indirect or invalid"
+                    )
+                continue
+            try:
+                directory.mkdir()
+            except FileExistsError:
+                pass
+            if cls._path_is_link_or_junction(directory) or not directory.is_dir():
+                raise AutopilotError("global validation mutex namespace creation raced")
+            cls._fsync_directory(directory.parent)
+
+    def _validation_mutex_scope(self) -> tuple[Mapping[str, str], Path]:
+        """Resolve the one durable validation-mutex scope for this repository.
+
+        Production controllers place the mutex below Git's common directory, which
+        is shared by every linked worktree.  Tests may explicitly inject a disposable
+        mutex root; tracked configuration never selects the mutex scope.
+        """
+
+        target = _require_mapping(self.control.get("target"), "control-plane.target")
+        repository = self._exact_mutex_text(target.get("repository"), "target.repository")
+        if self._fixture_validation_mutex_root is not None:
+            scope = {
+                "scope_kind": "non-git-fixture",
+                "repository": repository,
+                "origin_name": "fixture",
+                "origin_fetch_identity_digest": digest_json({"fixture": repository}),
+                "origin_push_identity_digest": digest_json({"fixture": repository}),
+            }
+            return scope, self._fixture_validation_mutex_root
+
+        common_result = self._git(
+            ("rev-parse", "--path-format=absolute", "--git-common-dir"),
+            check=True,
+        )
+        common_lines = common_result.stdout.splitlines()
+        if len(common_lines) != 1:
+            raise ConfigurationError("Git common directory is unavailable")
+        common = self._exact_mutex_text(common_lines[0], "Git common directory")
+        common_dir = Path(common)
+        if not common_dir.is_absolute():
+            common_dir = self.repo_root / common_dir
+        if self._path_is_link_or_junction(common_dir):
+            raise ConfigurationError("Git common directory must not be a link or junction")
+        common_dir = common_dir.resolve()
+
+        fetch_values = tuple(
+            self._git(
+                ("config", "--local", "--get-all", "remote.origin.url"),
+                check=False,
+            ).stdout.splitlines()
+        )
+        push_values = tuple(
+            self._git(
+                ("config", "--local", "--get-all", "remote.origin.pushurl"),
+                check=False,
+            ).stdout.splitlines()
+        )
+        if len(fetch_values) != 1 or len(push_values) > 1:
+            raise ConfigurationError(
+                "global validation mutex requires one exact origin fetch URL and at most one push URL"
+            )
+        fetch_url = self._exact_mutex_text(fetch_values[0], "origin fetch URL")
+        push_url = self._exact_mutex_text(
+            push_values[0] if push_values else fetch_url,
+            "origin push URL",
+        )
+        if fetch_url.startswith("-") or push_url.startswith("-"):
+            raise ConfigurationError("origin URLs must not be command options")
+        expected_url = f"https://github.com/{repository}.git"
+        transport_overrides = self._git(
+            (
+                "config", "--local", "--get-regexp",
+                r"^(url\.|include\.|includeIf\.|protocol\.|remote\.origin\.(vcs|proxy)|http\.)",
+            ),
+            check=False,
+        )
+        if transport_overrides.returncode not in {0, 1} or transport_overrides.stdout.strip():
+            raise ConfigurationError(
+                "global validation mutex forbids repository-local transport rewrites"
+            )
+        for candidate in (fetch_url, push_url):
+            parsed = urlparse(candidate)
+            if (
+                candidate != expected_url or parsed.username is not None
+                or parsed.password is not None or parsed.query or parsed.fragment
+            ):
+                raise ConfigurationError(
+                    "global validation mutex requires canonical secret-free origin identity"
+                )
+        effective_fetch = tuple(
+            self._git(("remote", "get-url", "--all", "origin"), check=False).stdout.splitlines()
+        )
+        effective_push = tuple(
+            self._git(
+                ("remote", "get-url", "--push", "--all", "origin"), check=False
+            ).stdout.splitlines()
+        )
+        if effective_fetch != (expected_url,) or effective_push != (expected_url,):
+            raise ConfigurationError(
+                "global validation mutex effective origin endpoint is not sealed"
+            )
+        scope = {
+            "scope_kind": "git-common-dir",
+            "repository": repository,
+            "origin_name": "origin",
+            "origin_fetch_identity_digest": digest_json({"url": fetch_url}),
+            "origin_push_identity_digest": digest_json({"url": push_url}),
+        }
+        return scope, common_dir / "hive-mind-autopilot" / "validation-mutex"
+
+    @property
+    def validation_lease_path(self) -> Path:
+        return self._validation_mutex_scope()[1] / "global-validation-lease.json"
+
+    @property
+    def validation_lease_archive_dir(self) -> Path:
+        return self._validation_mutex_scope()[1] / "archive"
 
     @property
     def plan_fingerprint(self) -> str:
@@ -645,31 +825,13 @@ class ControlPlane:
         check: bool = False,
         environment: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        # Preserve the host runtime environment in memory. Windows Git and
-        # Schannel need variables such as SystemRoot, TEMP, USERPROFILE, and
-        # LOCALAPPDATA; reducing this to PATH makes getaddrinfo/credential
-        # helpers fail even when standalone Git succeeds. Nothing here is
-        # persisted or printed, and prompts remain disabled.
-        base_environment = dict(os.environ)
-        base_environment["GIT_TERMINAL_PROMPT"] = "0"
-        # Keep the controller deterministic while allowing a trusted local
-        # proxy/network path to reach GitHub. These values exist only in the
-        # child process environment; they are never persisted or printed.
-        for key in SAFE_GIT_TRANSPORT_ENVIRONMENT_KEYS:
-            value = os.environ.get(key)
-            if not value or any(character in value for character in "\r\n"):
-                base_environment.pop(key, None)
-                continue
-            if key.lower() in {"http_proxy", "https_proxy"}:
-                parsed = urlparse(value)
-                if parsed.scheme not in {"http", "https", "socks5", "socks5h"} or not parsed.hostname:
-                    base_environment.pop(key, None)
-                    continue
-            base_environment[key] = value
+        base_environment = self._sealed_transport_environment(tool="git")
         if environment is not None:
+            if any(key.startswith(("GIT_CONFIG", "GIT_EXEC", "GIT_SSL")) for key in environment):
+                raise AutopilotError("unsafe Git environment override is forbidden")
             base_environment.update(environment)
         completed = subprocess.run(
-            ("git", "-C", str(self.repo_root), *args),
+            (self._trusted_tool("git"), "-C", str(self.repo_root), *args),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -685,6 +847,135 @@ class ControlPlane:
                 f"git {' '.join(args)} failed: {completed.stderr.strip()}"
             )
         return completed
+
+    def _trusted_tool(self, name: str) -> str:
+        cached = self._trusted_tool_paths.get(name)
+        if cached is not None:
+            return cached
+        if name not in {"git", "gh"}:
+            raise AutopilotError("unsealed executable requested")
+        resolved = shutil.which(name)
+        if not resolved:
+            raise AutopilotError(f"required trusted executable is unavailable: {name}")
+        path = Path(resolved).resolve()
+        if path.name.lower() not in {name, name + ".exe"}:
+            raise AutopilotError(f"trusted executable identity is invalid: {name}")
+        blocked_roots = (self.repo_root, Path(tempfile.gettempdir()).resolve())
+        if any(path.is_relative_to(root) for root in blocked_roots):
+            raise AutopilotError(f"trusted executable cannot come from repository or temporary paths: {name}")
+        if os.name == "nt":
+            try:
+                import winreg
+
+                with winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SOFTWARE\Microsoft\Windows\CurrentVersion",
+                ) as key:
+                    program_files = winreg.QueryValueEx(key, "ProgramFilesDir")[0]
+                approved_roots = (Path(str(program_files)).resolve(),)
+            except (OSError, ValueError) as error:
+                raise AutopilotError("trusted Windows install root is unavailable") from error
+        else:
+            approved_roots = (Path("/usr/bin"), Path("/usr/local/bin"), Path("/opt/homebrew/bin"))
+        try:
+            stat = path.lstat()
+        except OSError as error:
+            raise AutopilotError(f"trusted executable cannot be inspected: {name}") from error
+        reparse = bool(getattr(stat, "st_file_attributes", 0) & 0x400)
+        if (
+            not path.is_file()
+            or path.is_symlink()
+            or reparse
+            or not any(path.is_relative_to(root) for root in approved_roots)
+        ):
+            raise AutopilotError(f"trusted executable is outside approved immutable install roots: {name}")
+        if os.name != "nt" and (
+            getattr(stat, "st_uid", -1) != 0 or stat.st_mode & 0o022
+        ):
+            raise AutopilotError(f"trusted executable ownership or mode is mutable: {name}")
+        if os.name == "nt" and not self._windows_tool_acl_is_immutable(path):
+            raise AutopilotError(f"trusted executable ACL permits untrusted mutation: {name}")
+        self._trusted_tool_paths[name] = str(path)
+        return str(path)
+
+    @staticmethod
+    def _windows_tool_acl_is_immutable(path: Path) -> bool:
+        try:
+            import winreg
+
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+            ) as key:
+                system_root = Path(str(winreg.QueryValueEx(key, "SystemRoot")[0])).resolve()
+            icacls = system_root / "System32" / "icacls.exe"
+            stat = icacls.lstat()
+            if not icacls.is_file() or icacls.is_symlink() or bool(
+                getattr(stat, "st_file_attributes", 0) & 0x400
+            ):
+                return False
+            completed = subprocess.run(
+                (str(icacls), str(path)),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=10,
+                env={"SystemRoot": str(system_root), "WINDIR": str(system_root)},
+            )
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return False
+        if completed.returncode != 0:
+            return False
+        broad_principals = (
+            "everyone", "authenticated users", "builtin\\users",
+            "codexsandboxusers",
+        )
+        write_markers = ("(f)", "(m)", "(w)", "(wd)", "(ad)", "(dc)", "(wo)")
+        for line in completed.stdout.lower().splitlines():
+            if any(principal in line for principal in broad_principals) and any(
+                marker in line for marker in write_markers
+            ):
+                return False
+        return True
+
+    def _sealed_transport_environment(self, *, tool: str) -> dict[str, str]:
+        blocked_exact = {
+            "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_EXEC_PATH",
+            "GIT_SSL_NO_VERIFY", "GIT_SSL_CAINFO", "GIT_SSL_CAPATH",
+            "SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE", "REQUESTS_CA_BUNDLE",
+            "GIT_ASKPASS", "SSH_ASKPASS", "GH_HTTP_UNIX_SOCKET", "GH_HOST", "GH_REPO",
+        }
+        blocked_prefixes = ("GIT_CONFIG", "GIT_ALTERNATE_OBJECT", "GIT_OBJECT_DIRECTORY")
+        if any(key in os.environ for key in blocked_exact) or any(
+            key.startswith(blocked_prefixes) for key in os.environ
+        ):
+            raise AutopilotError("unsafe inherited GitHub transport environment is forbidden")
+        environment = dict(os.environ)
+        for key in tuple(environment):
+            upper = key.upper()
+            if key in blocked_exact or key.startswith(blocked_prefixes) or "ASKPASS" in upper:
+                environment.pop(key, None)
+        for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+            value = environment.get(key)
+            if value:
+                parsed = urlparse(value)
+                if parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment:
+                    raise AutopilotError("credential-bearing proxy transport is forbidden")
+        environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+        # Every authenticated read and mutation must ignore attacker-controlled
+        # user/system configuration (notably url.*.insteadOf and TLS overrides).
+        # Repository-local configuration remains visible and is separately
+        # constrained to the exact canonical origin by the sealed controller.
+        environment["GIT_CONFIG_GLOBAL"] = os.devnull
+        environment["GIT_CONFIG_NOSYSTEM"] = "1"
+        if tool == "gh":
+            environment["GH_PROMPT_DISABLED"] = "1"
+        return environment
 
     def git_object_exists(self, sha: str) -> bool:
         if FULL_SHA.fullmatch(sha) is None:
@@ -1154,47 +1445,79 @@ class ControlPlane:
         node_id: str,
         owner: str,
         *,
-        lease_minutes: int = 10,
+        lease_minutes: int = 30,
     ) -> Mapping[str, Any]:
         """Serialize repository-wide gates while focused node checks stay parallel."""
 
-        if node_id not in self._nodes:
+        if type(node_id) is not str or node_id not in self._nodes:
             raise AutopilotError(f"unknown validation node: {node_id}")
-        if not isinstance(owner, str) or not owner.strip():
+        if (
+            type(owner) is not str or not owner or owner != owner.strip()
+            or any(ord(character) < 32 or ord(character) == 127 for character in owner)
+        ):
             raise AutopilotError("validation lease owner is required")
-        if type(lease_minutes) is not int or lease_minutes < 1:
-            raise AutopilotError("validation lease_minutes must be positive")
+        if (
+            type(lease_minutes) is not int
+            or not 1 <= lease_minutes <= MAX_VALIDATION_LEASE_MINUTES
+        ):
+            raise AutopilotError(
+                "validation lease_minutes must be between 1 and "
+                f"{MAX_VALIDATION_LEASE_MINUTES}"
+            )
         now = self.clock()
-        if self.validation_lease_path.is_file():
-            current = read_json(self.validation_lease_path)
-            if isinstance(current, Mapping):
-                expires = parse_time(current.get("expires_at"))
-                identity = (current.get("node_id"), current.get("owner"))
-                if expires > now:
-                    if identity == (node_id, owner):
-                        return current
-                    raise AutopilotError(
-                        "global validation lease is active for "
-                        f"{current.get('node_id')} owned by {current.get('owner')}"
-                    )
+        scope, mutex_dir = self._validation_mutex_scope()
+        self._ensure_validation_mutex_namespace(mutex_dir)
+        lease_path = mutex_dir / "global-validation-lease.json"
+        if lease_path.exists():
+            current, encoded = self._read_validation_lease(lease_path, scope)
+            self._recover_validation_transaction_artifacts(
+                lease_path,
+                current,
+                encoded,
+                scope,
+                now,
+            )
+            expires = parse_time(current["expires_at"])
+            identity = (str(current["node_id"]), str(current["owner"]))
+            held = self._held_validation_leases.get(identity)
+            if expires > now:
+                if identity == (node_id, owner) and held == (
+                    current["lease_id"],
+                    current["lease_token"],
+                ):
+                    return current
                 raise AutopilotError(
-                    "expired global validation lease requires exact-identity release before reacquisition"
+                    "global validation lease is active for "
+                    f"{current.get('node_id')} owned by {current.get('owner')}"
                 )
-            raise AutopilotError("global validation lease is malformed")
-        lease = {
+            self._archive_validation_lease(
+                lease_path,
+                current,
+                encoded,
+                disposition="expired",
+            )
+        lease_token = secrets.token_hex(32)
+        lease: dict[str, Any] = {
             "schema_version": SCHEMA_VERSION,
+            "kind": "hive-mind-autopilot-global-validation-lease-v3",
+            **scope,
+            "mutex_scope_digest": digest_json(scope),
             "node_id": node_id,
             "owner": owner,
             "target_sha": self.current_target_sha(),
+            "lease_token": lease_token,
+            "revision": 0,
+            "prior_lease_id": None,
             "acquired_at": format_time(now),
+            "heartbeat_at": format_time(now),
             "expires_at": format_time(now + timedelta(minutes=lease_minutes)),
             "status": "ACTIVE",
         }
         lease["lease_id"] = digest_json(lease)
-        self.validation_lease_path.parent.mkdir(parents=True, exist_ok=True)
+        lease_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             descriptor = os.open(
-                self.validation_lease_path,
+                lease_path,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL,
                 0o600,
             )
@@ -1204,29 +1527,406 @@ class ControlPlane:
             os.write(descriptor, (json.dumps(lease, indent=2, sort_keys=True) + "\n").encode("utf-8"))
             os.fsync(descriptor)
         except Exception:
-            self.validation_lease_path.unlink(missing_ok=True)
+            lease_path.unlink(missing_ok=True)
             raise
         finally:
             os.close(descriptor)
+        self._fsync_directory(lease_path.parent)
+        self._held_validation_leases[(node_id, owner)] = (
+            str(lease["lease_id"]),
+            lease_token,
+        )
         return lease
 
-    def release_global_validation_lease(self, node_id: str, owner: str) -> None:
-        if not self.validation_lease_path.is_file():
+    def _read_validation_lease(
+        self,
+        lease_path: Path,
+        expected_scope: Mapping[str, str],
+    ) -> tuple[Mapping[str, Any], bytes]:
+        if self._path_is_link_or_junction(lease_path) or not lease_path.is_file():
+            raise AutopilotError("global validation lease is indirect or absent")
+        try:
+            encoded = lease_path.read_bytes()
+            current = json.loads(encoded.decode("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise AutopilotError("global validation lease is malformed") from error
+        if not isinstance(current, Mapping):
+            raise AutopilotError("global validation lease is malformed")
+        required_keys = {
+            "schema_version",
+            "kind",
+            "scope_kind",
+            "repository",
+            "origin_name",
+            "origin_fetch_identity_digest",
+            "origin_push_identity_digest",
+            "mutex_scope_digest",
+            "node_id",
+            "owner",
+            "target_sha",
+            "lease_token",
+            "revision",
+            "prior_lease_id",
+            "acquired_at",
+            "heartbeat_at",
+            "expires_at",
+            "status",
+            "lease_id",
+        }
+        if set(current) != required_keys:
+            raise AutopilotError("global validation lease schema is malformed")
+        if (
+            type(current.get("schema_version")) is not int
+            or current.get("schema_version") != SCHEMA_VERSION
+            or current.get("kind") != "hive-mind-autopilot-global-validation-lease-v3"
+            or current.get("status") != "ACTIVE"
+        ):
+            raise AutopilotError("global validation lease schema is malformed")
+        for key, expected in expected_scope.items():
+            if current.get(key) != expected:
+                raise AutopilotError("global validation lease repository/origin identity mismatch")
+        if current.get("mutex_scope_digest") != digest_json(expected_scope):
+            raise AutopilotError("global validation lease scope digest mismatch")
+        if (
+            type(current.get("node_id")) is not str
+            or not str(current["node_id"]).strip()
+            or current["node_id"] != str(current["node_id"]).strip()
+            or type(current.get("owner")) is not str
+            or not str(current["owner"]).strip()
+            or current["owner"] != str(current["owner"]).strip()
+            or any(ord(character) < 32 or ord(character) == 127 for character in str(current["node_id"]))
+            or any(ord(character) < 32 or ord(character) == 127 for character in str(current["owner"]))
+            or type(current.get("target_sha")) is not str
+            or FULL_SHA.fullmatch(str(current["target_sha"])) is None
+            or type(current.get("lease_token")) is not str
+            or VALIDATION_TOKEN.fullmatch(str(current["lease_token"])) is None
+            or type(current.get("revision")) is not int
+            or int(current["revision"]) < 0
+            or (
+                current.get("prior_lease_id") is not None
+                and (
+                    type(current.get("prior_lease_id")) is not str
+                    or re.fullmatch(r"sha256:[0-9a-f]{64}", str(current["prior_lease_id"]))
+                    is None
+                )
+            )
+        ):
+            raise AutopilotError("global validation lease identity is malformed")
+        try:
+            acquired = parse_time(current.get("acquired_at"))
+            heartbeat = parse_time(current.get("heartbeat_at"))
+            expires = parse_time(current.get("expires_at"))
+            canonical_times = (
+                format_time(acquired) == current.get("acquired_at")
+                and format_time(heartbeat) == current.get("heartbeat_at")
+                and format_time(expires) == current.get("expires_at")
+            )
+        except (TypeError, ValueError):
+            canonical_times = False
+            acquired = heartbeat = expires = utc_now()
+        if not canonical_times or not acquired <= heartbeat < expires:
+            raise AutopilotError("global validation lease timestamps are malformed")
+        unsigned = dict(current)
+        lease_id = unsigned.pop("lease_id", None)
+        if (
+            type(lease_id) is not str
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", lease_id) is None
+            or lease_id != digest_json(unsigned)
+        ):
+            raise AutopilotError("global validation lease digest mismatch")
+        return current, encoded
+
+    def _validation_transaction_path(self, lease_path: Path, lease_id: str) -> Path:
+        transaction_dir = lease_path.parent / "transactions"
+        if transaction_dir.exists():
+            if self._path_is_link_or_junction(transaction_dir) or not transaction_dir.is_dir():
+                raise AutopilotError("global validation transaction namespace is invalid")
+        else:
+            try:
+                transaction_dir.mkdir()
+            except FileExistsError:
+                pass
+            if self._path_is_link_or_junction(transaction_dir) or not transaction_dir.is_dir():
+                raise AutopilotError("global validation transaction namespace creation raced")
+            self._fsync_directory(transaction_dir.parent)
+        return transaction_dir / (lease_id.replace(":", "-") + ".cas")
+
+    def _claim_validation_lease_cas(
+        self,
+        lease_path: Path,
+        current: Mapping[str, Any],
+        encoded: bytes,
+    ) -> Path:
+        transaction = self._validation_transaction_path(
+            lease_path,
+            str(current["lease_id"]),
+        )
+        try:
+            os.link(lease_path, transaction)
+        except FileExistsError as error:
+            raise AutopilotError("global validation lease CAS is already active") from error
+        except OSError as error:
+            raise AutopilotError("global validation lease CAS could not be acquired") from error
+        self._fsync_directory(transaction.parent)
+        if (
+            self._path_is_link_or_junction(transaction)
+            or transaction.read_bytes() != encoded
+            or lease_path.read_bytes() != encoded
+            or not os.path.samefile(lease_path, transaction)
+        ):
+            raise AutopilotError("global validation lease changed during CAS acquisition")
+        return transaction
+
+    def _recover_validation_transaction_artifacts(
+        self,
+        lease_path: Path,
+        current: Mapping[str, Any],
+        encoded: bytes,
+        scope: Mapping[str, str],
+        now: datetime,
+    ) -> None:
+        prior_lease_id = current.get("prior_lease_id")
+        if isinstance(prior_lease_id, str):
+            completed = self._validation_transaction_path(lease_path, prior_lease_id)
+            if completed.exists():
+                prior, _ = self._read_validation_lease(completed, scope)
+                if (
+                    prior.get("lease_id") != prior_lease_id
+                    or prior.get("lease_token") != current.get("lease_token")
+                    or prior.get("node_id") != current.get("node_id")
+                    or prior.get("owner") != current.get("owner")
+                ):
+                    raise AutopilotError("global validation completed CAS artifact conflicts")
+                completed.unlink()
+                self._fsync_directory(completed.parent)
+
+        active = self._validation_transaction_path(lease_path, str(current["lease_id"]))
+        if not active.exists():
+            return
+        if (
+            active.read_bytes() != encoded
+            or not os.path.samefile(active, lease_path)
+        ):
+            raise AutopilotError("global validation active CAS artifact conflicts")
+        if parse_time(current["expires_at"]) > now:
+            raise AutopilotError("global validation lease CAS is already active")
+        active.unlink()
+        self._fsync_directory(active.parent)
+
+    def _archive_validation_lease(
+        self,
+        lease_path: Path,
+        current: Mapping[str, Any],
+        encoded: bytes,
+        *,
+        disposition: str,
+    ) -> None:
+        lease_id = str(current["lease_id"]).replace(":", "-")
+        archive_dir = lease_path.parent / "archive"
+        if archive_dir.exists():
+            if self._path_is_link_or_junction(archive_dir) or not archive_dir.is_dir():
+                raise AutopilotError("global validation lease archive namespace is invalid")
+        else:
+            try:
+                archive_dir.mkdir()
+            except FileExistsError:
+                pass
+            if self._path_is_link_or_junction(archive_dir) or not archive_dir.is_dir():
+                raise AutopilotError("global validation archive namespace creation raced")
+            self._fsync_directory(archive_dir.parent)
+        archive = archive_dir / f"{lease_id}.{disposition}.json"
+        transaction = self._claim_validation_lease_cas(lease_path, current, encoded)
+        try:
+            os.link(transaction, archive)
+        except FileExistsError as error:
+            transaction.unlink(missing_ok=True)
+            raise AutopilotError("global validation lease archive collision") from error
+        except OSError as error:
+            transaction.unlink(missing_ok=True)
+            raise AutopilotError("global validation lease could not be archived") from error
+        try:
+            self._fsync_directory(archive.parent)
+            if (
+                archive.read_bytes() != encoded
+                or lease_path.read_bytes() != encoded
+                or not os.path.samefile(lease_path, transaction)
+            ):
+                raise AutopilotError("global validation lease changed during archival")
+            lease_path.unlink()
+            self._fsync_directory(lease_path.parent)
+        finally:
+            transaction.unlink(missing_ok=True)
+            self._fsync_directory(transaction.parent)
+
+    def release_global_validation_lease(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        lease_id: str,
+        lease_token: str | None = None,
+    ) -> None:
+        node_id = self._exact_mutex_text(node_id, "validation lease node")
+        owner = self._exact_mutex_text(owner, "validation lease owner")
+        lease_id = self._exact_mutex_text(lease_id, "validation lease ID")
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", lease_id) is None:
+            raise AutopilotError("global validation lease ID is malformed")
+        scope, mutex_dir = self._validation_mutex_scope()
+        self._ensure_validation_mutex_namespace(mutex_dir)
+        lease_path = mutex_dir / "global-validation-lease.json"
+        if not lease_path.exists():
             raise AutopilotError("global validation lease is absent")
-        current = read_json(self.validation_lease_path)
-        identity = (
-            current.get("node_id"),
-            current.get("owner"),
-        ) if isinstance(current, Mapping) else (None, None)
+        current, encoded = self._read_validation_lease(lease_path, scope)
+        identity = (current.get("node_id"), current.get("owner"))
         if identity != (node_id, owner):
             raise AutopilotError("global validation lease identity mismatch")
-        lease_id = str(current.get("lease_id", "unknown")).replace(":", "-")
-        archive = self.state_dir / "validation-leases" / f"{lease_id}.json"
-        atomic_write_json(
-            archive,
-            {**current, "status": "RELEASED", "released_at": format_time(self.clock())},
+        held = self._held_validation_leases.get((node_id, owner))
+        if lease_token is None:
+            if held is None or held[0] != lease_id:
+                raise AutopilotError("global validation lease token is required")
+            expected_token = held[1]
+        else:
+            expected_token = lease_token
+        if (
+            type(expected_token) is not str
+            or VALIDATION_TOKEN.fullmatch(expected_token) is None
+        ):
+            raise AutopilotError("global validation lease token is malformed")
+        if (
+            current.get("lease_id") != lease_id
+            or current.get("lease_token") != expected_token
+        ):
+            raise AutopilotError("global validation lease ID mismatch")
+        self._archive_validation_lease(
+            lease_path,
+            current,
+            encoded,
+            disposition="released",
         )
-        self.validation_lease_path.unlink()
+        self._held_validation_leases.pop((node_id, owner), None)
+
+    def renew_global_validation_lease(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        lease_id: str,
+        lease_token: str,
+        lease_minutes: int = 30,
+    ) -> Mapping[str, Any]:
+        """Heartbeat a live lease using an exact revision CAS."""
+
+        node_id = self._exact_mutex_text(node_id, "validation lease node")
+        owner = self._exact_mutex_text(owner, "validation lease owner")
+        lease_id = self._exact_mutex_text(lease_id, "validation lease ID")
+        lease_token = self._exact_mutex_text(lease_token, "validation lease token")
+        if (
+            re.fullmatch(r"sha256:[0-9a-f]{64}", lease_id) is None
+            or VALIDATION_TOKEN.fullmatch(lease_token) is None
+            or type(lease_minutes) is not int
+            or not 1 <= lease_minutes <= MAX_VALIDATION_LEASE_MINUTES
+        ):
+            raise AutopilotError("global validation lease renewal inputs are malformed")
+        scope, mutex_dir = self._validation_mutex_scope()
+        self._ensure_validation_mutex_namespace(mutex_dir)
+        lease_path = mutex_dir / "global-validation-lease.json"
+        if not lease_path.exists():
+            raise AutopilotError("global validation lease is absent")
+        current, encoded = self._read_validation_lease(lease_path, scope)
+        if (
+            current.get("node_id") != node_id
+            or current.get("owner") != owner
+            or current.get("lease_id") != lease_id
+            or current.get("lease_token") != lease_token
+        ):
+            raise AutopilotError("global validation lease renewal identity mismatch")
+        if current.get("target_sha") != self.current_target_sha():
+            raise AutopilotError("global validation lease target moved before renewal")
+        now = self.clock()
+        self._recover_validation_transaction_artifacts(
+            lease_path,
+            current,
+            encoded,
+            scope,
+            now,
+        )
+        if parse_time(current["expires_at"]) <= now:
+            raise AutopilotError("expired global validation lease cannot be renewed")
+        replacement = dict(current)
+        replacement["prior_lease_id"] = current["lease_id"]
+        replacement["revision"] = int(current["revision"]) + 1
+        replacement["heartbeat_at"] = format_time(now)
+        replacement["expires_at"] = format_time(now + timedelta(minutes=lease_minutes))
+        replacement.pop("lease_id")
+        replacement["lease_id"] = digest_json(replacement)
+
+        candidate = mutex_dir / f".global-validation-renew-{secrets.token_hex(16)}.tmp"
+        descriptor: int | None = None
+        transaction: Path | None = None
+        try:
+            descriptor = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            os.write(
+                descriptor,
+                (json.dumps(replacement, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+            )
+            os.fsync(descriptor)
+            os.close(descriptor)
+            descriptor = None
+            transaction = self._claim_validation_lease_cas(lease_path, current, encoded)
+            if lease_path.read_bytes() != encoded:
+                raise AutopilotError("global validation lease changed before renewal")
+            os.replace(candidate, lease_path)
+            self._fsync_directory(lease_path.parent)
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+            candidate.unlink(missing_ok=True)
+            if transaction is not None:
+                transaction.unlink(missing_ok=True)
+                self._fsync_directory(transaction.parent)
+        self._held_validation_leases[(node_id, owner)] = (
+            str(replacement["lease_id"]),
+            lease_token,
+        )
+        return replacement
+
+    def assert_global_validation_lease(
+        self,
+        node_id: str,
+        owner: str,
+        *,
+        lease_id: str,
+        lease_token: str | None = None,
+    ) -> Mapping[str, Any]:
+        node_id = self._exact_mutex_text(node_id, "validation lease node")
+        owner = self._exact_mutex_text(owner, "validation lease owner")
+        lease_id = self._exact_mutex_text(lease_id, "validation lease ID")
+        scope, mutex_dir = self._validation_mutex_scope()
+        self._ensure_validation_mutex_namespace(mutex_dir)
+        lease_path = mutex_dir / "global-validation-lease.json"
+        if not lease_path.exists():
+            raise AutopilotError("global validation lease is absent")
+        current, _ = self._read_validation_lease(lease_path, scope)
+        held = self._held_validation_leases.get((node_id, owner))
+        if lease_token is None:
+            if held is None or held[0] != lease_id:
+                raise AutopilotError("global validation lease token is required")
+            expected_token = held[1]
+        else:
+            expected_token = lease_token
+        if (
+            current.get("node_id") != node_id
+            or current.get("owner") != owner
+            or current.get("lease_id") != lease_id
+            or type(expected_token) is not str
+            or current.get("lease_token") != expected_token
+        ):
+            raise AutopilotError("global validation lease identity mismatch")
+        if parse_time(current.get("expires_at")) <= self.clock():
+            raise AutopilotError("global validation lease expired")
+        if current.get("target_sha") != self.current_target_sha():
+            raise AutopilotError("global validation lease target moved")
+        return current
 
     @staticmethod
     def recovery_action(packet: Mapping[str, Any]) -> Mapping[str, Any]:

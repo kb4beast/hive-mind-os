@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "evidence_id": "orch-300-atomic-store-successor-evidence-20260811",
+  "node_id": "ORCH-300",
+  "court_disposition_digest": "sha256:d27adbf38f7469af9a8af40bdf6b46540e182663750db95fbcc2112c3e023b5f",
+  "appeals_ordering_disposition_digest": "sha256:04fc994d2199c8f227d43397619d8d547eb372583e6f3eac1546050e28ecf589",
+  "replan_digest": "sha256:6c94fd20e35169461df80963283d7c0c689f6eb83cda62ea343dc2bffad33fb4",
+  "evidence_refs": [
+    "git:319ed6bbbd3c6df86073365f8c0351c476f9f385",
+    "git:4f77d1b14042d02ec49035037f6f2077b659e50b",
+    "git:dbb8cb736eb98e77ef35eb141b2e55e492fbcf88",
+    "git:eee7171f8dc8110128d7d3bd442bd33f3cfbdb7f:rolled-back-only",
+    "github-event:29298109938",
+    "patch-blob-sha1:be65e732cdd1634fbe7d6a8a992620b7fc52a8b4",
+    "patch-sha256:6c86c7cbbf97e498fe03cdac142423db1d03c111d78aa3a5446858becdecf7ab",
+    "artifact:.autopilot/evidence/orch-300-v1-preserved-two-file.patch.gz.b64",
+    "pr:https://github.com/kb4beast/hive-mind-os/pull/131"
+  ],
+  "test_receipt_refs": [
+    "test:orch-v1-rollback-stops-redispatch",
+    "test:orch-v2-two-parent-order-and-four-path-final-scope",
+    "test:store-batch-order-idempotency-rollback-and-concurrency-contract",
+    "test:orch-v2-live-pr-pre-post-cas",
+    "test:orch-v2-real-bare-crash-restart-integrated-complete"
+  ],
+  "dissent": [
+    "The preserved local patch is not integrated evidence and must be reapplied only after a fresh v2 claim."
+  ]
+}

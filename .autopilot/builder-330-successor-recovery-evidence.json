@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "evidence_id": "builder-330-r4-foreign-successor-recovery-evidence-20260811",
+  "node_id": "BUILDER-330",
+  "owner_identity": "builder:builder-330-r4-successor-owner",
+  "outcome_metric": "Exact 01ee3ec is archived and the canonical Builder branch is retired once under current-release, shared-validation-mutex, source/archive, r4, PR139, and full-topology leases; only a later fresh current-release START NOW may create a new Builder claim.",
+  "court_disposition_digest": "sha256:04d49b160b061f770f320c377505a2a90d8894158bfa5f5fec8bed7aabf03c8d",
+  "appeals_ordering_disposition_digest": "sha256:3ddc737ef9556fc79aefec8d2d44ce821bf1984f9bc32c443a2e1a8f159ba1d8",
+  "replan_digest": "sha256:3f152fd7d1bcee6fd23f97932ca2b5eba9205ca02da6f64a1a134f7b79f0f4ad",
+  "prior_authenticated_snapshot_retrieval_digest": "sha256:80bc11dd427dae3c8a19e3bb68bb45aed328fb8b975d198fca4c6c33a2ea9d86",
+  "authenticated_snapshot_retrieval_digest": "sha256:caf8b2f88d2ce24557beceb394e0707a685d261b77b54358c2c80ea7a7cf425c",
+  "authenticated_snapshot_retrieved_at": "2026-08-11T18:35:00Z",
+  "authenticated_snapshot_source": "github-graphql-and-rest:kb4beast/hive-mind-os#139",
+  "forensic_chain_digest": "sha256:ad2e9a466df6cec9b44075164c65c5e60282414996ad06feb7092df7c9d6c3f3",
+  "evidence_refs": [
+    "git:9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+    "git:1268050ff22f3af5338adf16284b9083aafd8bf1",
+    "git:93a9c46b57fe581216021e791e61403b09494c5f",
+    "git:590b40a9f7536e9629e7dbd1b8163a5f29f3f2ab",
+    "git:359a5c5ff8d1eae4566661f3547b33d80dc1a679",
+    "git:64ca3f7084f6a96c564efa8ea3f7c75de37d1b72",
+    "git:e34824db0ceb246b35f7aca27aed0b38e156a803",
+    "git:01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+    "git:0654b024bc609374f119b7b476fc59c79bc1c192",
+    "git:744333fb76b514ecd27f94c70c825124ddc6d318",
+    "git:46c04b7f81e21a5c212b6bb40eaabb2bfe44049c",
+    "git:b36ca7d335e3e46fffdc9129c2fc49d89e235e84",
+    "git:344f87f77a9a3433444d209cc2a3d21f6996ff4f:adverse-extension",
+    "github-pr:139:aggregate-quarantine",
+    "archive:refs/hive-mind-autopilot/archive/builder-330/01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64"
+  ],
+  "test_receipt_refs": [
+    "test:builder-successor-old-grant-rejection",
+    "test:builder-successor-full-topology-and-tree",
+    "test:builder-successor-r4-duplicate-receipt-quarantine",
+    "test:builder-successor-pr139-live-pre-post-cas",
+    "test:builder-successor-archive-collision-release-race-and-reuse",
+    "test:builder-successor-crash-resume-and-compensation",
+    "test:builder-successor-real-bare-retire-refresh-dispatch-reclaim",
+    "test:shared-validation-mutex-cross-worktree-race-expiry-recovery",
+    "test:sealed-live-pr-claim-complete-toctou",
+    "test:controller-full-suite",
+    "test:canonical-full-suite"
+  ],
+  "dissent": [
+    "PR 139 and both r4 Builder receipts remain quarantined evidence even if their code trees equal the preserved candidate tree.",
+    "The shared Git-common-directory mutex serializes worktrees of the same repository; independent clones remain governed by the existing operational single-controller rule and literal-origin CAS publication checks."
+  ]
+}

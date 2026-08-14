@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "grant_id": "orch-300-atomic-store-continuation-v2",
+  "supersedes_grant_id": "orch-300-continuation-supersession-v1",
+  "court_disposition_digest": "sha256:d27adbf38f7469af9a8af40bdf6b46540e182663750db95fbcc2112c3e023b5f",
+  "appeals_ordering_disposition_digest": "sha256:04fc994d2199c8f227d43397619d8d547eb372583e6f3eac1546050e28ecf589",
+  "replan_digest": "sha256:6c94fd20e35169461df80963283d7c0c689f6eb83cda62ea343dc2bffad33fb4",
+  "evidence_digest": "sha256:c4aac80029d3c9af47f94746ddec2c3c03b59eb18661f54588b7ee9a75db7511",
+  "capability_commit": "0000000000000000000000000000000000000000"
+}

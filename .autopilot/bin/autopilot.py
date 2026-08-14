@@ -262,19 +262,38 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
             for name in os.environ
         ):
             return False
-        urls = self._git(("config", "--get-all", "remote.origin.url"), check=False)
+        urls = self._git(("config", "--local", "--get-all", "remote.origin.url"), check=False)
         if urls.returncode != 0:
             return False
         configured_urls = [line.strip() for line in urls.stdout.splitlines() if line.strip()]
         if configured_urls != [record["origin_url"]]:
             return False
-        push_urls = self._git(("config", "--get-all", "remote.origin.pushurl"), check=False)
+        push_urls = self._git(("config", "--local", "--get-all", "remote.origin.pushurl"), check=False)
         if push_urls.returncode not in {0, 1} or push_urls.stdout.strip():
             return False
-        rewrites = self._git(("config", "--get-regexp", r"^url\..*\.(insteadOf|pushInsteadOf)$"), check=False)
+        rewrites = self._git(
+            (
+                "config", "--local", "--get-regexp",
+                r"^(url\.|include\.|includeIf\.|protocol\.|remote\.origin\.(vcs|proxy)|http\.)",
+            ),
+            check=False,
+        )
         if rewrites.returncode not in {0, 1} or rewrites.stdout.strip():
             return False
-        return record["origin_url"] == f"https://github.com/{record['repository']}.git"
+        effective_fetch = self._git(
+            ("remote", "get-url", "--all", "origin"), check=False
+        )
+        effective_push = self._git(
+            ("remote", "get-url", "--push", "--all", "origin"), check=False
+        )
+        expected = f"https://github.com/{record['repository']}.git"
+        return (
+            record["origin_url"] == expected
+            and effective_fetch.returncode == 0
+            and effective_fetch.stdout.splitlines() == [expected]
+            and effective_push.returncode == 0
+            and effective_push.stdout.splitlines() == [expected]
+        )
 
     def _remote_ref_sha(self, reference: str) -> str | None:
         completed = self._git(("ls-remote", "origin", reference), check=False)
@@ -660,11 +679,20 @@ def parser() -> argparse.ArgumentParser:
     validation_acquire = commands.add_parser("validation-lease-acquire")
     validation_acquire.add_argument("node_id")
     validation_acquire.add_argument("--owner", required=True)
-    validation_acquire.add_argument("--lease-minutes", type=int, default=10)
+    validation_acquire.add_argument("--lease-minutes", type=int, default=30)
 
     validation_release = commands.add_parser("validation-lease-release")
     validation_release.add_argument("node_id")
     validation_release.add_argument("--owner", required=True)
+    validation_release.add_argument("--lease-id", required=True)
+    validation_release.add_argument("--lease-token", required=True)
+
+    validation_renew = commands.add_parser("validation-lease-renew")
+    validation_renew.add_argument("node_id")
+    validation_renew.add_argument("--owner", required=True)
+    validation_renew.add_argument("--lease-id", required=True)
+    validation_renew.add_argument("--lease-token", required=True)
+    validation_renew.add_argument("--lease-minutes", type=int, default=30)
 
     retirement = commands.add_parser("retire-receipt-branch")
     retirement.add_argument("retirement_id")
@@ -891,7 +919,22 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command == "validation-lease-release":
-            plane.release_global_validation_lease(args.node_id, args.owner)
+            plane.release_global_validation_lease(
+                args.node_id,
+                args.owner,
+                lease_id=args.lease_id,
+                lease_token=args.lease_token,
+            )
+            return 0
+        if args.command == "validation-lease-renew":
+            result = plane.renew_global_validation_lease(
+                args.node_id,
+                args.owner,
+                lease_id=args.lease_id,
+                lease_token=args.lease_token,
+                lease_minutes=args.lease_minutes,
+            )
+            print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command == "retire-receipt-branch":
             print(json.dumps(plane.retire_receipt_branch(args.retirement_id, actor=args.actor), indent=2, sort_keys=True))

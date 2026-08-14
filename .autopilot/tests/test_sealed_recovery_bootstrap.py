@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,7 +33,17 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         copy_autopilot_fixture(Path(__file__).resolve().parents[1], self.root / ".autopilot")
+        shutil.copy2(Path(__file__).resolve().parents[2] / ".gitattributes", self.root / ".gitattributes")
         self.original_capability = sealed_recovery.SEALED_CAPABILITY_COMMIT
+        self.original_builder_successor_capability = (
+            sealed_recovery.BUILDER_SUCCESSOR_CAPABILITY_COMMIT
+        )
+        self.original_orch_successor_capability = (
+            sealed_recovery.ORCH_SUCCESSOR_CAPABILITY_COMMIT
+        )
+        self.original_orch_successor_digests = dict(
+            sealed_recovery.ORCH_SUCCESSOR_DIGESTS
+        )
         if self.original_capability == "0" * 40:
             sealed_recovery.SEALED_CAPABILITY_COMMIT = "f" * 40
             authority_path = self.root / ".autopilot" / "sealed-repair-authorities.json"
@@ -44,16 +55,71 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             builder = json.loads(builder_path.read_text(encoding="utf-8"))
             builder["capability_commit"] = "f" * 40
             builder_path.write_text(json.dumps(builder), encoding="utf-8")
+        if self.original_builder_successor_capability == "0" * 40:
+            sealed_recovery.BUILDER_SUCCESSOR_CAPABILITY_COMMIT = "e" * 40
+            path = self.root / sealed_recovery.BUILDER_SUCCESSOR_BOOTSTRAP_PATH
+            value = json.loads(path.read_text(encoding="utf-8"))
+            value["capability_commit"] = "e" * 40
+            path.write_text(json.dumps(value), encoding="utf-8")
+        if self.original_orch_successor_capability == "0" * 40:
+            sealed_recovery.ORCH_SUCCESSOR_CAPABILITY_COMMIT = "d" * 40
+            replan_path = self.root / sealed_recovery.ORCH_SUCCESSOR_REPLAN_PATH
+            replan = json.loads(replan_path.read_text(encoding="utf-8"))
+            replan["repair_authority"]["capability_commit"] = "d" * 40
+            replan_path.write_text(json.dumps(replan), encoding="utf-8")
+            replan_digest = sealed_recovery.digest_json(replan)
+            evidence_path = self.root / sealed_recovery.ORCH_SUCCESSOR_EVIDENCE_PATH
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            evidence["replan_digest"] = replan_digest
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+            evidence_digest = sealed_recovery.digest_json(evidence)
+            bootstrap_path = self.root / sealed_recovery.ORCH_SUCCESSOR_BOOTSTRAP_PATH
+            bootstrap = json.loads(bootstrap_path.read_text(encoding="utf-8"))
+            bootstrap["replan_digest"] = replan_digest
+            bootstrap["evidence_digest"] = evidence_digest
+            bootstrap["capability_commit"] = "d" * 40
+            bootstrap_path.write_text(json.dumps(bootstrap), encoding="utf-8")
+            sealed_recovery.ORCH_SUCCESSOR_DIGESTS = {
+                sealed_recovery.ORCH_SUCCESSOR_COURT_PATH: sealed_recovery.digest_json(
+                    json.loads(
+                        (self.root / sealed_recovery.ORCH_SUCCESSOR_COURT_PATH).read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                ),
+                sealed_recovery.ORCH_SUCCESSOR_APPEALS_PATH: sealed_recovery.digest_json(
+                    json.loads(
+                        (self.root / sealed_recovery.ORCH_SUCCESSOR_APPEALS_PATH).read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                ),
+                sealed_recovery.ORCH_SUCCESSOR_REPLAN_PATH: replan_digest,
+                sealed_recovery.ORCH_SUCCESSOR_EVIDENCE_PATH: evidence_digest,
+            }
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
         control_path.write_text(json.dumps(control), encoding="utf-8")
-        self.plane = autopilot.ControlPlane(self.root)
+        self.plane = autopilot.ControlPlane(
+            self.root,
+            validation_mutex_root=self.root / ".autopilot" / "state" / "validation-mutex",
+        )
         self.plane._live_release_issues = lambda _record, _expected=None: ()  # type: ignore[method-assign]
         self.plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
+        self.plane._live_pr_metadata_issues = lambda *_args, **_kwargs: ()  # type: ignore[method-assign]
+        self.plane._builder_successor_release_issues = lambda *_args, **_kwargs: ()  # type: ignore[method-assign]
+        self.plane.assert_global_validation_lease = lambda *_args, **_kwargs: {}  # type: ignore[method-assign]
 
     def tearDown(self) -> None:
         sealed_recovery.SEALED_CAPABILITY_COMMIT = self.original_capability
+        sealed_recovery.BUILDER_SUCCESSOR_CAPABILITY_COMMIT = (
+            self.original_builder_successor_capability
+        )
+        sealed_recovery.ORCH_SUCCESSOR_CAPABILITY_COMMIT = (
+            self.original_orch_successor_capability
+        )
+        sealed_recovery.ORCH_SUCCESSOR_DIGESTS = self.original_orch_successor_digests
         self.temporary.cleanup()
 
     @property
@@ -63,6 +129,24 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
     def _record(self, node_id: str) -> dict:
         document = json.loads(self.authority_path.read_text(encoding="utf-8"))
         return next(record for record in document["repair_authorities"] if record["node_id"] == node_id)
+
+    def _builder_successor_fixture(self) -> dict:
+        value = self.plane._builder_document(
+            sealed_recovery.BUILDER_SUCCESSOR_REPLAN_PATH
+        )
+        assert isinstance(value, dict)
+        topology = self.plane._builder_successor_topology(value)
+        projected = dict(value)
+        projected.update(
+            {
+                "branch": topology.branch,
+                "candidate_commit": topology.source_head,
+                "candidate_tree": topology.source_tree,
+                "archive_ref": topology.archive_ref,
+                "r4_head": topology.r4_head,
+            }
+        )
+        return projected
 
     def _rewrite_record(self, node_id: str, key: str, value: object) -> None:
         document = json.loads(self.authority_path.read_text(encoding="utf-8"))
@@ -505,7 +589,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         }
 
     def test_replacement_requires_supersedes_grant_exact_pr_and_scope(self) -> None:
-        for node_id in ("OPTIMIZER-370", "ORCH-300"):
+        for node_id in ("OPTIMIZER-370",):
             self.assertEqual(self.plane._replacement_receipt_issues(node_id, self._receipt(node_id)), ())
             for mutation in ("missing_supersedes", "wrong_grant", "wrong_pr", "scope"):
                 receipt = self._receipt(node_id)
@@ -519,6 +603,88 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
                     receipt["changed_paths"] = ["src/outside.py"]
                 with self.subTest(node_id=node_id, mutation=mutation):
                     self.assertTrue(self.plane._replacement_receipt_issues(node_id, receipt))
+        self.assertTrue(
+            self.plane._replacement_receipt_issues("ORCH-300", self._receipt("ORCH-300"))
+        )
+
+    def test_real_optimizer_incident_base_and_later_execution_release_are_compatible(self) -> None:
+        repository = Path(__file__).resolve().parents[2]
+        plane = autopilot.ControlPlane(repository)
+        record = plane._effective_repair_record("OPTIMIZER-370")
+        assert isinstance(record, dict)
+        claim = "8fa51243327ae928e46df180bfd81fbf90062cf5"
+        execution_merge = "88f2962b64f7cc9f88284c5dd30106de5313da7b"
+        execution_target = "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379"
+        final = "948368b77ba8de920369f416970e83b909bd50ba"
+        claim_payload = plane._repair_claim_message(claim)
+        self.assertIsInstance(claim_payload, dict)
+        node = plane.node("OPTIMIZER-370")
+        receipt = {
+            "schema_version": 1,
+            "plan_fingerprint": plane.expected_plan_fingerprint,
+            "node_id": "OPTIMIZER-370",
+            "contract_version": 1,
+            "base_commit": record["incident_target_sha"],
+            "base_tree": sealed_recovery.OPTIMIZER_INCIDENT_TREE,
+            "final_commit": final,
+            "final_tree": "e7fe4cdec441550a0007306182b222ac76ba73b3",
+            "branch": record["branch"],
+            "pr": 135,
+            "changed_paths": list(record["allowed_paths"]),
+            "tests": [
+                {"name": name, "status": "passed", "command": ["python", "-m", "unittest"]}
+                for name in node["required_tests"]
+            ],
+            "evidence_refs": ["evidence:optimizer-370-repair"],
+            "model_runtime": {"provider": "fixture", "model": "fixture"},
+            "role_identities": [
+                {"role": role, "identity": f"role:{role}", "identity_kind": "model_role"}
+                for role in node["roles"]
+            ],
+            "authority": {
+                "node_id": "OPTIMIZER-370",
+                "autonomy_level": "A3",
+                "grants": [record["grant_id"]],
+                "grant_id": record["grant_id"],
+                "supersedes_receipt_commit": record["old_receipt_commit"],
+                "repair_authority_digest": autopilot.digest_json(record),
+                "repair_claim_commit": claim,
+                "execution_merge_commit": execution_merge,
+                "execution_target_sha": execution_target,
+                "repair_claim_payload_digest": autopilot.digest_json(claim_payload),
+            },
+            "consultations": [],
+            "acceptance_decision": "ADAPT",
+            "timestamp": "2030-01-01T00:00:00Z",
+            "rollback_ref": "revert:optimizer-370-repair",
+        }
+        self.assertEqual(plane._replacement_receipt_issues("OPTIMIZER-370", receipt), ())
+        for key, value in (
+            ("base_commit", execution_target),
+            ("base_tree", "0" * 40),
+            ("changed_paths", [*record["allowed_paths"], "src/outside.py"]),
+        ):
+            mutated = copy.deepcopy(receipt)
+            mutated[key] = value
+            with self.subTest(key=key):
+                self.assertTrue(plane._replacement_receipt_issues("OPTIMIZER-370", mutated))
+        original_diff = plane._diff_paths
+        for omitted in record["allowed_paths"]:
+            retained = tuple(path for path in record["allowed_paths"] if path != omitted)
+            plane._diff_paths = lambda base, end, retained=retained: (  # type: ignore[method-assign]
+                retained if base == execution_target and end == final else original_diff(base, end)
+            )
+            with self.subTest(omitted=omitted):
+                self.assertIn(
+                    "exact two-path scope",
+                    "; ".join(plane._replacement_receipt_issues("OPTIMIZER-370", receipt)),
+                )
+        plane._diff_paths = original_diff  # type: ignore[method-assign]
+        plane.control = {**plane.control, "verify_git_objects": False}
+        self.assertIn(
+            "requires object verification",
+            "; ".join(plane._replacement_receipt_issues("OPTIMIZER-370", receipt)),
+        )
 
     def test_replacement_receipt_rejects_schema_expansion_and_weak_types(self) -> None:
         def consultation_mutation(receipt: dict, mutation: str) -> None:
@@ -727,7 +893,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             with self.subTest(label=label):
                 self.assertTrue(self.plane._sealed_receipt_shape_issues(node_id, receipt))
 
-    def test_only_exact_old_new_pair_resolves_and_extra_receipt_fails_closed(self) -> None:
+    def test_legacy_orch_pair_does_not_resolve_after_v2_supersession(self) -> None:
         node_id = "ORCH-300"
         record = copy.deepcopy(self._record(node_id))
         old_receipt = {"node_id": node_id, "pr": None}
@@ -737,7 +903,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         old = {"commit": record["old_receipt_commit"], "receipt": old_receipt}
         new = {"commit": "f" * 40, "receipt": {"pr": 131}}
         records = [old, new]
-        self.assertEqual(self.plane.resolve_sealed_repair_records(node_id, records), [new])
+        self.assertIs(self.plane.resolve_sealed_repair_records(node_id, records), records)
         extra = [old, new, {"commit": "a" * 40}]
         self.assertIs(self.plane.resolve_sealed_repair_records(node_id, extra), extra)
         wrong_old = copy.deepcopy(old)
@@ -760,6 +926,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         }
         self.plane._repair_records = lambda: {node_id: record}  # type: ignore[method-assign]
         self.plane.sealed_recovery_issues = lambda: ()  # type: ignore[method-assign]
+        self.plane._repair_authority_issues = lambda _node: ()  # type: ignore[method-assign]
         with mock.patch.object(DurableControlPlane, "_durable_receipt_records", return_value=durable_records):
             view = self.plane.node_view(node_id)
         self.assertEqual(view.state, "COMPLETE", view.reasons)
@@ -845,9 +1012,11 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
                 "OPTIMIZER-370": record, "ORCH-300": other_record,
             }
             plane.sealed_recovery_issues = lambda: ()  # type: ignore[method-assign]
+            plane._repair_authority_issues = lambda _node: ()  # type: ignore[method-assign]
             plane._repair_live_issues = lambda _record: ()  # type: ignore[method-assign]
             plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
             plane._live_release_issues = lambda _record, _expected=None: ()  # type: ignore[method-assign]
+            plane._live_pr_metadata_issues = lambda *_args, **_kwargs: ()  # type: ignore[method-assign]
             plane.assert_start_now = lambda _node: {"release_id": "sealed-real-release"}  # type: ignore[method-assign]
             plane.current_release = lambda: {  # type: ignore[method-assign]
                 "release_id": "sealed-real-release", "target_sha": target,
@@ -856,6 +1025,12 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             plane._reconciliation_digest = lambda: "reconciliation"  # type: ignore[method-assign]
             plane._doctor_evidence_digest = lambda: "doctor"  # type: ignore[method-assign]
             plane._release_binding_issues = lambda _claim=None: ()  # type: ignore[method-assign]
+            plane.acquire_global_validation_lease = lambda *_args, **_kwargs: {  # type: ignore[method-assign]
+                "lease_id": "sha256:" + "1" * 64,
+                "lease_token": "2" * 64,
+            }
+            plane.assert_global_validation_lease = lambda *_args, **_kwargs: {}  # type: ignore[method-assign]
+            plane.release_global_validation_lease = lambda *_args, **_kwargs: None  # type: ignore[method-assign]
 
         plane = autopilot.ControlPlane(repository)
         configure(plane)
@@ -920,7 +1095,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         view = integrated.node_view("OPTIMIZER-370")
         self.assertEqual(view.state, "COMPLETE", view.reasons)
 
-    def test_orch_exact_inherited_claim_provenance_can_validate_integrated_successor(self) -> None:
+    def test_orch_v1_inherited_claim_provenance_is_retired_by_successor(self) -> None:
         node_id = "ORCH-300"
         record = self._record(node_id)
         receipt = self._receipt(node_id)
@@ -956,7 +1131,10 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane._git = lambda args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
             args, 0, json.dumps(original_payload), ""
         )
-        self.assertEqual(self.plane._validate_receipt_commit_record(node_id, durable), ())
+        self.assertIn(
+            "expected exactly one retained remote claim",
+            "; ".join(self.plane._validate_receipt_commit_record(node_id, durable)),
+        )
 
     def test_receipt_publication_uses_final_head_cas_and_keeps_claim_until_verified(self) -> None:
         node_id = "OPTIMIZER-370"
@@ -1219,9 +1397,117 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.assertEqual(state["head"], receipt_commit)
         self.assertTrue((self.plane.state_dir / f"sealed-repair-completion-{node_id.lower()}.json").is_file())
 
+    def test_successor_registry_envelope_and_cross_grant_isolation_fail_closed(self) -> None:
+        self.assertEqual(self.plane._repair_authority_issues("OPTIMIZER-370"), ())
+        orch_court = self.root / sealed_recovery.ORCH_SUCCESSOR_COURT_PATH
+        original_court = orch_court.read_text(encoding="utf-8")
+        orch_court.write_text(original_court.replace("\"ADAPT\"", "\"REJECT\"", 1), encoding="utf-8")
+        self.assertEqual(self.plane._repair_authority_issues("OPTIMIZER-370"), ())
+        self.assertTrue(self.plane._repair_authority_issues("ORCH-300"))
+        orch_court.write_text(original_court, encoding="utf-8")
+
+        original_registry = self.authority_path.read_text(encoding="utf-8")
+        registry = json.loads(original_registry)
+        registry["repair_authorities"].append(copy.deepcopy(registry["repair_authorities"][0]))
+        self.authority_path.write_text(json.dumps(registry), encoding="utf-8")
+        for node_id in ("OPTIMIZER-370", "ORCH-300"):
+            self.assertIn("registry envelope", "; ".join(self.plane._repair_authority_issues(node_id)))
+        registry = json.loads(original_registry)
+        registry["unexpected"] = True
+        self.authority_path.write_text(json.dumps(registry), encoding="utf-8")
+        self.assertIn("registry envelope", "; ".join(self.plane._repair_authority_issues("OPTIMIZER-370")))
+        self.authority_path.write_text(original_registry, encoding="utf-8")
+
+    def test_orch_v2_artifact_scope_v1_retirement_and_rollback_event_are_exact(self) -> None:
+        record = self.plane._effective_repair_record("ORCH-300")
+        assert isinstance(record, dict)
+        self.assertEqual(record["grant_id"], "orch-300-atomic-store-continuation-v2")
+        self.assertEqual(record["historical_merge_paths"], record["preserved_patch_paths"])
+        self.assertEqual(len(record["historical_merge_paths"]), 2)
+        self.assertEqual(len(record["allowed_paths"]), 4)
+        artifact = self.root / record["preserved_patch_artifact"]
+        original = artifact.read_bytes()
+        artifact.write_bytes(original + b"!")
+        self.assertIn("artifact", "; ".join(self.plane._orch_successor_record_issues()))
+        artifact.write_bytes(original)
+
+        event = {
+            "id": 29298109938,
+            "event": "head_ref_force_pushed",
+            "created_at": "2026-08-11T18:35:53Z",
+            "commit_id": record["old_receipt_commit"],
+            "actor": {"login": "kb4beast"},
+            "issue": {
+                "number": 131,
+                "url": "https://api.github.com/repos/kb4beast/hive-mind-os/issues/131",
+                "html_url": "https://github.com/kb4beast/hive-mind-os/pull/131",
+                "repository_url": "https://api.github.com/repos/kb4beast/hive-mind-os",
+            },
+        }
+        self.plane.remote_branch_sha = lambda _branch: record["old_receipt_commit"]  # type: ignore[method-assign]
+        self.plane._remote_ref_sha = lambda ref: (  # type: ignore[method-assign]
+            record["protected_main_sha"] if ref == "refs/heads/main" else None
+        )
+        self.plane._query_github_issue_event = lambda *_args: event  # type: ignore[method-assign]
+        self.assertEqual(self.plane._orch_successor_live_issues(record), ())
+        for key, value in (
+            ("commit_id", "0" * 40),
+            ("event", "closed"),
+        ):
+            with self.subTest(key=key):
+                mutated = dict(event)
+                mutated[key] = value
+                self.plane._query_github_issue_event = lambda *_args, mutated=mutated: mutated  # type: ignore[method-assign]
+                self.assertIn("rollback event", "; ".join(self.plane._orch_successor_live_issues(record)))
+        wrong_issue = copy.deepcopy(event)
+        wrong_issue["issue"]["number"] = 999
+        self.plane._query_github_issue_event = lambda *_args: wrong_issue  # type: ignore[method-assign]
+        self.assertIn("rollback event", "; ".join(self.plane._orch_successor_live_issues(record)))
+
+    def test_orch_v2_live_pr_base_metadata_is_independent_of_execution_release(self) -> None:
+        record = self.plane._effective_repair_record("ORCH-300")
+        assert isinstance(record, dict)
+        execution = "a" * 40
+        payload = {
+            "number": 131,
+            "state": "open",
+            "draft": True,
+            "created_at": record["pr_created_at"],
+            "closed_at": None,
+            "merged_at": None,
+            "base": {
+                "ref": record["pr_base_branch"], "sha": record["pr_base_sha"],
+                "repo": {"full_name": record["repository"]},
+            },
+            "head": {
+                "ref": record["pr_head_branch"], "sha": record["old_receipt_commit"],
+                "repo": {"full_name": record["repository"]},
+            },
+        }
+        self.plane._query_github_pr = lambda *_args: payload  # type: ignore[method-assign]
+        self.assertEqual(
+            sealed_recovery.SealedRecoveryMixin._live_pr_metadata_issues(
+                self.plane,
+                record,
+                record["old_receipt_commit"],
+                expected_base_sha=record["pr_base_sha"],
+            ),
+            (),
+        )
+        self.assertIn(
+            "base_sha",
+            "; ".join(
+                sealed_recovery.SealedRecoveryMixin._live_pr_metadata_issues(
+                    self.plane,
+                    record,
+                    record["old_receipt_commit"],
+                    expected_base_sha=execution,
+                )
+            ),
+        )
+
     def test_builder_atomic_cas_archive_delete_and_reuse_denial(self) -> None:
-        replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
-        assert isinstance(replan, dict)
+        replan = self._builder_successor_fixture()
         self.plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
         self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
         self.plane.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
@@ -1230,7 +1516,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane._doctor_evidence_digest = lambda: "doctor"  # type: ignore[method-assign]
         self.plane.github_snapshot = lambda: {  # type: ignore[method-assign]
             "target_sha": "d" * 40,
-            "pull_requests": [],
+            "pull_requests": [{"number": 139, "head_sha": replan["r4_head"]}],
             "branches": [{"name": replan["branch"], "sha": replan["candidate_commit"], "stale": True}],
         }
         self.plane._builder_history_issues = lambda _replan: ()  # type: ignore[method-assign]
@@ -1239,7 +1525,10 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane.is_ancestor = lambda ancestor, descendant: True  # type: ignore[method-assign]
         self.plane._commit_tree = lambda _commit: replan["candidate_tree"]  # type: ignore[method-assign]
         state = {"source": replan["candidate_commit"], "archive": None}
-        self.plane._remote_ref_sha = lambda ref: state["source"] if ref.startswith("refs/heads/") else state["archive"]  # type: ignore[method-assign]
+        self.plane._remote_ref_sha = lambda ref: (  # type: ignore[method-assign]
+            state["source"] if ref == f"refs/heads/{replan['branch']}"
+            else state["archive"] if ref == replan["archive_ref"] else None
+        )
         pushes: list[tuple[str, ...]] = []
 
         def git(args, *, check=False, environment=None):
@@ -1257,7 +1546,8 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             if command[0] == "fetch":
                 return subprocess.CompletedProcess(command, 0, "", "")
             if command[0] == "rev-parse":
-                return subprocess.CompletedProcess(command, 0, replan["candidate_commit"] + "\n", "")
+                observed = replan["r4_head"] if replan["r4_head"] in command[-1] else replan["candidate_commit"]
+                return subprocess.CompletedProcess(command, 0, observed + "\n", "")
             if command[0] == "update-ref":
                 return subprocess.CompletedProcess(command, 0, "", "")
             self.fail(f"unexpected command: {command}")
@@ -1270,8 +1560,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             self.plane.retire_builder_branch(actor="test:reuse")
 
     def test_builder_post_push_failure_atomically_restores_source_and_removes_archive(self) -> None:
-        replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
-        assert isinstance(replan, dict)
+        replan = self._builder_successor_fixture()
         self.plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
         self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
         self.plane.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
@@ -1283,11 +1572,15 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane._release_binding_issues = lambda _claim=None: ()  # type: ignore[method-assign]
         self.plane._builder_history_issues = lambda _replan: ()  # type: ignore[method-assign]
         self.plane.github_snapshot = lambda: {  # type: ignore[method-assign]
-            "target_sha": "d" * 40, "pull_requests": [],
+            "target_sha": "d" * 40,
+            "pull_requests": [{"number": 139, "head_sha": replan["r4_head"]}],
             "branches": [{"name": replan["branch"], "sha": replan["candidate_commit"], "stale": True}],
         }
         state = {"source": replan["candidate_commit"], "archive": None}
-        self.plane._remote_ref_sha = lambda ref: state["source"] if ref.startswith("refs/heads/") else state["archive"]  # type: ignore[method-assign]
+        self.plane._remote_ref_sha = lambda ref: (  # type: ignore[method-assign]
+            state["source"] if ref == f"refs/heads/{replan['branch']}"
+            else state["archive"] if ref == replan["archive_ref"] else None
+        )
         pushes: list[tuple[str, ...]] = []
 
         def git(args, **_kwargs):
@@ -1300,7 +1593,8 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
                     state["source"], state["archive"] = replan["candidate_commit"], None
                 return subprocess.CompletedProcess(command, 0, "", "")
             if command[0] == "rev-parse":
-                return subprocess.CompletedProcess(command, 0, replan["candidate_commit"] + "\n", "")
+                observed = replan["r4_head"] if replan["r4_head"] in command[-1] else replan["candidate_commit"]
+                return subprocess.CompletedProcess(command, 0, observed + "\n", "")
             return subprocess.CompletedProcess(command, 0, "", "")
 
         self.plane._git = git  # type: ignore[method-assign]
@@ -1316,8 +1610,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.assertFalse(self.plane.builder_intent_path.exists())
 
     def test_builder_prepared_intent_recovers_verified_post_push_state(self) -> None:
-        replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
-        assert isinstance(replan, dict)
+        replan = self._builder_successor_fixture()
         self.plane.current_target_sha = lambda: "e" * 40  # type: ignore[method-assign]
         self.plane.current_release = lambda: {"release_id": "new-release"}  # type: ignore[method-assign]
         self.plane._live_release_issues = lambda _record, _expected=None: ("literal origin release advanced",)  # type: ignore[method-assign]
@@ -1343,15 +1636,11 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         }
         autopilot.atomic_write_json(self.plane.builder_intent_path, intent)
         autopilot.atomic_write_json(self.plane.builder_lease_path, lease)
-        recovered = self.plane._recover_interrupted_builder_retirement(replan)
-        assert recovered is not None
-        self.assertEqual(recovered["status"], "RETIRED")
-        self.assertFalse(self.plane.builder_intent_path.exists())
-        self.assertFalse(self.plane.builder_lease_path.exists())
+        with self.assertRaisesRegex(autopilot.ClaimError, "foreign or malformed"):
+            self.plane._recover_interrupted_builder_retirement(replan)
 
     def test_builder_restart_after_execution_record_finishes_only_intent_cleanup(self) -> None:
-        replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
-        assert isinstance(replan, dict)
+        replan = self._builder_successor_fixture()
         lease = {
             "schema_version": 1, "kind": sealed_recovery.BUILDER_EXECUTION_KIND,
             "recovery_id": "builder-330-stale-candidate-recovery-v1", "node_id": "BUILDER-330",
@@ -1381,14 +1670,11 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane._remote_ref_sha = lambda ref: (  # type: ignore[method-assign]
             None if ref.startswith("refs/heads/") else replan["candidate_commit"]
         )
-        recovered = self.plane.retire_builder_branch(actor="test:restart")
-        self.assertEqual(recovered, execution)
-        self.assertFalse(self.plane.builder_intent_path.exists())
-        self.assertFalse(self.plane.builder_lease_path.exists())
+        with self.assertRaisesRegex(autopilot.AutopilotError, "execution record is invalid"):
+            self.plane.retire_builder_branch(actor="test:restart")
 
-    def test_builder_recovery_snapshot_binds_absent_source_and_exact_archive(self) -> None:
-        replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
-        assert isinstance(replan, dict)
+    def test_legacy_builder_recovery_state_cannot_bypass_v2_schema(self) -> None:
+        replan = self._builder_successor_fixture()
         self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
         self.plane._snapshot_digest = lambda: "snapshot"  # type: ignore[method-assign]
         self.plane._reconciliation_digest = lambda: "reconciliation"  # type: ignore[method-assign]
@@ -1410,15 +1696,128 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         autopilot.atomic_write_json(self.plane.builder_execution_path, execution)
         autopilot.atomic_write_json(self.plane.builder_recovery_path, recovery)
         self.plane.github_snapshot = lambda: {"branches": [], "refs": []}  # type: ignore[method-assign]
-        self.assertIn("archive ref", "; ".join(self.plane._builder_recovery_issues()))
-        self.plane.github_snapshot = lambda: {  # type: ignore[method-assign]
-            "branches": [], "refs": [{"name": replan["archive_ref"], "sha": replan["candidate_commit"]}],
+        with self.assertRaisesRegex(autopilot.AutopilotError, "execution record is invalid"):
+            self.plane._builder_recovery_issues()
+
+    def test_builder_v2_retired_fresh_state_claim_refresh_and_race_safe_release(self) -> None:
+        replan = self.plane._builder_document(
+            sealed_recovery.BUILDER_SUCCESSOR_REPLAN_PATH
+        )
+        bootstrap = self.plane._builder_document(
+            sealed_recovery.BUILDER_SUCCESSOR_BOOTSTRAP_PATH
+        )
+        assert isinstance(replan, dict) and isinstance(bootstrap, dict)
+        topology = self.plane._builder_successor_topology(replan)
+        target = "d" * 40
+        execution = {
+            "schema_version": 1,
+            "kind": sealed_recovery.BUILDER_EXECUTION_KIND,
+            "status": "RETIRED",
+            "recovery_id": sealed_recovery.BUILDER_RECOVERY_ID,
+            "source_head": topology.source_head,
+            "archive_ref": topology.archive_ref,
+            "snapshot_digest": "snapshot",
+            "reconciliation_digest": "reconciliation",
+            "doctor_evidence_digest": "doctor",
+            "target_sha": target,
+            "release_id": "release",
+            "actor": "test:builder-retirement",
+            "authority_digest": autopilot.digest_json(bootstrap),
+            "replan_digest": sealed_recovery.BUILDER_SUCCESSOR_DIGESTS[
+                sealed_recovery.BUILDER_SUCCESSOR_REPLAN_PATH
+            ],
+            "validation_lease_id": "lease-id",
+            "validation_lease_digest": "sha256:" + "1" * 64,
+            "completed_at": "2026-08-11T18:00:00Z",
         }
+        remote = {
+            topology.source_ref: None,
+            topology.archive_ref: topology.source_head,
+            topology.legacy_archive_ref: None,
+        }
+        snapshot = {
+            "target_sha": target,
+            "pull_requests": [],
+            "branches": [],
+            "refs": [{"name": topology.archive_ref, "sha": topology.source_head}],
+        }
+        live_material = {
+            "source_ref": topology.source_ref,
+            "source_sha": None,
+            "archive_ref": topology.archive_ref,
+            "archive_sha": topology.source_head,
+            "legacy_archive_ref": topology.legacy_archive_ref,
+            "legacy_archive_sha": None,
+        }
+        recovery = {
+            "schema_version": 1,
+            "kind": sealed_recovery.BUILDER_EXECUTION_KIND,
+            "recovery_id": sealed_recovery.BUILDER_RECOVERY_ID,
+            "snapshot_digest": "snapshot",
+            "reconciliation_digest": "reconciliation",
+            "doctor_evidence_digest": "doctor",
+            "target_sha": target,
+            "live_ref_attestation_digest": autopilot.digest_json(live_material),
+            "live_ref_attested_at": "2026-08-11T18:01:00Z",
+            "recorded_at": "2026-08-11T18:01:00Z",
+        }
+        autopilot.atomic_write_json(self.plane.builder_execution_path, execution)
+        autopilot.atomic_write_json(self.plane.builder_recovery_path, recovery)
+        self.plane.current_target_sha = lambda: target  # type: ignore[method-assign]
+        self.plane._snapshot_digest = lambda: "snapshot"  # type: ignore[method-assign]
+        self.plane._reconciliation_digest = lambda: "reconciliation"  # type: ignore[method-assign]
+        self.plane._doctor_evidence_digest = lambda: "doctor"  # type: ignore[method-assign]
+        self.plane.github_snapshot = lambda: snapshot  # type: ignore[method-assign]
+        self.plane._remote_ref_sha = lambda reference: remote.get(reference)  # type: ignore[method-assign]
+        self.plane.current_release = lambda: {"release_id": "release", "target_sha": target}  # type: ignore[method-assign]
+        self.plane.assert_start_now = lambda _node: {"release_id": "release"}  # type: ignore[method-assign]
+        created = "c" * 40
+        payloads: dict[str, dict] = {}
+
+        def create(local: dict) -> str:
+            payloads[created] = self.plane._builder_successor_claim_payload(local)
+            return created
+
+        self.plane._create_builder_successor_claim_commit = create  # type: ignore[method-assign]
+        self.plane._git = lambda args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+            args,
+            0,
+            json.dumps(payloads[created]) if args[:3] == ("show", "-s", "--format=%B") else "",
+            "",
+        )
+        self.plane._cas_create_branch = lambda _branch, commit: remote.__setitem__(  # type: ignore[method-assign]
+            topology.source_ref, commit
+        )
+        self.plane._cas_delete_branch = lambda _branch, expected: (  # type: ignore[method-assign]
+            remote.__setitem__(topology.source_ref, None)
+            if remote[topology.source_ref] == expected
+            else (_ for _ in ()).throw(autopilot.ClaimError("CAS race"))
+        )
         self.assertEqual(self.plane._builder_recovery_issues(), ())
+        claimed = self.plane.claim(
+            "BUILDER-330", "builder:successor", publish_remote=True
+        )
+        self.assertEqual(claimed["kind"], sealed_recovery.BUILDER_CLAIM_KIND)
+        self.assertEqual(remote[topology.source_ref], created)
+        self.assertEqual(
+            payloads[created], self.plane._builder_successor_claim_payload(claimed)
+        )
+        snapshot["branches"] = [{"name": topology.branch, "sha": created}]
+        recovery["live_ref_attestation_digest"] = autopilot.digest_json(
+            {**live_material, "source_sha": created}
+        )
+        autopilot.atomic_write_json(self.plane.builder_recovery_path, recovery)
+        self.assertEqual(self.plane._builder_recovery_issues(), ())
+        self.assertIn(self.plane.node_view("BUILDER-330").state, {"CLAIMED", "RUNNING"})
+        remote[topology.source_ref] = "f" * 40
+        with self.assertRaisesRegex(autopilot.ClaimError, "phase head"):
+            self.plane.release("BUILDER-330", "builder:successor", reason="race")
+        retained = json.loads(self.plane.claim_path("BUILDER-330").read_text(encoding="utf-8"))
+        self.assertEqual(retained["status"], "ADVERSE")
+        self.assertEqual(remote[topology.source_ref], "f" * 40)
 
     def test_builder_source_archive_pr_and_lease_mismatches_never_push(self) -> None:
-        replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
-        assert isinstance(replan, dict)
+        replan = self._builder_successor_fixture()
         self.plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
         self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
         self.plane.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
@@ -1443,8 +1842,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.assertFalse(any(command and command[0] == "push" for command in pushes))
 
     def test_builder_active_claim_validation_lease_archive_and_foreign_lease_fail_closed(self) -> None:
-        replan = self.plane._builder_document(BUILDER_REPLAN_PATH)
-        assert isinstance(replan, dict)
+        replan = self._builder_successor_fixture()
         self.plane.current_target_sha = lambda: "d" * 40  # type: ignore[method-assign]
         self.plane.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
         self.plane._snapshot_digest = lambda: "snapshot"  # type: ignore[method-assign]
@@ -1454,7 +1852,8 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane._release_binding_issues = lambda _claim=None: ()  # type: ignore[method-assign]
         self.plane._builder_history_issues = lambda _replan: ()  # type: ignore[method-assign]
         self.plane.github_snapshot = lambda: {  # type: ignore[method-assign]
-            "target_sha": "d" * 40, "pull_requests": [],
+            "target_sha": "d" * 40,
+            "pull_requests": [{"number": 139, "head_sha": replan["r4_head"]}],
             "branches": [{"name": replan["branch"], "sha": replan["candidate_commit"], "stale": True}],
         }
         self.plane._remote_ref_sha = lambda ref: (  # type: ignore[method-assign]
@@ -1466,7 +1865,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
             self.plane.retire_builder_branch(actor="test:builder")
         claim_path.unlink()
         autopilot.atomic_write_json(self.plane.validation_lease_path, {"owner": "foreign"})
-        with self.assertRaisesRegex(autopilot.ClaimError, "validation lease"):
+        with self.assertRaisesRegex(autopilot.AutopilotError, "schema"):
             self.plane.retire_builder_branch(actor="test:builder")
         self.plane.validation_lease_path.unlink()
         self.plane._remote_ref_sha = lambda ref: replan["candidate_commit"]  # type: ignore[method-assign]
@@ -1483,7 +1882,7 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         self.plane._remote_ref_sha = lambda ref: (  # type: ignore[method-assign]
             replan["candidate_commit"] if ref.startswith("refs/heads/") else None
         )
-        with self.assertRaisesRegex(autopilot.ClaimError, "lease already exists"):
+        with self.assertRaisesRegex(autopilot.ClaimError, "foreign or malformed"):
             self.plane.retire_builder_branch(actor="test:builder")
 
 

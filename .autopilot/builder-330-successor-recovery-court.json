@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "court_id": "court-builder-330-r4-foreign-successor-recovery-20260811",
+  "node_id": "BUILDER-330",
+  "decision": "ADAPT",
+  "advocate_identity": "builder:builder-330-r4-successor-advocate",
+  "cross_examiner_identity": "curator:builder-330-r4-successor-cross-examiner",
+  "expert_witness_identity": "steward:builder-330-r4-successor-expert",
+  "judge_identity": "court:builder-330-independent-r4-successor-judge",
+  "supersedes_recovery_id": "builder-330-stale-candidate-recovery-v1",
+  "supersedes_bootstrap_digest": "sha256:40ae612644dbff1fe6323eff5e2f17605cfd9b03ff11b06b27a424b21627f975",
+  "supersedes_replan_digest": "sha256:afeda169e182db86dc8309d08493ce4a00f3ce806c96231be8ca2e18fcb28a13",
+  "incident_release_sha": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+  "incident_release_tree": "2a5b94489c368c0e3798c2d38d85f7631adb8604",
+  "branch": "autopilot/builder-330",
+  "canonical_head": "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+  "archive_ref": "refs/hive-mind-autopilot/archive/builder-330/01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+  "forensic_chain": {
+    "old_claim": "1268050ff22f3af5338adf16284b9083aafd8bf1",
+    "old_claim_parent": "01ca563a8a11fddde6f698abe42d10db3dd1bc71",
+    "old_claim_tree": "39874376c7fdf884c8aceb26faf936561ac24b63",
+    "old_claim_payload_digest": "sha256:9ef675e86bc40c5f4260153641913ecc6097d57442c765ff347428962e9d86a6",
+    "old_candidate": "93a9c46b57fe581216021e791e61403b09494c5f",
+    "old_candidate_tree": "0b7c26beb8d7cfbf1752c7625d3cdb0dce87c556",
+    "old_candidate_merge": "590b40a9f7536e9629e7dbd1b8163a5f29f3f2ab",
+    "old_candidate_merge_parents": [
+      "681d33527616e001ec98ce34b5dbc5272242e842",
+      "93a9c46b57fe581216021e791e61403b09494c5f"
+    ],
+    "old_candidate_merge_tree": "4ec8ddb09cc99467fbcc736e3b0e0c904d4590a0",
+    "foreign_base": "359a5c5ff8d1eae4566661f3547b33d80dc1a679",
+    "foreign_base_parent": "590b40a9f7536e9629e7dbd1b8163a5f29f3f2ab",
+    "foreign_base_tree": "7978862274926139e3c5507b881e7320cb71bbe1",
+    "repair_claim": "64ca3f7084f6a96c564efa8ea3f7c75de37d1b72",
+    "repair_claim_tree": "7978862274926139e3c5507b881e7320cb71bbe1",
+    "repair_claim_payload_digest": "sha256:48d4ea46b27159b7762579a3aaa0cb6dd07d7b940a037ed4819b6cd3ed4d0406",
+    "candidate": "e34824db0ceb246b35f7aca27aed0b38e156a803",
+    "candidate_tree": "ecdcc269ecfbfe5addcfae6ba4e2e670e4e51964",
+    "receipt": "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+    "receipt_tree": "ecdcc269ecfbfe5addcfae6ba4e2e670e4e51964",
+    "receipt_payload_digest": "sha256:99ba1cf456234e2245f909f0284fdfd19f4544fe9cc9d4b3d74eeee36297bb03",
+    "receipt_pr": null,
+    "receipt_timestamp": "2026-08-11T16:10:05.3068443Z",
+    "receipt_merge": "46c04b7f81e21a5c212b6bb40eaabb2bfe44049c",
+    "receipt_merge_parents": [
+      "0c8d24002acde8857ab87b80f1370c28dcd83367",
+      "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64"
+    ],
+    "receipt_merge_tree": "6d6ec5fe2e3fd6822ced591d1192cfd566a048aa",
+    "quarantined_sibling_candidate": "281453a11ce92f46fd31e4401e92f33e28cb35b5",
+    "quarantined_sibling_candidate_parent": "359a5c5ff8d1eae4566661f3547b33d80dc1a679",
+    "quarantined_sibling_candidate_tree": "ecdcc269ecfbfe5addcfae6ba4e2e670e4e51964",
+    "quarantined_sibling_receipt": "0654b024bc609374f119b7b476fc59c79bc1c192",
+    "quarantined_sibling_receipt_parent": "281453a11ce92f46fd31e4401e92f33e28cb35b5",
+    "quarantined_sibling_receipt_tree": "ecdcc269ecfbfe5addcfae6ba4e2e670e4e51964",
+    "quarantined_sibling_receipt_digest": "sha256:99b71d78704b339a4236b6fe70a40ad81f8f904ff8b77fd7c2cdbe9cf9e471a0",
+    "quarantined_sibling_merge": "744333fb76b514ecd27f94c70c825124ddc6d318",
+    "quarantined_sibling_merge_parents": [
+      "5557c5fa7a0f80ed1ece8a3dfa0420128ce4f3f9",
+      "0654b024bc609374f119b7b476fc59c79bc1c192"
+    ],
+    "quarantined_sibling_merge_tree": "6e0a915d803c389c9364378fad16ca0d47014f43"
+  },
+  "aggregate_pr_139": {
+    "number": 139,
+    "state": "open",
+    "draft": true,
+    "created_at": "2026-08-11T16:29:01Z",
+    "base_ref": "release/hive-mind-os-singleton-20260810-r2",
+    "base_sha": "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58",
+    "head_ref": "release/hive-mind-os-singleton-20260811-r4",
+    "head_sha": "344f87f77a9a3433444d209cc2a3d21f6996ff4f",
+    "head_tree": "9e68f956ea9fa4c97611976c0231f92315f61ec5",
+    "mergeable": false,
+    "mergeable_state": "dirty",
+    "updated_at": "2026-08-11T18:25:33Z",
+    "classification": "aggregate_quarantine_not_builder_node_pr",
+    "prior_authenticated_snapshot_digest": "sha256:80bc11dd427dae3c8a19e3bb68bb45aed328fb8b975d198fca4c6c33a2ea9d86",
+    "authenticated_snapshot_digest": "sha256:caf8b2f88d2ce24557beceb394e0707a685d261b77b54358c2c80ea7a7cf425c",
+    "authenticated_snapshot_retrieved_at": "2026-08-11T18:35:00Z",
+    "authenticated_snapshot_source": "github-graphql-and-rest:kb4beast/hive-mind-os#139",
+    "adverse_extension": {
+      "commit": "344f87f77a9a3433444d209cc2a3d21f6996ff4f",
+      "parent": "b36ca7d335e3e46fffdc9129c2fc49d89e235e84",
+      "tree": "9e68f956ea9fa4c97611976c0231f92315f61ec5",
+      "authored_at": "2026-08-11T18:25:14Z",
+      "committed_at": "2026-08-11T18:25:14Z",
+      "subject": "Add token-aware root-mediated sidecars",
+      "builder_scope_unchanged": true
+    }
+  },
+  "preserved_paths": [
+    "src/hive_mind_os/brain_kernel/builder.py",
+    "src/hive_mind_os/cortex/repository/builder_adapter.py",
+    "tests/test_hive_cortex_builder.py"
+  ],
+  "finding": "The v1 grant correctly fails closed because the canonical Builder ref moved from 93a9c46 to the foreign r4 receipt 01ee3ec. Preserve the full old and foreign ancestry under a new immutable archive, atomically retire only the exact 01ee3ec source, and quarantine PR 139 and both r4 Builder receipts from node-PR or duplicate-receipt resolution.",
+  "acceptance_conditions": [
+    "Every old and foreign commit, tree, ordered parent, payload digest, path, ref, PR, release, and authority binding is exact.",
+    "The v1 authority and PR 139 can never authorize, identify, or resolve the successor Builder node.",
+    "The new archive is absent before execution and equals exact 01ee3ec after one atomic source-head/archive-absence CAS transaction.",
+    "The archive preserves 1268050 to 93a9c46 and 359a5c5 to 64ca3f to e34824d to 01ee3ec ancestry and the exact candidate tree.",
+    "Fresh authenticated snapshot, reconciliation, full doctor, current release, status, and explicit Builder START NOW are required before a new canonical claim.",
+    "Release, r4, PR 139, receipt-set, archive, source, lease, repository, origin, path, tree, case, or reuse drift fails closed."
+  ],
+  "dissent": [
+    "The two r4 Builder receipts are adverse provenance only; neither is accepted as a current singleton-release completion receipt."
+  ]
+}

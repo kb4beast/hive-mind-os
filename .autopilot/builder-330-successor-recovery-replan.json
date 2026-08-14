@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "replan_id": "replan-builder-330-r4-foreign-successor-20260811",
+  "node_id": "BUILDER-330",
+  "decision": "ADAPT",
+  "prior_state": "REPAIR_REQUIRED",
+  "replacement_required": true,
+  "replacement_protocol": "sealed_r4_receipt_archive_retire_then_fresh_reclaim_v2",
+  "plan_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39",
+  "repository": "kb4beast/hive-mind-os",
+  "origin_name": "origin",
+  "origin_url": "https://github.com/kb4beast/hive-mind-os.git",
+  "origin_push_url": "https://github.com/kb4beast/hive-mind-os.git",
+  "supersedes": {
+    "recovery_id": "builder-330-stale-candidate-recovery-v1",
+    "court_digest": "sha256:b3cbb1178dde47c22d365218cc306e6aa31a59af252782a5edf572ab5858e69a",
+    "appeals_digest": "sha256:52c32912394146f36cfa55e11f5777da9d81b18885059408c4c791d186a54607",
+    "replan_digest": "sha256:afeda169e182db86dc8309d08493ce4a00f3ce806c96231be8ca2e18fcb28a13",
+    "evidence_digest": "sha256:fa08e2cbd40acfe15b6d42c7005348b63b414d586814d8d4257abaffd7c66d06",
+    "bootstrap_digest": "sha256:40ae612644dbff1fe6323eff5e2f17605cfd9b03ff11b06b27a424b21627f975",
+    "capability_commit": "b8ed8273b8819250a0e7850550d3335e7446d590",
+    "expected_remote_head": "93a9c46b57fe581216021e791e61403b09494c5f"
+  },
+  "incident_release": {
+    "branch": "release/hive-mind-os-singleton-20260810-r2",
+    "commit": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+    "tree": "2a5b94489c368c0e3798c2d38d85f7631adb8604",
+    "parents": [
+      "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58",
+      "c3ff90ec9b8edad198521ad08b965bd669dfab1e"
+    ]
+  },
+  "protected_main": {
+    "ref": "refs/heads/main",
+    "commit": "8bcecb7f6a182f86d30f9b9696c9720b6e06a0c8"
+  },
+  "branch": "autopilot/builder-330",
+  "source_ref": "refs/heads/autopilot/builder-330",
+  "expected_remote_head": "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+  "expected_remote_tree": "ecdcc269ecfbfe5addcfae6ba4e2e670e4e51964",
+  "archive_ref": "refs/hive-mind-autopilot/archive/builder-330/01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+  "legacy_archive_ref": "refs/hive-mind-autopilot/archive/builder-330/93a9c46b57fe581216021e791e61403b09494c5f",
+  "forensic_chain": {
+    "old_claim": "1268050ff22f3af5338adf16284b9083aafd8bf1",
+    "old_claim_parent": "01ca563a8a11fddde6f698abe42d10db3dd1bc71",
+    "old_claim_tree": "39874376c7fdf884c8aceb26faf936561ac24b63",
+    "old_claim_payload_digest": "sha256:9ef675e86bc40c5f4260153641913ecc6097d57442c765ff347428962e9d86a6",
+    "old_candidate": "93a9c46b57fe581216021e791e61403b09494c5f",
+    "old_candidate_tree": "0b7c26beb8d7cfbf1752c7625d3cdb0dce87c556",
+    "legacy_merge": "590b40a9f7536e9629e7dbd1b8163a5f29f3f2ab",
+    "legacy_merge_parents": [
+      "681d33527616e001ec98ce34b5dbc5272242e842",
+      "93a9c46b57fe581216021e791e61403b09494c5f"
+    ],
+    "legacy_merge_tree": "4ec8ddb09cc99467fbcc736e3b0e0c904d4590a0",
+    "foreign_base": "359a5c5ff8d1eae4566661f3547b33d80dc1a679",
+    "foreign_base_parent": "590b40a9f7536e9629e7dbd1b8163a5f29f3f2ab",
+    "foreign_base_tree": "7978862274926139e3c5507b881e7320cb71bbe1",
+    "repair_claim": "64ca3f7084f6a96c564efa8ea3f7c75de37d1b72",
+    "repair_claim_parent": "359a5c5ff8d1eae4566661f3547b33d80dc1a679",
+    "repair_claim_tree": "7978862274926139e3c5507b881e7320cb71bbe1",
+    "repair_claim_payload_digest": "sha256:48d4ea46b27159b7762579a3aaa0cb6dd07d7b940a037ed4819b6cd3ed4d0406",
+    "candidate": "e34824db0ceb246b35f7aca27aed0b38e156a803",
+    "candidate_parent": "64ca3f7084f6a96c564efa8ea3f7c75de37d1b72",
+    "candidate_tree": "ecdcc269ecfbfe5addcfae6ba4e2e670e4e51964",
+    "receipt": "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+    "receipt_parent": "e34824db0ceb246b35f7aca27aed0b38e156a803",
+    "receipt_tree": "ecdcc269ecfbfe5addcfae6ba4e2e670e4e51964",
+    "receipt_payload_digest": "sha256:99ba1cf456234e2245f909f0284fdfd19f4544fe9cc9d4b3d74eeee36297bb03",
+    "receipt_pr": null
+  },
+  "aggregate_quarantine": {
+    "r4_ref": "refs/heads/release/hive-mind-os-singleton-20260811-r4",
+    "r4_head": "344f87f77a9a3433444d209cc2a3d21f6996ff4f",
+    "r4_head_tree": "9e68f956ea9fa4c97611976c0231f92315f61ec5",
+    "prior_r4_head": "b36ca7d335e3e46fffdc9129c2fc49d89e235e84",
+    "adverse_extension": {
+      "commit": "344f87f77a9a3433444d209cc2a3d21f6996ff4f",
+      "parent": "b36ca7d335e3e46fffdc9129c2fc49d89e235e84",
+      "tree": "9e68f956ea9fa4c97611976c0231f92315f61ec5",
+      "authored_at": "2026-08-11T18:25:14Z",
+      "committed_at": "2026-08-11T18:25:14Z",
+      "subject": "Add token-aware root-mediated sidecars",
+      "changed_paths": [
+        ".autopilot/README.md",
+        ".autopilot/bin/host_execution.py",
+        ".autopilot/bin/orchestration.py",
+        ".autopilot/bin/sidecar_execution.py",
+        ".autopilot/orchestration-policy.json",
+        ".autopilot/orchestration-policy.schema.json",
+        ".autopilot/sidecar-bindings.lock",
+        ".autopilot/tests/test_host_execution.py",
+        ".autopilot/tests/test_sidecar_execution.py",
+        ".autopilot/tests/test_workflow_policy.py",
+        ".autopilot/workflow-policy.json",
+        ".gitignore",
+        "docs/architecture/ADR-061-TOKEN-AWARE-ROOT-MEDIATED-SIDECARS.md",
+        "docs/architecture/ADR_INDEX.md"
+      ]
+    },
+    "canonical_receipt_merge": "46c04b7f81e21a5c212b6bb40eaabb2bfe44049c",
+    "canonical_receipt_merge_parents": [
+      "0c8d24002acde8857ab87b80f1370c28dcd83367",
+      "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64"
+    ],
+    "canonical_receipt_merge_tree": "6d6ec5fe2e3fd6822ced591d1192cfd566a048aa",
+    "other_candidate": "281453a11ce92f46fd31e4401e92f33e28cb35b5",
+    "other_candidate_parent": "359a5c5ff8d1eae4566661f3547b33d80dc1a679",
+    "other_receipt": "0654b024bc609374f119b7b476fc59c79bc1c192",
+    "other_receipt_digest": "sha256:99b71d78704b339a4236b6fe70a40ad81f8f904ff8b77fd7c2cdbe9cf9e471a0",
+    "other_receipt_merge": "744333fb76b514ecd27f94c70c825124ddc6d318",
+    "other_receipt_merge_parents": [
+      "5557c5fa7a0f80ed1ece8a3dfa0420128ce4f3f9",
+      "0654b024bc609374f119b7b476fc59c79bc1c192"
+    ],
+    "other_receipt_merge_tree": "6e0a915d803c389c9364378fad16ca0d47014f43",
+    "expected_builder_receipts": [
+      "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+      "0654b024bc609374f119b7b476fc59c79bc1c192"
+    ],
+    "pull_request": {
+      "number": 139,
+      "state": "open",
+      "draft": true,
+      "created_at": "2026-08-11T16:29:01Z",
+      "base_ref": "release/hive-mind-os-singleton-20260810-r2",
+      "base_sha": "cfe17ff7d6b06bdaa42e9ba6ec2a75a9c66c6a58",
+      "head_ref": "release/hive-mind-os-singleton-20260811-r4",
+      "head_sha": "344f87f77a9a3433444d209cc2a3d21f6996ff4f",
+      "updated_at": "2026-08-11T18:25:33Z",
+      "mergeable": false,
+      "mergeable_state": "dirty",
+      "prior_snapshot_digest": "sha256:80bc11dd427dae3c8a19e3bb68bb45aed328fb8b975d198fca4c6c33a2ea9d86",
+      "snapshot_digest": "sha256:caf8b2f88d2ce24557beceb394e0707a685d261b77b54358c2c80ea7a7cf425c",
+      "retrieved_at": "2026-08-11T18:35:00Z",
+      "source": "github-graphql-and-rest:kb4beast/hive-mind-os#139"
+    }
+  },
+  "court_disposition_digest": "sha256:04d49b160b061f770f320c377505a2a90d8894158bfa5f5fec8bed7aabf03c8d",
+  "appeals_ordering_disposition_digest": "sha256:3ddc737ef9556fc79aefec8d2d44ce821bf1984f9bc32c443a2e1a8f159ba1d8",
+  "preserved_candidate_paths": [
+    "src/hive_mind_os/brain_kernel/builder.py",
+    "src/hive_mind_os/cortex/repository/builder_adapter.py",
+    "tests/test_hive_cortex_builder.py"
+  ],
+  "execution_release_constraints": [
+    "Execution release descends from exact G and contains the separately pinned v2 capability.",
+    "G-to-execution changes none of the three Builder paths.",
+    "Execution release contains none of b36ca7d, 46c04b7, 744333f, 0654b02, or 01ee3ec ancestry.",
+    "Live main remains exact 8bcecb7 and live r4/PR139 metadata remains exact before and after CAS."
+  ],
+  "state_machine": [
+    "SEALED_STOP",
+    "VERIFIED_REPAIR_REQUIRED",
+    "LEASE_ACTIVE",
+    "PREPARED",
+    "REMOTE_RETIRED_PENDING_VERIFICATION",
+    "RETIRED",
+    "FRESH_STATE_REQUIRED",
+    "RECLAIM_ELIGIBLE",
+    "FRESH_CLAIMED"
+  ],
+  "required_sequence": [
+    "verify_v1_authority_is_superseded_and_cannot_match_live_head",
+    "verify_current_release_descends_G_contains_v2_capability_and_excludes_quarantine_ancestry",
+    "verify_shared_repository_validation_mutex_and_exact_builder_retirement_lease",
+    "authenticate_literal_origin_main_release_builder_r4_and_PR139",
+    "fetch_exact_builder_and_r4_refs_to_bounded_local_refs",
+    "verify_full_old_foreign_receipt_and_duplicate_quarantine_topology",
+    "verify_both_archive_refs_absent",
+    "persist_PREPARED_intent_bound_to_authority_release_snapshot_doctor_PR139_and_lease",
+    "atomically_archive_01ee3ec_and_delete_exact_canonical_source",
+    "persist_REMOTE_RETIRED_PENDING_VERIFICATION_before_post_CAS_checks",
+    "verify_archive_tree_ancestry_payload_scope_and_PR139_release_main_r4_stability",
+    "persist_RETIRED_execution_before_append_only_audit_cleanup",
+    "install_fresh_authenticated_snapshot_proving_source_absent_archive_exact_and_PR139_quarantined",
+    "reconcile_exact_current_singleton_target_and_run_full_doctor_status",
+    "dispatch_explicit_builder_START_NOW",
+    "claim_fresh_canonical_builder_branch_from_then_current_release",
+    "restore_repair_and_independently_verify_exact_three_path_candidate"
+  ],
+  "constraints": [
+    "No mutation of main, singleton release, r4, PR139, either r4 receipt, either r4 receipt merge, or any protected branch.",
+    "No generic retirement, caller-selected remote/ref/SHA/archive/PR, force push, rebase, squash, or authority reuse.",
+    "PR139 is never a Builder node PR and neither quarantined r4 receipt is resolved as a valid durable pair.",
+    "Every ambiguous source/archive/state/lease/release/PR/receipt combination becomes ADVERSE and fails closed."
+  ],
+  "rollback": "Before any FRESH_CLAIMED transition, atomically restore only refs/heads/autopilot/builder-330 to exact 01ee3ec and delete only the exact v2 archive under matching leases after re-authenticating G containment, PR139/r4/main stability, and absence of a replacement claim. After a fresh claim, preserve both histories and require a separately judged appeal."
+}

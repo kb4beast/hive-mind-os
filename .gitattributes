@@ -5,6 +5,7 @@
 *.toml text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+.autopilot/evidence/orch-300-v1-preserved-two-file.patch.gz.b64 text eol=lf
 
 # Source exhibits are evidentiary bytes. Never normalize line endings or text diffs.
 evidence/sources/**/raw/** -text -diff

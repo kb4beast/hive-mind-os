@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "appeals_id": "appeals-builder-330-r4-successor-ordering-20260811",
+  "node_id": "BUILDER-330",
+  "decision": "ADAPT",
+  "preserves_court_disposition": "ADAPT",
+  "court_disposition_digest": "sha256:04d49b160b061f770f320c377505a2a90d8894158bfa5f5fec8bed7aabf03c8d",
+  "appeals_judge_identity": "appeals:builder-330-independent-r4-successor-judge",
+  "supersedes_recovery_id": "builder-330-stale-candidate-recovery-v1",
+  "successor_recovery_id": "builder-330-r4-foreign-successor-recovery-v2",
+  "incident_release_sha": "9ea57b8ee1bb630b4fe3a8350e1629c4fb4a4379",
+  "canonical_branch": "autopilot/builder-330",
+  "canonical_head": "01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+  "archive_ref": "refs/hive-mind-autopilot/archive/builder-330/01ee3ec1bd3bfb0bc18bbdea70a428b16b96ee64",
+  "aggregate_pr_number": 139,
+  "finding": "The current canonical Builder head may be archived and retired only by a current singleton release that descends from G, contains the separately sealed v2 capability, excludes every quarantined r4 receipt and merge, and re-authenticates PR 139 as unchanged aggregate evidence before and after the atomic transaction. The resulting absence of the Builder branch is not a dispatch grant: fresh state, reconciliation, doctor, status, and explicit START NOW remain mandatory.",
+  "constraints": [
+    "Never move or mutate main, the canonical singleton release, the r4 branch, PR 139, either quarantined receipt, or either r4 receipt merge.",
+    "Never interpret PR 139 as the Builder node PR or set a successor Builder receipt pr field to 139.",
+    "Never resolve the two r4 Builder receipts as an authorized old/new durable pair.",
+    "Never use the v1 authority, the legacy 93a archive, caller-selected refs, or a generic branch-retirement interface.",
+    "Never execute if G-to-current-release changes any Builder path or if current release contains r4, 46c04b7, 744333f, 0654b02, or 01ee3ec ancestry."
+  ],
+  "rollback": "Before any fresh Builder claim, restore only refs/heads/autopilot/builder-330 to exact 01ee3ec and delete only the exact v2 archive in one atomic leased transaction. After any fresh claim, preserve all histories and require a separately judged appeal."
+}

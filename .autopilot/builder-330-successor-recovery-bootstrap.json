@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recovery_id": "builder-330-r4-foreign-successor-recovery-v2",
+  "supersedes_recovery_id": "builder-330-stale-candidate-recovery-v1",
+  "supersedes_bootstrap_digest": "sha256:40ae612644dbff1fe6323eff5e2f17605cfd9b03ff11b06b27a424b21627f975",
+  "court_disposition_digest": "sha256:04d49b160b061f770f320c377505a2a90d8894158bfa5f5fec8bed7aabf03c8d",
+  "appeals_ordering_disposition_digest": "sha256:3ddc737ef9556fc79aefec8d2d44ce821bf1984f9bc32c443a2e1a8f159ba1d8",
+  "replan_digest": "sha256:3f152fd7d1bcee6fd23f97932ca2b5eba9205ca02da6f64a1a134f7b79f0f4ad",
+  "evidence_record_digest": "sha256:4348caec76b78cd13825067b228efa060f3f3f1a79a54fc0630fb701e8c6698f",
+  "capability_commit": "0000000000000000000000000000000000000000"
+}
