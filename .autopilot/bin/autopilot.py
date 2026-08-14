@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Sequence
@@ -64,6 +66,91 @@ RETIREMENT_COURT_DOCUMENT = ".autopilot/receipt-branch-retirement-court.json"
 RETIREMENT_AUDIT = "receipt-branch-retirement-audit.jsonl"
 RETIREMENT_RECOVERY = "receipt-branch-retirement-recovery.json"
 RETIREMENT_EXECUTION = "receipt-branch-retirement-execution.json"
+RUNTIME_IDENTITY_KIND = "hive-mind-runtime-identity-v1"
+MAX_RUNTIME_IDENTITY_BYTES = 64 * 1024
+
+
+def _runtime_identity_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise AutopilotError(f"runtime identity contains duplicate key {key!r}")
+        value[key] = item
+    return value
+
+
+def _read_runtime_identity(path: Path) -> Mapping[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise AutopilotError("runtime identity must be a regular non-symlink file")
+    body = path.read_bytes()
+    if len(body) > MAX_RUNTIME_IDENTITY_BYTES:
+        raise AutopilotError("runtime identity exceeds its size bound")
+    try:
+        value = json.loads(
+            body.decode("utf-8"),
+            object_pairs_hook=_runtime_identity_pairs,
+            parse_constant=lambda token: (_ for _ in ()).throw(
+                ValueError(f"invalid JSON constant {token}")
+            ),
+        )
+    except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+        if isinstance(error, AutopilotError):
+            raise
+        raise AutopilotError(f"runtime identity is corrupt: {error}") from error
+    if not isinstance(value, Mapping):
+        raise AutopilotError("runtime identity must be a JSON object")
+    return value
+
+
+@contextlib.contextmanager
+def _exclusive_runtime_lock(path: Path, *, timeout_seconds: float = 30.0):
+    """Cross-process advisory lock for one explicitly shared runtime state."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise AutopilotError("runtime lock may not be a symbolic link")
+    descriptor = os.open(
+        path,
+        os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
+        0o600,
+    )
+    locked = False
+    deadline = time.monotonic() + timeout_seconds
+    try:
+        if os.fstat(descriptor).st_size == 0:
+            os.write(descriptor, b"0")
+            os.fsync(descriptor)
+        while not locked:
+            try:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locked = True
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise AutopilotError(
+                        "runtime state is fenced by another controller"
+                    ) from None
+                time.sleep(0.01)
+        yield
+    finally:
+        if locked:
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
 
 EXPLORER_COURT_DISPOSITION = {
     "schema_version": 1,
@@ -537,7 +624,62 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
                 issues.append("dispatcher release was issued before receipt retirement recovery")
         return tuple(dict.fromkeys(issues))
 
+    def _bind_runtime_identity(self, *, max_sessions: int) -> None:
+        target = self.control.get("target")
+        repository = target.get("repository") if isinstance(target, Mapping) else None
+        identity = {
+            "schema_version": 1,
+            "kind": RUNTIME_IDENTITY_KIND,
+            "plan_id": self.control.get("plan_id"),
+            "plan_fingerprint": self.expected_plan_fingerprint,
+            "repository": repository,
+            "target_branch": self.target_branch,
+            "session_cap": max_sessions,
+        }
+        if not all(
+            isinstance(identity[key], str) and str(identity[key]).strip()
+            for key in ("plan_id", "plan_fingerprint", "repository", "target_branch")
+        ):
+            raise AutopilotError("runtime identity is incomplete")
+        path = self.state_dir / "runtime-identity.json"
+        if path.exists() or path.is_symlink():
+            stored = _read_runtime_identity(path)
+            if stored != identity:
+                competing = dict(identity)
+                competing["session_cap"] = stored.get("session_cap")
+                if stored == competing:
+                    raise AutopilotError(
+                        "runtime session cap is sealed at "
+                        f"{stored.get('session_cap')}; requested {max_sessions}"
+                    )
+                raise AutopilotError(
+                    "runtime state belongs to another plan, namespace, or target"
+                )
+            return
+        atomic_write_json(path, identity)
+
     def dispatch(
+        self,
+        *,
+        actor: str,
+        requested_nodes: Sequence[str] = (),
+        max_sessions: int = 8,
+    ) -> Mapping[str, Any]:
+        if (
+            not isinstance(max_sessions, int)
+            or isinstance(max_sessions, bool)
+            or max_sessions < 1
+        ):
+            raise AutopilotError("runtime session cap must be a positive integer")
+        with _exclusive_runtime_lock(self.state_dir / "dispatcher.lock"):
+            self._bind_runtime_identity(max_sessions=max_sessions)
+            return self._dispatch_locked(
+                actor=actor,
+                requested_nodes=requested_nodes,
+                max_sessions=max_sessions,
+            )
+
+    def _dispatch_locked(
         self,
         *,
         actor: str,
@@ -557,6 +699,22 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         snapshot_digest = self._snapshot_digest()
         if reconciliation_digest is None or snapshot_digest is None:
             raise AutopilotError("dispatcher release requires current reconciliation and GitHub snapshot evidence")
+        if self.current_release_path.is_file():
+            existing_release = read_json(self.current_release_path)
+            if (
+                isinstance(existing_release, Mapping)
+                and not self._release_issues(existing_release)
+                and existing_release.get("target_sha") == self.current_target_sha()
+                and existing_release.get("plan_fingerprint")
+                == self.expected_plan_fingerprint
+            ):
+                sealed_cap = existing_release.get("session_cap")
+                if not isinstance(sealed_cap, int) or isinstance(sealed_cap, bool):
+                    raise AutopilotError("current runtime release has no valid session cap")
+                if sealed_cap != max_sessions:
+                    raise AutopilotError(
+                        f"runtime session cap is sealed at {sealed_cap}; requested {max_sessions}"
+                    )
         base_status = self._base_status()
         ready = base_status.get("ready", [])
         eligible = [str(item) for item in ready] if isinstance(ready, list) else []
@@ -738,6 +896,11 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="autopilot")
     root.add_argument("--repo-root", default=".")
+    root.add_argument(
+        "--state-dir",
+        default=os.environ.get("HIVE_MIND_RUNTIME_STATE_DIR"),
+        help="shared namespaced runtime state (or HIVE_MIND_RUNTIME_STATE_DIR)",
+    )
     commands = root.add_subparsers(dest="command", required=True)
 
     doctor = commands.add_parser("doctor")
@@ -1027,7 +1190,7 @@ def main(argv: list[str] | None = None) -> int:
             # Plan-only analysis: deliberately does not construct a live control
             # plane so any repository's plan.json can be compiled and linted.
             return run_dag_standard_command(args)
-        plane = ControlPlane(Path(args.repo_root))
+        plane = ControlPlane(Path(args.repo_root), state_dir=args.state_dir)
         if args.command == "doctor":
             result = plane.doctor(
                 run_controller_tests=not args.skip_controller_tests

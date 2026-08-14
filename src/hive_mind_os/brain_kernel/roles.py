@@ -149,9 +149,16 @@ def append_role_result(
     if result.result_digest != result_digest(result):
         raise RoleProtocolError("role result digest does not bind its content")
     events = store.events()
+    event_id = f"role-result:{result.result_digest}"
+    existing = next((item for item in events if item["event_id"] == event_id), None)
+    previous_digest = (
+        existing["previous_digest"]
+        if existing is not None
+        else (events[-1]["digest"] if events else None)
+    )
     return store.append(
         KernelEvent(
-            event_id=f"role-result:{result.result_digest}",
+            event_id=event_id,
             mission_id=result.mission_id,
             event_type="role.result",
             actor_id=result.executor_id,
@@ -160,7 +167,7 @@ def append_role_result(
             work_id=result.work_id,
             attempt_id=result.attempt_id,
             actor_role=result.role,
-            previous_digest=events[-1]["digest"] if events else None,
+            previous_digest=previous_digest,
         ),
         idempotency_key=result.result_digest,
     )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from hashlib import sha256
 from pathlib import Path
 from threading import RLock
 from typing import Any, Iterable, Iterator, Mapping, cast
@@ -46,7 +47,6 @@ class KernelStore:
             if self.read_only:
                 with self._lock:
                     self._validate_open_locked(require_schema=True)
-                    list(self._events_locked())
             else:
                 with self._lock, self.connection:
                     self._bootstrap_locked()
@@ -247,6 +247,33 @@ class KernelStore:
                 ).fetchone()
                 if receipt is None or receipt["intent_digest"] != row["intent_digest"]:
                     raise KernelIntegrityError("effect receipt linkage is corrupt")
+        outbox_intents = {str(row["intent_digest"]) for row in outbox}
+        for receipt in self.connection.execute("SELECT * FROM effect_receipts"):
+            if str(receipt["intent_digest"]) not in outbox_intents:
+                raise KernelIntegrityError("effect receipt has no durable outbox intent")
+            try:
+                document = json.loads(str(receipt["receipt_json"]))
+            except (TypeError, json.JSONDecodeError) as error:
+                raise KernelIntegrityError("effect receipt JSON is corrupt") from error
+            encoded = canonical_bytes(document).decode("utf-8")
+            if encoded != str(receipt["receipt_json"]):
+                raise KernelIntegrityError("effect receipt JSON is not canonical")
+            if "sha256:" + sha256(encoded.encode("utf-8")).hexdigest() != receipt["receipt_digest"]:
+                raise KernelIntegrityError("effect receipt digest is corrupt")
+        allowed_reconciliation_states = {"reconciliation_required", "reconciled"}
+        for reconciliation in self.connection.execute(
+            "SELECT * FROM effect_reconciliations"
+        ):
+            if str(reconciliation["intent_digest"]) not in outbox_intents:
+                raise KernelIntegrityError("effect reconciliation has no durable outbox intent")
+            if reconciliation["state"] not in allowed_reconciliation_states:
+                raise KernelIntegrityError("effect reconciliation state is invalid")
+            try:
+                evidence = json.loads(str(reconciliation["evidence_json"]))
+            except (TypeError, json.JSONDecodeError) as error:
+                raise KernelIntegrityError("effect reconciliation JSON is corrupt") from error
+            if canonical_bytes(evidence).decode("utf-8") != reconciliation["evidence_json"]:
+                raise KernelIntegrityError("effect reconciliation JSON is not canonical")
 
     def append(
         self,

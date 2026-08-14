@@ -640,16 +640,50 @@ class MissionStore:
             "recorded_at": utc_now(),
         }
         if _file_exists(path):
-            stored = json.loads(_read_bytes(path).decode("utf-8"))
-            if (
-                stored.get("intent_digest") != record["intent_digest"]
-                or stored.get("idempotency_key") != record["idempotency_key"]
-            ):
-                raise StoreIntegrityError(
-                    "write-ahead effect record binds a different intent"
-                )
-            return stored
+            return self._validated_effect_intent_record(
+                checkpoint,
+                _read_bytes(path),
+            )
         _atomic_write(path, (_canonical_json(record) + "\n").encode("utf-8"))
+        return record
+
+    def _validated_effect_intent_record(
+        self,
+        checkpoint: StepCheckpoint,
+        content: bytes,
+    ) -> dict[str, Any]:
+        record = _strict_json_document(content, label="write-ahead effect record")
+        expected_fields = {
+            "schema_version",
+            "mission_id",
+            "step_index",
+            "intent_digest",
+            "idempotency_key",
+            "action_id",
+            "action_kind",
+            "state_ref",
+            "recorded_at",
+        }
+        if set(record) != expected_fields:
+            raise StoreIntegrityError(
+                "write-ahead effect record has unknown or missing fields"
+            )
+        expected = {
+            "schema_version": 1,
+            "mission_id": checkpoint.mission_id,
+            "step_index": checkpoint.step_index,
+            "intent_digest": checkpoint.intent_digest,
+            "idempotency_key": checkpoint.intent["idempotency_key"],
+            "action_id": checkpoint.intent["action_id"],
+            "action_kind": checkpoint.intent["kind"],
+            "state_ref": checkpoint.intent["state_ref"],
+        }
+        mismatched = [key for key, value in expected.items() if record.get(key) != value]
+        if mismatched or not isinstance(record.get("recorded_at"), str):
+            raise StoreIntegrityError(
+                "write-ahead effect record binds a different intent: "
+                + ", ".join(mismatched or ["recorded_at"])
+            )
         return record
 
     def find_effect_intent(
@@ -662,12 +696,7 @@ class MissionStore:
         )
         if not _file_exists(path):
             return None
-        record = json.loads(_read_bytes(path).decode("utf-8"))
-        if record.get("intent_digest") != checkpoint.intent_digest:
-            raise StoreIntegrityError(
-                "write-ahead effect record belongs to another intent"
-            )
-        return record
+        return self._validated_effect_intent_record(checkpoint, _read_bytes(path))
 
     def begin_effect(self, mission_id: str, step_index: int) -> dict[str, Any]:
         """Persist the write-ahead effect record, then claim the execution."""

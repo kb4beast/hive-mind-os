@@ -120,7 +120,7 @@ class AttendedHostTests(unittest.TestCase):
         })
         self.assertEqual(created["kind"], attended.CREATE_KIND)
         self.assertEqual(created["idempotency_key"], INSTRUCTION)
-        card = self.root / ".autopilot" / "state" / "host" / "cards" / f"{NODE}.md"
+        card = self.host.cards_dir / f"{created['task_id']}.md"
         self.assertIn("rendered node contract", card.read_text(encoding="utf-8"))
 
     def test_lookup_enables_crash_safe_adoption(self) -> None:
@@ -148,7 +148,7 @@ class AttendedHostTests(unittest.TestCase):
     def test_identical_create_reuses_one_durable_binding(self) -> None:
         first = self.create()
         ledger_before = self.host.ledger_path.read_bytes()
-        card = self.host.cards_dir / f"{NODE}.md"
+        card = self.host.cards_dir / f"{first['task_id']}.md"
         card_before = card.read_bytes()
         second = self.create()
         self.assertEqual(first["task_id"], second["task_id"])
@@ -165,6 +165,13 @@ class AttendedHostTests(unittest.TestCase):
                 prompt="competing instructions",
                 idempotency_key=INSTRUCTION,
             )
+
+    def test_general_ledger_read_rejects_a_tampered_card(self) -> None:
+        created = self.create()
+        card = self.host.cards_dir / f"{created['task_id']}.md"
+        card.write_text("competing card\n", encoding="utf-8")
+        with self.assertRaisesRegex(attended.AttendedHostError, "card digest"):
+            self.host.pending_cards()
 
     def test_task_binding_rejects_a_traversing_node_id(self) -> None:
         with self.assertRaisesRegex(attended.AttendedHostError, "unsafe"):

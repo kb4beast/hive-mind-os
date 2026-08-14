@@ -353,6 +353,7 @@ class PlanGraph:
         nodes: Iterable[Mapping[str, Any]],
         *,
         source: Path | None = None,
+        plan_digest: str | None = None,
     ) -> None:
         self.source = source
         self._nodes: dict[str, Mapping[str, Any]] = {}
@@ -369,6 +370,19 @@ class PlanGraph:
             self._nodes[node_id] = item
         if not self._nodes:
             raise DagStandardError("plan contains no nodes")
+        if plan_digest is None:
+            material = {
+                "nodes": [dict(self._nodes[node_id]) for node_id in sorted(self._nodes)]
+            }
+            encoded = json.dumps(
+                material,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+            plan_digest = "sha256:" + hashlib.sha256(encoded).hexdigest()
+        self.plan_digest = plan_digest
 
     # -- basic access -----------------------------------------------------
 
@@ -529,7 +543,18 @@ def load_plan_graph(path: str | Path) -> PlanGraph:
     nodes = document.get("nodes")
     if not isinstance(nodes, list):
         raise DagStandardError("plan.nodes must be a list")
-    return PlanGraph(nodes, source=plan_path)
+    encoded = json.dumps(
+        document,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return PlanGraph(
+        nodes,
+        source=plan_path,
+        plan_digest="sha256:" + hashlib.sha256(encoded).hexdigest(),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -569,6 +594,7 @@ class Frontier:
     """The sole resumable dispatch frontier under one host-capacity lease."""
 
     state: str
+    plan_digest: str
     max_sessions: int
     round_id: str | None
     level: int | None
@@ -582,6 +608,7 @@ class Frontier:
     def frontier_id(self) -> str:
         material = {
             "state": self.state,
+            "plan_digest": self.plan_digest,
             "max_sessions": self.max_sessions,
             "round_id": self.round_id,
             "level": self.level,
@@ -597,6 +624,7 @@ class Frontier:
         return {
             "frontier_id": self.frontier_id,
             "state": self.state,
+            "plan_digest": self.plan_digest,
             "max_sessions": self.max_sessions,
             "round_id": self.round_id,
             "level": self.level,
@@ -850,6 +878,12 @@ def compile_rounds(
 
     if max_sessions < 1:
         raise DagStandardError("max_sessions must be at least 1")
+    graph_issues = _check_graph_validity(graph)
+    if graph_issues:
+        raise DagStandardError(
+            "invalid dependency graph: "
+            + "; ".join(item.message for item in graph_issues)
+        )
     if command_prefix is None:
         command_prefix = dispatch_command_prefix(plan_path=graph.source)
     levels = graph.levels()
@@ -993,6 +1027,7 @@ def select_frontier(
             raise DagStandardError("active nodes remain after every compiled round is complete")
         return Frontier(
             state="PLAN_QUIESCENT",
+            plan_digest=graph.plan_digest,
             max_sessions=max_sessions,
             round_id=None,
             level=None,
@@ -1027,6 +1062,7 @@ def select_frontier(
     )
     return Frontier(
         state=state,
+        plan_digest=graph.plan_digest,
         max_sessions=max_sessions,
         round_id=current.round_id,
         level=current.level,
@@ -1993,7 +2029,10 @@ def lint_plan(
     repo_root: Path | None = None,
     semantic_ordering: bool = True,
 ) -> tuple[Finding, ...]:
-    findings = _check_graph_validity(graph)
+    graph_findings = _check_graph_validity(graph)
+    if graph_findings:
+        return _sort_findings(graph_findings)
+    findings: list[Finding] = []
     findings.extend(_check_scope_syntax(graph))
     findings.extend(_check_parallel_safe_declaration(graph))
     findings.extend(_check_contract_completeness(graph))

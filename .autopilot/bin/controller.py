@@ -313,6 +313,12 @@ def atomic_write_json(path: Path, value: object) -> None:
             if not windows_replace_retry_enabled() or attempt == 4:
                 raise
             time.sleep(0.01 * (2**attempt))
+    if os.name != "nt":
+        descriptor = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
 
 
 def append_jsonl(path: Path, value: Mapping[str, object]) -> None:
@@ -433,6 +439,7 @@ class ControlPlane:
         repo_root: str | Path,
         *,
         clock: Callable[[], datetime] = utc_now,
+        state_dir: str | Path | None = None,
     ) -> None:
         self.repo_root = Path(repo_root).resolve()
         self.ap_root = self.repo_root / ".autopilot"
@@ -443,7 +450,11 @@ class ControlPlane:
         self.routing_path = self.ap_root / "model-routing.json"
         self.role_matrix_path = self.ap_root / "role-wiring.json"
         self.acceptance_path = self.ap_root / "acceptance-matrix.json"
-        self.state_dir = self.ap_root / "state"
+        self.state_dir = (
+            Path(state_dir).resolve()
+            if state_dir is not None
+            else self.ap_root / "state"
+        )
         self.claims_dir = self.state_dir / "claims"
         self.receipts_dir = self.state_dir / "receipts"
         self.failures_dir = self.state_dir / "failures"

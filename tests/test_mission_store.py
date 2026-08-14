@@ -570,15 +570,25 @@ def _case_competing_effect_claim_and_missing_wal_fail_closed(tmp_path: Path) -> 
                 "IDEMPOTENCY-WAL-CAS-1201-push",
             ),
         )
-        store.begin_effect(mission_id, checkpoint.step_index)
+        written_ahead = store.begin_effect(mission_id, checkpoint.step_index)
         with _assert_raises(StoreIntegrityError, match="already claimed"):
             store.begin_effect(mission_id, checkpoint.step_index)
 
-        store.effect_intent_path(
+        intent_path = store.effect_intent_path(
             mission_id,
             checkpoint.intent_digest,
-        ).unlink()
+        )
+        intent_path.unlink()
         with _assert_raises(StoreIntegrityError, match="missing its write-ahead"):
+            store.unreconciled_effects(mission_id)
+        forged = {**written_ahead, "action_id": "ACT-COMPETING"}
+        _atomic_write(
+            intent_path,
+            (json.dumps(forged, sort_keys=True, separators=(",", ":")) + "\n").encode(
+                "utf-8"
+            ),
+        )
+        with _assert_raises(StoreIntegrityError, match="different intent"):
             store.unreconciled_effects(mission_id)
     finally:
         store.close()

@@ -3,10 +3,10 @@
 ## Status
 
 Implemented as a bounded candidate on
-`codex/hive-os-dag-runtime-recovery-v1`. Promotion remains pending an
-independent Curator review and the repository CI gate. This ADR does not
-authorize deployment, ASP resealing, or mutation of any accepted execution
-ledger.
+`codex/hive-os-dag-runtime-recovery-v1`. The first checkpoint was independently
+remanded after adversarial review; the corrective follow-up remains pending a
+second Curator judgment and the repository CI gate. This ADR does not authorize
+deployment, ASP resealing, or mutation of any accepted execution ledger.
 
 ## Court record
 
@@ -29,14 +29,22 @@ Atomic claims considered:
    incoherent durable states.
 6. Bare Python in this worktree imported `hive_mind_os` from another live
    worktree, contaminating test and execution truth.
+7. Capacity and release state were still local to a worktree, so controllers
+   using different worktrees could not share a lock or immutable active cap.
+8. A completed plan with an expired validation lease could return an unwakeable
+   `WAITING` result instead of repairing the lease and becoming quiescent.
+9. Synthetic graphs accepted missing dependencies, frontier identities did not
+   bind plan content, legacy scheduler identities could duplicate after
+   migration, and receipt linkage was checked in only one direction.
 
 The Orchestrator/Builder identity is `codex:hive-os-recovery-v1`. Independent
 roles used during diagnosis were `architect:capacity-frontier`,
 `cross-examiner:loop-reconstruction`, and `steward:durable-store`. The
 candidate disposition is **adapt**: reuse the existing deterministic compiler
 as the sole frontier selector and harden the smallest stores on the execution
-path. Final judgment is intentionally reserved for a separately identified
-Curator after the candidate commit exists.
+path. The first independent Curator identity was
+`curator:os-candidate-review`; its disposition was **defer/remand**. Final
+judgment is reserved for a new review of the corrective commit.
 
 ## Context
 
@@ -60,8 +68,10 @@ release nor a local task card can manufacture completion.
 compiled round from three inputs: the sealed plan, accepted node identities,
 and active claim identities. It refuses unknown nodes, accepted/active overlap,
 active work outside the current round, and active work above runtime capacity.
-Its output binds the cap, round, completed members, active members, and newly
-releasable members in a SHA-256 frontier identity.
+Its output binds the cap, round, completed members, active members, newly
+releasable members, and a digest of the complete plan in a SHA-256 frontier
+identity. Compilation rejects duplicate node identities, unknown dependencies,
+and dependency cycles before producing any release.
 
 The mutating dispatcher consumes that frontier directly. Each release records
 the frontier identity, round identity, full round membership, and runtime cap.
@@ -69,12 +79,26 @@ An exact retry returns the existing release without appending history. The
 healer may redispatch only the selected round and must carry the same cap.
 Partially accepted rounds resume only their unaccepted members.
 
+The controller holds an advisory cross-process dispatcher lock while binding
+runtime state to the plan identity, plan fingerprint, repository, and target
+branch. Once a frontier is released, its runtime cap is immutable until that
+plan/target runtime state is retired. Every controller that may operate on the
+same execution **must** use the same absolute runtime state directory, either
+with `--state-dir <absolute-path>` or
+`HIVE_MIND_RUNTIME_STATE_DIR=<absolute-path>`. The default remains
+worktree-local for backwards compatibility and therefore does not coordinate
+separate worktrees.
+
 Plan completion and healing inactivity are distinct states:
 
 - `NO_REPAIR` means the healer has no authorized mutation;
 - `WAITING` means live runtime authority remains;
 - `PLAN_QUIESCENT` requires every compiled round complete and no active claim
   or validation lease.
+
+`WAITING` carries the earliest claim or validation-lease expiry as `wake_at`.
+With healing enabled, an expired validation lease is repaired before the
+quiescence decision rather than producing an unwakeable wait.
 
 ### External plans
 
@@ -89,15 +113,20 @@ responsible for converting that verified contract into sessions.
 - The attended-host ledger is size-bounded, duplicate-key rejecting, locked,
   atomically replaced, and bound to immutable node/card digests. An exact task
   retry is read-only; a competing instruction under the same key is rejected.
+  Card content is revalidated on every ledger read, and the ledger and cards
+  may live in shared runtime state outside either worktree.
 - Kernel-store startup validates schema version, SQLite integrity, canonical
-  effect intents, state-dependent fields, receipt linkage, and the event chain
-  before use. Exact event retries include their predecessor digest.
+  effect intents, state-dependent fields, bidirectional receipt linkage, and
+  reconciliation records before use. Read operations verify the event chain.
+  Exact event retries include their durable predecessor digest, including at
+  compatibility call sites that retry after the chain head advanced.
 - Mission effects use compare-and-swap claim semantics. Missing write-ahead
   records, unsafe mission/receipt paths, noncanonical or tampered receipts, and
   mismatched receipt contracts fail closed before checkpoint completion.
 - Scheduler identity includes mission, kind, payload, retry limit, and requested
-  start time. Claims may be mission/kind scoped; lease coherence and completion
-  mission identity are validated.
+  start time. Legacy rows are deterministically migrated to the same canonical
+  enqueue specification before accepting new work. Claims may be mission/kind
+  scoped; lease coherence and completion mission identity are validated.
 
 ### Source affinity
 
@@ -112,6 +141,9 @@ worktree, and package resources resolve from the same source tree.
   read-only from the deterministic frontier.
 - **Controller crash with active workers:** active claims consume the current
   frontier; later rounds cannot be selected.
+- **Competing worktree controller:** the shared lock serializes release and its
+  runtime binding rejects a different plan, repository, or target; an active
+  release rejects a changed cap.
 - **Competing task instruction:** immutable card digest mismatch fails closed.
 - **Torn or corrupt local JSON:** strict parsing and atomic replacement prevent
   an empty-store reset.
@@ -121,14 +153,24 @@ worktree, and package resources resolve from the same source tree.
   digest, canonical wrapper, schema, and intent bindings are all required.
 - **Foreign editable install:** source-affinity tests require the imported
   package and resources to reside under this checkout.
+- **Expired validation authority:** healing breaks only an expired lease and
+  then reevaluates the strict fixed point; live authority returns a timed wait.
 
 ## Migration and compatibility
 
 Existing scheduler databases gain the nullable enqueue-spec column. Legacy rows
-remain readable; every newly enqueued row carries and validates the stronger
-identity. Existing attended ledgers without card digests fail closed and require
-explicit operator migration rather than silent rewriting. No accepted DAG
-receipt, remote evidence ref, or ASP ledger is changed by this candidate.
+are upgraded transactionally to the canonical specification before validation;
+every newly enqueued row carries and validates the stronger identity. Existing
+attended ledgers without card digests, or with the old repository-relative card
+location, fail closed and require explicit operator migration rather than silent
+rewriting. No accepted DAG receipt, remote evidence ref, or ASP ledger is
+changed by this candidate.
+
+Concurrent worktrees require one deliberately chosen shared state directory.
+Using each worktree's default `.autopilot/state` preserves isolation but does
+not provide cross-worktree exclusion. Separate DAGs must still use distinct
+sealed execution namespaces and ledger/evidence refs; sharing controller state
+does not merge their evidence authorities.
 
 Conventional resident plans keep mutating dispatch commands, now with an
 explicit session cap. External plan consumers must use the frontier JSON
@@ -148,13 +190,17 @@ Focused tests cover:
 - 8-node levels split and advance as 3/3/2 frontiers;
 - partial accepted/active round recovery and later-round refusal;
 - capped mutating dispatch, exact read-only retry, and active-round resumption;
+- shared-state cross-worktree dispatch exclusion and immutable active capacity;
+- missing-dependency rejection and plan-bound frontier identities;
 - runnable external frontier assertions;
 - exact-wave healer behavior and distinct quiescence dispositions;
+- timed waits and expired validation-lease repair at apparent completion;
 - malformed, duplicate-key, conflicting, and traversing attended task state;
 - wrong-predecessor retry, unknown kernel schema, and incoherent effects;
+- bidirectional receipt/reconciliation linkage and canonical payload checks;
 - competing mission effects, missing WAL, receipt tamper, and path traversal;
 - cross-mission scheduler identity, scoped claims, incomplete leases, and
-  mission-rebinding denial;
+  mission-rebinding denial, including legacy identity migration;
 - bare-Python source and package-resource affinity.
 
 The repository-wide CI gate and independent promotion judgment remain required.

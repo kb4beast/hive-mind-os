@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from hashlib import sha256
 from pathlib import Path
 
 from hive_mind_os.scheduler import (
@@ -197,6 +198,58 @@ class SchedulerTests(unittest.TestCase):
         connection.close()
         with self.assertRaisesRegex(SchedulerIntegrityError, "incomplete lease"):
             Scheduler(self.root, clock=self.clock)
+
+    def test_legacy_identity_migrates_without_duplicate_enqueue(self) -> None:
+        job = self._enqueue()
+        self.scheduler.close()
+        connection = sqlite3.connect(self.root / "scheduler.sqlite3")
+        payload_json = connection.execute(
+            "SELECT payload_json FROM jobs WHERE id=?",
+            (job.id,),
+        ).fetchone()[0]
+        legacy_digest = "sha256:" + sha256(
+            ("test\0" + str(payload_json)).encode("utf-8")
+        ).hexdigest()
+        connection.execute(
+            """
+            UPDATE jobs SET enqueue_spec_json=NULL,payload_digest=? WHERE id=?
+            """,
+            (legacy_digest, job.id),
+        )
+        connection.commit()
+        connection.close()
+
+        self.scheduler = Scheduler(self.root, clock=self.clock)
+        retry = self._enqueue()
+        self.assertEqual(retry.id, job.id)
+        self.assertEqual(len(self.scheduler.jobs()), 1)
+
+    def test_corrupt_legacy_row_is_not_rewritten_during_failed_open(self) -> None:
+        job = self._enqueue()
+        self.scheduler.close()
+        database = self.root / "scheduler.sqlite3"
+        connection = sqlite3.connect(database)
+        legacy_digest = "sha256:" + "7" * 64
+        connection.execute(
+            """
+            UPDATE jobs
+            SET payload_json='{',enqueue_spec_json=NULL,payload_digest=?
+            WHERE id=?
+            """,
+            (legacy_digest, job.id),
+        )
+        connection.commit()
+        connection.close()
+
+        with self.assertRaisesRegex(SchedulerIntegrityError, "payload JSON"):
+            Scheduler(self.root, clock=self.clock)
+        connection = sqlite3.connect(database)
+        stored = connection.execute(
+            "SELECT enqueue_spec_json,payload_digest FROM jobs WHERE id=?",
+            (job.id,),
+        ).fetchone()
+        connection.close()
+        self.assertEqual(stored, (None, legacy_digest))
 
     def test_completion_cannot_rebind_a_job_to_another_mission(self) -> None:
         self._enqueue()

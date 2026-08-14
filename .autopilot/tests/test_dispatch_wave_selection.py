@@ -127,6 +127,70 @@ class DispatchWaveSelectionTests(unittest.TestCase):
                 max_sessions=2,
             )
 
+    def test_runtime_capacity_cannot_widen_after_the_first_release(self) -> None:
+        self._make_eligible(list(PARALLEL))
+        first = self.plane.dispatch(actor="test:dispatcher", max_sessions=2)
+        self.assertEqual(len(first["released_wave"]), 2)
+        self.plane.current_release_path.unlink()
+        with self.assertRaisesRegex(autopilot.AutopilotError, "sealed at 2"):
+            self.plane.dispatch(actor="test:competitor", max_sessions=3)
+
+    def test_invalid_capacity_does_not_bind_runtime_state(self) -> None:
+        with self.assertRaisesRegex(autopilot.AutopilotError, "positive integer"):
+            self.plane.dispatch(actor="test:dispatcher", max_sessions=0)
+        self.assertFalse((self.plane.state_dir / "runtime-identity.json").exists())
+
+    def test_two_controllers_share_one_explicit_runtime_fence(self) -> None:
+        shared = self.root.parent / "shared-runtime"
+        first = autopilot.ControlPlane(self.root, state_dir=shared)
+        second = autopilot.ControlPlane(self.root, state_dir=shared)
+        eligible = list(PARALLEL)
+        rows = [{"node_id": node_id, "state": "READY"} for node_id in eligible]
+        rows += [
+            {"node_id": node_id, "state": "COMPLETE"}
+            for node_id in first._nodes
+            if node_id not in eligible
+        ]
+        status = {"ready": eligible, "nodes": rows}
+        for plane in (first, second):
+            plane._base_status = lambda status=status: dict(status)  # type: ignore[method-assign]
+            plane.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
+            plane._reconciliation_digest = lambda: "sha256:" + "1" * 64  # type: ignore[method-assign]
+            plane._snapshot_digest = lambda: "sha256:" + "2" * 64  # type: ignore[method-assign]
+            plane._recovery_issues = lambda: ()  # type: ignore[method-assign]
+            plane.active_claims = lambda: {}  # type: ignore[method-assign]
+        first.dispatch(actor="test:first", max_sessions=2)
+        with self.assertRaisesRegex(autopilot.AutopilotError, "sealed at 2"):
+            second.dispatch(actor="test:second", max_sessions=3)
+
+    def test_shared_runtime_rejects_a_different_plan_identity(self) -> None:
+        shared = self.root.parent / "shared-runtime"
+        first = autopilot.ControlPlane(self.root, state_dir=shared)
+        second = autopilot.ControlPlane(self.root, state_dir=shared)
+        for plane in (first, second):
+            self._make_eligible(list(PARALLEL))
+            plane._base_status = self.plane._base_status  # type: ignore[method-assign]
+            plane.target_requires_reconciliation = lambda: False  # type: ignore[method-assign]
+            plane._reconciliation_digest = lambda: "sha256:" + "1" * 64  # type: ignore[method-assign]
+            plane._snapshot_digest = lambda: "sha256:" + "2" * 64  # type: ignore[method-assign]
+            plane._recovery_issues = lambda: ()  # type: ignore[method-assign]
+            plane.active_claims = lambda: {}  # type: ignore[method-assign]
+        first.dispatch(actor="test:first", max_sessions=2)
+        second.control = {**second.control, "plan_id": "competing-plan"}
+        with self.assertRaisesRegex(autopilot.AutopilotError, "another plan"):
+            second.dispatch(actor="test:second", max_sessions=2)
+
+    def test_corrupt_shared_runtime_identity_fails_closed(self) -> None:
+        self._make_eligible(list(PARALLEL))
+        self.plane.dispatch(actor="test:first", max_sessions=2)
+        identity = self.plane.state_dir / "runtime-identity.json"
+        identity.write_text(
+            '{"schema_version":1,"schema_version":1}\n',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(autopilot.AutopilotError, "duplicate key"):
+            self.plane.dispatch(actor="test:second", max_sessions=2)
+
     def test_identical_valid_dispatch_is_a_read_only_retry(self) -> None:
         self._make_eligible(list(PARALLEL))
         first = self.plane.dispatch(actor="test:dispatcher", max_sessions=2)

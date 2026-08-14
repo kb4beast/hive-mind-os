@@ -1252,6 +1252,19 @@ class RoundCompilationTests(unittest.TestCase):
         self.assertEqual(frontier.state, "PLAN_QUIESCENT")
         self.assertEqual(frontier.release_nodes, ())
 
+    def test_frontier_rejects_a_missing_dependency(self) -> None:
+        graph = graph_of(node("BROKEN", dependencies=["MISSING"]))
+        with self.assertRaisesRegex(DagStandardError, "unknown node MISSING"):
+            select_frontier(graph, command_prefix=TEST_PREFIX)
+
+    def test_frontier_identity_binds_the_plan_digest(self) -> None:
+        first = graph_of(node("A", objective="first plan"))
+        second = graph_of(node("A", objective="second plan"))
+        first_frontier = select_frontier(first, command_prefix=TEST_PREFIX)
+        second_frontier = select_frontier(second, command_prefix=TEST_PREFIX)
+        self.assertNotEqual(first_frontier.plan_digest, second_frontier.plan_digest)
+        self.assertNotEqual(first_frontier.frontier_id, second_frontier.frontier_id)
+
     def test_conflicting_nodes_never_share_a_round(self) -> None:
         graph = graph_of(
             node("ALPHA", file_locks=["src/shared/**"]),

@@ -239,7 +239,12 @@ class RoundDriverTests(unittest.TestCase):
                 with patch.object(
                     self.plane,
                     "active_claims",
-                    return_value={"A": {"node_id": "A"}},
+                    return_value={
+                        "A": {
+                            "node_id": "A",
+                            "expires_at": "2026-08-13T18:00:00Z",
+                        }
+                    },
                 ):
                     result = driver.drive_round(
                         self.plane,
@@ -248,6 +253,58 @@ class RoundDriverTests(unittest.TestCase):
                         heal=False,
                     )
         self.assertEqual(result["disposition"], "WAITING")
+        self.assertEqual(result["wake_at"], "2026-08-13T18:00:00Z")
+
+    def test_expired_validation_lease_is_healed_before_plan_quiescence(self) -> None:
+        before = {
+            "nodes": [],
+            "active_validation_lease": {
+                "owner": "dead-validator",
+                "expires_at": "2026-08-13T17:00:00Z",
+            },
+        }
+        after = {"nodes": [], "active_validation_lease": None}
+        with patch.object(driver, "select_round", return_value=None):
+            with patch.object(self.plane, "status", side_effect=(before, after)):
+                with patch.object(self.plane, "active_claims", return_value={}):
+                    with patch.object(
+                        self.plane,
+                        "break_expired_validation_lease",
+                        return_value={"owner": "dead-validator"},
+                    ) as broken:
+                        result = driver.drive_round(
+                            self.plane,
+                            actor="test:driver",
+                            push=False,
+                            heal=True,
+                        )
+        broken.assert_called_once_with(actor="test:driver")
+        self.assertEqual(result["disposition"], "PLAN_QUIESCENT")
+        self.assertIsNone(result["wake_at"])
+
+    def test_expired_validation_lease_repair_failure_is_not_an_unwakeable_wait(self) -> None:
+        status = {
+            "nodes": [],
+            "active_validation_lease": {
+                "owner": "dead-validator",
+                "expires_at": "2026-08-13T17:00:00Z",
+            },
+        }
+        with patch.object(driver, "select_round", return_value=None):
+            with patch.object(self.plane, "status", return_value=status):
+                with patch.object(
+                    self.plane,
+                    "break_expired_validation_lease",
+                    side_effect=OSError("archive unavailable"),
+                ):
+                    result = driver.drive_round(
+                        self.plane,
+                        actor="test:driver",
+                        push=False,
+                        heal=True,
+                    )
+        self.assertEqual(result["disposition"], "RECONCILE_REQUIRED")
+        self.assertIn("archive unavailable", result["steps"][-1]["detail"])
 
     def test_driver_refuses_to_select_before_reconciliation(self) -> None:
         class UnreconciledPlane:

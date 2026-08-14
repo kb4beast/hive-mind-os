@@ -70,6 +70,25 @@ def _canonical_json(value: Mapping[str, Any]) -> str:
     )
 
 
+def _enqueue_spec_json(
+    kind: str,
+    payload: Mapping[str, Any],
+    *,
+    max_attempts: int,
+    not_before: float | None,
+    mission_id: str | None,
+) -> str:
+    return _canonical_json(
+        {
+            "kind": kind,
+            "payload": dict(payload),
+            "max_attempts": max_attempts,
+            "not_before": not_before,
+            "mission_id": mission_id,
+        }
+    )
+
+
 class Scheduler:
     def __init__(
         self,
@@ -137,7 +156,56 @@ class Scheduler:
         }
         if "enqueue_spec_json" not in columns:
             self._connection.execute("ALTER TABLE jobs ADD COLUMN enqueue_spec_json TEXT")
+        # Validate all legacy content before migration is allowed to rewrite
+        # identity fields. A corrupt database must remain forensic evidence.
         self._validate_open()
+        self._migrate_legacy_identities()
+        self._validate_open()
+
+    def _migrate_legacy_identities(self) -> None:
+        """Bind pre-v2 rows without changing their stable job identities."""
+
+        rows = self._connection.execute(
+            "SELECT * FROM jobs WHERE enqueue_spec_json IS NULL ORDER BY created_at,id"
+        ).fetchall()
+        if not rows:
+            return
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            for row in rows:
+                try:
+                    payload = json.loads(str(row["payload_json"]))
+                except (TypeError, json.JSONDecodeError) as error:
+                    raise SchedulerIntegrityError(
+                        "legacy scheduler payload JSON is corrupt"
+                    ) from error
+                if not isinstance(payload, dict):
+                    raise SchedulerIntegrityError("legacy scheduler payload is not an object")
+                spec = _enqueue_spec_json(
+                    str(row["kind"]),
+                    payload,
+                    max_attempts=int(row["max_attempts"]),
+                    # Historical rows did not retain whether the caller supplied
+                    # a start time. Preserve the common default-idempotent form.
+                    not_before=None,
+                    mission_id=row["mission_id"],
+                )
+                digest = "sha256:" + sha256(spec.encode("utf-8")).hexdigest()
+                self._connection.execute(
+                    """
+                    UPDATE jobs SET payload_digest=?,enqueue_spec_json=?
+                    WHERE id=? AND enqueue_spec_json IS NULL
+                    """,
+                    (digest, spec, row["id"]),
+                )
+            self._connection.execute("COMMIT")
+        except BaseException as error:
+            self._connection.execute("ROLLBACK")
+            if isinstance(error, sqlite3.IntegrityError):
+                raise SchedulerIntegrityError(
+                    "legacy scheduler identities collide during migration"
+                ) from error
+            raise
 
     def _validate_open(self) -> None:
         quick = [str(row[0]) for row in self._connection.execute("PRAGMA quick_check")]
@@ -208,14 +276,12 @@ class Scheduler:
         if not kind.strip() or max_attempts < 1:
             raise ValueError("job kind and positive max_attempts are required")
         encoded = _canonical_json(payload)
-        enqueue_spec = _canonical_json(
-            {
-                "kind": kind,
-                "payload": dict(payload),
-                "max_attempts": max_attempts,
-                "not_before": not_before,
-                "mission_id": mission_id,
-            }
+        enqueue_spec = _enqueue_spec_json(
+            kind,
+            payload,
+            max_attempts=max_attempts,
+            not_before=not_before,
+            mission_id=mission_id,
         )
         digest_value = sha256(enqueue_spec.encode("utf-8")).hexdigest()
         digest = f"sha256:{digest_value}"

@@ -25,6 +25,7 @@ from typing import Any
 
 import healing
 from attended_host import RECEIPT_IDENTITY
+from controller import parse_time
 from dag_standard import Round, compile_rounds, load_plan_graph
 
 # A blocker naming any of these is sealed or external: repairing it would rotate
@@ -407,6 +408,36 @@ def drive_round(
             return finish("RECONCILE_REQUIRED")
     round_ = select_round(plane, status, max_sessions=max_sessions)
     if round_ is None:
+        lease = status.get("active_validation_lease")
+        should_break_lease = lease is not None and heal
+        if isinstance(lease, Mapping):
+            try:
+                should_break_lease = should_break_lease and (
+                    parse_time(lease.get("expires_at")) <= plane.clock()
+                )
+            except (TypeError, ValueError):
+                # An unreadable expiry grants no durable live authority; the
+                # control plane archives it using the same fail-closed path.
+                should_break_lease = bool(should_break_lease)
+        if should_break_lease:
+            try:
+                broken = plane.break_expired_validation_lease(actor=actor)
+            except Exception as error:
+                report.record(
+                    "heal",
+                    None,
+                    "RECONCILE_REQUIRED",
+                    f"expired validation lease could not be archived: {error}",
+                )
+                return finish("RECONCILE_REQUIRED")
+            if broken is not None:
+                report.record(
+                    "heal",
+                    None,
+                    "REPAIRED",
+                    f"archived expired validation lease of {broken.get('owner')}",
+                )
+                status = plane.status()
         claims = plane.active_claims() if hasattr(plane, "active_claims") else {}
         lease = status.get("active_validation_lease")
         if claims or lease is not None:
@@ -415,7 +446,18 @@ def drive_round(
                 f"{'an active' if lease is not None else 'no'} validation lease remain"
             )
             report.record("select", None, "WAITING", detail)
-            return finish("WAITING")
+            wake_candidates = [
+                str(value.get("expires_at"))
+                for value in claims.values()
+                if isinstance(value, Mapping)
+                and isinstance(value.get("expires_at"), str)
+            ]
+            if isinstance(lease, Mapping) and isinstance(lease.get("expires_at"), str):
+                wake_candidates.append(str(lease["expires_at"]))
+            return finish(
+                "WAITING",
+                min(wake_candidates) if wake_candidates else None,
+            )
         report.record(
             "select",
             None,

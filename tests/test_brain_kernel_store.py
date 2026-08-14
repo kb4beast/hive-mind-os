@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
+from hashlib import sha256
 from pathlib import Path
 
 from hive_mind_os.brain_kernel.events import KernelEvent
@@ -202,6 +203,25 @@ class KernelStoreTests(unittest.TestCase):
             store.connection.commit()
             store.close()
             with self.assertRaisesRegex(KernelIntegrityError, "invalid state"):
+                KernelStore(path)
+
+    def test_orphan_effect_receipt_fails_on_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / DATABASE_FILENAME
+            store = KernelStore(path)
+            encoded = "{}"
+            store.connection.execute(
+                "INSERT INTO effect_receipts VALUES(?,?,?,?)",
+                (
+                    "sha256:" + sha256(encoded.encode("utf-8")).hexdigest(),
+                    "sha256:" + "9" * 64,
+                    encoded,
+                    TIME,
+                ),
+            )
+            store.connection.commit()
+            store.close()
+            with self.assertRaisesRegex(KernelIntegrityError, "no durable outbox"):
                 KernelStore(path)
 
     def test_batch_append_is_atomic_and_exact_retry_is_read_only(self) -> None:

@@ -97,6 +97,16 @@ def default_kernel_state_dir(legacy_state_dir: str | Path) -> Path:
     return Path(legacy_state_dir).resolve().parent / ".hive-mind-kernel-state"
 
 
+def _event_predecessor(store: KernelStore, event_id: str) -> str | None:
+    """Return the durable predecessor for a retry, or the current chain head."""
+
+    events = store.events()
+    existing = next((item for item in events if item["event_id"] == event_id), None)
+    if existing is not None:
+        return existing["previous_digest"]
+    return events[-1]["digest"] if events else None
+
+
 def record_legacy_enqueue(
     job: Job,
     *,
@@ -145,7 +155,7 @@ def record_legacy_enqueue(
                     "scheduler_payload_digest": job.payload_digest,
                     "repository_pin": job.payload.get("pin"),
                 },
-                previous_digest=store.events()[-1]["digest"] if store.events() else None,
+                previous_digest=_event_predecessor(store, event_id),
             ),
             idempotency_key=idempotency_key,
         )
@@ -205,7 +215,7 @@ def record_canonical_enqueue(
                     "repository_pin": job.payload.get("pin"),
                     "rollback_ref": CANONICAL_ROLLBACK_REF,
                 },
-                previous_digest=store.events()[-1]["digest"] if store.events() else None,
+                previous_digest=_event_predecessor(store, event_id),
             ),
             idempotency_key=idempotency_key,
         )

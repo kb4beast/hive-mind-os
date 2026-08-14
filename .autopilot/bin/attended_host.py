@@ -56,6 +56,16 @@ def _object_without_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return value
 
 
+def _fsync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 class AttendedCodexHost:
     """A ``HostAdapter`` for a host that only a human can actually drive."""
 
@@ -72,6 +82,7 @@ class AttendedCodexHost:
             raise AttendedHostError("attended host wait bounds must be positive")
         self.plane = plane
         self.repo_root = Path(plane.repo_root)
+        self.state_dir = Path(plane.state_dir).resolve()
         self.wait_seconds = wait_seconds
         self.poll_seconds = poll_seconds
         self.clock = clock
@@ -175,11 +186,24 @@ class AttendedCodexHost:
                 )
             if entry["card_digest"][:7] != "sha256:" or len(entry["card_digest"]) != 71:
                 raise AttendedHostError("attended ledger card digest is invalid")
-            card = (self.repo_root / str(entry["card"])).resolve()
+            relative_card = Path(str(entry["card"]).replace("\\", "/"))
+            if relative_card.is_absolute() or ".." in relative_card.parts:
+                raise AttendedHostError("attended ledger card path is unsafe")
+            raw_card = self.state_dir / relative_card
+            cursor = raw_card
+            while cursor != self.state_dir:
+                if cursor.is_symlink():
+                    raise AttendedHostError("attended ledger card traverses a symbolic link")
+                cursor = cursor.parent
+            card = raw_card.resolve()
             try:
                 card.relative_to(self.cards_dir.resolve())
             except ValueError as error:
                 raise AttendedHostError("attended ledger card escapes the managed card directory") from error
+            if not card.is_file():
+                raise AttendedHostError("attended ledger card is missing")
+            if "sha256:" + sha256(card.read_bytes()).hexdigest() != entry["card_digest"]:
+                raise AttendedHostError("attended ledger card digest does not match its content")
         return value
 
     def _ledger(self) -> dict[str, Any]:
@@ -200,6 +224,7 @@ class AttendedCodexHost:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, self.ledger_path)
+            _fsync_directory(self.ledger_path.parent)
         except OSError as error:
             raise AttendedHostError(f"cannot atomically persist attended ledger: {error}") from error
         finally:
@@ -232,8 +257,8 @@ class AttendedCodexHost:
 
         The ledger accumulates one entry per launch attempt, but the operator
         opens one session per node, so entries are deduplicated by node.  Every
-        attempt for a node writes the same per-node card file, so whichever
-        entry survives points at identical instructions.
+        attempt has its own immutable card file; one deterministic pending entry
+        per node is rendered to the operator.
         """
 
         pending: dict[str, Mapping[str, Any]] = {}
@@ -241,7 +266,11 @@ class AttendedCodexHost:
             node_id = entry.get("node_id")
             if not isinstance(node_id, str) or self._observe(node_id) is None:
                 key = node_id if isinstance(node_id, str) else str(entry.get("task_id"))
-                pending[key] = entry
+                rendered = dict(entry)
+                rendered["card"] = str(
+                    (self.state_dir / str(entry["card"])).resolve()
+                )
+                pending[key] = rendered
         return tuple(pending.values())
 
     # ------------------------------------------------------------------ adapter
@@ -299,7 +328,7 @@ class AttendedCodexHost:
         with self._ledger_lock():
             ledger = self._ledger_unlocked()
             self.cards_dir.mkdir(parents=True, exist_ok=True)
-            card_name = f"{node_id}.md"
+            card_name = f"{task_id}.md"
             card_path = self.cards_dir / card_name
             card_body = (
                 f"# {title}\n\n"
@@ -314,7 +343,7 @@ class AttendedCodexHost:
                 "capability_digest": "sha256:" + _digest(CAPABILITY),
                 "node_id": node_id,
                 "title": title,
-                "card": str(card_path.relative_to(self.repo_root)),
+                "card": str(card_path.relative_to(self.state_dir)),
                 "card_digest": "sha256:" + sha256(card_body).hexdigest(),
             }
             existing = ledger.get(idempotency_key)
@@ -346,6 +375,7 @@ class AttendedCodexHost:
                     handle.flush()
                     os.fsync(handle.fileno())
                 os.replace(card_temporary, card_path)
+                _fsync_directory(card_path.parent)
             finally:
                 card_temporary.unlink(missing_ok=True)
             ledger[idempotency_key] = entry
