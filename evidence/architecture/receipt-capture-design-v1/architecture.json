@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-native-validation-receipt-contract-v1",
+  "node_id": "RCD-ARCH-010",
+  "recorded_at": "2026-08-13",
+  "author": {
+    "identity": "codex:rcd-arch-010",
+    "role": "architect",
+    "seat": "architect-distinct",
+    "self_approval": false
+  },
+  "scope": {
+    "subject": "Forward-looking native recorder contract for validation discovery, execution outcomes, and durable recovery evidence.",
+    "design_only": true,
+    "implementation_authority": false,
+    "candidate_execution_authority": false,
+    "ci_or_discovery_execution_authority": false,
+    "performance_or_promotion_authority": false,
+    "main_or_remote_authority": false
+  },
+  "problem_binding": {
+    "historical_inputs": [
+      {
+        "path": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+        "finding": "The ordered discovery vector, exactly-once outcome mapping, declared labels, and summary reconciliation were not retained."
+      },
+      {
+        "path": "evidence/performance/validation-provenance-remand-v1/integration.json",
+        "finding": "A count and digest cannot replace an unavailable ordered discovery vector; 1,049 canonical headers did not identify the one extra outcome reported by a 1,050-test summary."
+      },
+      {
+        "path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json",
+        "finding": "The sole historical execution is adverse evidence only and is bound to b789b68e7d6a741e0b85a3ac33cbce846e1e32c9 / b909b7b7e374bff22912059387ef0fe639498af6."
+      },
+      {
+        "path": "evidence/courts/CASE-DOCTOR-PERFORMANCE-PROMOTION.json",
+        "finding": "The rejected 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 fixture candidate remains immutable adverse evidence."
+      }
+    ],
+    "non_retroactivity": "This contract never reconstructs, normalizes, re-labels, or upgrades historical evidence. Receipts captured before this contract are legacy evidence and remain unqualified for its invariants unless a contemporaneous, separately verified native receipt exists."
+  },
+  "architecture_alignment": {
+    "portable_workflow_reuse": [
+      "Use repository-relative portable paths and reject absolute, traversal, symlink, junction, and reserved-name paths, consistent with src/hive_mind_os/receipts.py.",
+      "Use canonical UTF-8 JSON and content digests for declared material, consistent with src/hive_mind_os/autopilot_workflow.py and src/hive_mind_os/receipts.py.",
+      "Use a repository-resident control-plane adapter behind a versioned contract; no recorder may execute untrusted target-repository code or acquire ambient authority.",
+      "Use the control plane's idempotency, lease, checkpoint, bounded-recovery, and independent-receipt concepts rather than chat history as state."
+    ],
+    "adapter_boundary": "The recorder is a native validation adapter in the execution/evidence boundary. It accepts a sealed runner contract and emits evidence; it does not decide policy, judge results, promote candidates, mutate plans, or treat a validation receipt as a court verdict."
+  },
+  "contract": {
+    "contract_id": "native-validation-receipt-v1",
+    "canonicalization": "UTF-8 JSON, sorted object keys, compact separators, no NaN; all listed sha256 digests are sha256 over those canonical bytes unless a field says otherwise.",
+    "session_identity": {
+      "session_id": "UUIDv7 generated before discovery; immutable and unique in the receipt store.",
+      "idempotency_key": "sha256 of the sealed runner contract, target binding, declared discovery selector, parser grammar digest, and label-vocabulary digest. A duplicate key may return the same committed session only after byte-for-byte binding comparison; it may never append a second execution to that session.",
+      "attempt_id": "A new recovery revalidation attempt has a new session_id and explicit predecessor_session_digest. It never silently overwrites or merges a prior attempt."
+    },
+    "sealed_runner_contract": {
+      "required_before_execution": [
+        "repository_identity, source_commit, source_tree, declared_command, working_directory, execution_sandbox, interpreter_binding, environment_allowlist, discovery_selector, parser_grammar, terminal_label_vocabulary, timeout_and_budget, retention_policy, authority_reference"
+      ],
+      "source_binding": {
+        "repository_identity": "canonical repository identity plus configured remote identity, when a remote exists",
+        "source_commit": "full Git object ID",
+        "source_tree": "tree object ID independently resolved from source_commit before launch",
+        "worktree_digest": "digest of a sorted tracked-file manifest after checkout, excluding recorder-private output paths",
+        "plan_or_contract_digest": "the governing validation plan/contract digest; absent authority fails closed"
+      },
+      "runtime_binding": {
+        "interpreter": "executable path class, file digest where locally readable, implementation, exact version, ABI, and invocation arguments",
+        "environment": "OS, architecture, locale, timezone, container/sandbox image digest or explicit absence, network policy, resource limits, and an allowlisted map of environment variable names to privacy-safe value digests",
+        "command": "array arguments only, resolved working directory, approved executable identity, timeout, and runner-adapter version/digest",
+        "forbidden": "ambient environment capture, unpinned target checkout, mutable source after discovery, and undeclared executable substitution"
+      }
+    },
+    "ordered_discovery_vector": {
+      "record": {
+        "discovery_id": "monotonic zero-based integer",
+        "test_id": "canonical opaque runner test identifier; exact Unicode code points are preserved",
+        "selector_status": "selected | excluded_by_declared_selector",
+        "source_location": "optional portable source reference, informational only"
+      },
+      "invariants": [
+        "Discovery completes and its vector is sealed before the runner receives permission to execute.",
+        "The vector is a complete ordered array, not only a count, first/last value, or digest.",
+        "test_id is nonempty and unique; duplicate IDs, invalid UTF-8, or discovery error produce a blocked session with no success claim.",
+        "discovery_vector_digest is sha256 over the complete canonical vector and discovery_count equals its length.",
+        "The runner receives the vector digest and must emit outcomes only for IDs in that vector."
+      ],
+      "retention": "The complete vector is a content-addressed retained artifact referenced by digest and portable path in the terminal receipt."
+    },
+    "terminal_outcome_ledger": {
+      "record": {
+        "discovery_id": "integer referencing one discovery vector record",
+        "test_id": "must exactly equal the referenced discovery record",
+        "terminal_kind": "PASS | FAIL | ERROR | SKIP_EXPLICIT | SKIP_CLASS | SKIP_LIFECYCLE | EXPECTED_FAILURE | UNEXPECTED_SUCCESS | NOT_RUN_SESSION_ABORTED | NOT_RUN_POLICY_BLOCKED",
+        "terminal_label": "one declared vocabulary key",
+        "event_ordinal": "strictly increasing integer in the parsed event stream",
+        "occurred_at": "RFC3339 UTC timestamp supplied by the recorder",
+        "reason_code": "required for every skip, not-run, timeout, or cancellation kind; selected from declared machine-readable codes",
+        "diagnostic_refs": "zero or more redacted artifact references; never raw secret values"
+      },
+      "exactly_once_invariants": [
+        "Every selected discovery ID has exactly one and only one terminal ledger record.",
+        "Every excluded_by_declared_selector ID has exactly one NOT_RUN_POLICY_BLOCKED record naming the sealed selector reason; it is not counted as executed.",
+        "A class-level skip is represented by one SKIP_CLASS record for every affected discovery ID, even when the underlying framework emits no method header.",
+        "A lifecycle/setup/teardown skip or cancellation is represented by one SKIP_LIFECYCLE record for every affected ID, with lifecycle phase and reason code.",
+        "If a session aborts after discovery, every selected ID without an earlier terminal event receives NOT_RUN_SESSION_ABORTED with the same immutable abort event reference; no missing ID is tolerated.",
+        "Duplicate, unknown, out-of-order, or contradictory outcomes fail receipt finalization. A terminal receipt with such a condition is invalid, not partially successful."
+      ],
+      "meaning": "NOT_RUN_SESSION_ABORTED and NOT_RUN_POLICY_BLOCKED are terminal accounting states, never passing test results and never evidence that a validation command completed."
+    },
+    "label_vocabulary": {
+      "declaration": "A versioned array sealed before discovery. Each entry has label_key, terminal_kind, grammar token or structured event code, reason-code requirements, and whether it is legal on a class or lifecycle boundary.",
+      "digest": "label_vocabulary_digest is recorded in the runner contract, raw parser receipt, and final receipt.",
+      "invariants": [
+        "One label maps to one terminal_kind in one grammar version; aliases and fallback stripping are forbidden.",
+        "Free-text warning, deprecation, or skip reason output is diagnostic data, not a terminal label unless its structured label key was declared beforehand.",
+        "A changed vocabulary changes the idempotency key and requires a new session."
+      ]
+    },
+    "raw_stream_and_parser": {
+      "capture": {
+        "streams": "stdout, stderr, runner-events, recorder-events, and process-exit are captured with stream ordinal, byte length, chunk hash chain, and final digest.",
+        "privacy": "The capture boundary computes a protected raw-stream HMAC before redaction. The normal receipt stores only that keyed digest identifier, byte counts, and sha256 digests of retained redacted streams; raw secret-bearing bytes never enter the repository receipt store.",
+        "redaction": "An approved versioned redaction policy runs before durable repository retention. It replaces matches with deterministic typed placeholders, preserves line/event boundaries, records redaction count and policy digest, and fails closed on scanner failure, invalid encoding, or grammar-affecting redaction. Access to any short-lived protected raw spool requires separate secret-store authority."
+      },
+      "grammar": {
+        "name": "hive-mind-validation-event-jsonl-v1",
+        "digest": "parser_grammar_digest binds an immutable grammar document and parser adapter digest before execution",
+        "wire_format": "One UTF-8 JSON object per LF-delimited record. Each record contains schema_version, event_ordinal, event_kind, session_id, and event payload. event_kind is DISCOVERY_SEALED, OUTCOME, CLASS_SKIP, LIFECYCLE_SKIP, SESSION_ABORT, SUMMARY, or PROCESS_EXIT.",
+        "parser_rules": [
+          "event_ordinal starts at zero and increments by one with no gaps or duplicates.",
+          "DISCOVERY_SEALED appears exactly once before any outcome and carries discovery_vector_digest and count.",
+          "OUTCOME, CLASS_SKIP, and LIFECYCLE_SKIP normalize only through declared label vocabulary into one ledger record per discovery ID.",
+          "SESSION_ABORT causes explicit not-run ledger records for all remaining selected IDs; it cannot terminate parsing successfully without process-exit evidence.",
+          "SUMMARY is parsed only after the ledger is complete and is reconciled rather than trusted as the source of truth.",
+          "Unparseable bytes, unknown event kinds, unknown labels, malformed JSON, duplicate terminal events, or stream/trailer digest mismatch invalidate finalization."
+        ],
+        "human_text": "Verbose framework text is retained as redacted diagnostic output only. It is not an authoritative parser input in v1, eliminating ambiguous inline labels such as the historical warning and skip-reason headers."
+      }
+    },
+    "summary_reconciliation": {
+      "required_equations": [
+        "discovery_count = count(discovery_vector)",
+        "selected_count + excluded_count = discovery_count",
+        "count(terminal_ledger) = discovery_count",
+        "executed_count = count(PASS, FAIL, ERROR, SKIP_EXPLICIT, SKIP_CLASS, SKIP_LIFECYCLE, EXPECTED_FAILURE, UNEXPECTED_SUCCESS)",
+        "not_run_count = count(NOT_RUN_SESSION_ABORTED, NOT_RUN_POLICY_BLOCKED)",
+        "selected_count = executed_count + count(NOT_RUN_SESSION_ABORTED)",
+        "runner summary executed/failed/error/skipped/expected-failure totals, when supplied, equal the corresponding ledger totals"
+      ],
+      "failure_behavior": "Missing or inconsistent summary is retained as an adverse parser finding. It prevents a successful validation result and cannot be repaired by post-hoc aggregation."
+    },
+    "receipt_bundle": {
+      "root_record": {
+        "fields": [
+          "receipt_id, session_id, idempotency_key, state, authority_reference, runner_contract_digest, source_binding, runtime_binding, discovery_artifact, ledger_artifact, parser_artifact, redacted_stream_artifacts, reconciliation, process_exit, privacy, retention, recovery_linkage, receipt_digest"
+        ],
+        "result_states": "VALIDATED_SUCCEEDED | VALIDATED_FAILED | BLOCKED | INVALID_CAPTURE. Only the first two mean all recorder invariants were met; VALIDATED_FAILED is an accurately captured adverse validation result."
+      },
+      "artifact_manifest": "Every artifact has portable relative path, media type, byte length, sha256, producer identity, and retention class. The final receipt includes a sorted manifest digest and no artifact is implied by prose.",
+      "atomic_commit_protocol": [
+        "Create a new session-private staging directory using exclusive creation; reject preexisting session_id or receipt_id.",
+        "Write immutable artifacts with exclusive creation, fsync each file, verify bytes against the manifest, then fsync the staging directory.",
+        "Write final receipt last with state FINALIZING; fsync it and atomically rename the complete staging directory to a content-addressed committed directory on the same filesystem.",
+        "Append the receipt index only after the directory rename using compare-and-swap on the previous index digest, then fsync the index directory.",
+        "A reader accepts only a committed directory whose final receipt, manifest, and index binding all verify. Partial staging directories are never evidence."
+      ],
+      "retention": "Committed redacted bundles are append-only and retained according to the sealed retention policy. Deletion, legal hold, or cryptographic-erasure requests create a signed tombstone that retains identity, digests, authority, and reason without rewriting prior receipts."
+    },
+    "recovery_protocol": {
+      "state_machine": [
+        "PREPARED -> DISCOVERING -> DISCOVERY_SEALED -> EXECUTING -> PARSING -> RECONCILING -> COMMITTED",
+        "Any state -> BLOCKED when authority, integrity, environment, privacy, parser, source-binding, or budget invariants fail.",
+        "BLOCKED -> DIAGNOSE -> REMEDIATE -> REVALIDATE only under a recovery lease, bounded recovery contract, and preserved predecessor evidence.",
+        "REVALIDATE -> COMMITTED | BLOCKED; it creates a new attempt/session and never edits the blocked receipt.",
+        "BLOCKED -> ESCALATED when bounded retries, remediation authority, budget, or safety conditions are exhausted."
+      ],
+      "diagnose": "Records a machine-classified blocker, exact checkpoint, source/runtime bindings, and evidence references. It may inspect declared artifacts but may not infer missing outcomes or broaden authority.",
+      "remediate": "Consumes only a separately authorized reversible remediation action. It must declare scope, rollback, idempotency key, expected evidence, and candidate applicability before execution. A recorder incident does not grant code, plan, candidate, CI, promotion, or remote authority.",
+      "revalidate": "Replays discovery and validation in a new sealed session against a newly bound target. It retains both attempts, performs no statistical/performance conclusion, and emits a linkage record rather than a replacement.",
+      "bounded_retry_and_escalation": {
+        "default_max_automatic_attempts": 2,
+        "max_diagnosis_rounds_per_blocker_signature": 1,
+        "max_remediation_rounds_per_blocker_signature": 1,
+        "blocker_signature": "sha256 of normalized failure class, invariant, source binding, runner contract digest, and declared environment class",
+        "escalation": "On repeated signature, missing authority, destructive/sensitive remediation, or exhausted budget, emit an ESCALATED receipt with all prior links and open an evidence-backed decision record. Escalation is not a human-approval substitute and does not permit recursive unbounded courts."
+      }
+    },
+    "candidate_applicability": {
+      "record": [
+        "candidate_id, candidate_commit, candidate_tree, parent_commit, component_kind, changed_path_manifest_digest, source_target_commit, source_target_tree, required_composition, governing_case, authority_status, rejection_or_promotion_status, required_validation_contract_digest, comparator_receipts, rollback_reference"
+      ],
+      "invariants": [
+        "A candidate is applicable only when its exact commit/tree, declared component kind, validation target commit/tree, required composition, authority status, and validation contract all match the sealed applicability predicate.",
+        "Candidate lineage, a similarly named API, or a passing focused test never implies applicability.",
+        "Rejected, quarantined, non-promoted, or explicitly ineligible candidates fail applicability before execution and are retained as negative evidence.",
+        "Composition is an explicit new candidate record with its own commit/tree, authority, rollback, and independent validation; a recorder never combines historical candidates implicitly."
+      ],
+      "historical_guard": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 and d02c2d2 remain adverse/ineligible as specified by their courts. This design neither changes their status nor permits reuse, relabeling, qualification, or composition."
+    }
+  },
+  "api_boundary": {
+    "inputs": [
+      "Sealed ValidationRunContract from the control plane",
+      "Approved sandbox execution handle",
+      "Versioned discovery adapter and event-emitting runner adapter",
+      "Scoped receipt-store and secret-redaction handles"
+    ],
+    "outputs": [
+      "Immutable NativeValidationReceipt reference",
+      "Immutable content-addressed discovery vector, terminal ledger, parser, reconciliation, and redacted stream artifacts",
+      "Blocked, invalid, or escalated evidence reference when final validation cannot be proven"
+    ],
+    "explicit_non_capabilities": [
+      "No direct shell, repository, network, secret, Git ref, plan, candidate, or promotion authority.",
+      "No interpretation of text output outside the sealed event grammar.",
+      "No overwriting, deletion, or mutation of a prior receipt.",
+      "No verdict, merge, self-approval, or conversion of a validation result into implementation authority."
+    ],
+    "versioning": "Adapters negotiate major schema version only. Unknown major versions, optional fields that affect accounting, or lossy down-conversion fail closed."
+  },
+  "migration_and_rollback": {
+    "migration": [
+      "Introduce the native recorder behind a new adapter capability; retain existing portable receipt validation unchanged.",
+      "Run in shadow-capture mode only under a separately authorized implementation/evaluation plan; shadow receipts never replace existing evidence.",
+      "Promote an adapter only after independent tests demonstrate all invariants and a separate court approves the implementation."
+    ],
+    "legacy_behavior": "Legacy transcript receipts remain readable as historical artifacts, but absence of a native discovery vector, terminal ledger, vocabulary, or reconciliation is represented as unknown, not backfilled.",
+    "rollback": "Disable the new adapter capability and revert only its implementation commit under a separately authorized rollback. Preserve every native receipt, blocked session, redaction record, rejection, and migration mapping append-only."
+  },
+  "verification_plan_for_a_later_implementation": {
+    "unit_contract_tests": [
+      "Reject duplicate/unknown discovery IDs and nonportable artifact paths.",
+      "Reject missing, duplicate, contradictory, or out-of-order terminal outcomes.",
+      "Expand class and lifecycle skips to one ledger record per discovered affected ID.",
+      "Reject undeclared labels, grammar mutation, malformed JSONL, stream digest mismatch, and post-hoc vocabulary changes.",
+      "Prove all summary equations and that NOT_RUN states cannot be counted as passes or executed tests.",
+      "Exercise redaction without leaking candidate secrets into retained artifacts, exceptions, metrics, or hashes visible to the repository."
+    ],
+    "durability_and_recovery_tests": [
+      "Inject crash cuts before/after every fsync, rename, and index compare-and-swap; readers must see either no receipt or one valid committed receipt.",
+      "Prove duplicate idempotency keys do not create duplicate terminal ledgers.",
+      "Prove BLOCKED -> DIAGNOSE -> REMEDIATE -> REVALIDATE preserves all predecessor evidence and respects retry bounds.",
+      "Prove blocked candidates cannot become applicable by naming or composition alone."
+    ],
+    "integration_tests": [
+      "Use a synthetic event-emitting runner with pass, failure, explicit skip, class skip, lifecycle skip, abort, output diagnostics, and malformed-stream cases.",
+      "Verify repository/worktree, interpreter, environment, and authority bindings change when inputs change.",
+      "Independently reproduce a committed receipt from immutable artifacts in a clean workspace without raw secret access."
+    ],
+    "acceptance_metrics": {
+      "discovery_vector_retention_rate": "100% for committed native receipts",
+      "terminal_coverage_rate": "100% of discovery IDs exactly once",
+      "summary_reconciliation_rate": "100% for completed runner summaries; mismatch count must be zero for VALIDATED_* receipts",
+      "artifact_integrity_rate": "100% manifest/hash verification",
+      "privacy_leak_rate": "0 confirmed secret values in repository-retained artifacts",
+      "atomicity_violation_rate": "0 accepted partial/duplicate bundles under injected crash tests",
+      "unbounded_recovery_rate": "0; every recurrence must escalate at configured bounds"
+    }
+  },
+  "material_design_risks": [
+    {
+      "risk": "Runner frameworks may not expose class/lifecycle skips per method.",
+      "control": "The native adapter must emit structured affected-ID events from the sealed vector; unsupported runners are BLOCKED, not text-parsed heuristically."
+    },
+    {
+      "risk": "Raw output can contain secrets or personal/proprietary data.",
+      "control": "Protected capture and pre-retention redaction separate raw stream integrity from repository artifacts; a redaction failure blocks finalization."
+    },
+    {
+      "risk": "A technically complete receipt could be mistaken for a passing delivery or court judgment.",
+      "control": "Receipt result, authority reference, candidate applicability, and court dispositions are separate typed fields; the API has no promotion or judgment operation."
+    },
+    {
+      "risk": "Automatic recovery may recreate the recursive-governance loop.",
+      "control": "Recovery is a bounded state machine with blocker signatures, finite budgets, and an escalated decision record rather than automatic successor courts."
+    }
+  ],
+  "implementation_boundary": {
+    "authorized_by_this_record": "Architecture and later independent review only.",
+    "not_authorized_by_this_record": [
+      "Production or .autopilot implementation",
+      "Tests, fixtures, controller changes, CI, discovery, candidate execution, or performance measurements",
+      "Reuse, relabeling, qualification, or composition of 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 or d02c2d2",
+      "Modification of .autopilot/plan.json, main, or remotes"
+    ],
+    "next_authority_requirement": "Only a separate newly sealed native implementation-proposal DAG, after independent cross-examination and a Judge finds zero unresolved material design findings, may propose bounded implementation work."
+  }
+}
