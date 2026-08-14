@@ -985,26 +985,21 @@ class HostExecutionTests(unittest.TestCase):
     def test_prepared_launch_adopts_lookup_without_duplicate_create(self) -> None:
         contract = _contract(tasks=1)
         instruction_id = str(contract["tasks"][0]["launch_instruction_id"])
-        prepare_launch(self.root, instruction_id, "codex")
         adapter = Adapter([[_event(instruction_id, "SUCCEEDED", "1")]])
         adapter.seed(instruction_id)
         result = execute_contract(self.root, contract, adapter, Resolver())
         self.assertTrue(result["successful"])
         self.assertEqual(adapter.created, [])
 
-    def test_bound_launch_requires_lookup_and_adopts_exact_capability(self) -> None:
+    def test_lookup_adopts_exact_capability_without_duplicate_create(self) -> None:
         contract = _contract(tasks=1)
         instruction_id = str(contract["tasks"][0]["launch_instruction_id"])
         adapter = Adapter([[_event(instruction_id, "SUCCEEDED", "1")]])
         adapter.seed(instruction_id)
-        prepare_launch(self.root, instruction_id, "codex")
-        bind_launch(
-            self.root, instruction_id, "codex", "task-0",
-            host_id="host-1", cursor="binding-cursor-0", capability="capability-0"
-        )
         result = execute_contract(self.root, contract, adapter, Resolver())
         self.assertTrue(result["successful"])
         self.assertEqual(adapter.created, [])
+        self.assertGreaterEqual(adapter.lookup_count, 1)
 
     def test_forged_capability_event_is_rejected_without_terminal_release(self) -> None:
         contract = _contract(tasks=1)

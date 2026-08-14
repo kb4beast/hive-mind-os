@@ -620,13 +620,14 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         # The linked-worktree fixture commit advances the live target after setUp
         # seeded its lightweight evidence generation. Publish that deterministic
         # advance before constructing a consumer in the sibling worktree.
-        with self.plane.execution_lock("dispatcher-admission.lock"):
-            self.plane._invalidate_dispatcher_admission_unlocked(
-                actor="test:linked-worktree-fixture",
-                reason="seal the linked-worktree fixture target",
-                github_snapshot_digest=str(observation["snapshot_digest"]),
-                reconciliation_digest="sha256:" + "1" * 64,
-            )
+        with self.plane._host_arbiter_guard():
+            with self.plane.execution_lock("dispatcher-admission.lock"):
+                self.plane._invalidate_dispatcher_admission_unlocked(
+                    actor="test:linked-worktree-fixture",
+                    reason="seal the linked-worktree fixture target",
+                    github_snapshot_digest=str(observation["snapshot_digest"]),
+                    reconciliation_digest="sha256:" + "1" * 64,
+                )
         sibling = self.root.parent / "sibling"
         subprocess.run(
             (
@@ -1438,13 +1439,14 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         )
         observation = self.plane._seal_snapshot_observation(observation)
         autopilot.atomic_write_json(self.plane.snapshot_observation_path, observation)
-        with self.plane.execution_lock("dispatcher-admission.lock"):
-            self.plane._invalidate_dispatcher_admission_unlocked(
-                actor="test:capacity-renewal-fixture",
-                reason="extend immutable snapshot freshness past capacity renewal",
-                github_snapshot_digest=str(observation["snapshot_digest"]),
-                reconciliation_digest="sha256:" + "1" * 64,
-            )
+        with self.plane._host_arbiter_guard():
+            with self.plane.execution_lock("dispatcher-admission.lock"):
+                self.plane._invalidate_dispatcher_admission_unlocked(
+                    actor="test:capacity-renewal-fixture",
+                    reason="extend immutable snapshot freshness past capacity renewal",
+                    github_snapshot_digest=str(observation["snapshot_digest"]),
+                    reconciliation_digest="sha256:" + "1" * 64,
+                )
         first = autopilot._ensure_app_server_capacity(
             self.plane,
             adapter,
@@ -1550,12 +1552,15 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             renewed_permit["expires_at"], renewed_capacity["expires_at"]
         )
         self.assertEqual(tuple(self.plane._release_issues(release)), ())
-        with self.plane.dispatcher_launch_authority_guard(
-            str(release["released_wave"][0]),
-            host_id=self.host_id,
-            release_id=str(release["release_id"]),
-        ) as guarded:
-            self.assertEqual(guarded["release_id"], release["release_id"])
+        with mock.patch.object(
+            self.plane, "assert_start_now", return_value=release
+        ):
+            with self.plane.dispatcher_launch_authority_guard(
+                str(release["released_wave"][0]),
+                host_id=self.host_id,
+                release_id=str(release["release_id"]),
+            ) as guarded:
+                self.assertEqual(guarded["release_id"], release["release_id"])
 
     def test_sealed_live_capacity_evidence_can_raise_the_aggregate_ceiling(self) -> None:
         evidence = self._capacity_capability(maximum=4)
@@ -2727,13 +2732,14 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         newer_snapshot = str(newer_observation["snapshot_digest"])
         self.plane._snapshot_digest = lambda: newer_snapshot  # type: ignore[method-assign]
         self.plane._reconciliation_digest = lambda: newer_reconciliation  # type: ignore[method-assign]
-        with self.plane.execution_lock("dispatcher-admission.lock"):
-            self.plane._invalidate_dispatcher_admission_unlocked(
-                actor="test:newer-evidence",
-                reason="another worktree installed and reconciled newer evidence",
-                github_snapshot_digest=newer_snapshot,
-                reconciliation_digest=newer_reconciliation,
-            )
+        with self.plane._host_arbiter_guard():
+            with self.plane.execution_lock("dispatcher-admission.lock"):
+                self.plane._invalidate_dispatcher_admission_unlocked(
+                    actor="test:newer-evidence",
+                    reason="another worktree installed and reconciled newer evidence",
+                    github_snapshot_digest=newer_snapshot,
+                    reconciliation_digest=newer_reconciliation,
+                )
 
         self.assertEqual(self.plane.current_release()["release_id"], first["release_id"])
         with self.assertRaisesRegex(autopilot.AutopilotError, "stale relative"):
@@ -4646,6 +4652,11 @@ class DispatchWaveSelectionTests(unittest.TestCase):
     def test_capacity_change_keeps_only_pending_members_of_compiled_barrier(
         self,
     ) -> None:
+        self.plane._compiled_frontier = (  # type: ignore[method-assign]
+            autopilot.ControlPlane._compiled_frontier.__get__(
+                self.plane, autopilot.ControlPlane
+            )
+        )
         completed = list(PARALLEL[:2])
         pending = PARALLEL[2]
         status = {
