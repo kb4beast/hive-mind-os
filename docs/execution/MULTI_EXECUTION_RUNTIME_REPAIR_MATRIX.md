@@ -27,6 +27,8 @@ Relevant implementation hashes at this baseline:
 6. **Migration command modes are incomplete.** The crash-resumable semantic legacy reconciliation court and runtime authority migration exist, but the operator surface does not yet provide explicit dry-run, apply, verify, and rollback-before-READY modes over one preserved manifest.
 7. **The default Python environment is not authoritative.** `C:\Python314\python.exe` currently imports `hive_mind_os` from the foreign editable checkout `C:\Users\beesp\.codex\worktrees\1a44\hive-mind-os`. Authoritative tests must use isolated startup and prove the candidate import path before discovery.
 
+8. **Lock ownership is tracked but order is not asserted.** `runtime_file_lock` provides cross-process exclusion and same-thread reentrancy, but at this baseline it does not reject a direct or indirect acquisition that reverses host kernel → repository arbiter → execution → node/effect/binding. The mission explicitly requires runtime inversion rejection, including cleanup and recovery paths.
+
 ## Already fixed in current bytes
 
 1. Three-tier host/repository/execution roots, transport-keyed repository registry, checkout adoption, and execution-scoped decision state are implemented.
