@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-VALIDATION-PROVENANCE-REMAND-OPENING",
+  "node_id": "VPR-SEAL-000",
+  "recorded_at": "2026-08-13",
+  "subject": "Bounded remand for an ordered, fail-closed validation-outcome provenance ledger",
+  "authority": {
+    "predecessor": "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json",
+    "predecessor_receipt_digest": "sha256:82d23d9165c67b4e6f2d5a104d354bfd4307a1f1aee3d2d16d2da57abab5c213",
+    "predecessor_disposition": "defer",
+    "authorization": "separate_bounded_evidence_only_remand",
+    "implementation_authority": false
+  },
+  "source_binding": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "rejected_historical_fpc_tuples": [
+      {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"},
+      {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "4f20bd2"}
+    ],
+    "rule": "Only the exact commit/tree pair may be observed; invalid historical tuples must never be normalized or repaired."
+  },
+  "retained_inputs": {
+    "fpcr_discovery": {"path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json", "receipt_digest": "sha256:743a8da506dc75d22873288661652b6ec6c40e2cc61f9b5186052e083221fd2e", "ordered_id_digest": "sha256:0503898f0fcc82c6d0e50e6c86fa34185a02f5223b5ad1160d612eeb3cbb3893", "reported_count": 1059},
+    "fpcr_execution": {"path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json", "receipt_digest": "sha256:85e324a6a12b1bd76d85243c0519a3b3d49ac6c3d986e73fb56eb6ec5f3ce871"},
+    "fpcr_transcript": {"path": "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json", "receipt_digest": "sha256:4f7f561f59f3e93d50d06c312362ce9cd45cb86f757b3290884fe5065d5cdb66", "document_digest": "sha256:fa47790899393221d3c99d5e26096a4faa48c909fc0195cf2108ffbe791868e3", "reported_tests_run": 1050, "reported_failures": 28, "reported_skipped": 8},
+    "vtc_qualification": {"path": "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json", "receipt_digest": "sha256:82d23d9165c67b4e6f2d5a104d354bfd4307a1f1aee3d2d16d2da57abab5c213"}
+  },
+  "question": "Can a deterministic state-machine replay of the retained transcript produce a machine-checkable ordered outcome ledger, binding every retained discovery ID exactly once, while preserving all adverse facts?",
+  "parser_acceptance": {
+    "states": ["IDLE", "AWAITING_TERMINAL"],
+    "allowed_default_labels": ["ok", "FAIL", "ERROR", "skipped", "expected failure", "unexpected success"],
+    "warning_interleaving": "Warnings may appear while AWAITING_TERMINAL and do not alter the pending ID.",
+    "custom_labels": "A non-default label is accepted only when explicitly supplied in the replay receipt.",
+    "bijection": "Every discovery ID must receive exactly one terminal outcome; duplicate, unknown, malformed, pending, or missing IDs fail closed.",
+    "adversarial_cases": ["missing ID", "unknown label", "header before pending terminal", "duplicate binding", "unknown ID"]
+  },
+  "lint_warning_justifications": [
+    {
+      "node": "VPR-SEAL-000",
+      "check": "scaffold-collision",
+      "subject": "docs/execution/__init__.py",
+      "justification": "docs/execution is an established documentation directory, not a Python package. The sealed helpers are direct script entrypoints. Adding a package marker is not required by this repository surface and is outside this remand's exact authorized artifacts."
+    },
+    {
+      "node": "VPR-SEAL-000",
+      "check": "scaffold-collision",
+      "subject": "docs/execution/dags/__init__.py",
+      "justification": "docs/execution/dags is an established documentation directory, not a Python package. The sealed helpers use local script imports and do not import this directory as a package. Adding a marker would be an unneeded, out-of-scope artifact."
+    }
+  ],
+  "historical_candidates": {
+    "fixture": {"commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378", "status": "rejected_non_promotable_no_reuse_or_composition"},
+    "gco": {"commit": "d02c2d2", "status": "non_promoted_not_a_validation_target_candidate_no_reuse_or_composition"}
+  },
+  "strict_limit": "Even a successful ledger may only reduce validation provenance uncertainty. It cannot authorize implementation, candidate use or execution, CI rerun, promotion, performance conclusion, or knowledge-BASELINE-000 retry.",
+  "sealed_plan": {"path": "docs/execution/dags/validation-provenance-remand-v1/manifest.json", "node_count": 5, "plan_digest": "sha256:a9f2cd4687b05b16cae4a383b85f01be705caa2503b83e29c54e69f4348ad443"},
+  "forbidden": ["all source, test, fixture, GitCommitObservation, controller, durable-controller, and .autopilot/plan.json changes", "all CI, unittest discovery, candidate execution, performance measurement, promotion, main checkout/update, or remote effect", "reuse, relabeling, qualification, or composition of 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 or d02c2d2"],
+  "disposition": "open_evidence_only"
+}
