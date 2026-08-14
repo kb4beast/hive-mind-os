@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-receipt-capture-design-integration-v1",
+  "node_id": "RCD-INTEGRATE-030",
+  "recorded_at": "2026-08-13",
+  "author": {
+    "identity": "codex:rcd-integrate-030",
+    "role": "integrator",
+    "seat": "integrator-distinct",
+    "self_approval": false,
+    "independent_from": ["RCD-ARCH-010", "RCD-CROSS-020"]
+  },
+  "scope": {
+    "design_reconciliation_only": true,
+    "implementation_authority": false,
+    "implementation_proposal_dag_authority": false,
+    "ci_or_test_execution_authority": false,
+    "candidate_execution_authority": false,
+    "performance_or_promotion_authority": false,
+    "main_or_remote_authority": false
+  },
+  "authority": {
+    "opening_case": "evidence/courts/CASE-RECEIPT-CAPTURE-DESIGN-OPENING.json",
+    "predecessor_case": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+    "authority_commit": "89f1a44a9687d351eae52633d015fc55948005fd",
+    "authority_tree": "bb649cca210b0fa2d2161395e33e6a3b58041b76",
+    "sealed_plan_digest": "sha256:7606b7c159cc89feac0815df6ae24f216461daedfe1d79aef12f108656b310ab",
+    "judge_gate": "Only a distinct RCD Judge may authorize opening a later separately sealed native implementation-proposal DAG, and only after zero unresolved material design findings."
+  },
+  "inputs": {
+    "architecture": {
+      "path": "evidence/architecture/receipt-capture-design-v1/architecture.json",
+      "node_id": "RCD-ARCH-010",
+      "status": "design contract supplied"
+    },
+    "cross_examination": {
+      "path": "evidence/architecture/receipt-capture-design-v1/cross-examination.json",
+      "node_id": "RCD-CROSS-020",
+      "receipt_digest": "sha256:6117a6baa6726835b19742c8e850a19444889dcbf2876c4b584576d9d00ac18f",
+      "status": "independent adverse review supplied"
+    },
+    "historical_constraint": {
+      "path": "evidence/courts/CASE-VALIDATION-PROVENANCE-REMAND-QUALIFICATION.json",
+      "status": "historical evidence remains inconclusive and is not repaired by this design"
+    }
+  },
+  "integrated_design_coverage": [
+    {
+      "requirement": "ordered discovery vector and one terminal outcome per ID",
+      "architecture_mitigation": "Seal a complete ordered vector before execution; maintain an exactly-once terminal ledger, explicitly expanding class, lifecycle, abort, and policy-blocked states.",
+      "later_verification": ["deterministic vector test", "ledger bijection property test", "synthetic class/lifecycle/abort integration test"],
+      "rollback_or_failure_behavior": "Duplicate, foreign, missing, contradictory, or post-start discovery/outcome data invalidates finalization; source artifacts remain as blocked evidence.",
+      "design_status": "covered"
+    },
+    {
+      "requirement": "declared labels, parser grammar, raw-stream integrity, and summary reconciliation",
+      "architecture_mitigation": "Bind versioned label vocabulary and JSONL grammar before discovery; retain protected raw-stream HMAC metadata and redacted stream hashes; reconcile summaries against the ledger rather than trusting text.",
+      "later_verification": ["vocabulary/grammar adversarial test", "summary reconciliation test", "held-out forged-summary and ambiguous-label cases"],
+      "rollback_or_failure_behavior": "Unknown labels, malformed or ambiguous events, stream mismatch, or summary disagreement yield invalid capture rather than a successful validation result.",
+      "design_status": "partially specified; executable grammar and full label semantics remain material future-proposal obligations"
+    },
+    {
+      "requirement": "immutable source, interpreter, environment, and authority binding",
+      "architecture_mitigation": "Bind repository identity, commit/tree, tracked manifest, interpreter identity, sandbox, allowlisted environment digests, command, and governing-contract digest before launch.",
+      "later_verification": ["binding/TOCTOU integration test", "cross-repository/worktree isolation test"],
+      "rollback_or_failure_behavior": "A changed source, executable, interpreter, environment, or authority binding blocks publication and preserves an aborted attempt.",
+      "design_status": "partially specified; allowlisted fields and reproducible privacy-safe identity procedure remain material future-proposal obligations"
+    },
+    {
+      "requirement": "privacy-sensitive redaction and retention",
+      "architecture_mitigation": "Redact before repository retention, retain typed placeholders and redaction metadata, fail closed on redaction failure, and make committed bundles append-only with signed tombstones for deletion/legal-hold events.",
+      "later_verification": ["privacy leak test across streams, environment, exceptions, and diagnostics", "held-out delimiter and split-secret redaction cases"],
+      "rollback_or_failure_behavior": "Scanner failure, invalid encoding, or grammar-affecting redaction prevents finalization; new adapter rollback disables only the capability while preserving receipts and tombstones.",
+      "design_status": "partially specified; protected raw-stream storage, encryption/access authority, and deletion model are unresolved"
+    },
+    {
+      "requirement": "atomic receipt finalization and append-only retention",
+      "architecture_mitigation": "Use exclusive session staging, fsync/hash verification, atomic same-filesystem rename, compare-and-swap index append, and reader verification of committed receipt, manifest, and index binding.",
+      "later_verification": ["atomicity crash matrix", "idempotency and duplicate-key test", "clean-workspace independent receipt reproduction"],
+      "rollback_or_failure_behavior": "Incomplete or orphaned files are quarantined, never reused; readers accept no partial bundle; adapter rollback preserves every prior receipt.",
+      "design_status": "covered at contract level; durable storage abstraction remains material future-proposal work"
+    },
+    {
+      "requirement": "bounded recovery, rollback, and non-recursive escalation",
+      "architecture_mitigation": "Use append-only PREPARED through COMMITTED/BLOCKED transitions, new linked sessions for revalidation, one diagnosis and one remediation round per blocker signature, two automatic attempts by default, then ESCALATED decision evidence.",
+      "later_verification": ["retry/idempotency fault-injection test", "crash/recovery transition matrix", "budget exhaustion escalation test"],
+      "rollback_or_failure_behavior": "No retry may overwrite, merge, hide, or replace a prior adverse/incomplete attempt; exhausted or sensitive remediation escalates without implementation/promotion conclusion.",
+      "design_status": "covered"
+    },
+    {
+      "requirement": "separate candidate applicability and no cross-repository reuse",
+      "architecture_mitigation": "Require exact candidate commit/tree, parent, component kind, changed-path digest, target binding, composition, authority, validation contract, and rollback reference; namespace receipts by repository/policy realm/worktree bindings.",
+      "later_verification": ["candidate applicability test", "cross-repository/worktree test", "held-out mixed-tree composition case"],
+      "rollback_or_failure_behavior": "A rejected, quarantined, non-promoted, mixed-tree, or mismatched candidate fails before execution; no historic candidate can be implicitly composed or relabeled.",
+      "design_status": "covered"
+    }
+  ],
+  "cross_examination_disposition": [
+    {
+      "finding": "Protected raw-stream storage, encryption/access authority, and deletion model are not precisely chosen.",
+      "material": true,
+      "architecture_response": "Architecture establishes pre-retention redaction, protected raw-spool separation, retention policy, and tombstone behavior, but does not select a concrete protected-store design.",
+      "status": "unresolved",
+      "required_before_later_proposal_can_open": "A precise privacy/storage threat model and repository-safe protected-stream retention/deletion design, including authorities and fail-closed behavior."
+    },
+    {
+      "finding": "Parser grammar, label semantics, canonicalization, and durable storage remain narrative rather than executable/specifiable artifacts.",
+      "material": true,
+      "architecture_response": "Architecture names JSONL events, parser rejection rules, and canonical JSON, with mandatory grammar and adversarial tests, but provides no executable grammar, complete vocabulary, canonicalization test vectors, or storage interface.",
+      "status": "unresolved",
+      "required_before_later_proposal_can_open": "Versioned executable grammar/vocabulary artifacts, canonicalization vectors, and a bounded durable-storage contract that can be independently reviewed."
+    },
+    {
+      "finding": "Environment allowlist and reproducible interpreter/executable identity are not defined without host-data leakage.",
+      "material": true,
+      "architecture_response": "Architecture requires an allowlisted environment-name-to-digest map and interpreter metadata, but leaves the exact fields, normalization, and privacy-safe reproducibility procedure open.",
+      "status": "unresolved",
+      "required_before_later_proposal_can_open": "A field-level allowlist, normalization/redaction rules, identity digest procedure, and held-out leakage/reproducibility cases."
+    },
+    {
+      "finding": "The current court supplies no implementation authority.",
+      "material": false,
+      "architecture_response": "Both design inputs explicitly preserve this boundary.",
+      "status": "resolved_as_boundary",
+      "required_before_later_proposal_can_open": "A distinct Judge decision after all material design findings are resolved; no implementation follows directly."
+    }
+  ],
+  "non_negotiables_preserved": {
+    "no_raw_secrets": "Repository evidence stores redacted artifacts, typed placeholders, counts, and digests only; raw secret-bearing bytes are outside repository retention and need separate authority.",
+    "atomic_receipt_finalization": "Only manifest-verified, atomically renamed, index-bound committed bundles are evidence; staging and orphaned material are quarantined.",
+    "immutable_identity_and_source_binding": "Session IDs, source commit/tree, runner contract, interpreter, environment, and receipt lineage are immutable; revalidation opens a linked new session.",
+    "bounded_recovery": "Recovery is finite and stateful, with blocker signatures, a small retry/remediation budget, and escalation rather than recursive automatic courts.",
+    "candidate_applicability": "Candidate use is a separate exact predicate; prior fixture candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 and GCO candidate d02c2d2 remain adverse and ineligible for reuse, relabeling, qualification, or composition.",
+    "cross_repository_isolation": "Receipt/cache reuse requires matching repository fingerprint, source/tree, worktree, policy realm, interpreter, and contract; branch/path/name similarity is insufficient."
+  },
+  "historical_evidence_boundary": {
+    "historical_repair": "not authorized",
+    "historical_target": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9 / b909b7b7e374bff22912059387ef0fe639498af6 remains adverse historical evidence only",
+    "candidate_reuse": "not authorized",
+    "ci_or_discovery_execution": "not authorized",
+    "implementation": "not authorized"
+  },
+  "readiness": {
+    "all_material_design_findings_have_concrete_mitigation_test_and_rollback": false,
+    "unresolved_material_finding_count": 3,
+    "later_implementation_proposal_dag_may_be_authorized": false,
+    "reason": "The architecture has strong mitigations, acceptance tests, and rollback/failure controls, but three independent material findings remain underspecified. The sealed Judge gate requires zero unresolved material design findings before it may authorize even a later proposal DAG.",
+    "disposition": "DEFER_FAIL_CLOSED"
+  },
+  "permitted_next_step": "A distinct Judge may retain this defer decision. Any later work must first obtain separately sealed, non-implementation authority to resolve the three enumerated design specifications; it may not implement, test, execute CI, use candidates, or modify historical evidence under this record.",
+  "rollback": "Revert only this integration record if an authorized correction is required. Preserve architecture, cross-examination, predecessor evidence, rejected-candidate restrictions, and every adverse conclusion append-only.",
+  "receipt_digest_algorithm": "sha256(canonical JSON of this receipt excluding receipt_digest, UTF-8, sorted keys, compact separators)",
+  "receipt_digest": "sha256:2e01c94f2d9526664d7469f43a3c965c67f8b1c1ac598f5b17322d87a076ee29"
+}
