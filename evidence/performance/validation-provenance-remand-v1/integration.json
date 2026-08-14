@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "kind": "validation-provenance-remand-integration-v1",
+  "node_id": "VPR-INTEGRATE-030",
+  "phase": "integration",
+  "recorded_at": "2026-08-13",
+  "source_binding": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "rule": "Only this exact commit/tree pair is observed. The rejected historical FPC tuples are neither repaired nor normalized.",
+    "rejected_historical_fpc_tuples": [
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c",
+        "status": "rejected"
+      },
+      {
+        "commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70",
+        "tree": "4f20bd2cbe9c3df8b1cf4a28557f330dd401df40",
+        "status": "rejected"
+      }
+    ]
+  },
+  "input_receipts": {
+    "ordered_outcome_ledger": {
+      "path": "evidence/performance/validation-provenance-remand-v1/ordered-outcome-ledger.json",
+      "receipt_digest": "sha256:a2cb4cc638099e829a17e9e661bd593934150962b651a870e2fafab648e00b79",
+      "result": "inconclusive_fail_closed"
+    },
+    "ledger_replay": {
+      "path": "evidence/performance/validation-provenance-remand-v1/ledger-replay.json",
+      "receipt_digest": "sha256:c6fdb81cd1854e12fbecd5369c18ff56a02f4d4c55b515995814548468e00e15",
+      "result": "inconclusive_fail_closed"
+    },
+    "cross_examination": {
+      "path": "evidence/performance/validation-provenance-remand-v1/cross-examination.json",
+      "receipt_digest": "sha256:fc959f1cb2a47fe6d8623818b9b75d2061432e327b40549a1d76fa30801ea571",
+      "result": "inconclusive_fail_closed"
+    },
+    "vtc_qualification": {
+      "path": "evidence/courts/CASE-VALIDATION-TARGET-COMPOSITION-QUALIFICATION.json",
+      "receipt_digest": "sha256:82d23d9165c67b4e6f2d5a104d354bfd4307a1f1aee3d2d16d2da57abab5c213",
+      "disposition": "defer"
+    }
+  },
+  "reconciliation": {
+    "ledger_and_replay": "Both ledger records fail closed before parser evaluation. The required non-empty, unique ordered 1,059-ID discovery vector is absent; reconstructing or substituting it would invent evidence. They also retain the same secondary undefined-label obstacle.",
+    "cross_examination": "The independent cross-examination agrees that neither exact-once coverage nor a terminal outcome mapping can be proven from the retained receipts and transcript, and independently retains the header/summary mismatch and candidate boundary.",
+    "vtc_qualification": "VTC's source-and-transcript accounting classification remains retained only as a limited aggregate explanation. It did not supply the missing ordered vector, a machine-checkable ledger, or an applicable candidate.",
+    "compatibility": "There is no conflict: the records consistently reject converting count-level or source-supported observations into an ID-level provenance proof."
+  },
+  "provenance_disposition": {
+    "reduced": false,
+    "resolved": false,
+    "scope": "The narrow VPR question was whether retained evidence could deterministically bind every claimed discovery ID exactly once to a terminal transcript outcome. That uncertainty was not reduced because the sealed parser could not be invoked and no ledger was produced.",
+    "claim_not_made": "No statement that provenance is resolved, partially proven, or sufficient for remediation is made."
+  },
+  "remaining_blockers": [
+    {
+      "id": "missing_ordered_discovery_vector",
+      "finding": "The retained FPCR and VTC discovery receipts provide the count 1,059 and an ordered-vector digest, but not the ordered ID vector required by the sealed parser.",
+      "effect": "Exactly-once discovery-to-outcome coverage cannot be evaluated without inventing or substituting unavailable evidence."
+    },
+    {
+      "id": "header_summary_mismatch",
+      "finding": "The retained transcript has 1,049 distinct canonical method headers while its sole execution summary reports 1,050 tests run; the missing reported test cannot be identified or assigned an ID. The same summary remains unbound to the claimed 1,059 discovery IDs.",
+      "effect": "Static counts do not establish a bijection or identify the unaccounted outcome."
+    },
+    {
+      "id": "undefined_terminal_labels",
+      "finding": "Thirty-five canonical headers carry non-default inline text: 27 diagnostic or warning labels and eight skipped-with-reason labels. Retained evidence declares no custom-label vocabulary for those texts.",
+      "effect": "The sealed parser cannot silently strip, reinterpret, or post-hoc declare those labels."
+    },
+    {
+      "id": "no_candidate_applicability",
+      "finding": "Fixture candidate 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 is rejected and the GCO candidate d02c2d2 is non-promoted, not a validation-target candidate, and ineligible for reuse, relabeling, qualification, or composition.",
+      "effect": "No applicable implementation or validation candidate exists under this remand."
+    }
+  ],
+  "retained_adverse_facts": {
+    "sole_historical_execution": {
+      "tests_run": 1050,
+      "failures": 28,
+      "skipped": 8,
+      "timed_out": false,
+      "wall_time_seconds": 1130.917,
+      "status": "adverse historical evidence only; not rerun"
+    },
+    "historical_candidates": {
+      "fixture_41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378": "rejected, non-promotable, and ineligible for reuse, relabeling, qualification, or composition",
+      "gco_d02c2d2": "non-promoted, not a validation-target candidate, and ineligible for reuse, relabeling, qualification, or composition"
+    }
+  },
+  "authority": {
+    "implementation": false,
+    "candidate_use_or_execution": false,
+    "ci_or_test_execution": false,
+    "promotion_or_performance_conclusion": false,
+    "knowledge_baseline_retry": false,
+    "main_or_remote_effect": false
+  },
+  "conclusion": "DEFER / fail closed. The independently produced ledger/replay and cross-examination records agree that provenance was not reduced and is not resolved. The exact remaining blockers are the missing ordered discovery vector, the transcript header/summary mismatch, undefined terminal labels, and no applicable candidate. This integration authorizes no code, test, candidate, CI, promotion, performance, or knowledge-baseline action.",
+  "receipt_digest_algorithm": "sha256(canonical JSON of this receipt excluding receipt_digest, UTF-8, sorted keys, compact separators)",
+  "receipt_digest": "sha256:0ae06b988ebaa72e9c8d5a87b35a54ca00adcec6af4d92d1f67084a58753989e"
+}
