@@ -7,19 +7,167 @@ claim, write, receipt, validation-lease, publication, or judgment authority.
 from __future__ import annotations
 
 import json
+import math
 import os
-import time
+import re
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from controller import (
+    ConfigurationError,
+    assert_execution_authority_open,
+    ensure_repository_runtime_identity,
+    require_execution_authority_dir,
+    resolve_repository_state_dir,
+    runtime_file_lock,
+    runtime_file_lock_is_held,
+)
+
 SIDECAR_KINDS = frozenset(
     {"bounded_read_only_research", "independent_review", "non_blocking_validation"}
 )
 ACTIVE_SIDECAR_STATES = frozenset({"PREPARED", "BOUND", "ACTIVE", "ATTENTION_ACKNOWLEDGED"})
-TERMINAL_SIDECAR_STATES = frozenset({"SUCCEEDED", "FAILED", "CANCELLED", "SPAWN_FAILED"})
+TERMINAL_SIDECAR_STATES = frozenset(
+    {
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED",
+        "SPAWN_FAILED",
+        "SKIPPED_CAPACITY",
+        "ORPHANED",
+    }
+)
+INITIALIZATION_LOCK_NAME = "authority-ledger-initialization.lock"
+DIGEST_TEXT = re.compile(r"sha256:[0-9a-f]{64}")
+
+_SIDECAR_ENVELOPE_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "sidecar_id",
+        "state",
+        "previous_event_id",
+        "recorded_at",
+        "event_id",
+    }
+)
+_SIDECAR_AUTHORITY_FIELDS = frozenset(
+    {
+        "parent_launch_instruction_id",
+        "parent_sidecar_id",
+        "parent_resource_key",
+        "parent_authority_epoch",
+        "parent_authority_class",
+        "parent_dispatcher_release_id",
+        "parent_dispatcher_admission_epoch",
+        "host_reservation_id",
+        "capacity_host_id",
+        "capacity_generation",
+        "capacity_epoch",
+        "reservation_expires_at",
+    }
+)
+_SIDECAR_BINDING_FIELDS = frozenset(
+    {
+        "spec_digest",
+        "token_budget_reserved",
+        "host_id",
+        "sidecar_task_id",
+        "cursor",
+        "capability_digest",
+        "parent_spawn_message_id",
+    }
+)
+_SIDECAR_PROGRESS_FIELDS = frozenset(
+    {
+        "host_event_id",
+        "host_event_cursor",
+        "message_id",
+        "descendant_request",
+    }
+)
+_SIDECAR_TERMINAL_FIELDS = frozenset(
+    {
+        "result",
+        "parent_terminal_message_id",
+        "close_reason",
+        "error",
+        "reason",
+        "admission_code",
+    }
+)
+_SIDECAR_ORPHAN_FIELDS = frozenset(
+    {
+        "recovery_actor",
+        "recovery_reason",
+        "orphaned_parent_event_id",
+        "external_cancellation",
+    }
+)
+_SIDECAR_ALLOWED_BY_STATE = {
+    "PREPARED": _SIDECAR_ENVELOPE_FIELDS | _SIDECAR_AUTHORITY_FIELDS | {
+        "spec_digest",
+        "token_budget_reserved",
+    },
+    "BOUND": _SIDECAR_ENVELOPE_FIELDS | _SIDECAR_AUTHORITY_FIELDS | _SIDECAR_BINDING_FIELDS,
+    "ACTIVE": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | _SIDECAR_BINDING_FIELDS
+        | _SIDECAR_PROGRESS_FIELDS
+    ),
+    "ATTENTION_ACKNOWLEDGED": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | _SIDECAR_BINDING_FIELDS
+        | _SIDECAR_PROGRESS_FIELDS
+    ),
+    "SUCCEEDED": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | _SIDECAR_BINDING_FIELDS
+        | _SIDECAR_PROGRESS_FIELDS
+        | _SIDECAR_TERMINAL_FIELDS
+    ),
+    "FAILED": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | _SIDECAR_BINDING_FIELDS
+        | _SIDECAR_PROGRESS_FIELDS
+        | _SIDECAR_TERMINAL_FIELDS
+    ),
+    "CANCELLED": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | _SIDECAR_BINDING_FIELDS
+        | _SIDECAR_PROGRESS_FIELDS
+        | _SIDECAR_TERMINAL_FIELDS
+    ),
+    "SPAWN_FAILED": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | _SIDECAR_BINDING_FIELDS
+        | _SIDECAR_TERMINAL_FIELDS
+    ),
+    "SKIPPED_CAPACITY": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | {"spec_digest", "token_budget_reserved"}
+        | _SIDECAR_TERMINAL_FIELDS
+    ),
+    "ORPHANED": (
+        _SIDECAR_ENVELOPE_FIELDS
+        | _SIDECAR_AUTHORITY_FIELDS
+        | _SIDECAR_BINDING_FIELDS
+        | _SIDECAR_PROGRESS_FIELDS
+        | _SIDECAR_TERMINAL_FIELDS
+        | _SIDECAR_ORPHAN_FIELDS
+    ),
+}
 
 
 class SidecarPolicyError(ValueError):
@@ -32,8 +180,284 @@ def _canonical(value: Mapping[str, object]) -> bytes:
     ).encode("utf-8")
 
 
-def _managed(repo_root: Path, *parts: str) -> Path:
-    root = repo_root.resolve()
+def _reject_duplicate_pairs(
+    pairs: Sequence[tuple[str, object]],
+) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key {key!r}")
+        value[key] = item
+    return value
+
+
+def _reject_nonfinite(value: str) -> object:
+    raise ValueError(f"non-finite JSON constant {value}")
+
+
+def _finite_json(value: object) -> bool:
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, Mapping):
+        return all(isinstance(key, str) and _finite_json(item) for key, item in value.items())
+    if isinstance(value, list):
+        return all(_finite_json(item) for item in value)
+    return value is None or type(value) in {str, int, bool}
+
+
+def _strict_event(line: str, index: int) -> Mapping[str, object]:
+    try:
+        event = json.loads(
+            line,
+            object_pairs_hook=_reject_duplicate_pairs,
+            parse_constant=_reject_nonfinite,
+        )
+    except (json.JSONDecodeError, ValueError) as error:
+        raise SidecarPolicyError(f"sidecar ledger line {index} is invalid") from error
+    if not isinstance(event, Mapping):
+        raise SidecarPolicyError(f"sidecar ledger line {index} must be an object")
+    if not _finite_json(event):
+        raise SidecarPolicyError(f"sidecar ledger line {index} contains non-finite JSON")
+    try:
+        canonical_line = json.dumps(
+            event,
+            ensure_ascii=False,
+            sort_keys=True,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError, UnicodeError) as error:
+        raise SidecarPolicyError(f"sidecar ledger line {index} is not canonical JSON") from error
+    if line != canonical_line:
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} uses a noncanonical encoding"
+        )
+    return event
+
+
+def _validate_event_schema(event: Mapping[str, object], index: int | str) -> None:
+    state = event.get("state")
+    if not isinstance(state, str) or state not in _SIDECAR_ALLOWED_BY_STATE:
+        raise SidecarPolicyError(f"sidecar ledger line {index} has an invalid state")
+    allowed = _SIDECAR_ALLOWED_BY_STATE[state]
+    unexpected = sorted(set(event) - allowed)
+    if unexpected:
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has unexpected {state} fields: "
+            + ", ".join(unexpected)
+        )
+    required = _SIDECAR_ENVELOPE_FIELDS | _SIDECAR_AUTHORITY_FIELDS
+    if state == "SKIPPED_CAPACITY":
+        # Admission lost the aggregate host-capacity race, so no reservation
+        # exists.  The denial still binds the exact capacity generation and
+        # parent authority under which it was observed.
+        required -= {"host_reservation_id"}
+    if state == "ORPHANED":
+        required |= _SIDECAR_ORPHAN_FIELDS | {"parent_launch_instruction_id"}
+    missing = sorted(required - set(event))
+    if missing:
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} lacks required {state} fields: "
+            + ", ".join(missing)
+        )
+    if event.get("schema_version") != 1 or event.get("kind") != "hive-mind-sidecar-ledger-event-v1":
+        raise SidecarPolicyError(f"sidecar ledger line {index} has an invalid schema")
+    for field in ("sidecar_id", "event_id"):
+        value = event.get(field)
+        if not isinstance(value, str) or DIGEST_TEXT.fullmatch(value) is None:
+            raise SidecarPolicyError(f"sidecar ledger line {index} has invalid {field}")
+    previous = event.get("previous_event_id")
+    if previous is not None and (
+        not isinstance(previous, str) or DIGEST_TEXT.fullmatch(previous) is None
+    ):
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has invalid previous_event_id"
+        )
+    if not isinstance(event.get("recorded_at"), str):
+        raise SidecarPolicyError(f"sidecar ledger line {index} has invalid recorded_at")
+    required_by_state = {
+        "PREPARED": {"parent_launch_instruction_id"},
+        "BOUND": {
+            "parent_launch_instruction_id",
+            "host_id",
+            "sidecar_task_id",
+            "cursor",
+            "capability_digest",
+        },
+        "ACTIVE": {"parent_launch_instruction_id", "host_id", "sidecar_task_id"},
+        "ATTENTION_ACKNOWLEDGED": {
+            "parent_launch_instruction_id",
+            "host_id",
+            "sidecar_task_id",
+            "host_event_id",
+            "host_event_cursor",
+            "message_id",
+        },
+        "SUCCEEDED": {"parent_launch_instruction_id"},
+        "FAILED": {"parent_launch_instruction_id"},
+        "CANCELLED": {"parent_launch_instruction_id"},
+        "SPAWN_FAILED": {"parent_launch_instruction_id", "error"},
+        "SKIPPED_CAPACITY": {
+            "parent_launch_instruction_id",
+            "spec_digest",
+            "token_budget_reserved",
+            "admission_code",
+            "reason",
+        },
+        "ORPHANED": _SIDECAR_ORPHAN_FIELDS | {"parent_launch_instruction_id"},
+    }[state]
+    missing_state = sorted(required_by_state - set(event))
+    if missing_state:
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} lacks required {state} fields: "
+            + ", ".join(missing_state)
+        )
+    parent_id = event.get("parent_launch_instruction_id")
+    if parent_id is not None and (
+        not isinstance(parent_id, str) or DIGEST_TEXT.fullmatch(parent_id) is None
+    ):
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has invalid parent launch identity"
+        )
+    epoch = event.get("parent_authority_epoch")
+    if epoch is not None and (type(epoch) is not int or epoch < 1):
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has invalid parent authority epoch"
+        )
+    dispatch_epoch = event.get("parent_dispatcher_admission_epoch")
+    if dispatch_epoch is not None and (
+        type(dispatch_epoch) is not int or dispatch_epoch < 1
+    ):
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has invalid dispatcher admission epoch"
+        )
+    authority_class = event.get("parent_authority_class")
+    if authority_class not in {"PREPARATION_ONLY", "WRITE_AUTHORIZED"}:
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has invalid parent authority class"
+        )
+    release_id = event.get("parent_dispatcher_release_id")
+    if authority_class == "WRITE_AUTHORIZED":
+        if (
+            not isinstance(release_id, str)
+            or DIGEST_TEXT.fullmatch(release_id) is None
+            or type(dispatch_epoch) is not int
+            or dispatch_epoch < 1
+        ):
+            raise SidecarPolicyError(
+                f"sidecar ledger line {index} lacks exact parent dispatcher authority"
+            )
+    elif release_id is not None or dispatch_epoch is not None:
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} gives preparation parent dispatcher authority"
+        )
+    for digest_field in ("host_reservation_id", "capacity_generation"):
+        value = event.get(digest_field)
+        if state == "SKIPPED_CAPACITY" and digest_field == "host_reservation_id":
+            if value is not None:
+                raise SidecarPolicyError(
+                    f"sidecar ledger line {index} fabricates a denied reservation"
+                )
+            continue
+        if not isinstance(value, str) or DIGEST_TEXT.fullmatch(value) is None:
+            raise SidecarPolicyError(
+                f"sidecar ledger line {index} has invalid {digest_field}"
+            )
+    if (
+        not isinstance(event.get("capacity_host_id"), str)
+        or not str(event.get("capacity_host_id")).strip()
+        or type(event.get("capacity_epoch")) is not int
+        or int(event["capacity_epoch"]) < 1
+        or not isinstance(event.get("reservation_expires_at"), str)
+        or not str(event.get("reservation_expires_at")).strip()
+    ):
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has invalid host capacity fence"
+        )
+    if state == "ORPHANED":
+        if event.get("external_cancellation") != "NOT_CLAIMED":
+            raise SidecarPolicyError(
+                f"sidecar ledger line {index} overclaims external cancellation"
+            )
+        for field in ("recovery_actor", "recovery_reason", "orphaned_parent_event_id"):
+            value = event.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise SidecarPolicyError(
+                    f"sidecar ledger line {index} has invalid orphan provenance"
+                )
+    if state == "SKIPPED_CAPACITY" and event.get("admission_code") != "ADMISSION_DENIED":
+        raise SidecarPolicyError(
+            f"sidecar ledger line {index} has invalid capacity-denial provenance"
+        )
+
+
+def _validate_sidecar_replay(events: Sequence[Mapping[str, object]]) -> None:
+    latest: dict[str, Mapping[str, object]] = {}
+    immutable = _SIDECAR_AUTHORITY_FIELDS | _SIDECAR_BINDING_FIELDS
+    legal = {
+        "PREPARED": {"BOUND", "SPAWN_FAILED", "FAILED", "CANCELLED", "ORPHANED"},
+        "BOUND": {
+            "ACTIVE",
+            "ATTENTION_ACKNOWLEDGED",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED",
+            "ORPHANED",
+        },
+        "ACTIVE": {
+            "ACTIVE",
+            "ATTENTION_ACKNOWLEDGED",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED",
+            "ORPHANED",
+        },
+        "ATTENTION_ACKNOWLEDGED": {
+            "ACTIVE",
+            "ATTENTION_ACKNOWLEDGED",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED",
+            "ORPHANED",
+        },
+        "SUCCEEDED": set(),
+        "FAILED": set(),
+        "CANCELLED": set(),
+        "SPAWN_FAILED": set(),
+        "SKIPPED_CAPACITY": set(),
+        "ORPHANED": set(),
+    }
+    for index, event in enumerate(events, 1):
+        sidecar_id = str(event["sidecar_id"])
+        prior = latest.get(sidecar_id)
+        if prior is None:
+            if event.get("state") not in {"PREPARED", "SKIPPED_CAPACITY"}:
+                raise SidecarPolicyError(
+                    f"sidecar ledger line {index} has no admission ancestry"
+                )
+        else:
+            prior_state = str(prior["state"])
+            state = str(event["state"])
+            if state not in legal[prior_state]:
+                raise SidecarPolicyError(
+                    f"sidecar ledger line {index} has impossible {prior_state} -> {state} transition"
+                )
+            for field in immutable:
+                if prior.get(field) is not None and prior.get(field) != event.get(field):
+                    raise SidecarPolicyError(
+                        f"sidecar ledger line {index} mutates immutable {field}"
+                    )
+        latest[sidecar_id] = event
+
+
+def _managed(
+    repo_root: Path,
+    state_dir: str | Path | None,
+    *parts: str,
+) -> Path:
+    try:
+        root = _authority_state_root(repo_root, state_dir)
+    except ConfigurationError as error:
+        raise SidecarPolicyError(str(error)) from error
     current = root
     for part in parts:
         current /= part
@@ -41,70 +465,139 @@ def _managed(repo_root: Path, *parts: str) -> Path:
         if current.is_symlink() or (callable(is_junction) and is_junction()):
             raise SidecarPolicyError(f"sidecar state path uses a link: {current}")
         if current.exists() and not current.resolve().is_relative_to(root):
-            raise SidecarPolicyError(f"sidecar state path escapes repository: {current}")
+            raise SidecarPolicyError(f"sidecar state path escapes runtime state: {current}")
     return current
 
 
-@contextmanager
-def _ledger_lock(repo_root: Path):
-    path = _managed(repo_root, ".autopilot", "sidecar-bindings.lock")
-    if not path.is_file():
-        raise SidecarPolicyError("required sidecar binding lock file is missing")
-    descriptor = os.open(path, os.O_RDWR | getattr(os, "O_NOFOLLOW", 0))
-    deadline = time.monotonic() + 10.0
-    while True:
+def _authority_state_root(
+    repo_root: Path,
+    state_dir: str | Path | None,
+) -> Path:
+    coordination = resolve_repository_state_dir(repo_root)
+    if state_dir is None:
+        if (coordination / "runtime-authority-ready.json").is_file():
+            raise SidecarPolicyError(
+                "runtime READY requires an explicit authenticated execution directory"
+            )
+        return coordination
+    supplied = Path(os.path.abspath(os.fspath(state_dir))).absolute()
+    if supplied == coordination:
+        if (coordination / "runtime-authority-ready.json").is_file():
+            raise SidecarPolicyError(
+                "repository-global sidecar authority is retired after runtime READY"
+            )
+        return coordination
+    if re.fullmatch(r"[0-9a-f]{64}", supplied.name):
         try:
-            os.lseek(descriptor, 0, os.SEEK_SET)
-            if os.name == "nt":
-                import msvcrt
-
-                if os.fstat(descriptor).st_size == 0:
-                    os.write(descriptor, b"0")
-                    os.fsync(descriptor)
-                    os.lseek(descriptor, 0, os.SEEK_SET)
-                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            break
-        except OSError:
-            if time.monotonic() >= deadline:
-                os.close(descriptor)
-                raise SidecarPolicyError("sidecar binding ledger lock timed out")
-            time.sleep(0.01)
+            return require_execution_authority_dir(
+                repo_root,
+                supplied,
+                execution_id="sha256:" + supplied.name,
+            )
+        except ConfigurationError as error:
+            raise SidecarPolicyError(str(error)) from error
     try:
-        yield
-    finally:
-        os.lseek(descriptor, 0, os.SEEK_SET)
-        if os.name == "nt":
-            import msvcrt
+        return resolve_repository_state_dir(repo_root, supplied)
+    except ConfigurationError as error:
+        raise SidecarPolicyError(str(error)) from error
 
-            msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+
+def _explicit_execution_dir(
+    repo_root: Path,
+    *,
+    execution_dir: str | Path,
+    execution_id: str,
+    execution_namespace: str | None = None,
+) -> Path:
+    try:
+        return require_execution_authority_dir(
+            repo_root,
+            execution_dir,
+            execution_id=execution_id,
+            execution_namespace=execution_namespace,
+        )
+    except ConfigurationError as error:
+        raise SidecarPolicyError(str(error)) from error
+
+
+@contextmanager
+def _ledger_lock(
+    repo_root: Path,
+    state_dir: str | Path | None = None,
+    *,
+    for_write: bool = False,
+) -> Iterator[None]:
+    directory = _authority_state_root(repo_root, state_dir)
+    try:
+        identity = ensure_repository_runtime_identity(
+            repo_root, resolve_repository_state_dir(repo_root), create=False
+        )
+    except ConfigurationError as error:
+        raise SidecarPolicyError(str(error)) from error
+    ledger_path = _managed(repo_root, directory, "sidecar-bindings.jsonl")
+    lock_path = _managed(repo_root, directory, "locks", "sidecar-bindings.lock")
+    initialization_path = _managed(
+        repo_root,
+        directory,
+        "locks",
+        INITIALIZATION_LOCK_NAME,
+    )
+    if not for_write and not lock_path.is_file():
+        raise SidecarPolicyError(
+            "sidecar binding lock is absent; run an explicit authority migration"
+        )
+    if identity is not None and (
+        not lock_path.is_file() or not initialization_path.is_file()
+    ):
+        raise SidecarPolicyError(
+            "sidecar authority is uninitialized; run runtime-authority-migrate"
+        )
+    is_execution = directory != resolve_repository_state_dir(repo_root)
+    if for_write and is_execution:
+        dispatcher_lock = directory / "locks" / "dispatcher-admission.lock"
+        if not runtime_file_lock_is_held(dispatcher_lock):
+            raise SidecarPolicyError(
+                "sidecar mutation requires caller-held dispatcher authority"
+            )
+    try:
+        if for_write and not ledger_path.exists():
+            with runtime_file_lock(initialization_path):
+                with runtime_file_lock(lock_path):
+                    if is_execution:
+                        assert_execution_authority_open(directory)
+                    yield
         else:
-            import fcntl
+            with runtime_file_lock(lock_path):
+                if for_write and is_execution:
+                    assert_execution_authority_open(directory)
+                yield
+    except ConfigurationError as error:
+        raise SidecarPolicyError(str(error)) from error
 
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-        os.close(descriptor)
 
-
-def _events_unlocked(repo_root: Path) -> tuple[Mapping[str, object], ...]:
-    path = _managed(repo_root, ".autopilot", "state", "sidecar-bindings.jsonl")
+def _events_unlocked(
+    repo_root: Path,
+    state_dir: str | Path | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    path = _managed(repo_root, state_dir, "sidecar-bindings.jsonl")
     if not path.exists():
         return ()
     previous: str | None = None
     events: list[Mapping[str, object]] = []
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        raw = path.read_bytes()
+        text = raw.decode("utf-8")
     except (OSError, UnicodeError) as error:
         raise SidecarPolicyError(f"cannot read sidecar ledger: {error}") from error
+    if raw and not raw.endswith(b"\n"):
+        raise SidecarPolicyError(
+            "sidecar ledger has an unterminated final record; explicit torn-tail "
+            "recovery is required"
+        )
+    lines = text.splitlines()
     for index, line in enumerate(lines, 1):
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError as error:
-            raise SidecarPolicyError(f"sidecar ledger line {index} is invalid") from error
-        if not isinstance(event, Mapping):
-            raise SidecarPolicyError(f"sidecar ledger line {index} must be an object")
+        event = _strict_event(line, index)
+        _validate_event_schema(event, index)
         material = dict(event)
         event_id = material.pop("event_id", None)
         if material.get("previous_event_id") != previous:
@@ -114,47 +607,92 @@ def _events_unlocked(repo_root: Path) -> tuple[Mapping[str, object], ...]:
             raise SidecarPolicyError(f"sidecar ledger line {index} has an invalid digest")
         previous = str(event_id)
         events.append(event)
+    _validate_sidecar_replay(events)
     return tuple(events)
 
 
-def sidecar_events(repo_root: Path) -> tuple[Mapping[str, object], ...]:
-    with _ledger_lock(repo_root):
-        return _events_unlocked(repo_root)
+def sidecar_events(
+    repo_root: Path,
+    *,
+    state_dir: str | Path | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    path = _managed(repo_root, state_dir, "sidecar-bindings.jsonl")
+    if path.exists():
+        with _ledger_lock(repo_root, state_dir):
+            return _events_unlocked(repo_root, state_dir)
+    initialization_path = _managed(
+        repo_root,
+        state_dir,
+        "locks",
+        INITIALIZATION_LOCK_NAME,
+    )
+    if not initialization_path.is_file():
+        return ()
+    try:
+        with runtime_file_lock(initialization_path):
+            if not path.exists():
+                return ()
+            with _ledger_lock(repo_root, state_dir):
+                return _events_unlocked(repo_root, state_dir)
+    except ConfigurationError as error:
+        raise SidecarPolicyError(str(error)) from error
 
 
-def _append(repo_root: Path, value: Mapping[str, object]) -> Mapping[str, object]:
-    with _ledger_lock(repo_root):
-        events = _events_unlocked(repo_root)
-        material = {
-            "schema_version": 1,
-            **dict(value),
-            "previous_event_id": events[-1]["event_id"] if events else None,
-            "recorded_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        }
-        event = {**material, "event_id": "sha256:" + sha256(_canonical(material)).hexdigest()}
-        path = _managed(repo_root, ".autopilot", "state", "sidecar-bindings.jsonl")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor = os.open(
-            path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0), 0o600
-        )
-        with os.fdopen(descriptor, "a", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        return event
+def _append(
+    repo_root: Path,
+    value: Mapping[str, object],
+    state_dir: str | Path | None = None,
+) -> Mapping[str, object]:
+    with _ledger_lock(repo_root, state_dir, for_write=True):
+        events = _events_unlocked(repo_root, state_dir)
+        return _append_unlocked(repo_root, value, events, state_dir)
 
 
-def latest_sidecars(repo_root: Path) -> dict[str, Mapping[str, object]]:
+def _append_unlocked(
+    repo_root: Path,
+    value: Mapping[str, object],
+    events: Sequence[Mapping[str, object]],
+    state_dir: str | Path | None = None,
+) -> Mapping[str, object]:
+    material = {
+        "schema_version": 1,
+        **dict(value),
+        "previous_event_id": events[-1]["event_id"] if events else None,
+        "recorded_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+    }
+    event = {**material, "event_id": "sha256:" + sha256(_canonical(material)).hexdigest()}
+    _validate_event_schema(event, "new")
+    path = _managed(repo_root, state_dir, "sidecar-bindings.jsonl")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(
+        path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0), 0o600
+    )
+    with os.fdopen(descriptor, "a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    return event
+
+
+def latest_sidecars(
+    repo_root: Path,
+    *,
+    state_dir: str | Path | None = None,
+) -> dict[str, Mapping[str, object]]:
     latest: dict[str, Mapping[str, object]] = {}
-    for event in sidecar_events(repo_root):
+    for event in sidecar_events(repo_root, state_dir=state_dir):
         sidecar_id = event.get("sidecar_id")
         if isinstance(sidecar_id, str):
             latest[sidecar_id] = event
     return latest
 
 
-def active_sidecars(repo_root: Path) -> tuple[Mapping[str, object], ...]:
-    latest = latest_sidecars(repo_root)
+def active_sidecars(
+    repo_root: Path,
+    *,
+    state_dir: str | Path | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    latest = latest_sidecars(repo_root, state_dir=state_dir)
     return tuple(
         latest[key]
         for key in sorted(latest)
@@ -162,15 +700,164 @@ def active_sidecars(repo_root: Path) -> tuple[Mapping[str, object], ...]:
     )
 
 
-def record_sidecar_state(repo_root: Path, sidecar_id: str, state: str, **fields: object) -> Mapping[str, object]:
+def record_sidecar_state(
+    repo_root: Path,
+    sidecar_id: str,
+    state: str,
+    *,
+    state_dir: str | Path | None = None,
+    **fields: object,
+) -> Mapping[str, object]:
     if state not in ACTIVE_SIDECAR_STATES | TERMINAL_SIDECAR_STATES:
         raise SidecarPolicyError("invalid sidecar state")
-    prior = latest_sidecars(repo_root).get(sidecar_id)
-    if prior is not None and prior.get("state") in TERMINAL_SIDECAR_STATES:
-        if prior.get("state") == state and all(prior.get(key) == value for key, value in fields.items()):
-            return prior
-        raise SidecarPolicyError("terminal sidecar state cannot regress or change")
-    return _append(repo_root, {"kind": "hive-mind-sidecar-ledger-event-v1", "sidecar_id": sidecar_id, "state": state, **fields})
+    with _ledger_lock(repo_root, state_dir, for_write=True):
+        events = _events_unlocked(repo_root, state_dir)
+        prior = next(
+            (event for event in reversed(events) if event.get("sidecar_id") == sidecar_id),
+            None,
+        )
+        if prior is None and state not in {"PREPARED", "SKIPPED_CAPACITY"}:
+            raise SidecarPolicyError(
+                "sidecar must begin with PREPARED or denied-admission evidence"
+            )
+        if prior is not None and prior.get("state") in TERMINAL_SIDECAR_STATES:
+            if prior.get("state") == state and all(prior.get(key) == value for key, value in fields.items()):
+                return prior
+            raise SidecarPolicyError("terminal sidecar state cannot regress or change")
+        inherited = (
+            {
+                key: value
+                for key, value in prior.items()
+                if key
+                not in {
+                    "schema_version",
+                    "kind",
+                    "sidecar_id",
+                    "state",
+                    "previous_event_id",
+                    "recorded_at",
+                    "event_id",
+                }
+            }
+            if prior is not None
+            else {}
+        )
+        return _append_unlocked(
+            repo_root,
+            {
+                "kind": "hive-mind-sidecar-ledger-event-v1",
+                "sidecar_id": sidecar_id,
+                "state": state,
+                **inherited,
+                **fields,
+            },
+            events,
+            state_dir,
+        )
+
+
+def orphan_sidecar_obligations(
+    repo_root: Path,
+    active_parent_launch_ids: Sequence[str],
+    *,
+    state_dir: str | Path | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    """Return active sidecars whose durable parent launch is no longer active.
+
+    The caller owns the task-binding lock before entering this function.  This
+    module never imports orchestration, preserving the single binding -> sidecar
+    lock order and avoiding a circular authority dependency.
+    """
+
+    active_parents = frozenset(active_parent_launch_ids)
+    return tuple(
+        event
+        for event in active_sidecars(repo_root, state_dir=state_dir)
+        if event.get("parent_launch_instruction_id") not in active_parents
+    )
+
+
+def fence_orphaned_sidecars(
+    repo_root: Path,
+    active_parent_launch_ids: Sequence[str],
+    *,
+    actor: str,
+    reason: str,
+    orphaned_parent_events: Mapping[str, str] | None = None,
+    limit: int | None = None,
+    state_dir: str | Path | None = None,
+) -> tuple[Mapping[str, object], ...]:
+    """Append terminal ORPHANED evidence without claiming host cancellation.
+
+    This is an administrative repository-state transition.  It deliberately
+    does not call a host adapter: a stale external process may still exist, but
+    its parent launch fence prevents it from performing repository effects.
+    """
+
+    if not actor.strip() or not reason.strip():
+        raise SidecarPolicyError("orphan recovery requires actor and reason")
+    if limit is not None and (type(limit) is not int or limit < 0):
+        raise SidecarPolicyError("orphan recovery limit must be a nonnegative integer")
+    active_parents = frozenset(active_parent_launch_ids)
+    parent_events = dict(orphaned_parent_events or {})
+    recovered: list[Mapping[str, object]] = []
+    with _ledger_lock(repo_root, state_dir, for_write=True):
+        events = list(_events_unlocked(repo_root, state_dir))
+        latest: dict[str, Mapping[str, object]] = {}
+        history: dict[str, list[Mapping[str, object]]] = {}
+        for event in events:
+            sidecar_id = str(event["sidecar_id"])
+            latest[sidecar_id] = event
+            history.setdefault(sidecar_id, []).append(event)
+        candidates = [
+            latest[key]
+            for key in sorted(latest)
+            if latest[key].get("state") in ACTIVE_SIDECAR_STATES
+            and latest[key].get("parent_launch_instruction_id") not in active_parents
+        ]
+        if limit is not None:
+            candidates = candidates[:limit]
+        preserve_fields = (
+            _SIDECAR_AUTHORITY_FIELDS
+            | _SIDECAR_BINDING_FIELDS
+            | _SIDECAR_PROGRESS_FIELDS
+            | _SIDECAR_TERMINAL_FIELDS
+        )
+        for prior in candidates:
+            sidecar_id = str(prior["sidecar_id"])
+            aggregate: dict[str, object] = {}
+            for historical in history[sidecar_id]:
+                for field in preserve_fields:
+                    if field in historical and historical[field] is not None:
+                        aggregate[field] = historical[field]
+            parent_id = aggregate.get("parent_launch_instruction_id")
+            if not isinstance(parent_id, str) or DIGEST_TEXT.fullmatch(parent_id) is None:
+                raise SidecarPolicyError(
+                    f"active sidecar {sidecar_id} has no exact parent launch identity"
+                )
+            parent_event_id = parent_events.get(parent_id)
+            if not isinstance(parent_event_id, str) or DIGEST_TEXT.fullmatch(parent_event_id) is None:
+                raise SidecarPolicyError(
+                    f"orphan sidecar {sidecar_id} lacks the exact terminal parent event"
+                )
+            event = _append_unlocked(
+                repo_root,
+                {
+                    "kind": "hive-mind-sidecar-ledger-event-v1",
+                    "sidecar_id": sidecar_id,
+                    "state": "ORPHANED",
+                    **aggregate,
+                    "recovery_actor": actor,
+                    "recovery_reason": reason,
+                    "orphaned_parent_event_id": parent_event_id,
+                    "external_cancellation": "NOT_CLAIMED",
+                },
+                events,
+                state_dir,
+            )
+            events.append(event)
+            recovered.append(event)
+    return tuple(recovered)
 
 
 def validate_sidecar_policy(value: object) -> tuple[str, ...]:

@@ -43,8 +43,8 @@ deterministic kernel surfaces plus retained evidence.
 - Never touch the release branch; never rebase/squash/amend the node branch;
   commit forward only.
 - Run ONLY the focused commands in section 5. Never run
-  `python -m unittest discover` or any repo-wide test pass — the R2B integrator
-  owns the single leased repo-wide run.
+  `python -m unittest discover` or any repo-wide test pass — the authenticated
+  validation broker exclusively owns the repository-wide gate.
 - Do not weaken, skip, or fork `tests/hive_cortex/acceptance_harness.py`
   semantics; consume it as-is via relative import.
 
@@ -397,6 +397,7 @@ transient executor exception with `backoff_seconds=0` and `ManualClock`;
 - Do NOT import or wait for `hive_mind_os.brain_kernel.mission_runtime` (MISSION-400's file) or any other sibling deliverable; if you believe you need it, `autopilot fail` with a blocker instead.
 - Do NOT add fixtures under `tests/fixtures/**` — that is ACCEPT-240's completed scope; only read them.
 - Do NOT modify anything under `src/`, `.github/`, `.autopilot/`, `evidence/courts/**`, or `docs/architecture/**`.
-- Do NOT run `python -m unittest discover`, pytest, or any repo-wide pass; the R2B integrator owns the single leased run.
+- Do NOT run `python -m unittest discover`, pytest, or any repo-wide pass; the
+  authenticated validation broker exclusively owns the repository-wide gate.
 - Do NOT loosen assertions to pass (e.g. accepting `TRUE_AUTHORITY_REQUIRED` for a defect scenario) — that violates the no-authority-expansion assumption and the `humanless-qualification` semantic lock.
 - Do NOT hand-edit `humanless-qualification.json` (regenerate via `--write-evidence`), and do NOT rebase, squash, amend, force-push, or merge the PR; stop at the draft PR + receipt.

@@ -57,21 +57,70 @@ The procedure below is also implemented as `.autopilot/bin/round_driver.py`.
 Prefer the command; the prose exists so the behaviour is auditable and so a
 human can take over at any phase.
 
+All snippets use one exact initialized execution. Populate these once and never borrow
+`default` or another worktree's paths:
+
 ```bash
-python .autopilot/bin/github_snapshot.py --reconcile --actor codex:orchestrator
-python .autopilot/bin/autopilot.py --repo-root . run-round --actor codex:round-driver
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STATE_DIR="<absolute repository coordination root>"
+HOST_RUNTIME_DIR="<absolute canonical per-user host runtime>"
+EXECUTION_NAMESPACE="<exact execution namespace>"
+HOST_ID="<canonical authenticated host id>"
+PYTHON="<absolute interpreter from the sealed execution identity>"
+AUTOPILOT=("$PYTHON" "$REPO_ROOT/.autopilot/bin/autopilot.py" --repo-root "$REPO_ROOT" \
+  --state-dir "$STATE_DIR" --host-runtime-dir "$HOST_RUNTIME_DIR" \
+  --execution-namespace "$EXECUTION_NAMESPACE")
+SNAPSHOT=("$PYTHON" "$REPO_ROOT/.autopilot/bin/github_snapshot.py" --repo-root "$REPO_ROOT" \
+  --state-dir "$STATE_DIR" --host-runtime-dir "$HOST_RUNTIME_DIR" \
+  --execution-namespace "$EXECUTION_NAMESPACE")
 ```
 
-`run-round` selects the first incomplete compiled round, triages any recorded
-blockers, integrates every node branch sealed by a receipt commit in the wave's
-declared order, and runs the round's single leased repository-wide gate once the
-wave is whole. It refuses to select anything while reconciliation is required,
-because every verdict is untrustworthy until then. Each phase is idempotent, so
-re-running after a stall resumes rather than repeats.
+```bash
+"${SNAPSHOT[@]}" --reconcile --actor codex:orchestrator
+DISPATCH_JSON=$("${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" --actor codex:orchestrator --node <NODE> [--node <NODE> ...])
+RELEASE_ID=$(printf '%s' "$DISPATCH_JSON" | jq -r .release_id)
+# After every worker has sealed its branch and settled its claim:
+"${AUTOPILOT[@]}" run-round --actor codex:round-driver --release-id "$RELEASE_ID"
+```
+
+`dispatch` publishes one repository-shared, generation-fenced release and returns its
+exact `release_id`. Before its remote reads, `github_snapshot.py` reserves a monotonic
+repository-shared observation ID and installs only through that exact reservation; a
+slower observation that began before a newer one is fenced. `run-round` must present the
+release ID. It locks and revalidates the shared release, requires all worker claims to be
+settled, requires the released wave to equal the first incomplete compiled round, and
+preflights the exact receipt head for every released node before triage or Git effects. A
+partial wave returns `PENDING` without healing, reconciliation, merge, push, or validation.
+After separately fenced recovery, run a fresh snapshot/reconciliation and dispatch before
+retrying. A whole wave integrates every sealed node branch in the release's declared
+order and obtains the single authenticated validation-broker completion as one
+transaction. A stale,
+invalidated, wrong-plan, wrong-target, wrong-wave, or noncanonical-cap release fails
+before mutation. The public command has no skip-validation or in-lock healing mode.
+
+The publication broker also requires independently attested network and credential
+isolation for untrusted candidate tests. The current Windows environment cannot prove
+that sandbox boundary, so the broker deliberately fails closed before validation and no
+ordinary round can be published there. Do not replace it with the legacy in-process
+runner.
 
 `autopilot execute-wave` covers the worker half: it renders the released wave
-into session cards under `.autopilot/state/host/cards/` and supervises them by
+into session cards under the authenticated execution directory's `host/cards/` and supervises them by
 polling repository evidence, never by waiting on a chat session.
+
+Primary, sidecar, and validation reservations consume one authenticated per-user host
+budget across every registered repository. The current App Server ceiling is
+conservatively one unless a stronger expiring provider capability is sealed; the
+controller cannot claim eight slots from source-code parallelism alone. Optional work is
+omitted when no capacity remains, while mandatory work fails closed before a host effect.
+The host kernel arbitrates admission across repositories, but it does not claim OS-level
+CPU, memory, disk, network, CI, or process cancellation control. A fence cannot forcibly
+cancel an external chat.
+
+The pinned Codex App Server protocol has no crash-exact thread-create idempotency token,
+so its adapter is observer-only (`autonomous_launch=false`). `execute-wave` can adopt or
+observe existing work, but fresh unfinished work returns `WAITING_FOR_HOST`; operators
+must not describe this build as autonomous fresh-task launch.
 
 ## Orchestrator procedure (one round)
 
@@ -79,9 +128,10 @@ Phase 0 — release the wave (~2 minutes, all deterministic):
 
 ```bash
 git fetch origin <release-branch>
-python .autopilot/bin/github_snapshot.py --reconcile --actor codex:<round>-orchestrator
-python .autopilot/bin/autopilot.py --repo-root . dispatch --actor codex:<round>-orchestrator --node <NODE> [--node <NODE> ...]
-python .autopilot/bin/autopilot.py --repo-root . render-prompt <NODE>   # per released node
+"${SNAPSHOT[@]}" --reconcile --actor codex:<round>-orchestrator
+DISPATCH_JSON=$("${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" --actor codex:<round>-orchestrator --node <NODE> [--node <NODE> ...])
+RELEASE_ID=$(printf '%s' "$DISPATCH_JSON" | jq -r .release_id)
+"${AUTOPILOT[@]}" render-prompt --host-id "$HOST_ID" <NODE>   # per released node
 ```
 
 The dispatch output must say `START NOW` (one node) or `START TOGETHER NOW`
@@ -129,59 +179,41 @@ receipt branch in the normal Phase 2 order. The stall was cosmetic.
 **Remote branch exists without a receipt** — settle it before the lease expires:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . fail <NODE> --owner <exact-owner> \
+"${AUTOPILOT[@]}" fail <NODE> --owner <exact-owner> \
+  --claim-id <exact-claim-id> \
+  --launch-instruction-id <exact-launch-instruction-id> \
+  --resource-key <exact-resource-key> --authority-epoch <exact-authority-epoch> \
   --kind failure --error "worker stalled; settled by <round> orchestrator" \
   --blocker-cause "no terminal evidence within supervision window" \
   --blocker-fix "resume or repair the node from its retained branch" \
   --retry-when "after the branch is reconciled"
-python .autopilot/bin/autopilot.py --repo-root . release <NODE> --owner <exact-owner> \
-  --reason "stalled worker settled; branch retained for repair"
 ```
 
-`--owner` must be the stalled session's exact owner string (read it from
-`.autopilot/state/claims/<NODE>.json` before it is reaped). If `release` cannot
-delete the remote claim ref because the branch advanced past the claim commit,
-do not force it — the node's next round is a **repair**, not a fresh claim:
+`--owner` and `--claim-id` must come from the exact stalled claim (read them from
+the shared authority's `claims/<NODE>.json` before it is reaped). `fail` releases an
+untouched remote claim but preserves a branch that advanced past the claim commit. In
+that case do not force-delete it — the node's next round is a **repair**, not a fresh claim:
 re-dispatch it and use `.autopilot/templates/repair.md`, which resumes from the
 retained branch instead of demanding a new claim.
 
-Phase 2 — integrate serially, in deterministic order:
+Phase 2 — integrate and validate under the exact shared release:
 
-Workers never touch the release branch. The orchestrator is the single
-integrator. Take finished nodes in the wave's declared `--node` order (not
-finish order); for each:
-
-```bash
-git fetch origin <node-branch>
-git merge --no-ff <node-branch>        # ancestry-preserving; never squash/rebase
-git push origin <release-branch>
-python .autopilot/bin/github_snapshot.py --reconcile --actor codex:<round>-integrator
-python .autopilot/bin/autopilot.py --repo-root . status   # node must now be COMPLETE
-```
-
-A merge conflict is a stop signal, not a judgment call: scopes are disjoint, so
-a conflict means a scope violation. Remand to the owning node's repair flow
-(`.autopilot/templates/repair.md`); never resolve semantically in the merge.
-
-Phase 3 — one repository-wide validation per round, then release the next round:
+Workers never touch the release branch. After every node has a durable receipt branch and
+every worker claim is settled, the orchestrator invokes the single fenced integrator:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . validation-lease-acquire <anchor-node> --owner codex:<round>-integrator
-python -m unittest discover -s tests    # the single authoritative run for the round
-python .autopilot/bin/autopilot.py --repo-root . validation-lease-release <anchor-node> --owner codex:<round>-integrator
+"${AUTOPILOT[@]}" run-round \
+  --actor codex:<round>-integrator --release-id "$RELEASE_ID"
 ```
 
-Workers run only their node's focused `required_tests`; the round's repo-wide
-gate runs exactly once, here. Use the round's first node as `<anchor-node>`.
-
-**R8 exception (QUALIFY-610).** In R8 the QUALIFY-610 worker runs the round's
-single leased repo-wide pass itself per its runbook (Gate 1b, anchor
-`QUALIFY-610`, owner `codex:qualify-610`) — its sealed contract names
-`full-constitutional-ci` and `cross-platform-qualification` among its
-`required_tests`, which no focused suite can satisfy. The R8 integrator does
-NOT run a second Phase 3 pass; it verifies the lease was released and consumes
-the worker's retained `gate1-ci/unittest-full.log` receipts instead. The
-one-leased-run-per-round invariant is preserved; only the owner changes.
+The command owns deterministic ancestry-preserving merges, optional push, and the one
+repository-wide validation lease while holding the dispatcher-admission lock. A merge
+conflict is a stop signal, not a judgment call: scopes are disjoint, so a conflict means a
+scope violation. Remand to the owning node's repair flow
+(`.autopilot/templates/repair.md`); never resolve semantically in the merge. Validation
+failure fails the round; it cannot be bypassed by a public CLI flag. Worker-required
+qualification receipts remain evidence, but they do not replace this integration-time
+gate over the exact integrated tree.
 
 ## Self-healing blocker triage (repair and continue; do not halt the DAG)
 
@@ -233,13 +265,24 @@ that is a sealed boundary wearing operational clothes.
 - Record every repair in the round report: node, class, `file:line` evidence,
   the replacement invariant, and the re-dispatch result.
 
-## Recovery (heal first; manual commands only when healing reports STUCK_HUMAN)
+## Recovery (heal separately; manual commands only when healing reports STUCK_HUMAN)
 
-Every mechanical wedge below is repaired automatically: `run-round` heals by
-default, `execute-wave --apply` heals a withheld wave once before conceding,
-and `python .autopilot/bin/autopilot.py --repo-root . heal [--dry-run]` runs
-the same pass standalone. Each action is proof-carrying, audited, and guarded
-by `--force-with-lease`; the laws and their limits live in
+Every mechanical wedge below has a deterministic recovery path. Public `run-round` does
+not perform it while holding a release fence: a partial wave returns `PENDING` with no
+heal, reconciliation, merge, push, or validation effect. Run the standalone healer,
+refresh snapshot/reconciliation evidence, and obtain a new release before retrying:
+
+```bash
+"${AUTOPILOT[@]}" heal --host-id "$HOST_ID" --actor codex:<round>-orchestrator
+"${SNAPSHOT[@]}" --reconcile --actor codex:<round>-orchestrator
+DISPATCH_JSON=$("${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" --actor codex:<round>-orchestrator --node <NODE> [--node <NODE> ...])
+RELEASE_ID=$(printf '%s' "$DISPATCH_JSON" | jq -r .release_id)
+```
+
+`execute-wave --apply` may heal a withheld wave once before conceding, and
+`"${AUTOPILOT[@]}" heal --host-id "$HOST_ID" [--dry-run]` runs the
+same pass standalone. Each action is proof-carrying, audited, and guarded by
+`--force-with-lease`; the laws and their limits live in
 `docs/execution/HEALING_DOCTRINE.md`. The heal report ends in a machine
 disposition — `HEALED` (loop again now), `WAITING` with the exact `wake_at`
 past which polling can matter again, `OPEN_SESSIONS` (open the named operator
@@ -251,10 +294,11 @@ What follows explains what the healer does, and remains runnable by hand.
   (the healer runs Phase 0 itself); or run Phase 0 by hand.
 - **Validation lease held by a dead session.** A *live* lease is released only
   by its exact identity:
-  `python .autopilot/bin/autopilot.py --repo-root . validation-lease-release <node_id> --owner <exact-owner>`.
+  `"${AUTOPILOT[@]}" validation-lease-release <node_id> --owner <exact-owner> --claim-id <exact-claim-id> --lease-id <exact-lease-id> --launch-instruction-id <exact-launch-instruction-id> --resource-key <exact-resource-key> --authority-epoch <exact-authority-epoch>`.
   An *expired* lease no longer wedges the round: the healer archives it as
-  `EXPIRED_BROKEN` (expiry is the bound the owner itself declared), and
-  `run-round` does the same before its validation phase.
+  `EXPIRED_BROKEN` (expiry is the bound the owner itself declared). Refresh the
+  snapshot/reconciliation and obtain a new release after that repair; public
+  `run-round` does not break the lease inside its admission transaction.
 - **Worker died holding a local claim.** Safe to let lapse **only if it pushed
   nothing** (`git ls-remote origin <node-branch>` is empty). If it published a
   branch, see the next two bullets — the healer settles both cases.
@@ -265,7 +309,7 @@ What follows explains what the healer does, and remains runnable by hand.
   longer wedges the node until TTL. Manual equivalent:
 
   ```bash
-  python .autopilot/bin/autopilot.py --repo-root . reap-stale-remote-claim <NODE> --owner <exact-owner-from-the-claim-commit-message> --reason "worker session ended"
+  "${AUTOPILOT[@]}" reap-stale-remote-claim <NODE> --owner <exact-owner-from-the-claim-commit-message> --reason "worker session ended"
   ```
 
   A branch carrying real unsealed work is never deleted: once its governing
@@ -279,10 +323,10 @@ What follows explains what the healer does, and remains runnable by hand.
   command) for **every** open blocker, and the healer (or
   `lift-retry-quarantine <NODE> --actor <you>`) archives the spent ledger and
   reopens the node for dispatch. Unresolved causes keep the quarantine.
-- **Target advanced mid-wave (a sibling integrated first).** Only the
-  *dispatcher release* goes stale, not running claims. Workers keep going;
-  integration re-reconciles between merges, and the healer re-snapshots,
-  re-reconciles, and re-dispatches after every repair it applies.
+- **Target advanced outside the admitted transaction.** The shared dispatcher
+  generation becomes stale. Hosted claim transitions fail closed against the
+  advanced target; preserve the worker branch and reconcile it explicitly. A
+  fresh snapshot, reconciliation, and dispatch are required before new work.
 
 ## Token discipline
 
@@ -291,12 +335,12 @@ What follows explains what the healer does, and remains runnable by hand.
   the controller enforces every gate deterministically and fails closed.
 - A worker session reads exactly: its rendered prompt, root `AGENTS.md`, its
   `docs/execution/runbooks/<NODE-ID>.md`, and files inside its read scope.
-- Workers run focused tests only; one leased repo-wide run per round
-  (in R8 that single leased run is executed by the QUALIFY-610 worker, not the
-  integrator — see the Phase 3 R8 exception).
-- Orchestrators use `github_snapshot.py --reconcile` instead of hand-building
-  snapshot JSON, and `--node` lists from the table above instead of re-deriving
-  eligibility from the plan.
+- Workers run their node's focused `required_tests`. `run-round` accepts only the
+  authenticated validation-broker completion over the exact integrated tree; when the
+  broker cannot attest isolation, it fails closed.
+- Orchestrators use `"${SNAPSHOT[@]}" --reconcile --actor "$ACTOR"` instead of
+  hand-building snapshot JSON, and `--node` lists from the table above instead of
+  re-deriving eligibility from the plan.
 
 ## Portability note (running DAGs on other repositories)
 

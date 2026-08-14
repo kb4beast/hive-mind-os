@@ -16,7 +16,9 @@ Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use 
 Parallel tasks may run focused checks only. Before any repository-wide validation,
 acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
 stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
-not retry. Release the lease after the one authoritative run.
+not retry. Retain the returned `lease_id` and pass that exact value to
+`validation-lease-release` after the one authoritative run; an owner label alone cannot
+release a successor lease.
 
 This rendered prompt carries the node contract; do not re-read `.autopilot/plan.json`
 or `.autopilot/README.md`. Read prior receipt/failure evidence, the open PR, and failing

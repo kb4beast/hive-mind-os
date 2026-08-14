@@ -28,7 +28,7 @@ judgement as code.
 
 | Wedge | Proof required | Action | Audit trail |
 | --- | --- | --- | --- |
-| Missing/stale reconciliation or snapshot | `status.reconciliation_required`, or a release invalidated by digest drift | Re-run `github_snapshot.py --reconcile` (operator step 2) | reconciliation events |
+| Missing/stale reconciliation or snapshot | `status.reconciliation_required`, or a release invalidated by digest drift | Run the canonical namespace-aware `SNAPSHOT` command from the operator runbook with `--reconcile --actor <authenticated-actor>`; it reserves a monotonic shared observation before remote reads and installs only through that exact ID | snapshot observation and reconciliation records |
 | Expired remote claim | `expires_at` in the claim record has lapsed | Retire the claim ref | `state/releases.jsonl` with proof |
 | Claim bound to a retired plan | `plan_fingerprint` in the record differs from the sealed plan | Retire the claim ref | `state/releases.jsonl` with proof |
 | Dead worker's live claim | Bare claim commit (tree == parent tree) with **zero work commits** for `claim_stall_minutes` | Retire the claim ref (`--force-with-lease` on the observed head) | `state/releases.jsonl` with `stalled-bare-claim` proof |
@@ -86,15 +86,23 @@ mechanically instead of guessing:
 - `QUIESCENT` — no candidate needs anything.
 
 `run-round` adds its own integration dispositions on top of these:
-`RECONCILE_REQUIRED`, `PENDING` (wave not whole, healing off),
-`ROUND_INTEGRATED` (validation skipped), `ROUND_COMPLETE`, and
+`RECONCILE_REQUIRED`, `PENDING` (the public wave is not whole and no recovery mutation ran),
+`ROUND_INTEGRATED` (controller-internal validation-disabled calls only), `ROUND_COMPLETE`, and
 `VALIDATION_FAILED`.  Repeated stall retirements for the same node double the
 stall bound each time and suspend it after three — lease expiry then bounds
 the wait — so a slow-but-alive worker cannot be reaped in a loop.
 
-The loop contract: `run-round` heals by default (`--no-heal` to observe only),
-`execute-wave --apply` heals a withheld wave once before conceding, and
-`autopilot heal [--dry-run] [--node N]` runs the same pass standalone.
+The public loop contract: `run-round --release-id <exact-shared-release>` revalidates the
+release and preflights every exact receipt head before triage or Git effects. A partial
+wave returns `PENDING` without healing, reconciliation, merge, push, or validation.
+Run the canonical host- and namespace-aware `AUTOPILOT` heal command separately, then run
+the canonical `SNAPSHOT` command with `--reconcile --actor <authenticated-actor>`, obtain
+a fresh dispatcher release, and retry with its new ID. Snapshot acquisition reserves its
+monotonic shared observation before `git fetch`
+or `gh`, so a slower older observation cannot overwrite the newer one. A whole public
+wave always validates after integration; the existing `--no-heal` parser option does not
+grant an in-lock recovery path. `execute-wave --apply` may still heal a withheld wave
+once before conceding.
 
 ## Learning at runtime
 
@@ -104,8 +112,9 @@ refusal reason, and every heal pass fingerprints the observed evidence into
 how long the world has been byte-identical — the difference between "workers
 are running" and "polling for no reason" is that number against `wake_at`.
 
-Those ledgers are session-local by design (`.autopilot/state/` is gitignored),
-so on their own they teach nobody. The durable memory is
+Those healing-observation ledgers remain worktree-local by design even though execution
+authority under `.autopilot/state/` is repository-shared, so on their own they teach
+nobody. The durable memory is
 **`.autopilot/lessons/`, which is committed** — see its README for the format.
 
 **The feedback loop.** An applied repair is not a successful repair. After

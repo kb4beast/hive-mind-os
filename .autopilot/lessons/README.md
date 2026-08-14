@@ -67,5 +67,8 @@ outcomes, and rewriting one is the same act as fabricating a receipt.
 Inspect the record with:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . lessons
+"${AUTOPILOT[@]}" lessons
 ```
+
+Here `AUTOPILOT` is the exact namespace-aware command array defined in
+`.autopilot/README.md`; do not rely on parser defaults.

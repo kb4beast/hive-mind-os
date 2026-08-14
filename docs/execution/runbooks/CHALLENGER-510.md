@@ -314,8 +314,8 @@ PYTHONPATH=src python -m unittest tests.test_hive_cortex_challengers.ChampionImm
 PYTHONPATH=src python -m unittest tests.test_hive_cortex_challengers.ScopeDenialTests -v
 ```
 
-No `discover`, no other test modules; the R3 integrator runs the single leased
-repo-wide pass.
+No `discover`, no other test modules; the authenticated validation broker exclusively
+owns the repository-wide gate.
 
 ## 6. Acceptance self-check → completion receipt evidence
 

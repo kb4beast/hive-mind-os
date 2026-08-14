@@ -10,13 +10,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fixture_support import copy_autopilot_fixture
+from fixture_support import copy_autopilot_fixture, ready_runtime
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
 import durable_controller as durable  # noqa: E402
+import controller as controller_module  # noqa: E402
 
 BASELINE = "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23"
 SECOND = "b" * 40
@@ -39,6 +40,7 @@ class DurableCompletionTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.plane = durable.ControlPlane(self.root)
+        ready_runtime(controller_module, self.root)
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -236,10 +238,20 @@ class DurableCompletionTests(unittest.TestCase):
             {
                 "node_id": "BASE-020",
                 "owner": "fixture:session",
+                "claim_id": "sha256:" + "1" * 64,
                 "expires_at": "2099-01-01T00:00:00Z",
+                "claim_authority_class": "PRIVILEGED_INTERNAL",
+                "launch_instruction_id": None,
+                "resource_key": None,
+                "authority_epoch": None,
             },
         )
-        receipt_commit = self.plane.complete("BASE-020", "fixture:session", receipt)
+        receipt_commit = self.plane.complete_internal(
+            "BASE-020",
+            "fixture:session",
+            receipt,
+            claim_id="sha256:" + "1" * 64,
+        )
         self.assertEqual(self.git("rev-parse", "HEAD"), receipt_commit)
         self.assertEqual(self.git("rev-parse", f"{receipt_commit}^{{tree}}"), final_tree)
         self.assertEqual(self.git("diff", "--name-only", f"{final}..{receipt_commit}"), "")

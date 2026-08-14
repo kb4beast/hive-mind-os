@@ -295,8 +295,8 @@ PYTHONPATH=src python -m unittest tests.test_cli_enqueue -v      # out-of-scope 
 PYTHONPATH=src python -m unittest tests.test_workers -v          # out-of-scope guard: default-executor flip must not break it
 ```
 
-Do NOT run `python -m unittest discover` or any repo-wide pass — the R4
-integrator runs the single leased repo-wide validation.
+Do NOT run `python -m unittest discover` or any repo-wide pass — the authenticated
+validation broker exclusively owns repository-wide validation.
 
 Edge cases the tests must pin: `M-` prefix validation in
 `record_canonical_enqueue` (invalid mission id raises `ValueError`); kernel

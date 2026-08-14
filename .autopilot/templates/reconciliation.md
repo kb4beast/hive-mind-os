@@ -2,6 +2,12 @@ Repository: `{{REPOSITORY}}`
 Integration target: `{{TARGET_BRANCH}}`
 Node: **{{NODE_ID}}**
 Target SHA: `{{TARGET_SHA}}`
+Execution namespace: `{{EXECUTION_NAMESPACE}}`
+Repository root: `{{REPO_ROOT}}`
+Execution authority: `{{EXECUTION_DIR}}`
+Host runtime: `{{HOST_RUNTIME_DIR}}`
+Authenticated host: `{{HOST_ID}}`
+Controller prefix: `{{AUTOPILOT_PREFIX}}`
 
 ## Mandatory execution-surface policy
 
@@ -21,7 +27,9 @@ Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use 
 Parallel tasks may run focused checks only. Before any repository-wide validation,
 acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
 stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
-not retry. Release the lease after the one authoritative run.
+not retry. Retain the returned `lease_id` and pass that exact value to
+`validation-lease-release` after the one authoritative run; an owner label alone cannot
+release a successor lease.
 
 Do not implement product work. Reconstruct current branch ancestry, open/merged/closed
 PRs, CI, remote branches, durable validated receipt commits, and changed planned
@@ -37,7 +45,7 @@ GitHub snapshot and recording the current reconciliation event, the dispatcher m
 publish an explicit release with:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . dispatch \
+{{AUTOPILOT_PREFIX}} dispatch --host-id {{HOST_ID}} \
   --actor <dispatcher-identity> [--node NODE ...]
 ```
 
@@ -52,10 +60,11 @@ reconciliation event invalidates the prior release. Re-run live reconciliation a
 
 If this reconciliation node itself reaches its completion gate, finalize its evidence
 commit, create a receipt with exact base/final commit and tree identities, and run
-`autopilot complete`. The command appends a zero-path durable receipt commit retaining
-the exact final tree and remote-claim provenance. Push that branch. The eventual node PR
+`autopilot complete`. The command requires the exact `claim_id` returned by this task's
+claim; an owner label is not a claim fence. It appends a zero-path durable receipt commit
+retaining the exact final tree and remote-claim provenance. Push that branch. The eventual node PR
 must use an ancestry-preserving merge commit; do not squash or rebase it.
 
 Stop only after the dispatcher can safely recompute eligibility and, when releasing new
 workers, can produce a current explicit release record. Completion remains durably
-retained in target Git history rather than only under `.autopilot/state/`.
+retained in target Git history rather than only under runtime execution state.

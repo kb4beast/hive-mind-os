@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fixture_support import copy_autopilot_fixture
+from fixture_support import copy_autopilot_fixture, ready_runtime
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
 SPEC = importlib.util.spec_from_file_location("blocker_controller", MODULE_PATH)
@@ -266,12 +266,17 @@ class BlockerProtocolTests(unittest.TestCase):
             control["verify_git_objects"] = False
             controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
             plane = controller.ControlPlane(root)
-            lease = plane.acquire_global_validation_lease("ACCEPT-240", "worker:accept")
+            ready_runtime(controller, root)
+            lease = plane.acquire_global_validation_lease_internal("ACCEPT-240", "worker:accept")
             self.assertEqual(lease["status"], "ACTIVE")
             with self.assertRaises(controller.AutopilotError):
-                plane.acquire_global_validation_lease("CONSULT-210", "worker:consult")
-            plane.release_global_validation_lease("ACCEPT-240", "worker:accept")
-            second = plane.acquire_global_validation_lease("CONSULT-210", "worker:consult")
+                plane.acquire_global_validation_lease_internal("CONSULT-210", "worker:consult")
+            plane.release_global_validation_lease_internal(
+                "ACCEPT-240",
+                "worker:accept",
+                lease_id=str(lease["lease_id"]),
+            )
+            second = plane.acquire_global_validation_lease_internal("CONSULT-210", "worker:consult")
             self.assertEqual(second["node_id"], "CONSULT-210")
 
     def test_validation_lease_concurrent_acquisition_has_exactly_one_winner(self) -> None:
@@ -282,13 +287,14 @@ class BlockerProtocolTests(unittest.TestCase):
             control["verify_git_objects"] = False
             controller.atomic_write_json(root / ".autopilot" / "control-plane.json", control)
             plane = controller.ControlPlane(root)
+            ready_runtime(controller, root)
             barrier = threading.Barrier(2)
             outcomes: list[str] = []
 
             def acquire(node_id: str, owner: str) -> None:
                 barrier.wait()
                 try:
-                    plane.acquire_global_validation_lease(node_id, owner)
+                    plane.acquire_global_validation_lease_internal(node_id, owner)
                     outcomes.append("won")
                 except controller.AutopilotError:
                     outcomes.append("lost")

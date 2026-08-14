@@ -38,8 +38,8 @@ reconciliation. The design **composes** the existing
 - Never touch the release branch (`release/hive-mind-os-singleton-20260812-r5`).
   Work only on node branch `autopilot/selfheal-450`. Never rebase/squash/amend.
 - Run ONLY the focused test command in section 5. NEVER run
-  `python -m unittest discover` — the round integrator owns the single leased
-  repo-wide pass.
+  `python -m unittest discover` — the authenticated validation broker exclusively owns
+  the repository-wide gate.
 - Semantic lock held: `self-healing-runtime`. Stopping condition: open a draft
   PR targeting `main` with a validated node receipt; do not merge, do not
   start downstream nodes.

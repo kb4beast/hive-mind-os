@@ -40,32 +40,61 @@ listed control-plane/documentation/test paths.
 
 ## Commands
 
+All execution commands must use one authenticated coordinate set. Populate these once
+from the exact initialized execution; never rely on the parser's `default` namespace or
+borrow another worktree's roots:
+
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . doctor
-python .autopilot/bin/autopilot.py --repo-root . status
-python .autopilot/bin/autopilot.py --repo-root . ready
-python .autopilot/bin/autopilot.py --repo-root . dispatch \
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STATE_DIR="<absolute repository coordination root>"
+HOST_RUNTIME_DIR="<absolute canonical per-user host runtime>"
+EXECUTION_NAMESPACE="<exact execution namespace>"
+HOST_ID="<canonical authenticated host id>"
+PYTHON="<absolute interpreter from the sealed execution identity>"
+AUTOPILOT=("$PYTHON" "$REPO_ROOT/.autopilot/bin/autopilot.py" --repo-root "$REPO_ROOT" \
+  --state-dir "$STATE_DIR" --host-runtime-dir "$HOST_RUNTIME_DIR" \
+  --execution-namespace "$EXECUTION_NAMESPACE")
+SNAPSHOT=("$PYTHON" "$REPO_ROOT/.autopilot/bin/github_snapshot.py" --repo-root "$REPO_ROOT" \
+  --state-dir "$STATE_DIR" --host-runtime-dir "$HOST_RUNTIME_DIR" \
+  --execution-namespace "$EXECUTION_NAMESPACE")
+
+"${AUTOPILOT[@]}" doctor
+"${AUTOPILOT[@]}" status
+"${AUTOPILOT[@]}" ready
+"${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" \
   --actor DISPATCHER_ID [--node NODE_ID ...]
-python .autopilot/bin/autopilot.py --repo-root . render-prompt NODE_ID
-python .autopilot/bin/autopilot.py --repo-root . infer-intent "USER MESSAGE"
-python .autopilot/bin/autopilot.py --repo-root . orchestrate \
+"${SNAPSHOT[@]}" --reconcile --actor SNAPSHOT_ACTOR
+"${AUTOPILOT[@]}" run-round \
+  --actor INTEGRATOR_ID --release-id RELEASE_ID
+"${AUTOPILOT[@]}" snapshot-observation-begin --actor SNAPSHOT_ACTOR
+"${AUTOPILOT[@]}" install-github-snapshot SNAPSHOT_FILE --observation-id OBSERVATION_ID
+"${AUTOPILOT[@]}" render-prompt --host-id "$HOST_ID" NODE_ID
+"${AUTOPILOT[@]}" infer-intent "USER MESSAGE"
+"${AUTOPILOT[@]}" orchestrate --host-id "$HOST_ID" \
   --request "USER MESSAGE" [--apply] --json
-python .autopilot/bin/autopilot.py --repo-root . simple-prompt
-python .autopilot/bin/autopilot.py --repo-root . prepare-launch INSTRUCTION_ID --host HOST
-python .autopilot/bin/autopilot.py --repo-root . bind-launch INSTRUCTION_ID \
-  --host HOST --task-id TASK_ID [--host-id HOST_ID] [--cursor CURSOR]
-python .autopilot/bin/autopilot.py --repo-root . record-launch-terminal INSTRUCTION_ID \
-  --terminal-state SUCCEEDED --host-event-ref HOST_TERMINAL_EVENT \
-  --observed-by ORCHESTRATOR_ID
-python .autopilot/bin/autopilot.py --repo-root . release-launch INSTRUCTION_ID \
-  --terminal-event TERMINAL_OBSERVATION_EVENT_ID \
-  --reason "terminal host result recorded"
-python .autopilot/bin/autopilot.py --repo-root . claim NODE_ID \
-  --owner PROVIDER:SESSION --publish-remote
-python .autopilot/bin/autopilot.py --repo-root . heartbeat NODE_ID \
-  --owner PROVIDER:SESSION
-python .autopilot/bin/autopilot.py --repo-root . complete NODE_ID \
-  --owner PROVIDER:SESSION --receipt PATH
+"${AUTOPILOT[@]}" simple-prompt
+"${AUTOPILOT[@]}" runtime-authority-migrate --actor ACTOR
+"${AUTOPILOT[@]}" prepare-launch INSTRUCTION_ID --host HOST --host-id "$HOST_ID" \
+  --repository REPOSITORY \
+  --node-id NODE_ID --lifecycle LIFECYCLE --branch BRANCH \
+  --resource-key RESOURCE_KEY --target-sha TARGET_SHA \
+  --plan-fingerprint PLAN_FINGERPRINT --target-branch TARGET_BRANCH \
+  --authority-class WRITE_AUTHORIZED
+"${AUTOPILOT[@]}" bind-launch INSTRUCTION_ID \
+  --host HOST --task-id TASK_ID --host-id "$HOST_ID" [--cursor CURSOR] \
+  --capability CAPABILITY --resource-key RESOURCE_KEY --authority-epoch EPOCH
+"${AUTOPILOT[@]}" check-launch-authority INSTRUCTION_ID \
+  --resource-key RESOURCE_KEY --authority-epoch EPOCH
+"${AUTOPILOT[@]}" fence-launch INSTRUCTION_ID \
+  --actor ACTOR --reason "explicit audited revocation"
+"${AUTOPILOT[@]}" claim NODE_ID --owner PROVIDER:SESSION --launch-instruction-id INSTRUCTION_ID \
+  --resource-key RESOURCE_KEY --authority-epoch EPOCH --publish-remote
+"${AUTOPILOT[@]}" heartbeat NODE_ID --owner PROVIDER:SESSION --claim-id CLAIM_ID \
+  --launch-instruction-id INSTRUCTION_ID --resource-key RESOURCE_KEY \
+  --authority-epoch EPOCH
+"${AUTOPILOT[@]}" complete NODE_ID --owner PROVIDER:SESSION --claim-id CLAIM_ID \
+  --launch-instruction-id INSTRUCTION_ID --resource-key RESOURCE_KEY \
+  --authority-epoch EPOCH --receipt PATH
 ```
 
 `orchestrate` is the normal host entrypoint. It reads live controller truth, infers
@@ -79,13 +108,33 @@ The mandatory host-neutral behavior is versioned in
 `.autopilot/orchestration-policy.json`. Codex maps primary work to `create_thread`,
 `wait_threads`, and `send_message_to_thread`. Nested subagents cannot replace primary
 node tasks. External task operations are performed by the active host adapter. The CLI
-records `PREPARED -> CREATED -> BOUND -> TERMINAL_OBSERVED -> RELEASED` events and
+records `PREPARED -> CREATED -> BOUND -> HOST_EVENT_OBSERVED -> RELEASED` events and
 consumes existing bindings;
 emitting JSON alone is not task creation.
+
+Hosted commands must use the exact absolute shared state directory and
+instruction/resource/epoch envelope injected by the dispatcher. The uppercase values in
+the command synopsis are placeholders only; a worker may not derive or substitute its
+own authority values.
 
 `status` distinguishes static **eligibility** from current execution **release**.
 `ready` returns only nodes whose latest valid dispatcher release assigns `START NOW`.
 A worker claim fails closed if there is no current explicit release for that exact node.
+`dispatch` returns the exact `release_id` for a repository-shared admission generation.
+The public `run-round` command must present that ID. Under the shared dispatcher lock it
+revalidates the release and preflights the exact receipt head for every released node
+before triage or Git effects. A partial wave returns `PENDING` without healing,
+reconciliation, merge, push, or validation. Run the canonical host-aware `heal` command
+and `"${SNAPSHOT[@]}" --reconcile --actor SNAPSHOT_ACTOR` as separate fenced operations,
+obtain a fresh dispatch, and retry with the new `release_id`. A whole wave is integrated
+and validated as one
+fenced transaction; validation cannot be skipped on the public path.
+
+Publication validation is accepted only from the independently authenticated validation
+broker; a worker or integrator cannot substitute a direct test process or caller-produced
+receipt. On the current Windows host, independently attested network isolation is not
+available, so the broker fails closed before running candidate tests and publication
+remains blocked. `run-round` does not weaken or bypass that boundary.
 
 `--publish-remote` creates a unique empty claim commit on the node's fixed remote branch.
 That claim retains the exact node branch, target SHA, owner, lease, and plan fingerprint.
@@ -101,22 +150,30 @@ all not-yet-released workers are `WAIT`.
 For level-by-level execution of the current DAG, follow
 `docs/execution/runbooks/README.md`: it fixes the dispatch rounds, the explicit
 `--node` waves, the serial integration order, and bounded-wait supervision.
-`python .autopilot/bin/github_snapshot.py --reconcile --actor <id>` performs
-steps 2, 4, and 6 below deterministically in one command.
+`"${SNAPSHOT[@]}" --reconcile --actor <id>` performs
+steps 2, 4, and 6 below deterministically in one command. Before its first `git fetch` or
+`gh` read, the helper reserves a monotonic repository-shared observation ID. Installation
+must present that exact reservation, so a slower observation that began before a newer
+one is fenced instead of overwriting newer scheduling evidence.
 
 1. Read this file, `workflow-policy.json`, `control-plane.json`,
    `authority-amendments.json`, and `plan.json`.
 2. Fetch the configured singleton release target branch and record its exact commit and tree.
 3. Inspect open/merged/closed PRs, CI, remote node branches, claims, durable receipts, and
    plan-impacting changes.
-4. Install a current `.autopilot/state/github-state.json` snapshot through
-   `install-github-snapshot`.
+4. Install a current snapshot in the authenticated execution directory through
+   `install-github-snapshot --observation-id ...` using the exact reservation created
+   before the external reads.
 5. Run `doctor`, `status`, and `ready` as applicable.
 6. Reconcile current target state before release. Any graph/scope inconsistency must use
    append-only reconciliation/replan authority; never silently broaden a node.
 7. Compute the smallest dependency-eligible, conflict-free candidate wave. Eligibility
-   alone still means `WAIT`.
-8. Run `dispatch --actor ... [--node ...]`. This is the explicit release boundary.
+   alone still means `WAIT`; admission is the minimum of the authenticated provider
+   ceiling, repository policy, and demonstrably remaining per-user host capacity across
+   every repository's primary, sidecar, and validation reservations. A
+   `parallel_safe: false` node must be released alone.
+8. Run `"${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" --actor ...
+   [--node ...]`. This is the explicit release boundary.
 9. Require every candidate node to have exactly one verdict: `START NOW`, `WAIT`, or
    `STOP`.
 10. A released multi-node wave must say `START TOGETHER NOW`. The dispatcher must also
@@ -124,15 +181,19 @@ steps 2, 4, and 6 below deterministically in one command.
     or `Do not open any worker sessions yet`.
 11. Render/copy worker prompts only for current `START NOW` nodes.
 
-Static DAG/level membership never authorizes a worker. A target-branch advance or merge,
-new conflicting claim, GitHub snapshot change, or new reconciliation event makes prior
-release instructions stale. Run the dispatcher again rather than reusing an old prompt.
-The claim command independently revalidates the release before creating a claim.
+Static DAG/level membership never authorizes a worker. Every standard linked worktree
+consults the same locked release and monotonic admission generation. A target-branch
+advance, plan change, or authorized snapshot/reconciliation mutation invalidates the
+generation; active claims prevent replacement or invalidation until they settle. Run the
+dispatcher again rather than reusing an old prompt. Claim admission and every hosted
+claim transition independently revalidate the exact current release before changing
+authority.
 
-Target reconciliation remains intentionally live and session-local: a fresh dispatcher
-must inspect the configured singleton release target branch before releasing work. Completion evidence is the
-opposite: once integrated and validated, it survives deletion of local
-`.autopilot/state/` and a completely fresh checkout.
+Target reconciliation evidence remains intentionally live and execution-scoped: a fresh
+dispatcher must inspect the configured singleton release target branch before releasing
+work, and the resulting exact digest must match the repository-arbiter target watermark.
+Completion evidence is the opposite: once integrated and validated, it survives deletion
+of runtime authority and a completely fresh checkout.
 
 ## Host-neutral durable primary-task workflow
 
@@ -148,11 +209,22 @@ shared descendant budget, and records every preparation, binding, progress event
 terminal result in the hash-chained `state/sidecar-bindings.jsonl` registry. A sidecar
 may request a depth-two descendant, but only the root may authenticate and spawn it;
 deeper, duplicate, unevidenced, or over-budget requests are denied before side effects.
-The host waits for primary and sidecar activity together in fair groups of at most eight
-with a wall-clock deadline. Parent tasks receive idempotent spawn and terminal notices.
+Primary tasks, sidecars, and validation consume one canonical per-OS-user host budget
+across every registered repository. The current App Server policy is conservatively one
+slot unless a stronger expiring provider capability is independently sealed; compiler
+support never fabricates a larger ceiling. Initial and descendant sidecar admission fail
+closed when no slot remains. Parent tasks receive idempotent spawn and terminal notices.
 Early parent termination cancels and settles its whole sidecar subtree first. Poll,
 replay, timeout, malformed-result, and cancellation paths fail closed and active
 sidecars prevent a quiescent verdict.
+
+The attended-card adapter has no authenticated lifecycle and the current Codex App Server
+protocol has no crash-exact thread creation key. They therefore advertise card-only and
+observer-only authority respectively; unfinished autonomous work returns
+`WAITING_FOR_HOST` instead of claiming it was launched. Optional preparation tasks and
+sidecars are omitted when they cannot be settled. Mandatory work is never silently
+truncated; a cohort that cannot fit authenticated capacity fails closed before a host
+effect.
 
 When a capability is unavailable, return an exact typed blocker to the parent. The parent
 repairs the workflow or selects an approved capable host and resumes the same node. A
@@ -201,9 +273,12 @@ quarantines the work. Unresolved cheating cannot be converted into ordinary succ
 
 ## State and durable receipt commits
 
-Runtime state under `.autopilot/state/` is generated and ignored by Git. It may contain a
-working receipt copy, dispatcher reconciliation state, GitHub snapshots, and dispatcher
-release records, but it is never the durable completion source.
+Runtime state under the authenticated execution directory is generated and ignored by
+Git. The default repository-local locator may still resolve beneath `.autopilot/state/`,
+but callers must use the canonical `--state-dir`, `--host-runtime-dir`, and
+`--execution-namespace` coordinates rather than assuming that path. Runtime authority may
+contain a working receipt copy, dispatcher reconciliation state, GitHub snapshots, and
+dispatcher release records, but it is never the durable completion source.
 
 For every non-bootstrap node, `complete` validates the receipt and creates an **empty
 receipt commit** on the already-claimed node branch. The receipt commit:
@@ -251,7 +326,10 @@ The literal-origin singleton release ref is fetched and compared immediately bef
 after each recovery CAS. Repair claim and receipt intents are written before publication,
 so an exact interrupted or expired lease can be verified and resumed or rolled back after
 restart. Ambiguous or failed compensation remains `ADVERSE` with its intent and audit
-evidence intact. The global validation lease is an exclusive-create mutex, and replacement
+evidence intact. The global validation lease is a repository-shared, locked mutex with an
+exact nonce-backed `lease_id`; release and expiry repair must present that generation, so
+a stale owner cannot delete its successor. Claims use the same repository authority and
+return an exact `claim_id` required by every later claim transition. Replacement
 receipts are rejected unless their complete schema, identities, evidence references, and
 model-runtime record have the sealed types and nonblank values. Consultation and identity
 rows have exact nested schemas and unique roles; authority digests use canonical lowercase
@@ -272,6 +350,22 @@ runtime state directory. Tests must never import ignored `.autopilot/state/**`, 
 modules, bytecode caches, or live origin refs. Production generated-state and literal-origin
 verification semantics are unchanged.
 
+Linked worktrees and registered independent clones converge on one repository arbiter;
+each authenticated execution namespace then converges on its own execution directory.
+Repository target watermarks, claims, publication fences, and cross-execution conflicts
+live under the arbiter. Receipts, blockers, snapshots, task/sidecar bindings, attended
+cards, and execution validation state live under the execution namespace. Existing
+legacy registries require the explicit `runtime-authority-migrate` reconciliation court,
+which archives exact bytes, partitions compatible evidence, quarantines ambiguity, and
+fails closed on unproved authority. The runtime-ready marker is published only after
+bootstrap and attended migration both complete. See ADR-063.
+
+The repository arbiter is paired with one canonical per-user host admission kernel, so
+aggregate session and validation reservations are host-wide and multi-repository. This
+does not claim OS-level CPU, memory, disk, network, CI, or process cancellation control;
+an authority fence cannot forcibly cancel an external chat. Those stronger capabilities
+require a separately governed execution provider.
+
 Worker publication order is mandatory:
 
 1. Receive a current explicit dispatcher `START NOW` for the exact node.
@@ -280,7 +374,7 @@ Worker publication order is mandatory:
    as `final_commit` and `final_tree` in the receipt.
 4. Run `autopilot complete ...`. It validates the candidate and claim provenance, appends
    the zero-path durable receipt commit, advances the local node branch to that commit,
-   writes only a working copy/index under `.autopilot/state/`, and prints the receipt
+   writes only a working copy/index under the authenticated execution directory, and prints the receipt
    commit SHA.
 5. Push the node branch and open/update its draft PR. The receipt commit itself is the
    durable repository evidence; no extra file path is required.

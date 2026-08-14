@@ -37,8 +37,8 @@ rollback/compatibility surfaces with a rollback tag and migration receipts.
   by full module path (e.g. `hive_mind_os.workers.retirement_notice`). No
   package re-export edits (the package `__init__.py` is frozen).
 - Never touch the release branch; never rebase/squash/amend the node branch;
-  never run repo-wide test discovery (`python -m unittest discover` is the
-  round integrator's single leased pass, not yours).
+  never run repo-wide test discovery (the authenticated validation broker exclusively
+  owns that gate).
 
 **Semantic locks.** `legacy-retirement`, `public-cli-routing`. You own the
 retirement semantics; MIGRATION-460 (R4, already merged when you run) owns the
@@ -121,7 +121,7 @@ Then apply exactly one row of this decision table:
 |---|---|
 | **Expected shape:** `workers.py` matches MIGRATION-460 §3.2 — `route_job_executor` kind dispatch + `execute_canonical_mission_job`/`CanonicalMissionInvoker` present, `Worker.__init__`/`serve` defaults are `route_job_executor`, `execute_mission_job` byte-identical legacy executor | Add the retirement notice + `DeprecationWarning` in `execute_mission_job` (§3.2) only. Do not touch `route_job_executor`, `execute_canonical_mission_job`, or the flipped defaults — the default flip is R4's contractual change, **not** an API-freeze violation. Do NOT hard-disable the legacy kind: `LEGACY_JOB_KIND` dispatch is the contract-mandated rollback mode, and `tests/test_workers.py` (`WorkerTests`, un-editable) drives `execute_mission_job` via `"repository-mission"` jobs and must pass byte-identically. |
 | `workers.py` routes legacy vs canonical through some other contract-compliant mechanism (e.g. a selector/mode argument instead of pure kind dispatch), with legacy execution still reachable as an explicit rollback mode and no dual-authority execution | Keep both routes. Add the retirement notice + `DeprecationWarning` (§3.2). Legacy-route execution must additionally log the notice's `rollback_ref` into the job failure/receipt text it already produces — do not add new stores or side effects. Do NOT hard-disable the legacy route. |
-| R4 shape contradicts the MIGRATION-460 contract (e.g. dual-authority execution, canonical falling back to legacy, `route_job_executor`/canonical dispatch absent entirely, or defaults still `execute_mission_job`) | STOP. `python .autopilot/bin/autopilot.py --repo-root . fail LEGACY-620 --blocker "post-R4 workers.py contradicts node assumption <detail>"` — this is the "current code contradicts a node assumption" escalation condition. |
+| R4 shape contradicts the MIGRATION-460 contract (e.g. dual-authority execution, canonical falling back to legacy, `route_job_executor`/canonical dispatch absent entirely, or defaults still `execute_mission_job`) | STOP. Run the dispatcher-injected Fail command with its exact shared state, claim ID, launch instruction, resource key, and authority epoch, setting `--error "post-R4 workers.py contradicts node assumption <detail>"`. Never reconstruct an owner-only failure command. This is the "current code contradicts a node assumption" escalation condition. |
 
 ### 3.2 Retirement notice (new API, identical pattern in all four modules)
 
@@ -273,8 +273,10 @@ evidence of a regression. It cannot be fixed from inside this node — `tests/`
 is read-only here and adding a `conftest.py` is forbidden — so the invocation
 carries the fix.
 
-Focused commands only. The single repo-wide `python -m unittest discover -s tests`
-run belongs to the R9 integrator under the validation lease — never run it here.
+Focused commands only. The completed R9 integrator's direct repository-wide test run is
+historical evidence. Under the current publication FSM, neither worker nor integrator may
+replace the validation broker with `python -m unittest discover`; without an attested
+broker completion the round remains blocked.
 
 ## 6. Acceptance self-check
 

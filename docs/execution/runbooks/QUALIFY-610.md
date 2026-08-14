@@ -1,5 +1,13 @@
 # QUALIFY-610 — Complete local governed-autonomy qualification
 
+> **RETIRED EVIDENCE ONLY — DO NOT EXECUTE.** This file preserves the historical R8
+> qualification procedure and its command transcripts. Every command and imperative in
+> sections 2–7 is quoted provenance, not current authority. Current repository-wide
+> validation and publication require an authenticated validation-broker completion. The
+> current Windows broker fails closed because independent network isolation cannot be
+> attested; no direct test process, validation lease, or retained log may substitute for
+> that completion.
+
 ## 1. Contract summary
 
 **Objective.** Run the complete local governed-autonomy qualification and issue an
@@ -11,12 +19,13 @@ branch `autopilot/qualify-610`, PR target `main`, draft PR only — never merge.
 Dependencies already integrated when this node dispatches: MIGRATION-460,
 PROMOTE-530, POISON-540, BENCH-600, DELIVERY-420.
 
-**Special authority.** This node runs the round's ONE repo-wide validation itself,
-under the global validation lease (commands in section 4, step 3). No other
-repo-wide test discovery is permitted anywhere else in the node. This is the
-documented R8 exception to the README's Phase 3: the R8 integrator does not run
-a second Phase 3 repo-wide pass — it verifies lease release and consumes this
-node's retained `gate1-ci/unittest-full.log` receipts instead.
+**Historical authority (retired).** The completed R8 node ran the repository-wide gate
+directly under the then-current validation lease and retained its transcript. That
+exception is provenance, not current authority. The current publication FSM accepts only
+an authenticated validation-broker completion; workers and integrators cannot substitute
+a direct `unittest` process or caller-produced lease receipt. On the current Windows host
+the broker fails closed because network isolation is not attestable, so this historical
+node cannot be replayed as a current publication.
 
 **Compressed acceptance criteria.**
 1. All required CI and adversarial suites pass on the exact candidate commit.
@@ -64,14 +73,14 @@ directory hierarchies into evidence; retain logs and JSON summaries only.
 | `tests/test_brain_kernel_local_assurance_artifact.py` | `class LocalAssuranceArtifactTests(unittest.TestCase)` | artifact round-trip tests | Gate 3 focused suite |
 | `tests/test_brain_kernel_local_assurance_evidence.py` | `class LocalAssuranceEvidenceTests(unittest.TestCase)` | retained-evidence verification tests | Gate 3 focused suite |
 | root `AGENTS.md` | test convention | `python -m unittest discover -s tests -v` is the documented repo-wide gate | Command style authority |
-| `docs/execution/runbooks/README.md` | wave protocol | lease commands, worker read budget, "one leased repo-wide run per round" | Governs section 4 step 3 |
+| `docs/execution/runbooks/README.md` | current wave protocol | authenticated broker boundary and worker read budget | Supersedes the retired direct-run authority preserved in section 4 step 3 |
 
 Modules created by earlier rounds (R2–R7: DURABLE-410, DELIVERY-420, HUMANLESS-430,
 CHEAT-440, SELFHEAL-450, MIGRATION-460, LEARN-500, CHALLENGER-510, EVAL-520,
 PROMOTE-530, POISON-540, BENCH-600, MISSION-400) will exist under `tests/` by the
-time this node runs. Do not guess their filenames: the leased repo-wide discovery
-pass executes all of them, and Gate 2 records the enumerated module list as
-evidence (section 4, step 4).
+time this node ran. The retained historical discovery transcript enumerates those
+modules, and Gate 2 records that inventory as evidence (section 4, step 4). It does not
+authorize a new direct discovery pass.
 
 ## 3. Design — files this node creates
 
@@ -190,26 +199,13 @@ the exact exit code in `receipts.json`.
    concluding a tool is missing. Deferring on the PATH technicality would have
    concealed a genuinely red quality job on this node's first execution —
    15 ruff errors and 4 pyright errors, all real (repaired in `5ead055`).
-3. **Gate 1b — the single leased repo-wide pass.** Exactly per
-   `docs/execution/runbooks/README.md` Phase 3, with this node as anchor and owner:
-
-   ```
-   python .autopilot/bin/autopilot.py --repo-root . validation-lease-acquire QUALIFY-610 --owner codex:qualify-610 --lease-minutes 90
-   python -m unittest discover -s tests -v > evidence/qualification/hive-cortex/q610-<sha8>/gate1-ci/unittest-full.log 2>&1
-   python .autopilot/bin/autopilot.py --repo-root . validation-lease-release QUALIFY-610 --owner codex:qualify-610
-   ```
-
-   `--lease-minutes 90` is not optional padding. The acquire default is 10
-   minutes, while this gate needs one repo-wide pass (~17 min) plus step 6's
-   extra interpreter run inside the same window. Measured on the first
-   execution: acquired 17:07:54Z, expired 17:17:54Z, released 17:41:32Z — the
-   lease was held 33m38s and released 23m38s AFTER it had expired. It only
-   appeared to work because `release_global_validation_lease`
-   (`.autopilot/bin/controller.py:1963`) checks the owner identity and never
-   the expiry, so an overrun fails silently instead of loudly.
-
-   Always release the lease, even on failure. This log is the authoritative input
-   for Gates 1, 2, and the role inventory. Commit:
+3. **Gate 1b — historical retained receipt; do not execute this path.** The completed
+   node's `gate1-ci/unittest-full.log` records the direct gate used by the retired R8
+   contract. Its requested 90-minute lease exceeds the current conservative one-hour App
+   capacity authority and is not an executable current command. Current work must obtain
+   a trusted broker completion or remain blocked; it must not run the old gate and mint
+   equivalent evidence. The retained log remains the historical input for Gates 1, 2,
+   and the role inventory. The completed node used commit message:
    `docs(qualify): record constitutional ci gate receipts`.
 4. **Gate 2 — acceptance evidence extraction + focused confirmation.** From
    `unittest-full.log`, extract the executed module inventory into
@@ -257,16 +253,16 @@ the exact exit code in `receipts.json`.
      `PYTHONPATH=src python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v > .../gate3-replay/replay-focused.log 2>&1`.
    Remove the worktree afterwards (`git worktree remove <scratch>/q610-clean`).
    Commit: `docs(qualify): record clean replay receipts`.
-6. **Gate 4 — cross-platform qualification.** Record host identity to
+6. **Gate 4 — historical cross-platform qualification procedure (retained only).** The
+   completed node recorded host identity to
    `gate4-platform/host-platform.txt`. The host row (Windows + its Python) is
    already covered by the Gate 1b log; symlink nothing — reference the Gate 1b log
    by path. For each ADDITIONAL locally installed interpreter from the CI matrix
    (`py -3.11`, `py -3.12`, `py -3.14` on Windows; `python3.X` elsewhere), run
-   `<interpreter> -m unittest discover -s tests -v > gate4-platform/pyXY.log 2>&1`
-   **while still holding no new claim to repo-wide runs beyond this gate** — these
-   runs are part of the same qualification and must happen inside the Gate 1b
-   lease window if performed; otherwise mark the matrix cell `DEFERRED` to CI.
-   Never `pip install` interpreters or packages. Every matrix cell
+   `<interpreter> -m unittest discover -s tests -v > gate4-platform/pyXY.log 2>&1`.
+   That command is preserved only as historical evidence; it is not executable current
+   authority. Any new matrix execution must be produced by the authenticated broker or
+   remain `DEFERRED` to CI. Never `pip install` interpreters or packages. Every matrix cell
    (ubuntu×{3.11,3.12,3.14}, windows×3.12) gets an explicit `PASS`/`DEFERRED` row.
    Commit: `docs(qualify): record cross-platform receipts`.
 7. **Write the report + verdict.** Fill `docs/execution/HIVE_CORTEX_QUALIFICATION.md`
@@ -285,24 +281,24 @@ to executed commands over EXISTING suites, not to new test files:
 
 | required_tests name | Concrete backing | Exact command |
 |---|---|---|
-| `full-constitutional-ci` | local reproduction of `.github/workflows/ci.yml` deterministic jobs incl. `tests.test_ci_contract.CIContractTests`; GitHub-only jobs listed as DEFERRED residuals | `python -m compileall -q src tests` then leased `python -m unittest discover -s tests -v` (step 3); optional `ruff check src tests` |
+| `full-constitutional-ci` | retained local reproduction of `.github/workflows/ci.yml` deterministic jobs incl. `tests.test_ci_contract.CIContractTests`; GitHub-only jobs listed as DEFERRED residuals | Historical transcript from step 3; current replay requires an authenticated broker completion |
 | `complete-autonomy-acceptance` | acceptance-matrix suite checklist backed by the discovery log + focused `tests.test_acceptance.AcceptanceSpecificationTests`, `tests.hive_cortex.test_acceptance_harness.AcceptanceHarnessTests`, `tests.test_autonomy.AutonomyTests`, `tests.test_policy_invariants.PolicyInvariantTests` | `PYTHONPATH=src python -m unittest tests.test_acceptance tests.hive_cortex.test_acceptance_harness tests.test_autonomy tests.test_policy_invariants -v` |
 | `clean-replay-verification` | fresh-worktree verification: `verify_local_assurance_artifact` over every retained `evidence/local_assurance/phase12-*` packet, `snapshot_tree` identity, plus `tests.test_brain_kernel_verification.ExactCandidateVerificationTests`, `tests.test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests`, `tests.test_brain_kernel_local_assurance_evidence.LocalAssuranceEvidenceTests`, `tests.test_kernel.KernelTests` | `PYTHONPATH=src python -m unittest tests.test_brain_kernel_verification tests.test_brain_kernel_local_assurance_artifact tests.test_brain_kernel_local_assurance_evidence tests.test_kernel -v` (in the clean worktree) |
-| `cross-platform-qualification` | per-interpreter matrix runs inside the lease window; unavailable cells DEFERRED to the CI matrix on the draft PR; `tests.test_ci_contract.CIContractTests.test_workflow_exercises_windows_with_python_3_12` guards the contract | `<interpreter> -m unittest discover -s tests -v` per available interpreter |
+| `cross-platform-qualification` | retained per-interpreter matrix receipts; unavailable cells DEFERRED to the CI matrix on the draft PR; `tests.test_ci_contract.CIContractTests.test_workflow_exercises_windows_with_python_3_12` guards the contract | Historical transcripts only; current replay requires an authenticated broker completion |
 
 Edge cases the procedure must handle honestly: missing ruff/pyright (DEFERRED, no
 installs); a retained assurance packet raising `LocalAssuranceError` (gate FAIL +
 escalate — evidence may not be rewritten); non-empty `git status` in the worktree
-(abort Gate 3, investigate contamination); lease already held (follow README
-recovery: read `.autopilot/state/global-validation-lease.json`, release with the
-exact recorded identity — never delete the file); any FAIL → verdict
+(abort Gate 3, investigate contamination); lease already held (use the authenticated
+status/healing path with the exact namespace and lease identity — never locate or delete
+an assumed runtime file); any FAIL → verdict
 `NOT QUALIFIED`, receipts still committed.
 
 ## 6. Acceptance self-check
 
 | Acceptance criterion | How met | Receipt evidence |
 |---|---|---|
-| All required CI and adversarial suites pass on exact candidate | Gate 1b leased full run + Gate 2 focused run, all executed at the pinned commit with a clean tree | `gate1-ci/unittest-full.log`, `gate2-acceptance/*.log`, exit codes + sha256 in `receipts.json`, commit/tree ids in header |
+| All required CI and adversarial suites passed on the historical exact candidate | Retained Gate 1b and Gate 2 transcripts from the pinned clean tree; not reusable as current authority | `gate1-ci/unittest-full.log`, `gate2-acceptance/*.log`, exit codes + sha256 in `receipts.json`, commit/tree ids in header |
 | All eight roles have meaningful end-to-end receipts | Role inventory section maps each of the eight roles to passing `tests/test_hive_cortex_<role>.py` runs in the full log + retained evidence paths | report section 4 + `module-inventory.txt` |
 | Humanless / no-cheating / learning / self-healing / durability / repository-safety gates pass | Acceptance-matrix checklist row per suite, each bound to named passing modules; empty coverage = FAIL row | report section 3 + `verdict.json` |
 | Residual blockers and maturity labels explicit | Mandatory verdict template with minimum residual rows (a)–(e); `release_ready`/`production_ready`/`comparative_claim_authorized` all pinned `false` | report section 5 + `verdict.json` |
@@ -318,8 +314,9 @@ exact recorded identity — never delete the file); any FAIL → verdict
   receipts — a broken retained receipt is a FAIL finding, not an edit target.
 - Do not fix bugs you find. A failing suite is recorded as FAIL + residual blocker;
   repairs belong to the owning node's repair flow.
-- Do not run `python -m unittest discover` outside the validation-lease window, and
-  never leave the lease held (release even after failure).
+- Do not replay any direct discovery command from this retired runbook. Current
+  repository-wide validation must use the authenticated broker; if its isolation
+  requirement is unavailable, remain blocked.
 - Do not `pip install` tools, providers, or interpreters; do not call remote
   providers or GitHub APIs; no network effects. DEFERRED is the honest outcome for
   anything requiring them.

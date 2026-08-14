@@ -52,8 +52,8 @@ raises on unknown types); append ONLY the nine existing event types
 
 **Branch:** `autopilot/mission-400`, PR target `main` (draft PR only; never
 merge, never touch the release branch, never rebase/squash/amend the node
-branch, never run repo-wide test discovery — that is the round integrator's
-single leased pass). Stopping condition: draft integration PR with the
+branch, never run repo-wide test discovery — the authenticated validation broker
+exclusively owns that gate). Stopping condition: draft integration PR with the
 eight-role local mission suite green; do NOT route public CLI traffic.
 
 ## 2. Existing-code map (real symbols; NEVER invent others; paths relative to `src/hive_mind_os/`)

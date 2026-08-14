@@ -146,8 +146,8 @@ this node.
 
 Environment: Windows 11 (10.0.26200), CPython 3.14.4, repo root
 `C:\Repos\HiveMind\hive-mind-os`, `PYTHONPATH=src` on every Python command.
-Repo-wide `unittest discover` was **never** run by this node — that is the round
-integrator's single leased pass.
+Repo-wide `unittest discover` was **never** run by this node. Current repository-wide
+validation belongs exclusively to the authenticated broker, not an integrator lease.
 
 ### 4.1 `legacy-parity-tests`
 

@@ -765,17 +765,61 @@ class ControlPlane(BaseControlPlane):
         node_id: str,
         owner: str,
         receipt: Mapping[str, Any],
+        *,
+        claim_id: str,
+        claim_authority_class: str,
+        launch_instruction_id: str | None = None,
+        resource_key: str | None = None,
+        authority_epoch: int | None = None,
+        _internal_authority: object | None = None,
     ) -> str:
         """Validate completion and append an immutable, zero-path receipt commit."""
 
+        with self.claim_launch_authority_guard(
+            node_id,
+            claim_authority_class=claim_authority_class,
+            launch_instruction_id=launch_instruction_id,
+            resource_key=resource_key,
+            authority_epoch=authority_epoch,
+            _internal_authority=_internal_authority,
+        ):
+            with self.runtime_lock("claim-authority.lock", timeout_seconds=120.0):
+                return self._complete_durable(
+                    node_id,
+                    owner,
+                    receipt,
+                    claim_id=claim_id,
+                    claim_authority_class=claim_authority_class,
+                    launch_instruction_id=launch_instruction_id,
+                    resource_key=resource_key,
+                    authority_epoch=authority_epoch,
+                )
+
+    def _complete_durable(
+        self,
+        node_id: str,
+        owner: str,
+        receipt: Mapping[str, Any],
+        *,
+        claim_id: str,
+        claim_authority_class: str,
+        launch_instruction_id: str | None,
+        resource_key: str | None,
+        authority_epoch: int | None,
+    ) -> str:
+        """Complete while the shared claim authority lock is held."""
+
         if node_id == "BOOT-000":
             raise ReceiptError("historical BOOT-000 completion is sealed by bootstrap attestation")
-        claim_path = self.claim_path(node_id)
-        if not claim_path.is_file():
-            raise ClaimError("node completion requires an active claim")
-        claim = read_json(claim_path)
-        if not isinstance(claim, Mapping) or claim.get("owner") != owner:
-            raise ClaimError("claim owner does not match")
+        claim_path, claim = self._fenced_claim(
+            node_id,
+            owner,
+            claim_id,
+            claim_authority_class=claim_authority_class,
+            launch_instruction_id=launch_instruction_id,
+            resource_key=resource_key,
+            authority_epoch=authority_epoch,
+        )
         if parse_time(claim.get("expires_at")) <= self.clock():
             raise ClaimError("claim expired before receipt publication")
 
@@ -799,6 +843,7 @@ class ControlPlane(BaseControlPlane):
             self.state_dir / "receipt-index.jsonl",
             {
                 "node_id": node_id,
+                "claim_id": claim_id,
                 "receipt_commit": receipt_commit,
                 "receipt_digest": digest_json(receipt),
                 "final_commit": receipt.get("final_commit"),

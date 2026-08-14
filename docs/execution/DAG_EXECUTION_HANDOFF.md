@@ -97,8 +97,10 @@ do not confuse them.** A previous session did, and stalled on it.
   round. BENCH-600 lands in R15, PROMOTE-530 in R16. **That is correct
   behaviour, not a bug** — see the serial-node rule in §5.
 - *Implementation* (who may write files at once) is governed by `file_locks`.
-  BENCH-600 and PROMOTE-530 have disjoint locks, so two workers can write their
-  code simultaneously in one tree.
+  BENCH-600 and PROMOTE-530 have disjoint logical scopes, so two workers can
+  write simultaneously in separate linked worktrees. Logical scope separation
+  does not make one filesystem tree, Git index, temp directory, or test
+  environment safe for concurrent writers.
 
 That pairing is now history — both are sealed. It is retained because the
 distinction is the one that stalled a previous session. In practice the whole
@@ -111,24 +113,74 @@ pushed and merged into the release branch.
 
 ## 2. The loop
 
+Every command below uses one authenticated execution prefix. Populate these values from
+the exact initialized execution; never borrow `default` or another worktree's paths:
+
 ```bash
-git fetch origin && git merge --ff-only origin/release/hive-mind-os-singleton-20260812-r5
-python .autopilot/bin/github_snapshot.py --reconcile --actor codex:orchestrator
-python .autopilot/bin/autopilot.py --repo-root . run-round --actor codex:orchestrator
-python .autopilot/bin/autopilot.py --repo-root . execute-wave --apply --actor codex:orchestrator
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STATE_DIR="<absolute repository coordination root>"
+HOST_RUNTIME_DIR="<absolute canonical per-user host runtime>"
+EXECUTION_NAMESPACE="<exact execution namespace>"
+HOST_ID="<canonical authenticated host id>"
+PYTHON="<absolute interpreter from the sealed execution identity>"
+AUTOPILOT=("$PYTHON" "$REPO_ROOT/.autopilot/bin/autopilot.py" --repo-root "$REPO_ROOT" \
+  --state-dir "$STATE_DIR" --host-runtime-dir "$HOST_RUNTIME_DIR" \
+  --execution-namespace "$EXECUTION_NAMESPACE")
+SNAPSHOT=("$PYTHON" "$REPO_ROOT/.autopilot/bin/github_snapshot.py" --repo-root "$REPO_ROOT" \
+  --state-dir "$STATE_DIR" --host-runtime-dir "$HOST_RUNTIME_DIR" \
+  --execution-namespace "$EXECUTION_NAMESPACE")
 ```
 
-`run-round` heals by default and returns a machine `disposition`:
+```bash
+git fetch origin && git merge --ff-only origin/release/hive-mind-os-singleton-20260812-r5
+"${SNAPSHOT[@]}" --reconcile --actor codex:orchestrator
+DISPATCH_JSON=$("${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" --actor codex:orchestrator --node <NODE> [--node <NODE> ...])
+RELEASE_ID=$(printf '%s' "$DISPATCH_JSON" | jq -r .release_id)
+"${AUTOPILOT[@]}" execute-wave --host-id "$HOST_ID" --apply --actor codex:orchestrator
+"${AUTOPILOT[@]}" run-round --actor codex:orchestrator --release-id "$RELEASE_ID"
+```
 
-- `HEALED` — state changed; run it again immediately.
-- `ROUND_INTEGRATED` / `ROUND_COMPLETE` — a wave merged.
-- `OPEN_SESSIONS` — a released node has no branch; it needs a worker. **This is
-  the normal terminal state, not a failure.**
-- `WAITING` — carries `wake_at`; polling before then cannot help.
-- `RESOLVE_BLOCKERS` / `STUCK_HUMAN` — carries the exact commands.
+`github_snapshot.py` reserves a monotonic repository-shared observation ID before its
+first `git fetch` or `gh` read and installs only through that exact ID. If another
+worktree starts a newer observation first, the slower older observation is fenced instead
+of replacing newer scheduling evidence.
 
-Use `--skip-validation` while integrating several nodes, then run the gate once
-at the end (see §6).
+The public `run-round` preflights the exact receipt head for every node in the released
+wave before triage or Git effects and returns a machine `disposition`:
+
+- `PENDING` — the wave is partial; no heal, reconciliation, merge, push, or validation
+  effect occurred.
+- `ROUND_COMPLETE` — the whole wave merged and passed the repository gate.
+- `VALIDATION_FAILED` — the whole wave merged but its repository gate failed.
+
+For `PENDING`, run recovery outside the round-admission lock, refresh evidence, and issue
+a new release before retrying:
+
+```bash
+"${AUTOPILOT[@]}" heal --host-id "$HOST_ID" --actor codex:orchestrator
+"${SNAPSHOT[@]}" --reconcile --actor codex:orchestrator
+DISPATCH_JSON=$("${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" --actor codex:orchestrator --node <NODE> [--node <NODE> ...])
+RELEASE_ID=$(printf '%s' "$DISPATCH_JSON" | jq -r .release_id)
+```
+
+The public round command always integrates the exact released wave and runs its
+repository-wide gate under the same shared admission fence. There is no public
+skip-validation mode and no in-lock recovery mutation.
+
+Primary, sidecar, and validation reservations consume one authenticated per-user host
+budget across every registered repository. The current App Server ceiling is
+conservatively one unless a stronger expiring provider capability is sealed; source-code
+parallelism never fabricates eight host slots. Optional work is omitted when no capacity
+remains, while mandatory work fails closed before a host effect.
+
+The host kernel arbitrates session admission across repositories. It does not claim
+OS-level CPU, memory, disk, network, CI, or process cancellation control. A Hive Mind
+fence revokes controller authority but cannot forcibly cancel an external chat.
+
+The pinned Codex App Server protocol does not expose a crash-exact thread-create
+idempotency token. Its adapter therefore advertises `autonomous_launch=false`: it may
+adopt or observe existing work, but a fresh unfinished wave returns `WAITING_FOR_HOST`.
+This handoff does not claim autonomous fresh-task launch on that provider.
 
 ---
 
@@ -137,10 +189,12 @@ at the end (see §6).
 Implementation and the git ceremony are separate. Workers write code; the
 orchestrator does all git.
 
-**Implementation.** Nodes in a wave have disjoint `file_locks` by contract, so
-several subagents can work in ONE tree at once. Tell every worker:
+**Implementation.** Nodes in a wave have disjoint logical `file_locks`, but that does
+not make one filesystem tree, Git index, temp directory, or test environment safe for
+multiple writers. Give every worker its own linked worktree and tell every worker:
 
 - write ONLY its declared `file_locks`;
+- write and test only in its assigned worktree;
 - no state-changing git (no commit/push/checkout/branch/add);
 - never `unittest discover` — it picks up siblings' in-progress files;
 - implement every mandated test with the exact mandated names, no tautologies;
@@ -150,14 +204,22 @@ several subagents can work in ONE tree at once. Tell every worker:
 **Sealing (orchestrator, serial).** Use `.autopilot/bin/` verbs:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . dispatch --actor codex:orchestrator --node <NODE>
-CLAIM=$(... claim <NODE> --owner claude:<node>-worker --publish-remote --remote origin | jq -r .remote_claim_commit)
-git checkout -B autopilot/<node-lower> "$CLAIM"
+"${AUTOPILOT[@]}" dispatch --host-id "$HOST_ID" --actor codex:orchestrator --node <NODE>
+# STATE_DIR, LAUNCH_INSTRUCTION_ID, RESOURCE_KEY, and AUTHORITY_EPOCH come from
+# the exact dispatcher-issued hosted authority envelope; do not derive them here.
+CLAIM_JSON=$("${AUTOPILOT[@]}" claim <NODE> --owner claude:<node>-worker \
+  --launch-instruction-id "$LAUNCH_INSTRUCTION_ID" --resource-key "$RESOURCE_KEY" \
+  --authority-epoch "$AUTHORITY_EPOCH" --publish-remote --remote origin)
+CLAIM_COMMIT=$(printf '%s' "$CLAIM_JSON" | jq -r .remote_claim_commit)
+CLAIM_ID=$(printf '%s' "$CLAIM_JSON" | jq -r .claim_id)
+git checkout -B autopilot/<node-lower> "$CLAIM_COMMIT"
 git add <exact scope paths>
 git commit -F - <<'MSG' ... MSG
 python <scratch>/mkreceipt.py <NODE> <owner> <TARGET_SHA> <out.json> "group=cmd=Ran N OK" ...
-python .autopilot/bin/autopilot.py --repo-root . verify-receipt <NODE> <out.json>
-python .autopilot/bin/autopilot.py --repo-root . complete <NODE> --owner <owner> --receipt <out.json>
+"${AUTOPILOT[@]}" verify-receipt <NODE> <out.json>
+"${AUTOPILOT[@]}" complete <NODE> --owner <owner> --claim-id "$CLAIM_ID" \
+  --launch-instruction-id "$LAUNCH_INSTRUCTION_ID" --resource-key "$RESOURCE_KEY" \
+  --authority-epoch "$AUTHORITY_EPOCH" --receipt <out.json>
 git push origin HEAD:refs/heads/autopilot/<node-lower>
 git checkout release/hive-mind-os-singleton-20260812-r5
 ```
@@ -236,18 +298,15 @@ it is cheap and it is the difference between evidence and decoration.
 
 ---
 
-## 6. The repo-wide gate
+## 6. The historical repo-wide gate
 
-Workers run focused tests only. The repository-wide pass is the integrator's
-single leased run per round:
-
-```bash
-PYTHONPATH=src python -m unittest discover -s tests
-```
-
-Run it only when no worker is writing — discovery otherwise picks up
-in-progress files and the verdict is meaningless. `run-round` runs it
-automatically unless `--skip-validation` is passed.
+Workers run focused tests only. Earlier completed rounds used a direct integrator-owned
+`unittest discover` pass; the measurements below preserve that historical evidence but
+are not current publication authority. Current `run-round` requires the exact shared
+`release_id` and an authenticated validation-broker completion. It does not trust a
+caller-run test transcript. The present Windows broker cannot attest network isolation
+and therefore fails closed before candidate tests; no round may bypass that block with
+the historical command.
 
 **Last full run on this branch: `Ran 958 tests`, 2 errors, 7 skipped — and both
 errors were environmental, not regressions.** `tests/test_hive_cortex_explorer`
@@ -426,11 +485,11 @@ blocker.
   whose digests point at files absent from the repo — the exact fake-evidence
   mode that node exists to catch. Seal evidence directories with `git add -f`
   and explicit pathspecs.
-- **The validation lease does not enforce its own expiry.**
-  `release_global_validation_lease` (`controller.py:1963`) checks owner identity
-  and never expiry, so an overrun fails silently. Measured: a 10-minute lease
-  held 33m38s and released 23m38s after expiry, with no error. Always pass
-  `--lease-minutes 90` for a full gate.
+- **Historical validation-lease expiry defect.** The retired direct runner once
+  overran a 10-minute lease by 23m38s. That transcript is retained evidence, not
+  current advice: do not request a 90-minute lease or run a direct full gate. Current
+  publication requires the authenticated validation broker and fails closed when its
+  isolation contract is unavailable.
 - **A tracked file cannot record the commit that introduces it.** A3's
   `summary.json` correctly leaves `final_commit` null; the binding lives in the
   `HIVE-MIND-AUTOPILOT-COMPLETION-V1` receipt, which is a commit message.

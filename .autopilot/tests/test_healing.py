@@ -9,8 +9,9 @@ import tempfile
 import unittest
 from datetime import timedelta
 from pathlib import Path
+from unittest import mock
 
-from fixture_support import copy_autopilot_fixture
+from fixture_support import copy_autopilot_fixture, ready_runtime
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 # healing imports its siblings by name, exactly as the CLI does.
@@ -46,6 +47,68 @@ CLAIM_ENVIRONMENT = {
 }
 
 
+class SnapshotNamespaceTests(unittest.TestCase):
+    def _plane(self, root: Path, *, installed_namespace: str = "experiment"):
+        plane = type("SnapshotPlane", (), {})()
+        plane.ap_root = root / ".autopilot"
+        plane.repo_root = root
+        plane.coordination_dir = root / ".autopilot" / "state"
+        plane.host_runtime_dir = root / "host-runtime"
+        plane.execution_namespace = "experiment"
+        plane.execution_id = "sha256:" + "a" * 64
+        plane.github_snapshot = lambda: {
+            "execution_namespace": installed_namespace,
+            "execution_id": plane.execution_id,
+        }
+        return plane
+
+    def test_nondefault_reconcile_carries_exact_authority_and_preserves_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            plane = self._plane(root)
+            default_state = plane.coordination_dir / "executions" / "default-sentinel.json"
+            default_state.parent.mkdir(parents=True)
+            default_state.write_bytes(b"default execution authority\n")
+            before = default_state.read_bytes()
+            completed = subprocess.CompletedProcess(
+                args=(), returncode=0, stdout="reconciled: fixture\n", stderr=""
+            )
+            with mock.patch.object(
+                healing.subprocess, "run", return_value=completed
+            ) as run:
+                ok, detail = healing.reconcile_with_snapshot(
+                    plane, actor="orchestrator:test"
+                )
+            self.assertTrue(ok, detail)
+            command = tuple(run.call_args.args[0])
+            self.assertEqual(
+                command[command.index("--state-dir") + 1],
+                str(plane.coordination_dir.resolve()),
+            )
+            self.assertEqual(
+                command[command.index("--execution-namespace") + 1],
+                "experiment",
+            )
+            self.assertEqual(
+                command[command.index("--host-runtime-dir") + 1],
+                str(plane.host_runtime_dir.resolve()),
+            )
+            self.assertEqual(default_state.read_bytes(), before)
+
+    def test_reconcile_rejects_child_execution_identity_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            plane = self._plane(Path(temporary), installed_namespace="default")
+            completed = subprocess.CompletedProcess(
+                args=(), returncode=0, stdout="reconciled: fixture\n", stderr=""
+            )
+            with mock.patch.object(healing.subprocess, "run", return_value=completed):
+                ok, detail = healing.reconcile_with_snapshot(
+                    plane, actor="orchestrator:test"
+                )
+            self.assertFalse(ok)
+            self.assertIn("execution identity", detail)
+
+
 def git(root: Path, *arguments: str, environment: dict[str, str] | None = None) -> str:
     completed = subprocess.run(
         ("git", "-C", str(root)) + arguments,
@@ -79,13 +142,14 @@ class HealingFixture(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
-        control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
+        controller.atomic_write_json(control_path, control)
         git(self.root, "add", "-A")
         git(self.root, "commit", "-m", "fixture base")
         git(self.root, "remote", "add", "origin", str(self.origin))
         git(self.root, "push", "-u", "origin", "main")
         self.target = git(self.root, "rev-parse", "HEAD")
         self.plane = controller.ControlPlane(self.root)
+        ready_runtime(controller, self.root)
         self.policy = {
             **healing.DEFAULT_POLICY,
             "auto_reconcile": False,
@@ -538,9 +602,24 @@ class EscalationResolutionTests(HealingFixture):
     def escalate(self) -> str:
         """Escalate through the real verb, inside the budget, and return the blocker id."""
 
-        record = self.plane.fail(
+        claim_id = "sha256:" + "1" * 64
+        controller.atomic_write_json(
+            self.plane.claim_path(NODE),
+            {
+                "node_id": NODE,
+                "owner": OWNER,
+                "claim_id": claim_id,
+                "expires_at": FUTURE,
+                "claim_authority_class": "PRIVILEGED_INTERNAL",
+                "launch_instruction_id": None,
+                "resource_key": None,
+                "authority_epoch": None,
+            },
+        )
+        record = self.plane.fail_internal(
             NODE,
             OWNER,
+            claim_id=claim_id,
             error="host adapter refused the dispatch",
             kind="escalation",
             blocker_cause="host adapter refused the dispatch",
@@ -769,7 +848,7 @@ class ValidationLeaseBreakTests(HealingFixture):
                     "node_id": NODE,
                     "owner": "codex:departed-session",
                     "expires_at": expires_at,
-                    "lease_id": "sha256:fixture-lease",
+                    "lease_id": "sha256:" + "1" * 64,
                     "status": "ACTIVE",
                 }
             )
@@ -779,24 +858,38 @@ class ValidationLeaseBreakTests(HealingFixture):
 
     def test_expired_lease_is_broken_and_archived(self) -> None:
         self.write_lease(expires_at=PAST)
-        broken = self.plane.break_expired_validation_lease(actor="test:healer")
+        broken = self.plane.break_expired_validation_lease(
+            actor="test:healer",
+            lease_id="sha256:" + "1" * 64,
+        )
         self.assertEqual(broken["status"], "EXPIRED_BROKEN")
         self.assertEqual(broken["broken_by"], "test:healer")
         self.assertFalse(self.plane.validation_lease_path.is_file())
         archive = (
             self.root / ".autopilot" / "state" / "validation-leases" /
-            "sha256-fixture-lease.json"
+            ("sha256-" + "1" * 64 + ".json")
         )
         self.assertTrue(archive.is_file())
         self.assertIsNone(
-            self.plane.break_expired_validation_lease(actor="test:healer")
+            self.plane.break_expired_validation_lease(
+                actor="test:healer",
+                lease_id="sha256:" + "1" * 64,
+            )
         )
 
     def test_live_lease_is_never_broken(self) -> None:
         self.write_lease(expires_at=FUTURE)
         with self.assertRaises(controller.AutopilotError) as raised:
-            self.plane.break_expired_validation_lease(actor="test:healer")
+            self.plane.break_expired_validation_lease(
+                actor="test:healer",
+                lease_id="sha256:" + "1" * 64,
+            )
         self.assertIn("live", str(raised.exception))
+        self.assertTrue(self.plane.validation_lease_path.is_file())
+
+    def test_malformed_expiry_is_not_break_authority(self) -> None:
+        self.write_lease(expires_at="not-a-time")
+        self.assertIsNone(healing._expired_lease(self.plane))
         self.assertTrue(self.plane.validation_lease_path.is_file())
 
 
@@ -1301,21 +1394,23 @@ class AttendedHostSurfaceTests(HealingFixture):
 
     def test_pending_cards_deduplicate_by_node(self) -> None:
         host = attended.AttendedCodexHost(self.plane)
+        first_attempt = "sha256:" + "1" * 64
+        second_attempt = "sha256:" + "2" * 64
         host.bind_tasks(
             [
-                {"launch_instruction_id": "sha256:attempt-1", "node_id": NODE},
-                {"launch_instruction_id": "sha256:attempt-2", "node_id": NODE},
+                {"launch_instruction_id": first_attempt, "node_id": NODE},
+                {"launch_instruction_id": second_attempt, "node_id": NODE},
             ]
         )
         host.create_thread(
             title="Hive Mind MISSION-400 attempt 1",
             prompt="do the work",
-            idempotency_key="sha256:attempt-1",
+            idempotency_key=first_attempt,
         )
         host.create_thread(
             title="Hive Mind MISSION-400 attempt 2",
             prompt="do the work again",
-            idempotency_key="sha256:attempt-2",
+            idempotency_key=second_attempt,
         )
         self.assertEqual(len(host.pending_cards()), 1)
 

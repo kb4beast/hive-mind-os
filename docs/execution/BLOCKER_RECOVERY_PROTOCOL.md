@@ -86,11 +86,13 @@ is archived under a named recovery directory before the current validated
 snapshot and release projections are installed; evidence ledgers are retained.
 
 Parallel nodes may run focused tests concurrently, but the repository-wide CI
-gate requires `validation-lease-acquire`. Only one node may own that lease at a
-time; every other child remains active and ready for the global gate. The owner
-releases it after recording the actual verdict. This prevents parallel full
-suites from exhausting process, clone, or filesystem resources and turning
-contention into false failures.
+gate requires the dispatcher-injected validation authority envelope. Acquire,
+renew, and release must carry the exact claim ID, launch instruction, resource
+key, authority epoch, and lease ID required by the command. Only one valid
+generation may own that lease at a time; every other child remains active and
+ready for the global gate. This prevents parallel full suites from exhausting
+process, clone, or filesystem resources and turning contention into false
+failures.
 
 ## Sealed rejected-receipt retirement
 

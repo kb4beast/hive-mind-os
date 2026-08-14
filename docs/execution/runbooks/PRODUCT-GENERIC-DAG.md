@@ -30,7 +30,7 @@ The six generic lessons, and where each is answered:
 | 2 | **Universal read scopes.** `read_scope` of `**` or `src/**` invites a worker to read the entire repository. Globs are not banned — some repos need a discovery pass — but cold expansion must be budgeted and RECORDED. | Standard §read-scope + `dag-lint` rule (Package A); runtime enforcement by budgeted cold retrieval (Package B, §4.3) |
 | 3 | **Durability ordering.** A node whose acceptance asserts crash/restart/resume/interruption/replay recovery, or that performs external effects (push/PR/comment/deploy), cannot be honestly proven before a durability node exists. Here `HUMANLESS-430` ("mission resumes after interruption without restating context") and `DELIVERY-420` sat at the SAME BFS level as `DURABLE-410`. | Standard §durability-ordering + `dag-lint` rule (Package A) |
 | 4 | **Serial nodes inside parallel levels.** A BFS dependency level is NOT an executable wave. Greedy selection (`release_barrier.py:350-372`, the `else:` branch opening `wave = []` / `ordered = sorted(` at `:351-352`) appends the highest-priority node first and then *skips every other node* if that first node is `parallel_safe: false` — `if not bool(self.node(node_id).get("parallel_safe")): continue` at `:364-365` and the `if any(not bool(self.node(chosen).get("parallel_safe")) for chosen in wave): continue` guard at `:366-370`, capping the wave at one session. | Standard §round-compilation + `dag-lint` rule (Package A) |
-| 5 | **Per-round validation.** Repository-wide validation must run once per round (integrator), not once per node, or N parallel workers serialize on one validation lease. | Standard §validation-ownership (Package A) |
+| 5 | **Per-round validation.** Repository-wide validation must produce one authenticated broker completion per round, not one direct run per node. | Standard §validation-ownership (Package A) |
 | 6 | **Prompt-as-contract.** The rendered worker prompt must BE the node contract; workers must not re-read the plan file (~18.5K tokens measured here) because the controller enforces every gate deterministically anyway. | Standard §prompt-as-contract (Package A) + measured token ledger (Package B, §4.5) |
 
 Package A makes the *generator* produce DAGs bound to the standard and gated on
@@ -478,7 +478,7 @@ path and digest are interpolated so the prompt is self-binding:
         "external effect, executable dispatch rounds rather than dependency levels, "
         "per-round repository-wide validation, and prompt-as-contract worker rendering. "
         "The control plane you generate MUST implement the standard's `dag-lint` command, "
-        "and `python .autopilot/bin/autopilot.py --repo-root . dag-lint --json` MUST exit "
+        "and the canonical namespace-aware AUTOPILOT command with `dag-lint --json` MUST exit "
         "zero with an empty error list against the DAG you built. Do NOT report this task "
         "successful before that clean lint receipt exists; a lint error is a defect in your "
         "DAG, never a reason to weaken the standard, the linter, or this contract. "
@@ -984,8 +984,8 @@ statement that adopting it in the controller is a separate reviewed change.
 
 Both packages: push the node branch, open a **draft** PR to `main`, record the
 node receipt. Never merge, never touch the release branch, never
-rebase/squash/amend the node branch, never run repo-wide discovery (that is the
-round integrator's single leased pass — lesson 5).
+rebase/squash/amend the node branch, never run repo-wide discovery (the authenticated
+validation broker exclusively owns that gate — lesson 5).
 
 ---
 
@@ -1105,8 +1105,8 @@ Do NOT run `python -m unittest discover`, pytest, or any other test module.
 - **Do NOT edit `tests/test_model_backend.py`, `tests/test_hive_cortex_role_runtime.py`,
   or `tests/test_hive_cortex_context.py`.** They are compatibility guards. If one
   breaks, the change is wrong, not the test.
-- **Do NOT run repo-wide test discovery** (lesson 5 — that is the round
-  integrator's single leased pass), rebase/squash/amend the node branch, merge
+- **Do NOT run repo-wide test discovery** (lesson 5 — the authenticated validation
+  broker exclusively owns that gate), rebase/squash/amend the node branch, merge
   the draft PR, touch the release branch, or create/modify any `__init__.py`,
   `conftest.py`, or `pyproject.toml`. New modules are imported by full module
   path; no package re-exports.

@@ -9,32 +9,86 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fixture_support import copy_autopilot_fixture
+from fixture_support import copy_autopilot_fixture, ready_runtime
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
 import autopilot  # noqa: E402
+import controller as runtime_controller  # noqa: E402
 
 
 class ExplorerReceiptRetirementTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
+        self.host_base = self.root / "host-authority-base"
+        self.host_base_patch = mock.patch.object(
+            runtime_controller,
+            "_host_runtime_base_dir",
+            return_value=self.host_base,
+        )
+        self.host_base_patch.start()
+        self.host_runtime = self.root / "host-runtime"
+        runtime_controller.initialize_host_runtime(self.host_runtime)
         copy_autopilot_fixture(Path(__file__).resolve().parents[1], self.root / ".autopilot")
         control = self.root / ".autopilot" / "control-plane.json"
         value = json.loads(control.read_text(encoding="utf-8"))
         value["verify_git_objects"] = False
         control.write_text(json.dumps(value), encoding="utf-8")
-        self.plane = autopilot.ControlPlane(self.root)
+        self.plane = autopilot.ControlPlane(
+            self.root, host_runtime_dir=self.host_runtime
+        )
         self.record = autopilot.EXPLORER_RETIREMENT
 
     def tearDown(self) -> None:
+        self.host_base_patch.stop()
         self.temporary.cleanup()
 
     def _ready(self, plane: autopilot.ControlPlane | None = None) -> autopilot.ControlPlane:
         plane = plane or self.plane
+        if not (plane.repo_root / ".git").exists():
+            subprocess.run(
+                ("git", "init", "--quiet", str(plane.repo_root)),
+                check=True,
+                capture_output=True,
+            )
+        configured_origin = subprocess.run(
+            ("git", "-C", str(plane.repo_root), "remote", "get-url", "origin"),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if configured_origin.returncode != 0:
+            subprocess.run(
+                (
+                    "git",
+                    "-C",
+                    str(plane.repo_root),
+                    "remote",
+                    "add",
+                    "origin",
+                    str(plane.repo_root),
+                ),
+                check=True,
+                capture_output=True,
+            )
+        ready_runtime(runtime_controller, plane.repo_root)
+        with plane.host_lock():
+            runtime_controller.bind_host_repository_runtime(
+                plane.host_runtime_dir,
+                repository=str(plane.control["target"]["repository"]),
+                coordination_dir=plane.coordination_dir,
+                repo_root=plane.repo_root,
+                transport_digest=str(plane.repository_identity["transport_digest"]),
+                bound_at=runtime_controller.format_time(plane.clock()),
+            )
+            with plane.arbiter_lock():
+                runtime_controller.initialize_execution_namespace(
+                    plane.coordination_dir, plane.execution_identity
+                )
+                plane.bind_canonical_remote_transport_identity()
         execution_target = "d" * 40
         plane._origin_is_configured_repository = lambda _record: True  # type: ignore[method-assign]
         plane.current_target_sha = lambda: execution_target  # type: ignore[method-assign]
@@ -219,12 +273,116 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         }
         autopilot.atomic_write_json(plane.retirement_execution_path, execution)
         self.assertTrue(plane._recovery_issues())
+        # Historical recovery seeding above deliberately uses digest sentinels. The
+        # fresh observation must exercise the real digest implementation or its
+        # installed bytes can never match the shared dispatcher watermark.
+        plane._snapshot_digest = autopilot.ControlPlane._snapshot_digest.__get__(  # type: ignore[method-assign]
+            plane, autopilot.ControlPlane
+        )
+        plane._reconciliation_digest = (  # type: ignore[method-assign]
+            autopilot.ControlPlane._reconciliation_digest.__get__(
+                plane, autopilot.ControlPlane
+            )
+        )
+        observation = plane.begin_github_snapshot_observation(actor="test:snapshot")
+        branch_observations = [
+            {
+                "node_id": item["node_id"],
+                "branch": item["branch"],
+                "fetch_ref": item["fetch_ref"],
+                "present": False,
+                "sha": None,
+            }
+            for item in observation["branch_fetches"]
+        ]
+        ls_remote_argv = [
+            "git",
+            "--no-replace-objects",
+            "-c",
+            f"core.hooksPath={os.devnull}",
+            "ls-remote",
+            "--heads",
+            "origin",
+        ]
+        raw_stdout = (
+            f"{'d' * 40}\trefs/heads/{observation['target_branch']}\n"
+        )
+        source_material = {
+            "schema_version": 1,
+            "kind": autopilot.SNAPSHOT_SOURCE_REF_OBSERVATION_KIND,
+            "execution_namespace": observation["execution_namespace"],
+            "execution_id": observation["execution_id"],
+            "observation_id": observation["observation_id"],
+            "repository": observation["repository"],
+            "repository_transport_digest": plane.repository_identity[
+                "transport_digest"
+            ],
+            "target_ref": f"refs/heads/{observation['target_branch']}",
+            "target_sha": "d" * 40,
+            "branch_refs": [
+                {
+                    "node_id": item["node_id"],
+                    "branch": item["branch"],
+                    "ref": f"refs/heads/{item['branch']}",
+                    "present": False,
+                    "sha": None,
+                }
+                for item in observation["branch_fetches"]
+            ],
+            "ls_remote_argv": ls_remote_argv,
+            "raw_stdout": raw_stdout,
+            "raw_stdout_digest": "sha256:"
+            + autopilot.sha256(raw_stdout.encode("utf-8")).hexdigest(),
+            "observed_at": "2026-08-14T00:00:00+00:00",
+        }
+        candidate = {
+            "schema_version": 1,
+            "kind": autopilot.SNAPSHOT_CANDIDATE_KIND,
+            "execution_namespace": observation["execution_namespace"],
+            "execution_id": observation["execution_id"],
+            "observation_id": observation["observation_id"],
+            "observation_epoch": observation["observation_epoch"],
+            "fetch_ref": observation["fetch_ref"],
+            "repository": observation["repository"],
+            "target_branch": observation["target_branch"],
+            "target_sha": "d" * 40,
+            "branch_observations": branch_observations,
+            "pull_requests": [],
+            "raw_pull_requests": [],
+            "branches": [],
+            "github_query": {
+                "offline": True,
+                "evidence_available": False,
+                "complete": False,
+                "node_queries": [],
+                "exit_code": 0,
+            },
+            "git_query": {
+                "target_refspec": (
+                    f"+refs/heads/{observation['target_branch']}:"
+                    f"{observation['fetch_ref']}"
+                ),
+                "branch_refspecs": [],
+                "ls_remote_argv": ls_remote_argv,
+            },
+            "source_ref_observation": {
+                **source_material,
+                "record_id": autopilot.digest_json(source_material),
+            },
+        }
+        candidate["candidate_id"] = autopilot.digest_json(candidate)
         snapshot = self.root / "snapshot.json"
-        snapshot.write_text(json.dumps({"target_sha": "d" * 40, "pull_requests": [], "branches": []}), encoding="utf-8")
-        plane.install_github_snapshot(snapshot)
+        snapshot.write_text(json.dumps(candidate), encoding="utf-8")
+        plane.install_github_snapshot(
+            snapshot,
+            observation_id=str(observation["observation_id"]),
+        )
         plane.reconcile("d" * 40, actor="test", reason="fresh after retirement")
         self.assertEqual(plane._recovery_issues(), ())
-        self.assertEqual(json.loads((plane.state_dir / "github-state.json").read_text()), json.loads(snapshot.read_text()))
+        self.assertEqual(
+            json.loads(plane.github_snapshot_path.read_text()),
+            candidate,
+        )
 
     def test_execution_requires_integrated_capability_and_current_snapshot_reconciliation(self) -> None:
         plane = self._ready()
@@ -287,7 +445,9 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         control.write_text(json.dumps(value), encoding="utf-8")
         prior_record = self.record
         self.record = synthetic
-        plane = self._ready(autopilot.ControlPlane(clone))
+        plane = self._ready(
+            autopilot.ControlPlane(clone, host_runtime_dir=self.host_runtime)
+        )
         plane._retirement_record = lambda _retirement_id: synthetic  # type: ignore[method-assign]
         result = plane.retire_receipt_branch(synthetic["retirement_id"], actor="test:builder")
         archive = synthetic["archive_ref"]
@@ -300,7 +460,13 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         fresh_value = json.loads(fresh_control.read_text(encoding="utf-8"))
         fresh_value["verify_git_objects"] = False
         fresh_control.write_text(json.dumps(fresh_value), encoding="utf-8")
-        resumed = self._ready(autopilot.ControlPlane(fresh))
+        resumed = self._ready(
+            autopilot.ControlPlane(
+                fresh,
+                state_dir=plane.coordination_dir,
+                host_runtime_dir=self.host_runtime,
+            )
+        )
         resumed._retirement_record = lambda _retirement_id: synthetic  # type: ignore[method-assign]
         resumed_result = resumed.retire_receipt_branch(synthetic["retirement_id"], actor="test:recovery")
         self.assertEqual(resumed_result["archive_commit"], result["archive_commit"])

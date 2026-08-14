@@ -4,6 +4,12 @@ Node: **{{NODE_ID}}**
 Observed state: **{{NODE_STATE}}**
 Plan fingerprint: `{{PLAN_FINGERPRINT}}`
 Target SHA at dispatch: `{{TARGET_SHA}}`
+Execution namespace: `{{EXECUTION_NAMESPACE}}`
+Repository root: `{{REPO_ROOT}}`
+Execution authority: `{{EXECUTION_DIR}}`
+Host runtime: `{{HOST_RUNTIME_DIR}}`
+Authenticated host: `{{HOST_ID}}`
+Controller prefix: `{{AUTOPILOT_PREFIX}}`
 
 ## Mandatory execution-surface policy
 
@@ -21,9 +27,12 @@ If genuine human action remains, never assume prior knowledge: give exact click-
 Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use `None.` for BLOCKS when clear.
 
 Parallel tasks may run focused checks only. Before any repository-wide validation,
-acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
+use the dispatcher-injected hosted authority envelope to acquire the singleton lease
+with `validation-lease-acquire`; if another owner holds it,
 stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
-not retry. Release the lease after the one authoritative run.
+not retry. Retain the returned `lease_id`, keep the exact claim/launch fence alive with
+the injected renewal command, and pass the same fences to `validation-lease-release`
+after the one authoritative run. An owner label alone cannot renew or release a lease.
 
 ## Dispatcher release barrier
 
@@ -47,9 +56,11 @@ implementation plan and validation commands), and files inside your read scope.
   deterministic order after the wave.
 - Never rebase, squash, or amend your node branch: the retained claim commit, exact
   `final_commit`, and receipt commit must stay in its ancestry.
-- If `{{TARGET_BRANCH}}` advances while you work (a sibling integrated first), keep
-  going: your claim and branch remain valid, and integration ordering is the
-  integrator's job, not yours. Do not merge the new target into your branch.
+- If `{{TARGET_BRANCH}}` advances while you work, stop new writes and all
+  controller-mediated completion or publication. Preserve the node branch exactly,
+  report the stale-target authority, and wait for authenticated reconciliation plus a
+  fresh dispatcher release. Do not merge the new target into your branch or assume the
+  old claim remains valid.
 - Never wait on a sibling node's output. Waves are dependency-satisfied and
   conflict-free by construction; if you discover a real dependency on a sibling,
   stop and record a blocker with `autopilot fail` instead of polling.
@@ -57,14 +68,20 @@ implementation plan and validation commands), and files inside your read scope.
 Run:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . doctor --skip-controller-tests
-python .autopilot/bin/autopilot.py --repo-root . status
-python .autopilot/bin/autopilot.py --repo-root . ready
-python .autopilot/bin/autopilot.py --repo-root . claim {{NODE_ID}} \
-  --owner <provider>:<unique-session> --publish-remote
+{{AUTOPILOT_PREFIX}} doctor --skip-controller-tests
+{{AUTOPILOT_PREFIX}} status
+{{AUTOPILOT_PREFIX}} ready
 ```
 
-`ready` returns only nodes with a current explicit dispatcher release, not merely static DAG eligibility. The remote claim must succeed before product work begins. Create/switch to `{{BRANCH}}` from the claim commit. Do not reuse another branch.
+`ready` returns only nodes with a current explicit dispatcher release, not merely static
+DAG eligibility. The host must append a dispatcher-injected authority envelope containing
+the exact shared `--state-dir`, launch instruction, resource key, and epoch. If that
+envelope or its Claim command is absent, stop: this base template deliberately cannot
+manufacture authority. The remote claim must succeed before product work begins.
+Create/switch to `{{BRANCH}}` from the claim commit. Do not reuse another branch.
+Preserve the returned JSON `claim_id`; every heartbeat, failure, release, and completion
+must present that exact fence. Reusing only the owner label cannot mutate a replacement
+claim.
 
 ## Objective
 
@@ -119,19 +136,17 @@ continue with broader scope or weaker acceptance.
 Completion must survive a fresh checkout without expanding file authority. After the
 implementation/evidence commit is final, record its exact base/final commits and trees
 in a receipt matching `.autopilot/receipt.schema.json`, including `base_tree` and
-`final_tree`, then run:
-
-```bash
-python .autopilot/bin/autopilot.py --repo-root . complete {{NODE_ID}} \
-  --owner <provider>:<unique-session> --receipt <receipt.json>
-```
+`final_tree`, then run the dispatcher-injected Complete command from the hosted authority
+envelope. It supplies the exact state directory and launch/resource/epoch tuple; substitute
+only the stable owner, returned claim ID, and receipt path. If the envelope is absent or
+its launch fence no longer validates, do not publish completion.
 
 The command validates that declared changed paths equal the exact Git diff and remain
 inside this node's effective write scope, validates the retained remote claim including its branch,
 and appends a **zero-path durable receipt commit** whose tree equals `final_tree`. It
 advances the local node branch to that receipt commit and prints its SHA. Push that branch
-and open/update the draft PR. Do not put completion truth only under ignored
-`.autopilot/state/`.
+and open/update the draft PR. Do not put completion truth only under ignored runtime
+execution state.
 
 The node PR must later be integrated with an **ancestry-preserving merge commit**. Do not
 squash or rebase: the retained claim, exact `final_commit`, and durable receipt commit

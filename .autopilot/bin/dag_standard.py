@@ -67,6 +67,12 @@ DEFAULT_ACTOR_NAMESPACE = "orchestrator"
 
 DISPATCH_SCRIPT_RELPATH = ".autopilot/bin/autopilot.py"
 
+EXECUTION_NAMESPACE = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}\Z")
+HOST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,255}\Z")
+PLANNING_ONLY_DISPATCH_PREFIX = (
+    "PLANNING_ONLY (supply an authenticated host and execution namespace to dag-rounds)"
+)
+
 SEVERITIES = ("error", "warning", "info")
 _SEVERITY_RANK = {severity: index for index, severity in enumerate(SEVERITIES)}
 
@@ -354,7 +360,9 @@ class PlanGraph:
                 raise DagStandardError("every plan node must be an object")
             node_id = item.get("id")
             if not isinstance(node_id, str) or not node_id.strip():
-                raise DagStandardError("every plan node must carry a non-empty string id")
+                raise DagStandardError(
+                    "every plan node must carry a non-empty string id"
+                )
             if node_id in self._nodes:
                 self.duplicate_ids.append(node_id)
                 continue
@@ -437,7 +445,9 @@ class PlanGraph:
         overlaps: list[tuple[str, str]] = []
         for first in _text_list(self.node(first_id).get("write_scope")):
             for second in _text_list(self.node(second_id).get("write_scope")):
-                if _scopes_overlap(_normalize(first), _normalize(second), on_error=on_error):
+                if _scopes_overlap(
+                    _normalize(first), _normalize(second), on_error=on_error
+                ):
                     overlaps.append((first, second))
         return tuple(overlaps)
 
@@ -450,14 +460,29 @@ class PlanGraph:
     # -- graph shape ------------------------------------------------------
 
     def cycle(self) -> tuple[str, ...] | None:
-        dependencies = {
-            node_id: self.dependencies(node_id) for node_id in self._nodes
-        }
+        dependencies = {node_id: self.dependencies(node_id) for node_id in self._nodes}
         return _find_cycle(dependencies)
 
     def levels(self) -> dict[int, tuple[str, ...]]:
         """Longest-path BFS depth per node, grouped by level."""
 
+        if self.duplicate_ids:
+            duplicates = ", ".join(sorted(set(self.duplicate_ids)))
+            raise DagStandardError(
+                "execution plan contains duplicate node ids: " + duplicates
+            )
+        missing = tuple(
+            (node_id, dependency)
+            for node_id in self.node_ids
+            for dependency in self.missing_dependencies(node_id)
+        )
+        if missing:
+            details = ", ".join(
+                f"{node_id}->{dependency}" for node_id, dependency in missing
+            )
+            raise DagStandardError(
+                "execution plan contains unknown dependencies: " + details
+            )
         cycle = self.cycle()
         if cycle:
             raise DagStandardError("dependency cycle: " + " -> ".join(cycle))
@@ -584,6 +609,8 @@ def derived_repo_root(plan_path: Path | None) -> Path | None:
 
 def dispatch_command_prefix(
     *,
+    execution_namespace: str,
+    host_id: str,
     plan_path: str | Path | None = None,
     repo_root: str | Path | None = None,
 ) -> str:
@@ -592,9 +619,17 @@ def dispatch_command_prefix(
     A hardcoded ``--repo-root .`` is wrong in a generic clone: it silently
     targets whatever directory the operator happened to be standing in. The
     prefix is derived from the plan being compiled (or, failing that, from how
-    this process was actually launched), and carries ``--plan`` whenever the plan
-    does not sit at the conventional location under the repository root.
+    this process was actually launched), carries the immutable execution
+    namespace and authenticated host identity, and carries ``--plan`` whenever
+    the plan does not sit at the conventional location under the repository
+    root.  Both identities are strict command tokens; accepting arbitrary text
+    here would turn a planning document into a shell-injection surface.
     """
+
+    if EXECUTION_NAMESPACE.fullmatch(execution_namespace) is None:
+        raise DagStandardError("execution_namespace is invalid")
+    if HOST_ID.fullmatch(host_id) is None:
+        raise DagStandardError("host_id is invalid")
 
     plan = Path(plan_path) if plan_path is not None else None
     root = Path(repo_root) if repo_root is not None else derived_repo_root(plan)
@@ -608,7 +643,17 @@ def dispatch_command_prefix(
         sibling = Path(__file__).resolve().with_name("autopilot.py")
         if sibling.is_file():
             script = sibling
-    parts = ["python", _render_path(script), "--repo-root", _render_path(root), "dispatch"]
+    parts = [
+        "python",
+        _render_path(script),
+        "--repo-root",
+        _render_path(root),
+        "--execution-namespace",
+        execution_namespace,
+        "dispatch",
+        "--host-id",
+        host_id,
+    ]
     if plan is not None and not _same_file(plan, root / ".autopilot" / "plan.json"):
         parts.extend(["--plan", _render_path(plan)])
     return " ".join(parts)
@@ -664,7 +709,9 @@ def semantic_ordering_constraints(
             if node_id in providers:
                 continue
             deferrals.setdefault(node_id, set()).update(providers)
-    return {node_id: tuple(sorted(value)) for node_id, value in sorted(deferrals.items())}
+    return {
+        node_id: tuple(sorted(value)) for node_id, value in sorted(deferrals.items())
+    }
 
 
 def _release_ranks(
@@ -768,7 +815,10 @@ def compile_rounds(
     if max_sessions < 1:
         raise DagStandardError("max_sessions must be at least 1")
     if command_prefix is None:
-        command_prefix = dispatch_command_prefix(plan_path=graph.source)
+        # Pure compilation/linting is allowed without runtime authority.  Its
+        # rendered command is deliberately non-executable; only ``dag-rounds``
+        # may supply the authenticated prefix below.
+        command_prefix = PLANNING_ONLY_DISPATCH_PREFIX
     levels = graph.levels()
     level_of = {
         node_id: level for level, members in levels.items() for node_id in members
@@ -781,9 +831,7 @@ def compile_rounds(
             graph, level_of, contention_findings, repo_root=repo_root
         )
     rank = (
-        _release_ranks(graph, level_of, constraints)
-        if constraints
-        else dict(level_of)
+        _release_ranks(graph, level_of, constraints) if constraints else dict(level_of)
     )
     buckets: dict[tuple[int, int], list[str]] = {}
     for level, members in levels.items():
@@ -795,10 +843,18 @@ def compile_rounds(
         _, level = key
         members = buckets[key]
         deferred = tuple(
-            sorted({provider for node_id in members for provider in constraints.get(node_id, ())})
+            sorted(
+                {
+                    provider
+                    for node_id in members
+                    for provider in constraints.get(node_id, ())
+                }
+            )
         )
         deferral_note = (
-            f"; deferred behind durability node(s) {', '.join(deferred)}" if deferred else ""
+            f"; deferred behind durability node(s) {', '.join(deferred)}"
+            if deferred
+            else ""
         )
         parallel = [node_id for node_id in members if graph.parallel_safe(node_id)]
         serial = [node_id for node_id in members if not graph.parallel_safe(node_id)]
@@ -1011,7 +1067,9 @@ def _check_scope_syntax(graph: PlanGraph) -> list[Finding]:
         for name in LOCKING_SCOPE_FIELDS:
             for raw in _text_list(node.get(name)):
                 scope = _normalize(raw)
-                reason = _scope_error(scope) if scope else "scope must be non-empty text"
+                reason = (
+                    _scope_error(scope) if scope else "scope must be non-empty text"
+                )
                 if reason is None:
                     continue
                 findings.append(
@@ -1040,7 +1098,9 @@ def _check_parallel_safe_declaration(graph: PlanGraph) -> list[Finding]:
     """A plan that never says ``parallel_safe`` is silently fully serialized."""
 
     missing = tuple(
-        node_id for node_id in graph.node_ids if not graph.declares_parallel_safe(node_id)
+        node_id
+        for node_id in graph.node_ids
+        if not graph.declares_parallel_safe(node_id)
     )
     if not missing:
         return []
@@ -1156,14 +1216,14 @@ def _check_write_scope_overlap(
     """
 
     findings: list[Finding] = []
-    candidates = [
-        node_id for node_id in graph.node_ids if graph.parallel_safe(node_id)
-    ]
+    candidates = [node_id for node_id in graph.node_ids if graph.parallel_safe(node_id)]
     for index, first_id in enumerate(candidates):
         for second_id in candidates[index + 1 :]:
             if level_of[first_id] != level_of[second_id]:
                 continue
-            overlaps = graph.overlapping_write_scopes(first_id, second_id, on_error=False)
+            overlaps = graph.overlapping_write_scopes(
+                first_id, second_id, on_error=False
+            )
             if not overlaps:
                 continue
             rendered = ", ".join(
@@ -1286,8 +1346,9 @@ def _implied_scaffolds(path: str) -> list[tuple[str, str]]:
             re.match(ecosystem.segment_pattern, segment) for segment in segments[1:]
         ):
             break
-        if ecosystem.marker_anchor is not None and ecosystem.marker_anchor not in (
-            segments[:-1]
+        if (
+            ecosystem.marker_anchor is not None
+            and ecosystem.marker_anchor not in (segments[:-1])
         ):
             # The marker only exists strictly below the anchor directory.
             continue
@@ -1492,11 +1553,15 @@ def _check_scaffold_collisions(
             ()
             if repo_root is None
             else tuple(
-                name for name in _root_manifests(extensions) if (repo_root / name).is_file()
+                name
+                for name in _root_manifests(extensions)
+                if (repo_root / name).is_file()
             )
         )
         for name in manifests:
-            entry = implications.setdefault(name, _Implication(path=name, kind="root-manifest"))
+            entry = implications.setdefault(
+                name, _Implication(path=name, kind="root-manifest")
+            )
             entry.by_level.setdefault(first_level, []).extend(sorted(introducing))
 
     findings: list[Finding] = []
@@ -1528,11 +1593,7 @@ def _check_scaffold_collisions(
                     for node_id in graph.node_ids
                     if level_of[node_id] <= earliest and _names(graph, node_id, path)
                 }
-                | {
-                    node_id
-                    for node_id in impliers
-                    if _covers(graph, node_id, path)
-                }
+                | {node_id for node_id in impliers if _covers(graph, node_id, path)}
             )
         )
         permissive = tuple(
@@ -1625,7 +1686,9 @@ def _asserted_semantics(node: Mapping[str, Any]) -> tuple[str, ...]:
     for statement in statements:
         if not isinstance(statement, str) or not statement.strip():
             continue
-        match = _RECOVERY_SEMANTICS.search(statement) or _EXTERNAL_EFFECT.search(statement)
+        match = _RECOVERY_SEMANTICS.search(statement) or _EXTERNAL_EFFECT.search(
+            statement
+        )
         if match is None:
             continue
         if _TRAILING_DENIAL.search(statement):
@@ -1887,6 +1950,7 @@ def add_dag_standard_arguments(commands: Any) -> None:
     rounds.add_argument("--json", action="store_true", dest="json_output")
     rounds.add_argument("--max-sessions", type=int, default=DEFAULT_MAX_SESSIONS)
     rounds.add_argument("--actor")
+    rounds.add_argument("--host-id", required=True)
     rounds.add_argument("--plan")
     rounds.add_argument(
         "--no-semantic-ordering",
@@ -1945,7 +2009,10 @@ def run_dag_standard_command(args: argparse.Namespace) -> int:
             actor=getattr(args, "actor", None),
             semantic_ordering=semantic_ordering,
             command_prefix=dispatch_command_prefix(
-                plan_path=plan_path, repo_root=repo_root
+                plan_path=plan_path,
+                repo_root=repo_root,
+                execution_namespace=str(args.execution_namespace),
+                host_id=str(args.host_id),
             ),
             repo_root=repo_root,
         )

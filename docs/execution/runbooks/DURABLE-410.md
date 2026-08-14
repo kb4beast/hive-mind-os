@@ -30,8 +30,8 @@ runs on: `KernelStore`, `DurableEffectOutbox`, `Scheduler`, `KernelWorker`.
   no package re-export edits.
 - Never touch the release branch; never rebase/squash/amend the node branch
   (`autopilot/durable-410`); never run repo-wide test discovery. Run ONLY the
-  focused command in §5; the round integrator runs the single leased
-  repo-wide pass.
+  focused command in §5; the authenticated validation broker exclusively owns the
+  repository-wide gate.
 - Semantic lock: `durability-qualification`. Do not weaken acceptance to pass;
   a test that cannot be made honest is an escalation, not a skip.
 

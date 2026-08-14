@@ -30,7 +30,7 @@ any path not in the write list above. Import the new module by full path
 **Round:** R7, ALONE (`parallel_safe: false`) — no siblings this round.
 **Branch:** `autopilot/promote-530`. Never touch the release branch; never
 rebase/squash/amend the node branch; never run repo-wide test discovery (the
-round integrator runs the single leased repo-wide pass).
+authenticated validation broker exclusively owns the repository-wide gate).
 
 ## 2. Existing-code map (verified signatures — do not invent others)
 
@@ -352,7 +352,8 @@ PowerShell equivalent: `$env:PYTHONPATH="src"; PYTHONPATH=src python -m unittest
 (`PYTHONPATH=src` is required: the repo is a src-layout package and a stale
 editable install may shadow it. Verified working for
 `tests.test_hive_cortex_court` on this branch.) Never run
-`python -m unittest discover` — that is the integrator's leased pass.
+`python -m unittest discover` — that gate belongs exclusively to the authenticated
+validation broker.
 
 ## 6. Acceptance self-check → completion-receipt evidence
 

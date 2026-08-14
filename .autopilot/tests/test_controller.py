@@ -3,20 +3,37 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
-from fixture_support import copy_autopilot_fixture
+from fixture_support import copy_autopilot_fixture, ready_runtime
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
+BIN = Path(__file__).resolve().parents[1] / "bin"
+if str(BIN) not in sys.path:
+    sys.path.insert(0, str(BIN))
+MODULE_PATH = BIN / "controller.py"
 SPEC = importlib.util.spec_from_file_location("autopilot_controller", MODULE_PATH)
 assert SPEC and SPEC.loader
 controller = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = controller
 SPEC.loader.exec_module(controller)
+
+from orchestration import (  # noqa: E402
+    OrchestrationError,
+    bind_launch,
+    binding_events,
+    derive_launch_identity,
+    fence_launch,
+    prepare_launch,
+)
+from sidecar_execution import SidecarPolicyError, sidecar_events  # noqa: E402
 
 BASELINE = "7e1d4d83ace334463fa8d3caa5f4c1d617bc2c23"
 SECOND = "b" * 40
@@ -43,9 +60,14 @@ class AutopilotControllerTests(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
-        control_path.write_text(json.dumps(control, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        control_path.write_text(
+            json.dumps(control, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
         self.clock = Clock()
         self.plane = controller.ControlPlane(self.root, clock=self.clock)
+        ready_runtime(controller, self.root)
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -133,6 +155,63 @@ class AutopilotControllerTests(unittest.TestCase):
             {"target_sha": target, "pull_requests": prs or [], "branches": branches or []},
         )
 
+    def bind_hosted_launch(self, node_id: str) -> dict[str, object]:
+        node = self.plane.node(node_id)
+        target = self.plane.control["target"]
+        identity = dict(
+            derive_launch_identity(
+                execution_id=self.plane.execution_id,
+                execution_namespace=self.plane.execution_namespace,
+                repository=str(target["repository"]),
+                node_id=node_id,
+                lifecycle="NODE_DELIVERY",
+                branch=str(node["branch"]),
+                target_sha=self.plane.current_target_sha(),
+                plan_fingerprint=self.plane.expected_plan_fingerprint,
+                target_branch=self.plane.target_branch,
+                authority_class="WRITE_AUTHORIZED",
+                attempt=1,
+                retry_of=None,
+            )
+        )
+        with self.plane.execution_lock("dispatcher-admission.lock"):
+            prepared = prepare_launch(
+                self.root,
+                str(identity["launch_instruction_id"]),
+                "codex",
+                execution_id=self.plane.execution_id,
+                execution_namespace=self.plane.execution_namespace,
+                repository=str(target["repository"]),
+                node_id=node_id,
+                lifecycle="NODE_DELIVERY",
+                branch=str(node["branch"]),
+                resource_key=str(identity["resource_key"]),
+                target_sha=self.plane.current_target_sha(),
+                plan_fingerprint=self.plane.expected_plan_fingerprint,
+                target_branch=self.plane.target_branch,
+                authority_class="WRITE_AUTHORIZED",
+                dispatcher_release_id="sha256:" + "1" * 64,
+                dispatcher_admission_epoch=1,
+                host_reservation_id="sha256:" + "2" * 64,
+                capacity_host_id="test:host",
+                capacity_generation="sha256:" + "3" * 64,
+                capacity_epoch=1,
+                reservation_expires_at="2030-01-01T02:00:00Z",
+                state_dir=self.plane.execution_dir,
+            )
+            bind_launch(
+                self.root,
+                str(identity["launch_instruction_id"]),
+                "codex",
+                "task:test-hosted",
+                capability="durable_user_owned_task",
+                resource_key=str(identity["resource_key"]),
+                authority_epoch=int(prepared["authority_epoch"]),
+                state_dir=self.plane.execution_dir,
+            )
+        identity["authority_epoch"] = int(prepared["authority_epoch"])
+        return identity
+
     def test_01_fresh_bootstrap_is_required(self) -> None:
         self.assertEqual(self.plane.node_view("BOOT-000").state, "BOOTSTRAP_REQUIRED")
 
@@ -189,21 +268,220 @@ class AutopilotControllerTests(unittest.TestCase):
 
     def test_12_duplicate_claim_is_rejected(self) -> None:
         self.mark_complete("BOOT-000")
-        self.plane.claim("RECON-010", "worker:one")
+        self.plane.claim_internal("RECON-010", "worker:one")
         with self.assertRaises(controller.ClaimError):
-            self.plane.claim("RECON-010", "worker:two")
+            self.plane.claim_internal("RECON-010", "worker:two")
 
     def test_13_file_lock_conflict_blocks_parallel_claim(self) -> None:
         self.mark_dependencies_complete("CONTRACT-110")
         self.mark_complete("CONTRACT-110")
-        self.plane.claim("ROLE-200", "worker:role")
+        self.plane.claim_internal("ROLE-200", "worker:role")
         self.plane._nodes["CONSULT-210"]["file_locks"] = list(self.plane.node("ROLE-200")["file_locks"])
         self.assertEqual(self.plane.node_view("CONSULT-210").state, "BLOCKED")
+
+    def test_hosted_claim_is_bound_to_launch_and_fence_blocks_all_transitions(self) -> None:
+        self.mark_complete("BOOT-000")
+        identity = self.bind_hosted_launch("RECON-010")
+        coordinates = {
+            "claim_authority_class": "HOSTED_LAUNCH",
+            "launch_instruction_id": str(identity["launch_instruction_id"]),
+            "resource_key": str(identity["resource_key"]),
+            "authority_epoch": int(identity["authority_epoch"]),
+        }
+        claim = self.plane.claim(
+            "RECON-010",
+            "worker:hosted",
+            **coordinates,
+        )
+        claim_id = str(claim["claim_id"])
+        validation_coordinates = {**coordinates, "claim_id": claim_id}
+        validation = self.plane.acquire_global_validation_lease(
+            "RECON-010",
+            "worker:hosted",
+            lease_minutes=10,
+            **validation_coordinates,
+        )
+        with self.plane.execution_lock("dispatcher-admission.lock"):
+            fence_launch(
+                self.root,
+                str(identity["launch_instruction_id"]),
+                actor="curator:test",
+                reason="session superseded",
+                state_dir=self.plane.execution_dir,
+            )
+        transitions = (
+            lambda: self.plane.heartbeat(
+                "RECON-010", "worker:hosted", claim_id=claim_id, **coordinates
+            ),
+            lambda: self.plane.release(
+                "RECON-010",
+                "worker:hosted",
+                claim_id=claim_id,
+                reason="stale release",
+                **coordinates,
+            ),
+            lambda: self.plane.fail(
+                "RECON-010",
+                "worker:hosted",
+                claim_id=claim_id,
+                error="stale failure",
+                **coordinates,
+            ),
+            lambda: self.plane.complete(
+                "RECON-010",
+                "worker:hosted",
+                self.receipt("RECON-010"),
+                claim_id=claim_id,
+                **coordinates,
+            ),
+        )
+        for transition in transitions:
+            with self.subTest(transition=transition):
+                with self.assertRaisesRegex(controller.ClaimError, "stale or revoked"):
+                    transition()
+        validation_transitions = (
+            lambda: self.plane.acquire_global_validation_lease(
+                "RECON-010",
+                "worker:hosted",
+                lease_minutes=10,
+                **validation_coordinates,
+            ),
+            lambda: self.plane.renew_global_validation_lease(
+                "RECON-010",
+                "worker:hosted",
+                lease_id=str(validation["lease_id"]),
+                lease_minutes=10,
+                **validation_coordinates,
+            ),
+            lambda: self.plane.release_global_validation_lease(
+                "RECON-010",
+                "worker:hosted",
+                lease_id=str(validation["lease_id"]),
+                **validation_coordinates,
+            ),
+        )
+        for transition in validation_transitions:
+            with self.subTest(validation_transition=transition):
+                with self.assertRaisesRegex(controller.ClaimError, "stale or revoked"):
+                    transition()
+        self.assertTrue(self.plane.claim_path("RECON-010").is_file())
+        self.assertTrue(self.plane.validation_lease_path.is_file())
+
+        for node_id in self.plane._nodes:
+            self.mark_complete(node_id)
+        status = self.plane.observe_status()
+        self.assertFalse(status["complete"])
+        self.assertTrue(status["claim_authority_reconciliation_required"])
+        self.assertEqual(
+            [item["node_id"] for item in status["stale_hosted_claims"]],
+            ["RECON-010"],
+        )
+        self.assertEqual(
+            [item["node_id"] for item in status["stale_hosted_validation_leases"]],
+            ["RECON-010"],
+        )
+        self.assertNotIn("RECON-010", status["ready"])
+
+    def test_caller_text_cannot_grant_privileged_internal_claim_authority(self) -> None:
+        self.mark_complete("BOOT-000")
+        with self.assertRaisesRegex(controller.ClaimError, "not available"):
+            self.plane.claim(
+                "RECON-010",
+                "worker:hosted",
+                claim_authority_class="PRIVILEGED_INTERNAL",
+            )
+
+    def test_hosted_heartbeat_and_completion_recheck_dispatcher_generation(self) -> None:
+        self.mark_complete("BOOT-000")
+        identity = self.bind_hosted_launch("RECON-010")
+        coordinates = {
+            "claim_authority_class": "HOSTED_LAUNCH",
+            "launch_instruction_id": str(identity["launch_instruction_id"]),
+            "resource_key": str(identity["resource_key"]),
+            "authority_epoch": int(identity["authority_epoch"]),
+        }
+        claim = self.plane.claim("RECON-010", "worker:hosted", **coordinates)
+        claim_id = str(claim["claim_id"])
+
+        @contextmanager
+        def invalidated_dispatcher(node_id: str, **_coordinates: object):
+            self.assertEqual(node_id, "RECON-010")
+            raise controller.ClaimError(
+                "shared dispatcher admission invalidated by target advance"
+            )
+            yield None  # pragma: no cover - required by contextmanager protocol
+
+        self.plane.dispatcher_launch_authority_guard = invalidated_dispatcher  # type: ignore[method-assign]
+        transitions = (
+            lambda: self.plane.heartbeat(
+                "RECON-010",
+                "worker:hosted",
+                claim_id=claim_id,
+                **coordinates,
+            ),
+            lambda: self.plane.complete(
+                "RECON-010",
+                "worker:hosted",
+                self.receipt("RECON-010"),
+                claim_id=claim_id,
+                **coordinates,
+            ),
+        )
+        for transition in transitions:
+            with self.subTest(transition=transition):
+                with self.assertRaisesRegex(controller.ClaimError, "target advance"):
+                    transition()
+        self.assertTrue(self.plane.claim_path("RECON-010").is_file())
+
+    def test_expired_hosted_claim_cannot_acquire_validation_authority(self) -> None:
+        self.mark_complete("BOOT-000")
+        identity = self.bind_hosted_launch("RECON-010")
+        coordinates = {
+            "claim_authority_class": "HOSTED_LAUNCH",
+            "launch_instruction_id": str(identity["launch_instruction_id"]),
+            "resource_key": str(identity["resource_key"]),
+            "authority_epoch": int(identity["authority_epoch"]),
+        }
+        claim = self.plane.claim(
+            "RECON-010",
+            "worker:hosted",
+            lease_minutes=1,
+            **coordinates,
+        )
+        self.clock.advance(2)
+        with self.assertRaisesRegex(controller.ClaimError, "has expired"):
+            self.plane.acquire_global_validation_lease(
+                "RECON-010",
+                "worker:hosted",
+                claim_id=str(claim["claim_id"]),
+                lease_minutes=10,
+                **coordinates,
+            )
+        self.assertFalse(self.plane.validation_lease_path.exists())
+
+    def test_expired_validation_lease_is_visible_and_prevents_quiescence(self) -> None:
+        lease = self.plane.acquire_global_validation_lease_internal(
+            "BOOT-000",
+            "controller:test",
+            lease_minutes=1,
+        )
+        self.clock.advance(2)
+        for node_id in self.plane._nodes:
+            self.mark_complete(node_id)
+        status = self.plane.observe_status()
+        self.assertIsNone(status["active_validation_lease"])
+        self.assertEqual(
+            status["expired_validation_lease"]["lease_id"],
+            lease["lease_id"],
+        )
+        self.assertTrue(status["validation_lease_recovery_required"])
+        self.assertTrue(status["reconciliation_required"])
+        self.assertFalse(status["complete"])
 
     def test_14_semantic_lock_conflict_blocks_parallel_claim(self) -> None:
         self.mark_dependencies_complete("CONTRACT-110")
         self.mark_complete("CONTRACT-110")
-        self.plane.claim("ROLE-200", "worker:role")
+        self.plane.claim_internal("ROLE-200", "worker:role")
         self.plane._nodes["CONSULT-210"]["semantic_locks"] = ["role-runtime"]
         self.assertEqual(self.plane.node_view("CONSULT-210").state, "BLOCKED")
 
@@ -238,8 +516,14 @@ class AutopilotControllerTests(unittest.TestCase):
 
     def test_21_worker_can_preserve_model_escalation(self) -> None:
         self.mark_complete("BOOT-000")
-        self.plane.claim("RECON-010", "worker:one")
-        self.plane.fail("RECON-010", "worker:one", error="architecture ambiguity exceeded T2", kind="escalation")
+        claim = self.plane.claim_internal("RECON-010", "worker:one")
+        self.plane.fail_internal(
+            "RECON-010",
+            "worker:one",
+            claim_id=str(claim["claim_id"]),
+            error="architecture ambiguity exceeded T2",
+            kind="escalation",
+        )
         self.assertEqual(self.plane.node_view("RECON-010").state, "ESCALATION_REQUIRED")
 
     def test_22_consultation_resolves_question(self) -> None:
@@ -276,15 +560,25 @@ class AutopilotControllerTests(unittest.TestCase):
 
     def test_29_self_healing_retry_returns_node_to_ready(self) -> None:
         self.mark_complete("BOOT-000")
-        self.plane.claim("RECON-010", "worker:one")
-        self.plane.fail("RECON-010", "worker:one", error="transient failure")
+        claim = self.plane.claim_internal("RECON-010", "worker:one")
+        self.plane.fail_internal(
+            "RECON-010",
+            "worker:one",
+            claim_id=str(claim["claim_id"]),
+            error="transient failure",
+        )
         self.assertEqual(self.plane.node_view("RECON-010").state, "READY")
 
     def test_30_repeated_failure_quarantines_node(self) -> None:
         self.mark_complete("BOOT-000")
         for index in range(3):
-            self.plane.claim("RECON-010", f"worker:{index}")
-            self.plane.fail("RECON-010", f"worker:{index}", error="repeated semantic failure")
+            claim = self.plane.claim_internal("RECON-010", f"worker:{index}")
+            self.plane.fail_internal(
+                "RECON-010",
+                f"worker:{index}",
+                claim_id=str(claim["claim_id"]),
+                error="repeated semantic failure",
+            )
         self.assertEqual(self.plane.node_view("RECON-010").state, "QUARANTINED")
 
     def test_31_cycle_requires_replanning(self) -> None:
@@ -323,6 +617,54 @@ class AutopilotControllerTests(unittest.TestCase):
         receipt["changed_paths"] = ["src/hive_mind_os/unsafe.py"]
         self.assertTrue(any("outside" in issue for issue in self.plane.validate_receipt("BOOT-000", receipt)))
 
+    def test_receipt_rejects_out_of_scope_commit_hidden_by_revert(self) -> None:
+        def git(*arguments: str) -> str:
+            return subprocess.run(
+                ("git", "-C", str(self.root), *arguments),
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+
+        git("init", "--initial-branch=main")
+        git("config", "user.name", "Receipt Ancestry Fixture")
+        git("config", "user.email", "receipt-ancestry@hive-mind.invalid")
+        git("add", "-A")
+        git("commit", "-m", "baseline")
+        base = git("rev-parse", "HEAD")
+
+        allowed = self.root / ".autopilot" / "bin" / "allowed-fixture.txt"
+        allowed.write_text("allowed\n", encoding="utf-8")
+        git("add", str(allowed.relative_to(self.root)))
+        git("commit", "-m", "allowed governed work")
+
+        poison = self.root / "src" / "poison.txt"
+        poison.parent.mkdir(parents=True, exist_ok=True)
+        poison.write_text("must never enter this node ancestry\n", encoding="utf-8")
+        git("add", str(poison.relative_to(self.root)))
+        git("commit", "-m", "poison outside scope")
+        poison_commit = git("rev-parse", "HEAD")
+        git("revert", "--no-edit", poison_commit)
+        final = git("rev-parse", "HEAD")
+
+        self.plane.control["verify_git_objects"] = True
+        candidate = self.receipt("BOOT-000")
+        candidate["base_commit"] = base
+        candidate["final_commit"] = final
+        candidate["changed_paths"] = [
+            str(allowed.relative_to(self.root)).replace("\\", "/")
+        ]
+        issues = self.plane.validate_receipt("BOOT-000", candidate)
+        self.assertTrue(
+            any(
+                "raw ancestry" in issue
+                and "outside node write scope" in issue
+                and "src/poison.txt" in issue
+                for issue in issues
+            ),
+            issues,
+        )
+
     def test_39_nonpassing_test_is_rejected(self) -> None:
         receipt = self.receipt("BOOT-000")
         receipt["tests"][0]["status"] = "failed"
@@ -330,7 +672,7 @@ class AutopilotControllerTests(unittest.TestCase):
 
     def test_40_stale_claim_is_reaped(self) -> None:
         self.mark_complete("BOOT-000")
-        self.plane.claim("RECON-010", "worker:one", lease_minutes=1)
+        self.plane.claim_internal("RECON-010", "worker:one", lease_minutes=1)
         self.clock.advance(2)
         self.assertEqual(self.plane.clean_stale_claims(), ("RECON-010",))
         self.assertEqual(self.plane.node_view("RECON-010").state, "READY")
@@ -344,10 +686,14 @@ class AutopilotControllerTests(unittest.TestCase):
         self.assertTrue(result["passed"], result)
 
     def test_43_rendered_prompt_contains_node_and_routes(self) -> None:
-        text = self.plane.render_worker_prompt("BOOT-000")
+        text = self.plane.render_worker_prompt(
+            "BOOT-000", host_id="host:authenticated-fixture"
+        )
         self.assertIn("BOOT-000", text)
         self.assertIn("GPT-5.6 Terra", text)
         self.assertIn("Claude Sonnet 5", text)
+        self.assertIn("dispatcher-injected authority envelope", text)
+        self.assertNotIn(" claim {{NODE_ID}}", text)
 
     def test_44_filename_glob_scope_accepts_matching_receipt(self) -> None:
         self.assertTrue(
@@ -364,6 +710,135 @@ class AutopilotControllerTests(unittest.TestCase):
                 "src/hive_mind_os/schemas/other-*.schema.json",
             )
         )
+
+    def test_terminal_fixed_point_closes_later_validation_and_claim_admission(self) -> None:
+        host_base = self.root / "canonical-host-base"
+        host_runtime = self.root / "host-kernel"
+        with mock.patch.object(
+            controller, "_host_runtime_base_dir", return_value=host_base
+        ):
+            controller.initialize_host_runtime(host_runtime)
+            self.plane.host_runtime_dir = host_runtime
+            for node_id in self.plane._nodes:
+                self.mark_complete(node_id)
+            release_id = "sha256:" + "e" * 64
+            target_watermark = self.plane.repository_target_watermark()
+            release = {
+                "release_id": release_id,
+                "admission_epoch": 1,
+                "released_wave": [],
+                "target_sha": self.plane.current_target_sha(),
+                "target_generation": target_watermark["target_generation"],
+                "target_watermark_record_id": target_watermark["record_id"],
+            }
+            self.plane.current_release = lambda: release
+            self.plane._release_issues = lambda _value: ()
+            publication_path = self.plane.execution_dir / "publication-test.json"
+            self.plane._publication_resource_path = lambda: publication_path
+            publication_material = {
+                "status": "PREPARED",
+                "transaction": {
+                    "transaction_id": "sha256:" + "a" * 64,
+                    "transaction_key": "sha256:" + "b" * 64,
+                    "execution_id": self.plane.execution_id,
+                    "release_id": release_id,
+                    "round_id": "sha256:" + "c" * 64,
+                    "repository": self.plane.control["target"]["repository"],
+                    "target_branch": self.plane.target_branch,
+                    "expected_target_sha": self.plane.current_target_sha(),
+                    "receipt_heads_digest": "sha256:" + "d" * 64,
+                },
+            }
+            controller.atomic_write_json(
+                publication_path,
+                {
+                    **publication_material,
+                    "record_id": controller.digest_json(publication_material),
+                },
+            )
+            blocked_snapshot = self.plane.round_authority_snapshot(release_id)
+            self.assertEqual(blocked_snapshot["active_publication_count"], 1)
+            with self.assertRaisesRegex(
+                controller.AutopilotError, "publication"
+            ):
+                self.plane.seal_plan_quiescent(
+                    release_id,
+                    actor="test:publication-race",
+                    expected_authority_digest=str(
+                        blocked_snapshot["authority_digest"]
+                    ),
+                )
+            publication_path.unlink()
+            snapshot = self.plane.round_authority_snapshot(release_id)
+            self.assertTrue(snapshot["status"]["complete"])
+            fence = self.plane.seal_plan_quiescent(
+                release_id,
+                actor="test:fixed-point",
+                expected_authority_digest=str(snapshot["authority_digest"]),
+            )
+            self.assertEqual(fence["state"], "PLAN_QUIESCENT")
+            self.assertEqual(
+                self.plane.seal_plan_quiescent(
+                    release_id,
+                    actor="test:fixed-point-retry",
+                    expected_authority_digest=str(snapshot["authority_digest"]),
+                ),
+                fence,
+            )
+            with self.assertRaisesRegex(
+                controller.AutopilotError, "terminal fence"
+            ):
+                self.plane.acquire_global_validation_lease_internal(
+                    "RECON-010", "test:late-validator"
+                )
+            with self.assertRaisesRegex(controller.ClaimError, "terminal fence"):
+                self.plane.claim_internal("RECON-010", "test:late-claim")
+
+    def test_ready_runtime_cannot_recreate_retired_repository_global_ledgers(self) -> None:
+        task_ledger = self.plane.coordination_dir / "task-bindings.jsonl"
+        sidecar_ledger = self.plane.coordination_dir / "sidecar-bindings.jsonl"
+        self.assertFalse(task_ledger.exists())
+        self.assertFalse(sidecar_ledger.exists())
+        with self.assertRaisesRegex(OrchestrationError, "explicit authenticated"):
+            binding_events(self.root)
+        with self.assertRaisesRegex(SidecarPolicyError, "explicit authenticated"):
+            sidecar_events(self.root)
+        self.assertFalse(task_ledger.exists())
+        self.assertFalse(sidecar_ledger.exists())
+        self.assertEqual(
+            binding_events(self.root, state_dir=self.plane.execution_dir), ()
+        )
+        self.assertEqual(
+            sidecar_events(self.root, state_dir=self.plane.execution_dir), ()
+        )
+
+    def test_malformed_target_control_never_justifies_claim_supersession(self) -> None:
+        plan_text = (self.root / ".autopilot" / "plan.json").read_text(
+            encoding="utf-8"
+        )
+        cases = (
+            '{"plan_fingerprint":"sha256:' + "1" * 64 + '","plan_fingerprint":"sha256:' + "2" * 64 + '"}\n',
+            '{"plan_fingerprint":NaN}\n',
+            '{ "plan_fingerprint": "sha256:' + "3" * 64 + '" }\n',
+        )
+        self.plane.control["verify_git_objects"] = True
+        self.plane.current_target_sha = lambda: "f" * 40
+        record = {
+            "expires_at": "2030-01-01T01:00:00Z",
+            "plan_fingerprint": "sha256:" + "0" * 64,
+        }
+        for malformed in cases:
+            with self.subTest(malformed=malformed[:24]):
+                def fake_git(arguments, *, check=True):
+                    del check
+                    text = malformed if str(arguments[1]).endswith("control-plane.json") else plan_text
+                    return SimpleNamespace(returncode=0, stdout=text, stderr="")
+
+                with mock.patch.object(self.plane, "_git", side_effect=fake_git):
+                    with self.assertRaisesRegex(
+                        controller.ClaimError, "cannot justify destructive"
+                    ):
+                        self.plane.defunct_remote_claim_proof(record)
 
 
 if __name__ == "__main__":

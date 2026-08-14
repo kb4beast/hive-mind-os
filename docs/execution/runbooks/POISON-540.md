@@ -31,8 +31,8 @@ unittest suite plus a results document proving the existing defenses hold.
   never edit package re-exports.
 - Never touch the release branch; never rebase/squash/amend the node branch
   `autopilot/poison-540`; never run repo-wide test discovery. Run only the
-  focused command in section 5; the round integrator owns the single leased
-  repo-wide pass.
+  focused command in section 5; the authenticated validation broker exclusively owns
+  the repository-wide gate.
 - If a real dependency on a sibling's files appears, `autopilot fail` with a
   blocker; never wait for or read a sibling's branch.
 

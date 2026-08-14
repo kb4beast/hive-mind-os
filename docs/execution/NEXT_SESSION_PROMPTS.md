@@ -1,9 +1,10 @@
-# Historical next sessions after BOOT-000
+# Historical next sessions after BOOT-000 — RETIRED, DO NOT EXECUTE
 
-This sealed handoff is retained for provenance. Its current-`main` assumptions are not
-the active workflow. Current execution uses the configured target branch and
-`.autopilot/orchestration-policy.json`; start from
-`USER_GUIDE/02_ONE_PROMPT_FOREVER.md`.
+This sealed handoff is retained for provenance. Every command and prompt below is an
+inactive historical transcript and MUST NOT be copied or executed. Its current-`main`
+assumptions are not the active workflow. Current execution uses a dispatcher-rendered
+prompt with exact host, namespace, repository-state, and host-runtime coordinates; start
+from `USER_GUIDE/02_ONE_PROMPT_FOREVER.md`.
 
 This handoff is bound to plan `hive-mind-os-verifiable-hive-cortex-v1` and fingerprint
 `sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39`. The original baseline SHA is provenance only. Each new
@@ -34,9 +35,7 @@ Use a fresh, clean checkout with authenticated GitHub access. Read every applica
 Run:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . doctor --skip-controller-tests
-python .autopilot/bin/autopilot.py --repo-root . claim RECON-010 \
-  --owner <provider>:<unique-session> --publish-remote
+# RETIRED TRANSCRIPT: obtain a current dispatcher-rendered prompt instead.
 ```
 
 The remote claim must succeed before product work begins. Create/switch to `autopilot/recon-010`
@@ -125,9 +124,7 @@ Use a fresh, clean checkout with authenticated GitHub access. Read every applica
 Run:
 
 ```bash
-python .autopilot/bin/autopilot.py --repo-root . doctor --skip-controller-tests
-python .autopilot/bin/autopilot.py --repo-root . claim BASE-020 \
-  --owner <provider>:<unique-session> --publish-remote
+# RETIRED TRANSCRIPT: obtain a current dispatcher-rendered prompt instead.
 ```
 
 The remote claim must succeed before product work begins. Create/switch to `autopilot/base-020`

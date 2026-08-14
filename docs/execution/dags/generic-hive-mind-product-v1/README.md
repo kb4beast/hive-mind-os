@@ -6,13 +6,17 @@ open-source Hive Mind product. It does **not** replace or edit the sealed
 
 ## Verify, materialize, lint, and compile
 
-```bash
-python docs/execution/dags/generic-hive-mind-product-v1/verify_plan.py --write
+First define the canonical `REPO_ROOT`, `STATE_DIR`, `HOST_RUNTIME_DIR`,
+`EXECUTION_NAMESPACE`, `PYTHON`, and `AUTOPILOT` array exactly as shown in
+`.autopilot/README.md`; do not use parser defaults.
 
-python .autopilot/bin/autopilot.py --repo-root . dag-lint \
+```bash
+"$PYTHON" "$REPO_ROOT/docs/execution/dags/generic-hive-mind-product-v1/verify_plan.py" --write
+
+"${AUTOPILOT[@]}" dag-lint \
   --plan .autopilot/state/generic-hive-mind-product-v1.json --strict --json
 
-python .autopilot/bin/autopilot.py --repo-root . dag-rounds \
+"${AUTOPILOT[@]}" dag-rounds \
   --plan .autopilot/state/generic-hive-mind-product-v1.json \
   --max-sessions 8 --actor codex:generic-product --json
 ```

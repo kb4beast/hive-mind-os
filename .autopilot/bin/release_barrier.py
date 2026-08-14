@@ -84,7 +84,10 @@ class ControlPlane(DurableControlPlane):
         node_id = record.get("node_id")
         if node_id != "RECON-010":
             issues.append("authority amendment may only target RECON-010")
-        if record.get("amendment_id") != "recon-010-pr120-dispatcher-release-barrier-v1":
+        if (
+            record.get("amendment_id")
+            != "recon-010-pr120-dispatcher-release-barrier-v1"
+        ):
             issues.append("authority amendment id is not the sealed PR #120 amendment")
         if record.get("decision") != "ADAPT":
             issues.append("authority amendment decision must be ADAPT")
@@ -154,7 +157,9 @@ class ControlPlane(DurableControlPlane):
             scope.startswith("src/") or scope.startswith("tests/")
             for scope in additional_write
         ):
-            issues.append("authority amendment may not enter product runtime/test paths")
+            issues.append(
+                "authority amendment may not enter product runtime/test paths"
+            )
         return tuple(dict.fromkeys(issues))
 
     def authority_issues(self) -> tuple[str, ...]:
@@ -251,8 +256,7 @@ class ControlPlane(DurableControlPlane):
         ):
             return True
         return bool(
-            set(first.get("semantic_locks", []))
-            & set(second.get("semantic_locks", []))
+            set(first.get("semantic_locks", [])) & set(second.get("semantic_locks", []))
         )
 
     def _candidate_verdicts(
@@ -364,8 +368,7 @@ class ControlPlane(DurableControlPlane):
                 if not bool(self.node(node_id).get("parallel_safe")):
                     continue
                 if any(
-                    not bool(self.node(chosen).get("parallel_safe"))
-                    for chosen in wave
+                    not bool(self.node(chosen).get("parallel_safe")) for chosen in wave
                 ):
                     continue
                 if all(not self._nodes_conflict(node_id, chosen) for chosen in wave):
@@ -468,9 +471,7 @@ class ControlPlane(DurableControlPlane):
 
     def _status_with_release(self, base: dict[str, object]) -> dict[str, object]:
         original_eligible = (
-            list(base.get("ready", []))
-            if isinstance(base.get("ready"), list)
-            else []
+            list(base.get("ready", [])) if isinstance(base.get("ready"), list) else []
         )
         record = self.current_release()
         issues = (
@@ -522,11 +523,7 @@ class ControlPlane(DurableControlPlane):
     def ready_nodes(self) -> tuple[str, ...]:
         status = self.status()
         ready = status.get("ready", [])
-        return (
-            tuple(str(item) for item in ready)
-            if isinstance(ready, list)
-            else ()
-        )
+        return tuple(str(item) for item in ready) if isinstance(ready, list) else ()
 
     def assert_start_now(self, node_id: str) -> Mapping[str, Any]:
         # Release revalidation is a pure observation; scope one snapshot cache to
@@ -540,7 +537,10 @@ class ControlPlane(DurableControlPlane):
                 )
             assert record is not None
             verdicts = record.get("verdicts")
-            if not isinstance(verdicts, Mapping) or verdicts.get(node_id) != "START NOW":
+            if (
+                not isinstance(verdicts, Mapping)
+                or verdicts.get(node_id) != "START NOW"
+            ):
                 raise ClaimError(
                     f"node {node_id} is WAIT; explicit START NOW was not released"
                 )
@@ -556,6 +556,11 @@ class ControlPlane(DurableControlPlane):
         node_id: str,
         owner: str,
         *,
+        claim_authority_class: str,
+        launch_instruction_id: str | None = None,
+        resource_key: str | None = None,
+        authority_epoch: int | None = None,
+        _internal_authority: object | None = None,
         lease_minutes: int = 90,
         publish_remote: bool = False,
         remote: str = "origin",
@@ -564,29 +569,34 @@ class ControlPlane(DurableControlPlane):
         return super().claim(
             node_id,
             owner,
+            claim_authority_class=claim_authority_class,
+            launch_instruction_id=launch_instruction_id,
+            resource_key=resource_key,
+            authority_epoch=authority_epoch,
+            _internal_authority=_internal_authority,
             lease_minutes=lease_minutes,
             publish_remote=publish_remote,
             remote=remote,
         )
 
-    def render_worker_prompt(self, node_id: str) -> str:
-        rendered = super().render_worker_prompt(node_id)
+    def render_worker_prompt(
+        self,
+        node_id: str,
+        *,
+        host_id: str | None = None,
+    ) -> str:
+        rendered = super().render_worker_prompt(node_id, host_id=host_id)
         release = self.status().get("dispatch_release", {})
         verdicts = release.get("verdicts", {}) if isinstance(release, Mapping) else {}
         verdict = (
-            verdicts.get(node_id, "WAIT")
-            if isinstance(verdicts, Mapping)
-            else "WAIT"
+            verdicts.get(node_id, "WAIT") if isinstance(verdicts, Mapping) else "WAIT"
         )
         directive = (
-            release.get("directive", "WAIT")
-            if isinstance(release, Mapping)
-            else "WAIT"
+            release.get("directive", "WAIT") if isinstance(release, Mapping) else "WAIT"
         )
         return (
             f"DISPATCH VERDICT FOR {node_id}: {verdict}\n"
             f"DISPATCH DIRECTIVE: {directive}\n"
             "Static DAG/level eligibility is not execution authority. If the verdict is not "
-            "START NOW, do not claim or implement this node.\n\n"
-            + rendered
+            "START NOW, do not claim or implement this node.\n\n" + rendered
         )

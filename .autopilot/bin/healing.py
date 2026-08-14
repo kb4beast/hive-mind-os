@@ -26,6 +26,7 @@ candidate needs anything.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -41,6 +42,8 @@ from controller import (
     digest_json,
     format_time,
     parse_time,
+    read_json,
+    strict_jsonl_records,
 )
 
 POLICY_FILE = "healing-policy.json"
@@ -74,6 +77,10 @@ SEALED_MARKERS = (
     "spending",
     "sealed",
 )
+
+
+class HealingError(RuntimeError):
+    """Healing authority or evidence is incomplete."""
 
 
 def load_policy(ap_root: Path) -> dict[str, Any]:
@@ -122,16 +129,8 @@ class NodeDiagnosis:
 
 def _last_blocker(plane: Any, node_id: str) -> Mapping[str, Any] | None:
     path = Path(plane.blockers_dir) / f"{node_id}.jsonl"
-    if not path.is_file():
-        return None
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    if not lines:
-        return None
-    try:
-        value = json.loads(lines[-1])
-    except json.JSONDecodeError:
-        return None
-    return value if isinstance(value, Mapping) else None
+    records = strict_jsonl_records(path, label="healing blocker ledger")
+    return records[-1] if records else None
 
 
 def _blocker_is_sealed(packet: Mapping[str, Any] | None) -> bool:
@@ -278,17 +277,32 @@ def reconcile_with_snapshot(plane: Any, *, actor: str) -> tuple[bool, str]:
     """Refresh the GitHub snapshot and reconciliation the way the operator would."""
 
     script = Path(plane.ap_root) / "bin" / "github_snapshot.py"
+    coordination_dir = Path(plane.coordination_dir).resolve()
+    host_runtime_dir = Path(plane.host_runtime_dir).resolve()
+    execution_namespace = str(plane.execution_namespace)
+    execution_id = str(plane.execution_id)
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", execution_namespace):
+        return False, "snapshot execution namespace is invalid"
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", execution_id):
+        return False, "snapshot execution identity is invalid"
+    command = (
+        sys.executable,
+        str(script),
+        "--repo-root",
+        str(plane.repo_root),
+        "--state-dir",
+        str(coordination_dir),
+        "--execution-namespace",
+        execution_namespace,
+        "--host-runtime-dir",
+        str(host_runtime_dir),
+        "--reconcile",
+        "--actor",
+        actor,
+    )
     try:
         completed = subprocess.run(
-            (
-                sys.executable,
-                str(script),
-                "--repo-root",
-                str(plane.repo_root),
-                "--reconcile",
-                "--actor",
-                actor,
-            ),
+            command,
             cwd=str(plane.repo_root),
             capture_output=True,
             text=True,
@@ -296,7 +310,20 @@ def reconcile_with_snapshot(plane: Any, *, actor: str) -> tuple[bool, str]:
     except OSError as error:
         return False, f"snapshot process could not start: {error}"
     tail = (completed.stderr or completed.stdout).strip().splitlines()
-    return completed.returncode == 0, tail[-1] if tail else "no snapshot output"
+    detail = tail[-1] if tail else "no snapshot output"
+    if completed.returncode != 0:
+        return False, detail
+    try:
+        installed = plane.github_snapshot()
+    except Exception as error:
+        return False, f"snapshot authority could not be authenticated: {error}"
+    if (
+        not isinstance(installed, Mapping)
+        or installed.get("execution_namespace") != execution_namespace
+        or installed.get("execution_id") != execution_id
+    ):
+        return False, "snapshot child execution identity does not match its parent"
+    return True, detail
 
 
 _MECHANISMS: Mapping[str, str] = {
@@ -475,18 +502,8 @@ def _stall_retirements(plane: Any, node_id: str) -> int:
     """
 
     path = Path(plane.state_dir) / "releases.jsonl"
-    if not path.is_file():
-        return 0
     count = 0
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(record, Mapping):
-            continue
+    for record in strict_jsonl_records(path, label="healing release ledger"):
         proof = record.get("proof")
         if (
             record.get("node_id") == node_id
@@ -510,16 +527,18 @@ def _quarantine_liftable(plane: Any, node_id: str) -> bool:
     return bool(plane.blockers_fully_resolved(node_id))
 
 
-def _expired_lease(plane: Any) -> bool:
+def _expired_lease(plane: Any) -> str | None:
     path = Path(plane.validation_lease_path)
     if not path.is_file():
-        return False
+        return None
+    value = read_json(path)
+    if not isinstance(value, Mapping) or not isinstance(value.get("lease_id"), str):
+        raise HealingError("validation lease is malformed; reconciliation is required")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-        expires = parse_time(value.get("expires_at")) if isinstance(value, Mapping) else None
-    except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError):
-        return True  # unreadable bounds can never be identity-released
-    return expires is None or expires <= plane.clock()
+        expires = parse_time(value.get("expires_at"))
+    except (TypeError, ValueError):
+        raise HealingError("validation lease expiry is malformed; reconciliation is required")
+    return str(value["lease_id"]) if expires <= plane.clock() else None
 
 
 def _evidence_fingerprint(plane: Any, diagnoses: Sequence[NodeDiagnosis]) -> str:
@@ -541,17 +560,7 @@ def _record_observation(plane: Any, fingerprint: str) -> int:
 
     path = Path(plane.state_dir) / "heal" / "observations.jsonl"
     now = plane.clock()
-    entries: list[Mapping[str, Any]] = []
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, Mapping):
-                entries.append(value)
+    entries = list(strict_jsonl_records(path, label="healing observation ledger"))
     append_jsonl(path, {"fingerprint": fingerprint, "observed_at": format_time(now)})
     frozen_since = now
     for entry in reversed(entries):
@@ -568,6 +577,7 @@ def heal_round(
     plane: Any,
     *,
     actor: str,
+    host_id: str,
     nodes: Sequence[str] | None = None,
     policy: Mapping[str, Any] | None = None,
     status: Mapping[str, Any] | None = None,
@@ -600,6 +610,8 @@ def heal_round(
         report["disposition"] = "DISABLED"
         return report
     acting = apply
+    if not isinstance(host_id, str) or not host_id.strip():
+        raise HealingError("healing requires an authenticated host_id")
 
     def record_action(kind: str, node_id: str | None, outcome: str, detail: str) -> None:
         report["actions"].append(
@@ -610,6 +622,44 @@ def heal_round(
     withheld = 0
     refused = 0
     current = dict(status) if status is not None else plane.status()
+    try:
+        from orchestration import orphaned_sidecar_obligations
+
+        orphan_sidecars = orphaned_sidecar_obligations(
+            Path(plane.repo_root),
+            state_dir=getattr(plane, "execution_dir", None),
+        )
+    except Exception as error:
+        record_action("reconcile-orphan-sidecars", None, "REFUSED", str(error))
+        orphan_sidecars = ()
+    if orphan_sidecars:
+        if acting:
+            try:
+                recovered = plane.reconcile_orphan_sidecar_reservations(
+                    actor=actor,
+                    reason="healing observed an active sidecar behind a terminal parent fence",
+                    limit=max(0, int(policy["max_actions_per_run"])),
+                )
+            except Exception as error:
+                refused += 1
+                record_action("reconcile-orphan-sidecars", None, "REFUSED", str(error))
+            else:
+                healed += len(recovered)
+                record_action(
+                    "reconcile-orphan-sidecars",
+                    None,
+                    "APPLIED",
+                    f"fenced {len(recovered)} orphan reservation(s); external cancellation not claimed",
+                )
+                current = plane.status()
+        else:
+            withheld += len(orphan_sidecars)
+            record_action(
+                "reconcile-orphan-sidecars",
+                None,
+                "WITHHELD",
+                f"{len(orphan_sidecars)} orphan reservation(s) require fencing",
+            )
     if current.get("reconciliation_required") and policy["auto_reconcile"]:
         if acting:
             ok, detail = reconcile_with_snapshot(plane, actor=actor)
@@ -811,10 +861,14 @@ def heal_round(
         # same mechanism wedges this node again.
         _record_attempt(plane, policy, diagnosis, actor=actor)
 
-    if policy["break_expired_validation_lease"] and _expired_lease(plane):
+    expired_lease_id = _expired_lease(plane)
+    if policy["break_expired_validation_lease"] and expired_lease_id is not None:
         if acting:
             try:
-                broken = plane.break_expired_validation_lease(actor=actor)
+                broken = plane.break_expired_validation_lease(
+                    actor=actor,
+                    lease_id=expired_lease_id,
+                )
             except Exception as error:
                 record_action("break-lease", None, "REFUSED", str(error))
             else:
@@ -839,7 +893,7 @@ def heal_round(
             record_action("reconcile", None, "APPLIED" if ok else "FAILED", detail)
         if policy["auto_redispatch"]:
             try:
-                fresh = plane.dispatch(actor=actor)
+                fresh = plane.dispatch(actor=actor, host_id=host_id)
             except Exception as error:
                 record_action("dispatch", None, "FAILED", str(error))
             else:
@@ -856,7 +910,7 @@ def heal_round(
         unstarted = [d.node_id for d in diagnoses if d.verdict == "UNSTARTED"]
         if unstarted and not current.get("reconciliation_required"):
             try:
-                fresh = plane.dispatch(actor=actor)
+                fresh = plane.dispatch(actor=actor, host_id=host_id)
             except Exception as error:
                 record_action("dispatch", None, "FAILED", str(error))
             else:

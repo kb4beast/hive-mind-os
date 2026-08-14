@@ -15,6 +15,7 @@ if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
 import controller  # noqa: E402
+from fixture_support import ready_runtime  # noqa: E402
 
 TARGET_A = "a" * 40
 PARENT_A = "1" * 40
@@ -55,7 +56,9 @@ class InstrumentedStatusPlane(controller.ControlPlane):
         command = args[0]
         self.git_calls[command] += 1
         if command == "rev-parse":
-            return subprocess.CompletedProcess(args, 0, self.synthetic_target + "\n", "")
+            return subprocess.CompletedProcess(
+                args, 0, self.synthetic_target + "\n", ""
+            )
         if command == "log":
             parent, tree, parent_tree = self.graph[self.synthetic_target]
             output = (
@@ -102,10 +105,28 @@ class StatusPerformanceRegressionTests(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = True
-        control_path.write_text(
-            json.dumps(control, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        control_path.write_bytes(
+            (json.dumps(control, indent=2, sort_keys=True) + "\n").encode("utf-8")
         )
+        subprocess.run(
+            ("git", "init", "--initial-branch=main", str(self.root)),
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            (
+                "git",
+                "-C",
+                str(self.root),
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/" + str(control["target"]["repository"]) + ".git",
+            ),
+            check=True,
+            capture_output=True,
+        )
+        ready_runtime(controller, self.root, actor="test:status-performance")
         self.plane = InstrumentedStatusPlane(self.root)
 
     def tearDown(self) -> None:
@@ -115,7 +136,9 @@ class StatusPerformanceRegressionTests(unittest.TestCase):
         first = self.plane.observe_status()
         self.assertEqual(first["target_sha"], TARGET_A)
         self.assertEqual(set(self.plane.node_evaluations), set(self.plane._nodes))
-        self.assertTrue(all(count == 1 for count in self.plane.node_evaluations.values()))
+        self.assertTrue(
+            all(count == 1 for count in self.plane.node_evaluations.values())
+        )
         # One physical rev-parse per snapshot: the target is resolved once and
         # pinned for the whole observation, including the reconciliation check.
         self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 1, "log": 1}))
@@ -126,7 +149,9 @@ class StatusPerformanceRegressionTests(unittest.TestCase):
         second = self.plane.observe_status()
 
         self.assertEqual(second["target_sha"], TARGET_B)
-        self.assertTrue(all(count == 2 for count in self.plane.node_evaluations.values()))
+        self.assertTrue(
+            all(count == 2 for count in self.plane.node_evaluations.values())
+        )
         self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 2, "log": 2}))
         self.assertEqual(self.plane.commit_tree_fallbacks, 0)
         self.assertEqual(self.plane.commit_parent_fallbacks, 0)
@@ -136,7 +161,9 @@ class StatusPerformanceRegressionTests(unittest.TestCase):
         # bounded Git cost as one status snapshot, not one uncached traversal
         # per dependency (regression: 5,231 subprocesses / ~4 minutes per render).
         with self.plane.snapshot_cache():
-            prompt = self.plane.render_worker_prompt("BOOT-000")
+            prompt = self.plane.render_worker_prompt(
+                "BOOT-000", host_id="test-performance-host"
+            )
         self.assertIn("BOOT-000", prompt)
         self.assertEqual(self.plane.git_calls, Counter({"rev-parse": 1, "log": 1}))
         self.assertEqual(self.plane.commit_tree_fallbacks, 0)

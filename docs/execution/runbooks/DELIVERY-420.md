@@ -42,8 +42,8 @@ adapter behind the kernel, not a separate brain.
 - Work only on branch `autopilot/delivery-420`. Never touch the release
   branch, never rebase/squash/amend the node branch, never force-push.
 - Run ONLY the focused required_tests command (section 5). Never run
-  `python -m unittest discover` — the round integrator runs the single leased
-  repo-wide pass.
+  `python -m unittest discover` — the authenticated validation broker exclusively owns
+  the repository-wide gate.
 - Semantic lock: `github-delivery-adapter`. Round R2B (runs after DURABLE-410 has
 integrated, so crash recovery exists before any external effect); siblings released in the
   same wave: `DURABLE-410`, `HUMANLESS-430`, `CHEAT-440`, `LEARN-500` — never

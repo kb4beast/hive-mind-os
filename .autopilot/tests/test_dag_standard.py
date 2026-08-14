@@ -73,7 +73,9 @@ def subject_of(findings: tuple[Finding, ...], subject: str) -> Finding:
     for item in findings:
         if item.subject == subject:
             return item
-    raise AssertionError(f"no finding for {subject!r} in {[i.subject for i in findings]}")
+    raise AssertionError(
+        f"no finding for {subject!r} in {[i.subject for i in findings]}"
+    )
 
 
 class PlanGraphTests(unittest.TestCase):
@@ -91,6 +93,18 @@ class PlanGraphTests(unittest.TestCase):
         messages = [item.message for item in findings_of(graph, "graph-validity")]
         self.assertIn("node id A is declared more than once", messages)
         self.assertIn("B depends on unknown node GHOST", messages)
+
+    def test_execution_rejects_duplicate_ids_and_missing_dependencies(self) -> None:
+        cases = (
+            graph_of(node("A"), node("A")),
+            graph_of(node("B", dependencies=["GHOST"])),
+        )
+        for graph in cases:
+            with (
+                self.subTest(nodes=graph.node_ids),
+                self.assertRaises(DagStandardError),
+            ):
+                compile_rounds(graph, command_prefix=TEST_PREFIX)
 
     def test_cycle_is_an_error_and_level_checks_are_skipped(self) -> None:
         graph = graph_of(
@@ -137,7 +151,9 @@ class MalformedScopeTests(unittest.TestCase):
     def test_unanchored_lock_pattern_becomes_a_finding_not_a_traceback(self) -> None:
         graph = graph_of(
             node("ALPHA", file_locks=["**/*.py"], write_scope=["src/pkg/alpha.py"]),
-            node("BETA", file_locks=["src/pkg/beta.py"], write_scope=["src/pkg/beta.py"]),
+            node(
+                "BETA", file_locks=["src/pkg/beta.py"], write_scope=["src/pkg/beta.py"]
+            ),
         )
         # Neither command may raise.
         rounds = compile_rounds(graph, command_prefix=TEST_PREFIX)
@@ -156,7 +172,9 @@ class MalformedScopeTests(unittest.TestCase):
     def test_absolute_and_traversing_scopes_are_reported(self) -> None:
         graph = graph_of(
             node("ALPHA", write_scope=["/etc/passwd"], file_locks=["docs/ALPHA.md"]),
-            node("BETA", write_scope=["../outside/thing.go"], file_locks=["docs/BETA.md"]),
+            node(
+                "BETA", write_scope=["../outside/thing.go"], file_locks=["docs/BETA.md"]
+            ),
         )
         findings = findings_of(graph, "scope-syntax")
         self.assertEqual(
@@ -183,18 +201,37 @@ class MalformedScopeTests(unittest.TestCase):
             )
             with redirect_stdout(io.StringIO()):
                 rounds_code = autopilot.main(
-                    ["--repo-root", str(root), "dag-rounds", "--plan", str(plan)]
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-rounds",
+                        "--host-id",
+                        "host:test",
+                        "--plan",
+                        str(plan),
+                    ]
                 )
             buffer = io.StringIO()
             with redirect_stdout(buffer):
                 lint_code = autopilot.main(
-                    ["--repo-root", str(root), "dag-lint", "--plan", str(plan), "--json"]
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-lint",
+                        "--plan",
+                        str(plan),
+                        "--json",
+                    ]
                 )
         self.assertEqual(rounds_code, 0)
         self.assertEqual(lint_code, 1)
         report = json.loads(buffer.getvalue())
         self.assertEqual(
-            [item["check"] for item in report["findings"] if item["check"] == "scope-syntax"],
+            [
+                item["check"]
+                for item in report["findings"]
+                if item["check"] == "scope-syntax"
+            ],
             ["scope-syntax"],
         )
 
@@ -291,7 +328,9 @@ class ScaffoldCollisionTests(unittest.TestCase):
 
     def test_glob_coverage_alone_is_permission_not_ownership(self) -> None:
         graph = graph_of(
-            node("OWNER", write_scope=["tests/suite/**"], file_locks=["tests/suite/**"]),
+            node(
+                "OWNER", write_scope=["tests/suite/**"], file_locks=["tests/suite/**"]
+            ),
             node(
                 "ALPHA",
                 dependencies=["OWNER"],
@@ -429,7 +468,9 @@ class EcosystemContentionTests(unittest.TestCase):
 
     def test_typescript_barrel_is_named(self) -> None:
         graph = self._two_creators("src/api/users.ts", "src/api/orders.ts")
-        finding = subject_of(findings_of(graph, "scaffold-collision"), "src/api/index.ts")
+        finding = subject_of(
+            findings_of(graph, "scaffold-collision"), "src/api/index.ts"
+        )
         self.assertEqual(finding.severity, "error")
         self.assertEqual(finding.nodes, ("ALPHA", "BETA"))
         self.assertEqual(lint_exit_code(lint_plan(graph)), 1)
@@ -442,7 +483,9 @@ class EcosystemContentionTests(unittest.TestCase):
 
     def test_rust_module_file_is_named(self) -> None:
         graph = self._two_creators("src/engine/lexer.rs", "src/engine/parser.rs")
-        finding = subject_of(findings_of(graph, "scaffold-collision"), "src/engine/mod.rs")
+        finding = subject_of(
+            findings_of(graph, "scaffold-collision"), "src/engine/mod.rs"
+        )
         self.assertEqual(finding.severity, "error")
         self.assertEqual(lint_exit_code(lint_plan(graph)), 1)
 
@@ -485,7 +528,9 @@ class EcosystemContentionTests(unittest.TestCase):
     def test_go_falls_back_to_the_directory_rule(self) -> None:
         """Go needs no per-directory marker, so the language-neutral rule fires."""
 
-        graph = self._two_creators("internal/store/reader.go", "internal/store/writer.go")
+        graph = self._two_creators(
+            "internal/store/reader.go", "internal/store/writer.go"
+        )
         finding = subject_of(findings_of(graph, "scaffold-collision"), "internal/store")
         self.assertEqual(finding.severity, "error")
         self.assertEqual(finding.nodes, ("ALPHA", "BETA"))
@@ -574,11 +619,15 @@ class EcosystemContentionTests(unittest.TestCase):
         self.assertEqual(findings_of(graph, "scaffold-collision"), ())
 
     def test_an_existing_directory_is_not_a_new_shared_surface(self) -> None:
-        graph = self._two_creators("internal/store/reader.go", "internal/store/writer.go")
+        graph = self._two_creators(
+            "internal/store/reader.go", "internal/store/writer.go"
+        )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "internal" / "store").mkdir(parents=True)
-            self.assertEqual(findings_of(graph, "scaffold-collision", repo_root=root), ())
+            self.assertEqual(
+                findings_of(graph, "scaffold-collision", repo_root=root), ()
+            )
 
     def test_a_top_level_directory_is_a_repository_root_not_a_surface(self) -> None:
         graph = self._two_creators("docs/alpha.md", "docs/beta.md")
@@ -698,7 +747,9 @@ class ParallelSafeDeclarationTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0].severity, "warning")
         self.assertEqual(findings[0].subject, "plan")
-        self.assertIn("no node in this plan declares parallel_safe", findings[0].message)
+        self.assertIn(
+            "no node in this plan declares parallel_safe", findings[0].message
+        )
         rounds = compile_rounds(graph, command_prefix=TEST_PREFIX)
         self.assertEqual([item.sessions for item in rounds], [1, 1, 1])
 
@@ -742,7 +793,9 @@ class DurabilityOrderingTests(unittest.TestCase):
             node("DURABLE", semantic_locks=["durable-effects"]),
             node(
                 "DELIVERY",
-                acceptance_criteria=["Draft PR and comment delivery is receipt-backed."],
+                acceptance_criteria=[
+                    "Draft PR and comment delivery is receipt-backed."
+                ],
             ),
         )
         findings = findings_of(graph, "durability-ordering")
@@ -924,8 +977,7 @@ class ContentionCompilationTests(unittest.TestCase):
             [
                 finding
                 for finding in lint_plan(graph)
-                if finding.check == "scaffold-collision"
-                and finding.severity == "error"
+                if finding.check == "scaffold-collision" and finding.severity == "error"
             ],
             [],
         )
@@ -950,8 +1002,7 @@ class ContentionCompilationTests(unittest.TestCase):
             [
                 finding
                 for finding in findings
-                if finding.check == "scaffold-collision"
-                and finding.severity == "error"
+                if finding.check == "scaffold-collision" and finding.severity == "error"
             ],
             [],
         )
@@ -987,7 +1038,9 @@ class SemanticOrderingCompilationTests(unittest.TestCase):
             node(
                 "DELIVERY",
                 dependencies=["BASE"],
-                acceptance_criteria=["Draft PR and comment delivery is receipt-backed."],
+                acceptance_criteria=[
+                    "Draft PR and comment delivery is receipt-backed."
+                ],
                 critical_path_importance=70,
             ),
             node("QUIET", dependencies=["BASE"], critical_path_importance=60),
@@ -1000,9 +1053,7 @@ class SemanticOrderingCompilationTests(unittest.TestCase):
         level_one = [item for item in rounds if item.level == 1]
         self.assertEqual(len(level_one), 2)
         self.assertEqual(level_one[0].nodes, ("DURABLE",))
-        self.assertEqual(
-            sorted(level_one[1].nodes), ["DELIVERY", "MISSION", "QUIET"]
-        )
+        self.assertEqual(sorted(level_one[1].nodes), ["DELIVERY", "MISSION", "QUIET"])
         self.assertEqual(level_one[1].deferred_after, ("DURABLE",))
         self.assertIn("deferred behind durability node(s) DURABLE", level_one[1].reason)
 
@@ -1059,7 +1110,9 @@ class SemanticOrderingCompilationTests(unittest.TestCase):
         )
         rounds = compile_rounds(graph, command_prefix=TEST_PREFIX)
         placement = {
-            node_id: index for index, item in enumerate(rounds) for node_id in item.nodes
+            node_id: index
+            for index, item in enumerate(rounds)
+            for node_id in item.nodes
         }
         self.assertLess(placement["DURABLE"], placement["MISSION"])
         self.assertEqual(placement["QUIET"], placement["SEED"])
@@ -1207,7 +1260,9 @@ class RoundCompilationTests(unittest.TestCase):
             node("GAMMA", semantic_locks=["ALPHA-lock"], file_locks=["docs/GAMMA.md"]),
         )
         rounds = compile_rounds(graph, command_prefix=TEST_PREFIX)
-        self.assertEqual([item.nodes for item in rounds], [("ALPHA",), ("BETA", "GAMMA")])
+        self.assertEqual(
+            [item.nodes for item in rounds], [("ALPHA",), ("BETA", "GAMMA")]
+        )
 
     def test_ordering_matches_the_dispatcher_selection_order(self) -> None:
         graph = graph_of(
@@ -1231,13 +1286,20 @@ class DispatchCommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             (root / ".autopilot" / "bin").mkdir(parents=True)
-            (root / ".autopilot" / "bin" / "autopilot.py").write_text("", encoding="utf-8")
+            (root / ".autopilot" / "bin" / "autopilot.py").write_text(
+                "", encoding="utf-8"
+            )
             plan = root / ".autopilot" / "plan.json"
             plan.write_text("{}", encoding="utf-8")
-            prefix = dispatch_command_prefix(plan_path=plan)
+            prefix = dispatch_command_prefix(
+                plan_path=plan,
+                execution_namespace="default",
+                host_id="host:test",
+            )
         self.assertIn(root.as_posix(), prefix)
         self.assertIn(f"--repo-root {root.as_posix()}", prefix)
-        self.assertTrue(prefix.endswith("dispatch"))
+        self.assertIn("--execution-namespace default", prefix)
+        self.assertTrue(prefix.endswith("dispatch --host-id host:test"))
         self.assertNotIn("--plan", prefix)
 
     def test_a_plan_outside_the_conventional_location_carries_plan(self) -> None:
@@ -1245,9 +1307,28 @@ class DispatchCommandTests(unittest.TestCase):
             root = Path(directory).resolve()
             plan = root / "custom-plan.json"
             plan.write_text("{}", encoding="utf-8")
-            prefix = dispatch_command_prefix(plan_path=plan, repo_root=root)
+            prefix = dispatch_command_prefix(
+                plan_path=plan,
+                repo_root=root,
+                execution_namespace="mission-one",
+                host_id="host:test",
+            )
         self.assertIn("--plan", prefix)
         self.assertIn("custom-plan.json", prefix)
+
+    def test_runtime_authority_tokens_are_strict(self) -> None:
+        for namespace, host_id in (
+            ("Default", "host:test"),
+            ("default; echo owned", "host:test"),
+            ("default", "host:test && echo owned"),
+            ("default", ""),
+        ):
+            with self.subTest(namespace=namespace, host_id=host_id):
+                with self.assertRaises(DagStandardError):
+                    dispatch_command_prefix(
+                        execution_namespace=namespace,
+                        host_id=host_id,
+                    )
 
     def test_the_default_actor_is_vendor_neutral(self) -> None:
         graph = graph_of(node("ALPHA"), node("BETA"))
@@ -1273,15 +1354,26 @@ class DispatchCommandTests(unittest.TestCase):
             root = Path(directory).resolve()
             (root / ".autopilot").mkdir()
             plan = root / ".autopilot" / "plan.json"
-            plan.write_text(
-                json.dumps({"nodes": [node("ALPHA")]}), encoding="utf-8"
-            )
+            plan.write_text(json.dumps({"nodes": [node("ALPHA")]}), encoding="utf-8")
             buffer = io.StringIO()
             with redirect_stdout(buffer):
                 # No --repo-root: its "." default must not decide the target.
-                autopilot.main(["dag-rounds", "--plan", str(plan), "--json"])
+                autopilot.main(
+                    [
+                        "--execution-namespace",
+                        "mission-one",
+                        "dag-rounds",
+                        "--host-id",
+                        "host:test",
+                        "--plan",
+                        str(plan),
+                        "--json",
+                    ]
+                )
         command = json.loads(buffer.getvalue())["rounds"][0]["command"]
         self.assertIn(f"--repo-root {root.as_posix()}", command)
+        self.assertIn("--execution-namespace mission-one", command)
+        self.assertIn("dispatch --host-id host:test", command)
 
 
 class PlanLoadingAndCliTests(unittest.TestCase):
@@ -1307,7 +1399,9 @@ class PlanLoadingAndCliTests(unittest.TestCase):
             with self.assertRaises(DagStandardError):
                 load_plan_graph(empty)
 
-    def test_cli_subcommands_are_wired_and_return_the_documented_exit_codes(self) -> None:
+    def test_cli_subcommands_are_wired_and_return_the_documented_exit_codes(
+        self,
+    ) -> None:
         import autopilot
 
         with tempfile.TemporaryDirectory() as directory:
@@ -1335,7 +1429,16 @@ class PlanLoadingAndCliTests(unittest.TestCase):
             buffer = io.StringIO()
             with redirect_stdout(buffer):
                 rounds_code = autopilot.main(
-                    ["--repo-root", str(root), "dag-rounds", "--plan", str(plan), "--json"]
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-rounds",
+                        "--host-id",
+                        "host:test",
+                        "--plan",
+                        str(plan),
+                        "--json",
+                    ]
                 )
             self.assertEqual(rounds_code, 0)
             document = json.loads(buffer.getvalue())
@@ -1352,7 +1455,14 @@ class PlanLoadingAndCliTests(unittest.TestCase):
             buffer = io.StringIO()
             with redirect_stdout(buffer):
                 lint_code = autopilot.main(
-                    ["--repo-root", str(root), "dag-lint", "--plan", str(plan), "--json"]
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-lint",
+                        "--plan",
+                        str(plan),
+                        "--json",
+                    ]
                 )
             self.assertEqual(lint_code, 1)
             report = json.loads(buffer.getvalue())
@@ -1383,6 +1493,8 @@ class PlanLoadingAndCliTests(unittest.TestCase):
                         "--repo-root",
                         str(root),
                         "dag-rounds",
+                        "--host-id",
+                        "host:test",
                         "--plan",
                         str(plan),
                         "--json",
@@ -1393,7 +1505,16 @@ class PlanLoadingAndCliTests(unittest.TestCase):
             buffer = io.StringIO()
             with redirect_stdout(buffer):
                 autopilot.main(
-                    ["--repo-root", str(root), "dag-rounds", "--plan", str(plan), "--json"]
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-rounds",
+                        "--host-id",
+                        "host:test",
+                        "--plan",
+                        str(plan),
+                        "--json",
+                    ]
                 )
             ordered = json.loads(buffer.getvalue())
         self.assertFalse(unordered["semantic_ordering"])

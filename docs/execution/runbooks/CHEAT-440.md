@@ -35,8 +35,8 @@ writes TESTS and EVIDENCE only — it adds no kernel code and changes no behavio
   re-export edits anywhere.
 - Never touch the release branch; never rebase/squash/amend the node branch
   `autopilot/cheat-440`; plain forward commits only.
-- Never run repo-wide test discovery (`python -m unittest discover` is the round
-  integrator's single leased pass). Run ONLY the focused commands in §5.
+- Never run repo-wide test discovery; the authenticated validation broker exclusively
+  owns that gate. Run ONLY the focused commands in §5.
 - Do not weaken any acceptance check to make a fixture pass (node assumption:
   "No node may expand its own authority or weaken acceptance to pass"). If an
   existing kernel surface contradicts an expectation below, that is an escalation

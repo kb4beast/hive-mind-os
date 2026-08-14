@@ -313,10 +313,10 @@ The DAG MUST be executable under these invariants; author node contracts assumin
    A worker that has written anything must release, fail, or escalate its claim by an
    explicit action. Expiry-by-timeout on a mutated branch leaves work whose ownership and
    completeness are both unknown.
-5. **One repository-wide validation per round, run by the integrator.** Per-node
-   repository-wide validation serializes N parallel workers on a single lease all running
-   the same expensive suite. Workers run their own `required_tests` only; the round's full
-   suite runs once, after integration.
+5. **One authenticated validation-broker completion per round.** Per-node
+   repository-wide validation would duplicate the expensive suite and cannot mint
+   publication authority. Workers run their own `required_tests` only; after integration,
+   the trusted broker runs the governed gate or fails closed when isolation is unavailable.
 6. **The sealed plan and control-plane state are read-only to workers.** Node contracts
    must list them in `forbidden_scope`.
 
@@ -335,8 +335,8 @@ per worker for information the prompt already carried.
 tests, stopping condition, and locks. Put procedure, commands, and gotchas in a per-node
 runbook the prompt links; the worker reads one file, not the corpus.
 
-**Focused tests only.** Workers run `required_tests`; the repository suite runs once per
-round at integration (§6.5).
+**Focused tests only.** Workers run `required_tests`; the authenticated validation broker
+owns the single governed repository gate after integration (§6.5).
 
 **No duplicate discovery.** If several nodes need the same survey of the codebase, make it
 one upstream node whose output is a written index, and give the downstream nodes that
@@ -347,9 +347,10 @@ avoidable cost in a wide DAG.
 
 ## 8. Author checklist — and exactly what is enforced
 
-This checklist is **partly mechanized**. Do not treat it as a machine gate. Run
-`python .autopilot/bin/autopilot.py --repo-root . dag-lint --json`, then work the
-AUTHOR-VERIFIED rows by hand; a warning is not a pass and an absent check is not a pass.
+This checklist is **partly mechanized**. Do not treat it as a machine gate. Using the
+canonical namespace-aware `AUTOPILOT` array from `.autopilot/README.md`, run
+`"${AUTOPILOT[@]}" dag-lint --json`, then work the AUTHOR-VERIFIED rows by hand; a
+warning is not a pass and an absent check is not a pass.
 
 `dag-lint` emits ten checks. Their real names and severities, verified against
 `.autopilot/bin/dag_standard.py` by enumerating every `check=` literal in that file

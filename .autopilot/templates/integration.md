@@ -2,6 +2,12 @@ Repository: `{{REPOSITORY}}`
 Integration target: `{{TARGET_BRANCH}}`
 Integration node: **{{NODE_ID}}**
 Target SHA: `{{TARGET_SHA}}`
+Execution namespace: `{{EXECUTION_NAMESPACE}}`
+Repository root: `{{REPO_ROOT}}`
+Execution authority: `{{EXECUTION_DIR}}`
+Host runtime: `{{HOST_RUNTIME_DIR}}`
+Authenticated host: `{{HOST_ID}}`
+Controller prefix: `{{AUTOPILOT_PREFIX}}`
 
 ## Mandatory execution-surface policy
 
@@ -21,10 +27,12 @@ Every final response must contain `WHAT I DID`, `NEXT STEPS`, and `BLOCKS`; use 
 Parallel tasks may run focused checks only. Before any repository-wide validation,
 acquire the singleton lease with `validation-lease-acquire`; if another owner holds it,
 stop the duplicate run, preserve it as non-verdict evidence, notify the parent, and do
-not retry. Release the lease after the one authoritative run.
+not retry. Retain the returned `lease_id` and pass that exact value to
+`validation-lease-release` after the one authoritative run; an owner label alone cannot
+release a successor lease.
 
 **This rendered prompt is the complete node contract.** Confirm every dependency is
-COMPLETE with `python .autopilot/bin/autopilot.py --repo-root . status` — the controller
+COMPLETE with `{{AUTOPILOT_PREFIX}} status` — the controller
 has already cryptographically validated each retained receipt, so do not re-read
 `.autopilot/plan.json`, `.autopilot/README.md`, or hunt receipt commits through Git log
 archaeology. Read your node runbook at `docs/execution/runbooks/{{NODE_ID}}.md` when
@@ -35,9 +43,11 @@ resolve semantic conflicts by silently choosing a winner; remand or replan.
 
 Before opening the draft PR, finalize the implementation/evidence commit, create a
 receipt with exact base/final commit and tree identities, and run `autopilot complete`.
+Pass the exact `claim_id` returned by this task's claim; an owner label is not a claim
+fence.
 The command appends a zero-path durable receipt commit with the exact final tree and
-retained claim provenance; push that node branch. Completion retained only under
-`.autopilot/state/` is not durable. The eventual node PR must use an ancestry-preserving
+retained claim provenance; push that node branch. Completion retained only under runtime
+execution state is not durable. The eventual node PR must use an ancestry-preserving
 merge commit; do not squash or rebase it, because the claim, exact candidate, and receipt
 commits must remain in target ancestry.
 
