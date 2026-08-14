@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "validation-target-composition-v1-seal",
+  "baseline": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6"
+  },
+  "rejected_tuples": [
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"},
+    {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "4f20bd2"}
+  ],
+  "expected_node_ids": ["VTC-SEAL-000", "VTC-DISCOVERY-010", "VTC-CROSS-020", "VTC-INTEGRATE-030", "VTC-JUDGE-040"],
+  "expected_dependencies": {
+    "VTC-SEAL-000": [],
+    "VTC-DISCOVERY-010": ["VTC-SEAL-000"],
+    "VTC-CROSS-020": ["VTC-SEAL-000"],
+    "VTC-INTEGRATE-030": ["VTC-DISCOVERY-010", "VTC-CROSS-020"],
+    "VTC-JUDGE-040": ["VTC-INTEGRATE-030"]
+  },
+  "expected_plan_digest": "sha256:3abe10dc15870c68783430ad69be1bcab51d973f15023177881dfd4d7c713140",
+  "prohibitions": ["code", "tests", "fixtures", "GitCommitObservation", "controller", "durable-controller", "performance", "promotion", ".autopilot/plan.json", "main", "remotes", "knowledge BASELINE-000"],
+  "predecessor": "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-QUALIFICATION.json"
+}

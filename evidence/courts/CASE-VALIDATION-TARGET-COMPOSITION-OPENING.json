@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-court-case-v1",
+  "case_id": "CASE-VALIDATION-TARGET-COMPOSITION-OPENING",
+  "node_id": "VTC-SEAL-000",
+  "recorded_at": "2026-08-13",
+  "subject": "No-code validation of corrected-source target composition and candidate applicability",
+  "authority": {
+    "predecessor": "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-QUALIFICATION.json",
+    "predecessor_receipt_digest": "sha256:65f12d4be22ffc7a3266f50880b89114b55c0e74cecb7d51633c7cc7ec710631",
+    "authorization": "separate_court_opening_only",
+    "implementation_authority": false
+  },
+  "source_binding": {
+    "commit": "b789b68e7d6a741e0b85a3ac33cbce846e1e32c9",
+    "tree": "b909b7b7e374bff22912059387ef0fe639498af6",
+    "historical_bad_fpc_tuples_rejected": [
+      {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "f454db6d64120c946ae6700bcf4b4b6ea1bef26c"},
+      {"commit": "20e26e3c53d41ec4093b23f0957766cd0cbdab70", "tree": "4f20bd2"}
+    ],
+    "rule": "No tuple may be normalized, repaired, or observed as if it were the valid source."
+  },
+  "claims_under_review": [
+    "The reported 1,059 discovered IDs and 1,050 tests executed by the sole FPCR run must be independently classified and reconciled across collection, execution, skip, and inventory differences.",
+    "Fixture API and GitCommitObservation contract API are separate candidate components; neither component alone establishes that the corrected-source target can pass.",
+    "No root-CI rerun, candidate execution, performance conclusion, or promotion is authorized."
+  ],
+  "required_adverse_retention": {
+    "fpp": ["evidence/courts/CASE-FIXTURE-PREREQUISITE-OPENING.json", "evidence/performance/fixture-prerequisite-v1/causality.json"],
+    "fpc": ["evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-APPEAL-OPENING.json", "evidence/performance/fixture-prerequisite-causality-appeal-v1/discovery-analysis.json"],
+    "fpcr": ["evidence/performance/fixture-prerequisite-causality-reseal-v2/discovery-analysis.json", "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution.json", "evidence/performance/fixture-prerequisite-causality-reseal-v2/execution-transcript.json", "evidence/performance/fixture-prerequisite-causality-reseal-v2/cross-examination.json", "evidence/performance/fixture-prerequisite-causality-reseal-v2/integration.json", "evidence/courts/CASE-FIXTURE-PREREQUISITE-CAUSALITY-RESEAL-QUALIFICATION.json"],
+    "rejected_fixture_candidate": {"commit": "41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378", "tree": "b02326bf108de2fbaa2f174975f937979c02bf90", "status": "rejected_non_promotable_no_reuse_or_relabel"},
+    "gco_candidate": {"commit": "d02c2d2", "status": "non_promoted_and_not_a_validation_target_candidate"},
+    "rule": "All are adverse historical evidence, not implementation inputs or proof of causal sufficiency."
+  },
+  "sealed_plan": {"path": "docs/execution/dags/validation-target-composition-v1/manifest.json", "node_count": 5, "plan_digest": "sha256:3abe10dc15870c68783430ad69be1bcab51d973f15023177881dfd4d7c713140"},
+  "forbidden": ["all code, test, fixture, GCO, controller, durable-controller, performance, promotion, plan, main, remote, and knowledge-BASELINE changes", "CI rerun or retry of FPCR's sole completed execution", "reusing, relabeling, or qualifying 41950b74bdec2b6e1c48ee7f5ef3ce947d0c8378 or d02c2d2"],
+  "judge_gate": "Only a later distinct VTC Judge with zero unresolved material findings may authorize opening a separate implementation proposal; no implementation follows from this opening.",
+  "disposition": "open_evidence_only"
+}
