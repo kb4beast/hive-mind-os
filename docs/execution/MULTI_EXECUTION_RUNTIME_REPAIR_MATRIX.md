@@ -4,17 +4,17 @@ Status: immutable implementation candidate pending final verification and promot
 
 - Preservation baseline commit: `e57bd586a39056f88e1c08581c66eda8bc8f0686`
 - Preservation baseline tree: `1ce053b47bd1a49948144617fa5104e4f5e83ff3`
-- Implementation commit: `4bdb82f0fed40661f65cd5dba127bf071b28e25d`
-- Implementation tree: `8b72b7d057bdc209a2d439d0187556413c862a56`
+- Implementation commit: `4d4f578f0a57eccb790999ea5375f466560f6c89`
+- Implementation tree: `f8306228a044cf750d42b8e1d071701f472349a2`
 - Mission source: `pasted-text.txt`, SHA-256 `F2D48BCAF10D82D1EA1249B9BBE485AF9FED17306AA0932E328944869835139F`
 - Plan: `hive-mind-os-verifiable-hive-cortex-v1`
 - Plan fingerprint: `sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39`
 
 Implementation hashes:
 
-- `controller.py`: `17F23FD82A754E8E9F5914E43B2E1F8BD1E0DA1535984261F1323C7BF525AA5D`
-- `autopilot.py`: `7FFF44B917CFF8E20C616577FD181440FE343893829C38180BD9B87E52D73F2E`
-- `host_execution.py`: `046449420E79926D89DD35208FEF49E754E4C9F7E29E4BD403E0AB552CA204CC`
+- `controller.py`: `D77A4F8787F347063BB9171EA768915AAB831514190167581096F5341484958E`
+- `autopilot.py`: `B94B51E01FFF73666A2DB9F4745ED3F78C42DFF95DCC407A709F846CB0D6295B`
+- `host_execution.py`: `1CD05FA0A300D583CC1F1A788DDA7CD4675823D1479A63C7E22939FF7D5335CE`
 - `orchestration.py`: `872B180C70A5F44D2F5192E2EFDD6C2B50F0325DD1F08154C834B7CE962C21B6`
 - `host_scheduler.py`: `665568777AD4700213692A5689A32C99AA69A2A4AE4FE4242FA0E01FFEE8DFEC`
 - `app_server_host.py`: `902279A2B489F61A06A43132D3AB644AC0EA0442F2F13E6CEF2297069807BD08`
@@ -62,8 +62,9 @@ fresh autonomous launch and adversarial private publication fail-closed.
 10. Migration exposes idempotent `dry-run`, `apply`, `verify`, and
     `rollback-before-ready` modes. Rollback is intentionally abort-and-preserve:
     append-only fenced/quarantined legacy authority is never unsafely reactivated.
-    Archive and retired-evidence layouts use bounded digest components, retain the
-    full identities in their sealed manifests, and reject any compact-path collision.
+    Migration operations, execution namespace roots, kernel-transition receipts,
+    archives, and retired evidence use bounded digest components, retain the full
+    identities in sealed records, and reject any compact-path collision.
 11. Generated commands and all governed prompt templates carry absolute repository,
     state, host-runtime, namespace, plan, and host coordinates. Healing and snapshot
     child processes authenticate the returned execution identity.
