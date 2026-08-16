@@ -36,7 +36,7 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         control = self.root / ".autopilot" / "control-plane.json"
         value = json.loads(control.read_text(encoding="utf-8"))
         value["verify_git_objects"] = False
-        control.write_text(json.dumps(value), encoding="utf-8")
+        runtime_controller.atomic_write_json(control, value)
         self.plane = autopilot.ControlPlane(
             self.root, host_runtime_dir=self.host_runtime
         )
@@ -442,7 +442,7 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         control = clone / ".autopilot" / "control-plane.json"
         value = json.loads(control.read_text(encoding="utf-8"))
         value["verify_git_objects"] = False
-        control.write_text(json.dumps(value), encoding="utf-8")
+        runtime_controller.atomic_write_json(control, value)
         prior_record = self.record
         self.record = synthetic
         plane = self._ready(
@@ -459,7 +459,7 @@ class ExplorerReceiptRetirementTests(unittest.TestCase):
         fresh_control = fresh / ".autopilot" / "control-plane.json"
         fresh_value = json.loads(fresh_control.read_text(encoding="utf-8"))
         fresh_value["verify_git_objects"] = False
-        fresh_control.write_text(json.dumps(fresh_value), encoding="utf-8")
+        runtime_controller.atomic_write_json(fresh_control, fresh_value)
         resumed = self._ready(
             autopilot.ControlPlane(
                 fresh,
