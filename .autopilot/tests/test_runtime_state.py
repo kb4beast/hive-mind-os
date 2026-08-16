@@ -825,6 +825,22 @@ class LinkedWorktreeRuntimeStateTests(unittest.TestCase):
 
 
 class RuntimeIdentityTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "POSIX launcher symlink semantics")
+    def test_kernel_identity_binds_the_running_interpreter_target(self) -> None:
+        """A standard POSIX Python launcher symlink is not repository authority."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            install_fixture(root)
+            launcher = root / "python-launcher"
+            os.symlink(sys.executable, launcher)
+            with mock.patch.object(controller.sys, "executable", str(launcher)):
+                identity = controller._runtime_kernel_identity_from_disk(root)
+            self.assertEqual(
+                identity["interpreter"]["executable_digest"],
+                "sha256:" + hashlib.sha256(Path(sys.executable).resolve().read_bytes()).hexdigest(),
+            )
+
     def test_nondefault_execution_command_prefix_seals_all_authority_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

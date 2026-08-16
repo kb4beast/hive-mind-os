@@ -1192,9 +1192,19 @@ def _runtime_kernel_identity_from_disk(
                 )
             component_digest = None
         components.append({"path": relative, "digest": component_digest})
-    executable = _reject_link_components(
-        Path(sys.executable), label="Python interpreter executable"
-    ).resolve()
+    # ``sys.executable`` is supplied by the already-running interpreter rather
+    # than by a repository/runtime authority document.  Hosted Python
+    # installations conventionally expose it through a stable launcher
+    # symlink (for example, ``/opt/.../bin/python`` on GitHub Actions).  Bind
+    # the canonical target bytes, while retaining link rejection for every
+    # caller-controlled repository and authority path above.
+    try:
+        executable = Path(sys.executable).resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise ConfigurationError(
+            f"Python interpreter executable is unavailable: {error}"
+        ) from error
+    _reject_link_components(executable, label="resolved Python interpreter executable")
     if not executable.is_file():
         raise ConfigurationError("Python interpreter executable is unavailable")
     interpreter: dict[str, object] = {
