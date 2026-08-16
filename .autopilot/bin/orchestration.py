@@ -696,12 +696,26 @@ def _authority_state_root(
                 "repository-global task authority is retired after runtime READY"
             )
         return coordination
-    if re.fullmatch(r"[0-9a-f]{64}", supplied.name):
+    # Execution directories deliberately use a compact digest segment on
+    # Windows-safe authority paths.  Authenticate the identity stored inside
+    # a candidate below the canonical executions directory, then let the
+    # controller prove that its full digest resolves to this exact directory.
+    executions_root = (coordination / "executions").resolve()
+    if supplied.parent == executions_root:
         try:
+            identity = read_strict_canonical_json(
+                supplied / "execution-identity.json",
+                label="execution authority identity",
+            )
+            execution_id = (
+                identity.get("execution_id") if isinstance(identity, Mapping) else None
+            )
+            if not isinstance(execution_id, str):
+                raise ConfigurationError("execution authority identity has no execution id")
             return require_execution_authority_dir(
                 repo_root,
                 supplied,
-                execution_id="sha256:" + supplied.name,
+                execution_id=execution_id,
             )
         except ConfigurationError as error:
             raise OrchestrationError(str(error)) from error

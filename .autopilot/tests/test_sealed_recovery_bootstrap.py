@@ -60,7 +60,10 @@ class SealedRecoveryBootstrapTests(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
-        control_path.write_text(json.dumps(control), encoding="utf-8")
+        # Runtime control-plane bytes are an authority document.  Keep the
+        # fixture representative by writing the one canonical form accepted
+        # by the strict reader rather than a convenient peer encoding.
+        controller_module.atomic_write_json(control_path, control)
         self.plane = autopilot.ControlPlane(self.root)
         ready_runtime(controller_module, self.root)
         self.plane._live_release_issues = lambda _record, _expected=None: ()  # type: ignore[method-assign]

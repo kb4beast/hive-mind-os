@@ -841,6 +841,21 @@ class RuntimeIdentityTests(unittest.TestCase):
                 "sha256:" + hashlib.sha256(Path(sys.executable).resolve().read_bytes()).hexdigest(),
             )
 
+    @unittest.skipIf(os.name == "nt", "POSIX launcher symlink semantics")
+    def test_host_kernel_identity_binds_the_running_interpreter_target(self) -> None:
+        """The machine-user writer accepts a hosted Python launcher symlink."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            launcher = Path(temporary) / "python-launcher"
+            os.symlink(sys.executable, launcher)
+            with mock.patch.object(controller.sys, "executable", str(launcher)):
+                identity = controller.host_kernel_identity()
+            self.assertEqual(
+                identity["interpreter"]["executable_digest"],
+                "sha256:"
+                + hashlib.sha256(Path(sys.executable).resolve().read_bytes()).hexdigest(),
+            )
+
     def test_nondefault_execution_command_prefix_seals_all_authority_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

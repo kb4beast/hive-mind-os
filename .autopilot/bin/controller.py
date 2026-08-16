@@ -3744,9 +3744,18 @@ def host_kernel_identity() -> Mapping[str, object]:
             "host-kernel controller bytes changed after this process loaded; "
             "restart before opening machine-user authority"
         )
-    executable = _reject_link_components(
-        Path(sys.executable), label="host-kernel Python executable"
-    ).resolve()
+    # The running interpreter is process-selected rather than supplied by an
+    # authority document.  Hosted Python installations commonly expose the
+    # launcher through a symlink; bind the resolved executable bytes instead
+    # of rejecting that platform-owned launcher path.  Authority paths remain
+    # link-free everywhere they are opened.
+    try:
+        executable = Path(sys.executable).resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise ConfigurationError(
+            f"host-kernel Python executable is unavailable: {error}"
+        ) from error
+    _reject_link_components(executable, label="resolved host-kernel Python executable")
     if not executable.is_file():
         raise ConfigurationError("host-kernel Python executable is unavailable")
     executable_bytes = _read_regular_authority_bytes(

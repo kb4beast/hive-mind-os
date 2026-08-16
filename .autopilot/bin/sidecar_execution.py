@@ -21,6 +21,7 @@ from controller import (
     ConfigurationError,
     assert_execution_authority_open,
     ensure_repository_runtime_identity,
+    read_strict_canonical_json,
     require_execution_authority_dir,
     resolve_repository_state_dir,
     runtime_file_lock,
@@ -542,12 +543,26 @@ def _authority_state_root(
                 "repository-global sidecar authority is retired after runtime READY"
             )
         return coordination
-    if re.fullmatch(r"[0-9a-f]{64}", supplied.name):
+    # Namespace directories intentionally use compact digest segments to keep
+    # Windows authority paths bounded.  The strict identity inside the
+    # canonical executions directory supplies the full digest for the
+    # controller verifier; the path segment is never authority by itself.
+    executions_root = (coordination / "executions").resolve()
+    if supplied.parent == executions_root:
         try:
+            identity = read_strict_canonical_json(
+                supplied / "execution-identity.json",
+                label="execution authority identity",
+            )
+            execution_id = (
+                identity.get("execution_id") if isinstance(identity, Mapping) else None
+            )
+            if not isinstance(execution_id, str):
+                raise ConfigurationError("execution authority identity has no execution id")
             return require_execution_authority_dir(
                 repo_root,
                 supplied,
-                execution_id="sha256:" + supplied.name,
+                execution_id=execution_id,
             )
         except ConfigurationError as error:
             raise SidecarPolicyError(str(error)) from error

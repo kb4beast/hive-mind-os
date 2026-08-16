@@ -69,17 +69,21 @@ class ControllerFixtureIsolationTests(unittest.TestCase):
             control_path = fixture / "control-plane.json"
             control = json.loads(control_path.read_text(encoding="utf-8"))
             control["verify_git_objects"] = False
-            control_path.write_text(json.dumps(control), encoding="utf-8")
+            durable_controller.atomic_write_json(control_path, control)
             plane = durable_controller.ControlPlane(root / "fixture")
 
-            self.assertEqual(list(plane.state_dir.iterdir()), [])
+            # A copied fixture must not inherit live authority.  It therefore
+            # remains deliberately pre-READY until the test explicitly runs
+            # the runtime migration; reporting DAG readiness before that
+            # transition would recreate the retired singleton authority.
+            with self.assertRaisesRegex(
+                durable_controller.ConfigurationError,
+                "runtime authority identity is absent",
+            ):
+                plane.ready_nodes()
             self.assertFalse((fixture / "bin" / "untracked.generated").exists())
             self.assertFalse((fixture / "tests" / "__pycache__").exists())
             self.assertEqual(plane.github_snapshot(), {})
-            self.assertEqual(
-                set(plane.ready_nodes()),
-                {"RECON-010", "BASE-020"},
-            )
 
 
 if __name__ == "__main__":

@@ -112,6 +112,13 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             check=True,
             capture_output=True,
         )
+        # Kernel identities bind exact bytes.  Keep linked worktrees from
+        # applying a machine-global CRLF conversion to the copied fixture.
+        subprocess.run(
+            ("git", "-C", str(self.root), "config", "core.autocrlf", "false"),
+            check=True,
+            capture_output=True,
+        )
         subprocess.run(
             ("git", "-C", str(self.root), "remote", "add", "origin", str(self.root)),
             check=True,
@@ -616,12 +623,26 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             check=True,
             capture_output=True,
         )
+        committed_target = subprocess.run(
+            ("git", "-C", str(self.root), "rev-parse", "HEAD"),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
         observation = self._seed_installed_observation(self.plane, force=True)
         # The linked-worktree fixture commit advances the live target after setUp
         # seeded its lightweight evidence generation. Publish that deterministic
         # advance before constructing a consumer in the sibling worktree.
         with self.plane._host_arbiter_guard():
             with self.plane.execution_lock("dispatcher-admission.lock"):
+                watermark = self.plane.repository_target_watermark()
+                self.plane.advance_repository_target_watermark_from_snapshot(
+                    expected_generation=int(watermark["target_generation"]),
+                    expected_target_sha=str(watermark["target_sha"]),
+                    target_sha=committed_target,
+                    source_observation=observation,
+                    actor="test:linked-worktree-fixture",
+                )
                 self.plane._invalidate_dispatcher_admission_unlocked(
                     actor="test:linked-worktree-fixture",
                     reason="seal the linked-worktree fixture target",
@@ -649,10 +670,6 @@ class DispatchWaveSelectionTests(unittest.TestCase):
             )
 
         self.addCleanup(remove_sibling)
-        control_path = sibling / ".autopilot" / "control-plane.json"
-        control = json.loads(control_path.read_text(encoding="utf-8"))
-        control["plan_fingerprint"] = "sha256:" + "b" * 64
-        control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
         sibling_plane = autopilot.ControlPlane(sibling)
         self.assertEqual(sibling_plane.coordination_dir, self.plane.coordination_dir)
         return sibling_plane
@@ -1714,7 +1731,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         }
         identity_material = {
             "schema_version": 1,
-            "kind": "hive-mind-codex-app-server-provider-identity-v1",
+            "kind": "hive-mind-codex-app-server-identity-v1",
             "execution_namespace": self.plane.execution_namespace,
             "execution_id": self.plane.execution_id,
             "host_id": self.host_id,
@@ -1845,10 +1862,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         control_path = other / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["target"]["repository"] = "fixture/other-repository"
-        control_path.write_text(
-            json.dumps(control, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        controller.atomic_write_json(control_path, control)
         identity = controller.runtime_repository_identity(other)
         self.assertIsInstance(identity, Mapping)
         binding = {
@@ -2571,7 +2585,7 @@ class DispatchWaveSelectionTests(unittest.TestCase):
         material = dict(plan)
         material.pop("plan_fingerprint", None)
         control["plan_fingerprint"] = autopilot.digest_json(material)
-        control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
+        autopilot.atomic_write_json(control_path, control)
         sibling = autopilot.ControlPlane(sibling.repo_root)
         sibling.control["verify_git_objects"] = True
         self._make_eligible([PARALLEL[0]], plane=sibling)

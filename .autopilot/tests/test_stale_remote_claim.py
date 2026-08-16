@@ -11,6 +11,8 @@ from pathlib import Path
 from fixture_support import copy_autopilot_fixture
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
+if str(MODULE_PATH.parent) not in sys.path:
+    sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("stale_claim_controller", MODULE_PATH)
 assert SPEC and SPEC.loader
 controller = importlib.util.module_from_spec(SPEC)
@@ -54,7 +56,7 @@ class StaleRemoteClaimTests(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
-        control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
+        controller.atomic_write_json(control_path, control)
         git(self.root, "add", "-A")
         git(self.root, "commit", "-m", "fixture base")
         git(self.root, "remote", "add", "origin", str(self.origin))

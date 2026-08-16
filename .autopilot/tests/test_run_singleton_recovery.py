@@ -46,6 +46,7 @@ class SingletonRecoveryScriptTests(unittest.TestCase):
         # semantic guard after normalizing ANSI decoration and wrapped lines,
         # rather than coupling the safety contract to host-specific rendering.
         plain_output = re.sub(r"\x1b\[[0-9;]*m", "", output)
+        plain_output = re.sub(r"\s+\|\s+", " ", plain_output)
         self.assertIn(
             "No release, claim, Git, or repository action was attempted",
             re.sub(r"\s+", " ", plain_output),

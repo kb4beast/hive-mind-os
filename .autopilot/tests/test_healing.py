@@ -523,6 +523,7 @@ class RetryQuarantineLiftTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={
                 **healing.DEFAULT_POLICY,
@@ -570,6 +571,7 @@ class RetryQuarantineLiftTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={
                 **healing.DEFAULT_POLICY,
@@ -908,6 +910,7 @@ class HealRoundTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy=self.policy,
             status=self.RECONCILED_STATUS,
@@ -924,6 +927,7 @@ class HealRoundTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy=self.policy,
             status=self.RECONCILED_STATUS,
@@ -938,6 +942,7 @@ class HealRoundTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy=self.policy,
             status=self.RECONCILED_STATUS,
@@ -956,6 +961,7 @@ class HealRoundTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy=self.policy,
             status=status,
@@ -980,6 +986,7 @@ class HealRoundTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy=self.policy,
             status=self.RECONCILED_STATUS,
@@ -992,6 +999,7 @@ class HealRoundTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={**self.policy, "enabled": False},
             status=self.RECONCILED_STATUS,
@@ -1010,6 +1018,7 @@ class HealRoundTests(HealingFixture):
         first = healing.heal_round(
             early,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy=self.policy,
             status=self.RECONCILED_STATUS,
@@ -1017,6 +1026,7 @@ class HealRoundTests(HealingFixture):
         second = healing.heal_round(
             late,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy=self.policy,
             status=self.RECONCILED_STATUS,
@@ -1179,6 +1189,7 @@ class LearningTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={**self.policy, "commit_lessons": False},
             status=self.RECONCILED_STATUS,
@@ -1195,6 +1206,7 @@ class LearningTests(HealingFixture):
         healing.heal_round(
             later,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={**self.policy, "commit_lessons": False},
             status=self.RECONCILED_STATUS,
@@ -1211,6 +1223,7 @@ class LearningTests(HealingFixture):
         healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={**self.policy, "commit_lessons": False},
             status=self.RECONCILED_STATUS,
@@ -1223,6 +1236,7 @@ class LearningTests(HealingFixture):
         healing.heal_round(
             later,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={**self.policy, "commit_lessons": False},
             status=self.RECONCILED_STATUS,
@@ -1249,6 +1263,7 @@ class LearningTests(HealingFixture):
         report = healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={**self.policy, "commit_lessons": False},
             status=self.RECONCILED_STATUS,
@@ -1313,6 +1328,7 @@ class LearningTests(HealingFixture):
         healing.heal_round(
             self.plane,
             actor="test:healer",
+            host_id="test:sealed-host",
             nodes=[NODE],
             policy={**self.policy, "learn": False, "commit_lessons": False},
             status=self.RECONCILED_STATUS,

@@ -10,6 +10,8 @@ from pathlib import Path
 from fixture_support import copy_autopilot_fixture
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "bin" / "controller.py"
+if str(MODULE_PATH.parent) not in sys.path:
+    sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("singleton_controller", MODULE_PATH)
 assert SPEC and SPEC.loader
 controller = importlib.util.module_from_spec(SPEC)
@@ -26,7 +28,7 @@ class SingletonReleaseTargetTests(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["verify_git_objects"] = False
-        control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
+        controller.atomic_write_json(control_path, control)
         self.plane = controller.ControlPlane(self.root)
 
     def tearDown(self) -> None:
@@ -45,7 +47,7 @@ class SingletonReleaseTargetTests(unittest.TestCase):
         control_path = self.root / ".autopilot" / "control-plane.json"
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["target"]["branch"] = "main"
-        control_path.write_text(json.dumps(control, indent=2) + "\n", encoding="utf-8")
+        controller.atomic_write_json(control_path, control)
         plane = controller.ControlPlane(self.root)
         self.assertTrue(
             any("must not equal final integration branch" in issue for issue in plane.validate_configuration())
