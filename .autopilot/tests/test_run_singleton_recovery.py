@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
@@ -41,7 +42,14 @@ class SingletonRecoveryScriptTests(unittest.TestCase):
         output = completed.stdout + completed.stderr
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("Singleton recovery is quarantined", output)
-        self.assertIn("No release, claim, Git, or repository action was attempted", output)
+        # PowerShell formats a thrown string to the terminal width.  Assert the
+        # semantic guard after normalizing ANSI decoration and wrapped lines,
+        # rather than coupling the safety contract to host-specific rendering.
+        plain_output = re.sub(r"\x1b\[[0-9;]*m", "", output)
+        self.assertIn(
+            "No release, claim, Git, or repository action was attempted",
+            re.sub(r"\s+", " ", plain_output),
+        )
         self.assertFalse(root_was_touched)
 
     def test_quarantined_script_has_no_dispatch_or_claim_transport(self) -> None:

@@ -344,6 +344,11 @@ class CodexAppServerHostTests(unittest.TestCase):
         self.plane = FakePlane(self.root)
         self.executable = self.root / "codex.exe"
         self.executable.write_bytes(b"fake-codex-0.146.0")
+        # The adapter correctly requires its launch target to be executable.
+        # A Windows-suffixed fixture does not automatically receive that mode
+        # bit on Linux runners, so make the cross-platform test double match
+        # the authenticated executable contract explicitly.
+        self.executable.chmod(0o700)
         self.server = FakeAppServer()
         self.adapters: list[object] = []
 
