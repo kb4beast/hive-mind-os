@@ -205,6 +205,23 @@ Runtime state under `.autopilot/state/` is generated and ignored by Git. It may 
 working receipt copy, dispatcher reconciliation state, GitHub snapshots, and dispatcher
 release records, but it is never the durable completion source.
 
+That directory holds two different kinds of fact, and they have different scopes.
+**Evidence** — receipts, failures, blockers, questions, subtask waves, quarantine —
+records what one checkout did, and stays in that checkout. **Authority** — node claims
+and the repository-wide validation lease — decides who is eligible to act, so every
+linked worktree of a repository resolves it to the *primary* worktree's
+`.autopilot/state/`. A linked worktree that kept a claim or lease locally would hold
+authority the other worktrees cannot see, and two checkouts of one repository would
+validate the same target at once.
+
+`ControlPlane.coordination_dir` performs that resolution by reading Git's on-disk
+worktree metadata, so it costs no subprocess and works before any dispatch. Independent
+repositories are unaffected and continue to run concurrently: they are different
+families with different authority. `autopilot doctor` reports the resolved location
+under its `runtime-coordination` check, along with whether `hive_mind_os` imports from
+this repository — a machine has only one editable install, so a checkout elsewhere can
+otherwise own every `hive-mind` invocation without any visible sign.
+
 For every non-bootstrap node, `complete` validates the receipt and creates an **empty
 receipt commit** on the already-claimed node branch. The receipt commit:
 

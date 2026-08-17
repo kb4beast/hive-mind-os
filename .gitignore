@@ -443,3 +443,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Per-checkout isolated runtimes (scripts/isolated-runtime.ps1)
+.venv/

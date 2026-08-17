@@ -8,6 +8,7 @@ plane remains inspectable, portable, and independent of model providers.
 from __future__ import annotations
 
 import fnmatch
+import importlib.util
 import json
 import os
 import re
@@ -444,13 +445,11 @@ class ControlPlane:
         self.role_matrix_path = self.ap_root / "role-wiring.json"
         self.acceptance_path = self.ap_root / "acceptance-matrix.json"
         self.state_dir = self.ap_root / "state"
-        self.claims_dir = self.state_dir / "claims"
         self.receipts_dir = self.state_dir / "receipts"
         self.failures_dir = self.state_dir / "failures"
         self.blockers_dir = self.state_dir / "blockers"
         self.questions_dir = self.state_dir / "questions"
         self.subtask_waves_dir = self.state_dir / "subtask-waves"
-        self.validation_lease_path = self.state_dir / "global-validation-lease.json"
         self.quarantine_dir = self.state_dir / "quarantine"
         self.escalations_dir = self.state_dir / "escalations"
         self.plan = _require_mapping(read_json(self.plan_path), "plan")
@@ -472,6 +471,106 @@ class ControlPlane:
             for node in _require_list(self.plan.get("nodes"), "plan.nodes")
             if isinstance(node, Mapping) and "id" in node
         }
+        self._coordination_dir: Path | None = None
+
+    def _primary_worktree_root(self) -> Path | None:
+        """Return this repository family's primary worktree, or None when absent.
+
+        Read Git's on-disk metadata rather than shelling out. Authority paths are
+        resolved inside the memoized status path, where an extra ``git`` call both
+        costs a process per observation and bypasses the observed commit graph.
+
+        A primary worktree keeps ``.git`` as a directory; a linked worktree keeps a
+        ``gitdir:`` pointer whose target records ``commondir``. Anything else has no
+        primary worktree to converge on.
+        """
+
+        link = self.repo_root / ".git"
+        if not link.is_file():
+            return None
+        try:
+            pointer = link.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError) as error:
+            raise ConfigurationError(
+                f"repository Git link is unreadable: {error}"
+            ) from error
+        if not pointer.startswith("gitdir:"):
+            raise ConfigurationError("repository Git link is not a gitdir pointer")
+        git_dir = Path(pointer[len("gitdir:") :].strip())
+        if not git_dir.is_absolute():
+            git_dir = self.repo_root / git_dir
+        common_record = git_dir / "commondir"
+        if not common_record.is_file():
+            # A submodule or separate-git-dir primary checkout is not a linked
+            # worktree, so it owns its authority directly.
+            return None
+        try:
+            common_text = common_record.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError) as error:
+            raise ConfigurationError(
+                f"Git common directory record is unreadable: {error}"
+            ) from error
+        common = Path(common_text)
+        if not common.is_absolute():
+            common = git_dir / common
+        common = common.resolve()
+        if common.name != ".git":
+            raise ConfigurationError(
+                "this linked worktree uses a separate Git directory layout with no "
+                f"primary worktree ({common}); shared claim and validation authority "
+                "cannot be located"
+            )
+        return common.parent
+
+    @property
+    def coordination_dir(self) -> Path:
+        """Return the state directory shared by every worktree of this repository.
+
+        Claims and the repository-wide validation lease decide eligibility. A
+        linked worktree that kept them under its own ``.autopilot/state`` would
+        grant authority the other worktrees cannot see, so two checkouts of one
+        repository could validate the same target at the same time. Evidence —
+        receipts, failures, blockers, questions, waves, quarantine — describes
+        only what this checkout did and stays local.
+        """
+
+        if self._coordination_dir is not None:
+            return self._coordination_dir
+        resolved = self.state_dir
+        primary = self._primary_worktree_root()
+        if primary is not None and primary.resolve() != self.repo_root:
+            if not primary.is_dir():
+                raise ConfigurationError(
+                    "the primary worktree that owns shared authority is missing: "
+                    f"{primary}; run 'git worktree prune' or restore it before dispatch"
+                )
+            resolved = primary.resolve() / ".autopilot" / "state"
+        self._coordination_dir = resolved
+        return resolved
+
+    @property
+    def claims_dir(self) -> Path:
+        return self.coordination_dir / "claims"
+
+    @property
+    def validation_lease_path(self) -> Path:
+        return self.coordination_dir / "global-validation-lease.json"
+
+    @property
+    def target_record_path(self) -> Path:
+        """The reconciliation watermark every worker measures staleness against."""
+
+        return self.coordination_dir / "target.json"
+
+    @property
+    def github_snapshot_path(self) -> Path:
+        """The one observation a dispatcher release binds by digest."""
+
+        return self.coordination_dir / "github-state.json"
+
+    @property
+    def release_history_path(self) -> Path:
+        return self.coordination_dir / "releases.jsonl"
 
     @property
     def plan_fingerprint(self) -> str:
@@ -836,7 +935,7 @@ class ControlPlane:
         )
 
     def reconciled_target_sha(self) -> str:
-        path = self.state_dir / "target.json"
+        path = self.target_record_path
         if not path.is_file():
             return self.baseline_sha
         value = read_json(path)
@@ -869,7 +968,7 @@ class ControlPlane:
         )
 
     def github_snapshot(self) -> Mapping[str, Any]:
-        path = self.state_dir / "github-state.json"
+        path = self.github_snapshot_path
         if not path.is_file():
             return {}
         value = read_json(path)
@@ -1107,7 +1206,7 @@ class ControlPlane:
             "released_at": format_time(now),
             "outcome": "retired",
         }
-        append_jsonl(self.state_dir / "releases.jsonl", released)
+        append_jsonl(self.release_history_path, released)
         return released
 
     # ------------------------------------------------------------- self-healing
@@ -1303,7 +1402,7 @@ class ControlPlane:
             "released_at": format_time(self.clock()),
             "outcome": "retired-defunct",
         }
-        append_jsonl(self.state_dir / "releases.jsonl", released)
+        append_jsonl(self.release_history_path, released)
         return released
 
     def quarantine_defunct_remote_branch(
@@ -2946,7 +3045,7 @@ class ControlPlane:
                 node_id, remote_claim_commit, remote=remote
             )
         append_jsonl(
-            self.state_dir / "releases.jsonl",
+            self.release_history_path,
             {
                 "node_id": node_id,
                 "owner": owner,
@@ -3079,7 +3178,7 @@ class ControlPlane:
             "timestamp": format_time(self.clock()),
             "plan_fingerprint": self.expected_plan_fingerprint,
         }
-        path = self.state_dir / "target.json"
+        path = self.target_record_path
         atomic_write_json(path, record)
         append_jsonl(self.state_dir / "graph-changes.jsonl", record)
         return path
@@ -3094,7 +3193,7 @@ class ControlPlane:
         for key in ("pull_requests", "branches"):
             if not isinstance(value.get(key, []), list):
                 raise AutopilotError(f"GitHub snapshot {key} must be a list")
-        path = self.state_dir / "github-state.json"
+        path = self.github_snapshot_path
         atomic_write_json(path, value)
         return path
 
@@ -3145,6 +3244,49 @@ class ControlPlane:
         for key, value in values.items():
             rendered = rendered.replace("{{" + key + "}}", value)
         return rendered
+
+    def _coordination_check(self) -> dict[str, object]:
+        """Report where shared authority lives and which sources actually run.
+
+        Concurrent runs are only debuggable when both facts are visible: which
+        checkout arbitrates claims and validation, and whether ``hive_mind_os``
+        imports from this repository. A machine has one editable install, so a
+        checkout elsewhere can silently own every ``hive-mind`` invocation.
+        """
+
+        details: list[str] = []
+        passed = True
+        try:
+            coordination = self.coordination_dir
+        except ConfigurationError as error:
+            return {"name": "runtime-coordination", "passed": False, "details": [str(error)]}
+        if coordination.resolve() != self.state_dir.resolve():
+            details.append(
+                "linked worktree; shared claim and validation authority lives at "
+                f"{coordination}"
+            )
+        # Only a hive-mind-os checkout ships the package; a managed target
+        # repository is not expected to provide or match it.
+        packaged = (self.repo_root / "src" / "hive_mind_os").is_dir()
+        installed = None
+        if packaged:
+            try:
+                installed = importlib.util.find_spec("hive_mind_os")
+            except (ImportError, ValueError):
+                installed = None
+        origin = getattr(installed, "origin", None) if installed else None
+        if packaged and origin is not None:
+            source_root = Path(origin).resolve().parents[1]
+            if source_root != (self.repo_root / "src").resolve():
+                passed = False
+                details.append(
+                    f"hive_mind_os imports from {source_root}, not this repository; "
+                    "the machine-wide editable install points at another checkout, so "
+                    "'hive-mind' runs code you are not editing -- reinstall with "
+                    "'python -m pip install --no-deps -e .' from this repository, or "
+                    "use a per-project virtual environment to run projects concurrently"
+                )
+        return {"name": "runtime-coordination", "passed": passed, "details": details}
 
     def doctor(
         self,
@@ -3216,6 +3358,7 @@ class ControlPlane:
                 "details": consultation_details,
             }
         )
+        checks.append(self._coordination_check())
         test_details: list[str] = []
         if run_controller_tests:
             completed = subprocess.run(

@@ -600,7 +600,7 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
         }
         record["release_id"] = digest_json(record)
         atomic_write_json(self.current_release_path, record)
-        append_jsonl(self.state_dir / RELEASE_HISTORY, record)
+        append_jsonl(self.coordination_dir / RELEASE_HISTORY, record)
         return record
 
     def retire_receipt_branch(self, retirement_id: str, *, actor: str) -> Mapping[str, Any]:

@@ -1136,7 +1136,7 @@ class SealedRecoveryMixin:
                         node_id, owner, receipt, value, record
                     )
                     if recovered is not None:
-                        append_jsonl(self.state_dir / "releases.jsonl", {
+                        append_jsonl(self.release_history_path, {
                             "node_id": node_id, "owner": owner,
                             "reason": reason + "; recovered committed receipt",
                             "released_at": format_time(self.clock()),
@@ -1157,7 +1157,7 @@ class SealedRecoveryMixin:
         elif observed != record["old_receipt_commit"]:
             raise ClaimError("sealed repair rollback is forbidden after the branch advanced")
         append_jsonl(
-            self.state_dir / "releases.jsonl",
+            self.release_history_path,
             {"node_id": node_id, "owner": owner, "reason": reason, "released_at": format_time(self.clock())},
         )
         path.unlink()
