@@ -47,7 +47,15 @@ if ($LASTEXITCODE -ne 0 -or $liveTarget -notmatch '^[0-9a-f]{40}$') {
 # certificate-verification bypass is permitted here.
 Invoke-Checked "verified remote branch inspection" "git" @("ls-remote", "--heads", "origin", "refs/heads/$targetBranch") | Out-Null
 
-$snapshotPath = Join-Path $RepoRoot ".autopilot\state\github-state.json"
+# Shared authority lives in the primary worktree's state directory; a linked
+# worktree resolving its own path would demand a snapshot the controller no
+# longer reads. Git's common directory names the primary for both layouts.
+$commonDir = (git -C $RepoRoot rev-parse --path-format=absolute --git-common-dir).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $commonDir) {
+    throw "Cannot resolve the Git common directory for $RepoRoot."
+}
+$authorityRoot = Split-Path -Parent $commonDir
+$snapshotPath = Join-Path $authorityRoot ".autopilot\state\github-state.json"
 if (-not (Test-Path -LiteralPath $snapshotPath)) {
     throw "GitHub snapshot is missing. Install a current authenticated snapshot, then rerun this script."
 }

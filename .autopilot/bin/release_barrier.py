@@ -69,7 +69,7 @@ class ControlPlane(DurableControlPlane):
 
     @property
     def current_release_path(self):
-        return self.state_dir / CURRENT_RELEASE
+        return self.coordination_dir / CURRENT_RELEASE
 
     def _authority_document(self) -> Mapping[str, Any] | None:
         if not self.authority_amendments_path.is_file():
@@ -218,7 +218,7 @@ class ControlPlane(DurableControlPlane):
         return tuple(dict.fromkeys(issues))
 
     def _reconciliation_digest(self) -> str | None:
-        path = self.state_dir / "target.json"
+        path = self.target_record_path
         if not path.is_file():
             return None
         value = read_json(path)
@@ -389,7 +389,7 @@ class ControlPlane(DurableControlPlane):
         }
         record["release_id"] = digest_json(record)
         atomic_write_json(self.current_release_path, record)
-        append_jsonl(self.state_dir / RELEASE_HISTORY, record)
+        append_jsonl(self.coordination_dir / RELEASE_HISTORY, record)
         return record
 
     def _release_issues(self, record: object) -> tuple[str, ...]:

@@ -474,7 +474,7 @@ def _stall_retirements(plane: Any, node_id: str) -> int:
     three, so a slow-but-alive worker cannot be reaped in a loop forever.
     """
 
-    path = Path(plane.state_dir) / "releases.jsonl"
+    path = Path(plane.release_history_path)
     if not path.is_file():
         return 0
     count = 0
