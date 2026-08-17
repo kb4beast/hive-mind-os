@@ -112,6 +112,37 @@ class WorktreeCoordinationTests(unittest.TestCase):
             linked_plane.claim_path(other).parent,
         )
 
+    def test_every_shared_authority_path_resolves_identically(self) -> None:
+        """Pin the full shared set so a regression cannot silently localize one.
+
+        Claims and the lease are covered behaviorally above; these paths are
+        equally load-bearing -- the reconciliation watermark, the snapshot a
+        release binds by digest, and release history read for eligibility.
+        """
+
+        primary_plane = controller.ControlPlane(self.primary)
+        linked_plane = controller.ControlPlane(self.linked)
+        for attribute in (
+            "target_record_path",
+            "github_snapshot_path",
+            "release_history_path",
+        ):
+            self.assertEqual(
+                getattr(primary_plane, attribute),
+                getattr(linked_plane, attribute),
+                attribute,
+            )
+
+    def test_a_reconciled_target_is_visible_from_the_linked_worktree(self) -> None:
+        primary_plane = controller.ControlPlane(self.primary)
+        linked_plane = controller.ControlPlane(self.linked)
+        advanced = "d" * 40
+        primary_plane.target_record_path.parent.mkdir(parents=True, exist_ok=True)
+        primary_plane.target_record_path.write_text(
+            json.dumps({"target_sha": advanced}), encoding="utf-8"
+        )
+        self.assertEqual(linked_plane.reconciled_target_sha(), advanced)
+
     def test_evidence_directories_remain_worktree_local(self) -> None:
         linked_plane = controller.ControlPlane(self.linked)
         for directory in (
