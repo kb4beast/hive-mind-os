@@ -18,7 +18,6 @@ from hive_mind_os.cortex.github.delivery_adapter import ControlledGitHubDelivery
 from hive_mind_os.cortex.github.grants import (
     DEFAULT_GRANT_LIFETIME,
     MAX_GRANT_LIFETIME,
-    SELF_ISSUED,
     DeliveryGrant,
     DeliveryGrantError,
     DeliveryGrantLedger,
@@ -141,9 +140,10 @@ class _LedgerFixture(unittest.TestCase):
     def setUp(self) -> None:
         self.addCleanup(setattr, grants, "LEDGER", grants.LEDGER)
         grants.LEDGER = DeliveryGrantLedger()
+        self.owner_authority = _minted_root()
+        grants.LEDGER.anchor(self.owner_authority)
 
-    @staticmethod
-    def issue(**overrides: object) -> DeliveryGrant:
+    def issue(self, **overrides: object) -> DeliveryGrant:
         parameters: dict[str, object] = {
             "grant_id": "GRANT-1020",
             "owner": OWNER,
@@ -152,12 +152,36 @@ class _LedgerFixture(unittest.TestCase):
             "branch_prefix": BRANCH_PREFIX,
             "allowed_actions": ALL_ACTIONS,
             "issued_at": ISSUED,
+            "provenance": self.owner_authority,
         }
         parameters.update(overrides)
         return DeliveryGrant.issue(**parameters)  # type: ignore[arg-type]
 
 
 class UnissuedGrantTests(_LedgerFixture):
+    def test_a_bare_ledger_cannot_issue_or_spend_a_grant(self) -> None:
+        bare = DeliveryGrantLedger()
+        grant = _outside_grant()
+
+        with self.assertRaisesRegex(DeliveryGrantError, "requires a recorded owner"):
+            bare.record(grant, provenance=self.owner_authority, recorded_at=ISSUED)
+        with self.assertRaisesRegex(DeliveryGrantError, "requires a recorded owner"):
+            bare.require_issued(grant)
+
+        anchored = grants.LEDGER
+        grants.LEDGER = bare
+        self.addCleanup(setattr, grants, "LEDGER", anchored)
+        with self.assertRaisesRegex(DeliveryGrantError, "requires a recorded owner"):
+            DeliveryGrant.issue(
+                grant_id="GRANT-1020-bare-public-issue",
+                owner=OWNER,
+                repository=REPOSITORY,
+                base_branch=BASE_BRANCH,
+                branch_prefix=BRANCH_PREFIX,
+                allowed_actions=ALL_ACTIONS,
+                issued_at=ISSUED,
+            )
+
     def test_a_grant_the_ledger_never_admitted_authorizes_nothing(self) -> None:
         outside = _outside_grant()
 
@@ -247,23 +271,21 @@ class AttributionTests(_LedgerFixture):
             record.record_digest,
         )
 
-    def test_a_self_issued_grant_is_refused_once_the_owner_authority_is_anchored(
+    def test_a_self_issued_grant_is_refused_when_the_owner_authority_is_anchored(
         self,
     ) -> None:
-        self_issued = self.issue(expires_at=EXPIRES)
-        self_issued.require("push", now=ISSUED)
-        self.assertEqual(SELF_ISSUED, self_issued.issuer)
-
-        grants.LEDGER.anchor(_minted_root())
-
         with self.assertRaisesRegex(
-            DeliveryGrantError, "not issued under the recorded owner authority"
+            DeliveryGrantError, "requires the recorded owner authority"
         ):
-            self_issued.require("push", now=ISSUED)
-        with self.assertRaisesRegex(
-            DeliveryGrantError, "not issued under the recorded owner authority"
-        ):
-            self_issued.require_push_branch(RUN_BRANCH, now=ISSUED)
+            DeliveryGrant.issue(
+                grant_id="GRANT-1020-self-issued",
+                owner=OWNER,
+                repository=REPOSITORY,
+                base_branch=BASE_BRANCH,
+                branch_prefix=BRANCH_PREFIX,
+                allowed_actions=ALL_ACTIONS,
+                issued_at=ISSUED,
+            )
 
     def test_an_anchored_owner_still_issues_usable_grants(self) -> None:
         root = _minted_root()
@@ -274,12 +296,18 @@ class AttributionTests(_LedgerFixture):
         grant.require_push_branch(RUN_BRANCH, now=ISSUED)
 
     def test_self_issuance_is_refused_outright_while_an_anchor_stands(self) -> None:
-        grants.LEDGER.anchor(_minted_root())
-
         with self.assertRaisesRegex(
-            DeliveryGrantError, "not anchored to the recorded owner authority"
+            DeliveryGrantError, "requires the recorded owner authority"
         ):
-            self.issue(expires_at=EXPIRES)
+            DeliveryGrant.issue(
+                grant_id="GRANT-1020-self-issued-again",
+                owner=OWNER,
+                repository=REPOSITORY,
+                base_branch=BASE_BRANCH,
+                branch_prefix=BRANCH_PREFIX,
+                allowed_actions=ALL_ACTIONS,
+                issued_at=ISSUED,
+            )
 
     def test_issuance_under_a_foreign_authority_is_refused(self) -> None:
         grants.LEDGER.anchor(_minted_root())
@@ -331,13 +359,16 @@ class AttributionTests(_LedgerFixture):
     def test_a_grant_that_lies_about_its_issuer_is_never_recorded(self) -> None:
         root = _minted_root()
         claimant = _outside_grant(
-            issuer=root.issuer, authority_ref=root.authority_ref
+            issuer="an-issuer-the-repository-owner-never-named",
+            authority_ref=root.authority_ref,
         )
 
         with self.assertRaisesRegex(
             DeliveryGrantError, "does not name the authority it was issued under"
         ):
-            grants.LEDGER.record(claimant, provenance=None, recorded_at=ISSUED)
+            grants.LEDGER.record(
+                claimant, provenance=self.owner_authority, recorded_at=ISSUED
+            )
         self.assertIsNone(grants.LEDGER.issuance(claimant.grant_digest))
 
 
@@ -460,8 +491,19 @@ class SealTests(_LedgerFixture):
     def test_two_grants_differing_only_in_authority_have_different_digests(
         self,
     ) -> None:
-        self_issued = self.issue(expires_at=EXPIRES)
-        owner_issued = self.issue(provenance=_minted_root(), expires_at=EXPIRES)
+        owner_issued = self.issue(expires_at=EXPIRES)
+        self_issued = _outside_grant(
+            grant_id=owner_issued.grant_id,
+            owner=owner_issued.owner,
+            repository=owner_issued.repository,
+            base_branch=owner_issued.base_branch,
+            branch_prefix=owner_issued.branch_prefix,
+            allowed_actions=owner_issued.allowed_actions,
+            issued_at=owner_issued.issued_at,
+            expires_at=owner_issued.expires_at,
+            issuer="self-issued",
+            authority_ref="self-issued",
+        )
 
         self.assertNotEqual(self_issued.grant_digest, owner_issued.grant_digest)
 

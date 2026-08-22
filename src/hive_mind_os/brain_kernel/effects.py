@@ -10,7 +10,6 @@ from .authority import (
     AuthorityDenied,
     AuthorityRegistry,
     CapabilityToken,
-    token_is_issued,
 )
 from .canonical import canonical_digest
 from .contracts import EffectIntent, EffectReceipt
@@ -52,7 +51,7 @@ def validate_capability_token(
     now: str | None = None,
     network_hosts: tuple[str, ...] = (),
 ) -> None:
-    """Bind a token to an intent and, given an issuer, to live authority state."""
+    """Bind a token to an intent and require its live issuing authority."""
 
     expected_token_digest = canonical_digest(
         {
@@ -71,11 +70,7 @@ def validate_capability_token(
     if intent.intent_digest != intent_seal(intent):
         raise AuthorityDenied("intent digest does not seal this intent")
     if authority is None:
-        if network_hosts:
-            raise AuthorityDenied("a network effect requires an authority-bound gateway")
-        if not token_is_issued(token):
-            raise AuthorityDenied("capability token was not issued by an authority registry")
-        return
+        raise AuthorityDenied("effect execution requires an authority-bound gateway")
     issued = authority.authorize(
         token.envelope_digest, token.action, token.target, now=now or _now()
     )
@@ -129,11 +124,11 @@ def build_effect_receipt(
 class EffectGateway:
     """An adapter registry; duplicate intents return their prior local receipt.
 
-    A gateway built with an ``authority`` registry verifies every token against
-    live issuance state -- registration, expiry, revocation and scope -- plus the
-    intent seal and the envelope's network allowlist, before any adapter runs. A
-    gateway built without one can only bind a token to its intent, so an issuer
-    should be supplied wherever the registry that minted the token is in hand.
+    Every effect requires an ``authority`` registry. It verifies every token
+    against live issuance state -- registration, expiry, revocation and scope --
+    plus the intent seal and the envelope's network allowlist before any adapter
+    runs. A gateway without one may be constructed for wiring compatibility, but
+    refuses every execution.
     """
 
     def __init__(

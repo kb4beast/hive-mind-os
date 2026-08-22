@@ -105,7 +105,9 @@ class AuthorityTests(unittest.TestCase):
             DIGEST,
         ))
         calls: list[str] = []
-        gateway = EffectGateway()
+        gateway = EffectGateway(
+            authority=registry, clock=lambda: "2029-01-01T00:00:00Z"
+        )
         gateway.register_adapter("local", lambda _: calls.append("called"))
         self.assertEqual(gateway.execute(intent, token), gateway.execute(intent, token))
         self.assertEqual(["called"], calls)

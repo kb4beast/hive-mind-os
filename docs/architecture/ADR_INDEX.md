@@ -37,9 +37,10 @@ evidence. Numeric-only references to ADR-008, ADR-012, ADR-057, or ADR-058 are a
 | `ADR-060`     | [Visible parallel task cohorts](ADR-060-VISIBLE-PARALLEL-TASK-COHORTS.md)                                                   | Autopilot task scheduling  | adapted implementation candidate; independent Curator/security review pending        |
 | `ADR-061`     | [Token-aware root-mediated sidecars](ADR-061-TOKEN-AWARE-ROOT-MEDIATED-SIDECARS.md)                                        | Autopilot execution topology | adapted implementation candidate; independent Curator promotion review pending      |
 | `ADR-062`     | [Post-merge reconciliation and atomic planning](ADR-062-POST-MERGE-RECONCILIATION-AND-ATOMIC-PLANNING.md)                  | Singleton repair/promotion | implemented candidate; exact-head CI and independent promotion review pending        |
+| `ADR-063`     | [Authority-hardening successor and fail-closed delivery](ADR-063-AUTHORITY-HARDENING-SUCCESSOR-AND-FAIL-CLOSED-DELIVERY.md) | Authority successor         | implemented local candidate; external trust root and independent promotion pending   |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-063; it must be unique at creation time.
+is ADR-064; it must be unique at creation time.
