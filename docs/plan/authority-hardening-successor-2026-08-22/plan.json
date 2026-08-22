@@ -2,7 +2,7 @@
   "schema_version": 1,
   "plan_id": "hive-mind-os-authority-hardening-successor-v1",
   "title": "Authority hardening successor: local fail-closed repairs and external-root boundary",
-  "status": "LOCAL_CANDIDATE_AWAITING_CURATOR__EXTERNAL_ROOT_BLOCKED",
+  "status": "LOCAL_CONTROLS_ADOPTED__EXTERNAL_PROMOTION_BLOCKED",
   "created_at": "2026-08-22T00:00:00-05:00",
   "baseline": {
     "branch": "main",
@@ -13,7 +13,7 @@
   "nodes": [
     {
       "id": "GRANT-2010",
-      "state": "IMPLEMENTED_AWAITING_INDEPENDENT_VERIFICATION",
+      "state": "CURATOR_VERIFIED_LOCAL_CONTROL",
       "level": 0,
       "responsible_roles": ["builder", "integrator"],
       "objective": "Make a bare DeliveryGrantLedger incapable of recording or spending a delivery grant; require a matching sealed owner-authority anchor.",
@@ -30,7 +30,7 @@
     },
     {
       "id": "EFFECT-2020",
-      "state": "IMPLEMENTED_AWAITING_INDEPENDENT_VERIFICATION",
+      "state": "CURATOR_VERIFIED_LOCAL_CONTROL",
       "level": 0,
       "responsible_roles": ["builder", "integrator"],
       "objective": "Require a live AuthorityRegistry for every effect gateway and durable outbox operation so expiry and revocation are always observed.",
@@ -47,7 +47,7 @@
     },
     {
       "id": "LEGACY-2030",
-      "state": "IMPLEMENTED_AWAITING_INDEPENDENT_VERIFICATION",
+      "state": "CURATOR_VERIFIED_LOCAL_CONTROL",
       "level": 0,
       "responsible_roles": ["builder", "integrator"],
       "objective": "Fail closed at the retired RepositoryMission direct GitHub delivery seam until a separately reviewed authority-bound controlled-delivery migration exists.",
@@ -64,7 +64,7 @@
     },
     {
       "id": "DURABILITY-2050",
-      "state": "PENDING_CURRENT_DURABILITY_REVALIDATION",
+      "state": "STEWARD_ADAPTED_LOCAL_RECOVERY__EXTERNAL_ROOT_BLOCKED",
       "level": 0,
       "responsible_roles": ["steward"],
       "objective": "Independently establish that custody, rotation, revocation, and rollback records needed by an external root have a current durable storage and recovery basis.",
@@ -81,7 +81,7 @@
     },
     {
       "id": "AUTONOMOUS-2040",
-      "state": "IMPLEMENTED_AWAITING_INDEPENDENT_VERIFICATION",
+      "state": "CURATOR_VERIFIED_LOCAL_CONTROL",
       "level": 1,
       "responsible_roles": ["builder", "integrator"],
       "objective": "Disable caller-controlled autonomous runtime pushes, draft-PR creation, comments, and authenticated comment polling until an authority-bound controlled-delivery migration exists.",
@@ -132,7 +132,7 @@
     },
     {
       "id": "CURATOR-2900",
-      "state": "PENDING_INDEPENDENT_VERIFICATION",
+      "state": "CURATOR_VERIFIED_LOCAL_REVIEW",
       "level": 2,
       "responsible_roles": ["curator"],
       "objective": "Independently reproduce the local residual probes on the exact candidate, verify all changed paths and tests, and preserve dissent or open residuals.",
@@ -149,7 +149,7 @@
     },
     {
       "id": "JUDGE-3910",
-      "state": "PENDING_LOCAL_DISPOSITION",
+      "state": "JUDGE_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 3,
       "responsible_roles": ["judge"],
       "objective": "Issue an independent disposition for the scoped local fail-closed candidate without promoting it to full authority.",
