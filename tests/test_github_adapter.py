@@ -1019,7 +1019,7 @@ class GitHubAdapterTests(unittest.TestCase):
                         allow_remote=allow_remote,
                     )
 
-    def test_repository_mission_delivers_after_curator_adoption(self) -> None:
+    def test_repository_mission_refuses_legacy_direct_delivery(self) -> None:
         fixture = build_fixture_repo(self.root / "mission-fixture")
         mission_id = "mission-p07-integration"
         store = MissionStore(self.root / "mission-state")
@@ -1038,60 +1038,45 @@ class GitHubAdapterTests(unittest.TestCase):
         )
         report = asyncio.run(
             RepositoryMission(
-                fixture.root,
-                "Fix the failing test",
-                acceptance_criteria=("increment(1) returns 2",),
-                acceptance_specifications=(
-                    AcceptanceSpecification(
-                        "increment-returns-two",
-                        "increment(1) returns 2",
-                        (
-                            sys.executable,
-                            "-B",
-                            "-c",
-                            "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                    fixture.root,
+                    "Fix the failing test",
+                    acceptance_criteria=("increment(1) returns 2",),
+                    acceptance_specifications=(
+                        AcceptanceSpecification(
+                            "increment-returns-two",
+                            "increment(1) returns 2",
+                            (
+                                sys.executable,
+                                "-B",
+                                "-c",
+                                "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                            ),
                         ),
                     ),
-                ),
-                pin=fixture.commit_two,
-                output_dir=self.root / "mission-output",
-                policy=PolicyEngine(AutonomyLevel.REPOSITORY),
-                mission_store=store,
-                github_delivery=GitHubDeliveryTarget(
-                    client,
-                    "main",
-                    "P07 offline mission integration",
-                    "Draft evidence only.",
-                    ROOT
-                    / ".github"
-                    / "governance"
-                    / "required-repository-rules.json",
-                    max_check_attempts=1,
-                    check_interval_s=0,
-                ),
-                _run_id=mission_id,
+                    pin=fixture.commit_two,
+                    output_dir=self.root / "mission-output",
+                    policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+                    mission_store=store,
+                    github_delivery=GitHubDeliveryTarget(
+                        client,
+                        "main",
+                        "P07 offline mission integration",
+                        "Draft evidence only.",
+                        ROOT
+                        / ".github"
+                        / "governance"
+                        / "required-repository-rules.json",
+                        max_check_attempts=1,
+                        check_interval_s=0,
+                    ),
+                    _run_id=mission_id,
             ).run()
         )
-        self.assertEqual(report.curator_verdict, "adopt")
-        self.assertIsNotNone(report.github_delivery)
-        self.assertTrue(report.github_delivery["draft"])
-        self.assertIn("github.delivery.completed", report.event_types)
-        self.assertIsNotNone(client.local_remote)
-        self.assertEqual(
-            subprocess.run(
-                [
-                    "git",
-                    "--git-dir",
-                    str(client.local_remote),
-                    "rev-parse",
-                    "refs/heads/phase/mission-delivery",
-                ],
-                check=True,
-                stdout=subprocess.PIPE,
-                text=True,
-            ).stdout.strip(),
-            report.head_sha,
-        )
+        self.assertEqual("failed", report.status.value)
+        assert report.failure is not None
+        self.assertIn("legacy direct GitHub delivery", report.failure["message"])
+        self.assertIsNone(client.local_remote)
+        self.assertEqual([], transport.calls)
 
 
 R2_OWNER = "octocat"
@@ -1702,7 +1687,9 @@ class ControlledRetractionTests(unittest.TestCase):
         self.assertEqual(self.owner_authority.record_digest, record.anchor_digest)
         self.assertEqual(self.owner_authority.issuer, self.grant().issuer)
         # Cheat: cut a grant the anchored owner never backed.
-        with self.assertRaisesRegex(DeliveryGrantError, "not anchored"):
+        with self.assertRaisesRegex(
+            DeliveryGrantError, "requires the recorded owner authority"
+        ):
             DeliveryGrant.issue(
                 grant_id="GRANT-a4-800-self-issued",
                 owner=R2_OWNER,

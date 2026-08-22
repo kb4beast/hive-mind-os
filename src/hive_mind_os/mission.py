@@ -1188,68 +1188,10 @@ class RepositoryMission:
                 ):
                     raise MissionFailed("mission reached an incomplete delivery state")
                 if self.github_delivery is not None:
-                    assert builder_workspace is not None
-                    assert branch is not None
-                    delivery = self.github_delivery.client.deliver(
-                        builder_workspace,
-                        branch=branch,
-                        base=self.github_delivery.base,
-                        title=self.github_delivery.title,
-                        body=self.github_delivery.body,
-                        desired_rules_path=(
-                            self.github_delivery.desired_rules_path
-                        ),
-                        max_check_attempts=(
-                            self.github_delivery.max_check_attempts
-                        ),
-                        check_interval_s=self.github_delivery.check_interval_s,
+                    raise MissionFailed(
+                        "legacy direct GitHub delivery is disabled; use an "
+                        "authority-bound ControlledGitHubDelivery path"
                     )
-                    self._record_workspace_receipts(builder_workspace)
-                    self._record_receipts(
-                        (
-                            delivery.pull_request.receipt,
-                            *(check.receipt for check in delivery.checks),
-                        )
-                    )
-                    github_delivery_record = {
-                        "owner": self.github_delivery.client.owner,
-                        "repository": self.github_delivery.client.repository,
-                        "branch": delivery.push.branch,
-                        "head_sha": delivery.push.head_sha,
-                        "pull_request_number": delivery.pull_request.number,
-                        "pull_request_url": delivery.pull_request.url,
-                        "draft": delivery.pull_request.draft,
-                        "check_count": len(delivery.checks),
-                        "check_receipt_digests": [
-                            check.receipt["digest"]
-                            for check in delivery.checks
-                        ],
-                        "protection_matches": delivery.protection.matches,
-                        "protection_report": {
-                            "path": delivery.protection.evidence_path,
-                            "digest": delivery.protection.evidence_digest,
-                        },
-                    }
-                    self.ledger.append_event(
-                        self.run_id,
-                        "github.delivery.completed",
-                        Role.INTEGRATOR.value,
-                        github_delivery_record,
-                    )
-                    if not delivery.protection.matches:
-                        self.ledger.append_event(
-                            self.run_id,
-                            "github.protection.mismatch",
-                            Role.INTEGRATOR.value,
-                            {
-                                "mismatches": list(
-                                    delivery.protection.mismatches
-                                ),
-                                "report": github_delivery_record[
-                                    "protection_report"
-                                ],
-                            },
-                        )
                 if self.mission_store is None:
                     self._copy_and_validate_mission_evidence(candidate)
                 else:

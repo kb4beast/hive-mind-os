@@ -513,7 +513,9 @@ class AnchoredIssuanceTests(_DeliveryFixture):
         self.assertEqual(self.owner_authority.issuer, self.grant.issuer)
 
     def test_a_self_issued_grant_can_no_longer_be_cut_or_used(self) -> None:
-        with self.assertRaisesRegex(DeliveryGrantError, "not anchored"):
+        with self.assertRaisesRegex(
+            DeliveryGrantError, "requires the recorded owner authority"
+        ):
             DeliveryGrant.issue(
                 grant_id="GRANT-self-issued",
                 owner=OWNER,

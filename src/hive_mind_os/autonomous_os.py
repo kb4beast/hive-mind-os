@@ -24,8 +24,6 @@ import sqlite3
 import subprocess
 import tempfile
 import time
-import urllib.error
-import urllib.request
 import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -179,7 +177,12 @@ class PullRequestCommentGateway(Protocol):
 
 
 class GitHubRestCommentGateway:
-    """Small GitHub REST adapter that holds raw comment data only in process memory."""
+    """Disabled GitHub adapter retained only for compatibility of the retired runtime.
+
+    Its old write methods remain as compatibility entry points, but deny before
+    constructing a request. The authority-bound Cortex delivery path owns remote
+    access; a caller-controlled autonomous-run flag owns none of it.
+    """
 
     def __init__(self, token_env: str = "GITHUB_TOKEN", *, timeout_s: float = 30.0) -> None:
         if not _SIMPLE_NAME.fullmatch(token_env) or timeout_s <= 0:
@@ -190,97 +193,25 @@ class GitHubRestCommentGateway:
     def _request(
         self, method: str, path: str, body: Mapping[str, Any] | None = None
     ) -> dict[str, Any] | list[Any]:
-        token = os.environ.get(self.token_env, "")
-        if not token:
-            raise AutonomousRunError("GitHub comment credential is unavailable")
-        payload = (
-            json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-            if body is not None
-            else None
-        )
-        request = urllib.request.Request(
-            "https://api.github.com" + path,
-            data=payload,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "User-Agent": "hive-mind-os-autonomous-brain",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-            method=method,
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
-                raw = response.read()
-        except (OSError, TimeoutError, urllib.error.URLError) as error:
-            raise AutonomousRunError(
-                f"GitHub comment request failed: {type(error).__name__}"
-            ) from None
-        try:
-            document = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise AutonomousRunError("GitHub comment response was invalid JSON") from error
-        if not isinstance(document, (dict, list)):
-            raise AutonomousRunError("GitHub comment response was not an object or array")
-        return document
+        """Refuse even direct private transport access in the retired runtime."""
+
+        del method, path, body
+        raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
 
     def list_comments(
         self, owner: str, repository: str, pull_number: int
     ) -> Sequence[Mapping[str, Any]]:
-        conversation = self._request(
-            "GET", f"/repos/{owner}/{repository}/issues/{pull_number}/comments?per_page=100"
-        )
-        review = self._request(
-            "GET", f"/repos/{owner}/{repository}/pulls/{pull_number}/comments?per_page=100"
-        )
-        if not isinstance(conversation, list) or not isinstance(review, list):
-            raise AutonomousRunError("GitHub comments response was not a list")
-        records: list[Mapping[str, Any]] = []
-        for source, document in (("conversation", conversation), ("review", review)):
-            for item in document:
-                if isinstance(item, Mapping):
-                    records.append({**item, "_hive_comment_source": source})
-        return tuple(records)
+        raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
 
     def post_comment(
         self, owner: str, repository: str, pull_number: int, body: str
     ) -> Mapping[str, Any]:
-        document = self._request(
-            "POST", f"/repos/{owner}/{repository}/issues/{pull_number}/comments", {"body": body}
-        )
-        if not isinstance(document, Mapping):
-            raise AutonomousRunError("GitHub comment response was not an object")
-        return document
+        raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
 
     def open_draft_pull_request(
         self, owner: str, repository: str, branch: str, base: str, title: str, body: str
     ) -> Mapping[str, Any]:
-        if not branch.startswith("hive-mind/") or not _SIMPLE_NAME.fullmatch(base):
-            raise AutonomousRunError("draft pull request branch or base is unsafe")
-        existing = self._request(
-            "GET",
-            f"/repos/{owner}/{repository}/pulls?state=open&head={owner}:{branch}&base={base}",
-        )
-        if isinstance(existing, list):
-            for candidate in existing:
-                if isinstance(candidate, Mapping) and candidate.get("draft") is True:
-                    return candidate
-        document = self._request(
-            "POST",
-            f"/repos/{owner}/{repository}/pulls",
-            {
-                "title": title,
-                "body": body,
-                "head": branch,
-                "base": base,
-                "draft": True,
-                "maintainer_can_modify": False,
-            },
-        )
-        if not isinstance(document, Mapping) or document.get("draft") is not True:
-            raise AutonomousRunError("GitHub did not create a draft pull request")
-        return document
+        raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
 
 
 def _canonical(value: Mapping[str, Any]) -> str:
@@ -291,6 +222,12 @@ def _now() -> str:
     from .models import utc_now
 
     return utc_now()
+
+
+_DIRECT_REMOTE_DELIVERY_DISABLED = (
+    "legacy autonomous remote delivery is disabled; use an authority-bound "
+    "ControlledGitHubDelivery path"
+)
 
 
 def _safe_prompt(prompt: str) -> str:
@@ -621,6 +558,8 @@ class AutonomousBrain:
         allow_remote_push: bool = False,
         allow_pr_comments: bool = False,
     ) -> dict[str, Any]:
+        if allow_remote_push or allow_pr_comments:
+            raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
         safe_prompt = _safe_prompt(prompt)
         try:
             selected_host = HostKind(host)
@@ -948,34 +887,10 @@ class AutonomousBrain:
         body: str,
         gateway: PullRequestCommentGateway,
     ) -> dict[str, Any]:
-        """Publish only the stored branch and bind the resulting draft PR to this run."""
+        """Refuse the retired direct draft-PR path before any remote operation."""
 
-        contract = self.get_run(run_id)
-        if contract["authority"]["allow_remote_push"] is not True:
-            raise AutonomousRunError("draft PR delivery requires an immutable remote-push grant")
-        if (
-            not _SIMPLE_NAME.fullmatch(owner)
-            or not _SIMPLE_NAME.fullmatch(repository)
-            or not _SIMPLE_NAME.fullmatch(base)
-            or not _safe_reply(title)
-            or not _safe_reply(body)
-        ):
-            raise AutonomousRunError("draft pull request fields are unsafe")
-        head = self.push_own_branch(run_id)
-        result = gateway.open_draft_pull_request(
-            owner, repository, str(contract["branch"]), base, title, body
-        )
-        number = result.get("number")
-        url = result.get("html_url")
-        if type(number) is not int or number < 1 or not isinstance(url, str):
-            raise AutonomousRunError("draft pull request response lacks a safe binding")
-        self.register_pull_request(run_id, number, url)
-        self._append(
-            run_id,
-            "draft_pull_request_opened",
-            {"number": number, "url": url, "branch": contract["branch"], "head": head},
-        )
-        return {"number": number, "url": url, "branch": contract["branch"], "head": head}
+        self.get_run(run_id)
+        raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
 
     def _pull_request_number(self, run_id: str) -> int:
         row = self._connection.execute(
@@ -1013,56 +928,8 @@ class AutonomousBrain:
         gateway: PullRequestCommentGateway,
         executor: Callable[[tuple[str, ...], Path, Mapping[str, str]], HostExecution] | None = None,
     ) -> tuple[HostRunResult, ...]:
-        contract = self.get_run(run_id)
-        if not _SIMPLE_NAME.fullmatch(owner) or not _SIMPLE_NAME.fullmatch(repository):
-            raise AutonomousRunError("GitHub owner and repository names are unsafe")
-        pull_number = self._pull_request_number(run_id)
-        results: list[HostRunResult] = []
-        for comment in gateway.list_comments(owner, repository, pull_number)[:25]:
-            source = str(comment.get("_hive_comment_source", "conversation"))
-            remote_id = source + "-" + str(comment.get("id", ""))
-            author_data = comment.get("user")
-            author = author_data.get("login") if isinstance(author_data, Mapping) else "unknown"
-            if not _SIMPLE_NAME.fullmatch(remote_id) or not isinstance(author, str):
-                continue
-            if self._feedback_seen(run_id, remote_id):
-                continue
-            body = comment.get("body")
-            safe_body = _redact_untrusted_comment(body)
-            self._record_feedback(
-                run_id,
-                remote_id,
-                "received",
-                {
-                    "author": author[:96],
-                    "body_digest": sha256_digest(safe_body.encode("utf-8")),
-                    "summary": "Untrusted pull request comment received; body retained only for this turn.",
-                },
-            )
-            result = self.run_host_turn(run_id, feedback=safe_body, executor=executor)
-            self._record_feedback(
-                run_id,
-                remote_id,
-                "decision",
-                {"action": result.action, "reply": result.reply, "output_digest": result.output_digest},
-            )
-            if result.action == "implement" and contract["authority"]["allow_remote_push"] is True:
-                self.push_own_branch(run_id)
-            if result.reply is not None and contract["authority"]["allow_pr_comments"] is True:
-                posted = gateway.post_comment(owner, repository, pull_number, result.reply)
-                self._record_feedback(
-                    run_id,
-                    remote_id,
-                    "posted",
-                    {
-                        "reply_digest": sha256_digest(result.reply.encode("utf-8")),
-                        "remote_response_digest": sha256_digest(
-                            json.dumps(posted, ensure_ascii=False, sort_keys=True).encode("utf-8")
-                        ),
-                    },
-                )
-            results.append(result)
-        return tuple(results)
+        self.get_run(run_id)
+        raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
 
     def supervise(
         self,
@@ -1095,6 +962,8 @@ class AutonomousBrain:
         ):
             raise AutonomousRunError("supervision poll interval must be between zero and 3600 seconds")
         feedback_requested = gateway is not None or owner is not None or repository is not None
+        if feedback_requested:
+            raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
         if feedback_requested and (
             gateway is None
             or not isinstance(owner, str)
@@ -1141,37 +1010,10 @@ class AutonomousBrain:
         return result
 
     def push_own_branch(self, run_id: str, *, remote: str = "origin") -> str:
-        """Push only the isolated branch, never force and never a protected ref."""
+        """Refuse the retired direct branch-push path before any Git invocation."""
 
-        contract = self.get_run(run_id)
-        if contract["authority"]["allow_remote_push"] is not True:
-            raise AutonomousRunError("remote push was not granted in the immutable run charter")
-        branch = str(contract["branch"])
-        if branch in PROTECTED_BRANCHES or not branch.startswith("hive-mind/"):
-            raise AutonomousRunError("only the run's non-protected branch may be pushed")
-        worktree = self._worktree_path(run_id)
-        before = self._protected_refs(Path(str(contract["repository"])))
-        if not _SIMPLE_NAME.fullmatch(remote):
-            raise AutonomousRunError("remote name is unsafe")
-        remote_url = self._git(Path(str(contract["repository"])), "remote", "get-url", remote)
-        if not remote_url:
-            raise AutonomousRunError("configured source remote is unavailable")
-        completed = subprocess.run(
-            ("git", "-C", str(worktree), "push", remote_url, f"HEAD:refs/heads/{branch}"),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=self._host_environment(run_id),
-            check=False,
-            shell=False,
-            timeout=120,
-        )
-        self._assert_protected_refs(contract, before)
-        if completed.returncode:
-            raise AutonomousRunError("isolated branch push failed")
-        head = self._git(worktree, "rev-parse", "HEAD")
-        self._append(run_id, "own_branch_pushed", {"remote": remote, "branch": branch, "head": head})
-        return head
+        self.get_run(run_id)
+        raise AutonomousRunError(_DIRECT_REMOTE_DELIVERY_DISABLED)
 
     def _host_pit_predictor(self, run_id: str) -> Callable[[Path], Sequence[str]]:
         """Create a read-only host predictor without exposing a future commit."""
