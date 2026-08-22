@@ -297,24 +297,15 @@ class EffectBoundaryTests(unittest.TestCase):
         self.assertIsNone(store.effect_entry(intent_digest=intent.intent_digest))
         self.assertEqual([], self.calls)
 
-    def test_gateway_without_an_authority_serves_only_sealed_issued_work(self) -> None:
-        """The compatibility path still runs, but refuses an unsealed or unissued one."""
+    def test_gateway_without_an_authority_refuses_even_issued_work(self) -> None:
+        """A registry-less compatibility object may never spend a capability."""
 
         token = self.issued()
         gateway = EffectGateway()
         gateway.register_adapter("fake", self.record)
-        unsealed = replace(
-            _boundary_intent(self.envelope.digest_value), intent_digest=DIGEST
-        )
-        with self.assertRaisesRegex(AuthorityDenied, "does not seal"):
-            gateway.execute(unsealed, token)
-        forged = _hand_built_token(self.envelope.digest_value, "write", GRANTED_TARGET)
-        with self.assertRaisesRegex(AuthorityDenied, "was not issued"):
-            gateway.execute(_boundary_intent(self.envelope.digest_value), forged)
+        with self.assertRaisesRegex(AuthorityDenied, "authority-bound"):
+            gateway.execute(_boundary_intent(self.envelope.digest_value), token)
         self.assertEqual([], self.calls)
-        sealed = _boundary_intent(self.envelope.digest_value)
-        self.assertEqual("SUCCEEDED", gateway.execute(sealed, token).status)
-        self.assertEqual([GRANTED_TARGET], self.calls)
 
 
 class IssuanceWitnessTests(unittest.TestCase):
@@ -406,12 +397,17 @@ class EffectOutboxTests(unittest.TestCase):
 
     def test_intent_is_durable_before_adapter_runs(self) -> None:
         calls: list[str] = []
-        gateway = EffectGateway(store=self.store)
+        gateway = EffectGateway(
+            store=self.store, authority=self.registry, clock=lambda: TIME
+        )
         gateway.register_adapter("fake", lambda intent: calls.append(intent.target))
         intent = _intent()
 
         outbox = DurableEffectOutbox(
-            self.store, adapters={"fake": lambda _: calls.append("delivered")}
+            self.store,
+            adapters={"fake": lambda _: calls.append("delivered")},
+            authority=self.registry,
+            clock=lambda: TIME,
         )
         outbox.enqueue(intent, self.token)
         self.assertEqual([], calls)
@@ -427,16 +423,53 @@ class EffectOutboxTests(unittest.TestCase):
         assert entry is not None
         self.assertEqual("receipt_recorded", entry["state"])
 
+    def test_registry_less_outbox_refuses_every_effect_entry_point(self) -> None:
+        """A durable compatibility object cannot spend a still-genuine token."""
+
+        intent = _intent(key=canonical_digest({"key": "registry-less-outbox"}))
+        bound = DurableEffectOutbox(
+            self.store,
+            adapters={"fake": lambda _: None},
+            authority=self.registry,
+            clock=lambda: TIME,
+        )
+        bound.enqueue(intent, self.token)
+        receipt = build_effect_receipt(
+            intent,
+            adapter_identity="fake",
+            adapter_version="1",
+            started_at=TIME,
+            ended_at="2030-01-01T00:00:01Z",
+        )
+        unbound = DurableEffectOutbox(
+            self.store, adapters={"fake": lambda _: None}, clock=lambda: TIME
+        )
+        for operation in (
+            lambda: unbound.enqueue(intent, self.token),
+            lambda: unbound.execute(intent, self.token),
+            lambda: unbound.reconcile(intent.intent_digest, receipt, token=self.token),
+        ):
+            with self.assertRaisesRegex(AuthorityDenied, "authority-bound"):
+                operation()
+        entry = self.store.effect_entry(intent_digest=intent.intent_digest)
+        self.assertIsNotNone(entry)
+        assert entry is not None
+        self.assertEqual("pending", entry["state"])
+
     def test_duplicate_delivery_returns_prior_receipt_after_restart(self) -> None:
         calls: list[str] = []
         intent = _intent()
-        gateway = EffectGateway(store=self.store)
+        gateway = EffectGateway(
+            store=self.store, authority=self.registry, clock=lambda: TIME
+        )
         gateway.register_adapter("fake", lambda _: calls.append("physical"))
         first = gateway.execute(intent, self.token)
         self.store.close()
 
         reopened = KernelStore(Path(self.temporary.name) / "kernel.sqlite3")
-        retry = EffectGateway(store=reopened)
+        retry = EffectGateway(
+            store=reopened, authority=self.registry, clock=lambda: TIME
+        )
         retry.register_adapter("fake", lambda _: calls.append("duplicate"))
         second = retry.execute(intent, self.token)
         self.assertEqual(first, second)
@@ -452,7 +485,9 @@ class EffectOutboxTests(unittest.TestCase):
             raise RuntimeError("simulated crash after physical effect")
 
         intent = _intent(key=canonical_digest({"key": "crash"}))
-        gateway = EffectGateway(store=self.store)
+        gateway = EffectGateway(
+            store=self.store, authority=self.registry, clock=lambda: TIME
+        )
         gateway.register_adapter("fake", ambiguous)
         with self.assertRaises(EffectReconciliationRequired):
             gateway.execute(intent, self.token)
@@ -469,7 +504,9 @@ class EffectOutboxTests(unittest.TestCase):
             started_at=TIME,
             ended_at="2030-01-01T00:00:01Z",
         )
-        result = DurableEffectOutbox(self.store).reconcile(
+        result = DurableEffectOutbox(
+            self.store, authority=self.registry, clock=lambda: TIME
+        ).reconcile(
             intent.intent_digest,
             receipt,
             token=self.token,
