@@ -2,7 +2,7 @@
   "schema_version": 1,
   "plan_id": "hive-mind-os-authority-hardening-successor-v1",
   "title": "Authority hardening successor: local fail-closed repairs and external-root boundary",
-  "status": "RAW_GITHUB_AND_ROOT_INTERFACE_IMPLEMENTED__INDEPENDENT_REVIEW_AND_EXTERNAL_PROMOTION_BLOCKED",
+  "status": "LOCAL_SUCCESSOR_CONTROLS_ADOPTED__EXTERNAL_ROOT_AND_PROMOTION_BLOCKED",
   "created_at": "2026-08-22T00:00:00-05:00",
   "baseline": {
     "branch": "main",
@@ -98,7 +98,7 @@
     },
     {
       "id": "RAW-GITHUB-2070",
-      "state": "BUILDER_IMPLEMENTED_PENDING_INDEPENDENT_CURATOR",
+      "state": "JUDGE_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 1,
       "responsible_roles": ["architect", "integrator", "curator"],
       "objective": "Quarantine public raw GitHub write methods and move the production workspace push behind a grant-bound, effect-context-bound controlled-delivery contract without breaking receipt or recovery guarantees.",
@@ -115,7 +115,7 @@
     },
     {
       "id": "ROOT-INTERFACE-3010",
-      "state": "BUILDER_IMPLEMENTED_PENDING_INDEPENDENT_CURATOR",
+      "state": "JUDGE_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 1,
       "responsible_roles": ["builder", "integrator"],
       "objective": "Prepare a replaceable external-root verifier integration contract that records attestation, verification, expiry, revocation, and receipt bindings while refusing to call a local root external authority.",
@@ -126,7 +126,7 @@
       "file_locks": ["src/hive_mind_os/brain_kernel/authority.py", "tests/test_brain_kernel_authority.py"],
       "forbidden_scope": ["evidence/pilots/**", "docs/architecture/HUMAN_AUTHORITY_GATES.md", "pyproject.toml"],
       "required_tests": ["PYTHONPATH=src python -m unittest tests.test_brain_kernel_authority -v"],
-      "stopping_condition": "A local root is refused as external; a verified attestation is exact-bound and live; missing, mismatched, expired, rejected, or revoked evidence fails closed; independent Curator/Judge evidence is still pending.",
+      "stopping_condition": "A local root is refused as external; a verified attestation is exact-bound and live; missing, mismatched, expired, rejected, or revoked evidence fails closed; independent Curator and Judge receipts adopt only the local interface.",
       "rollback": "Revert the integration contract as one candidate; retain the external-root boundary and never replace it with a local key or HMAC workaround.",
       "lesson": "A verifier interface makes integration possible, but a fixture verifier is not an external operator."
     },
@@ -183,7 +183,7 @@
     },
     {
       "id": "RAW-CURATOR-2970",
-      "state": "PENDING_INDEPENDENT_CURATOR_REPRODUCTION",
+      "state": "CURATOR_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 2,
       "responsible_roles": ["curator"],
       "objective": "Independently reproduce RAW-GITHUB-2070's no-I/O denial, grant/remote binding, effect-context, host-allowlist, and controlled recovery assertions on the exact migration candidate.",
@@ -200,7 +200,7 @@
     },
     {
       "id": "ROOT-CURATOR-3020",
-      "state": "PENDING_INDEPENDENT_CURATOR_REPRODUCTION",
+      "state": "CURATOR_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 2,
       "responsible_roles": ["curator"],
       "objective": "Independently reproduce ROOT-INTERFACE-3010's local no-claim, attestation/verification binding, expiry, and revocation assertions while distinguishing protocol fixtures from external custody evidence.",
@@ -217,7 +217,7 @@
     },
     {
       "id": "RAW-JUDGE-3920",
-      "state": "PENDING_INDEPENDENT_JUDGE_DISPOSITION",
+      "state": "JUDGE_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 3,
       "responsible_roles": ["judge"],
       "objective": "Issue a disposition for the raw-GitHub migration after independent reproduction, without converting local process guards into an external-authority claim.",
@@ -234,7 +234,7 @@
     },
     {
       "id": "ROOT-JUDGE-3930",
-      "state": "PENDING_INDEPENDENT_JUDGE_DISPOSITION",
+      "state": "JUDGE_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 3,
       "responsible_roles": ["judge"],
       "objective": "Issue a scoped disposition for the external-root integration contract without representing its fixture verifier as deployed custody or promoting ROOT-3000.",
@@ -251,17 +251,17 @@
     },
     {
       "id": "PROMOTION-3990",
-      "state": "BLOCKED_ON_EXTERNAL_ROOT_AND_RAW_MIGRATION",
+      "state": "BLOCKED_ON_EXTERNAL_ROOT",
       "level": 4,
       "responsible_roles": ["judge", "owner-controlled root operator", "independent security witness"],
-      "objective": "Judge any full-authority or real-remote-delivery promotion only after the local disposition, external root, and raw GitHub API migration are independently evidenced.",
+      "objective": "Judge any full-authority or real-remote-delivery promotion only after an externally operated root is independently evidenced; the local raw-GitHub and root-interface successors are already independently adopted.",
       "dependencies": ["RAW-JUDGE-3920", "ROOT-JUDGE-3930", "ROOT-3000"],
       "parallel_safe": false,
       "read_scope": ["docs/plan/authority-hardening-successor-2026-08-22/**", "evidence/audits/authority-hardening-successor/**", "docs/architecture/ADR-063-AUTHORITY-HARDENING-SUCCESSOR-AND-FAIL-CLOSED-DELIVERY.md"],
       "write_scope": ["evidence/audits/authority-hardening-successor/promotion-judge/**"],
       "file_locks": ["evidence/audits/authority-hardening-successor/promotion-judge/**"],
       "forbidden_scope": ["src/**", "tests/**", "evidence/pilots/**"],
-      "required_tests": ["Review local Judge receipt, external-root witness, raw-API migration receipt, exact-head CI receipt, rollback evidence, and all dissent"],
+      "required_tests": ["Review both local Judge receipts, external-root witness, exact-head CI receipt, rollback evidence, and all dissent"],
       "stopping_condition": "A Judge distinct from Builder, Curator, and root operator records a promotion disposition; no full-authority claim is issued without every dependency.",
       "rollback": "Defer or reject promotion while retaining all decisions, probes, and dissent.",
       "lesson": "Full authority requires both an authentic root and elimination of parallel raw delivery paths."
