@@ -59,7 +59,6 @@ from hive_mind_os.github_adapter import (
     GitHubResponse,
     GitHubTransportError,
     MissingGitHubCredential,
-    PushResult,
     UrllibGitHubTransport,
     validate_github_receipt,
 )
