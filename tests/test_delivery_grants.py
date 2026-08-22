@@ -130,7 +130,7 @@ class _RefusingRest:
 
 
 class _RefusingPush:
-    def push(self, branch: str) -> str:
+    def push(self, grant: DeliveryGrant, branch: str) -> str:
         raise AssertionError(f"an unissued grant reached the push executor: {branch}")
 
 

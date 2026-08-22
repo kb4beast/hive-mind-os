@@ -205,7 +205,7 @@ class FakePushExecutor:
         self.head = head
         self.branches: list[str] = []
 
-    def push(self, branch: str) -> str:
+    def push(self, grant: DeliveryGrant, branch: str) -> str:
         self.branches.append(branch)
         return self.head
 

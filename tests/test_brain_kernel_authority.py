@@ -6,6 +6,8 @@ from dataclasses import replace
 from hive_mind_os.brain_kernel.authority import (
     AuthorityDenied,
     AuthorityRegistry,
+    ExternalRootAttestation,
+    ExternalRootVerification,
     RootProvenance,
 )
 from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope, EffectIntent
@@ -186,6 +188,121 @@ class RootMintTests(unittest.TestCase):
                 envelope(), issuer=ISSUER, authority_ref=AUTHORITY_REF, recorded_at="whenever"
             )
         self.assertIsNone(registry.root_provenance(AUTH))
+
+
+class _FixtureExternalRootVerifier:
+    """A deterministic protocol double, never evidence of a real external root."""
+
+    def __init__(
+        self,
+        *,
+        verifier_id: str = "fixture-owner-verifier",
+        accepted: bool = True,
+        result_verifier_id: str | None = None,
+        verified_at: str = "2026-01-01T01:00:00Z",
+    ) -> None:
+        self.verifier_id = verifier_id
+        self.accepted = accepted
+        self.result_verifier_id = result_verifier_id or verifier_id
+        self.verified_at = verified_at
+        self.calls: list[ExternalRootAttestation] = []
+
+    def verify_root(
+        self, attestation: ExternalRootAttestation
+    ) -> ExternalRootVerification:
+        self.calls.append(attestation)
+        return ExternalRootVerification.record(
+            attestation,
+            verifier_id=self.result_verifier_id,
+            receipt_ref="fixture://external-root/receipt-1",
+            verified_at=self.verified_at,
+            accepted=self.accepted,
+        )
+
+
+class ExternalRootIntegrationTests(unittest.TestCase):
+    """ROOT-INTERFACE-3010: local adapter contract, never external custody proof."""
+
+    def attestation(self, root: ConstraintEnvelope) -> ExternalRootAttestation:
+        return ExternalRootAttestation.issue(
+            envelope=root,
+            issuer=ISSUER,
+            authority_ref=AUTHORITY_REF,
+            issued_at=MINTED_AT,
+            expires_at="2026-01-02T00:00:00Z",
+        )
+
+    def test_local_mint_is_not_external_verifier_evidence(self) -> None:
+        registry = AuthorityRegistry()
+        root = envelope()
+        mint(registry, root)
+
+        with self.assertRaisesRegex(AuthorityDenied, "lacks external verifier evidence"):
+            registry.require_external_root(root.digest_value, now="2026-01-01T01:00:00Z")
+
+    def test_accepted_external_verification_is_bound_and_live(self) -> None:
+        registry = AuthorityRegistry()
+        root = envelope()
+        attestation = self.attestation(root)
+        verifier = _FixtureExternalRootVerifier()
+
+        record = registry.admit_external_root(
+            root, attestation=attestation, verifier=verifier
+        )
+
+        self.assertEqual([attestation], verifier.calls)
+        self.assertEqual(
+            (root.digest_value, ISSUER, AUTHORITY_REF, "2026-01-01T01:00:00Z"),
+            (record.envelope_digest, record.issuer, record.authority_ref, record.recorded_at),
+        )
+        evidence = registry.require_external_root(
+            root.digest_value, now="2026-01-01T02:00:00Z"
+        )
+        self.assertEqual(attestation, evidence[0])
+        self.assertTrue(evidence[1].accepted)
+
+    def test_external_attestation_mismatch_rejects_before_verifier_call(self) -> None:
+        registry = AuthorityRegistry()
+        root = envelope()
+        other = envelope(envelope_id="AUTH-other")
+        verifier = _FixtureExternalRootVerifier()
+
+        with self.assertRaisesRegex(AuthorityDenied, "does not bind this authority"):
+            registry.admit_external_root(
+                root, attestation=self.attestation(other), verifier=verifier
+            )
+
+        self.assertEqual([], verifier.calls)
+        self.assertIsNone(registry.root_provenance(root.digest_value))
+
+    def test_rejected_or_misattributed_verifier_output_fails_closed(self) -> None:
+        for verifier in (
+            _FixtureExternalRootVerifier(accepted=False),
+            _FixtureExternalRootVerifier(result_verifier_id="other-verifier"),
+            _FixtureExternalRootVerifier(verified_at="2026-01-02T00:00:00Z"),
+        ):
+            with self.subTest(verifier=verifier.verifier_id):
+                registry = AuthorityRegistry()
+                root = envelope()
+                with self.assertRaises(AuthorityDenied):
+                    registry.admit_external_root(
+                        root, attestation=self.attestation(root), verifier=verifier
+                    )
+                self.assertIsNone(registry.root_provenance(root.digest_value))
+
+    def test_expired_or_revoked_external_root_cannot_be_required(self) -> None:
+        registry = AuthorityRegistry()
+        root = envelope()
+        registry.admit_external_root(
+            root,
+            attestation=self.attestation(root),
+            verifier=_FixtureExternalRootVerifier(),
+        )
+        with self.assertRaisesRegex(AuthorityDenied, "expired"):
+            registry.require_external_root(root.digest_value, now="2026-01-02T00:00:00Z")
+        registry.revoke(root.digest_value)
+        with self.assertRaisesRegex(AuthorityDenied, "unavailable"):
+            registry.require_external_root(root.digest_value, now="2026-01-01T02:00:00Z")
 
 
 class RevocationTests(unittest.TestCase):

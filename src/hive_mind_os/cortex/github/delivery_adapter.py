@@ -41,7 +41,7 @@ _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
 class PushExecutor(Protocol):
     """Pushes exactly one non-force branch ref and returns the full head SHA."""
 
-    def push(self, branch: str) -> str: ...
+    def push(self, grant: DeliveryGrant, branch: str) -> str: ...
 
 
 class DeliveryParametersUnbound(RuntimeError):
@@ -119,9 +119,13 @@ class ControlledGitHubDelivery:
 
     @property
     def network_hosts(self) -> tuple[str, ...]:
-        """The single remote host every delivery adapter reaches."""
+        """Every remote host this controlled delivery instance can reach."""
 
-        return (urllib.parse.urlsplit(self.rest.api_base).netloc,)
+        hosts = {urllib.parse.urlsplit(self.rest.api_base).netloc}
+        push_hosts = getattr(self.push_executor, "network_hosts", ())
+        if isinstance(push_hosts, tuple):
+            hosts.update(host for host in push_hosts if isinstance(host, str) and host)
+        return tuple(sorted(hosts))
 
     def register_with(self, gateway: EffectGateway) -> None:
         """Register exactly the five delivery adapters on a kernel gateway."""
@@ -155,7 +159,7 @@ class ControlledGitHubDelivery:
         parameters = self._parameters(intent)
         branch = _required_text(parameters, "branch")
         self.grant.require_push_branch(branch)
-        head = self.push_executor.push(branch)
+        head = self.push_executor.push(self.grant, branch)
         if not isinstance(head, str) or _FULL_SHA.fullmatch(head) is None:
             raise DeliveryRestError(
                 "push executor did not return a full lowercase head SHA"

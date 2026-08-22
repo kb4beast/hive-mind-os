@@ -23,8 +23,8 @@ present codebase:
    bypassing `ControlledGitHubDelivery` and its grant boundary.
 4. The retired `AutonomousBrain` accepted caller-controlled remote-push/comment
    booleans and could directly push, create a draft PR, post comments, or poll GitHub.
-5. `GitHubClient` itself remains a public raw side-effect API. It is a separate
-   migration obligation, not proof that its callers are authority-bound.
+5. `GitHubClient` itself remained a public raw side-effect API. Its successor migration is
+   now specified in ADR-064; the original audit remains retained negative evidence.
 
 The same audit also proved a larger boundary: `AuthorityRegistry.mint_root` records
 issuer and authority-reference strings but does not authenticate their holder. A
@@ -53,9 +53,8 @@ authority.
 This decision does not claim cryptographic provenance, owner authentication, key
 custody, or a production anchoring service. The final successor node requires an
 externally administered verifier/signing root and a governed deployment ceremony.
-No code in this ADR is a substitute for that root. The public raw `GitHubClient`
-surface is also retained as an explicit, unclosed migration node; this ADR makes no
-claim that all direct GitHub delivery is impossible.
+No code in this ADR is a substitute for that root. ADR-064 narrows the raw write surface,
+but this ADR still makes no external-authority claim.
 
 ## Alternatives rejected
 
@@ -79,9 +78,8 @@ claim that all direct GitHub delivery is impossible.
 - A gateway without a registry can still be allocated, but it cannot run an adapter.
 - The grant ledger remains in-memory. Deployment persistence and recovery are outside
   this candidate and must be included in the external-root promotion review.
-- `GitHubClient` remains public for the existing controlled delivery implementation.
-  It must be migrated, quarantined, or otherwise capability-bound before a broader
-  direct-delivery safety claim.
+- ADR-064 quarantines the public raw write methods and removes `GitHubClient` from the
+  production push executor. Its independent review remains a required successor gate.
 
 ## Migration and rollback
 

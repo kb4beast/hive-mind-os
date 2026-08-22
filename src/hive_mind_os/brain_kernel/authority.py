@@ -5,6 +5,7 @@ from __future__ import annotations
 import secrets
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Protocol
 
 from .canonical import canonical_digest
 from .contracts import ConstraintEnvelope, normalize_portable_path
@@ -76,6 +77,165 @@ class RootProvenance:
     record_digest: str
 
 
+def _rfc3339(value: str, label: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise AuthorityDenied(f"{label} requires an RFC 3339 time")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise AuthorityDenied(f"{label} requires an RFC 3339 time") from error
+    if parsed.tzinfo is None:
+        raise AuthorityDenied(f"{label} requires an RFC 3339 time")
+    return parsed
+
+
+@dataclass(frozen=True, slots=True)
+class ExternalRootAttestation:
+    """Opaque owner-root statement prepared for an external verifier.
+
+    The digest seals claims passed to the verifier. It is not a signature:
+    authentication comes only from separately administered verifier custody.
+    """
+
+    envelope_digest: str
+    issuer: str
+    authority_ref: str
+    issued_at: str
+    expires_at: str
+    attestation_digest: str
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.envelope_digest, str)
+            or not self.envelope_digest
+            or not isinstance(self.issuer, str)
+            or not self.issuer.strip()
+            or not isinstance(self.authority_ref, str)
+            or not self.authority_ref.strip()
+        ):
+            raise AuthorityDenied(
+                "external root attestation requires bound authority claims"
+            )
+        issued = _rfc3339(self.issued_at, "external root attestation issued_at")
+        expires = _rfc3339(self.expires_at, "external root attestation expires_at")
+        if expires <= issued:
+            raise AuthorityDenied("external root attestation must expire after issuance")
+        if self.attestation_digest != canonical_digest(self._payload()):
+            raise AuthorityDenied(
+                "external root attestation digest does not seal its claims"
+            )
+
+    def _payload(self) -> dict[str, str]:
+        return {
+            "envelope": self.envelope_digest,
+            "issuer": self.issuer,
+            "authority_ref": self.authority_ref,
+            "issued_at": self.issued_at,
+            "expires_at": self.expires_at,
+        }
+
+    @classmethod
+    def issue(
+        cls,
+        *,
+        envelope: ConstraintEnvelope,
+        issuer: str,
+        authority_ref: str,
+        issued_at: str,
+        expires_at: str,
+    ) -> "ExternalRootAttestation":
+        payload = {
+            "envelope": envelope.digest_value,
+            "issuer": issuer,
+            "authority_ref": authority_ref,
+            "issued_at": issued_at,
+            "expires_at": expires_at,
+        }
+        return cls(
+            envelope.digest_value,
+            issuer,
+            authority_ref,
+            issued_at,
+            expires_at,
+            canonical_digest(payload),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ExternalRootVerification:
+    """A verifier's receipted decision about one sealed root attestation."""
+
+    attestation_digest: str
+    verifier_id: str
+    receipt_ref: str
+    verified_at: str
+    accepted: bool
+    verification_digest: str
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.attestation_digest, str)
+            or not self.attestation_digest
+            or not isinstance(self.verifier_id, str)
+            or not self.verifier_id.strip()
+            or not isinstance(self.receipt_ref, str)
+            or not self.receipt_ref.strip()
+        ):
+            raise AuthorityDenied("external root verification requires verifier evidence")
+        _rfc3339(self.verified_at, "external root verification verified_at")
+        if type(self.accepted) is not bool:
+            raise AuthorityDenied("external root verification acceptance must be boolean")
+        if self.verification_digest != canonical_digest(self._payload()):
+            raise AuthorityDenied(
+                "external root verification digest does not seal its claims"
+            )
+
+    def _payload(self) -> dict[str, object]:
+        return {
+            "attestation": self.attestation_digest,
+            "verifier": self.verifier_id,
+            "receipt_ref": self.receipt_ref,
+            "verified_at": self.verified_at,
+            "accepted": self.accepted,
+        }
+
+    @classmethod
+    def record(
+        cls,
+        attestation: ExternalRootAttestation,
+        *,
+        verifier_id: str,
+        receipt_ref: str,
+        verified_at: str,
+        accepted: bool,
+    ) -> "ExternalRootVerification":
+        payload: dict[str, object] = {
+            "attestation": attestation.attestation_digest,
+            "verifier": verifier_id,
+            "receipt_ref": receipt_ref,
+            "verified_at": verified_at,
+            "accepted": accepted,
+        }
+        return cls(
+            attestation.attestation_digest,
+            verifier_id,
+            receipt_ref,
+            verified_at,
+            accepted,
+            canonical_digest(payload),
+        )
+
+
+class ExternalRootVerifier(Protocol):
+    """Replaceable, owner-operated verifier boundary for a root attestation."""
+
+    verifier_id: str
+
+    def verify_root(
+        self, attestation: ExternalRootAttestation
+    ) -> ExternalRootVerification: ...
+
+
 def intersect_envelopes(parent: ConstraintEnvelope, child: ConstraintEnvelope) -> ConstraintEnvelope:
     """Reject a broadening child; intersection itself grants no capability."""
 
@@ -90,6 +250,9 @@ class AuthorityRegistry:
     def __init__(self) -> None:
         self._envelopes: dict[str, ConstraintEnvelope] = {}
         self._roots: dict[str, RootProvenance] = {}
+        self._external_roots: dict[
+            str, tuple[ExternalRootAttestation, ExternalRootVerification]
+        ] = {}
         self._revoked: set[str] = set()
         self._revoked_authorities: set[str] = set()
 
@@ -130,8 +293,111 @@ class AuthorityRegistry:
         self._roots[envelope.digest_value] = record
         return record
 
+    def admit_external_root(
+        self,
+        envelope: ConstraintEnvelope,
+        *,
+        attestation: ExternalRootAttestation,
+        verifier: ExternalRootVerifier,
+    ) -> RootProvenance:
+        """Admit a root only after an injected external verifier accepts it.
+
+        This method is an integration contract, not evidence that the supplied
+        verifier is externally administered. Deployment must provide custody,
+        identity, rotation, and independent witness evidence before this record
+        can support an external-authority claim.
+        """
+
+        if envelope.parent_envelope_digest is not None:
+            raise AuthorityDenied("external root authority must not declare a parent")
+        if not isinstance(attestation, ExternalRootAttestation):
+            raise AuthorityDenied("external root requires a sealed attestation")
+        if (
+            attestation.envelope_digest != envelope.digest_value
+            or attestation.issuer != attestation.issuer.strip()
+            or attestation.authority_ref != attestation.authority_ref.strip()
+        ):
+            raise AuthorityDenied("external root attestation does not bind this authority")
+        verifier_id = getattr(verifier, "verifier_id", None)
+        verify = getattr(verifier, "verify_root", None)
+        if not isinstance(verifier_id, str) or not verifier_id.strip() or not callable(verify):
+            raise AuthorityDenied("external root requires a configured verifier")
+        try:
+            verification = verify(attestation)
+        except Exception as error:
+            raise AuthorityDenied(
+                "external root verifier failed closed: " + type(error).__name__
+            ) from None
+        if not isinstance(verification, ExternalRootVerification):
+            raise AuthorityDenied("external root verifier returned no sealed verification")
+        if (
+            verification.attestation_digest != attestation.attestation_digest
+            or verification.verifier_id != verifier_id
+            or not verification.accepted
+        ):
+            raise AuthorityDenied("external root verification does not accept this attestation")
+        verified_at = _rfc3339(
+            verification.verified_at, "external root verification verified_at"
+        )
+        issued_at = _rfc3339(
+            attestation.issued_at, "external root attestation issued_at"
+        )
+        expires_at = _rfc3339(
+            attestation.expires_at, "external root attestation expires_at"
+        )
+        if verified_at < issued_at or verified_at >= expires_at:
+            raise AuthorityDenied("external root verification is outside attestation validity")
+        self._admit(envelope)
+        record = RootProvenance(
+            envelope.digest_value,
+            attestation.issuer,
+            attestation.authority_ref,
+            verification.verified_at,
+            canonical_digest(
+                {
+                    "envelope": envelope.digest_value,
+                    "issuer": attestation.issuer,
+                    "authority_ref": attestation.authority_ref,
+                    "recorded_at": verification.verified_at,
+                }
+            ),
+        )
+        self._roots[envelope.digest_value] = record
+        self._external_roots[envelope.digest_value] = (attestation, verification)
+        return record
+
     def root_provenance(self, digest: str) -> RootProvenance | None:
         return self._roots.get(digest)
+
+    def external_root_evidence(
+        self, digest: str
+    ) -> tuple[ExternalRootAttestation, ExternalRootVerification] | None:
+        """Return the sealed external-verifier evidence recorded for one root."""
+
+        return self._external_roots.get(digest)
+
+    def require_external_root(
+        self,
+        digest: str,
+        *,
+        now: str,
+    ) -> tuple[ExternalRootAttestation, ExternalRootVerification]:
+        """Require a live, externally verified root before deployment wiring."""
+
+        self.envelope(digest)
+        evidence = self._external_roots.get(digest)
+        if evidence is None:
+            raise AuthorityDenied("authority root lacks external verifier evidence")
+        attestation, verification = evidence
+        moment = _rfc3339(now, "external root verification now")
+        expires_at = _rfc3339(
+            attestation.expires_at, "external root attestation expires_at"
+        )
+        if moment >= expires_at:
+            raise AuthorityDenied("external root attestation is expired")
+        if not verification.accepted:
+            raise AuthorityDenied("external root verification is not accepted")
+        return evidence
 
     def envelope(self, digest: str) -> ConstraintEnvelope:
         """Read one admitted authority; absence and revocation both fail closed.

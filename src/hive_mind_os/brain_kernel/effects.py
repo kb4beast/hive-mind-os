@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterator
 
 from .authority import (
     AuthorityDenied,
@@ -23,6 +25,59 @@ class EffectResult:
     intent_digest: str
     receipt_digest: str
     status: str
+
+
+@dataclass(frozen=True, slots=True)
+class _ActiveEffectExecution:
+    """Short-lived proof that an adapter is running behind this gateway.
+
+    This is process-local plumbing, not a second authority. The gateway has
+    already validated the live capability token before it installs this marker.
+    It lets lower-level tool wrappers refuse direct calls that would otherwise
+    bypass the adapter boundary.
+    """
+
+    intent_digest: str
+    target_adapter: str
+
+
+_ACTIVE_EFFECT_EXECUTION: ContextVar[_ActiveEffectExecution | None] = ContextVar(
+    "hive_mind_active_effect_execution", default=None
+)
+
+
+@contextmanager
+def _authorized_effect_execution(intent: EffectIntent) -> Iterator[None]:
+    """Install the gateway-validated execution marker around one adapter call."""
+
+    if _ACTIVE_EFFECT_EXECUTION.get() is not None:
+        raise AuthorityDenied("nested effect execution is not permitted")
+    reset = _ACTIVE_EFFECT_EXECUTION.set(
+        _ActiveEffectExecution(intent.intent_digest, intent.target_adapter)
+    )
+    try:
+        yield
+    finally:
+        _ACTIVE_EFFECT_EXECUTION.reset(reset)
+
+
+def require_active_effect_execution(*, target_adapter: str) -> None:
+    """Refuse a lower-level operation outside its validated adapter invocation.
+
+    The marker cannot mint or broaden a capability. It is set only after
+    :func:`validate_capability_token` succeeds in an effect gateway or durable
+    outbox, and is removed before control returns to the caller.
+    """
+
+    marker = _ACTIVE_EFFECT_EXECUTION.get()
+    if marker is None:
+        raise AuthorityDenied(
+            "remote execution requires a validated effect gateway invocation"
+        )
+    if marker.target_adapter != target_adapter:
+        raise AuthorityDenied(
+            "remote execution is not authorized for adapter " + target_adapter
+        )
 
 
 def _now() -> str:
@@ -188,7 +243,8 @@ class EffectGateway:
         adapter = self._adapters.get(intent.target_adapter)
         if adapter is None:
             raise AuthorityDenied("adapter is not registered")
-        adapter(intent)
+        with _authorized_effect_execution(intent):
+            adapter(intent)
         result = EffectResult(intent.intent_digest, canonical_digest({"intent": intent.intent_digest, "status": "SUCCEEDED"}), "SUCCEEDED")
         self._receipts[intent.idempotency_key] = result
         return result

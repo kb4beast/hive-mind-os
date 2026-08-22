@@ -18,6 +18,7 @@ from .canonical import canonical_bytes, canonical_digest
 from .contracts import EffectIntent, EffectReceipt
 from .effects import (
     EffectResult,
+    _authorized_effect_execution,
     build_effect_receipt,
     validate_capability_token,
 )
@@ -134,7 +135,8 @@ class DurableEffectOutbox:
 
         started_at = self.clock()
         try:
-            raw_result = adapter(intent)
+            with _authorized_effect_execution(intent):
+                raw_result = adapter(intent)
         except Exception as error:
             self.store.mark_effect_reconciliation_required(
                 intent_digest=intent.intent_digest,
