@@ -5,6 +5,13 @@ overlay for the persisted generic Hive Mind product request. It is a sealed
 design artifact, not an execution authorization. It never replaces or edits
 `.autopilot/plan.json`, and its 20-node plan contains no runnable commands.
 
+Payload A is preserved at commit
+`4e2b81b932e5145f24c4b52ceeee664bff91df2e`. Its exact committed focused suite
+exposed a two-test authoring-fixture defect (12/14), so the current manifest uses
+an append-only v2 correction contract: one exact five-path child of Payload A,
+with ten embedded non-manifest bindings plus the court-authenticated manifest
+covering the complete ordered 11-path payload inventory.
+
 The intended post-implementation user surface is deliberately small:
 
 ```text
@@ -57,18 +64,26 @@ python .autopilot/bin/dag_standard.py dag-rounds --plan docs/execution/dags/gene
 
 The rounds result must report exactly 20 `manual-parent-v1` rounds with one node
 per round and every `command` value null. `--authoring-check` is explicitly
-non-executing and never qualifies a release. After the 11-path payload is one
-exact child commit of the recorded authoring-base parent, omit that flag and pass
-the manifest digest pinned by the independent court/Envelope B:
+non-executing and never qualifies a release; it is valid only in a fixture at
+Payload A with the current manifest-bound correction overlaid but uncommitted.
+After the five-path correction is one exact non-merge direct child commit of Payload A, omit that
+flag and pass the manifest digest pinned by the independent court/Envelope B:
 
 ```powershell
 python docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py --expected-manifest-digest <court-pinned-sha256>
 ```
 
 Committed mode rejects a missing caller digest, the precommit authoring state,
-an extra or wrong-parent commit, any changed path outside the exact 11-path
-payload, and dirty, staged, or unapproved untracked/ignored checkout state. The
-sole explicit exception is `.hive-mind/autopilot-request.json`.
+an extra or wrong-parent commit, any changed path outside the exact five-path
+correction, any mismatch in the complete 11-path payload inventory, and dirty,
+staged, or unapproved untracked/ignored checkout state. The sole explicit
+exception is `.hive-mind/autopilot-request.json`.
+It disables Git replace objects, verifies both frozen commit objects, compares
+all worktree bytes with regular-file `HEAD` blobs, and rejects hidden
+skip-worktree/assume-unchanged flags on every tracked path or payload mode
+substitutions. A passing committed check
+means `committed_payload_qualification=true`; execution qualification and
+authorization remain false.
 
 ## External activation boundary
 
@@ -84,6 +99,9 @@ provides all of the following as one authenticated, short-lived bundle:
    enforced outside-repository deny sandbox.
 5. A one-run nonce, deadline, and compare-and-swap ledger that rejects replay,
    collision, repeat-resume mismatch, and concurrent losers.
+6. A signed minimum-version and revocation policy that requires correction
+   contract v2 and rejects the Payload A manifest, predecessor activation, and
+   every V1 fallback.
 
 Qualification and handoff evidence belongs in the separate external Envelope B
 evidence worktree/branch. It must not dirty or reidentify the frozen candidate.

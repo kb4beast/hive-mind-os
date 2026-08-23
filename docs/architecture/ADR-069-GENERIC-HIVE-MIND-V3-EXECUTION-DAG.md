@@ -3,7 +3,8 @@
 - Status: proposed `adapt`; distinct Curator and Judge disposition pending
 - Date: 2026-08-23
 - Scope: repeated persisted-subject Autopilot invocation and its bounded product-completion DAG
-- Immutable authoring-base parent: commit `42b4aeef17f816430a7d8a435102635afea8761a`, tree `b896e16755a1d6864989757732fdc5ca9d2b5eed`
+- Immutable plan authoring base: commit `42b4aeef17f816430a7d8a435102635afea8761a`, tree `b896e16755a1d6864989757732fdc5ca9d2b5eed`
+- Immutable correction parent (Payload A): commit `4e2b81b932e5145f24c4b52ceeee664bff91df2e`, tree `8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157`
 - Immutable Clerk intake: `docs/execution/dags/generic-hive-mind-product-v3/source-intake.json`, 58,463 bytes, SHA-256 `dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c`
 
 ## Context
@@ -23,6 +24,13 @@ is expired and stale, and the observed host worktree contained ignored bytecode.
 The legacy continuation launcher returned a quiescent success but withheld
 release publication after reconciliation and GitHub snapshot drift; it is not V3
 authority or dispatch.
+
+Payload A is preserved append-only at `4e2b81b932e5145f24c4b52ceeee664bff91df2e`.
+Its inert plan and independent committed verifier passed, but two focused tests
+incorrectly ran the precommit-only authoring mode against the committed payload
+HEAD. The exact commit therefore ran 12 of 14 focused tests, while the same bytes
+overlaid on the intended base passed 14 of 14. This ADR adapts the lineage with a
+versioned correction child; it does not erase or relabel that failed observation.
 
 ## Decision
 
@@ -47,13 +55,19 @@ authorship { architect, judge=UNASSIGNED, court_status, execution_authority=NONE
 request_binding { request_id, objective_digest, repository_id, task_key,
                   launch_digest, target_branch }
 snapshot_lineage { request_observation, qualified_prerequisite,
-                   combined_envelope_b, authoring_base_parent } -> { commit, tree }
+                   combined_envelope_b, authoring_base_parent,
+                   correction_parent } -> { commit, tree }
 source_bindings.repository[] -> { path, bytes, sha256, git_blob }
 source_bindings.overlay[] -> { path, bytes, sha256 }
 committed_payload_contract {
-  mode=exact-single-overlay-commit-v1,
-  authoring_base_parent,
-  expected_changed_paths[11], payload_bindings[10],
+  mode=exact-append-only-correction-v2,
+  authoring_base_parent=plan-authoring-base,
+  correction_parent=Payload-A,
+  predecessor_payload { commit, tree, parent_commit, parent_tree,
+                        manifest_raw_sha256, full_payload_aggregate,
+                        observed_status, author_proposed_disposition },
+  expected_changed_paths[5], payload_inventory[11], payload_bindings[10],
+  activation_anti_downgrade,
   manifest_authentication=caller-supplied-raw-sha256,
   court_envelope_b_bindings
 }
@@ -70,11 +84,16 @@ execution_authorized=false
 
 The manifest binds the six V1 source blobs and expected V1 digest, V1 and V2
 standards, the frozen V2 compiler, Clerk intake, qualification evidence, snapshot
-lineage, the immutable authoring-base parent, the exact 11-path committed
-payload, the external plan bytes, and the independent verifier. The manifest
+lineage, the immutable plan authoring base and Payload A correction parent, the
+exact five-path correction, ten embedded non-manifest payload bindings, the
+ordered 11-path inventory, the external plan bytes, and the independent verifier. The manifest
 cannot authenticate itself: its raw digest must be supplied by the caller from
-the independent court/Envelope B. That court also binds the committed payload
-HEAD and tree. The expected V3 plan digest lives outside `plan.json`.
+the independent court/Envelope B. Ten embedded bindings plus that externally
+authenticated manifest make the complete 11-path binding. The court also binds
+the v2 contract, correction parent, committed HEAD/tree, corrected aggregate,
+predecessor identity and supersession verdict, court verdict, and the external
+minimum-version/revocation-policy digest. The expected V3 plan digest lives
+outside `plan.json`.
 
 ### Host-external activation bundle
 
@@ -90,8 +109,11 @@ reviewer_identity, reviewer_evidence_digest
 actor_identity, issuer_identity
 request_id, repository_id, objective_digest, target_branch
 authoring_base_parent_commit, authoring_base_parent_tree
+correction_parent_commit, correction_parent_tree, committed_contract_mode
 committed_payload_head, committed_payload_tree
-caller_authenticated_manifest_digest
+caller_authenticated_manifest_digest, corrected_full_payload_aggregate_digest
+predecessor_payload_identity, predecessor_supersession_verdict, court_verdict
+external_minimum_version_and_revocation_policy_digest
 compiler_digest, standard_digest
 one_run_nonce, lease_deadline
 ```
@@ -103,7 +125,9 @@ cache-free Git extraction at commit
 bundle digest is
 `sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255`.
 Predecessor and new trust receipts plus a one-run compare-and-swap ledger are
-required. These are blockers, not facts asserted satisfied by this ADR.
+required. A signed external minimum-version and revocation policy must reject the
+Payload A manifest and every v1 fallback. These are blockers, not facts asserted
+satisfied by this ADR.
 
 ### Verification order
 
@@ -114,9 +138,16 @@ The verifier fails closed in this order:
    non-finite-number, size, and depth rejection.
 2. Validate fixed request, repository, objective, target, snapshot, expected-plan,
    topology, execution, exact payload, and distinct-review boundaries.
-3. In default committed mode require the current HEAD to be one non-merge child
-   of the immutable authoring-base parent, require `git diff --name-only` to equal
-   the exact 11-path allowlist, bind the committed payload HEAD/tree, and reject
+3. Disable Git replace objects; independently verify the plan-base and Payload A
+   commit objects, trees, and Payload A parent. In default committed mode require
+   the current HEAD to be one non-merge direct child
+   of the preserved Payload A commit, require `git diff --name-only` to equal
+   the exact five-path correction allowlist, bind the complete 11-path payload
+   inventory and committed HEAD/tree, require all files to be regular mode, and
+   compare worktree bytes to `HEAD:path`. Require the six inherited blobs to
+   equal Payload A and the five correction blobs to differ. Require every tracked
+   index entry to have normal visible state, rejecting skip-worktree or
+   assume-unchanged flags anywhere in the checkout. Reject
    dirty, staged, or unapproved untracked/ignored state. The only declared
    exception is `.hive-mind/autopilot-request.json`.
 4. Resolve safe non-symlink paths and verify every manifest-declared repository
@@ -134,8 +165,8 @@ The verifier fails closed in this order:
    byte-compare `.autopilot/plan.json` before and after verification.
 
 This order rejects materializer substitution before authored code can execute.
-An explicit `--authoring-check` exists only for deterministic precommit
-development at the immutable base parent; it reports non-qualification and is
+An explicit `--authoring-check` exists only for deterministic correction
+development at the immutable Payload A correction parent; it reports non-qualification and is
 forbidden as execution or release evidence. Default verification refuses that
 precommit state and refuses a missing caller manifest digest.
 
@@ -144,6 +175,8 @@ precommit state and refuses a missing caller manifest digest.
 The compiled result is `manual-parent-v1`, `executable=false`, with exactly 20
 rounds, one node per round, and `command=null` in every round. A trusted parent
 may invoke durable task APIs directly only after external activation succeeds.
+Committed mode may report `committed_payload_qualification=true`; it always
+reports `execution_qualification=false` and `execution.authorized=false`.
 
 The resume ID is the digest of a `manual-parent-resume-v1` object binding plan and
 generation IDs, request, objective, repository, task key, launch, target branch,
@@ -183,13 +216,16 @@ or deeply nested JSON; detached signature or digest substitution; node or plan
 resealing; topology, durability, ownership, or effect corruption; missing V1
 mapping; source-quarantine mutation; generation collision; expired/replayed
 lease; repeat-resume mismatch; and concurrent activation losers. Invalid V3 has
-no legacy fallback. Tests also prove deterministic materialization, source
+no predecessor or legacy fallback. Tests also prove Git replace refs are ignored,
+hidden skip-worktree/assume-unchanged substitutions and mode changes are rejected,
+deterministic materialization, source
 verification before any authored code, self-review rejection, exact frozen-host
 and evidence lineage, and no `.autopilot` mutation.
 
-The focused harness constructs a temporary Git checkout, commits exactly the 11
-payload paths as one child of the immutable base, and requires default committed
-verification to pass. Missing caller binding, extra commit, wrong parent, path
+The corrected focused harness constructs an immutable temporary checkout at
+Payload A, overlays the current manifest-bound payload bytes, commits exactly the
+five correction paths as one non-merge direct child, and requires default committed verification
+to pass. Missing caller binding, extra commit, wrong parent, path
 addition, dirty tracked state, staged state, and other untracked or ignored state
 must fail.
 
@@ -198,19 +234,22 @@ must fail.
 Migration is additive:
 
 1. Preserve V1 and `.autopilot/plan.json` byte-for-byte as historical evidence.
-2. Land the exact 11-path inert V3 payload as one child of the immutable
-   authoring-base parent without wiring it into the public runtime; have the
-   independent court bind its commit, tree, and manifest digest.
-3. Obtain independent court disposition and a fresh external trust deployment.
-4. Implement the same-request discovery and activation path behind a reversible
+2. Preserve Payload A and its exact-commit 12/14 focused result as an observed
+   failing predecessor with author-proposed `adapt`; do not rewrite or discard it.
+3. Land the exact five-path correction as one child of Payload A without wiring
+   it into the public runtime; have the independent court bind its commit, tree,
+   manifest digest, full payload inventory, and predecessor disposition.
+4. Obtain independent court disposition and a fresh external trust deployment.
+5. Implement the same-request discovery and activation path behind a reversible
    feature gate.
-5. Qualify a frozen candidate using the external Envelope B evidence lineage.
-6. Enable the easy command only for exact authenticated V3 matches.
+6. Qualify a frozen candidate using the external Envelope B evidence lineage.
+7. Enable the easy command only for exact authenticated V3 matches.
 
 Rollback disables the V3 feature gate and retires outstanding V3 leases and
 nonces. It preserves append-only receipts and the sealed overlay for diagnosis.
-Rollback must not execute V1 as a fallback; the user receives a typed blocker and
-can inspect or reissue a fresh V3 generation through the external trust path.
+Rollback must not reactivate Payload A or execute V1 as a fallback; the user
+receives a typed blocker and can inspect or reissue a fresh V3 generation through
+the external trust path.
 
 ## Consequences and nonclaims
 

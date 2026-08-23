@@ -41,8 +41,12 @@ QUALIFIED_PREREQUISITE_COMMIT = "ca43709591313c1c166a2e655b8982ccff16daf3"
 QUALIFIED_PREREQUISITE_TREE = "22639258c7a524ffda25272ccf34fede176b2663"
 COMBINED_ENVELOPE_COMMIT = "877bf9fc9cdbef94e6fc33ff9e22fe53349db130"
 COMBINED_ENVELOPE_TREE = "1ede87e53fc7fc75d29968698ba4b8dab082dd1e"
-AUTHORING_BASE_PARENT_COMMIT = "42b4aeef17f816430a7d8a435102635afea8761a"
-AUTHORING_BASE_PARENT_TREE = "b896e16755a1d6864989757732fdc5ca9d2b5eed"
+PLAN_AUTHORING_BASE_COMMIT = "42b4aeef17f816430a7d8a435102635afea8761a"
+PLAN_AUTHORING_BASE_TREE = "b896e16755a1d6864989757732fdc5ca9d2b5eed"
+CORRECTION_PARENT_COMMIT = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
+CORRECTION_PARENT_TREE = "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157"
+PAYLOAD_A_MANIFEST_RAW_DIGEST = "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522"
+PAYLOAD_A_AGGREGATE_DIGEST = "sha256:ff7a0f323aac32da18c70d6f871ddc0918225ddd47de0c15618822be84706d78"
 SOURCE_INTAKE_DIGEST = "sha256:dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c"
 STANDARD_DIGEST = "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a"
 STANDARD_BLOB = "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374"
@@ -70,6 +74,13 @@ EXPECTED_PAYLOAD_PATHS = (
     "docs/execution/dags/generic-hive-mind-product-v3/ownership-effects.json",
     "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
     "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
+    "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "tests/test_generic_dag_v3_overlay.py",
+)
+EXPECTED_CHANGED_PATHS = (
+    "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    "docs/execution/dags/generic-hive-mind-product-v3/README.md",
+    "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
     "tests/test_generic_dag_v3_overlay.py",
 )
@@ -205,6 +216,7 @@ def safe_child(root: Path, relative: str, *, label: str) -> Path:
 def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
     environment = dict(os.environ)
     environment["GIT_OPTIONAL_LOCKS"] = "0"
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     try:
         raw = subprocess.check_output(
             ["git", "-C", str(repo_root), *args],
@@ -216,6 +228,23 @@ def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
         rendered = detail.decode("utf-8", errors="replace").strip()
         raise VerificationError(f"git {' '.join(args)} failed: {rendered or error}") from error
     return raw if binary else raw.decode("utf-8").strip()
+
+
+def verify_commit_object(
+    repo_root: Path,
+    *,
+    commit: str,
+    tree: str,
+    parent: str | None,
+    label: str,
+) -> None:
+    require(git(repo_root, "cat-file", "-t", commit) == "commit", f"{label} is not a commit object")
+    lines = str(git(repo_root, "cat-file", "-p", commit)).splitlines()
+    trees = [line.removeprefix("tree ") for line in lines if line.startswith("tree ")]
+    parents = [line.removeprefix("parent ") for line in lines if line.startswith("parent ")]
+    require(trees == [tree], f"{label} tree mismatch")
+    if parent is not None:
+        require(parents == [parent], f"{label} parent mismatch")
 
 
 def validate_manifest_constants(manifest: dict[str, Any]) -> None:
@@ -240,8 +269,13 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(lineage.get("combined_envelope_b") == {"commit": COMBINED_ENVELOPE_COMMIT, "tree": COMBINED_ENVELOPE_TREE}, "Envelope B snapshot mismatch")
     require(
         lineage.get("authoring_base_parent")
-        == {"commit": AUTHORING_BASE_PARENT_COMMIT, "tree": AUTHORING_BASE_PARENT_TREE},
+        == {"commit": PLAN_AUTHORING_BASE_COMMIT, "tree": PLAN_AUTHORING_BASE_TREE},
         "authoring-base parent commit/tree mismatch",
+    )
+    require(
+        lineage.get("correction_parent")
+        == {"commit": CORRECTION_PARENT_COMMIT, "tree": CORRECTION_PARENT_TREE},
+        "correction parent commit/tree mismatch",
     )
     plan_binding = manifest.get("plan_binding")
     require(isinstance(plan_binding, dict), "plan binding missing")
@@ -259,18 +293,57 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(manifest.get("execution_authorized") is False, "checked-in manifest cannot authorize execution")
     authorship = manifest.get("authorship")
     require(isinstance(authorship, dict), "manifest authorship missing")
+    require(
+        set(authorship) == {"architect", "judge", "court_status", "execution_authority"},
+        "manifest authorship field inventory mismatch",
+    )
     require(authorship.get("architect") == "/root/generation_architect", "architect identity mismatch")
     require(authorship.get("judge") == "UNASSIGNED", "author manifest cannot self-assign a judge")
     require(authorship.get("court_status") == "PENDING_DISTINCT_COURT", "self-review boundary missing")
+    require(authorship.get("execution_authority") == "NONE", "author manifest cannot grant execution authority")
     payload = manifest.get("committed_payload_contract")
     require(isinstance(payload, dict), "committed payload contract missing")
-    require(payload.get("mode") == "exact-single-overlay-commit-v1", "committed payload mode mismatch")
+    require(payload.get("mode") == "exact-append-only-correction-v2", "committed payload mode mismatch")
     require(
         payload.get("authoring_base_parent")
-        == {"commit": AUTHORING_BASE_PARENT_COMMIT, "tree": AUTHORING_BASE_PARENT_TREE},
+        == {"commit": PLAN_AUTHORING_BASE_COMMIT, "tree": PLAN_AUTHORING_BASE_TREE},
         "committed payload parent mismatch",
     )
-    require(payload.get("expected_changed_paths") == list(EXPECTED_PAYLOAD_PATHS), "committed payload path allowlist mismatch")
+    require(
+        payload.get("correction_parent")
+        == {"commit": CORRECTION_PARENT_COMMIT, "tree": CORRECTION_PARENT_TREE},
+        "committed correction parent mismatch",
+    )
+    require(
+        payload.get("predecessor_payload")
+        == {
+            "commit": CORRECTION_PARENT_COMMIT,
+            "tree": CORRECTION_PARENT_TREE,
+            "parent_commit": PLAN_AUTHORING_BASE_COMMIT,
+            "parent_tree": PLAN_AUTHORING_BASE_TREE,
+            "manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
+            "full_payload_aggregate": {
+                "domain": "hive-mind-os/v3-payload-a-content/v1",
+                "sha256": PAYLOAD_A_AGGREGATE_DIGEST,
+            },
+            "observed_status": "FOCUSED_SUITE_FAILED_12_OF_14",
+            "author_proposed_disposition": "ADAPT",
+        },
+        "predecessor Payload A identity/status mismatch",
+    )
+    require(payload.get("expected_changed_paths") == list(EXPECTED_CHANGED_PATHS), "committed payload path allowlist mismatch")
+    require(payload.get("payload_inventory") == list(EXPECTED_PAYLOAD_PATHS), "committed payload inventory mismatch")
+    require(
+        payload.get("activation_anti_downgrade")
+        == {
+            "required_contract_mode": "exact-append-only-correction-v2",
+            "rejected_predecessor_manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
+            "predecessor_activation": "PROHIBITED",
+            "legacy_v1_fallback": "PROHIBITED",
+            "external_minimum_version_and_revocation_policy": "REQUIRED_NOT_SATISFIED",
+        },
+        "activation anti-downgrade contract mismatch",
+    )
     require(payload.get("allowed_untracked_paths") == [ALLOWED_UNTRACKED_PATH], "untracked exception contract mismatch")
     require(
         payload.get("manifest_authentication")
@@ -279,7 +352,19 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     )
     require(
         payload.get("court_envelope_b_bindings")
-        == ["committed_payload_head", "committed_payload_tree", "caller_authenticated_manifest_digest"],
+        == [
+            "committed_contract_mode",
+            "correction_parent_commit",
+            "correction_parent_tree",
+            "committed_payload_head",
+            "committed_payload_tree",
+            "caller_authenticated_manifest_digest",
+            "corrected_full_payload_aggregate_digest",
+            "predecessor_payload_identity",
+            "predecessor_supersession_verdict",
+            "court_verdict",
+            "external_minimum_version_and_revocation_policy_digest",
+        ],
         "court Envelope B committed identity contract mismatch",
     )
 
@@ -317,7 +402,7 @@ def verify_manifest_declared_sources(
         require(len(raw) == expected_bytes, f"repository source size mismatch: {relative}")
         require(sha256_bytes(raw) == expected_digest, f"repository source digest mismatch: {relative}")
         require(
-            git(repo_root, "rev-parse", f"{AUTHORING_BASE_PARENT_COMMIT}:{relative}") == expected_blob,
+            git(repo_root, "rev-parse", f"{PLAN_AUTHORING_BASE_COMMIT}:{relative}") == expected_blob,
             f"repository source Git blob mismatch: {relative}",
         )
         verified[f"repository:{relative}"] = raw
@@ -370,29 +455,95 @@ def verify_payload_bindings(
     return verified
 
 
+def verify_committed_payload_git_bytes(repo_root: Path, overlay_dir: Path) -> None:
+    changed_paths = set(EXPECTED_CHANGED_PATHS)
+    for relative in EXPECTED_PAYLOAD_PATHS:
+        entry = str(git(repo_root, "ls-tree", "HEAD", "--", relative))
+        header, separator, listed_path = entry.partition("\t")
+        fields = header.split()
+        require(
+            separator == "\t"
+            and listed_path == relative
+            and len(fields) == 3
+            and fields[0] == "100644"
+            and fields[1] == "blob",
+            f"committed payload is not one regular file: {relative}",
+        )
+        head_raw = git(repo_root, "cat-file", "blob", f"HEAD:{relative}", binary=True)
+        parent_raw = git(
+            repo_root,
+            "cat-file",
+            "blob",
+            f"{CORRECTION_PARENT_COMMIT}:{relative}",
+            binary=True,
+        )
+        require(
+            payload_path(repo_root, overlay_dir, relative).read_bytes() == head_raw,
+            f"worktree bytes differ from committed payload blob: {relative}",
+        )
+        if relative in changed_paths:
+            require(head_raw != parent_raw, f"correction path did not change from Payload A: {relative}")
+        else:
+            require(head_raw == parent_raw, f"inherited payload path changed from Payload A: {relative}")
+
+
+def verify_global_index_visibility(repo_root: Path) -> None:
+    raw = git(repo_root, "ls-files", "-v", "-z", binary=True)
+    require(isinstance(raw, bytes), "Git index visibility inventory is not binary")
+    for entry in raw.split(b"\0"):
+        if not entry:
+            continue
+        require(
+            len(entry) > 2 and entry[:2] == b"H ",
+            "tracked index visibility flag is not pristine",
+        )
+
+
 def verify_repository_state(
     repo_root: Path, overlay_dir: Path, *, authoring_check: bool
 ) -> dict[str, Any]:
+    verify_commit_object(
+        repo_root,
+        commit=PLAN_AUTHORING_BASE_COMMIT,
+        tree=PLAN_AUTHORING_BASE_TREE,
+        parent=None,
+        label="plan authoring base",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=CORRECTION_PARENT_COMMIT,
+        tree=CORRECTION_PARENT_TREE,
+        parent=PLAN_AUTHORING_BASE_COMMIT,
+        label="Payload A correction parent",
+    )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch mismatch")
     head = str(git(repo_root, "rev-parse", "HEAD"))
     tree = str(git(repo_root, "rev-parse", "HEAD^{tree}"))
     if authoring_check:
-        require(head == AUTHORING_BASE_PARENT_COMMIT, "authoring check requires the immutable base parent HEAD")
-        require(tree == AUTHORING_BASE_PARENT_TREE, "authoring check requires the immutable base parent tree")
+        require(head == CORRECTION_PARENT_COMMIT, "authoring check requires the immutable correction parent HEAD")
+        require(tree == CORRECTION_PARENT_TREE, "authoring check requires the immutable correction parent tree")
         return {
-            "mode": "authoring-check-non-executing",
+            "mode": "authoring-correction-check-non-executing",
             "qualification": False,
             "head": head,
             "tree": tree,
-            "authoring_base_parent": AUTHORING_BASE_PARENT_COMMIT,
+            "authoring_base_parent": PLAN_AUTHORING_BASE_COMMIT,
+            "correction_parent": CORRECTION_PARENT_COMMIT,
         }
 
     expected_overlay = safe_child(repo_root, OVERLAY_RELATIVE_DIRECTORY, label="committed overlay directory")
     require(overlay_dir == expected_overlay, "committed verification forbids an alternate overlay path")
     parents = str(git(repo_root, "rev-list", "--parents", "-n", "1", "HEAD")).split()
     require(
-        len(parents) == 2 and parents[0] == head and parents[1] == AUTHORING_BASE_PARENT_COMMIT,
-        "committed payload must be one non-merge child of the immutable authoring-base parent",
+        len(parents) == 2 and parents[0] == head and parents[1] == CORRECTION_PARENT_COMMIT,
+        "committed payload must be one non-merge direct child of the correction parent",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=head,
+        tree=tree,
+        parent=CORRECTION_PARENT_COMMIT,
+        label="correction HEAD",
     )
     changed = tuple(
         sorted(
@@ -403,13 +554,14 @@ def verify_repository_state(
                     "diff",
                     "--name-only",
                     "--no-renames",
-                    f"{AUTHORING_BASE_PARENT_COMMIT}..HEAD",
+                    f"{CORRECTION_PARENT_COMMIT}..HEAD",
                 )
             ).splitlines()
             if line
         )
     )
-    require(changed == EXPECTED_PAYLOAD_PATHS, "committed payload changed-path allowlist mismatch")
+    require(changed == EXPECTED_CHANGED_PATHS, "committed payload changed-path allowlist mismatch")
+    verify_global_index_visibility(repo_root)
     tracked_status_lines = [
         line
         for line in str(git(repo_root, "status", "--porcelain=v1", "--untracked-files=no")).splitlines()
@@ -432,14 +584,14 @@ def verify_repository_state(
         untracked_paths | ignored_paths <= {ALLOWED_UNTRACKED_PATH},
         "committed checkout contains an unapproved untracked or ignored path",
     )
-    for relative in EXPECTED_PAYLOAD_PATHS:
-        require(bool(git(repo_root, "rev-parse", f"HEAD:{relative}")), f"payload path is not committed: {relative}")
+    verify_committed_payload_git_bytes(repo_root, overlay_dir)
     return {
-        "mode": "committed-payload-v1",
+        "mode": "committed-correction-v2",
         "qualification": True,
         "head": head,
         "tree": tree,
-        "authoring_base_parent": AUTHORING_BASE_PARENT_COMMIT,
+        "authoring_base_parent": PLAN_AUTHORING_BASE_COMMIT,
+        "correction_parent": CORRECTION_PARENT_COMMIT,
     }
 
 
@@ -669,8 +821,8 @@ def build_expected_plan(
         "request_id": REQUEST_ID, "objective_digest": OBJECTIVE_DIGEST,
         "repository_id": REPOSITORY_ID, "task_key": TASK_KEY,
         "launch_digest": LAUNCH_DIGEST, "target_branch": TARGET_BRANCH,
-        "authoring_base_parent_commit": AUTHORING_BASE_PARENT_COMMIT,
-        "authoring_base_parent_tree": AUTHORING_BASE_PARENT_TREE,
+        "authoring_base_parent_commit": PLAN_AUTHORING_BASE_COMMIT,
+        "authoring_base_parent_tree": PLAN_AUTHORING_BASE_TREE,
         "source_intake_digest": SOURCE_INTAKE_DIGEST,
         "standard_digest": STANDARD_DIGEST, "compiler_digest": COMPILER_DIGEST,
         "source_document_digests": {key: value["raw_sha256"] for key, value in source_documents.items()},
@@ -682,8 +834,8 @@ def build_expected_plan(
         "objective_digest": OBJECTIVE_DIGEST, "repository_id": REPOSITORY_ID,
         "task_key": TASK_KEY, "launch_digest": LAUNCH_DIGEST,
         "target_branch": TARGET_BRANCH,
-        "authoring_base_parent_commit": AUTHORING_BASE_PARENT_COMMIT,
-        "authoring_base_parent_tree": AUTHORING_BASE_PARENT_TREE,
+        "authoring_base_parent_commit": PLAN_AUTHORING_BASE_COMMIT,
+        "authoring_base_parent_tree": PLAN_AUTHORING_BASE_TREE,
     }
     plan: dict[str, Any] = {
         "schema_version": 3,
@@ -701,8 +853,8 @@ def build_expected_plan(
             "repository": "kb4beast/hive-mind-os",
             "qualified_prerequisite_commit": QUALIFIED_PREREQUISITE_COMMIT,
             "qualified_prerequisite_tree": QUALIFIED_PREREQUISITE_TREE,
-            "authoring_base_parent_commit": AUTHORING_BASE_PARENT_COMMIT,
-            "authoring_base_parent_tree": AUTHORING_BASE_PARENT_TREE,
+            "authoring_base_parent_commit": PLAN_AUTHORING_BASE_COMMIT,
+            "authoring_base_parent_tree": PLAN_AUTHORING_BASE_TREE,
             "target_branch": TARGET_BRANCH,
         },
         "standard": {"version": 2, "path": "docs/execution/DAG_AUTHORING_STANDARD_V2.md", "bytes": 12312, "sha256": STANDARD_DIGEST, "git_blob_sha": STANDARD_BLOB},
@@ -923,11 +1075,13 @@ def verify(
         "plan_id": PLAN_ID,
         "manifest_raw_sha256": sha256_bytes(manifest_raw),
         "verification_mode": repository_state["mode"],
-        "execution_qualification": repository_state["qualification"],
+        "committed_payload_qualification": repository_state["qualification"],
+        "execution_qualification": False,
         "committed_payload": {
             "head": repository_state["head"],
             "tree": repository_state["tree"],
             "authoring_base_parent": repository_state["authoring_base_parent"],
+            "correction_parent": repository_state["correction_parent"],
         },
         "plan_digest": EXPECTED_PLAN_DIGEST,
         "plan_raw_sha256": EXPECTED_PLAN_RAW_DIGEST,
@@ -948,6 +1102,7 @@ def verify(
             "file_count": 16,
             "bundle_digest": EXPECTED_FROZEN_HOST_BUNDLE,
             "external_activation_status": "NOT_SATISFIED_BY_CHECKED_IN_EVIDENCE",
+            "anti_downgrade_policy_status": "REQUIRED_NOT_SATISFIED_BY_CHECKED_IN_EVIDENCE",
         },
         "materializer_imported_or_executed": False,
         "historical_plan_unchanged": True,

@@ -14,8 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OVERLAY = ROOT / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3"
-SEALED_LEGACY_PLAN = ROOT / ".autopilot" / "plan.json"
-AUTHORING_BASE_PARENT = "42b4aeef17f816430a7d8a435102635afea8761a"
+PLAN_AUTHORING_BASE = "42b4aeef17f816430a7d8a435102635afea8761a"
+CORRECTION_PARENT = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
 TARGET_BRANCH = "release/hive-mind-autopilot"
 PAYLOAD_PATHS = (
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
@@ -27,6 +27,13 @@ PAYLOAD_PATHS = (
     "docs/execution/dags/generic-hive-mind-product-v3/ownership-effects.json",
     "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
     "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
+    "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "tests/test_generic_dag_v3_overlay.py",
+)
+CORRECTION_PATHS = (
+    "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    "docs/execution/dags/generic-hive-mind-product-v3/README.md",
+    "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
     "tests/test_generic_dag_v3_overlay.py",
 )
@@ -50,19 +57,47 @@ def raw_digest(path: Path) -> str:
 class GenericDagV3OverlayTests(unittest.TestCase):
     maxDiff = None
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls._authoring_directory = tempfile.TemporaryDirectory()
+        cls.authoring_root = Path(cls._authoring_directory.name) / "authoring"
+        subprocess.run(
+            ["git", "clone", "--quiet", "--no-hardlinks", str(ROOT), str(cls.authoring_root)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        cls.run_git(cls.authoring_root, "switch", "--quiet", "-C", TARGET_BRANCH, CORRECTION_PARENT)
+        for relative in PAYLOAD_PATHS:
+            destination = cls.authoring_root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, destination)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._authoring_directory.cleanup()
+        super().tearDownClass()
+
     def copy_overlay(self, target: Path) -> Path:
         copied = target / "overlay"
-        shutil.copytree(OVERLAY, copied)
+        shutil.copytree(
+            self.authoring_root / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3",
+            copied,
+        )
         return copied
 
     def run_verifier(
         self,
         overlay: Path,
         *,
-        repo_root: Path = ROOT,
+        repo_root: Path | None = None,
         authoring_check: bool = True,
         include_expected_manifest: bool = True,
     ) -> subprocess.CompletedProcess[str]:
+        if repo_root is None:
+            repo_root = self.authoring_root if authoring_check else ROOT
         command = [
             sys.executable,
             str(overlay / "verify_plan.py"),
@@ -82,13 +117,14 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             command.append("--authoring-check")
         return subprocess.run(
             command,
-            cwd=ROOT,
+            cwd=repo_root,
             text=True,
             capture_output=True,
             check=False,
         )
 
-    def run_git(self, repository: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    @staticmethod
+    def run_git(repository: Path, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["git", "-C", str(repository), *args],
             cwd=ROOT,
@@ -101,8 +137,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         self,
         parent: Path,
         *,
-        base: str = AUTHORING_BASE_PARENT,
+        base: str = CORRECTION_PARENT,
         extra_path: bool = False,
+        executable_path: str | None = None,
     ) -> Path:
         checkout = parent / "committed"
         subprocess.run(
@@ -118,21 +155,44 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         for relative in PAYLOAD_PATHS:
             destination = checkout / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(ROOT / relative, destination)
-        paths = list(PAYLOAD_PATHS)
+            shutil.copy2(self.authoring_root / relative, destination)
+        paths = list(CORRECTION_PATHS)
         if extra_path:
             unexpected = checkout / "unexpected-v3-payload.txt"
             unexpected.write_text("not allowlisted\n", encoding="utf-8")
             paths.append("unexpected-v3-payload.txt")
         self.run_git(checkout, "add", "--", *paths)
+        if executable_path is not None:
+            self.run_git(checkout, "update-index", "--chmod=+x", "--", executable_path)
+        if base == CORRECTION_PARENT:
+            staged = tuple(
+                sorted(
+                    line
+                    for line in self.run_git(
+                        checkout,
+                        "diff",
+                        "--cached",
+                        "--name-only",
+                        "--no-renames",
+                    ).stdout.splitlines()
+                    if line
+                )
+            )
+            self.assertEqual(staged, tuple(sorted(paths)))
         self.run_git(checkout, "commit", "--quiet", "-m", "fixture: exact V3 payload")
         return checkout
 
-    def assert_rejected(self, result: subprocess.CompletedProcess[str]) -> None:
+    def assert_rejected(
+        self,
+        result: subprocess.CompletedProcess[str],
+        expected_error: str | None = None,
+    ) -> None:
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout.strip().splitlines()[-1])
         self.assertIs(payload["verified"], False)
         self.assertTrue(payload["error"])
+        if expected_error is not None:
+            self.assertIn(expected_error, payload["error"])
 
     def rewrite_manifest(self, overlay: Path, mutate) -> None:
         path = overlay / "manifest.json"
@@ -144,7 +204,8 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         )
 
     def test_valid_overlay_verifies_without_mutating_historical_plan(self) -> None:
-        before = SEALED_LEGACY_PLAN.read_bytes()
+        sealed_legacy_plan = self.authoring_root / ".autopilot" / "plan.json"
+        before = sealed_legacy_plan.read_bytes()
         with tempfile.TemporaryDirectory() as directory:
             result = self.run_verifier(self.copy_overlay(Path(directory)))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -154,9 +215,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         self.assertEqual(payload["durability_semantics"], "typed-v2")
         self.assertEqual(payload["topology"], {"nodes": 20, "raw_edges": 28, "levels": 17, "rounds": 20})
         self.assertFalse(payload["materializer_imported_or_executed"])
-        self.assertEqual(payload["verification_mode"], "authoring-check-non-executing")
+        self.assertEqual(payload["verification_mode"], "authoring-correction-check-non-executing")
+        self.assertFalse(payload["committed_payload_qualification"])
         self.assertFalse(payload["execution_qualification"])
-        self.assertEqual(SEALED_LEGACY_PLAN.read_bytes(), before)
+        self.assertEqual(sealed_legacy_plan.read_bytes(), before)
 
     def test_default_mode_requires_exact_committed_payload_and_caller_manifest_binding(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -165,9 +227,11 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             result = self.run_verifier(overlay, repo_root=checkout, authoring_check=False)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["verification_mode"], "committed-payload-v1")
-            self.assertTrue(payload["execution_qualification"])
-            self.assertEqual(payload["committed_payload"]["authoring_base_parent"], AUTHORING_BASE_PARENT)
+            self.assertEqual(payload["verification_mode"], "committed-correction-v2")
+            self.assertTrue(payload["committed_payload_qualification"])
+            self.assertFalse(payload["execution_qualification"])
+            self.assertEqual(payload["committed_payload"]["authoring_base_parent"], PLAN_AUTHORING_BASE)
+            self.assertEqual(payload["committed_payload"]["correction_parent"], CORRECTION_PARENT)
             self.assertEqual(
                 payload["committed_payload"]["head"],
                 self.run_git(checkout, "rev-parse", "HEAD").stdout.strip(),
@@ -182,25 +246,40 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             self.assertIn("--expected-manifest-digest", missing.stderr)
 
     def test_default_mode_refuses_precommit_extra_commit_wrong_parent_and_path_change(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            overlay = self.copy_overlay(Path(directory))
-            self.assert_rejected(self.run_verifier(overlay, authoring_check=False))
+        overlay = self.authoring_root / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3"
+        self.assert_rejected(
+            self.run_verifier(
+                overlay,
+                repo_root=self.authoring_root,
+                authoring_check=False,
+            ),
+            "committed payload must be one non-merge direct child of the correction parent",
+        )
 
         with tempfile.TemporaryDirectory() as directory:
             checkout = self.make_committed_checkout(Path(directory))
             self.run_git(checkout, "commit", "--quiet", "--allow-empty", "-m", "unexpected second commit")
             overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
-            self.assert_rejected(self.run_verifier(overlay, repo_root=checkout, authoring_check=False))
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed payload must be one non-merge direct child of the correction parent",
+            )
 
         with tempfile.TemporaryDirectory() as directory:
-            checkout = self.make_committed_checkout(Path(directory), base=AUTHORING_BASE_PARENT + "^")
+            checkout = self.make_committed_checkout(Path(directory), base=CORRECTION_PARENT + "^")
             overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
-            self.assert_rejected(self.run_verifier(overlay, repo_root=checkout, authoring_check=False))
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed payload must be one non-merge direct child of the correction parent",
+            )
 
         with tempfile.TemporaryDirectory() as directory:
             checkout = self.make_committed_checkout(Path(directory), extra_path=True)
             overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
-            self.assert_rejected(self.run_verifier(overlay, repo_root=checkout, authoring_check=False))
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed payload changed-path allowlist mismatch",
+            )
 
     def test_default_mode_refuses_dirty_staged_and_other_untracked_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -208,7 +287,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
             readme = overlay / "README.md"
             readme.write_text(readme.read_text(encoding="utf-8") + "dirty\n", encoding="utf-8")
-            self.assert_rejected(self.run_verifier(overlay, repo_root=checkout, authoring_check=False))
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed checkout has dirty or staged tracked paths",
+            )
 
         with tempfile.TemporaryDirectory() as directory:
             checkout = self.make_committed_checkout(Path(directory))
@@ -216,13 +298,63 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             readme = overlay / "README.md"
             readme.write_text(readme.read_text(encoding="utf-8") + "staged\n", encoding="utf-8")
             self.run_git(checkout, "add", "--", "docs/execution/dags/generic-hive-mind-product-v3/README.md")
-            self.assert_rejected(self.run_verifier(overlay, repo_root=checkout, authoring_check=False))
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed checkout has dirty or staged tracked paths",
+            )
 
         with tempfile.TemporaryDirectory() as directory:
             checkout = self.make_committed_checkout(Path(directory))
             overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
-            (checkout / "unapproved.tmp").write_text("untracked\n", encoding="utf-8")
-            self.assert_rejected(self.run_verifier(overlay, repo_root=checkout, authoring_check=False))
+            (checkout / "unapproved.txt").write_text("untracked\n", encoding="utf-8")
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed checkout contains an unapproved untracked or ignored path",
+            )
+
+    def test_git_replace_hidden_worktree_and_mode_substitution_fail_closed(self) -> None:
+        readme_relative = "docs/execution/dags/generic-hive-mind-product-v3/README.md"
+        unrelated_relative = "CONTRIBUTING.md"
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = self.make_committed_checkout(Path(directory))
+            overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
+            self.run_git(checkout, "replace", CORRECTION_PARENT, PLAN_AUTHORING_BASE)
+            result = self.run_verifier(overlay, repo_root=checkout, authoring_check=False)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        for flag in ("--skip-worktree", "--assume-unchanged"):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as directory:
+                checkout = self.make_committed_checkout(Path(directory))
+                overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
+                unrelated = checkout / unrelated_relative
+                self.run_git(checkout, "update-index", flag, "--", unrelated_relative)
+                unrelated.write_bytes(unrelated.read_bytes() + b"hidden substitution\n")
+                self.assert_rejected(
+                    self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                    "tracked index visibility flag is not pristine",
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = self.make_committed_checkout(
+                Path(directory),
+                executable_path=readme_relative,
+            )
+            overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed payload is not one regular file",
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = self.make_committed_checkout(Path(directory))
+            overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
+            (checkout / "ignored.tmp").write_text("ignored\n", encoding="utf-8")
+            self.run_git(checkout, "check-ignore", "--quiet", "--", "ignored.tmp")
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "committed checkout contains an unapproved untracked or ignored path",
+            )
 
     def test_source_substitution_is_rejected_before_materializer_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -233,9 +365,8 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 encoding="utf-8",
             )
             result = self.run_verifier(overlay)
-            self.assert_rejected(result)
+            self.assert_rejected(result, "materialize_plan.py")
             self.assertFalse(marker.exists())
-            self.assertIn("materialize_plan.py", result.stdout)
 
     def test_manifest_identity_snapshot_and_tool_substitution_fail_closed(self) -> None:
         mutations = {
@@ -245,6 +376,12 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "branch": lambda m: m["request_binding"].__setitem__("target_branch", "main"),
             "head": lambda m: m["snapshot_lineage"]["authoring_base_parent"].__setitem__("commit", "0" * 40),
             "tree": lambda m: m["snapshot_lineage"]["authoring_base_parent"].__setitem__("tree", "0" * 40),
+            "correction_head": lambda m: m["snapshot_lineage"]["correction_parent"].__setitem__("commit", "0" * 40),
+            "correction_tree": lambda m: m["snapshot_lineage"]["correction_parent"].__setitem__("tree", "0" * 40),
+            "predecessor_manifest": lambda m: m["committed_payload_contract"]["predecessor_payload"].__setitem__("manifest_raw_sha256", "sha256:stale"),
+            "predecessor_aggregate": lambda m: m["committed_payload_contract"]["predecessor_payload"]["full_payload_aggregate"].__setitem__("sha256", "sha256:stale"),
+            "payload_inventory": lambda m: m["committed_payload_contract"]["payload_inventory"].pop(),
+            "anti_downgrade": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("predecessor_activation", "ALLOWED"),
             "request_snapshot": lambda m: m["snapshot_lineage"]["request_observation"].__setitem__("commit", "0" * 40),
             "compiler": lambda m: next(
                 row for row in m["source_bindings"]["repository"] if row["path"] == ".autopilot/bin/dag_standard.py"
@@ -252,13 +389,35 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "standard": lambda m: next(
                 row for row in m["source_bindings"]["repository"] if row["path"] == "docs/execution/DAG_AUTHORING_STANDARD_V2.md"
             ).__setitem__("sha256", "sha256:substituted"),
+            "execution_authority": lambda m: m["authorship"].__setitem__("execution_authority", "SELF_GRANTED"),
+            "extra_authority_field": lambda m: m["authorship"].__setitem__("delegated_authority", "SELF_GRANTED"),
             "self_review": lambda m: m["authorship"].__setitem__("judge", "/root/generation_architect"),
+        }
+        expected_errors = {
+            "request": "manifest request/repository/objective binding mismatch",
+            "objective": "manifest request/repository/objective binding mismatch",
+            "repository": "manifest request/repository/objective binding mismatch",
+            "branch": "manifest request/repository/objective binding mismatch",
+            "head": "authoring-base parent commit/tree mismatch",
+            "tree": "authoring-base parent commit/tree mismatch",
+            "correction_head": "correction parent commit/tree mismatch",
+            "correction_tree": "correction parent commit/tree mismatch",
+            "predecessor_manifest": "predecessor Payload A identity/status mismatch",
+            "predecessor_aggregate": "predecessor Payload A identity/status mismatch",
+            "payload_inventory": "committed payload inventory mismatch",
+            "anti_downgrade": "activation anti-downgrade contract mismatch",
+            "request_snapshot": "request snapshot mismatch",
+            "compiler": "manifest repository source binding mismatch",
+            "standard": "manifest repository source binding mismatch",
+            "execution_authority": "author manifest cannot grant execution authority",
+            "extra_authority_field": "manifest authorship field inventory mismatch",
+            "self_review": "author manifest cannot self-assign a judge",
         }
         for label, mutation in mutations.items():
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
                 overlay = self.copy_overlay(Path(directory))
                 self.rewrite_manifest(overlay, mutation)
-                self.assert_rejected(self.run_verifier(overlay))
+                self.assert_rejected(self.run_verifier(overlay), expected_errors[label])
 
     def test_strict_json_rejects_duplicate_nonfinite_oversize_and_deep_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
