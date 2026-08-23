@@ -132,7 +132,7 @@
     },
     {
       "id": "CONTINUATION-3060",
-      "state": "BUILDER_REPAIRED_AWAITING_FULL_CI_AND_CURATOR",
+      "state": "JUDGE_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 1,
       "responsible_roles": ["orchestrator", "builder", "integrator"],
       "objective": "Bind a durable owner continuation directive to this committed repository and deterministic control-plane contract; distinguish an actually published safe dispatcher release from a typed withholding.",
@@ -149,7 +149,7 @@
     },
     {
       "id": "CONTINUATION-CURATOR-3070",
-      "state": "BLOCKED_ON_BUILDER_REPAIR",
+      "state": "CURATOR_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 2,
       "responsible_roles": ["curator"],
       "objective": "Independently reproduce the continuation launcher's repository binding, immutable actor, withheld-release behavior, and retained external-authority boundary.",
@@ -166,7 +166,7 @@
     },
     {
       "id": "CONTINUATION-JUDGE-3960",
-      "state": "BLOCKED_ON_CURATOR_REVIEW",
+      "state": "JUDGE_ADOPTED_SCOPED_LOCAL_CONTROL",
       "level": 3,
       "responsible_roles": ["judge"],
       "objective": "Issue a scoped local disposition for durable continuation after independent review without treating it as unlimited consent or external-root evidence.",
