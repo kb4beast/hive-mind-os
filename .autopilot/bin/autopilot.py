@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -324,8 +325,17 @@ class ControlPlane(SealedRecoveryMixin, ReleaseBarrierControlPlane):
 
     def validate_configuration(self) -> tuple[str, ...]:
         issues = list(super().validate_configuration())
-        issues.extend(self.receipt_retirement_issues())
-        issues.extend(self.sealed_recovery_issues())
+        # Doctor must report configuration/target failures as checks. Sealed
+        # historical validation can require current target resolution, so it is
+        # not allowed to turn a diagnosable doctor failure into an exception.
+        for label, inspect in (
+            ("receipt retirement", self.receipt_retirement_issues),
+            ("sealed recovery", self.sealed_recovery_issues),
+        ):
+            try:
+                issues.extend(inspect())
+            except (AutopilotError, ConfigurationError) as error:
+                issues.append(f"{label} validation failed closed: {error}")
         try:
             load_policy(self.repo_root)
         except OrchestrationError as error:
@@ -1001,6 +1011,34 @@ def run_orchestration(
     return result
 
 
+def doctor_failure_result(
+    error: Exception,
+    *,
+    controller_tests_run: bool,
+) -> dict[str, object]:
+    """Keep the JSON doctor protocol parseable when its own guard rejects work."""
+
+    return {
+        "schema_version": 1,
+        "passed": False,
+        "state": "BOOTSTRAP_INVALID",
+        "validation_scope": "full" if controller_tests_run else "reduced",
+        "controller_tests_run": controller_tests_run,
+        "plan_fingerprint": None,
+        "checks": [
+            {
+                "name": "doctor-execution",
+                "passed": False,
+                "details": [
+                    "doctor execution failed closed: " + type(error).__name__
+                ],
+                "evidence": {"error_type": type(error).__name__},
+            }
+        ],
+        "generated_at": format_time(datetime.now(UTC)),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
@@ -1402,8 +1440,34 @@ def main(argv: list[str] | None = None) -> int:
         OrchestrationError,
         ReceiptError,
     ) as error:
+        if args.command == "doctor" and args.json_output:
+            print(
+                json.dumps(
+                    doctor_failure_result(
+                        error,
+                        controller_tests_run=not args.skip_controller_tests,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 1
         print(f"autopilot: {error}", file=sys.stderr)
         return 2
+    except Exception as error:
+        if args.command == "doctor" and args.json_output:
+            print(
+                json.dumps(
+                    doctor_failure_result(
+                        error,
+                        controller_tests_run=not args.skip_controller_tests,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 1
+        raise
 
 
 if __name__ == "__main__":
