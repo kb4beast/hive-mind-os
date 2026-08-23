@@ -11,12 +11,14 @@ effects, host manifest, and manual-parent boundary.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import math
 import os
 import re
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -27,6 +29,11 @@ MAX_MANIFEST_BYTES = 262_144
 MAX_SOURCE_JSON_BYTES = 1_000_000
 MAX_PLAN_BYTES = 2_000_000
 MAX_JSON_DEPTH = 48
+MAX_GIT_OUTPUT_BYTES = 16_777_216
+GIT_TIMEOUT_SECONDS = 60
+MAX_TRACKED_FILE_BYTES = 2_097_152
+MAX_GIT_POINTER_BYTES = 4_096
+MAX_GIT_INDEX_BYTES = 16_777_216
 
 PLAN_ID = "generic-hive-mind-product-v3"
 REQUEST_ID = "sha256:baa813bdcbd1b3bd459736cb65dccaf060758991a8a9b581fe8a1bf17dd65562"
@@ -43,10 +50,15 @@ COMBINED_ENVELOPE_COMMIT = "877bf9fc9cdbef94e6fc33ff9e22fe53349db130"
 COMBINED_ENVELOPE_TREE = "1ede87e53fc7fc75d29968698ba4b8dab082dd1e"
 PLAN_AUTHORING_BASE_COMMIT = "42b4aeef17f816430a7d8a435102635afea8761a"
 PLAN_AUTHORING_BASE_TREE = "b896e16755a1d6864989757732fdc5ca9d2b5eed"
-CORRECTION_PARENT_COMMIT = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
-CORRECTION_PARENT_TREE = "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157"
+PAYLOAD_A_COMMIT = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
+PAYLOAD_A_TREE = "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157"
 PAYLOAD_A_MANIFEST_RAW_DIGEST = "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522"
 PAYLOAD_A_AGGREGATE_DIGEST = "sha256:ff7a0f323aac32da18c70d6f871ddc0918225ddd47de0c15618822be84706d78"
+CORRECTION_PARENT_COMMIT = "f06e52c43a1e2d1d53523378c0d6f5564fb984bf"
+CORRECTION_PARENT_TREE = "8730203c89835c4d1d9dac4be9b2086dacd2d869"
+CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339"
+CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:229821586021d8e2769035aeca4a4589cb7b458a9740a8b8ca82ebdfdadaee36"
+CORRECTION_PARENT_REPORT_DIGEST = "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810"
 SOURCE_INTAKE_DIGEST = "sha256:dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c"
 STANDARD_DIGEST = "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a"
 STANDARD_BLOB = "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374"
@@ -89,7 +101,7 @@ OVERLAY_RELATIVE_DIRECTORY = "docs/execution/dags/generic-hive-mind-product-v3"
 ALLOWED_UNTRACKED_PATH = ".hive-mind/autopilot-request.json"
 
 EXPECTED_REPOSITORY_SOURCES = {
-    "LICENSE": (1086, "sha256:903a82ad84a68d2b48c2c3ee2707d1394fb82aee1bdfdae4a91ff9f8af1691df", "06da1af7996f5e2b059cd52045e36f9f2cfac201"),
+    "LICENSE": (1065, "sha256:6e76d648ae297aa3dcefc739604cfcfab2a50b484ab7331090c745a089de21f8", "06da1af7996f5e2b059cd52045e36f9f2cfac201"),
     "docs/execution/DAG_AUTHORING_STANDARD.md": (27006, "sha256:86d1c1c81a27fc3e3ffd931193e0e145030756f78b58c674e8ba8b1c1bd3397d", "70e43b0a8078a303d44c0109b8dd218a948258c2"),
     "docs/execution/DAG_AUTHORING_STANDARD_V2.md": (12312, STANDARD_DIGEST, STANDARD_BLOB),
     ".autopilot/bin/dag_standard.py": (104317, COMPILER_DIGEST, COMPILER_BLOB),
@@ -127,6 +139,38 @@ def require(condition: bool, message: str) -> None:
 
 def sha256_bytes(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def read_bounded_bytes(path: Path, *, label: str, size_limit: int) -> bytes:
+    require(isinstance(size_limit, int) and size_limit >= 0, f"invalid {label} size limit")
+    try:
+        require(path.is_file() and not path.is_symlink(), f"{label} must be a regular file")
+        path_state = path.stat()
+        require(path_state.st_size <= size_limit, f"{label} exceeds size limit {size_limit}")
+        with path.open("rb") as handle:
+            open_state = os.fstat(handle.fileno())
+            require(
+                (open_state.st_dev, open_state.st_ino) == (path_state.st_dev, path_state.st_ino),
+                f"{label} path/open-file identity mismatch",
+            )
+            raw = handle.read(size_limit + 1)
+            require(len(raw) <= size_limit, f"{label} exceeds size limit {size_limit}")
+            final_open_state = os.fstat(handle.fileno())
+        final_path_state = path.stat()
+    except OSError as error:
+        raise VerificationError(f"cannot read {label}: {error}") from error
+    require(
+        (final_open_state.st_dev, final_open_state.st_ino, final_open_state.st_size)
+        == (open_state.st_dev, open_state.st_ino, open_state.st_size),
+        f"{label} open-file identity/size changed while reading",
+    )
+    require(
+        (final_path_state.st_dev, final_path_state.st_ino, final_path_state.st_size)
+        == (path_state.st_dev, path_state.st_ino, path_state.st_size),
+        f"{label} path identity/size changed while reading",
+    )
+    require(len(raw) == final_open_state.st_size, f"{label} read length differs from file size")
+    return raw
 
 
 def git_blob_sha(raw: bytes) -> str:
@@ -193,10 +237,7 @@ def parse_strict_json(raw: bytes, *, label: str, size_limit: int) -> dict[str, A
 
 
 def read_strict_json(path: Path, *, label: str, size_limit: int) -> tuple[dict[str, Any], bytes]:
-    try:
-        raw = path.read_bytes()
-    except OSError as error:
-        raise VerificationError(f"cannot read {label}: {error}") from error
+    raw = read_bounded_bytes(path, label=label, size_limit=size_limit)
     return parse_strict_json(raw, label=label, size_limit=size_limit), raw
 
 
@@ -213,21 +254,338 @@ def safe_child(root: Path, relative: str, *, label: str) -> Path:
     return resolved
 
 
-def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
-    environment = dict(os.environ)
-    environment["GIT_OPTIONAL_LOCKS"] = "0"
-    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+_GIT_BOUNDARY: dict[str, Any] | None = None
+
+
+def _windows_system_environment() -> dict[str, str]:
+    if os.name != "nt":
+        return {}
+    buffer = ctypes.create_unicode_buffer(32_768)
+    length = ctypes.windll.kernel32.GetWindowsDirectoryW(buffer, len(buffer))
+    require(0 < length < len(buffer), "cannot resolve the Windows system directory")
+    windows_root = str(Path(buffer.value).resolve())
+    return {"SYSTEMROOT": windows_root, "WINDIR": windows_root}
+
+
+def _read_gitdir_pointer(path: Path, *, label: str) -> Path:
+    require(path.is_file() and not path.is_symlink(), f"{label} must be a regular file")
+    raw = read_bounded_bytes(path, label=label, size_limit=MAX_GIT_POINTER_BYTES)
+    require(0 < len(raw) and b"\0" not in raw, f"{label} is malformed")
     try:
-        raw = subprocess.check_output(
-            ["git", "-C", str(repo_root), *args],
-            stderr=subprocess.STDOUT,
-            env=environment,
+        text = raw.decode("utf-8").strip()
+    except UnicodeError as error:
+        raise VerificationError(f"{label} is not UTF-8") from error
+    prefix = "gitdir:"
+    require(text.casefold().startswith(prefix), f"{label} lacks a gitdir pointer")
+    value = text[len(prefix) :].strip()
+    require(bool(value), f"{label} gitdir pointer is empty")
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = path.parent / candidate
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError as error:
+        raise VerificationError(f"{label} gitdir cannot be resolved: {error}") from error
+    require(resolved.is_dir() and not resolved.is_symlink(), f"{label} gitdir is not a regular directory")
+    return resolved
+
+
+def _resolve_git_dir(repo_root: Path) -> Path:
+    dot_git = repo_root / ".git"
+    require(not dot_git.is_symlink(), "repository .git symlink is forbidden")
+    if dot_git.is_dir():
+        return dot_git.resolve(strict=True)
+    git_dir = _read_gitdir_pointer(dot_git, label="repository .git file")
+    back_pointer = git_dir / "gitdir"
+    require(back_pointer.is_file() and not back_pointer.is_symlink(), "linked-worktree gitdir backlink missing")
+    raw = read_bounded_bytes(
+        back_pointer,
+        label="linked-worktree gitdir backlink",
+        size_limit=MAX_GIT_POINTER_BYTES,
+    )
+    require(0 < len(raw) and b"\0" not in raw, "linked-worktree gitdir backlink is malformed")
+    try:
+        value = raw.decode("utf-8").strip()
+    except UnicodeError as error:
+        raise VerificationError("linked-worktree gitdir backlink is not UTF-8") from error
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = git_dir / candidate
+    try:
+        resolved_back_pointer = candidate.resolve(strict=True)
+        resolved_dot_git = dot_git.resolve(strict=True)
+    except OSError as error:
+        raise VerificationError(f"linked-worktree gitdir backlink cannot be resolved: {error}") from error
+    require(resolved_back_pointer == resolved_dot_git, "linked-worktree gitdir backlink mismatch")
+    return git_dir
+
+
+def _resolve_common_git_dir(git_dir: Path) -> Path:
+    pointer = git_dir / "commondir"
+    if not pointer.exists():
+        common_dir = git_dir
+    else:
+        require(pointer.is_file() and not pointer.is_symlink(), "Git commondir pointer must be a regular file")
+        raw = read_bounded_bytes(pointer, label="Git commondir pointer", size_limit=MAX_GIT_POINTER_BYTES)
+        require(0 < len(raw) and b"\0" not in raw, "Git commondir pointer is malformed")
+        try:
+            value = raw.decode("utf-8").strip()
+        except UnicodeError as error:
+            raise VerificationError("Git commondir pointer is not UTF-8") from error
+        candidate = Path(value)
+        if not candidate.is_absolute():
+            candidate = git_dir / candidate
+        try:
+            common_dir = candidate.resolve(strict=True)
+        except OSError as error:
+            raise VerificationError(f"Git commondir cannot be resolved: {error}") from error
+    require(common_dir.is_dir() and not common_dir.is_symlink(), "Git common directory is not a regular directory")
+    objects = common_dir / "objects"
+    require(objects.is_dir() and not objects.is_symlink(), "Git object directory is not a regular directory")
+    require(not (objects / "info" / "alternates").exists(), "Git object alternates are forbidden")
+    require(not (objects / "info" / "http-alternates").exists(), "Git HTTP object alternates are forbidden")
+    return common_dir
+
+
+def _git_executable_path_state(path: Path) -> tuple[int, int, int, int, int]:
+    require(path.is_file() and not path.is_symlink(), "Git executable is no longer a regular file")
+    stat_result = path.stat()
+    return (
+        stat_result.st_dev,
+        stat_result.st_ino,
+        stat_result.st_size,
+        stat_result.st_mtime_ns,
+        stat_result.st_ctime_ns,
+    )
+
+
+def _open_file_identity(handle: Any) -> tuple[int, int, int, int]:
+    stat_result = os.fstat(handle.fileno())
+    return (
+        stat_result.st_dev,
+        stat_result.st_ino,
+        stat_result.st_size,
+        stat_result.st_mtime_ns,
+    )
+
+
+def _open_file_sha256(handle: Any) -> str:
+    digest_state = hashlib.sha256()
+    handle.seek(0)
+    while True:
+        chunk = handle.read(1_048_576)
+        if not chunk:
+            break
+        digest_state.update(chunk)
+    handle.seek(0)
+    return "sha256:" + digest_state.hexdigest()
+
+
+def configure_git_boundary(
+    repo_root: Path,
+    *,
+    git_executable: Path,
+    expected_git_executable_sha256: str,
+) -> None:
+    global _GIT_BOUNDARY
+    require(_GIT_BOUNDARY is None, "Git execution boundary was already configured")
+    inherited_git = sorted(key for key in os.environ if key.casefold().startswith("git_"))
+    require(not inherited_git, f"inherited Git environment is forbidden: {', '.join(inherited_git)}")
+    require(
+        isinstance(expected_git_executable_sha256, str)
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", expected_git_executable_sha256) is not None,
+        "caller must supply a canonical expected Git executable SHA-256",
+    )
+    require(git_executable.is_absolute(), "Git executable path must be absolute")
+    try:
+        resolved_executable = git_executable.resolve(strict=True)
+    except OSError as error:
+        raise VerificationError(f"Git executable cannot be resolved: {error}") from error
+    require(resolved_executable == git_executable, "Git executable path must already be canonical")
+    if os.name == "nt":
+        require(resolved_executable.suffix.casefold() == ".exe", "Git executable must be a native .exe file")
+    else:
+        require(os.access(resolved_executable, os.X_OK), "Git executable is not executable")
+    try:
+        executable_handle = resolved_executable.open("rb")
+    except OSError as error:
+        raise VerificationError(f"cannot open Git executable: {error}") from error
+    path_state = _git_executable_path_state(resolved_executable)
+    handle_identity = _open_file_identity(executable_handle)
+    require(handle_identity == path_state[:4], "Git executable path/open-file identity mismatch")
+    require(
+        _open_file_sha256(executable_handle) == expected_git_executable_sha256,
+        "caller-authenticated Git executable digest mismatch",
+    )
+    git_dir = _resolve_git_dir(repo_root)
+    common_dir = _resolve_common_git_dir(git_dir)
+    index_path = git_dir / "index"
+    require(index_path.is_file() and not index_path.is_symlink(), "Git index must be a regular file")
+    require(index_path.stat().st_size <= MAX_GIT_INDEX_BYTES, "Git index exceeds the verifier limit")
+    environment = {
+        "PATH": str(resolved_executable.parent),
+        "LC_ALL": "C",
+        "LANG": "C",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_DISCOVERY_ACROSS_FILESYSTEM": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+    environment.update(_windows_system_environment())
+    _GIT_BOUNDARY = {
+        "executable": resolved_executable,
+        "expected_sha256": expected_git_executable_sha256,
+        "path_state": path_state,
+        "handle_identity": handle_identity,
+        "handle": executable_handle,
+        "git_dir": git_dir,
+        "common_dir": common_dir,
+        "index_path": index_path.resolve(strict=True),
+        "work_tree": repo_root,
+        "environment": environment,
+    }
+
+
+def verify_git_executable_stable(*, full_digest: bool) -> None:
+    require(_GIT_BOUNDARY is not None, "Git execution boundary is not configured")
+    executable = _GIT_BOUNDARY["executable"]
+    handle = _GIT_BOUNDARY["handle"]
+    require(_git_executable_path_state(executable) == _GIT_BOUNDARY["path_state"], "Git executable identity changed during verification")
+    require(
+        _open_file_identity(handle) == _GIT_BOUNDARY["handle_identity"],
+        "open Git executable identity changed during verification",
+    )
+    if full_digest:
+        require(
+            _open_file_sha256(handle) == _GIT_BOUNDARY["expected_sha256"],
+            "retained Git executable bytes changed during verification",
         )
-    except (OSError, subprocess.CalledProcessError) as error:
-        detail = getattr(error, "output", b"")
-        rendered = detail.decode("utf-8", errors="replace").strip()
-        raise VerificationError(f"git {' '.join(args)} failed: {rendered or error}") from error
-    return raw if binary else raw.decode("utf-8").strip()
+        try:
+            with executable.open("rb") as current_handle:
+                require(
+                    _open_file_identity(current_handle) == _GIT_BOUNDARY["handle_identity"],
+                    "Git executable path now addresses a different file",
+                )
+                require(
+                    _open_file_sha256(current_handle) == _GIT_BOUNDARY["expected_sha256"],
+                    "Git executable path bytes changed during verification",
+                )
+        except OSError as error:
+            raise VerificationError(f"cannot re-open Git executable: {error}") from error
+
+
+def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
+    require(_GIT_BOUNDARY is not None, "Git execution boundary is not configured")
+    require(repo_root == _GIT_BOUNDARY["work_tree"], "Git worktree binding mismatch")
+    verify_git_executable_stable(full_digest=True)
+    command = [
+        str(_GIT_BOUNDARY["executable"]),
+        "--no-pager",
+        "--no-replace-objects",
+        "--no-lazy-fetch",
+        "--no-optional-locks",
+        "--literal-pathspecs",
+        f"--git-dir={_GIT_BOUNDARY['git_dir']}",
+        f"--work-tree={repo_root}",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        f"core.hooksPath={os.devnull}",
+        "-c",
+        f"core.attributesFile={os.devnull}",
+        "-c",
+        f"core.excludesFile={os.devnull}",
+        "-c",
+        "core.untrackedCache=false",
+        "-c",
+        "diff.external=",
+        *args,
+    ]
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=_GIT_BOUNDARY["executable"].parent,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=_GIT_BOUNDARY["environment"],
+            executable=str(_GIT_BOUNDARY["executable"]),
+            shell=False,
+            close_fds=True,
+            bufsize=0,
+        )
+    except OSError as error:
+        verify_git_executable_stable(full_digest=True)
+        raise VerificationError(f"git {' '.join(args)} could not start: {error}") from error
+
+    require(process.stdout is not None, "Git output pipe was not created")
+    output = bytearray()
+    output_overflow = threading.Event()
+    reader_errors: list[BaseException] = []
+
+    def read_bounded_output() -> None:
+        try:
+            with process.stdout:
+                while True:
+                    remaining = MAX_GIT_OUTPUT_BYTES + 1 - len(output)
+                    chunk = process.stdout.read(min(65_536, remaining))
+                    if not chunk:
+                        return
+                    output.extend(chunk)
+                    if len(output) > MAX_GIT_OUTPUT_BYTES:
+                        output_overflow.set()
+                        try:
+                            process.kill()
+                        except OSError:
+                            pass
+                        return
+        except BaseException as error:  # pragma: no cover - defensive pipe failure
+            reader_errors.append(error)
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    reader = threading.Thread(target=read_bounded_output, name="v3-git-output-reader", daemon=True)
+    reader.start()
+    timed_out = False
+    try:
+        process.wait(timeout=GIT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        process.kill()
+        process.wait(timeout=5)
+    reader.join(timeout=5)
+    if reader.is_alive():
+        process.stdout.close()
+        reader.join(timeout=1)
+    verify_git_executable_stable(full_digest=True)
+    require(not reader.is_alive(), "Git output pipe did not close after process exit")
+    require(not reader_errors, f"Git output reader failed: {reader_errors[0] if reader_errors else ''}")
+    raw = bytes(output)
+    require(not output_overflow.is_set(), "Git output exceeds the verifier limit")
+    if timed_out:
+        rendered = raw.decode("utf-8", errors="replace").strip()
+        raise VerificationError(
+            f"git {' '.join(args)} timed out: {rendered or f'{GIT_TIMEOUT_SECONDS} seconds'}"
+        )
+    if process.returncode != 0:
+        rendered = raw.decode("utf-8", errors="replace").strip()
+        raise VerificationError(
+            f"git {' '.join(args)} failed: {rendered or f'exit {process.returncode}'}"
+        )
+    if binary:
+        return raw
+    try:
+        return raw.decode("utf-8").strip()
+    except UnicodeError as error:
+        raise VerificationError(f"git {' '.join(args)} returned non-UTF-8 output") from error
 
 
 def verify_commit_object(
@@ -248,6 +606,29 @@ def verify_commit_object(
 
 
 def validate_manifest_constants(manifest: dict[str, Any]) -> None:
+    require(
+        set(manifest)
+        == {
+            "schema_version",
+            "kind",
+            "plan_id",
+            "authorship",
+            "request_binding",
+            "snapshot_lineage",
+            "committed_payload_contract",
+            "source_bindings",
+            "plan_binding",
+            "topology",
+            "execution_contract",
+            "standard_and_compiler",
+            "frozen_host_prerequisite",
+            "evidence_partition",
+            "source_governance",
+            "execution_authorized",
+            "nonclaims",
+        },
+        "manifest top-level field inventory mismatch",
+    )
     require(manifest.get("schema_version") == 3, "manifest schema mismatch")
     require(manifest.get("kind") == "hive-mind-generic-product-overlay-manifest-v3", "manifest kind mismatch")
     require(manifest.get("plan_id") == PLAN_ID, "manifest plan id mismatch")
@@ -264,6 +645,17 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(request == expected_request, "manifest request/repository/objective binding mismatch")
     lineage = manifest.get("snapshot_lineage")
     require(isinstance(lineage, dict), "manifest snapshot lineage missing")
+    require(
+        set(lineage)
+        == {
+            "request_observation",
+            "qualified_prerequisite",
+            "combined_envelope_b",
+            "authoring_base_parent",
+            "correction_parent",
+        },
+        "snapshot lineage field inventory mismatch",
+    )
     require(lineage.get("request_observation") == {"commit": REQUEST_OBSERVED_HEAD, "tree": REQUEST_OBSERVED_TREE}, "request snapshot mismatch")
     require(lineage.get("qualified_prerequisite") == {"commit": QUALIFIED_PREREQUISITE_COMMIT, "tree": QUALIFIED_PREREQUISITE_TREE}, "qualified prerequisite mismatch")
     require(lineage.get("combined_envelope_b") == {"commit": COMBINED_ENVELOPE_COMMIT, "tree": COMBINED_ENVELOPE_TREE}, "Envelope B snapshot mismatch")
@@ -277,19 +669,29 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         == {"commit": CORRECTION_PARENT_COMMIT, "tree": CORRECTION_PARENT_TREE},
         "correction parent commit/tree mismatch",
     )
-    plan_binding = manifest.get("plan_binding")
-    require(isinstance(plan_binding, dict), "plan binding missing")
-    require(plan_binding.get("expected_plan_digest") == EXPECTED_PLAN_DIGEST, "manifest expected plan digest mismatch")
-    require(plan_binding.get("expected_raw_bytes_digest") == EXPECTED_PLAN_RAW_DIGEST, "manifest expected raw plan digest mismatch")
-    require(plan_binding.get("external_path") == "docs/execution/dags/generic-hive-mind-product-v3/plan.json", "external plan path mismatch")
+    require(
+        manifest.get("plan_binding")
+        == {
+            "expected_plan_digest": EXPECTED_PLAN_DIGEST,
+            "expected_raw_bytes_digest": EXPECTED_PLAN_RAW_DIGEST,
+            "external_path": "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
+            "historical_autopilot_plan_policy": "BYTE_IDENTICAL_READ_ONLY",
+            "historical_v1_expected_plan_digest": V1_EXPECTED_PLAN_DIGEST,
+        },
+        "plan binding mismatch",
+    )
     topology = manifest.get("topology")
     require(topology == {"node_count": 20, "raw_edge_count": 28, "level_count": 17, "round_count": 20, "redundant_direct_edge_count": 6}, "manifest topology mismatch")
-    execution = manifest.get("execution_contract")
-    require(isinstance(execution, dict), "manifest execution contract missing")
-    require(execution.get("mode") == "manual-parent-v1", "manifest execution mode mismatch")
-    require(execution.get("executable_dispatch_command_available") is False, "manifest claims executable command")
-    require(execution.get("every_round_command") is None, "manifest round command policy mismatch")
-    require(execution.get("legacy_fallback") == "PROHIBITED", "manifest permits legacy fallback")
+    require(
+        manifest.get("execution_contract")
+        == {
+            "mode": "manual-parent-v1",
+            "executable_dispatch_command_available": False,
+            "every_round_command": None,
+            "legacy_fallback": "PROHIBITED",
+        },
+        "manifest execution contract mismatch",
+    )
     require(manifest.get("execution_authorized") is False, "checked-in manifest cannot authorize execution")
     authorship = manifest.get("authorship")
     require(isinstance(authorship, dict), "manifest authorship missing")
@@ -303,7 +705,27 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(authorship.get("execution_authority") == "NONE", "author manifest cannot grant execution authority")
     payload = manifest.get("committed_payload_contract")
     require(isinstance(payload, dict), "committed payload contract missing")
-    require(payload.get("mode") == "exact-append-only-correction-v2", "committed payload mode mismatch")
+    require(
+        set(payload)
+        == {
+            "mode",
+            "authoring_base_parent",
+            "correction_parent",
+            "predecessor_payload",
+            "historical_payload_a",
+            "expected_changed_paths",
+            "payload_inventory",
+            "activation_anti_downgrade",
+            "git_execution_boundary",
+            "payload_bindings",
+            "manifest_authentication",
+            "court_envelope_b_bindings",
+            "allowed_untracked_paths",
+            "authoring_check",
+        },
+        "committed payload field inventory mismatch",
+    )
+    require(payload.get("mode") == "exact-append-only-git-boundary-correction-v3", "committed payload mode mismatch")
     require(
         payload.get("authoring_base_parent")
         == {"commit": PLAN_AUTHORING_BASE_COMMIT, "tree": PLAN_AUTHORING_BASE_TREE},
@@ -319,6 +741,24 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         == {
             "commit": CORRECTION_PARENT_COMMIT,
             "tree": CORRECTION_PARENT_TREE,
+            "parent_commit": PAYLOAD_A_COMMIT,
+            "parent_tree": PAYLOAD_A_TREE,
+            "manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "full_payload_aggregate": {
+                "domain": "hive-mind-os/v3-append-only-correction-content/v2",
+                "sha256": CORRECTION_PARENT_AGGREGATE_DIGEST,
+            },
+            "qualification_report_sha256": CORRECTION_PARENT_REPORT_DIGEST,
+            "observed_status": "QUALIFICATION_REMANDED_GIT_ENVIRONMENT_FAIL_OPEN",
+            "author_proposed_disposition": "ADAPT_REMAND",
+        },
+        "predecessor correction identity/status mismatch",
+    )
+    require(
+        payload.get("historical_payload_a")
+        == {
+            "commit": PAYLOAD_A_COMMIT,
+            "tree": PAYLOAD_A_TREE,
             "parent_commit": PLAN_AUTHORING_BASE_COMMIT,
             "parent_tree": PLAN_AUTHORING_BASE_TREE,
             "manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
@@ -327,24 +767,52 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
                 "sha256": PAYLOAD_A_AGGREGATE_DIGEST,
             },
             "observed_status": "FOCUSED_SUITE_FAILED_12_OF_14",
-            "author_proposed_disposition": "ADAPT",
+            "author_proposed_disposition": "ADAPT_SUPERSEDE",
         },
-        "predecessor Payload A identity/status mismatch",
+        "historical Payload A identity/status mismatch",
     )
     require(payload.get("expected_changed_paths") == list(EXPECTED_CHANGED_PATHS), "committed payload path allowlist mismatch")
     require(payload.get("payload_inventory") == list(EXPECTED_PAYLOAD_PATHS), "committed payload inventory mismatch")
     require(
         payload.get("activation_anti_downgrade")
         == {
-            "required_contract_mode": "exact-append-only-correction-v2",
-            "rejected_predecessor_manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
+            "required_contract_mode": "exact-append-only-git-boundary-correction-v3",
+            "rejected_predecessor_manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "rejected_historical_payload_a_manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
             "predecessor_activation": "PROHIBITED",
+            "historical_payload_a_activation": "PROHIBITED",
             "legacy_v1_fallback": "PROHIBITED",
             "external_minimum_version_and_revocation_policy": "REQUIRED_NOT_SATISFIED",
         },
         "activation anti-downgrade contract mismatch",
     )
+    require(
+        payload.get("git_execution_boundary")
+        == {
+            "policy": "caller-absolute-raw-sha256-v1",
+            "inherited_git_environment": "REJECT_ALL_CASE_INSENSITIVE_GIT_PREFIX",
+            "child_environment": "MINIMAL_ALLOWLIST_V1",
+            "path_lookup": "PROHIBITED",
+            "repository_addressing": "EXPLICIT_GIT_DIR_AND_WORK_TREE",
+            "system_and_global_config": "DISABLED",
+            "local_risk_overrides": [
+                "core.fsmonitor=false",
+                "core.hooksPath=<os-devnull>",
+                "core.attributesFile=<os-devnull>",
+                "core.excludesFile=<os-devnull>",
+                "core.untrackedCache=false",
+                "diff.external=",
+            ],
+            "tracked_state": "RAW_HEAD_INDEX_WORKTREE_BLOB_EQUALITY",
+            "object_alternates": "PROHIBITED",
+            "per_invocation_executable_revalidation": True,
+            "final_cleanliness_revalidation": True,
+            "strong_read_only_runtime": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED",
+        },
+        "Git execution boundary contract mismatch",
+    )
     require(payload.get("allowed_untracked_paths") == [ALLOWED_UNTRACKED_PATH], "untracked exception contract mismatch")
+    require(payload.get("authoring_check") == "NON_EXECUTING_NON_QUALIFYING_ONLY", "authoring mode boundary mismatch")
     require(
         payload.get("manifest_authentication")
         == {"mode": "caller-supplied-raw-sha256", "required": True},
@@ -359,14 +827,70 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "committed_payload_head",
             "committed_payload_tree",
             "caller_authenticated_manifest_digest",
+            "caller_authenticated_git_executable_path_and_digest",
             "corrected_full_payload_aggregate_digest",
             "predecessor_payload_identity",
             "predecessor_supersession_verdict",
+            "predecessor_qualification_report_digest",
+            "historical_payload_a_identity_and_disposition",
             "court_verdict",
             "external_minimum_version_and_revocation_policy_digest",
         ],
         "court Envelope B committed identity contract mismatch",
     )
+    bindings = manifest.get("source_bindings")
+    require(isinstance(bindings, dict) and set(bindings) == {"repository", "overlay"}, "source binding field inventory mismatch")
+    require(
+        manifest.get("standard_and_compiler")
+        == {
+            "standard_v2_sha256": STANDARD_DIGEST,
+            "standard_v2_git_blob": STANDARD_BLOB,
+            "compiler_sha256": COMPILER_DIGEST,
+            "compiler_git_blob": COMPILER_BLOB,
+        },
+        "standard/compiler contract mismatch",
+    )
+    require(
+        manifest.get("frozen_host_prerequisite")
+        == {
+            "extraction_commit": QUALIFIED_PREREQUISITE_COMMIT,
+            "extraction_tree": QUALIFIED_PREREQUISITE_TREE,
+            "manifest_location": "node-contracts.json#/frozen_host_contract/file_manifest",
+            "file_count": 16,
+            "bundle_sha256": EXPECTED_FROZEN_HOST_BUNDLE,
+            "status": "REQUIRED_NOT_SATISFIED",
+        },
+        "frozen-host prerequisite contract mismatch",
+    )
+    require(
+        manifest.get("evidence_partition")
+        == {
+            "checked_in": "Inert design, traceability, source bindings, and sealed external plan; never activation authority.",
+            "host_external": "Distinct-principal signed one-run activation bundle, pristine cache-free host extraction, trust receipts, lease ledger, and Envelope B evidence-only worktree/branch.",
+            "candidate_rule": "Qualification evidence never dirties or reidentifies the frozen candidate tree.",
+        },
+        "evidence partition contract mismatch",
+    )
+    require(
+        manifest.get("source_governance")
+        == {
+            "SRC-024": "QUARANTINE_CONTENT_UNREAD",
+            "SRC-025": "UNRESOLVED",
+            "a5_full_autonomy": "NOT_READY",
+        },
+        "source governance contract mismatch",
+    )
+    require(
+        manifest.get("nonclaims")
+        == [
+            "This checked-in manifest is not an activation bundle or execution authority.",
+            "The legacy continuation outcome was withheld and does not dispatch V3.",
+            "No full-autonomy, production, release, or superiority claim is made.",
+            "Every manual-parent-v1 round command is null until a separately trusted host supplies bounded execution.",
+        ],
+        "manifest nonclaims mismatch",
+    )
+    verify_no_runnable_commands(manifest, label="manifest")
 
 
 def source_rows(section: object, *, label: str) -> dict[str, dict[str, Any]]:
@@ -398,7 +922,7 @@ def verify_manifest_declared_sources(
         expected_bytes, expected_digest, expected_blob = expected
         require(row == {"path": relative, "bytes": expected_bytes, "sha256": expected_digest, "git_blob": expected_blob}, f"manifest repository source binding mismatch: {relative}")
         path = safe_child(repo_root, relative, label="repository source")
-        raw = path.read_bytes()
+        raw = read_bounded_bytes(path, label=f"repository source {relative}", size_limit=MAX_TRACKED_FILE_BYTES)
         require(len(raw) == expected_bytes, f"repository source size mismatch: {relative}")
         require(sha256_bytes(raw) == expected_digest, f"repository source digest mismatch: {relative}")
         require(
@@ -411,7 +935,7 @@ def verify_manifest_declared_sources(
         row = overlay[relative]
         require(row == {"path": relative, "bytes": expected_bytes, "sha256": expected_digest}, f"manifest overlay source binding mismatch: {relative}")
         path = safe_child(overlay_dir, relative, label="overlay source")
-        raw = path.read_bytes()
+        raw = read_bounded_bytes(path, label=f"overlay source {relative}", size_limit=MAX_TRACKED_FILE_BYTES)
         require(len(raw) == expected_bytes, f"overlay source size mismatch: {relative}")
         require(sha256_bytes(raw) == expected_digest, f"overlay source digest mismatch: {relative}")
         verified[f"overlay:{relative}"] = raw
@@ -419,7 +943,7 @@ def verify_manifest_declared_sources(
     verifier_row = overlay["verify_plan.py"]
     require(set(verifier_row) == {"path", "bytes", "sha256"}, "verifier source binding malformed")
     verifier_path = safe_child(overlay_dir, "verify_plan.py", label="verifier source")
-    verifier_raw = verifier_path.read_bytes()
+    verifier_raw = read_bounded_bytes(verifier_path, label="verifier source", size_limit=MAX_TRACKED_FILE_BYTES)
     require(verifier_row["bytes"] == len(verifier_raw), "verifier source size mismatch")
     require(verifier_row["sha256"] == sha256_bytes(verifier_raw), "verifier source digest mismatch")
     verified["overlay:verify_plan.py"] = verifier_raw
@@ -444,12 +968,21 @@ def verify_payload_bindings(
     for relative in sorted(expected_bound):
         row = rows[relative]
         require(set(row) == {"path", "bytes", "sha256"}, f"committed payload binding malformed: {relative}")
-        raw = payload_path(repo_root, overlay_dir, relative).read_bytes()
+        raw = read_bounded_bytes(
+            payload_path(repo_root, overlay_dir, relative),
+            label=f"committed payload {relative}",
+            size_limit=MAX_TRACKED_FILE_BYTES,
+        )
         require(row["bytes"] == len(raw), f"committed payload size mismatch: {relative}")
         require(row["sha256"] == sha256_bytes(raw), f"committed payload digest mismatch: {relative}")
         verified[relative] = raw
     require(
-        payload_path(repo_root, overlay_dir, MANIFEST_RELATIVE_PATH).read_bytes() == manifest_raw,
+        read_bounded_bytes(
+            payload_path(repo_root, overlay_dir, MANIFEST_RELATIVE_PATH),
+            label="authenticated manifest path",
+            size_limit=MAX_MANIFEST_BYTES,
+        )
+        == manifest_raw,
         "authenticated manifest path bytes mismatch",
     )
     return verified
@@ -478,16 +1011,21 @@ def verify_committed_payload_git_bytes(repo_root: Path, overlay_dir: Path) -> No
             binary=True,
         )
         require(
-            payload_path(repo_root, overlay_dir, relative).read_bytes() == head_raw,
+            read_bounded_bytes(
+                payload_path(repo_root, overlay_dir, relative),
+                label=f"committed payload worktree {relative}",
+                size_limit=MAX_TRACKED_FILE_BYTES,
+            )
+            == head_raw,
             f"worktree bytes differ from committed payload blob: {relative}",
         )
         if relative in changed_paths:
-            require(head_raw != parent_raw, f"correction path did not change from Payload A: {relative}")
+            require(head_raw != parent_raw, f"successor path did not change from the predecessor correction: {relative}")
         else:
-            require(head_raw == parent_raw, f"inherited payload path changed from Payload A: {relative}")
+            require(head_raw == parent_raw, f"inherited payload path changed from the predecessor correction: {relative}")
 
 
-def verify_global_index_visibility(repo_root: Path) -> None:
+def verify_global_index_visibility(repo_root: Path) -> str:
     raw = git(repo_root, "ls-files", "-v", "-z", binary=True)
     require(isinstance(raw, bytes), "Git index visibility inventory is not binary")
     for entry in raw.split(b"\0"):
@@ -497,6 +1035,103 @@ def verify_global_index_visibility(repo_root: Path) -> None:
             len(entry) > 2 and entry[:2] == b"H ",
             "tracked index visibility flag is not pristine",
         )
+    return sha256_bytes(raw)
+
+
+def _decode_git_path(raw: bytes, *, label: str) -> str:
+    try:
+        value = raw.decode("utf-8")
+    except UnicodeError as error:
+        raise VerificationError(f"{label} path is not UTF-8") from error
+    require(value and "\\" not in value, f"{label} path is malformed")
+    return value
+
+
+def verify_tracked_index_and_worktree(repo_root: Path) -> tuple[int, str]:
+    tree_raw = git(repo_root, "ls-tree", "-r", "-z", "--full-tree", "HEAD", binary=True)
+    index_raw = git(repo_root, "ls-files", "--stage", "-z", binary=True)
+    require(isinstance(tree_raw, bytes) and isinstance(index_raw, bytes), "tracked inventory is not binary")
+
+    tree_entries: dict[str, tuple[str, str]] = {}
+    for entry in tree_raw.split(b"\0"):
+        if not entry:
+            continue
+        header, separator, path_raw = entry.partition(b"\t")
+        fields = header.split()
+        path = _decode_git_path(path_raw, label="HEAD tree")
+        require(
+            separator == b"\t"
+            and len(fields) == 3
+            and fields[0] in {b"100644", b"100755"}
+            and fields[1] == b"blob"
+            and re.fullmatch(rb"[0-9a-f]{40}", fields[2]) is not None
+            and path not in tree_entries,
+            f"unsupported or malformed HEAD tree entry: {path}",
+        )
+        tree_entries[path] = (fields[0].decode("ascii"), fields[2].decode("ascii"))
+
+    index_entries: dict[str, tuple[str, str]] = {}
+    for entry in index_raw.split(b"\0"):
+        if not entry:
+            continue
+        header, separator, path_raw = entry.partition(b"\t")
+        fields = header.split()
+        path = _decode_git_path(path_raw, label="index")
+        require(
+            separator == b"\t"
+            and len(fields) == 3
+            and fields[0] in {b"100644", b"100755"}
+            and re.fullmatch(rb"[0-9a-f]{40}", fields[1]) is not None
+            and fields[2] == b"0"
+            and path not in index_entries,
+            f"unsupported or malformed index entry: {path}",
+        )
+        index_entries[path] = (fields[0].decode("ascii"), fields[1].decode("ascii"))
+
+    require(index_entries == tree_entries, "Git index differs from the exact HEAD tree")
+    for relative, (_, blob_sha) in sorted(tree_entries.items()):
+        path = safe_child(repo_root, relative, label="tracked worktree")
+        require(path.is_file() and not path.is_symlink(), f"tracked worktree path is not a regular file: {relative}")
+        raw = read_bounded_bytes(
+            path,
+            label=f"tracked worktree {relative}",
+            size_limit=MAX_TRACKED_FILE_BYTES,
+        )
+        require(git_blob_sha(raw) == blob_sha, f"tracked worktree bytes differ from HEAD: {relative}")
+    inventory = [[path, mode, blob] for path, (mode, blob) in sorted(tree_entries.items())]
+    return len(tree_entries), digest(inventory)
+
+
+def verify_untracked_and_ignored_state(repo_root: Path) -> str:
+    def path_set(*args: str) -> set[str]:
+        raw = git(repo_root, "ls-files", "-z", *args, binary=True)
+        require(isinstance(raw, bytes), "Git path inventory is not binary")
+        return {
+            _decode_git_path(entry, label="untracked/ignored")
+            for entry in raw.split(b"\0")
+            if entry
+        }
+
+    untracked_paths = path_set("--others", "--exclude-standard")
+    ignored_paths = path_set("--others", "--ignored", "--exclude-standard")
+    observed_paths = untracked_paths | ignored_paths
+    require(
+        observed_paths <= {ALLOWED_UNTRACKED_PATH},
+        "committed checkout contains an unapproved untracked or ignored path",
+    )
+    return digest(sorted(observed_paths))
+
+
+def verify_checkout_cleanliness(repo_root: Path) -> dict[str, Any]:
+    visibility_digest = verify_global_index_visibility(repo_root)
+    tracked_count, tracked_inventory_digest = verify_tracked_index_and_worktree(repo_root)
+    other_path_digest = verify_untracked_and_ignored_state(repo_root)
+    return {
+        "tracked_path_count": tracked_count,
+        "tracked_inventory_digest": tracked_inventory_digest,
+        "index_visibility_digest": visibility_digest,
+        "untracked_and_ignored_digest": other_path_digest,
+    }
 
 
 def verify_repository_state(
@@ -511,10 +1146,17 @@ def verify_repository_state(
     )
     verify_commit_object(
         repo_root,
+        commit=PAYLOAD_A_COMMIT,
+        tree=PAYLOAD_A_TREE,
+        parent=PLAN_AUTHORING_BASE_COMMIT,
+        label="Payload A",
+    )
+    verify_commit_object(
+        repo_root,
         commit=CORRECTION_PARENT_COMMIT,
         tree=CORRECTION_PARENT_TREE,
-        parent=PLAN_AUTHORING_BASE_COMMIT,
-        label="Payload A correction parent",
+        parent=PAYLOAD_A_COMMIT,
+        label="remanded correction parent",
     )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch mismatch")
     head = str(git(repo_root, "rev-parse", "HEAD"))
@@ -545,54 +1187,84 @@ def verify_repository_state(
         parent=CORRECTION_PARENT_COMMIT,
         label="correction HEAD",
     )
+    changed_raw = git(
+        repo_root,
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--name-only",
+        "--no-renames",
+        "-z",
+        f"{CORRECTION_PARENT_COMMIT}..HEAD",
+        binary=True,
+    )
+    require(isinstance(changed_raw, bytes), "committed changed-path inventory is not binary")
     changed = tuple(
         sorted(
-            line
-            for line in str(
-                git(
-                    repo_root,
-                    "diff",
-                    "--name-only",
-                    "--no-renames",
-                    f"{CORRECTION_PARENT_COMMIT}..HEAD",
-                )
-            ).splitlines()
-            if line
+            _decode_git_path(entry, label="committed changed")
+            for entry in changed_raw.split(b"\0")
+            if entry
         )
     )
     require(changed == EXPECTED_CHANGED_PATHS, "committed payload changed-path allowlist mismatch")
-    verify_global_index_visibility(repo_root)
-    tracked_status_lines = [
-        line
-        for line in str(git(repo_root, "status", "--porcelain=v1", "--untracked-files=no")).splitlines()
-        if line
-    ]
-    require(not tracked_status_lines, "committed checkout has dirty or staged tracked paths")
-    untracked_paths = {
-        line
-        for line in str(git(repo_root, "ls-files", "--others", "--exclude-standard")).splitlines()
-        if line
-    }
-    ignored_paths = {
-        line
-        for line in str(
-            git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard")
-        ).splitlines()
-        if line
-    }
-    require(
-        untracked_paths | ignored_paths <= {ALLOWED_UNTRACKED_PATH},
-        "committed checkout contains an unapproved untracked or ignored path",
-    )
+    checkout_snapshot = verify_checkout_cleanliness(repo_root)
     verify_committed_payload_git_bytes(repo_root, overlay_dir)
     return {
-        "mode": "committed-correction-v2",
+        "mode": "committed-git-boundary-correction-v3",
         "qualification": True,
         "head": head,
         "tree": tree,
         "authoring_base_parent": PLAN_AUTHORING_BASE_COMMIT,
         "correction_parent": CORRECTION_PARENT_COMMIT,
+        "checkout_snapshot": checkout_snapshot,
     }
+
+
+def verify_repository_state_stable_at_end(
+    repo_root: Path,
+    overlay_dir: Path,
+    repository_state: dict[str, Any],
+) -> None:
+    verify_commit_object(
+        repo_root,
+        commit=PLAN_AUTHORING_BASE_COMMIT,
+        tree=PLAN_AUTHORING_BASE_TREE,
+        parent=None,
+        label="final plan authoring base",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=PAYLOAD_A_COMMIT,
+        tree=PAYLOAD_A_TREE,
+        parent=PLAN_AUTHORING_BASE_COMMIT,
+        label="final Payload A",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=CORRECTION_PARENT_COMMIT,
+        tree=CORRECTION_PARENT_TREE,
+        parent=PAYLOAD_A_COMMIT,
+        label="final remanded correction parent",
+    )
+    require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch changed during verification")
+    require(git(repo_root, "rev-parse", "HEAD") == repository_state["head"], "HEAD changed during verification")
+    require(
+        git(repo_root, "rev-parse", "HEAD^{tree}") == repository_state["tree"],
+        "HEAD tree changed during verification",
+    )
+    if repository_state["qualification"]:
+        verify_commit_object(
+            repo_root,
+            commit=repository_state["head"],
+            tree=repository_state["tree"],
+            parent=CORRECTION_PARENT_COMMIT,
+            label="final correction HEAD",
+        )
+        require(
+            verify_checkout_cleanliness(repo_root) == repository_state["checkout_snapshot"],
+            "exact checkout snapshot changed during verification",
+        )
+        verify_committed_payload_git_bytes(repo_root, overlay_dir)
 
 
 def acceptance_index(nodes: list[dict[str, Any]]) -> dict[str, str]:
@@ -955,7 +1627,7 @@ def verify_ownership_expansion(plan: dict[str, Any], contracts: dict[str, Any]) 
         require(not own.intersection(node["forbidden_scope"]), f"owner forbids own path: {node['id']}")
 
 
-def verify_no_runnable_commands(value: Any) -> None:
+def verify_no_runnable_commands(value: Any, *, label: str = "external plan") -> None:
     pending = [value]
     shell_prefix = re.compile(r"^(?:python|powershell|pwsh|bash|sh|cmd)(?:\s|$)", re.IGNORECASE)
     while pending:
@@ -963,7 +1635,7 @@ def verify_no_runnable_commands(value: Any) -> None:
         if isinstance(current, dict):
             for key, item in current.items():
                 if key == "command":
-                    require(item is None, "runnable command embedded in external plan")
+                    require(item is None, f"runnable command embedded in {label}")
                 pending.append(item)
         elif isinstance(current, list):
             pending.extend(current)
@@ -971,7 +1643,7 @@ def verify_no_runnable_commands(value: Any) -> None:
         require(all(isinstance(item, str) and not shell_prefix.search(item) for item in node.get("required_tests", [])), f"shell command embedded in required_tests: {node.get('id')}")
 
 
-def verify(
+def _verify_configured(
     *,
     expected_manifest_digest: str,
     overlay_dir: Path = HERE,
@@ -981,7 +1653,11 @@ def verify(
     overlay_dir = overlay_dir.resolve()
     repo_root = repo_root.resolve()
     sealed_plan_path = safe_child(repo_root, ".autopilot/plan.json", label="historical sealed plan")
-    sealed_before = sealed_plan_path.read_bytes()
+    sealed_before = read_bounded_bytes(
+        sealed_plan_path,
+        label="historical sealed plan before verification",
+        size_limit=MAX_PLAN_BYTES,
+    )
 
     # Trust order is intentional: parse only the manifest, validate its fixed
     # identity, then verify every declared source byte before interpreting any
@@ -993,7 +1669,11 @@ def verify(
     )
     manifest_path = safe_child(overlay_dir, "manifest.json", label="manifest")
     try:
-        manifest_raw = manifest_path.read_bytes()
+        manifest_raw = read_bounded_bytes(
+            manifest_path,
+            label="manifest.json",
+            size_limit=MAX_MANIFEST_BYTES,
+        )
     except OSError as error:
         raise VerificationError(f"cannot read manifest.json: {error}") from error
     require(len(manifest_raw) <= MAX_MANIFEST_BYTES, f"manifest.json exceeds size limit {MAX_MANIFEST_BYTES}")
@@ -1067,9 +1747,15 @@ def verify(
     require(plan["authority"]["execution_status"].startswith("DEFER_"), "authority posture is not fail-closed")
     require(plan["vision_posture"]["A5"] == "NOT_READY", "A5 readiness overclaim")
 
-    sealed_after = sealed_plan_path.read_bytes()
+    sealed_after = read_bounded_bytes(
+        sealed_plan_path,
+        label="historical sealed plan after verification",
+        size_limit=MAX_PLAN_BYTES,
+    )
     require(sealed_after == sealed_before, "verifier mutated .autopilot/plan.json")
     require(sha256_bytes(sealed_after) == EXPECTED_REPOSITORY_SOURCES[".autopilot/plan.json"][1], "historical sealed plan changed")
+    verify_repository_state_stable_at_end(repo_root, overlay_dir, repository_state)
+    verify_git_executable_stable(full_digest=True)
     return {
         "verified": True,
         "plan_id": PLAN_ID,
@@ -1106,7 +1792,57 @@ def verify(
         },
         "materializer_imported_or_executed": False,
         "historical_plan_unchanged": True,
+        "git_boundary": {
+            "executable": str(_GIT_BOUNDARY["executable"]),
+            "executable_sha256": _GIT_BOUNDARY["expected_sha256"],
+            "path_lookup": False,
+            "inherited_git_environment": "REJECTED",
+            "system_and_global_config": "DISABLED",
+            "git_dir": str(_GIT_BOUNDARY["git_dir"]),
+            "common_dir": str(_GIT_BOUNDARY["common_dir"]),
+            "index_path": str(_GIT_BOUNDARY["index_path"]),
+            "work_tree": str(_GIT_BOUNDARY["work_tree"]),
+            "tracked_path_count": (
+                repository_state["checkout_snapshot"]["tracked_path_count"]
+                if repository_state["qualification"]
+                else None
+            ),
+        },
     }
+
+
+def verify(
+    *,
+    expected_manifest_digest: str,
+    git_executable: Path,
+    expected_git_executable_sha256: str,
+    overlay_dir: Path = HERE,
+    repo_root: Path = DEFAULT_REPO_ROOT,
+    authoring_check: bool = False,
+) -> dict[str, Any]:
+    global _GIT_BOUNDARY
+    overlay_dir = overlay_dir.resolve()
+    repo_root = repo_root.resolve()
+    configure_git_boundary(
+        repo_root,
+        git_executable=git_executable,
+        expected_git_executable_sha256=expected_git_executable_sha256,
+    )
+    try:
+        return _verify_configured(
+            expected_manifest_digest=expected_manifest_digest,
+            overlay_dir=overlay_dir,
+            repo_root=repo_root,
+            authoring_check=authoring_check,
+        )
+    finally:
+        boundary = _GIT_BOUNDARY
+        _GIT_BOUNDARY = None
+        if boundary is not None:
+            try:
+                boundary["handle"].close()
+            except OSError as error:
+                raise VerificationError(f"cannot close retained Git executable handle: {error}") from error
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1114,6 +1850,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--overlay-dir", type=Path, default=HERE)
     parser.add_argument("--repo-root", type=Path, default=DEFAULT_REPO_ROOT)
     parser.add_argument("--expected-manifest-digest", required=True)
+    parser.add_argument("--git-executable", type=Path, required=True)
+    parser.add_argument("--expected-git-executable-sha256", required=True)
     parser.add_argument(
         "--authoring-check",
         action="store_true",
@@ -1122,6 +1860,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     result = verify(
         expected_manifest_digest=args.expected_manifest_digest,
+        git_executable=args.git_executable,
+        expected_git_executable_sha256=args.expected_git_executable_sha256,
         overlay_dir=args.overlay_dir,
         repo_root=args.repo_root,
         authoring_check=args.authoring_check,

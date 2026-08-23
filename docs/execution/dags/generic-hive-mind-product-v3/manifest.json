@@ -34,21 +34,35 @@
       "tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed"
     },
     "correction_parent": {
-      "commit": "4e2b81b932e5145f24c4b52ceeee664bff91df2e",
-      "tree": "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157"
+      "commit": "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
+      "tree": "8730203c89835c4d1d9dac4be9b2086dacd2d869"
     }
   },
   "committed_payload_contract": {
-    "mode": "exact-append-only-correction-v2",
+    "mode": "exact-append-only-git-boundary-correction-v3",
     "authoring_base_parent": {
       "commit": "42b4aeef17f816430a7d8a435102635afea8761a",
       "tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed"
     },
     "correction_parent": {
-      "commit": "4e2b81b932e5145f24c4b52ceeee664bff91df2e",
-      "tree": "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157"
+      "commit": "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
+      "tree": "8730203c89835c4d1d9dac4be9b2086dacd2d869"
     },
     "predecessor_payload": {
+      "commit": "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
+      "tree": "8730203c89835c4d1d9dac4be9b2086dacd2d869",
+      "parent_commit": "4e2b81b932e5145f24c4b52ceeee664bff91df2e",
+      "parent_tree": "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157",
+      "manifest_raw_sha256": "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339",
+      "full_payload_aggregate": {
+        "domain": "hive-mind-os/v3-append-only-correction-content/v2",
+        "sha256": "sha256:229821586021d8e2769035aeca4a4589cb7b458a9740a8b8ca82ebdfdadaee36"
+      },
+      "qualification_report_sha256": "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810",
+      "observed_status": "QUALIFICATION_REMANDED_GIT_ENVIRONMENT_FAIL_OPEN",
+      "author_proposed_disposition": "ADAPT_REMAND"
+    },
+    "historical_payload_a": {
       "commit": "4e2b81b932e5145f24c4b52ceeee664bff91df2e",
       "tree": "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157",
       "parent_commit": "42b4aeef17f816430a7d8a435102635afea8761a",
@@ -59,7 +73,7 @@
         "sha256": "sha256:ff7a0f323aac32da18c70d6f871ddc0918225ddd47de0c15618822be84706d78"
       },
       "observed_status": "FOCUSED_SUITE_FAILED_12_OF_14",
-      "author_proposed_disposition": "ADAPT"
+      "author_proposed_disposition": "ADAPT_SUPERSEDE"
     },
     "expected_changed_paths": [
       "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
@@ -82,17 +96,40 @@
       "tests/test_generic_dag_v3_overlay.py"
     ],
     "activation_anti_downgrade": {
-      "required_contract_mode": "exact-append-only-correction-v2",
-      "rejected_predecessor_manifest_raw_sha256": "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522",
+      "required_contract_mode": "exact-append-only-git-boundary-correction-v3",
+      "rejected_predecessor_manifest_raw_sha256": "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339",
+      "rejected_historical_payload_a_manifest_raw_sha256": "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522",
       "predecessor_activation": "PROHIBITED",
+      "historical_payload_a_activation": "PROHIBITED",
       "legacy_v1_fallback": "PROHIBITED",
       "external_minimum_version_and_revocation_policy": "REQUIRED_NOT_SATISFIED"
+    },
+    "git_execution_boundary": {
+      "policy": "caller-absolute-raw-sha256-v1",
+      "inherited_git_environment": "REJECT_ALL_CASE_INSENSITIVE_GIT_PREFIX",
+      "child_environment": "MINIMAL_ALLOWLIST_V1",
+      "path_lookup": "PROHIBITED",
+      "repository_addressing": "EXPLICIT_GIT_DIR_AND_WORK_TREE",
+      "system_and_global_config": "DISABLED",
+      "local_risk_overrides": [
+        "core.fsmonitor=false",
+        "core.hooksPath=<os-devnull>",
+        "core.attributesFile=<os-devnull>",
+        "core.excludesFile=<os-devnull>",
+        "core.untrackedCache=false",
+        "diff.external="
+      ],
+      "tracked_state": "RAW_HEAD_INDEX_WORKTREE_BLOB_EQUALITY",
+      "object_alternates": "PROHIBITED",
+      "per_invocation_executable_revalidation": true,
+      "final_cleanliness_revalidation": true,
+      "strong_read_only_runtime": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED"
     },
     "payload_bindings": [
       {
         "path": "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
-        "bytes": 15001,
-        "sha256": "sha256:4e9a9cd8b91e1ebb8b6eaf199cfcd2b4c82d2408c592f8b9d786295ce8fd3340"
+        "bytes": 23970,
+        "sha256": "sha256:32785d1359234b9ce53dad47e87c884baf829566af7fc60a6847aa7401e4ab8a"
       },
       {
         "path": "docs/architecture/ADR_INDEX.md",
@@ -101,8 +138,8 @@
       },
       {
         "path": "docs/execution/dags/generic-hive-mind-product-v3/README.md",
-        "bytes": 6450,
-        "sha256": "sha256:0d122b9073b78b9d97a50feca04d3dc632e5a2e670481d36c1997eb6ce7ec33b"
+        "bytes": 11732,
+        "sha256": "sha256:b4ef0607f7f5a14460531b942c6637ec24df1e9de45c90fc52b1b69d08f7bcf9"
       },
       {
         "path": "docs/execution/dags/generic-hive-mind-product-v3/materialize_plan.py",
@@ -131,13 +168,13 @@
       },
       {
         "path": "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
-        "bytes": 63880,
-        "sha256": "sha256:5aa43bb7ced681d3987e8f600744f8f88f8bdf28b97fdaeeecc3ee58edbb891c"
+        "bytes": 94029,
+        "sha256": "sha256:9c8567d9ec8895f6c8549b9ea956bf66f9cba4fe73d11ba6e084970809244415"
       },
       {
         "path": "tests/test_generic_dag_v3_overlay.py",
-        "bytes": 32966,
-        "sha256": "sha256:43520b1d91bc3720c51cd309c19820fcd12d19e7273af696310f724f7f6c0ef7"
+        "bytes": 44848,
+        "sha256": "sha256:c5f0b294b2199064fd0c12f889bea42b5cccb76a1ac5373ece1e91dfc5cc0fb0"
       }
     ],
     "manifest_authentication": {
@@ -151,9 +188,12 @@
       "committed_payload_head",
       "committed_payload_tree",
       "caller_authenticated_manifest_digest",
+      "caller_authenticated_git_executable_path_and_digest",
       "corrected_full_payload_aggregate_digest",
       "predecessor_payload_identity",
       "predecessor_supersession_verdict",
+      "predecessor_qualification_report_digest",
+      "historical_payload_a_identity_and_disposition",
       "court_verdict",
       "external_minimum_version_and_revocation_policy_digest"
     ],
@@ -166,8 +206,8 @@
     "repository": [
       {
         "path": "LICENSE",
-        "bytes": 1086,
-        "sha256": "sha256:903a82ad84a68d2b48c2c3ee2707d1394fb82aee1bdfdae4a91ff9f8af1691df",
+        "bytes": 1065,
+        "sha256": "sha256:6e76d648ae297aa3dcefc739604cfcfab2a50b484ab7331090c745a089de21f8",
         "git_blob": "06da1af7996f5e2b059cd52045e36f9f2cfac201"
       },
       {
@@ -272,8 +312,8 @@
       },
       {
         "path": "verify_plan.py",
-        "bytes": 63880,
-        "sha256": "sha256:5aa43bb7ced681d3987e8f600744f8f88f8bdf28b97fdaeeecc3ee58edbb891c"
+        "bytes": 94029,
+        "sha256": "sha256:9c8567d9ec8895f6c8549b9ea956bf66f9cba4fe73d11ba6e084970809244415"
       }
     ]
   },

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -15,7 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OVERLAY = ROOT / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3"
 PLAN_AUTHORING_BASE = "42b4aeef17f816430a7d8a435102635afea8761a"
-CORRECTION_PARENT = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
+PAYLOAD_A = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
+CORRECTION_PARENT = "f06e52c43a1e2d1d53523378c0d6f5564fb984bf"
 TARGET_BRANCH = "release/hive-mind-autopilot"
 PAYLOAD_PATHS = (
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
@@ -54,20 +57,61 @@ def raw_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def shell_command(parts: list[str]) -> str:
+    if os.name == "nt":
+        return subprocess.list2cmdline(parts)
+    return shlex.join(parts)
+
+
 class GenericDagV3OverlayTests(unittest.TestCase):
     maxDiff = None
 
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
+        discovered_git = shutil.which("git")
+        if discovered_git is None:
+            raise unittest.SkipTest("Git executable is unavailable")
+        git_executable = Path(discovered_git).resolve()
+        if os.name == "nt":
+            direct_git = git_executable.parents[1] / "mingw64" / "bin" / "git.exe"
+            if direct_git.is_file():
+                git_executable = direct_git.resolve()
+        cls.git_executable = git_executable
+        cls.git_executable_sha256 = "sha256:" + hashlib.sha256(git_executable.read_bytes()).hexdigest()
+        cls.git_environment = dict(os.environ)
+        for key in list(cls.git_environment):
+            if key.casefold().startswith("git_"):
+                cls.git_environment.pop(key)
+        cls.git_environment.update(
+            {
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_SYSTEM": os.devnull,
+                "GIT_NO_REPLACE_OBJECTS": "1",
+                "GIT_OPTIONAL_LOCKS": "0",
+            }
+        )
         cls._authoring_directory = tempfile.TemporaryDirectory()
         cls.authoring_root = Path(cls._authoring_directory.name) / "authoring"
         subprocess.run(
-            ["git", "clone", "--quiet", "--no-hardlinks", str(ROOT), str(cls.authoring_root)],
+            [
+                str(cls.git_executable),
+                "-c",
+                "core.autocrlf=false",
+                "-c",
+                "core.eol=lf",
+                "clone",
+                "--quiet",
+                "--no-hardlinks",
+                str(ROOT),
+                str(cls.authoring_root),
+            ],
             cwd=ROOT,
             text=True,
             capture_output=True,
             check=True,
+            env=cls.git_environment,
         )
         cls.run_git(cls.authoring_root, "switch", "--quiet", "-C", TARGET_BRANCH, CORRECTION_PARENT)
         for relative in PAYLOAD_PATHS:
@@ -95,6 +139,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         repo_root: Path | None = None,
         authoring_check: bool = True,
         include_expected_manifest: bool = True,
+        environment_updates: dict[str, str] | None = None,
+        git_executable: Path | None = None,
+        git_executable_sha256: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         if repo_root is None:
             repo_root = self.authoring_root if authoring_check else ROOT
@@ -105,6 +152,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             str(overlay),
             "--repo-root",
             str(repo_root),
+            "--git-executable",
+            str(git_executable or self.git_executable),
+            "--expected-git-executable-sha256",
+            git_executable_sha256 or self.git_executable_sha256,
         ]
         if include_expected_manifest:
             command.extend(
@@ -115,22 +166,39 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             )
         if authoring_check:
             command.append("--authoring-check")
+        environment = dict(os.environ)
+        for key in list(environment):
+            if key.casefold().startswith("git_"):
+                environment.pop(key)
+        if environment_updates:
+            environment.update(environment_updates)
         return subprocess.run(
             command,
             cwd=repo_root,
             text=True,
             capture_output=True,
             check=False,
+            env=environment,
         )
 
-    @staticmethod
-    def run_git(repository: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    @classmethod
+    def run_git(cls, repository: Path, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["git", "-C", str(repository), *args],
+            [
+                str(cls.git_executable),
+                "-c",
+                "core.autocrlf=false",
+                "-c",
+                "core.eol=lf",
+                "-C",
+                str(repository),
+                *args,
+            ],
             cwd=ROOT,
             text=True,
             capture_output=True,
             check=True,
+            env=cls.git_environment,
         )
 
     def make_committed_checkout(
@@ -143,11 +211,23 @@ class GenericDagV3OverlayTests(unittest.TestCase):
     ) -> Path:
         checkout = parent / "committed"
         subprocess.run(
-            ["git", "clone", "--quiet", "--no-hardlinks", str(ROOT), str(checkout)],
+            [
+                str(self.git_executable),
+                "-c",
+                "core.autocrlf=false",
+                "-c",
+                "core.eol=lf",
+                "clone",
+                "--quiet",
+                "--no-hardlinks",
+                str(ROOT),
+                str(checkout),
+            ],
             cwd=ROOT,
             text=True,
             capture_output=True,
             check=True,
+            env=self.git_environment,
         )
         self.run_git(checkout, "switch", "--quiet", "-C", TARGET_BRANCH, base)
         self.run_git(checkout, "config", "user.name", "V3 Fixture")
@@ -227,7 +307,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             result = self.run_verifier(overlay, repo_root=checkout, authoring_check=False)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["verification_mode"], "committed-correction-v2")
+            self.assertEqual(payload["verification_mode"], "committed-git-boundary-correction-v3")
             self.assertTrue(payload["committed_payload_qualification"])
             self.assertFalse(payload["execution_qualification"])
             self.assertEqual(payload["committed_payload"]["authoring_base_parent"], PLAN_AUTHORING_BASE)
@@ -289,7 +369,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             readme.write_text(readme.read_text(encoding="utf-8") + "dirty\n", encoding="utf-8")
             self.assert_rejected(
                 self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
-                "committed checkout has dirty or staged tracked paths",
+                "tracked worktree bytes differ from HEAD: docs/execution/dags/generic-hive-mind-product-v3/README.md",
             )
 
         with tempfile.TemporaryDirectory() as directory:
@@ -300,7 +380,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             self.run_git(checkout, "add", "--", "docs/execution/dags/generic-hive-mind-product-v3/README.md")
             self.assert_rejected(
                 self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
-                "committed checkout has dirty or staged tracked paths",
+                "Git index differs from the exact HEAD tree",
             )
 
         with tempfile.TemporaryDirectory() as directory:
@@ -310,6 +390,195 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             self.assert_rejected(
                 self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
                 "committed checkout contains an unapproved untracked or ignored path",
+            )
+
+    def test_git_boundary_rejects_case_insensitive_ambient_overrides(self) -> None:
+        overlay = self.authoring_root / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3"
+        poison_path = str(self.authoring_root / ".git" / "poison")
+        overrides = (
+            ("GIT_WORK_TREE", poison_path),
+            ("GIT_DIR", poison_path),
+            ("gIt_CoMmOn_DiR", poison_path),
+            ("GIT_INDEX_FILE", poison_path),
+            ("GIT_OBJECT_DIRECTORY", poison_path),
+            ("GIT_ALTERNATE_OBJECT_DIRECTORIES", poison_path),
+            ("GIT_CONFIG_GLOBAL", poison_path),
+            ("GIT_CONFIG_SYSTEM", poison_path),
+            ("GIT_CONFIG_COUNT", "1"),
+            ("GIT_CONFIG_KEY_0", "core.fsmonitor"),
+            ("GIT_CONFIG_VALUE_0", "hostile"),
+            ("gIt_CoNfIg_PaRaMeTeRs", "'core.fsmonitor=hostile'"),
+            ("GIT_EXEC_PATH", poison_path),
+            ("GIT_PAGER", "hostile"),
+            ("GIT_EXTERNAL_DIFF", "hostile"),
+            ("GIT_REPLACE_REF_BASE", "refs/replace/hostile"),
+        )
+        for key, value in overrides:
+            with self.subTest(key=key):
+                result = self.run_verifier(
+                    overlay,
+                    environment_updates={key: value},
+                )
+                self.assert_rejected(result, "inherited Git environment is forbidden")
+                error = json.loads(result.stdout.strip().splitlines()[-1])["error"]
+                self.assertIn(key.casefold(), error.casefold())
+
+    def test_git_boundary_binds_absolute_executable_digest_and_ignores_path(self) -> None:
+        overlay = self.authoring_root / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3"
+
+        relative = self.run_verifier(overlay, git_executable=Path("git"))
+        self.assert_rejected(relative, "Git executable path must be absolute")
+
+        wrong_digest = self.run_verifier(
+            overlay,
+            git_executable_sha256="sha256:" + "0" * 64,
+        )
+        self.assert_rejected(wrong_digest, "caller-authenticated Git executable digest mismatch")
+
+        with tempfile.TemporaryDirectory() as directory:
+            fake_directory = Path(directory) / "fake-path"
+            fake_directory.mkdir()
+            fake_git = fake_directory / ("git.exe" if os.name == "nt" else "git")
+            if os.name == "nt":
+                fake_git.write_bytes(b"not a Git executable\n")
+            else:
+                fake_git.write_text("#!/bin/sh\nexit 97\n", encoding="utf-8")
+                fake_git.chmod(0o755)
+            result = self.run_verifier(
+                overlay,
+                environment_updates={"PATH": str(fake_directory)},
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["git_boundary"]["executable"], str(self.git_executable))
+        self.assertEqual(payload["git_boundary"]["executable_sha256"], self.git_executable_sha256)
+        self.assertFalse(payload["git_boundary"]["path_lookup"])
+
+    def test_git_boundary_blocks_hostile_configs_and_local_worktree_redirect(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkout = self.make_committed_checkout(root / "fixture")
+            overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
+            hook = root / "fsmonitor_hook.py"
+            hook.write_text(
+                "from pathlib import Path\n"
+                "import sys\n"
+                "Path(sys.argv[1]).write_text('executed', encoding='utf-8')\n"
+                "raise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+
+            local_marker = root / "local.marker"
+            home_marker = root / "home.marker"
+            xdg_marker = root / "xdg.marker"
+
+            def marker_command(marker: Path) -> str:
+                return shell_command([sys.executable, str(hook), str(marker)])
+
+            empty_home = root / "empty-home"
+            empty_xdg = root / "empty-xdg"
+            hostile_home = root / "hostile-home"
+            hostile_xdg = root / "hostile-xdg"
+            for path in (empty_home, empty_xdg, hostile_home, hostile_xdg / "git"):
+                path.mkdir(parents=True, exist_ok=True)
+
+            self.run_git(checkout, "config", "core.fsmonitor", marker_command(local_marker))
+            self.run_git(
+                checkout,
+                "config",
+                "--file",
+                str(hostile_home / ".gitconfig"),
+                "core.fsmonitor",
+                marker_command(home_marker),
+            )
+            self.run_git(
+                checkout,
+                "config",
+                "--file",
+                str(hostile_xdg / "git" / "config"),
+                "core.fsmonitor",
+                marker_command(xdg_marker),
+            )
+
+            config_cases = (
+                (
+                    "local",
+                    {"HOME": str(empty_home), "XDG_CONFIG_HOME": str(empty_xdg)},
+                ),
+                (
+                    "home",
+                    {"HOME": str(hostile_home), "XDG_CONFIG_HOME": str(empty_xdg)},
+                ),
+                (
+                    "xdg",
+                    {"HOME": str(empty_home), "XDG_CONFIG_HOME": str(hostile_xdg)},
+                ),
+            )
+            for label, environment in config_cases:
+                with self.subTest(config=label):
+                    for marker in (local_marker, home_marker, xdg_marker):
+                        marker.unlink(missing_ok=True)
+                    result = self.run_verifier(
+                        overlay,
+                        repo_root=checkout,
+                        authoring_check=False,
+                        environment_updates=environment,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse(local_marker.exists())
+                    self.assertFalse(home_marker.exists())
+                    self.assertFalse(xdg_marker.exists())
+
+            self.run_git(checkout, "config", "--unset", "core.fsmonitor")
+            shadow = root / "shadow"
+            subprocess.run(
+                [
+                    str(self.git_executable),
+                    "-c",
+                    "core.autocrlf=false",
+                    "-c",
+                    "core.eol=lf",
+                    "clone",
+                    "--quiet",
+                    "--no-hardlinks",
+                    str(checkout),
+                    str(shadow),
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=True,
+                env=self.git_environment,
+            )
+            self.run_git(checkout, "config", "core.worktree", str(shadow))
+            contributing = checkout / "CONTRIBUTING.md"
+            contributing.write_bytes(contributing.read_bytes() + b"hidden by hostile core.worktree\n")
+            redirected = self.run_verifier(
+                overlay,
+                repo_root=checkout,
+                authoring_check=False,
+            )
+            self.assert_rejected(
+                redirected,
+                "tracked worktree bytes differ from HEAD: CONTRIBUTING.md",
+            )
+
+    def test_git_boundary_rejects_on_disk_object_alternates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkout = self.make_committed_checkout(root / "fixture")
+            overlay = checkout / "docs/execution/dags/generic-hive-mind-product-v3"
+            git_dir = Path(
+                self.run_git(checkout, "rev-parse", "--absolute-git-dir").stdout.strip()
+            )
+            alternate_objects = root / "alternate-objects"
+            alternate_objects.mkdir()
+            alternates = git_dir / "objects" / "info" / "alternates"
+            alternates.parent.mkdir(parents=True, exist_ok=True)
+            alternates.write_text(str(alternate_objects.resolve()) + "\n", encoding="utf-8")
+            self.assert_rejected(
+                self.run_verifier(overlay, repo_root=checkout, authoring_check=False),
+                "Git object alternates are forbidden",
             )
 
     def test_git_replace_hidden_worktree_and_mode_substitution_fail_closed(self) -> None:
@@ -391,6 +660,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             ).__setitem__("sha256", "sha256:substituted"),
             "execution_authority": lambda m: m["authorship"].__setitem__("execution_authority", "SELF_GRANTED"),
             "extra_authority_field": lambda m: m["authorship"].__setitem__("delegated_authority", "SELF_GRANTED"),
+            "extra_top_level_authority": lambda m: m.__setitem__("execution_authority", "GRANTED"),
+            "extra_execution_command": lambda m: m["execution_contract"].__setitem__("command", "powershell hostile.ps1"),
+            "extra_evidence_authority": lambda m: m["evidence_partition"].__setitem__("external_execution_authority", "GRANTED"),
+            "removed_nonclaims": lambda m: m.__setitem__("nonclaims", []),
             "self_review": lambda m: m["authorship"].__setitem__("judge", "/root/generation_architect"),
         }
         expected_errors = {
@@ -402,8 +675,8 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "tree": "authoring-base parent commit/tree mismatch",
             "correction_head": "correction parent commit/tree mismatch",
             "correction_tree": "correction parent commit/tree mismatch",
-            "predecessor_manifest": "predecessor Payload A identity/status mismatch",
-            "predecessor_aggregate": "predecessor Payload A identity/status mismatch",
+            "predecessor_manifest": "predecessor correction identity/status mismatch",
+            "predecessor_aggregate": "predecessor correction identity/status mismatch",
             "payload_inventory": "committed payload inventory mismatch",
             "anti_downgrade": "activation anti-downgrade contract mismatch",
             "request_snapshot": "request snapshot mismatch",
@@ -411,6 +684,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "standard": "manifest repository source binding mismatch",
             "execution_authority": "author manifest cannot grant execution authority",
             "extra_authority_field": "manifest authorship field inventory mismatch",
+            "extra_top_level_authority": "manifest top-level field inventory mismatch",
+            "extra_execution_command": "manifest execution contract mismatch",
+            "extra_evidence_authority": "evidence partition contract mismatch",
+            "removed_nonclaims": "manifest nonclaims mismatch",
             "self_review": "author manifest cannot self-assign a judge",
         }
         for label, mutation in mutations.items():
