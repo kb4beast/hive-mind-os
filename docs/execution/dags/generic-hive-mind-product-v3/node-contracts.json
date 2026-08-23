@@ -1,0 +1,824 @@
+{
+  "schema_version": 3,
+  "kind": "hive-mind-generic-product-node-contracts-v3",
+  "plan_id": "generic-hive-mind-product-v3",
+  "completeness_policy": {
+    "file_locks": "exactly_write_scope",
+    "forbidden_scope": "common_forbidden_plus_every_other_node_write_scope",
+    "downstream_unlock_value": "equals_critical_path_importance",
+    "write_path_ownership": "exactly_one_node",
+    "worker_contracts_are_inert_data": true
+  },
+  "common_forbidden_scope": [
+    "AGENTS.md",
+    ".autopilot/**",
+    ".hive-mind/**",
+    ".git/**",
+    ".github/**",
+    "docs/architecture/**",
+    "docs/execution/dags/generic-hive-mind-product-v3/**"
+  ],
+  "frozen_host_contract": {
+    "status": "REQUIRED_NOT_SATISFIED_BY_CHECKED_IN_EVIDENCE",
+    "extraction_commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+    "extraction_tree": "22639258c7a524ffda25272ccf34fede176b2663",
+    "file_count": 16,
+    "bundle_digest": "sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255",
+    "files": [
+      {"path":".autopilot/bin/attended_host.py","bytes":13818,"sha256":"sha256:6382b03c63c3b56a1f8703e073705ada28000fdc68ac91341b61746e9c83fe49","git_blob":"3309675fe7d829c9ec02e98dbd6f61818cb5575f"},
+      {"path":".autopilot/bin/autopilot.py","bytes":66963,"sha256":"sha256:e93a8ff557500456eed27be88a5f1d3c5d8e8306c9379aa2d65503b3aa95b3e9","git_blob":"c7193136764e4a8e47f68240aa7a1ef661284b6c"},
+      {"path":".autopilot/bin/controller.py","bytes":170351,"sha256":"sha256:08230e8638296d000cb0e25c53b253f2a03dfc94d2a7770ebb471a941329512b","git_blob":"06b595096e514f2a9abb4d15ef0d6a9621b36d73"},
+      {"path":".autopilot/bin/dag_standard.py","bytes":104317,"sha256":"sha256:105674faf15aaf7b9f4c9db7ad4003fda404438eed2bf8cc3a1782c1cf321e6a","git_blob":"f170ac4f388d265fcaafd32437e449945dcebee3"},
+      {"path":".autopilot/bin/doctor.py","bytes":148,"sha256":"sha256:8d8d1d2e626adc035b323b65fb9c857a516fd2018c63d65ddeca500a48656dd1","git_blob":"4f5006cc295ce0f1a8fb79f14e4872b527fd365a"},
+      {"path":".autopilot/bin/durable_controller.py","bytes":34969,"sha256":"sha256:51424a1437e0dc746c3c06e04859be1dc355dc7ca0e8db62c5cdabdf93d624b6","git_blob":"0e48d0640010fd4cac6ae739636dabada5141e3d"},
+      {"path":".autopilot/bin/github_snapshot.py","bytes":6586,"sha256":"sha256:1a56977544e930474b672876ec42d25c97e7ef97e7bf9fd6aade97a988f93d54","git_blob":"89206c0e450cb5b17b8068bf343923c632052c29"},
+      {"path":".autopilot/bin/healing.py","bytes":36696,"sha256":"sha256:3354549a235e3ea85ada49283f92f03d6d1378e86d08ab1d55261cc57478de69","git_blob":"9c9d70a67a942e2cde9590fc724b965489a2b17c"},
+      {"path":".autopilot/bin/host_execution.py","bytes":62586,"sha256":"sha256:511a6da60b91596e612149f37efe61aa41467ab52f23fdda69b8c312c063c135","git_blob":"0d55e67f0e4dc6fbf1863c93bd70e8c89e6d4e42"},
+      {"path":".autopilot/bin/learning.py","bytes":20628,"sha256":"sha256:ff2c75bf23a030df53e0adbca5005dec2f02b0d3f4200ee4eec43e99cec76325","git_blob":"b29e777064f6319889c4b33fb8971e8782547c8c"},
+      {"path":".autopilot/bin/orchestration.py","bytes":53895,"sha256":"sha256:cf0069adb93a84cf2e5631dadbf46e88cd405057e5436e98b838bf22a5fd9ca8","git_blob":"0084f45be6fdf46e7b64bcede966f99f5939edd9"},
+      {"path":".autopilot/bin/release_barrier.py","bytes":23921,"sha256":"sha256:bdffb3d55d0486c4b57e6ac61c69d276969137ce4140294f5040557666af49cd","git_blob":"1116a10f5c52e3bcbdeb2c3a62edad14cd644590"},
+      {"path":".autopilot/bin/round_driver.py","bytes":17457,"sha256":"sha256:b52da4028252387754b85cd2b96ff4e9cc821d875b5e263b990755da673d0766","git_blob":"a0815c4a5e3b11f8715a2d258d2599de1ffce541"},
+      {"path":".autopilot/bin/sealed_recovery.py","bytes":131922,"sha256":"sha256:2dbd663a4b9a4e155382170d3ec70c88c62bc375ffe1dae911bda36e85982792","git_blob":"96d2774d3f875611b47651a94784b5066d2b8cd4"},
+      {"path":".autopilot/bin/sidecar_execution.py","bytes":14887,"sha256":"sha256:6bdd3c69871cb12c08dbc8c96d94386f21227e5498428d1237dc13e9fdd308a3","git_blob":"1c446053ee3c2bfba1266d503f360f75c548965b"},
+      {"path":".autopilot/bin/verify_receipt.py","bytes":156,"sha256":"sha256:4cb41ff518a53cddb3d3e575cde2f519deeeee2263ebeb2c2448ebefcee2c093","git_blob":"a6d8ea466ea04ff65ff5f015e1834f97ac2087db"}
+    ],
+    "required_external_bindings": [
+      "exact_interpreter_path_version_architecture_and_raw_digest",
+      "independent_reviewer_identity_and_evidence_digest",
+      "predecessor_trust_receipt_and_fresh_trust_receipt",
+      "distinct_signing_principal_or_enforced_outside_repository_deny_sandbox",
+      "short_lived_one_run_nonce_lease_deadline_and_activation_ledger",
+      "per_round_parent_receipts"
+    ],
+    "adverse_facts": [
+      "stored capability expired at 2026-08-23T06:05:21.102Z and binds request snapshot 44224532 plus stale bundle sha256:527ccbeac2d50601d65bf58bc0ce8f314cebda55a9162f5d08607b394c62a081",
+      "the same Windows SID can read the existing authority signing key",
+      "thirteen ignored __pycache__ bytecode files contaminate the current checkout and are not covered by the installed verifier",
+      "the legacy continuation launcher returned success-quiescent but withheld release publication and directed WAIT after reconciliation and remote snapshot change",
+      "none of these facts authenticates or dispatches V3"
+    ]
+  },
+  "node_order": [
+    "BASELINE-000",
+    "DOCTOR-PREFLIGHT-005",
+    "FOUNDATION-010",
+    "PLAN-CORE-100",
+    "RUNTIME-CONTRACTS-150",
+    "BUILD-SYSTEM-200",
+    "ADAPTER-INDEX-210",
+    "WAVE-HOST-300",
+    "TASK-REUSE-310",
+    "RUNTIME-TOKEN-320",
+    "GENERIC-EXECUTOR-400",
+    "CONTROL-TOKEN-410",
+    "PUBLIC-RUNTIME-500",
+    "GENERIC-FIXTURES-600",
+    "FAILURE-QUALIFICATION-610",
+    "TOKEN-BENCHMARK-620",
+    "QUALIFICATION-PREP-625",
+    "CANDIDATE-CI-627",
+    "GENERIC-QUALIFICATION-630",
+    "HANDOFF-700"
+  ],
+  "nodes": [
+    {
+      "id": "BASELINE-000",
+      "objective": "Bind the exact request, repository, authoring snapshot, admitted source inventory, unresolved obligations, and bounded claims before candidate work.",
+      "dependencies": [],
+      "parallel_safe": false,
+      "critical_path_importance": 100,
+      "durability_role": "none",
+      "semantic_locks": ["gate:v3-baseline"],
+      "read_scope": [
+        "AGENTS.md",
+        "docs/execution/dags/generic-hive-mind-product-v3/source-intake.json",
+        "evidence/courts/CASE-COMBINED-AUTOPILOT-PREREQUISITES-2026-08-23.json"
+      ],
+      "write_scope": ["evidence/generic-dag-v3-baseline.json"],
+      "required_tests": ["V3-BASELINE-BINDING-CHECK", "V3-SAME-REQUEST-FAST-PATH-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-BASE-TRACE: Every V1 row assigned to BASELINE-000 has an explicit retained disposition and target criterion.",
+        "AC-BASE-IDENTITY: Request, objective, repository, target branch, immutable authoring-base parent commit/tree, committed payload HEAD/tree, prerequisite snapshot, caller-authenticated manifest digest, and source bytes equal the sealed evidence; the parent identity is never treated as the committed payload identity.",
+        "AC-BASE-SAME-REQUEST: When the current branch already equals the persisted target and request identity is exact, initialization selects the existing authenticated generation path before applying a new-target protected-branch rejection; every partial or stale match blocks.",
+        "AC-BASE-SOURCES: SRC-024 stays QUARANTINE with content unread, and SRC-025 stays unresolved for provenance, license, and lineage.",
+        "AC-BASE-CLAIMS: A5 remains not-ready and no full-autonomy, production, release, deployment, protected-merge, or superiority claim is admitted.",
+        "AC-BASE-BLOCKERS: Credentials, legal consent, spending, production mutation, protected-branch mutation, destructive action, and missing evidence remain typed blockers.",
+        "AC-BASE-CONTINUATION: The withheld stale legacy continuation outcome is adverse evidence only and grants no V3 authority."
+      ],
+      "authority_preconditions": [
+        "exact_manifest_binding",
+        "admitted_source_inventory_complete",
+        "typed_blockers_clear_only_for_local_reversible_scope"
+      ],
+      "candidate_build_effects": ["local_evidence_record_only"],
+      "capabilities_under_test": ["none"],
+      "stopping_condition": "Stop after the exact baseline receipt is independently reproducible; stop blocked on any mismatch, stale fact, missing evidence, or authority ambiguity.",
+      "rollback": "Supersede the baseline receipt append-only; do not delete adverse evidence, rewrite source lineage, or alter either historical plan."
+    },
+    {
+      "id": "DOCTOR-PREFLIGHT-005",
+      "objective": "Evaluate the frozen-host, distinct-principal, cache-free extraction, one-run lease, deadline, and control-boundary preconditions and emit only a typed gate result.",
+      "dependencies": ["BASELINE-000"],
+      "parallel_safe": false,
+      "critical_path_importance": 100,
+      "durability_role": "none",
+      "semantic_locks": ["gate:frozen-host-preflight"],
+      "read_scope": [
+        "evidence/autopilot/COMBINED-PREREQUISITE-QUALIFICATION-2026-08-23.md",
+        "evidence/courts/CASE-COMBINED-AUTOPILOT-PREREQUISITES-2026-08-23.json",
+        ".autopilot/bin/dag_standard.py",
+        "docs/execution/DAG_AUTHORING_STANDARD_V2.md"
+      ],
+      "write_scope": ["evidence/generic-dag-v3-doctor-preflight.json"],
+      "required_tests": ["V3-FROZEN-HOST-PREFLIGHT-CHECK", "V3-FROZEN-HOST-MANIFEST-CHECK", "V3-SOURCE-BEFORE-CODE-FOCUSED", "V3-ACTIVATION-BUNDLE-ADVERSARIAL", "V3-ROUND-CONTRACT-CHECK"],
+      "acceptance_criteria": [
+        "AC-DOCTOR-TRACE: Every V1 row assigned to DOCTOR-PREFLIGHT-005 has an explicit retained disposition and target criterion.",
+        "AC-DOCTOR-HOST: One pristine bytecode-free read-only Git extraction at exact commit ca43709591313c1c166a2e655b8982ccff16daf3 contains exactly the declared sixteen files and bundle digest sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255 and is independently reviewed before candidate mutation.",
+        "AC-DOCTOR-PRINCIPAL: Signing custody is held by a principal distinct from workers, or an enforced outside-repository deny sandbox or restricted token prevents worker access to signing material.",
+        "AC-DOCTOR-LEASE: A short-lived one-run nonce, lease, and hard deadline bind the request, repository, objective, plan digest, interpreter, host bytes, and parent identity.",
+        "AC-DOCTOR-ACTIVATION: A host-authenticated distinct-key activation bundle binds complete signed plan bytes, caller-authenticated manifest digest, plan digest, reviewer, actor, issuer, request, repository, objective, target, immutable authoring-base parent, committed payload HEAD/tree, compiler, standard, nonce, lease, and deadline before activation.",
+        "AC-DOCTOR-ATTACKS: Duplicate-key, non-finite-number, oversize, excessive-depth, path-swap, detached-signature, identity-collision, replay, and concurrent-activation inputs fail before target mutation and retain typed evidence.",
+        "AC-DOCTOR-TRUST-ORDER: Manifest-declared source bytes, including the authored materializer, are size and digest verified before any authored materializer import or execution; the independent verifier never imports or executes it.",
+        "AC-DOCTOR-ROUNDS: The frozen compiler emits exactly twenty manual-parent-v1 rounds, one node per round, with executable availability false and every command null.",
+        "AC-DOCTOR-RECEIPTS: Interpreter identity, reviewer evidence, predecessor trust receipt, new trust receipt, one-run activation ledger, and every round receipt are host-external and digest-bound.",
+        "AC-DOCTOR-NULL: The external execution contract is manual-parent-v1, executable command availability is false, and every compiled round command is null.",
+        "AC-DOCTOR-SELFHOST: The mutable candidate supplies no compiler, controller, scheduler, integrator, doctor, or CI decision used to qualify itself.",
+        "AC-DOCTOR-DEFER: Stale or expired stored trust, same-SID signing-key readability, cache contamination, or missing independent evidence yields a typed DEFER result before mutation."
+      ],
+      "authority_preconditions": [
+        "fresh_external_host_review",
+        "distinct_signing_principal_or_enforced_deny_sandbox",
+        "pristine_cache_free_git_extraction",
+        "short_lived_one_run_lease_and_deadline"
+      ],
+      "candidate_build_effects": ["local_evidence_record_only"],
+      "capabilities_under_test": ["none"],
+      "stopping_condition": "Stop with READY only when every independently controlled precondition is exact and fresh; otherwise retain a typed DEFER or BLOCKED receipt before candidate mutation.",
+      "rollback": "Expire the one-run lease and supersede the preflight receipt; preserve stale-trust, continuation, cache, and same-principal adverse evidence."
+    },
+    {
+      "id": "FOUNDATION-010",
+      "objective": "Establish the qualified mission-state and checkpoint foundation that later durability consumers rely on without duplicating historical implementation.",
+      "dependencies": ["DOCTOR-PREFLIGHT-005"],
+      "parallel_safe": false,
+      "critical_path_importance": 99,
+      "durability_role": "provider",
+      "semantic_locks": ["capability:durable-foundation"],
+      "read_scope": [
+        ".autopilot/plan.json",
+        "docs/execution/runbooks/MISSION-400.md",
+        "docs/execution/runbooks/DURABLE-410.md"
+      ],
+      "write_scope": ["evidence/generic-dag-v3-foundation.json"],
+      "required_tests": ["V3-FOUNDATION-RECEIPT-CHECK"],
+      "acceptance_criteria": [
+        "AC-FOUNDATION-TRACE: Every V1 row assigned to FOUNDATION-010 has an explicit retained disposition and target criterion.",
+        "AC-FOUNDATION-RECEIPTS: Exact immutable receipts identify the qualified mission-state and checkpoint providers without treating historical plan completion as new-request authority.",
+        "AC-FOUNDATION-DURABILITY: The provider demonstrates checkpoint integrity, deterministic replay, idempotent adoption, and duplicate-effect denial on its bound fixture.",
+        "AC-FOUNDATION-SCOPE: This gate changes no product runtime source and delegates incomplete historical work to a versioned replan."
+      ],
+      "authority_preconditions": ["doctor_preflight_ready", "qualified_foundation_receipts"],
+      "candidate_build_effects": ["local_evidence_record_only"],
+      "capabilities_under_test": ["inert_duplicate_effect_fixture_only"],
+      "stopping_condition": "Stop after exact foundation receipts and their tests reproduce under the frozen host; stop for a versioned replan on any gap.",
+      "rollback": "Supersede only the mapping receipt and preserve historical mission-state, checkpoint, and adverse records."
+    },
+    {
+      "id": "PLAN-CORE-100",
+      "objective": "Implement authenticated plan-generation lineage for the exact request while preserving historical plan bytes and separating data proposals from authority.",
+      "dependencies": ["FOUNDATION-010"],
+      "parallel_safe": false,
+      "critical_path_importance": 98,
+      "durability_role": "none",
+      "semantic_locks": ["schema:plan-generation-lineage"],
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/contracts.py",
+        "docs/execution/dags/generic-hive-mind-product-v3/source-intake.json"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/plan_lineage.py",
+        "src/hive_mind_os/plan_generation.py",
+        "tests/test_plan_lineage.py",
+        "tests/test_plan_generation.py",
+        "docs/execution/PLAN_LINEAGE.md"
+      ],
+      "required_tests": ["V3-PLAN-LINEAGE-FOCUSED", "V3-PLAN-GENERATION-FOCUSED", "V3-PLAN-JSON-BOUNDARY-ADVERSARIAL"],
+      "acceptance_criteria": [
+        "AC-PLAN-TRACE: Every V1 row assigned to PLAN-CORE-100 has an explicit retained disposition and target criterion.",
+        "AC-PLAN-LINEAGE: Generation records bind request, objective, repository, target, parent generation, node mappings, source inventory, and exact standard and compiler identities.",
+        "AC-PLAN-PORTABLE: The typed PortablePlanBundle models repository and non-repository subjects, resources, capabilities, adapters, authority, budgets, recovery, integration, and token policy.",
+        "AC-PLAN-CARRYFORWARD: Unchanged qualified receipts carry forward byte-identically, changed contracts requalify, removed nodes remain historical, and new nodes inherit no completion.",
+        "AC-PLAN-SUBSTITUTION: Ambiguity, downgrade, cycle, stale request, stale tree, flat-fingerprint substitution, and cross-subject identity fail closed.",
+        "AC-PLAN-ACTIVATION: The generation exports complete sealed plan bytes and an external manifest for distinct-key host authentication; neither a detached digest nor a path reference is sufficient activation material.",
+        "AC-PLAN-REPEAT: No restart or resume semantic is established by this node; exact generation-identity repetition is idempotent, while a digest collision, identity collision, concurrent activation, or changed binding stops with no legacy-plan fallback.",
+        "AC-PLAN-SEPARATION: A generated plan is inert data and never grants credentials, host trust, execution authority, or an external effect.",
+        "AC-PLAN-HISTORICAL: The historical .autopilot/plan.json remains byte-identical and its existing receipts retain their original interpretation; V3 is external and additive."
+      ],
+      "authority_preconditions": ["foundation_provider_bound", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["inert_plan_data_only"],
+      "stopping_condition": "Stop after focused lineage and substitution tests pass on one immutable candidate and independent review has no unresolved material finding.",
+      "rollback": "Revert only PLAN-CORE-100 candidate changes; retain generations, rejected substitutions, receipts, and historical plan bytes."
+    },
+    {
+      "id": "RUNTIME-CONTRACTS-150",
+      "objective": "Define the shared subject-neutral runtime schemas and interfaces, including the complete decision-memory tree, before any implementation owner consumes them.",
+      "dependencies": ["PLAN-CORE-100"],
+      "parallel_safe": false,
+      "critical_path_importance": 98,
+      "durability_role": "none",
+      "semantic_locks": ["schema:shared-runtime-contracts", "iface:shared-runtime-contracts"],
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/contracts.py",
+        "src/hive_mind_os/brain_kernel/context.py",
+        "docs/execution/dags/generic-hive-mind-product-v3/source-intake.json"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/portable_plan.py",
+        "src/hive_mind_os/runtime_contracts.py",
+        "src/hive_mind_os/wave_manifest.py",
+        "src/hive_mind_os/host_adapter.py",
+        "tests/test_portable_plan.py",
+        "tests/test_runtime_contracts.py",
+        "docs/execution/portable-plan.schema.json",
+        "docs/execution/runtime-contracts.schema.json",
+        "docs/execution/RUNTIME_CONTRACTS.md"
+      ],
+      "required_tests": ["V3-PORTABLE-PLAN-CONTRACT", "V3-RUNTIME-CONTRACTS-FOCUSED", "V3-TYPED-DURABILITY-CHECK", "V3-SINGLE-WRITER-OWNERSHIP-CHECK"],
+      "acceptance_criteria": [
+        "AC-CONTRACTS-TRACE: Every V1 row assigned to RUNTIME-CONTRACTS-150 has an explicit retained disposition and target criterion.",
+        "AC-CONTRACTS-SCHEMAS: Portable plan, wave, host, authority, resource, budget, integration, token, and evidence schemas are versioned, closed, subject-neutral, and separately owned from implementations.",
+        "AC-CONTRACTS-DURABILITY: All twenty nodes carry the exact Clerk-assigned typed V2 durability role and each consumer names only its exact transitive providers.",
+        "AC-CONTRACTS-OWNERSHIP: Exactly eighty-five writable paths have one owner each and are forbidden elsewhere; the seven mandated shared surfaces have only their declared owner.",
+        "AC-CONTRACTS-MEMORY: Each decision-memory entry requires question, snapshot, alternatives, evidence, counterevidence, constraints, authority, budget, scoring model, scores, winner, losers, uncertainty, owner, time, freshness, corrections, supersession, and appeal state.",
+        "AC-CONTRACTS-SELECTION: Missing evidence, authority ambiguity, unresolved ties, or an unsafe winning alternative produces a typed blocker rather than a fabricated selection.",
+        "AC-CONTRACTS-VISION: The active-gate versus reference-only vision conflict remains unresolved and keeps A5 and the full hardened-vision claim not-ready."
+      ],
+      "authority_preconditions": ["plan_lineage_qualified", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["inert_schema_validation_only"],
+      "stopping_condition": "Stop after schema round-trip, rejection, ownership, and decision-memory tests pass and each shared interface has one declared owner.",
+      "rollback": "Revert only RUNTIME-CONTRACTS-150 schema and interface changes; consumers must stop for a versioned contract replan rather than silently downgrade."
+    },
+    {
+      "id": "BUILD-SYSTEM-200",
+      "objective": "Implement a standard-bound planner and one packaged canonical compiler without modifying the installed controller or either historical plan.",
+      "dependencies": ["RUNTIME-CONTRACTS-150"],
+      "parallel_safe": false,
+      "critical_path_importance": 97,
+      "durability_role": "none",
+      "semantic_locks": ["iface:product-build-dag", "iface:packaged-dag-compiler"],
+      "read_scope": [
+        "docs/execution/DAG_AUTHORING_STANDARD.md",
+        "docs/execution/DAG_AUTHORING_STANDARD_V2.md",
+        ".autopilot/bin/dag_standard.py",
+        "src/hive_mind_os/runtime_contracts.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/autopilot_workflow.py",
+        "src/hive_mind_os/dag_standard.py",
+        "src/hive_mind_os/planner_prompt.py",
+        "tests/test_autopilot_workflow.py",
+        "tests/test_dag_standard_product.py",
+        "tests/test_planner_prompt.py",
+        "docs/execution/PORTABLE_AUTOPILOT.md",
+        "docs/execution/PLANNER_PROMPT.md"
+      ],
+      "required_tests": ["V3-BUILD-DAG-FOCUSED", "V3-PACKAGED-COMPILER-FOCUSED", "V3-PLANNER-PROMPT-FOCUSED", "V3-EXACT-TOPOLOGY-CHECK"],
+      "acceptance_criteria": [
+        "AC-BUILD-TRACE: Every V1 row assigned to BUILD-SYSTEM-200 has an explicit retained disposition and target criterion.",
+        "AC-BUILD-STANDARD: Planning binds standard version, raw digest, byte count, Git blob, package identity, request identity, repository identity, and exact target snapshot.",
+        "AC-BUILD-LINT: BUILD_DAG succeeds only for the canonical compiler with zero lint errors and zero warnings and a caller-bound expected plan digest.",
+        "AC-BUILD-TOPOLOGY: The sealed graph has exactly twenty nodes, twenty-eight raw edges, seventeen levels, and exactly six transitive direct edges retained only with their direct-artifact rationales.",
+        "AC-BUILD-ORIGINAL: The repository-owned planner prompt is original, versioned, license-clean, content-addressed, and proposes inert data only.",
+        "AC-BUILD-FAILCLOSED: Missing, stale, substituted, downgraded, pre-standard, or repository-executed compiler material fails closed before target mutation.",
+        "AC-BUILD-CHECK: CHECK remains read-only and task-free under every missing, stale, substituted, downgraded, or pre-standard request condition."
+      ],
+      "authority_preconditions": ["runtime_contracts_qualified", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["inert_planning_and_lint_only"],
+      "stopping_condition": "Stop after focused build, compiler, prompt, substitution, and no-installed-controller-mutation tests pass on the immutable candidate.",
+      "rollback": "Revert only BUILD-SYSTEM-200 product-package changes and retain standards, compiler receipts, losing planner outputs, and historical controller bytes."
+    },
+    {
+      "id": "ADAPTER-INDEX-210",
+      "objective": "Implement subject and resource adapters, the sole adapter registry, and exact-snapshot indexing for arbitrary repositories and non-repository subjects.",
+      "dependencies": ["RUNTIME-CONTRACTS-150"],
+      "parallel_safe": false,
+      "critical_path_importance": 92,
+      "durability_role": "none",
+      "semantic_locks": ["iface:subject-adapters", "iface:adapter-registry", "iface:subject-index"],
+      "read_scope": [
+        "src/hive_mind_os/runtime_contracts.py",
+        "src/hive_mind_os/git_adapter.py",
+        "src/hive_mind_os/model_provider.py",
+        "src/hive_mind_os/brain_kernel/context.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/subject_adapter.py",
+        "src/hive_mind_os/resource_adapter.py",
+        "src/hive_mind_os/adapter_registry.py",
+        "src/hive_mind_os/repository_index.py",
+        "tests/test_subject_adapter.py",
+        "tests/test_resource_adapter.py",
+        "tests/test_adapter_registry.py",
+        "tests/test_repository_index.py",
+        "docs/execution/SUBJECT_ADAPTERS.md",
+        "docs/execution/REPOSITORY_INDEX.md"
+      ],
+      "required_tests": ["V3-SUBJECT-ADAPTER-FOCUSED", "V3-ADAPTER-REGISTRY-FOCUSED", "V3-REPOSITORY-INDEX-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-ADAPTER-TRACE: Every V1 row assigned to ADAPTER-INDEX-210 has an explicit retained disposition and target criterion.",
+        "AC-ADAPTER-GENERIC: Repository paths are one typed resource among artifacts, sources, datasets, APIs, tickets, databases, workflows, and custom subjects.",
+        "AC-ADAPTER-SELECTION: Selection is deterministic, lowest-sufficient, vendor-neutral, evidence-bound, and denies missing or conflicting capability authority.",
+        "AC-ADAPTER-INDEX: Index identity binds subject, exact snapshot, analyzer, environment, and content digests; changed and deleted content invalidates affected entries.",
+        "AC-ADAPTER-SAFETY: Analysis is conservative and non-executing; secrets, unsafe links, oversized binaries, mutable state, and unregistered third-party adapters are rejected."
+      ],
+      "authority_preconditions": ["runtime_contracts_qualified", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["read_only_or_inert_adapter_fixtures_only"],
+      "stopping_condition": "Stop after focused adapter, registry, index, cross-subject, secret, and substitution tests pass on the immutable candidate.",
+      "rollback": "Revert only ADAPTER-INDEX-210 paths; preserve rejected adapter registrations, index receipts, and source-license obligations."
+    },
+    {
+      "id": "WAVE-HOST-300",
+      "objective": "Implement durable wave state, bounded host supervision, immutable candidate sealing, and one compare-and-swap integration transaction per round using the shared contracts.",
+      "dependencies": ["BUILD-SYSTEM-200"],
+      "parallel_safe": false,
+      "critical_path_importance": 96,
+      "durability_role": "provider",
+      "semantic_locks": ["capability:wave-durability", "iface:host-runtime", "iface:integration-transaction"],
+      "read_scope": [
+        "src/hive_mind_os/runtime_contracts.py",
+        "src/hive_mind_os/wave_manifest.py",
+        "src/hive_mind_os/host_adapter.py",
+        "src/hive_mind_os/mission_store.py",
+        "src/hive_mind_os/git_adapter.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/host_runtime.py",
+        "src/hive_mind_os/integration_transaction.py",
+        "src/hive_mind_os/brain_kernel/candidate_state.py",
+        "tests/test_wave_runtime.py",
+        "tests/test_host_runtime.py",
+        "tests/test_integration_transaction.py",
+        "docs/execution/WAVE_RUNTIME.md",
+        "docs/execution/HOST_RUNTIME.md"
+      ],
+      "required_tests": ["V3-WAVE-RUNTIME-FOCUSED", "V3-HOST-RUNTIME-FOCUSED", "V3-INTEGRATION-TRANSACTION-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-WAVE-TRACE: Every V1 row assigned to WAVE-HOST-300 has an explicit retained disposition and target criterion.",
+        "AC-WAVE-MANIFEST: Each immutable wave binds generation, compiler, standard, subject snapshot, nodes, contracts, resources, context, tests, budgets, effects, and integration order.",
+        "AC-WAVE-STATES: State transitions include checkpointed, candidate-sealed, verifying, integration-ready, recoverable, replan-required, and explicit terminals.",
+        "AC-WAVE-SEALING: Candidate sealing ends mutable authority, while exact verification and adoption survive claim expiry and parent restart through the declared provider state.",
+        "AC-WAVE-HOST: Host create, poll, message, checkpoint, cancel, resume, and adopt operations are idempotent, time-bounded, usage-accounted, and subject to the one-run deadline.",
+        "AC-WAVE-INTEGRATION: Workers never mutate the target; the integrator consumes sealed candidates in declared order, validates once, and advances the target once by compare-and-swap.",
+        "AC-WAVE-FAILURE: Drift, mutation, conflict, process loss, or response loss leaves the target unchanged and records an adoptable or replan-required state without duplicate effects."
+      ],
+      "authority_preconditions": ["frozen_host_unchanged", "shared_runtime_contracts_qualified", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation", "local_compare_and_swap_integration_fixture"],
+      "capabilities_under_test": ["inert_or_disposable_effect_fixture_only"],
+      "stopping_condition": "Stop after wave, host, transaction, crash, drift, duplicate-effect, and bounded-wait tests pass on one immutable candidate.",
+      "rollback": "Revert only WAVE-HOST-300 implementation paths; preserve journals, sealed candidates, failed transactions, and effect evidence."
+    },
+    {
+      "id": "TASK-REUSE-310",
+      "objective": "Implement exact task fingerprints, existing-work detection, dependency receipts, and safe candidate reuse using the qualified wave provider.",
+      "dependencies": ["WAVE-HOST-300", "ADAPTER-INDEX-210", "BUILD-SYSTEM-200"],
+      "parallel_safe": false,
+      "critical_path_importance": 94,
+      "durability_role": "consumer",
+      "durability_providers": ["WAVE-HOST-300"],
+      "semantic_locks": ["schema:task-reuse"],
+      "read_scope": [
+        "src/hive_mind_os/repository_index.py",
+        "src/hive_mind_os/runtime_contracts.py",
+        "src/hive_mind_os/host_runtime.py",
+        "src/hive_mind_os/dag_standard.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/task_reuse.py",
+        "tests/test_task_reuse.py",
+        "docs/execution/TASK_REUSE.md"
+      ],
+      "required_tests": ["V3-TASK-REUSE-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-TASK-TRACE: Every V1 row assigned to TASK-REUSE-310 has an explicit retained disposition and target criterion.",
+        "AC-TASK-FINGERPRINT: Fingerprints bind plan, node, subject snapshot, relevant surface, direct dependency receipts, authority, compiler, policy, environment, and task contract.",
+        "AC-TASK-DISPOSITION: Results distinguish exact reuse, verify-existing, resume-active, repair-existing, execute-new, stale, conflict, and blocked.",
+        "AC-TASK-VALIDITY: Only validated integrated receipts complete work; unaccepted branches reduce to verification or repair and never inherit target completion.",
+        "AC-TASK-INVALIDATION: Changed content, dependencies, authority, policy, environment, corruption, or cross-subject identity invalidates reuse."
+      ],
+      "authority_preconditions": ["wave_provider_qualified", "adapter_index_qualified", "canonical_build_artifact_bound", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["inert_reuse_fixtures_only"],
+      "direct_dependency_rationales": {
+        "BUILD-SYSTEM-200": "Task fingerprints consume the canonical compiler and build identity directly even though WAVE-HOST-300 also depends on BUILD-SYSTEM-200."
+      },
+      "stopping_condition": "Stop after exact reuse, stale-state, corruption, cross-subject, and dependency-change tests pass on the immutable candidate.",
+      "rollback": "Revert only TASK-REUSE-310 paths and invalidate affected reuse receipts without deleting historical candidates."
+    },
+    {
+      "id": "RUNTIME-TOKEN-320",
+      "objective": "Implement adaptive role dispositions, dependency-routed context envelopes, and measured token accounting through the sole token ledger.",
+      "dependencies": ["ADAPTER-INDEX-210", "FOUNDATION-010"],
+      "parallel_safe": false,
+      "critical_path_importance": 95,
+      "durability_role": "none",
+      "semantic_locks": ["iface:runtime-token-economy"],
+      "read_scope": [
+        "src/hive_mind_os/brain_kernel/context.py",
+        "src/hive_mind_os/brain_kernel/roles.py",
+        "src/hive_mind_os/model_provider.py",
+        "src/hive_mind_os/adapter_registry.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/brain_kernel/role_applicability.py",
+        "src/hive_mind_os/token_ledger.py",
+        "src/hive_mind_os/brain_kernel/role_runtime.py",
+        "src/hive_mind_os/model_backend.py",
+        "tests/test_hive_cortex_role_applicability.py",
+        "tests/test_hive_cortex_token_economy.py",
+        "docs/execution/TOKEN_ECONOMY.md"
+      ],
+      "required_tests": ["V3-ROLE-APPLICABILITY-FOCUSED", "V3-RUNTIME-TOKEN-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-RUNTIME-TOKEN-TRACE: Every V1 row assigned to RUNTIME-TOKEN-320 has an explicit retained disposition and target criterion.",
+        "AC-RUNTIME-TOKEN-ROLES: Every role yields MODEL_EXECUTE, DETERMINISTIC_CHECK, NOT_APPLICABLE, DEFERRED, or BLOCKED with an evidence-bound result.",
+        "AC-RUNTIME-TOKEN-SMALL: Qualifying small tasks use fewer than eight model calls while retaining an explicit disposition and evidence record for every required lifecycle role and stage.",
+        "AC-RUNTIME-TOKEN-CONTEXT: Direct dependencies receive compact bodies, transitive dependencies receive digest references, unrelated context is omitted explicitly, and cold expansion is budgeted and recorded.",
+        "AC-RUNTIME-TOKEN-BUDGET: Existing ContextCompiler tiers remain canonical and character truncation is a declared last-resort fallback.",
+        "AC-RUNTIME-TOKEN-LEDGER: Input, output, cache, call, and fallback measurements are recorded as measured, estimated, or unavailable; unavailable never means zero."
+      ],
+      "authority_preconditions": ["foundation_provider_bound", "adapter_index_qualified", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["bounded_model_fixture_only"],
+      "direct_dependency_rationales": {
+        "FOUNDATION-010": "Role and context accounting consume the foundation mission-state identity directly even though ADAPTER-INDEX-210 is also a descendant of FOUNDATION-010."
+      },
+      "stopping_condition": "Stop after role, context-routing, budget, unavailable-accounting, and ledger single-writer tests pass on the immutable candidate.",
+      "rollback": "Revert only RUNTIME-TOKEN-320 paths and preserve measurement receipts and unavailable observations."
+    },
+    {
+      "id": "GENERIC-EXECUTOR-400",
+      "objective": "Implement the sole generic DAG executor that validates plans, compiles rounds, launches bounded workers, checkpoints, seals, verifies, integrates, resumes, and applies versioned graph patches.",
+      "dependencies": ["WAVE-HOST-300", "TASK-REUSE-310", "ADAPTER-INDEX-210"],
+      "parallel_safe": false,
+      "critical_path_importance": 98,
+      "durability_role": "consumer",
+      "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"],
+      "semantic_locks": ["iface:generic-dag-executor"],
+      "read_scope": [
+        "src/hive_mind_os/runtime_contracts.py",
+        "src/hive_mind_os/host_runtime.py",
+        "src/hive_mind_os/integration_transaction.py",
+        "src/hive_mind_os/task_reuse.py",
+        "src/hive_mind_os/adapter_registry.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/dag_executor.py",
+        "tests/test_dag_executor.py",
+        "docs/execution/DAG_EXECUTOR.md"
+      ],
+      "required_tests": ["V3-DAG-EXECUTOR-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-EXECUTOR-TRACE: Every V1 row assigned to GENERIC-EXECUTOR-400 has an explicit retained disposition and target criterion.",
+        "AC-EXECUTOR-REFUSAL: Execution refuses lint findings, undisposed warnings, stale generations, stale manifests, missing adapters, invalid authority, expired leases, and resource conflicts.",
+        "AC-EXECUTOR-ROUNDS: Ready nodes form conflict-free compiler rounds; all permitted workers start before bounded polling and graph level alone is never execution authority.",
+        "AC-EXECUTOR-DELTA: Each worker receives one frozen manifest plus only its node delta, and completed siblings and sealed candidates remain adoptable when another worker blocks or fails.",
+        "AC-EXECUTOR-ADOPTION: A parent restart adopts exact tasks, sealed candidates, tests, transactions, and effect receipts without duplicate work.",
+        "AC-EXECUTOR-PATCH: Graph patches are authenticated lineage records and cannot weaken acceptance, authority, independence, ownership, evidence, or the one-run deadline.",
+        "AC-EXECUTOR-MEMORY: Routine unresolved choices use the complete decision-memory contract and stop on missing evidence, unsafe ties, or authority gaps."
+      ],
+      "authority_preconditions": ["foundation_provider_bound", "wave_provider_qualified", "task_reuse_qualified", "adapter_registry_qualified", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["inert_or_disposable_worker_and_effect_fixtures_only"],
+      "direct_dependency_rationales": {
+        "WAVE-HOST-300": "The executor calls the wave and host runtime directly even though TASK-REUSE-310 is a descendant of WAVE-HOST-300.",
+        "ADAPTER-INDEX-210": "The executor resolves subject capabilities through the adapter registry directly even though TASK-REUSE-310 is a descendant of ADAPTER-INDEX-210."
+      },
+      "stopping_condition": "Stop after focused plan-refusal, round, adoption, graph-patch, decision-memory, and no-duplicate-effect tests pass on the immutable candidate.",
+      "rollback": "Revert only GENERIC-EXECUTOR-400 paths; retain task, candidate, transaction, effect, blocker, and graph-lineage receipts."
+    },
+    {
+      "id": "CONTROL-TOKEN-410",
+      "objective": "Implement immutable round capsules, node deltas, exact-candidate test reuse, tool snapshot reuse, compact evidence, and measured sidecar calibration.",
+      "dependencies": ["GENERIC-EXECUTOR-400", "RUNTIME-TOKEN-320"],
+      "parallel_safe": false,
+      "critical_path_importance": 94,
+      "durability_role": "none",
+      "semantic_locks": ["iface:control-token-economy", "iface:sidecar-calibration"],
+      "read_scope": [
+        "src/hive_mind_os/dag_executor.py",
+        "src/hive_mind_os/task_reuse.py",
+        "src/hive_mind_os/repository_index.py",
+        "src/hive_mind_os/token_ledger.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/context_capsule.py",
+        "src/hive_mind_os/test_result_cache.py",
+        "src/hive_mind_os/evidence_compaction.py",
+        "src/hive_mind_os/sidecar_calibration.py",
+        "tests/test_control_token_economy.py",
+        "tests/test_sidecar_calibration.py",
+        "docs/execution/CONTROL_TOKEN_ECONOMY.md"
+      ],
+      "required_tests": ["V3-CONTROL-TOKEN-FOCUSED", "V3-SIDECAR-CALIBRATION-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-CONTROL-TRACE: Every V1 row assigned to CONTROL-TOKEN-410 has an explicit retained disposition and target criterion.",
+        "AC-CONTROL-CAPSULE: One immutable shared capsule exists per round and workers receive only node deltas, direct dependency bodies, and content-addressed cold references.",
+        "AC-CONTROL-TESTREUSE: Test reuse requires exact candidate, command descriptor, test set, locks, configuration, toolchain, OS, and safe environment.",
+        "AC-CONTROL-EVIDENCE: Passing logs compact; failures retain the first causal and every distinct material error plus a raw digest.",
+        "AC-CONTROL-CALIBRATION: Net savings use measured avoided parent work minus sidecar input, output, and coordination; negative classes stop and static estimates stay labeled.",
+        "AC-CONTROL-LOWER: A controlled fixture demonstrates materially lower context than naive fan-out with identical acceptance, authority, subject snapshot, model route, and budget."
+      ],
+      "authority_preconditions": ["generic_executor_qualified", "runtime_token_qualified", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["bounded_sidecar_fixture_only"],
+      "stopping_condition": "Stop after capsule, cache-key, corruption, evidence-retention, and measured-calibration tests pass on the immutable candidate.",
+      "rollback": "Revert only CONTROL-TOKEN-410 paths and invalidate affected cache entries while retaining raw evidence digests."
+    },
+    {
+      "id": "PUBLIC-RUNTIME-500",
+      "objective": "Expose subject-neutral build, validate, rounds, execute, resume, status, cancel, graph, reconcile, and inert PowerShell-preparation interfaces.",
+      "dependencies": ["CONTROL-TOKEN-410", "BUILD-SYSTEM-200"],
+      "parallel_safe": false,
+      "critical_path_importance": 97,
+      "durability_role": "consumer",
+      "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"],
+      "semantic_locks": ["iface:public-subject-runtime"],
+      "read_scope": [
+        "src/hive_mind_os/autopilot_workflow.py",
+        "src/hive_mind_os/planner_prompt.py",
+        "src/hive_mind_os/runtime_contracts.py",
+        "src/hive_mind_os/dag_executor.py",
+        "src/hive_mind_os/token_ledger.py"
+      ],
+      "write_scope": [
+        "src/hive_mind_os/dag_cli.py",
+        "src/hive_mind_os/cli.py",
+        "src/hive_mind_os/subject_execution.py",
+        "src/hive_mind_os/powershell_preparation.py",
+        "tests/test_cli_dag.py",
+        "tests/test_subject_execution.py",
+        "tests/test_powershell_preparation.py",
+        "docs/execution/DAG_CLI.md",
+        "USER_GUIDE/README.md",
+        "USER_GUIDE/07_GENERIC_DAG_EXECUTION.md"
+      ],
+      "required_tests": ["V3-PUBLIC-DAG-CLI-FOCUSED", "V3-SUBJECT-EXECUTION-FOCUSED", "V3-POWERSHELL-PREPARATION-FOCUSED", "V3-REPEAT-RESUME-CONCURRENCY-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-PUBLIC-TRACE: Every V1 row assigned to PUBLIC-RUNTIME-500 has an explicit retained disposition and target criterion.",
+        "AC-PUBLIC-VALIDATE: Every executing entry validates the exact plan and refuses stale manifests, missing adapters, protected-target ambiguity, unsupported modes, expired leases, and non-null external-plan commands.",
+        "AC-PUBLIC-COMMANDS: Public interfaces cover build, validate, rounds, execute, resume, status, cancel, graph, and reconcile for repository and non-repository subjects.",
+        "AC-PUBLIC-READONLY: Read-only public operations work from any current directory with explicit subject, repository, and plan identities and never mutate subject, repository, cache, evidence, or control state.",
+        "AC-PUBLIC-GENERIC: Explicit subject, repository, plan, and target inputs work from any current directory without Hive-specific paths, vendors, languages, branch names, or GitHub assumptions.",
+        "AC-PUBLIC-MODES: Planning-only, local-no-SCM, disposable-fixture, and separately authorized delivery modes are explicit and subject-isolated.",
+        "AC-PUBLIC-EASY: The easy autopilot entry point recognizes the exact persisted request on its already-targeted branch, consumes only the host-authenticated activation bundle, and repeats or resumes idempotently without selecting a legacy plan.",
+        "AC-PUBLIC-GUIDE: The completed user guide covers the easy entry point, subjects, adapters, authority, token accounting, recovery, evidence envelopes, external gates, and bounded operator preparation before candidate freeze.",
+        "AC-PUBLIC-POWERSHELL: PowerShell output is inert bounded preparation only and cannot impersonate a person, attest review, obtain credentials, accept terms, sign, spend, bypass policy, or enlarge authority.",
+        "AC-PUBLIC-DIRECT: The public validator and rounds path consume the canonical build artifact directly rather than trusting an indirect runtime copy."
+      ],
+      "authority_preconditions": ["generic_executor_qualified", "control_token_qualified", "canonical_build_artifact_bound", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["inert_fixture_or_explicit_deny_path_only"],
+      "direct_dependency_rationales": {
+        "BUILD-SYSTEM-200": "Public validate and rounds interfaces consume the canonical compiler and planner package directly even though CONTROL-TOKEN-410 is a descendant of BUILD-SYSTEM-200."
+      },
+      "stopping_condition": "Stop after public command, any-current-directory, subject-isolation, deny-path, and inert PowerShell-preparation tests pass on the immutable candidate.",
+      "rollback": "Revert only PUBLIC-RUNTIME-500 paths; preserve generated inert artifacts, denial receipts, and public-contract compatibility evidence."
+    },
+    {
+      "id": "GENERIC-FIXTURES-600",
+      "objective": "Create disposable cross-language and non-repository fixtures that use only installed public interfaces and never live external authority.",
+      "dependencies": ["PUBLIC-RUNTIME-500"],
+      "parallel_safe": false,
+      "critical_path_importance": 90,
+      "durability_role": "consumer",
+      "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"],
+      "semantic_locks": ["fixture:generic-product"],
+      "read_scope": [
+        "src/hive_mind_os/subject_execution.py",
+        "src/hive_mind_os/dag_executor.py",
+        "src/hive_mind_os/powershell_preparation.py"
+      ],
+      "write_scope": [
+        "tests/test_generic_dag_fixtures.py",
+        "docs/execution/GENERIC_DAG_FIXTURES.md"
+      ],
+      "required_tests": ["V3-GENERIC-FIXTURES-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-FIXTURES-TRACE: Every V1 row assigned to GENERIC-FIXTURES-600 has an explicit retained disposition and target criterion.",
+        "AC-FIXTURES-COVERAGE: Fixtures cover Python, Node or TypeScript, C sharp, Go or Rust, monorepo, documentation-only, no-test, target-advancing, offline-local, research-artifact, and workflow subjects.",
+        "AC-FIXTURES-PUBLIC: Every fixture uses installed public contracts and adapters rather than a Hive-specific shortcut or target repository Python.",
+        "AC-FIXTURES-INERT: Credential, payment, push, pull request, comment, deployment, production, and protected-target capabilities use disposable inert doubles or explicit denial only.",
+        "AC-FIXTURES-REPRODUCIBLE: Plans, rounds, candidates, receipts, recovery, effects, and token observations are deterministic, disposable, license-safe, secret-free, and snapshot-bound."
+      ],
+      "authority_preconditions": ["public_runtime_qualified", "disposable_fixture_boundary", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation"],
+      "capabilities_under_test": ["disposable_inert_external_capability_doubles_only"],
+      "stopping_condition": "Stop after all cross-language, non-repository, denial, disposal, and deterministic-repeat fixture tests pass on the immutable candidate.",
+      "rollback": "Revert only GENERIC-FIXTURES-600 paths and delete only ephemeral fixture workspaces through their tested bounded cleanup path."
+    },
+    {
+      "id": "FAILURE-QUALIFICATION-610",
+      "objective": "Qualify concurrency, target drift, hidden dependencies, host loss, checkpoint adoption, candidate mutation, integration conflict, and duplicate-effect recovery.",
+      "dependencies": ["GENERIC-FIXTURES-600"],
+      "parallel_safe": false,
+      "critical_path_importance": 95,
+      "durability_role": "consumer",
+      "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"],
+      "semantic_locks": ["qualification:failure-matrix"],
+      "read_scope": [
+        "src/hive_mind_os/dag_executor.py",
+        "src/hive_mind_os/host_runtime.py",
+        "src/hive_mind_os/integration_transaction.py",
+        "src/hive_mind_os/brain_kernel/candidate_state.py"
+      ],
+      "write_scope": [
+        "tests/test_generic_dag_failure_matrix.py",
+        "evidence/generic-dag-v3-failure-qualification.json",
+        "docs/execution/GENERIC_DAG_FAILURE_QUALIFICATION.md"
+      ],
+      "required_tests": ["V3-FAILURE-MATRIX-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-FAILURE-TRACE: Every V1 row assigned to FAILURE-QUALIFICATION-610 has an explicit retained disposition and target criterion.",
+        "AC-FAILURE-BOUNDS: A silent worker cannot hang the parent; completed siblings and exact sealed candidates remain adoptable under the hard deadline.",
+        "AC-FAILURE-ORDER: Random worker finish order yields one deterministic candidate integration tree.",
+        "AC-FAILURE-DRIFT: Target advance, hidden dependency, stale manifest, resource conflict, and merge conflict stop before target mutation with typed replan evidence.",
+        "AC-FAILURE-NODUP: Parent and worker failures resume without duplicate model work, tests, push, pull request, comment, deployment, payment, or other effects.",
+        "AC-FAILURE-CONTAINMENT: Cross-host coordination loss, cache contamination, same-principal key exposure, and lease expiry fail closed with self-verifying evidence."
+      ],
+      "authority_preconditions": ["generic_fixtures_qualified", "durability_providers_bound", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation", "local_qualification_evidence"],
+      "capabilities_under_test": ["disposable_inert_failure_effects_only"],
+      "stopping_condition": "Stop after the complete failure matrix reproduces against one immutable candidate with no unexplained hang, mutation, or duplicate effect.",
+      "rollback": "Revert only FAILURE-QUALIFICATION-610 test and documentation paths; preserve adverse matrices, raw digests, and failed candidates."
+    },
+    {
+      "id": "TOKEN-BENCHMARK-620",
+      "objective": "Benchmark naive full-context and full-role evaluation against indexed, reused, dependency-routed evaluation across representative subjects.",
+      "dependencies": ["GENERIC-FIXTURES-600", "CONTROL-TOKEN-410"],
+      "parallel_safe": false,
+      "critical_path_importance": 94,
+      "durability_role": "none",
+      "semantic_locks": ["qualification:token-benchmark"],
+      "read_scope": [
+        "src/hive_mind_os/token_ledger.py",
+        "src/hive_mind_os/context_capsule.py",
+        "src/hive_mind_os/task_reuse.py",
+        "src/hive_mind_os/brain_kernel/role_runtime.py"
+      ],
+      "write_scope": [
+        "tests/test_generic_dag_token_benchmark.py",
+        "evidence/generic-dag-v3-token-benchmark.json",
+        "docs/execution/GENERIC_DAG_TOKEN_BENCHMARK.md"
+      ],
+      "required_tests": ["V3-TOKEN-BENCHMARK-FOCUSED"],
+      "acceptance_criteria": [
+        "AC-TOKEN-BENCH-TRACE: Every V1 row assigned to TOKEN-BENCHMARK-620 has an explicit retained disposition and target criterion.",
+        "AC-TOKEN-BENCH-CONTROL: Naive and optimized lanes have equal snapshots, acceptance, authority, model route, budgets, and seeds.",
+        "AC-TOKEN-BENCH-MEASURE: Input, output, cache, calls, retries, reads, tests, sidecars, and accepted outcomes are measured; unavailable remains unavailable.",
+        "AC-TOKEN-BENCH-BOUND: The controlled target must show at least thirty percent fewer input tokens without weaker acceptance, while making no universal or superiority claim.",
+        "AC-TOKEN-BENCH-REPRO: Results are reproducible, exact-candidate-bound, and include losing comparator observations."
+      ],
+      "authority_preconditions": ["generic_fixtures_qualified", "control_token_artifacts_bound", "single_writer_lease"],
+      "candidate_build_effects": ["local_versioned_candidate_mutation", "local_benchmark_evidence"],
+      "capabilities_under_test": ["bounded_model_fixture_only"],
+      "direct_dependency_rationales": {
+        "CONTROL-TOKEN-410": "The benchmark consumes exact capsule, cache, compaction, and calibration artifacts directly even though GENERIC-FIXTURES-600 is a descendant of CONTROL-TOKEN-410."
+      },
+      "stopping_condition": "Stop after both controlled lanes reproduce, measurement availability is explicit, and the bounded target is either met or truthfully rejected.",
+      "rollback": "Revert only TOKEN-BENCHMARK-620 test and documentation paths; preserve all comparator results, seeds, measurements, and losing outcomes."
+    },
+    {
+      "id": "QUALIFICATION-PREP-625",
+      "objective": "Freeze one exact candidate identity and prove that all implementation, documentation, and test-source changes ended before qualification.",
+      "dependencies": ["FAILURE-QUALIFICATION-610", "TOKEN-BENCHMARK-620"],
+      "parallel_safe": false,
+      "critical_path_importance": 99,
+      "durability_role": "none",
+      "semantic_locks": ["gate:candidate-freeze"],
+      "read_scope": [
+        "evidence/generic-dag-v3-failure-qualification.json",
+        "evidence/generic-dag-v3-token-benchmark.json",
+        "docs/execution/GENERIC_DAG_FAILURE_QUALIFICATION.md",
+        "docs/execution/GENERIC_DAG_TOKEN_BENCHMARK.md"
+      ],
+      "write_scope": ["evidence/generic-dag-v3-candidate-freeze.json"],
+      "required_tests": ["V3-CANDIDATE-FREEZE-CHECK"],
+      "acceptance_criteria": [
+        "AC-PREP-TRACE: Every V1 row assigned to QUALIFICATION-PREP-625 has an explicit retained disposition and target criterion.",
+        "AC-PREP-COMPLETE: Every product implementation, documentation, fixture, and test-source path is complete before this node starts.",
+        "AC-PREP-IDENTITY: The candidate receipt binds commit, tree, dirty-state denial, source manifest, toolchain, environment, plan, generation, tests, and all prior node receipts.",
+        "AC-PREP-HOST: The same unchanged external host, distinct principal or enforced deny boundary, one-run lease, and deadline remain valid for qualification.",
+        "AC-PREP-ENVELOPE: The freeze receipt and every later receipt are written only in a separate evidence-only worktree and append-only lineage whose parent binds, but never changes or reidentifies, the pristine candidate commit and tree.",
+        "AC-PREP-MUTATION: Any candidate or host byte change after this receipt invalidates qualification and requires a versioned replan."
+      ],
+      "authority_preconditions": ["all_candidate_source_complete", "frozen_host_unchanged", "single_writer_lease"],
+      "candidate_build_effects": ["local_evidence_record_only"],
+      "capabilities_under_test": ["none"],
+      "stopping_condition": "Stop after a pristine exact-candidate receipt proves no implementation, documentation, fixture, or test-source work remains.",
+      "rollback": "Invalidate and supersede the freeze receipt on any byte change; never rewrite it to fit a later candidate."
+    },
+    {
+      "id": "CANDIDATE-CI-627",
+      "objective": "Run exactly the frozen full doctor and repository CI against the exact frozen candidate through the unchanged external host.",
+      "dependencies": ["QUALIFICATION-PREP-625"],
+      "parallel_safe": false,
+      "critical_path_importance": 100,
+      "durability_role": "consumer",
+      "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"],
+      "semantic_locks": ["qualification:frozen-candidate-ci"],
+      "read_scope": [
+        "evidence/generic-dag-v3-candidate-freeze.json",
+        "src/hive_mind_os/host_runtime.py",
+        "src/hive_mind_os/integration_transaction.py"
+      ],
+      "write_scope": ["evidence/generic-dag-v3-candidate-ci.json"],
+      "required_tests": ["FROZEN-HOST-FULL-DOCTOR", "FROZEN-HOST-REPOSITORY-CI"],
+      "acceptance_criteria": [
+        "AC-CI-TRACE: Every V1 row assigned to CANDIDATE-CI-627 has an explicit retained disposition and target criterion.",
+        "AC-CI-ONLY: This node performs exactly two checks: frozen full doctor and repository CI; it changes no product, documentation, fixture, or test source.",
+        "AC-CI-EXACT: Both observations bind the same pristine candidate commit and tree, interpreter, environment, host bytes, plan digest, generation, lease, deadline, and raw output digests.",
+        "AC-CI-HOST: The candidate cannot supply or alter the doctor, CI harness, compiler, controller, scheduler, integrator, or verdict logic.",
+        "AC-CI-ENVELOPE: Doctor and CI receipts are committed only to the separate evidence lineage and bind the unchanged candidate commit and tree as the subject under test.",
+        "AC-CI-ADVERSE: Failure, timeout, contamination, stale identity, missing raw evidence, or host drift stops qualification and remains retained."
+      ],
+      "authority_preconditions": ["candidate_frozen", "external_host_unchanged", "one_run_lease_live"],
+      "candidate_build_effects": ["local_evidence_record_only"],
+      "capabilities_under_test": ["frozen_candidate_validation_only"],
+      "stopping_condition": "Stop after exactly the two frozen-candidate checks complete with raw digest-bound evidence, or immediately retain their typed adverse result.",
+      "rollback": "Never rewrite CI or doctor observations; supersede them only after a new candidate freeze and new one-run qualification lease."
+    },
+    {
+      "id": "GENERIC-QUALIFICATION-630",
+      "objective": "Issue an evidence-only independent verdict for the bounded generic DAG candidate and retain all dissent, gaps, and forbidden claims.",
+      "dependencies": ["CANDIDATE-CI-627"],
+      "parallel_safe": false,
+      "critical_path_importance": 100,
+      "durability_role": "none",
+      "semantic_locks": ["qualification:independent-v3-court"],
+      "read_scope": [
+        "evidence/generic-dag-v3-candidate-freeze.json",
+        "evidence/generic-dag-v3-candidate-ci.json",
+        "evidence/generic-dag-v3-failure-qualification.json",
+        "evidence/generic-dag-v3-token-benchmark.json",
+        "docs/execution/dags/generic-hive-mind-product-v3/source-intake.json"
+      ],
+      "write_scope": ["evidence/courts/CASE-GENERIC-HIVE-MIND-PRODUCT-V3.json"],
+      "required_tests": ["V3-INDEPENDENT-COURT-EVIDENCE-CHECK"],
+      "acceptance_criteria": [
+        "AC-QUAL-TRACE: Every V1 row assigned to GENERIC-QUALIFICATION-630 has an explicit retained disposition and target criterion.",
+        "AC-QUAL-INDEPENDENCE: Advocate, Cross-Examiner, Expert, Curator, and Judge identities are distinct from the Architect, Builder, mutable candidate, and affected champion.",
+        "AC-QUAL-EVIDENCE: The verdict binds all source obligations, node receipts, exact candidate, raw doctor and CI observations, failure matrix, token comparator, ownership, effects, rollback, and dissent.",
+        "AC-QUAL-PORTABILITY: One installed candidate build satisfies the required repository and non-repository fixtures without source changes or a target-repository Python dependency.",
+        "AC-QUAL-VENDOR: The qualified generic path assumes no Hive repository, node identifier, branch name, language, model vendor, or GitHub provider.",
+        "AC-QUAL-A5: A5 remains not-ready and the unresolved active-gate versus reference-only conflict prevents full hardened-vision compliance.",
+        "AC-QUAL-NONCLAIMS: No full-autonomy, production-readiness, release-readiness, deployment-readiness, protected-merge, or superiority claim is issued.",
+        "AC-QUAL-ENVELOPE: The court record is written only to the evidence lineage and cannot become part of, or alter the identity of, the candidate it judges.",
+        "AC-QUAL-ONLY: This node writes court evidence only and makes no candidate source change."
+      ],
+      "authority_preconditions": ["candidate_ci_exact_and_complete", "independent_court_identities"],
+      "candidate_build_effects": ["local_evidence_record_only"],
+      "capabilities_under_test": ["none"],
+      "stopping_condition": "Stop after an independent fail-closed court issues ADOPT, ADAPT, DEFER, REJECT, or QUARANTINE with every dissent and nonclaim retained.",
+      "rollback": "Court evidence is append-only; correct it through a superseding appeal and never delete or rewrite the original verdict."
+    },
+    {
+      "id": "HANDOFF-700",
+      "objective": "Hand off the completed generic user workflow and next lawful historical-plan action while performing at most one separately authorized draft pull request and never merging a protected branch.",
+      "dependencies": ["GENERIC-QUALIFICATION-630"],
+      "parallel_safe": false,
+      "critical_path_importance": 100,
+      "durability_role": "consumer",
+      "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"],
+      "semantic_locks": ["effect:draft-pr-handoff"],
+      "read_scope": [
+        "evidence/courts/CASE-GENERIC-HIVE-MIND-PRODUCT-V3.json",
+        "evidence/generic-dag-v3-candidate-ci.json",
+        "docs/execution/DAG_CLI.md",
+        "USER_GUIDE/README.md"
+      ],
+      "write_scope": ["evidence/generic-dag-v3-handoff.json"],
+      "required_tests": ["V3-DRAFT-PR-HANDOFF-GATE"],
+      "acceptance_criteria": [
+        "AC-HANDOFF-TRACE: Every V1 row assigned to HANDOFF-700 has an explicit retained disposition and target criterion.",
+        "AC-HANDOFF-AUTHORITY: Current repository, credential, network, fork, and branch-protection authority is independently rechecked immediately before any draft pull request effect.",
+        "AC-HANDOFF-EFFECT: The sole permitted external effect is preparing or opening one authorized draft pull request bound to the qualified candidate; no comment, deployment, production mutation, or other delivery effect is included.",
+        "AC-HANDOFF-NOMERGE: Main and every protected branch remain unmerged; merge always requires a separate explicit authority gate outside this DAG.",
+        "AC-HANDOFF-POWERSHELL: Any PowerShell artifact remains inert bounded preparation and cannot impersonate a person, attest review, acquire credentials, accept terms, sign, spend, bypass policy, or expand scope.",
+        "AC-HANDOFF-BLOCKED: Missing authority, evidence, legal consent, credentials, network, or branch-protection certainty produces a retained typed blocker with no attempted effect.",
+        "AC-HANDOFF-PACKET: The evidence-lineage handoff packet binds the completed user guide, public contracts, qualification evidence, exact candidate, and next lawful action without changing product, guide source, or candidate identity.",
+        "AC-HANDOFF-WORKFLOW: The bound guide lets a new user clone, build, validate, execute, resume, inspect, and reconcile portable DAGs through the installed public interfaces.",
+        "AC-HANDOFF-GUIDE: The bound guide covers subjects, adapters, authority, token accounting, recovery, evidence envelopes, and external gates.",
+        "AC-HANDOFF-SEALED: The packet names the original sealed program's next lawful round without modifying its plan, receipts, or historical interpretation."
+      ],
+      "authority_preconditions": ["independent_v3_court_adopt_or_adapt", "fresh_draft_pr_authority", "protected_merge_excluded", "one_run_effect_lease"],
+      "candidate_build_effects": ["none"],
+      "capabilities_under_test": ["authorized_draft_pull_request_only"],
+      "stopping_condition": "Stop after one authorized draft pull request is recorded as unmerged, or after a typed blocker is retained without attempting any external effect.",
+      "rollback": "Close the draft pull request if authorized and safe; never rewrite evidence, force-update history, or merge as rollback."
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "schema_version": 3,
+  "kind": "hive-mind-generic-product-ownership-effects-v3",
+  "plan_id": "generic-hive-mind-product-v3",
+  "path_ownership": {
+    "source": "node-contracts.json#nodes[*].write_scope",
+    "expected_unique_write_path_count": 85,
+    "invariants": [
+      "Every write_scope entry is a non-empty repository-relative path owned by exactly one node.",
+      "Every materialized node file_locks list equals its write_scope list.",
+      "Every materialized node forbidden_scope contains every other node write path and never its own write path.",
+      "No node may write AGENTS.md, .autopilot, .hive-mind, .git, .github, docs/architecture, or this V3 overlay.",
+      "No worker may change the frozen external host or qualify its own controller, compiler, schedule, integration, doctor, or CI."
+    ]
+  },
+  "single_writer_surfaces": {
+    "adapter_registry": {
+      "owner": "ADAPTER-INDEX-210",
+      "paths": ["src/hive_mind_os/adapter_registry.py"]
+    },
+    "dag_executor": {
+      "owner": "GENERIC-EXECUTOR-400",
+      "paths": ["src/hive_mind_os/dag_executor.py"]
+    },
+    "host_runtime": {
+      "owner": "WAVE-HOST-300",
+      "paths": ["src/hive_mind_os/host_runtime.py"]
+    },
+    "integration_transaction": {
+      "owner": "WAVE-HOST-300",
+      "paths": ["src/hive_mind_os/integration_transaction.py"]
+    },
+    "task_reuse": {
+      "owner": "TASK-REUSE-310",
+      "paths": ["src/hive_mind_os/task_reuse.py"]
+    },
+    "token_ledger": {
+      "owner": "RUNTIME-TOKEN-320",
+      "paths": ["src/hive_mind_os/token_ledger.py"]
+    },
+    "shared_runtime_schemas_and_interfaces": {
+      "owner": "RUNTIME-CONTRACTS-150",
+      "paths": [
+        "src/hive_mind_os/portable_plan.py",
+        "src/hive_mind_os/runtime_contracts.py",
+        "src/hive_mind_os/wave_manifest.py",
+        "src/hive_mind_os/host_adapter.py",
+        "docs/execution/portable-plan.schema.json",
+        "docs/execution/runtime-contracts.schema.json"
+      ]
+    }
+  },
+  "redundant_direct_edges": [
+    {
+      "dependency": "BUILD-SYSTEM-200",
+      "dependent": "TASK-REUSE-310",
+      "rationale": "Task fingerprints consume the canonical compiler and build identity directly even though WAVE-HOST-300 also depends on BUILD-SYSTEM-200."
+    },
+    {
+      "dependency": "FOUNDATION-010",
+      "dependent": "RUNTIME-TOKEN-320",
+      "rationale": "Role and context accounting consume the foundation mission-state identity directly even though ADAPTER-INDEX-210 is also a descendant of FOUNDATION-010."
+    },
+    {
+      "dependency": "WAVE-HOST-300",
+      "dependent": "GENERIC-EXECUTOR-400",
+      "rationale": "The executor calls the wave and host runtime directly even though TASK-REUSE-310 is a descendant of WAVE-HOST-300."
+    },
+    {
+      "dependency": "ADAPTER-INDEX-210",
+      "dependent": "GENERIC-EXECUTOR-400",
+      "rationale": "The executor resolves subject capabilities through the adapter registry directly even though TASK-REUSE-310 is a descendant of ADAPTER-INDEX-210."
+    },
+    {
+      "dependency": "BUILD-SYSTEM-200",
+      "dependent": "PUBLIC-RUNTIME-500",
+      "rationale": "Public validate and rounds interfaces consume the canonical compiler and planner package directly even though CONTROL-TOKEN-410 is a descendant of BUILD-SYSTEM-200."
+    },
+    {
+      "dependency": "CONTROL-TOKEN-410",
+      "dependent": "TOKEN-BENCHMARK-620",
+      "rationale": "The benchmark consumes exact capsule, cache, compaction, and calibration artifacts directly even though GENERIC-FIXTURES-600 is a descendant of CONTROL-TOKEN-410."
+    }
+  ],
+  "effect_axes": {
+    "candidate_build_effects": {
+      "scope": "Local versioned candidate and evidence mutations only, governed by node leases, exact path ownership, rollback, immutable candidates, and frozen-host integration.",
+      "default_remote_effect": "DENY"
+    },
+    "capabilities_under_test": {
+      "scope": "Credential, payment, push, pull request, comment, deployment, production, protected-target, and other external capabilities use disposable inert fixtures or explicit denial unless separately authorized.",
+      "never_implies_authority": true
+    },
+    "powershell_preparation": {
+      "status": "INERT_BOUNDED_PREPARATION_ONLY",
+      "may": ["Encode one deterministic bounded action for inspection and later separately authorized execution."],
+      "must_not": [
+        "impersonate a person or legal identity",
+        "claim human review or approval",
+        "obtain or solicit credentials",
+        "accept terms or sign",
+        "spend money",
+        "bypass a protected branch, policy, sandbox, evidence gate, or one-run lease",
+        "expand the objective, authority, or effect scope"
+      ]
+    },
+    "protected_merge": "ALWAYS_SEPARATE_AUTHORITY_GATE"
+  },
+  "frozen_host_reference": {
+    "source": "node-contracts.json#frozen_host_contract",
+    "extraction_commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+    "expected_file_count": 16,
+    "expected_bundle_digest": "sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255",
+    "required_properties": [
+      "per-file byte count, raw SHA-256, and Git blob",
+      "pristine read-only bytecode-free extraction",
+      "exact interpreter identity",
+      "independent reviewer evidence",
+      "predecessor and fresh trust receipts",
+      "distinct signing principal or enforced outside-repository deny sandbox",
+      "one-run nonce, lease, deadline, activation ledger, and round receipts"
+    ],
+    "checked_in_status": "REQUIREMENT_ONLY_NOT_EXECUTION_AUTHORITY"
+  },
+  "node_effect_expectations": {
+    "BASELINE-000": {"phase":"preflight_evidence","candidate_build_effects":["local_evidence_record_only"],"capabilities_under_test":["none"]},
+    "DOCTOR-PREFLIGHT-005": {"phase":"preflight_evidence","candidate_build_effects":["local_evidence_record_only"],"capabilities_under_test":["none"]},
+    "FOUNDATION-010": {"phase":"foundation_evidence","candidate_build_effects":["local_evidence_record_only"],"capabilities_under_test":["inert_duplicate_effect_fixture_only"]},
+    "PLAN-CORE-100": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["inert_plan_data_only"]},
+    "RUNTIME-CONTRACTS-150": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["inert_schema_validation_only"]},
+    "BUILD-SYSTEM-200": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["inert_planning_and_lint_only"]},
+    "ADAPTER-INDEX-210": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["read_only_or_inert_adapter_fixtures_only"]},
+    "WAVE-HOST-300": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation","local_compare_and_swap_integration_fixture"],"capabilities_under_test":["inert_or_disposable_effect_fixture_only"]},
+    "TASK-REUSE-310": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["inert_reuse_fixtures_only"]},
+    "RUNTIME-TOKEN-320": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["bounded_model_fixture_only"]},
+    "GENERIC-EXECUTOR-400": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["inert_or_disposable_worker_and_effect_fixtures_only"]},
+    "CONTROL-TOKEN-410": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["bounded_sidecar_fixture_only"]},
+    "PUBLIC-RUNTIME-500": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["inert_fixture_or_explicit_deny_path_only"]},
+    "GENERIC-FIXTURES-600": {"phase":"implementation","candidate_build_effects":["local_versioned_candidate_mutation"],"capabilities_under_test":["disposable_inert_external_capability_doubles_only"]},
+    "FAILURE-QUALIFICATION-610": {"phase":"implementation_and_fixture_qualification","candidate_build_effects":["local_versioned_candidate_mutation","local_qualification_evidence"],"capabilities_under_test":["disposable_inert_failure_effects_only"]},
+    "TOKEN-BENCHMARK-620": {"phase":"implementation_and_benchmark","candidate_build_effects":["local_versioned_candidate_mutation","local_benchmark_evidence"],"capabilities_under_test":["bounded_model_fixture_only"]},
+    "QUALIFICATION-PREP-625": {"phase":"candidate_freeze_evidence_only","candidate_build_effects":["local_evidence_record_only"],"capabilities_under_test":["none"]},
+    "CANDIDATE-CI-627": {"phase":"exact_frozen_doctor_and_ci_evidence_only","candidate_build_effects":["local_evidence_record_only"],"capabilities_under_test":["frozen_candidate_validation_only"]},
+    "GENERIC-QUALIFICATION-630": {"phase":"independent_judgment_evidence_only","candidate_build_effects":["local_evidence_record_only"],"capabilities_under_test":["none"]},
+    "HANDOFF-700": {"phase":"conditional_draft_pull_request_effect_only","candidate_build_effects":["none"],"capabilities_under_test":["authorized_draft_pull_request_only"]}
+  },
+  "phase_boundaries": {
+    "last_node_allowed_to_change_implementation_docs_or_test_source": "TOKEN-BENCHMARK-620",
+    "candidate_freeze_node": "QUALIFICATION-PREP-625",
+    "candidate_ci_node": "CANDIDATE-CI-627",
+    "candidate_ci_exact_tests": ["FROZEN-HOST-FULL-DOCTOR", "FROZEN-HOST-REPOSITORY-CI"],
+    "evidence_only_judgment_node": "GENERIC-QUALIFICATION-630",
+    "effect_only_handoff_node": "HANDOFF-700",
+    "handoff_effect": "authorized_draft_pull_request_only",
+    "protected_merge_permitted": false,
+    "candidate_and_evidence_lineage": {
+      "candidate": "One pristine immutable commit and tree frozen by QUALIFICATION-PREP-625; no later node writes in its worktree or branch.",
+      "envelope_b": "QUALIFICATION-PREP-625, CANDIDATE-CI-627, GENERIC-QUALIFICATION-630, and HANDOFF-700 write receipts only in a separate external evidence-only worktree and append-only branch.",
+      "parent_binding": "Every Envelope B record names the unchanged candidate commit and tree as subject plus its own predecessor evidence commit.",
+      "identity_rule": "Envelope B commits never become, dirty, amend, merge into, or reidentify the candidate under test.",
+      "rollback": "Supersede evidence append-only; invalidate candidate qualification on candidate or host drift and create a new freeze lineage."
+    },
+    "post_freeze_write_locations": {
+      "QUALIFICATION-PREP-625": "external_evidence_worktree",
+      "CANDIDATE-CI-627": "external_evidence_worktree",
+      "GENERIC-QUALIFICATION-630": "external_evidence_worktree",
+      "HANDOFF-700": "external_evidence_worktree"
+    }
+  }
+}

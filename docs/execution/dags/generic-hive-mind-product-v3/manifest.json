@@ -1,0 +1,288 @@
+{
+  "schema_version": 3,
+  "kind": "hive-mind-generic-product-overlay-manifest-v3",
+  "plan_id": "generic-hive-mind-product-v3",
+  "authorship": {
+    "architect": "/root/generation_architect",
+    "judge": "UNASSIGNED",
+    "court_status": "PENDING_DISTINCT_COURT",
+    "execution_authority": "NONE"
+  },
+  "request_binding": {
+    "request_id": "sha256:baa813bdcbd1b3bd459736cb65dccaf060758991a8a9b581fe8a1bf17dd65562",
+    "objective_digest": "sha256:36125297e861b0fea8d1be8b81e985445957f85378dc35c6712896b7b4d93c9c",
+    "repository_id": "sha256:48eb2b11cd99bb34f430f5e1c7a39d9a32b9bbaac6a99db4736d2ac422915590",
+    "task_key": "DAG-BUILD-48eb2b11cd99-baa813bdcbd1",
+    "launch_digest": "sha256:475c6908392956991faec25293170750e17fac70a97e62f550bb6d6164eb4461",
+    "target_branch": "release/hive-mind-autopilot"
+  },
+  "snapshot_lineage": {
+    "request_observation": {
+      "commit": "44224532dc25b94a95c3184054ec81762a258259",
+      "tree": "c2e7b983e9ed430ea8e3f7013ee2d8cb02a60e33"
+    },
+    "qualified_prerequisite": {
+      "commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+      "tree": "22639258c7a524ffda25272ccf34fede176b2663"
+    },
+    "combined_envelope_b": {
+      "commit": "877bf9fc9cdbef94e6fc33ff9e22fe53349db130",
+      "tree": "1ede87e53fc7fc75d29968698ba4b8dab082dd1e"
+    },
+    "authoring_base_parent": {
+      "commit": "42b4aeef17f816430a7d8a435102635afea8761a",
+      "tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed"
+    }
+  },
+  "committed_payload_contract": {
+    "mode": "exact-single-overlay-commit-v1",
+    "authoring_base_parent": {
+      "commit": "42b4aeef17f816430a7d8a435102635afea8761a",
+      "tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed"
+    },
+    "expected_changed_paths": [
+      "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+      "docs/architecture/ADR_INDEX.md",
+      "docs/execution/dags/generic-hive-mind-product-v3/README.md",
+      "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/materialize_plan.py",
+      "docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/ownership-effects.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+      "tests/test_generic_dag_v3_overlay.py"
+    ],
+    "payload_bindings": [
+      {
+        "path": "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+        "bytes": 12221,
+        "sha256": "sha256:586157b57b23b1e00999e305c7f6d8943ada3050564a2e62419c2f6409892f98"
+      },
+      {
+        "path": "docs/architecture/ADR_INDEX.md",
+        "bytes": 11435,
+        "sha256": "sha256:d573e57748bc0a0d4b8990b87e00aa00a3f0f3c68f3bfdc93a87743747a12b9b"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/README.md",
+        "bytes": 5329,
+        "sha256": "sha256:aa981c8bb6f4da075f1230eb4642b4a6ecef99eefa95de52c72bddb831f36d41"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/materialize_plan.py",
+        "bytes": 25309,
+        "sha256": "sha256:63c2dd154fc1a6e4db9e9ca5ca7e06d57ef93f141a921ff3189fa77b4b48464c"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json",
+        "bytes": 64381,
+        "sha256": "sha256:eef8694c935467bade1fed286ef9cce67f01e2f35f0b914105255bf8681e3cf8"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/ownership-effects.json",
+        "bytes": 10943,
+        "sha256": "sha256:056b74b37da1e7292d7931b93c5975c2c589ce4b64c8bf0004ca12f5deebaf80"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
+        "bytes": 170172,
+        "sha256": "sha256:5e03c7638b2d4865dda2b2c3a5e615ea4b2b8d37f61a3a5fdfbf29c1750827c4"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
+        "bytes": 24865,
+        "sha256": "sha256:4182ab1d43deaabe41b50e8c534d2f6de33d399696cb69611391858f17eaa786"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+        "bytes": 57521,
+        "sha256": "sha256:b9d11b55e4549bea19cbb5139ded53e81fdde80d1cfe1c09af31f2bfed4cb02a"
+      },
+      {
+        "path": "tests/test_generic_dag_v3_overlay.py",
+        "bytes": 24447,
+        "sha256": "sha256:f89a1afc5eee86e12c4aa07efc7a1b3cb660c3e538fdb96b9adf783e3edd0e1f"
+      }
+    ],
+    "manifest_authentication": {
+      "mode": "caller-supplied-raw-sha256",
+      "required": true
+    },
+    "court_envelope_b_bindings": [
+      "committed_payload_head",
+      "committed_payload_tree",
+      "caller_authenticated_manifest_digest"
+    ],
+    "allowed_untracked_paths": [
+      ".hive-mind/autopilot-request.json"
+    ],
+    "authoring_check": "NON_EXECUTING_NON_QUALIFYING_ONLY"
+  },
+  "source_bindings": {
+    "repository": [
+      {
+        "path": "LICENSE",
+        "bytes": 1086,
+        "sha256": "sha256:903a82ad84a68d2b48c2c3ee2707d1394fb82aee1bdfdae4a91ff9f8af1691df",
+        "git_blob": "06da1af7996f5e2b059cd52045e36f9f2cfac201"
+      },
+      {
+        "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+        "bytes": 27006,
+        "sha256": "sha256:86d1c1c81a27fc3e3ffd931193e0e145030756f78b58c674e8ba8b1c1bd3397d",
+        "git_blob": "70e43b0a8078a303d44c0109b8dd218a948258c2"
+      },
+      {
+        "path": "docs/execution/DAG_AUTHORING_STANDARD_V2.md",
+        "bytes": 12312,
+        "sha256": "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a",
+        "git_blob": "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374"
+      },
+      {
+        "path": ".autopilot/bin/dag_standard.py",
+        "bytes": 104317,
+        "sha256": "sha256:105674faf15aaf7b9f4c9db7ad4003fda404438eed2bf8cc3a1782c1cf321e6a",
+        "git_blob": "f170ac4f388d265fcaafd32437e449945dcebee3"
+      },
+      {
+        "path": ".autopilot/plan.json",
+        "bytes": 169053,
+        "sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+        "git_blob": "ee7ec9f2756fcff2b7010238d7064d017c4df7af"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/source-intake.json",
+        "bytes": 58463,
+        "sha256": "sha256:dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c",
+        "git_blob": "6dcc1b506fe9806b32eb6160de6994bd9e71bf58"
+      },
+      {
+        "path": "evidence/autopilot/COMBINED-PREREQUISITE-QUALIFICATION-2026-08-23.md",
+        "bytes": 10498,
+        "sha256": "sha256:a514b794be97268b6b2fe1daae08e191ef7c993e0928b73d977802a8137cc95e",
+        "git_blob": "fc56f63f576a2839ef7b3b24e72f246e1dc5644b"
+      },
+      {
+        "path": "evidence/courts/CASE-COMBINED-AUTOPILOT-PREREQUISITES-2026-08-23.json",
+        "bytes": 6586,
+        "sha256": "sha256:fcd5b64824ac6a31492b4a454528b6093648ac170c0fdaaa9f00d69bf869e8dc",
+        "git_blob": "2de4ddb37d5b8605f74a060377e52c9b5923fba9"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/README.md",
+        "bytes": 3506,
+        "sha256": "sha256:b83c659f3a4f9cf1be4ab707246636d9cc40f09ee28d14a6e0020b31b512f82b",
+        "git_blob": "7fe726912358e62bb557a0dcf043ad6e69629302"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/generate_plan.py",
+        "bytes": 6128,
+        "sha256": "sha256:ad540bf2e29e147671b715098ae3a9209fa7e9d4cdc62bd7bdd3df0368ba726c",
+        "git_blob": "b61407bb871e17e07da060ee4796bae05957afa6"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/manifest.json",
+        "bytes": 1363,
+        "sha256": "sha256:dd0adbe4bef4cce5343e5852a6d7076fb71c383f71456b4a86acbc11e187e02e",
+        "git_blob": "e4e0d24c90c0e9b9f13e15fb90b9bd31a75e3bf5"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/specs_a.py",
+        "bytes": 15352,
+        "sha256": "sha256:7616bd7229670daffed1040b037a9d2de73e447e9b50115bb0a7aab2334e4027",
+        "git_blob": "0adb16c3de4b7f78739aed2d00b64eb8a549f4f8"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/specs_b.py",
+        "bytes": 14810,
+        "sha256": "sha256:5f9cde6830880c5e5fcee88ac4973c172133e12bceb8b13514a192dbb3444eb6",
+        "git_blob": "0ed6d109bdf09037c41db56f25ca155b4179b2d4"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/verify_plan.py",
+        "bytes": 5684,
+        "sha256": "sha256:467e07a363a150914fa40ee3a225f4adc9a49a7f7e7be06fd287e60a425c43bf",
+        "git_blob": "4078803e652ca3be1a38baafb0b186be9420d848"
+      }
+    ],
+    "overlay": [
+      {
+        "path": "node-contracts.json",
+        "bytes": 64381,
+        "sha256": "sha256:eef8694c935467bade1fed286ef9cce67f01e2f35f0b914105255bf8681e3cf8"
+      },
+      {
+        "path": "traceability.json",
+        "bytes": 24865,
+        "sha256": "sha256:4182ab1d43deaabe41b50e8c534d2f6de33d399696cb69611391858f17eaa786"
+      },
+      {
+        "path": "ownership-effects.json",
+        "bytes": 10943,
+        "sha256": "sha256:056b74b37da1e7292d7931b93c5975c2c589ce4b64c8bf0004ca12f5deebaf80"
+      },
+      {
+        "path": "materialize_plan.py",
+        "bytes": 25309,
+        "sha256": "sha256:63c2dd154fc1a6e4db9e9ca5ca7e06d57ef93f141a921ff3189fa77b4b48464c"
+      },
+      {
+        "path": "verify_plan.py",
+        "bytes": 57521,
+        "sha256": "sha256:b9d11b55e4549bea19cbb5139ded53e81fdde80d1cfe1c09af31f2bfed4cb02a"
+      }
+    ]
+  },
+  "plan_binding": {
+    "expected_plan_digest": "sha256:43121c323dd652cd05807ccc5acdec70bb4a4b81a376e00c45acd16a5fc56ce1",
+    "expected_raw_bytes_digest": "sha256:5e03c7638b2d4865dda2b2c3a5e615ea4b2b8d37f61a3a5fdfbf29c1750827c4",
+    "external_path": "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
+    "historical_autopilot_plan_policy": "BYTE_IDENTICAL_READ_ONLY",
+    "historical_v1_expected_plan_digest": "sha256:b8879d09c5a42b0feeeec19b9c8f6a7523e4ef69b117eea1a18ef6dfaf35f977"
+  },
+  "topology": {
+    "node_count": 20,
+    "raw_edge_count": 28,
+    "level_count": 17,
+    "round_count": 20,
+    "redundant_direct_edge_count": 6
+  },
+  "execution_contract": {
+    "mode": "manual-parent-v1",
+    "executable_dispatch_command_available": false,
+    "every_round_command": null,
+    "legacy_fallback": "PROHIBITED"
+  },
+  "standard_and_compiler": {
+    "standard_v2_sha256": "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a",
+    "standard_v2_git_blob": "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374",
+    "compiler_sha256": "sha256:105674faf15aaf7b9f4c9db7ad4003fda404438eed2bf8cc3a1782c1cf321e6a",
+    "compiler_git_blob": "f170ac4f388d265fcaafd32437e449945dcebee3"
+  },
+  "frozen_host_prerequisite": {
+    "extraction_commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+    "extraction_tree": "22639258c7a524ffda25272ccf34fede176b2663",
+    "manifest_location": "node-contracts.json#/frozen_host_contract/file_manifest",
+    "file_count": 16,
+    "bundle_sha256": "sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255",
+    "status": "REQUIRED_NOT_SATISFIED"
+  },
+  "evidence_partition": {
+    "checked_in": "Inert design, traceability, source bindings, and sealed external plan; never activation authority.",
+    "host_external": "Distinct-principal signed one-run activation bundle, pristine cache-free host extraction, trust receipts, lease ledger, and Envelope B evidence-only worktree/branch.",
+    "candidate_rule": "Qualification evidence never dirties or reidentifies the frozen candidate tree."
+  },
+  "source_governance": {
+    "SRC-024": "QUARANTINE_CONTENT_UNREAD",
+    "SRC-025": "UNRESOLVED",
+    "a5_full_autonomy": "NOT_READY"
+  },
+  "execution_authorized": false,
+  "nonclaims": [
+    "This checked-in manifest is not an activation bundle or execution authority.",
+    "The legacy continuation outcome was withheld and does not dispatch V3.",
+    "No full-autonomy, production, release, or superiority claim is made.",
+    "Every manual-parent-v1 round command is null until a separately trusted host supplies bounded execution."
+  ]
+}
