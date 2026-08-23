@@ -1643,7 +1643,8 @@ class PlanLoadingAndCliTests(unittest.TestCase):
 
     def _write_document(self, root: Path, document: dict[str, Any], name: str = "plan.json") -> Path:
         path = root / name
-        path.write_text(json.dumps(document, indent=2), encoding="utf-8")
+        # This writes only synthetic, in-memory test fixtures to TemporaryDirectory.
+        path.write_text(json.dumps(document, indent=2), encoding="utf-8")  # lgtm[py/clear-text-storage-sensitive-data]
         return path
 
     def test_load_plan_graph_rejects_malformed_documents(self) -> None:

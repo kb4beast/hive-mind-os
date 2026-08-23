@@ -25,6 +25,10 @@ jobs:
   controller-contract:
     name: autopilot-controller-contract
     runs-on: ubuntu-latest
+    # The doctor treats the invoking interpreter's package origin as a release
+    # contract.  Bind it to this immutable checkout for every Python step.
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
     steps:
       - name: Checkout immutable workflow input
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
