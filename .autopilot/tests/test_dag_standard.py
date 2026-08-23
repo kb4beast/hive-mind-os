@@ -1866,9 +1866,9 @@ class PlanLoadingAndCliTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            trusted = {"schema_version": 1, "nodes": [node("LEGACY")]}
-            expected = digest_json(trusted)
-            plan = self._write_document(root, trusted)
+            legacy_fixture = {"schema_version": 1, "nodes": [node("LEGACY")]}
+            expected = digest_json(legacy_fixture)
+            plan = self._write_document(root, legacy_fixture)
             accepted_output = io.StringIO()
             with redirect_stdout(accepted_output):
                 accepted = autopilot.main(
