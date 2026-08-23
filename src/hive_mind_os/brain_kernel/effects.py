@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterator
 
 from .authority import (
     AuthorityDenied,
     AuthorityRegistry,
     CapabilityToken,
-    token_is_issued,
 )
 from .canonical import canonical_digest
 from .contracts import EffectIntent, EffectReceipt
@@ -24,6 +25,59 @@ class EffectResult:
     intent_digest: str
     receipt_digest: str
     status: str
+
+
+@dataclass(frozen=True, slots=True)
+class _ActiveEffectExecution:
+    """Short-lived proof that an adapter is running behind this gateway.
+
+    This is process-local plumbing, not a second authority. The gateway has
+    already validated the live capability token before it installs this marker.
+    It lets lower-level tool wrappers refuse direct calls that would otherwise
+    bypass the adapter boundary.
+    """
+
+    intent_digest: str
+    target_adapter: str
+
+
+_ACTIVE_EFFECT_EXECUTION: ContextVar[_ActiveEffectExecution | None] = ContextVar(
+    "hive_mind_active_effect_execution", default=None
+)
+
+
+@contextmanager
+def _authorized_effect_execution(intent: EffectIntent) -> Iterator[None]:
+    """Install the gateway-validated execution marker around one adapter call."""
+
+    if _ACTIVE_EFFECT_EXECUTION.get() is not None:
+        raise AuthorityDenied("nested effect execution is not permitted")
+    reset = _ACTIVE_EFFECT_EXECUTION.set(
+        _ActiveEffectExecution(intent.intent_digest, intent.target_adapter)
+    )
+    try:
+        yield
+    finally:
+        _ACTIVE_EFFECT_EXECUTION.reset(reset)
+
+
+def require_active_effect_execution(*, target_adapter: str) -> None:
+    """Refuse a lower-level operation outside its validated adapter invocation.
+
+    The marker cannot mint or broaden a capability. It is set only after
+    :func:`validate_capability_token` succeeds in an effect gateway or durable
+    outbox, and is removed before control returns to the caller.
+    """
+
+    marker = _ACTIVE_EFFECT_EXECUTION.get()
+    if marker is None:
+        raise AuthorityDenied(
+            "remote execution requires a validated effect gateway invocation"
+        )
+    if marker.target_adapter != target_adapter:
+        raise AuthorityDenied(
+            "remote execution is not authorized for adapter " + target_adapter
+        )
 
 
 def _now() -> str:
@@ -52,7 +106,7 @@ def validate_capability_token(
     now: str | None = None,
     network_hosts: tuple[str, ...] = (),
 ) -> None:
-    """Bind a token to an intent and, given an issuer, to live authority state."""
+    """Bind a token to an intent and require its live issuing authority."""
 
     expected_token_digest = canonical_digest(
         {
@@ -71,11 +125,7 @@ def validate_capability_token(
     if intent.intent_digest != intent_seal(intent):
         raise AuthorityDenied("intent digest does not seal this intent")
     if authority is None:
-        if network_hosts:
-            raise AuthorityDenied("a network effect requires an authority-bound gateway")
-        if not token_is_issued(token):
-            raise AuthorityDenied("capability token was not issued by an authority registry")
-        return
+        raise AuthorityDenied("effect execution requires an authority-bound gateway")
     issued = authority.authorize(
         token.envelope_digest, token.action, token.target, now=now or _now()
     )
@@ -129,11 +179,11 @@ def build_effect_receipt(
 class EffectGateway:
     """An adapter registry; duplicate intents return their prior local receipt.
 
-    A gateway built with an ``authority`` registry verifies every token against
-    live issuance state -- registration, expiry, revocation and scope -- plus the
-    intent seal and the envelope's network allowlist, before any adapter runs. A
-    gateway built without one can only bind a token to its intent, so an issuer
-    should be supplied wherever the registry that minted the token is in hand.
+    Every effect requires an ``authority`` registry. It verifies every token
+    against live issuance state -- registration, expiry, revocation and scope --
+    plus the intent seal and the envelope's network allowlist before any adapter
+    runs. A gateway without one may be constructed for wiring compatibility, but
+    refuses every execution.
     """
 
     def __init__(
@@ -193,7 +243,8 @@ class EffectGateway:
         adapter = self._adapters.get(intent.target_adapter)
         if adapter is None:
             raise AuthorityDenied("adapter is not registered")
-        adapter(intent)
+        with _authorized_effect_execution(intent):
+            adapter(intent)
         result = EffectResult(intent.intent_digest, canonical_digest({"intent": intent.intent_digest, "status": "SUCCEEDED"}), "SUCCEEDED")
         self._receipts[intent.idempotency_key] = result
         return result

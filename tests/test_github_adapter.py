@@ -17,7 +17,11 @@ from unittest.mock import patch
 
 from hive_mind_os.acceptance import AcceptanceSpecification
 from hive_mind_os.autonomy import AutonomyBudget
-from hive_mind_os.brain_kernel.authority import AuthorityRegistry, RootProvenance
+from hive_mind_os.brain_kernel.authority import (
+    AuthorityDenied,
+    AuthorityRegistry,
+    RootProvenance,
+)
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.contracts import (
     Budget,
@@ -51,10 +55,10 @@ from hive_mind_os.github_adapter import (
     GitHubDeliveryTarget,
     GitHubEffectReconciliationRequired,
     GitHubPolicyDenied,
+    GitHubRawWriteQuarantined,
     GitHubResponse,
     GitHubTransportError,
     MissingGitHubCredential,
-    PushResult,
     UrllibGitHubTransport,
     validate_github_receipt,
 )
@@ -379,6 +383,19 @@ class LocalDeliveryClient(GitHubClient):
         return result
 
 
+class HistoricalRawGitHubClient(GitHubClient):
+    """Test-only access to retained receipt/recovery regression fixtures.
+
+    Production ``GitHubClient`` writes are fail-closed. These historical tests
+    keep exercising the retired implementation's receipt parser and recovery
+    mechanics without making that bypass available to package consumers.
+    """
+
+    @staticmethod
+    def _require_controlled_delivery() -> None:
+        return None
+
+
 class GitHubAdapterTests(unittest.TestCase):
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
@@ -423,7 +440,7 @@ class GitHubAdapterTests(unittest.TestCase):
         evidence_root: Path | None = None,
         sleep=lambda _seconds: None,
     ) -> GitHubClient:
-        return GitHubClient(
+        return HistoricalRawGitHubClient(
             "octocat",
             "hive-mind-os",
             evidence_root or self.root / "github-evidence",
@@ -435,6 +452,40 @@ class GitHubAdapterTests(unittest.TestCase):
             sleep=sleep,
             clock=lambda: "2026-07-27T20:03:00Z",
         )
+
+    def test_raw_write_entry_points_are_quarantined_before_any_io(self) -> None:
+        transport = FakeGitHubTransport()
+        client = GitHubClient(
+            "octocat",
+            "hive-mind-os",
+            self.root / "quarantined-github-evidence",
+            transport=transport,
+            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+            mission_store=self.store,
+            mission_id=self.mission_id,
+        )
+
+        with self.assertRaises(GitHubRawWriteQuarantined):
+            client.push_branch(object())  # type: ignore[arg-type]
+        with self.assertRaises(GitHubRawWriteQuarantined):
+            client.open_draft_pr(
+                branch="phase/P07-live-fixture",
+                base="main",
+                head_sha=HEAD_SHA,
+                title="quarantined",
+                body="quarantined",
+            )
+        with self.assertRaises(GitHubRawWriteQuarantined):
+            client.deliver(
+                object(),  # type: ignore[arg-type]
+                branch="phase/P07-live-fixture",
+                base="main",
+                title="quarantined",
+                body="quarantined",
+                desired_rules_path=ROOT / ".github" / "governance" / "required-repository-rules.json",
+            )
+
+        self.assertEqual([], transport.calls)
 
     @staticmethod
     def pulls_query() -> str:
@@ -1019,7 +1070,7 @@ class GitHubAdapterTests(unittest.TestCase):
                         allow_remote=allow_remote,
                     )
 
-    def test_repository_mission_delivers_after_curator_adoption(self) -> None:
+    def test_repository_mission_refuses_legacy_direct_delivery(self) -> None:
         fixture = build_fixture_repo(self.root / "mission-fixture")
         mission_id = "mission-p07-integration"
         store = MissionStore(self.root / "mission-state")
@@ -1038,60 +1089,45 @@ class GitHubAdapterTests(unittest.TestCase):
         )
         report = asyncio.run(
             RepositoryMission(
-                fixture.root,
-                "Fix the failing test",
-                acceptance_criteria=("increment(1) returns 2",),
-                acceptance_specifications=(
-                    AcceptanceSpecification(
-                        "increment-returns-two",
-                        "increment(1) returns 2",
-                        (
-                            sys.executable,
-                            "-B",
-                            "-c",
-                            "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                    fixture.root,
+                    "Fix the failing test",
+                    acceptance_criteria=("increment(1) returns 2",),
+                    acceptance_specifications=(
+                        AcceptanceSpecification(
+                            "increment-returns-two",
+                            "increment(1) returns 2",
+                            (
+                                sys.executable,
+                                "-B",
+                                "-c",
+                                "from tiny_pkg.maths import increment; assert increment(1) == 2",
+                            ),
                         ),
                     ),
-                ),
-                pin=fixture.commit_two,
-                output_dir=self.root / "mission-output",
-                policy=PolicyEngine(AutonomyLevel.REPOSITORY),
-                mission_store=store,
-                github_delivery=GitHubDeliveryTarget(
-                    client,
-                    "main",
-                    "P07 offline mission integration",
-                    "Draft evidence only.",
-                    ROOT
-                    / ".github"
-                    / "governance"
-                    / "required-repository-rules.json",
-                    max_check_attempts=1,
-                    check_interval_s=0,
-                ),
-                _run_id=mission_id,
+                    pin=fixture.commit_two,
+                    output_dir=self.root / "mission-output",
+                    policy=PolicyEngine(AutonomyLevel.REPOSITORY),
+                    mission_store=store,
+                    github_delivery=GitHubDeliveryTarget(
+                        client,
+                        "main",
+                        "P07 offline mission integration",
+                        "Draft evidence only.",
+                        ROOT
+                        / ".github"
+                        / "governance"
+                        / "required-repository-rules.json",
+                        max_check_attempts=1,
+                        check_interval_s=0,
+                    ),
+                    _run_id=mission_id,
             ).run()
         )
-        self.assertEqual(report.curator_verdict, "adopt")
-        self.assertIsNotNone(report.github_delivery)
-        self.assertTrue(report.github_delivery["draft"])
-        self.assertIn("github.delivery.completed", report.event_types)
-        self.assertIsNotNone(client.local_remote)
-        self.assertEqual(
-            subprocess.run(
-                [
-                    "git",
-                    "--git-dir",
-                    str(client.local_remote),
-                    "rev-parse",
-                    "refs/heads/phase/mission-delivery",
-                ],
-                check=True,
-                stdout=subprocess.PIPE,
-                text=True,
-            ).stdout.strip(),
-            report.head_sha,
-        )
+        self.assertEqual("failed", report.status.value)
+        assert report.failure is not None
+        self.assertIn("legacy direct GitHub delivery", report.failure["message"])
+        self.assertIsNone(client.local_remote)
+        self.assertEqual([], transport.calls)
 
 
 R2_OWNER = "octocat"
@@ -1177,7 +1213,7 @@ class RecordingPushExecutor:
     def __init__(self) -> None:
         self.branches: list[str] = []
 
-    def push(self, branch: str) -> str:
+    def push(self, grant: DeliveryGrant, branch: str) -> str:
         self.branches.append(branch)
         return HEAD_SHA
 
@@ -1702,7 +1738,9 @@ class ControlledRetractionTests(unittest.TestCase):
         self.assertEqual(self.owner_authority.record_digest, record.anchor_digest)
         self.assertEqual(self.owner_authority.issuer, self.grant().issuer)
         # Cheat: cut a grant the anchored owner never backed.
-        with self.assertRaisesRegex(DeliveryGrantError, "not anchored"):
+        with self.assertRaisesRegex(
+            DeliveryGrantError, "requires the recorded owner authority"
+        ):
             DeliveryGrant.issue(
                 grant_id="GRANT-a4-800-self-issued",
                 owner=R2_OWNER,
@@ -1869,32 +1907,6 @@ class ControlledRetractionTests(unittest.TestCase):
                 self.assertEqual([], transport.calls)
 
 
-class ScriptedHeadClient(GitHubClient):
-    """Answers a push with a scripted head; it runs no Git and opens no socket."""
-
-    def __init__(
-        self,
-        *args: object,
-        head_sha: object,
-        transport: FakeGitHubTransport,
-        **kwargs: object,
-    ) -> None:
-        super().__init__(*args, transport=transport, **kwargs)  # type: ignore[arg-type]
-        self.scripted_head = head_sha
-        self.calls = 0
-
-    def push_branch(
-        self,
-        workspace: GitWorkspace,
-        *,
-        branch: str | None = None,
-        remote_url: str | Path | None = None,
-        allow_local_test_remote: bool = False,
-    ) -> PushResult:
-        self.calls += 1
-        return PushResult(branch or "", self.scripted_head, {})  # type: ignore[arg-type]
-
-
 class WorkspacePushExecutorTests(unittest.TestCase):
     """A4-800 Path B: the production binding from ``PushExecutor`` to a real push.
 
@@ -1954,39 +1966,42 @@ class WorkspacePushExecutorTests(unittest.TestCase):
 
     # -- fixtures ----------------------------------------------------------
 
-    def client(self, *, token_env: str | None = None) -> GitHubClient:
-        return GitHubClient(
-            R2_OWNER,
-            R2_REPOSITORY,
-            self.root / "gh",
-            transport=FakeGitHubTransport(),
-            token_env=token_env or self.TOKEN_ENV,
-            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
-            mission_store=self.store,
-            mission_id=self.mission_id,
-            sleep=lambda _seconds: None,
-            clock=lambda: "2026-07-27T20:03:00Z",
-        )
-
-    def scripted_client(self, head_sha: object) -> ScriptedHeadClient:
-        return ScriptedHeadClient(
-            R2_OWNER,
-            R2_REPOSITORY,
-            self.root / "gh",
-            head_sha=head_sha,
-            transport=FakeGitHubTransport(),
-            token_env=self.TOKEN_ENV,
-            policy=PolicyEngine(AutonomyLevel.REPOSITORY),
-            mission_store=self.store,
-            mission_id=self.mission_id,
-        )
-
-    def executor(self, client: GitHubClient | None = None) -> WorkspacePushExecutor:
+    def executor(self, *, token_env: str | None = None) -> WorkspacePushExecutor:
         return WorkspacePushExecutor(
-            client or self.client(),
             self.workspace,
             remote_url=Path(".git") / self.bare.name,
+            token_env=token_env or self.TOKEN_ENV,
             allow_local_test_remote=True,
+        )
+
+    def execute_controlled_push(
+        self, executor: WorkspacePushExecutor | None = None
+    ) -> tuple[object, ControlledGitHubDelivery, EffectIntent]:
+        registry = AuthorityRegistry()
+        _mint_root(registry, ControlledRetractionTests.envelope())
+        delivery = ControlledGitHubDelivery(
+            ControlledRetractionTests.grant(),
+            rest=ControlledRestGateway(
+                R2_OWNER,
+                R2_REPOSITORY,
+                transport=FakeGitHubTransport(),  # type: ignore[arg-type]
+            ),
+            push_executor=executor or self.executor(),
+        )
+        gateway = EffectGateway(authority=registry, clock=lambda: R2_TIME)
+        delivery.register_with(gateway)
+        intent = ControlledRetractionTests.intent(
+            action="push",
+            adapter=ControlledGitHubDelivery.PUSH_ADAPTER,
+            parameters_digest=delivery.bind_parameters({"branch": R2_BRANCH}),
+        )
+        return (
+            gateway.execute(
+                intent,
+                registry.authorize(R2_AUTH, "push", R2_TARGET, now=R2_TIME),
+            ),
+            delivery,
+            intent,
         )
 
     def workspace_head(self) -> str:
@@ -2010,62 +2025,75 @@ class WorkspacePushExecutorTests(unittest.TestCase):
     # -- the seam ----------------------------------------------------------
 
     def test_push_returns_the_committed_head_it_actually_wrote(self) -> None:
-        head = self.executor().push(R2_BRANCH)
+        result, _, _ = self.execute_controlled_push()
+        head = self.workspace_head()
 
+        self.assertEqual("SUCCEEDED", result.status)
         self.assertEqual(self.workspace_head(), head)
         self.assertEqual(self.remote_head(), head)
 
     def test_returned_head_is_a_lowercase_full_hex_sha(self) -> None:
-        head = self.executor().push(R2_BRANCH)
+        self.execute_controlled_push()
+        head = self.workspace_head()
 
         self.assertRegex(head, r"\A[0-9a-f]{40}\Z")
         self.assertEqual(head.lower(), head)
-        # An uppercase head from a delegate is normalized, not rejected.
-        upper = self.workspace_head().upper()
-        self.assertEqual(
-            upper.lower(),
-            self.executor(self.scripted_client(upper)).push(R2_BRANCH),
+
+    def test_direct_executor_call_is_refused_before_git_runs(self) -> None:
+        with self.assertRaises(AuthorityDenied):
+            self.executor().push(ControlledRetractionTests.grant(), R2_BRANCH)
+
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.remote_head()
+
+    def test_unapproved_production_push_host_is_refused_before_git_runs(
+        self,
+    ) -> None:
+        executor = WorkspacePushExecutor(
+            self.workspace,
+            remote_url="https://github.com/somebody-else/other-repository.git",
+            token_env=self.TOKEN_ENV,
         )
 
-    def test_a_head_that_is_not_a_full_sha_raises_instead_of_returning(self) -> None:
-        for head in (
-            "",
-            "abc123",
-            "z" * 40,
-            "a" * 39,
-            "a" * 41,
-            " " + "a" * 39,
-            "a" * 40 + "\n",
-            None,
-            b"a" * 40,
-        ):
-            with self.subTest(head=head):
-                executor = self.executor(self.scripted_client(head))
+        with self.assertRaisesRegex(AuthorityDenied, "outside the network allowlist"):
+            self.execute_controlled_push(executor)
 
-                with self.assertRaisesRegex(
-                    GitHubDeliveryError, "full 40-hex head SHA"
-                ):
-                    executor.push(R2_BRANCH)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.remote_head()
+
+    def test_production_push_host_is_declared_to_the_effect_gateway(self) -> None:
+        executor = WorkspacePushExecutor(
+            self.workspace,
+            remote_url=f"https://github.com/{R2_OWNER}/{R2_REPOSITORY}.git",
+            token_env=self.TOKEN_ENV,
+        )
+        delivery = ControlledGitHubDelivery(
+            ControlledRetractionTests.grant(),
+            rest=ControlledRestGateway(
+                R2_OWNER,
+                R2_REPOSITORY,
+                transport=FakeGitHubTransport(),  # type: ignore[arg-type]
+            ),
+            push_executor=executor,
+        )
+
+        self.assertEqual(("api.github.com", "github.com"), delivery.network_hosts)
 
     def test_a_blank_branch_never_falls_back_to_the_workspace_branch(self) -> None:
-        client = self.scripted_client("b" * 40)
-
         for branch in ("", "   "):
             with self.subTest(branch=branch):
                 with self.assertRaisesRegex(
                     GitHubDeliveryError, "requires a mission branch"
                 ):
-                    self.executor(client).push(branch)
-
-        self.assertEqual(0, client.calls)
+                    self.executor().push(ControlledRetractionTests.grant(), branch)
 
     def test_a_missing_credential_propagates_unweakened(self) -> None:
         absent = f"{self.TOKEN_ENV}_ABSENT"
         self.assertNotIn(absent, os.environ)
-        executor = self.executor(self.client(token_env=absent))
+        executor = self.executor(token_env=absent)
 
         with self.assertRaises(MissingGitHubCredential) as captured:
-            executor.push(R2_BRANCH)
+            self.execute_controlled_push(executor)
 
         self.assertIs(MissingGitHubCredential, type(captured.exception))
         self.assertIn(absent, str(captured.exception))
@@ -2086,48 +2114,13 @@ class WorkspacePushExecutorTests(unittest.TestCase):
     def test_controlled_delivery_accepts_the_executor_and_pushes_through_it(
         self,
     ) -> None:
-        registry = AuthorityRegistry()
-        _mint_root(registry, ControlledRetractionTests.envelope())
-        transport = FakeGitHubTransport()
-        delivery = ControlledGitHubDelivery(
-            ControlledRetractionTests.grant(),
-            rest=ControlledRestGateway(
-                R2_OWNER,
-                R2_REPOSITORY,
-                transport=transport,  # type: ignore[arg-type]
-            ),
-            push_executor=self.executor(),
-        )
-        gateway = EffectGateway(authority=registry, clock=lambda: R2_TIME)
-        delivery.register_with(gateway)
-        intent = ControlledRetractionTests.intent(
-            action="push",
-            adapter=ControlledGitHubDelivery.PUSH_ADAPTER,
-            parameters_digest=delivery.bind_parameters({"branch": R2_BRANCH}),
-        )
-
-        result = gateway.execute(
-            intent,
-            registry.authorize(R2_AUTH, "push", R2_TARGET, now=R2_TIME),
-        )
+        result, delivery, intent = self.execute_controlled_push()
 
         head = self.workspace_head()
         self.assertEqual("SUCCEEDED", result.status)
         self.assertEqual(head, self.remote_head())
-        # The gateway result carries digests only, so read the identifiers the
-        # push adapter produced by replaying the same bound intent; the mission
-        # store answers that from its effect receipt without pushing again.
-        self.assertEqual(
-            {
-                "produced_identifiers": (f"branch:{R2_BRANCH}", f"sha:{head}"),
-                "postcondition_digest": canonical_digest(
-                    {"pushed": R2_BRANCH, "head": head}
-                ),
-            },
-            delivery.push_adapter(intent),
-        )
-        # The push adapter is Git only; it reached no REST endpoint.
-        self.assertEqual([], transport.calls)
+        with self.assertRaises(AuthorityDenied):
+            delivery.push_adapter(intent)
 
 
 if __name__ == "__main__":

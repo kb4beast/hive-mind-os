@@ -41,6 +41,10 @@ class GitHubDeliveryError(RuntimeError):
     """Base error for external GitHub delivery."""
 
 
+class GitHubRawWriteQuarantined(GitHubDeliveryError):
+    """A retired raw GitHub write entry point was called directly."""
+
+
 class MissingGitHubCredential(GitHubDeliveryError):
     """The configured environment variable has no token."""
 
@@ -264,7 +268,13 @@ def _required_int(document: Mapping[str, Any], field: str) -> int:
 
 
 class GitHubClient:
-    """High-level GitHub delivery with fakeable transport and durable deduplication."""
+    """Legacy GitHub observer with quarantined direct write entry points.
+
+    Existing read-only observability methods remain available for evidence
+    collection. ``push_branch``, ``open_draft_pr``, and ``deliver`` are
+    retained only as fail-closed compatibility names: routine delivery must use
+    ``ControlledGitHubDelivery`` through an authority-bound effect gateway.
+    """
 
     def __init__(
         self,
@@ -336,6 +346,15 @@ class GitHubClient:
             )
         if not decision.allowed:
             raise GitHubPolicyDenied(decision.reason)
+
+    @staticmethod
+    def _require_controlled_delivery() -> None:
+        """Retire raw write methods before they can inspect credentials or I/O."""
+
+        raise GitHubRawWriteQuarantined(
+            "raw GitHub writes are quarantined; use authority-bound "
+            "ControlledGitHubDelivery through an EffectGateway"
+        )
 
     def _request_json(
         self,
@@ -594,6 +613,7 @@ class GitHubClient:
         remote_url: str | Path | None = None,
         allow_local_test_remote: bool = False,
     ) -> PushResult:
+        self._require_controlled_delivery()
         self._authorize(Action.OPEN_PULL_REQUEST)
         target_branch = branch or workspace.branch_name
         if target_branch is None:
@@ -682,6 +702,7 @@ class GitHubClient:
         title: str,
         body: str,
     ) -> PullRequestResult:
+        self._require_controlled_delivery()
         self._authorize(Action.OPEN_PULL_REQUEST)
         if not title.strip() or not body.strip() or not _FULL_SHA.fullmatch(head_sha):
             raise ValueError("draft PR title, body, and full head SHA are required")
@@ -1256,6 +1277,7 @@ class GitHubClient:
         max_check_attempts: int = 20,
         check_interval_s: float = 15.0,
     ) -> GitHubDelivery:
+        self._require_controlled_delivery()
         desired = json.loads(
             Path(desired_rules_path).read_text(encoding="utf-8")
         )

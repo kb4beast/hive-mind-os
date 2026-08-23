@@ -977,6 +977,30 @@ def select_orchestration_status(
     return status, decision
 
 
+def run_orchestration(
+    plane: ControlPlane,
+    request: str,
+    *,
+    actor: str,
+    apply: bool,
+) -> dict[str, object]:
+    """Return a contract that explicitly distinguishes release publication from withholding."""
+
+    status, decision = select_orchestration_status(plane, request)
+    published = False
+    if apply and should_publish_release(decision, status):
+        plane.dispatch(actor=actor)
+        published = True
+        status = plane.status()
+    result = dict(build_orchestration_contract(plane, request, status=status))
+    result["release_publication"] = {
+        "requested": apply,
+        "published": published,
+        "outcome": "PUBLISHED" if published else "WITHHELD",
+    }
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
@@ -1351,14 +1375,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"OPEN SESSION: {card['title']} -> {card['card']}")
             return 0
         if args.command == "orchestrate":
-            status, decision = select_orchestration_status(plane, args.request)
-            if args.apply and should_publish_release(decision, status):
-                plane.dispatch(actor=args.actor)
-                status = plane.status()
-            result = build_orchestration_contract(
+            result = run_orchestration(
                 plane,
                 args.request,
-                status=status,
+                actor=args.actor,
+                apply=args.apply,
             )
             if args.json_output:
                 print(json.dumps(result, indent=2, sort_keys=True))

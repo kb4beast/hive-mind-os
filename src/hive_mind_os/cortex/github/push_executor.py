@@ -1,79 +1,85 @@
-"""The one production implementation of the delivery ``PushExecutor`` seam.
+"""The production Git push implementation for controlled delivery only.
 
-:class:`hive_mind_os.cortex.github.delivery_adapter.ControlledGitHubDelivery`
-declares a ``PushExecutor`` protocol but deliberately owns no Git of its own:
-the receipted, policy-authorized push already exists as
-:meth:`hive_mind_os.github_adapter.GitHubClient.push_branch`.  This module is
-the thin binding between the two, and it is only a binding.  It opens no
-socket, runs no Git command, mints no receipt, and makes no authorization
-decision -- every one of those stays behind ``push_branch``, which authorizes
-:data:`hive_mind_os.policy.Action.OPEN_PULL_REQUEST`, binds the intent to the
-committed head, requires a sandbox receipt, and deduplicates through the
-mission store.
+The legacy :class:`hive_mind_os.github_adapter.GitHubClient` write surface is
+quarantined. This executor invokes the existing constrained ``GitWorkspace``
+operation directly, but only while an ``EffectGateway``-validated
+``github-push`` adapter is active. A direct call therefore fails before reading
+a credential or running Git.
 
-The two things this module does add are the guarantees the protocol states and
-the delegate does not: the branch actually pushed is the branch that was asked
-for, never a fallback to whatever the workspace happens to be on, and the value
-handed back is a full lowercase 40-hex SHA or an exception.  A malformed head
-fails here, at the source, rather than as an opaque rejection one frame later
-in ``push_adapter``.
+The executor never selects a fallback branch. It accepts exactly the branch
+the grant adapter has checked and returns only a full lowercase 40-hex SHA.
 """
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
+from hive_mind_os.brain_kernel.effects import require_active_effect_execution
+from hive_mind_os.cortex.github.grants import DeliveryGrant, DeliveryGrantError
 from hive_mind_os.git_adapter import GitWorkspace
-from hive_mind_os.github_adapter import GitHubClient, GitHubDeliveryError
+from hive_mind_os.github_adapter import GitHubDeliveryError, MissingGitHubCredential
 
 _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
 
 
 class WorkspacePushExecutor:
-    """Push one granted branch from one workspace and return its head SHA."""
+    """Push one grant-checked branch from one workspace under an effect gateway."""
 
     def __init__(
         self,
-        client: GitHubClient,
         workspace: GitWorkspace,
         *,
-        remote_url: str | Path | None = None,
+        remote_url: str | Path,
+        token_env: str = "GITHUB_TOKEN",
         allow_local_test_remote: bool = False,
     ) -> None:
-        if not isinstance(client, GitHubClient):
-            raise ValueError("push executor requires a GitHubClient delegate")
         if not isinstance(workspace, GitWorkspace):
             raise ValueError("push executor requires a GitWorkspace to push from")
-        self.client = client
+        if not isinstance(token_env, str) or not token_env.strip():
+            raise ValueError("push executor requires a credential environment name")
+        if not isinstance(remote_url, (str, Path)) or not str(remote_url).strip():
+            raise ValueError("push executor requires an explicit remote URL")
         self.workspace = workspace
-        # None means the delegate's own https://github.com/<owner>/<repo>.git.
         self.remote_url = remote_url
-        # Local bare remotes exist for tests only; production pushes leave this
-        # False so a non-HTTPS remote is refused by the Git layer.
+        self.token_env = token_env
+        # Local bare remotes exist for controlled, socket-free tests only.
         self.allow_local_test_remote = bool(allow_local_test_remote)
 
-    def push(self, branch: str) -> str:
-        """Delegate the push and return the committed head as lowercase 40-hex.
+    @property
+    def network_hosts(self) -> tuple[str, ...]:
+        """Hosts reached by the Git half of controlled delivery."""
 
-        Authorization and credential failures are the delegate's to raise and
-        are not caught here, so a policy denial stays a
-        :class:`~hive_mind_os.github_adapter.GitHubPolicyDenied` and a missing
-        token stays a
-        :class:`~hive_mind_os.github_adapter.MissingGitHubCredential`.
-        """
+        parsed = urlsplit(str(self.remote_url))
+        if parsed.scheme == "https" and parsed.hostname:
+            return (parsed.hostname,)
+        return ()
 
+    def push(self, grant: DeliveryGrant, branch: str) -> str:
+        """Push one granted branch under an active effect invocation."""
+
+        if not isinstance(grant, DeliveryGrant):
+            raise DeliveryGrantError("workspace push requires an immutable delivery grant")
         if not isinstance(branch, str) or not branch.strip():
-            # push_branch would fall back to workspace.branch_name here, which
-            # would push a branch nobody granted.  Refuse instead.
             raise GitHubDeliveryError("GitHub delivery requires a mission branch")
-        result = self.client.push_branch(
-            self.workspace,
+        grant.require("push")
+        grant.require_push_branch(branch)
+        require_active_effect_execution(target_adapter="github-push")
+        self._require_grant_remote(grant)
+        token = os.environ.get(self.token_env, "")
+        if not token:
+            raise MissingGitHubCredential(
+                "required GitHub credential environment variable is missing: "
+                f"{self.token_env}"
+            )
+        head = self.workspace.push_branch(
+            self.remote_url,
+            token,
             branch=branch,
-            remote_url=self.remote_url,
-            allow_local_test_remote=self.allow_local_test_remote,
+            allow_local=self.allow_local_test_remote,
         )
-        head = result.head_sha
         normalized = head.lower() if isinstance(head, str) else ""
         if _FULL_SHA.fullmatch(normalized) is None:
             raise GitHubDeliveryError(
@@ -81,3 +87,23 @@ class WorkspacePushExecutor:
                 f"{branch}"
             )
         return normalized
+
+    def _require_grant_remote(self, grant: DeliveryGrant) -> None:
+        """Bind a production Git remote to the same repository as the grant."""
+
+        parsed = urlsplit(str(self.remote_url))
+        if parsed.scheme == "" and self.allow_local_test_remote:
+            return
+        expected_path = f"/{grant.owner}/{grant.repository}.git"
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "github.com"
+            or parsed.path != expected_path
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+            or parsed.password
+        ):
+            raise DeliveryGrantError(
+                "workspace push remote is not the grant's HTTPS GitHub repository"
+            )

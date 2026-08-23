@@ -18,6 +18,7 @@ from .canonical import canonical_bytes, canonical_digest
 from .contracts import EffectIntent, EffectReceipt
 from .effects import (
     EffectResult,
+    _authorized_effect_execution,
     build_effect_receipt,
     validate_capability_token,
 )
@@ -38,11 +39,10 @@ def _time() -> str:
 class DurableEffectOutbox:
     """SQLite-backed effect intent, delivery, receipt, and repair boundary.
 
-    An outbox built with an ``authority`` registry re-derives every token through
-    live issuance state before it records or delivers anything, so constructing
-    the outbox directly reaches the same boundary a gateway would apply.  Built
-    without one it can only bind a token to its intent, so an issuer should be
-    supplied wherever the registry that minted the token is in hand.
+    An outbox requires an ``authority`` registry and re-derives every token
+    through live issuance state before it records or delivers anything. Direct
+    construction reaches the same boundary a gateway applies; without a registry
+    every enqueue and execution is denied.
     """
 
     def __init__(
@@ -135,7 +135,8 @@ class DurableEffectOutbox:
 
         started_at = self.clock()
         try:
-            raw_result = adapter(intent)
+            with _authorized_effect_execution(intent):
+                raw_result = adapter(intent)
         except Exception as error:
             self.store.mark_effect_reconciliation_required(
                 intent_digest=intent.intent_digest,

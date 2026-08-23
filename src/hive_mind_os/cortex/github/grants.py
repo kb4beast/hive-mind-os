@@ -171,7 +171,7 @@ class GrantIssuance:
 
 
 class DeliveryGrantLedger:
-    """In-process issuance ledger; a grant it never admitted authorizes nothing."""
+    """Owner-anchored issuance ledger; an unanchored ledger authorizes nothing."""
 
     def __init__(self) -> None:
         self._issuances: dict[str, GrantIssuance] = {}
@@ -201,17 +201,24 @@ class DeliveryGrantLedger:
     ) -> GrantIssuance:
         """Admit one grant, refusing an issuance the anchored owner did not back."""
 
+        anchor = self.anchor_digest
+        if not anchor:
+            raise DeliveryGrantError(
+                "delivery grant ledger requires a recorded owner authority anchor"
+            )
+        if provenance is None:
+            raise DeliveryGrantError(
+                "delivery grant issuance requires the recorded owner authority"
+            )
+        sealed_provenance = _sealed_provenance(provenance)
         issuer = SELF_ISSUED if provenance is None else provenance.issuer
         authority_ref = SELF_ISSUED if provenance is None else provenance.authority_ref
         if grant.issuer != issuer or grant.authority_ref != authority_ref:
             raise DeliveryGrantError(
                 "delivery grant does not name the authority it was issued under"
             )
-        anchor = self.anchor_digest
-        anchored = ""
-        if provenance is not None:
-            anchored = _sealed_provenance(provenance).record_digest
-        if anchor and anchored != anchor:
+        anchored = sealed_provenance.record_digest
+        if anchored != anchor:
             raise DeliveryGrantError(
                 "delivery grant issuance is not anchored to the recorded owner authority"
             )
@@ -246,15 +253,19 @@ class DeliveryGrantLedger:
         return self._issuances.get(grant_digest)
 
     def require_issued(self, grant: DeliveryGrant) -> GrantIssuance:
-        """Refuse a grant this ledger never admitted, or that a later anchor orphaned."""
+        """Refuse a grant unless a current owner anchor admitted it."""
 
+        anchor = self.anchor_digest
+        if not anchor:
+            raise DeliveryGrantError(
+                "delivery grant ledger requires a recorded owner authority anchor"
+            )
         record = self._issuances.get(grant.grant_digest)
         if record is None:
             raise DeliveryGrantError(
                 f"delivery grant {grant.grant_id} has no recorded issuance"
             )
-        anchor = self.anchor_digest
-        if anchor and record.anchor_digest != anchor:
+        if record.anchor_digest != anchor:
             raise DeliveryGrantError(
                 f"delivery grant {grant.grant_id} was not issued "
                 "under the recorded owner authority"
@@ -338,10 +349,9 @@ class DeliveryGrant:
     ) -> "DeliveryGrant":
         """Seal one grant and record its issuance; unrecorded input fails closed.
 
-        ``provenance`` is the owner authority the issuance is made under.  An
-        anchored ledger refuses an issuance that cannot present its record, so
-        an owner-issued grant and a self-issued one are told apart by what the
-        ledger admitted, not by the digest.
+        ``provenance`` is the owner authority the issuance is made under. The
+        ledger must already be anchored to that record; a bare process ledger
+        and self-issued grants are denied before they can authorize delivery.
         """
 
         _require_text(grant_id, "grant_id")
