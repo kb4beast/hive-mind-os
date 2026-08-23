@@ -22,8 +22,12 @@ if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) {
 }
 
 $repositoryRoot = (& git -C $root rev-parse --show-toplevel 2>$null).Trim()
-if ($LASTEXITCODE -ne 0 -or $repositoryRoot -ne $root) {
+if ($LASTEXITCODE -ne 0) {
     throw "Continuation root is not a Git repository: $root"
+}
+$repositoryRoot = (Resolve-Path -LiteralPath $repositoryRoot).Path
+if ($repositoryRoot -ne $root) {
+    throw "Continuation root is not this launcher's Git repository: $root"
 }
 
 # The controller is part of the authorized repository scope.  Refuse to execute a
@@ -74,7 +78,7 @@ if ($Apply) {
     if ($contract.release_publication.published -ne $true) {
         $issues = @($contract.dispatch_release.issues | ForEach-Object { [string]$_ })
         $detail = if ($issues.Count -gt 0) { $issues -join "; " } else { "no eligible safe dispatcher release" }
-        Write-Error "CONTINUATION WITHHELD: $detail"
+        Write-Host "CONTINUATION WITHHELD: $detail"
         exit 3
     }
     Write-Host "CONTINUATION APPLIED: live dispatcher release published from committed controller $controllerDigest."
