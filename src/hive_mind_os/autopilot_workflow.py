@@ -961,6 +961,53 @@ def simple_prompt() -> str:
     )
 
 
+def run_repository(
+    repository: str | Path,
+    *,
+    subject: str,
+    target_branch: str = DEFAULT_TARGET_BRANCH,
+    remote_name: str | None = "origin",
+    protected_branches: Sequence[str] = (),
+    actor: str = "hive-mind:portable-orchestrator",
+    trust_state_root: str | Path | None = None,
+) -> Mapping[str, Any]:
+    """Initialize a subject and request its durable DAG execution in one step.
+
+    This deliberately returns the host-neutral contract instead of executing target
+    repository code. The active host remains responsible for independently
+    reviewing, sandboxing, and carrying out the contract's external effects.
+    """
+
+    normalized_subject = subject.strip()
+    if not normalized_subject:
+        raise PortableAutopilotError("subject must not be empty")
+    initialization = initialize_repository(
+        repository,
+        objective=normalized_subject,
+        target_branch=target_branch,
+        remote_name=remote_name,
+        protected_branches=protected_branches,
+    )
+    contract = inspect_repository(
+        repository,
+        request=(
+            "Build and execute the governed Autopilot DAG for the objective: "
+            f"{normalized_subject}"
+        ),
+        apply=True,
+        actor=actor,
+        trust_state_root=trust_state_root,
+    )
+    return {
+        "schema_version": 1,
+        "kind": "hive-mind-portable-autopilot-run-v1",
+        "subject": normalized_subject,
+        "initialization": initialization,
+        "execution_contract": contract,
+        "execution_owner": "active_host_sandbox",
+    }
+
+
 def _uninstalled_contract(root: Path, request: str) -> Mapping[str, Any]:
     request_path = root / ".hive-mind" / "autopilot-request.json"
     if not request_path.is_file():

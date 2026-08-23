@@ -105,6 +105,18 @@ Hive Mind OS can now initialize an Autopilot request in another Git repository a
 the next host-neutral orchestration contract:
 
 ```bash
+hive-mind autopilot run "foobar" --repository /path/to/repo \
+  --target-branch release/hive-mind-autopilot
+```
+
+This one command records `foobar` as the objective and requests the durable DAG-build
+or execution contract. It is safe to repeat for the same objective; a different
+objective fails closed rather than replacing the existing request. The active host
+still reviews and executes returned task effects in its approved sandbox.
+
+The equivalent explicit commands remain available:
+
+```bash
 hive-mind autopilot init --repository /path/to/repo \
   --target-branch release/hive-mind-autopilot
 hive-mind autopilot inspect --repository /path/to/repo \

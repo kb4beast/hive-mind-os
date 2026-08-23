@@ -45,10 +45,24 @@ protected-branch merge, deployment, credential, spending, or authority expansion
 
 ## Use Hive Mind OS from another checkout
 
-Install this repository and initialize the target repository once:
+Install this repository, then run the target in one command:
 
 ```bash
 python -m pip install --no-deps -e C:/path/to/hive-mind-os
+hive-mind autopilot run "foobar" --repository C:/path/to/target \
+  --target-branch release/hive-mind-autopilot
+```
+
+`run` is the recommended entry point: its required positional argument is the
+objective/subject, such as `foobar`. It records the objective if the target has not
+been initialized, then requests the appropriate DAG-build or execution contract with
+execution authorization. It emits that contract for the active host; it never executes
+an unreviewed target controller itself. Repeating the command with the same subject is
+safe; a new subject requires an explicit new initialization decision.
+
+The explicit two-command form remains available:
+
+```bash
 hive-mind autopilot init --repository C:/path/to/target \
   --objective "OUTCOME OR LEAVE THE SAFE DEFAULT" \
   --target-branch release/hive-mind-autopilot

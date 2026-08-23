@@ -30,6 +30,7 @@ from .autopilot_workflow import (
     PortableAutopilotError,
     initialize_repository,
     inspect_repository,
+    run_repository,
     trust_controller,
 )
 from .autopilot_workflow import (
@@ -161,6 +162,26 @@ def build_autopilot_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--actor", default="hive-mind:portable-orchestrator")
     inspect.add_argument("--apply", action="store_true")
     inspect.add_argument("--trust-state-root")
+    run = commands.add_parser(
+        "run",
+        help="Initialize a subject and request its governed DAG execution",
+    )
+    run.add_argument("subject", help="Outcome or subject for the new DAG")
+    run.add_argument("--repository", default=".")
+    run.add_argument("--target-branch", default=DEFAULT_TARGET_BRANCH)
+    run.add_argument(
+        "--remote",
+        default="origin",
+        help="Git remote to identify, or an empty value for local-only use",
+    )
+    run.add_argument(
+        "--protected-branch",
+        action="append",
+        default=[],
+        help="Additional protected branch name; repeat for repository-specific policy",
+    )
+    run.add_argument("--actor", default="hive-mind:portable-orchestrator")
+    run.add_argument("--trust-state-root")
     trust = commands.add_parser(
         "trust-controller",
         help="Pin an independently reviewed target-controller bundle outside the repository",
@@ -188,6 +209,16 @@ def _run_autopilot(args: argparse.Namespace) -> int:
                 args.repository,
                 request=args.request,
                 apply=args.apply,
+                actor=args.actor,
+                trust_state_root=args.trust_state_root,
+            )
+        elif args.autopilot_command == "run":
+            result = run_repository(
+                args.repository,
+                subject=args.subject,
+                target_branch=args.target_branch,
+                remote_name=args.remote,
+                protected_branches=args.protected_branch,
                 actor=args.actor,
                 trust_state_root=args.trust_state_root,
             )

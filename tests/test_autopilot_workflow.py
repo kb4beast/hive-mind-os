@@ -1,21 +1,25 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from hmac import new as hmac_new
 from pathlib import Path
 from unittest.mock import patch
 
+from hive_mind_os import cli
 from hive_mind_os.autopilot_workflow import (
     GENERIC_PROMPT_SOURCE,
     PortableAutopilotError,
     initialize_repository,
     inspect_repository,
+    run_repository,
     simple_prompt,
     trust_controller,
 )
@@ -275,6 +279,61 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         prompt = simple_prompt()
         self.assertIn("build, start, continue, check, or finish", prompt)
         self.assertNotIn("kb4beast", prompt)
+
+    def test_run_initializes_subject_and_emits_an_execution_contract(self) -> None:
+        result = run_repository(
+            self.root,
+            subject="foobar",
+            target_branch="release/widgets",
+        )
+
+        self.assertEqual(result["kind"], "hive-mind-portable-autopilot-run-v1")
+        self.assertEqual(result["subject"], "foobar")
+        self.assertEqual(result["initialization"]["status"], "initialized")
+        self.assertEqual(result["initialization"]["request"]["objective"], "foobar")
+        contract = result["execution_contract"]
+        self.assertEqual(contract["intent"]["intent"], "BUILD_DAG")
+        self.assertTrue(contract["tasks"])
+        self.assertIn("foobar", contract["operator_request"])
+        self.assertEqual(result["execution_owner"], "active_host_sandbox")
+
+    def test_run_is_idempotent_for_the_same_subject_and_rejects_a_new_one(self) -> None:
+        first = run_repository(self.root, subject="foobar")
+        repeated = run_repository(self.root, subject="foobar")
+
+        self.assertEqual(repeated["initialization"]["status"], "already-initialized")
+        self.assertEqual(
+            first["execution_contract"]["tasks"][0]["task_key"],
+            repeated["execution_contract"]["tasks"][0]["task_key"],
+        )
+        with self.assertRaises(PortableAutopilotError):
+            run_repository(self.root, subject="different objective")
+
+    def test_run_rejects_an_empty_subject(self) -> None:
+        with self.assertRaisesRegex(PortableAutopilotError, "subject must not be empty"):
+            run_repository(self.root, subject="  ")
+
+    def test_run_cli_accepts_a_single_subject_argument(self) -> None:
+        args = cli.build_autopilot_parser().parse_args(
+            (
+                "run",
+                "foobar",
+                "--repository",
+                str(self.root),
+                "--target-branch",
+                "release/widgets",
+            )
+        )
+
+        self.assertEqual(args.autopilot_command, "run")
+        self.assertEqual(args.subject, "foobar")
+        self.assertEqual(args.repository, str(self.root))
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(cli._run_autopilot(args), 0)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["subject"], "foobar")
+        self.assertEqual(result["execution_contract"]["intent"]["intent"], "BUILD_DAG")
 
     def test_inspect_never_executes_target_repository_controller(self) -> None:
         controller = self.root / ".autopilot" / "bin" / "autopilot.py"
