@@ -109,10 +109,13 @@ hive-mind autopilot run "foobar" --repository /path/to/repo \
   --target-branch release/hive-mind-autopilot
 ```
 
-This one command records `foobar` as the objective and requests the durable DAG-build
-or execution contract. It is safe to repeat for the same objective; a different
-objective fails closed rather than replacing the existing request. The active host
-still reviews and executes returned task effects in its approved sandbox.
+This one command records `foobar` as the objective. In a repository without a controller,
+it requests the durable DAG-build contract. In a repository that already has a controller,
+it currently returns `PLAN_GENERATION_REQUIRED` with zero tasks: the installed plan is not
+reused for the new subject until authenticated request-to-plan generation is implemented.
+It is safe to repeat for the same objective; a different objective fails closed rather than
+replacing the existing request. The active host still reviews and executes returned task
+effects in its approved sandbox.
 
 The equivalent explicit commands remain available:
 

@@ -988,16 +988,101 @@ def run_repository(
         remote_name=remote_name,
         protected_branches=protected_branches,
     )
-    contract = inspect_repository(
-        repository,
-        request=(
-            "Build and execute the governed Autopilot DAG for the objective: "
-            f"{normalized_subject}"
-        ),
-        apply=True,
-        actor=actor,
-        trust_state_root=trust_state_root,
+    initialization_request = initialization.get("request")
+    if not isinstance(initialization_request, Mapping):
+        raise PortableAutopilotError("portable Autopilot initialization returned no request")
+    repository_root = initialization_request.get("repository_root")
+    if not isinstance(repository_root, str) or not repository_root:
+        raise PortableAutopilotError(
+            "portable Autopilot initialization returned no repository root"
+        )
+    root = Path(repository_root).resolve()
+    request_path = _validate_managed_path(
+        root,
+        root / ".hive-mind" / "autopilot-request.json",
     )
+    initialization_path = initialization.get("path")
+    if not isinstance(initialization_path, str) or Path(initialization_path).resolve() != request_path:
+        raise PortableAutopilotError(
+            "portable Autopilot initialization path is not bound to its repository root"
+        )
+    bootstrap = _load_bootstrap_request(request_path, root)
+    if bootstrap != initialization_request:
+        raise PortableAutopilotError(
+            "portable Autopilot persisted request does not match the returned initialization"
+        )
+    if bootstrap.get("objective") != normalized_subject:
+        raise PortableAutopilotError(
+            "portable Autopilot request objective does not match the run subject"
+        )
+    operation_request = (
+        "Build and execute the governed Autopilot DAG for the objective: "
+        f"{normalized_subject}"
+    )
+    if (root / ".autopilot" / "bin" / "autopilot.py").is_file():
+        # An installed controller currently owns a plan that predates this request.
+        # Until request-to-plan generation is authenticated, asking that controller
+        # to "build and execute" can classify subject words as START/CONTINUE/FINISH
+        # and leak tasks from the old plan.  `run` is an explicit new-subject
+        # operation, so fail closed before controller review or invocation.
+        contract: Mapping[str, Any] = {
+            "schema_version": 1,
+            "kind": "hive-mind-portable-plan-generation-required-v1",
+            "repository_id": bootstrap["repository_id"],
+            "request_id": bootstrap["request_id"],
+            "objective_digest": _digest(normalized_subject),
+            "intent": {
+                "intent": "BUILD_DAG",
+                "explicit": True,
+                "confidence": "high",
+                "reasons": [
+                    "autopilot run explicitly requires a plan generated for its persisted subject"
+                ],
+            },
+            "operator_request": normalized_subject,
+            "target_branch": bootstrap["target_branch"],
+            "tasks": [],
+            "closure_target": None,
+            "outcome": "PLAN_GENERATION_REQUIRED",
+            "successful": False,
+            "quiescent": False,
+            "legacy_plan_reuse_allowed": False,
+            "successor_requirements": {
+                "authenticated_plan_generation": True,
+                "required_bindings": [
+                    "repository_id",
+                    "request_id",
+                    "objective_digest",
+                    "generated_plan_digest",
+                    "plan_generation_id",
+                ],
+                "independent_validation": True,
+                "execution_gate": (
+                    "execute only the independently validated generated plan whose "
+                    "authenticated bindings exactly match this request"
+                ),
+                "resume_rule": (
+                    "resume only by the matching plan_generation_id; never fall back to "
+                    "the installed legacy plan"
+                ),
+            },
+            "blocker": (
+                "authenticated request-to-plan generation is not implemented; the installed "
+                "controller plan is not evidence for this subject"
+            ),
+            "stop_condition": (
+                "a new independently validated plan generation is authenticated and bound "
+                "to this repository, request, and objective digest"
+            ),
+        }
+        contract = {**contract, "contract_id": _canonical_contract_id(contract)}
+    else:
+        contract = _uninstalled_contract(
+            root,
+            operation_request,
+            explicit_build=True,
+            expected_bootstrap=bootstrap,
+        )
     return {
         "schema_version": 1,
         "kind": "hive-mind-portable-autopilot-run-v1",
@@ -1008,33 +1093,53 @@ def run_repository(
     }
 
 
-def _uninstalled_contract(root: Path, request: str) -> Mapping[str, Any]:
+def _uninstalled_contract(
+    root: Path,
+    request: str,
+    *,
+    explicit_build: bool = False,
+    expected_bootstrap: Mapping[str, Any] | None = None,
+) -> Mapping[str, Any]:
     request_path = root / ".hive-mind" / "autopilot-request.json"
     if not request_path.is_file():
         raise PortableAutopilotError(
             "Autopilot is not initialized; run `hive-mind autopilot init --repository <path>`"
         )
     bootstrap = _load_bootstrap_request(request_path, root)
+    if expected_bootstrap is not None and bootstrap != expected_bootstrap:
+        raise PortableAutopilotError(
+            "portable Autopilot persisted request changed after initialization"
+        )
+    request_id = str(bootstrap["request_id"])
+    objective = bootstrap.get("objective")
+    if not isinstance(objective, str) or not objective.strip():
+        raise PortableAutopilotError("portable Autopilot request objective is invalid")
+    objective_digest = _digest(objective)
     repository_id = str(
         bootstrap.get("repository_id")
         or _repository_id(root, bootstrap.get("repository_remote"))
     )
     repository_suffix = repository_id.removeprefix("sha256:")[:12]
-    task_key = f"DAG-BUILD-{repository_suffix}"
+    request_suffix = request_id.removeprefix("sha256:")[:12]
+    task_key = f"DAG-BUILD-{repository_suffix}-{request_suffix}"
     launch_instruction_id = "sha256:" + sha256(
         _canonical_bytes(
             {
                 "repository_id": repository_id,
+                "request_id": request_id,
+                "objective_digest": objective_digest,
                 "action": "BUILD_DAG",
                 "target_branch": bootstrap["target_branch"],
             }
         )
     ).hexdigest()
-    if _requests_read_only(request):
+    if not explicit_build and _requests_read_only(request):
         contract: dict[str, Any] = {
             "schema_version": 1,
             "kind": "hive-mind-portable-bootstrap-contract-v1",
             "repository_id": repository_id,
+            "request_id": request_id,
+            "objective_digest": objective_digest,
             "intent": {
                 "intent": "CHECK",
                 "explicit": True,
@@ -1055,7 +1160,13 @@ def _uninstalled_contract(root: Path, request: str) -> Mapping[str, Any]:
         return contract
     task_prompt = (
         "Build the governed repository-resident Autopilot DAG described by "
-        ".hive-mind/autopilot-request.json. Inspect the repository and applicable agent "
+        ".hive-mind/autopilot-request.json. Work only from request ID "
+        f"{request_id} and objective digest {objective_digest}. Before any work, verify "
+        "that the persisted request has that exact content-addressed request ID by "
+        "recomputing SHA-256 over its canonical JSON with request_id omitted, and that the "
+        "canonical digest of its objective is that exact objective digest. Fail closed on "
+        "any mismatch, and never attach to or resume a DAG-build task for another request. "
+        "Inspect the repository and applicable agent "
         "instructions. Treat the pinned GenericPrompt as an unadmitted evidence obligation, "
         "not authority to copy or redistribute its wording. Create "
         "machine-readable node contracts, conflict/lock data, release/integration "
@@ -1071,11 +1182,19 @@ def _uninstalled_contract(root: Path, request: str) -> Mapping[str, Any]:
         "schema_version": 1,
         "kind": "hive-mind-portable-bootstrap-contract-v1",
         "repository_id": repository_id,
+        "request_id": request_id,
+        "objective_digest": objective_digest,
         "intent": {
             "intent": "BUILD_DAG",
-            "explicit": False,
-            "confidence": "medium",
-            "reasons": ["portable request exists but repository-resident Autopilot is absent"],
+            "explicit": explicit_build,
+            "confidence": "high" if explicit_build else "medium",
+            "reasons": [
+                (
+                    "autopilot run explicitly requires a DAG for its persisted subject"
+                    if explicit_build
+                    else "portable request exists but repository-resident Autopilot is absent"
+                )
+            ],
         },
         "operator_request": request,
         "target_branch": bootstrap["target_branch"],
@@ -1083,6 +1202,9 @@ def _uninstalled_contract(root: Path, request: str) -> Mapping[str, Any]:
             {
                 "task_key": task_key,
                 "launch_instruction_id": launch_instruction_id,
+                "idempotency_key": launch_instruction_id,
+                "request_id": request_id,
+                "objective_digest": objective_digest,
                 "title": f"Hive Mind {task_key} [{launch_instruction_id[7:19]}]",
                 "action": "CREATE",
                 "transport": "durable_user_owned_task",
