@@ -1,0 +1,115 @@
+{
+  "allowed_claims": [
+    "The exact named 12-file Payload A coexists without an observed regression under the recorded focused suites, narrow repository-CI observation, and qualifying full doctor.",
+    "The conflict-resolved current ADR index is freshly covered by this combined court and conservatively preserves ADR-057 as pending independent judgment.",
+    "The unchanged qualification report and this court may be committed as Envelope B after ca43709591313c1c166a2e655b8982ccff16daf3 without changing Payload A."
+  ],
+  "case_id": "CASE-COMBINED-AUTOPILOT-PREREQUISITES-2026-08-23",
+  "decision": "ADAPT",
+  "dissent": [
+    "The repository-CI observation has no independently retained raw transcript or transcript digest; it supports only the recorded command, exit, count, skip, duration, and terminal-summary claim.",
+    "ADR-068 line 146 contains one disclosed trailing space that is part of the qualified source bytes; changing it creates a new unqualified payload requiring fresh exact-byte qualification.",
+    "A typed Windows CloseHandle failure cannot prove descendant cleanup after the raw handle is forgotten, and a POSIX descendant that calls setsid can escape process-group containment.",
+    "The exact 12-file manifest does not qualify every path in the 19-path request-baseline-to-HEAD delta; the Git commit and tree bind context but do not enlarge the payload verdict.",
+    "ADR-057 remains an implemented candidate pending independent judgment and cannot inherit promotion from this combined prerequisite case."
+  ],
+  "evidence": [
+    "evidence/autopilot/COMBINED-PREREQUISITE-QUALIFICATION-2026-08-23.md",
+    "evidence/courts/CASE-ADR-068-BOUNDED-DOCTOR-REPAIR.json",
+    "evidence/courts/CASE-ADR-057-PORTABLE-AUTOPILOT.json",
+    "evidence/courts/CASE-ADR-067-DAG-STANDARD-V2.md",
+    "docs/architecture/ADR-067-DAG-STANDARD-V2-TYPED-DURABILITY-AND-BOUND-CONSUMPTION.md"
+  ],
+  "forbidden_claims": [
+    "Qualification of all 19 changed paths or the complete contents of the three source commits.",
+    "General ADR-057 portable-Autopilot adoption.",
+    "Fresh controller execution trust, V3 execution, self-host qualification, release, push, pull request, protected merge, deployment, production readiness, full autonomy, or superiority.",
+    "Repository-CI transcript integrity, complete per-test evidence, independent transcript replay, or CI coverage of this later Envelope B.",
+    "Containment guarantees stronger than the retained Windows exceptional-path and POSIX setsid limitations."
+  ],
+  "identities": {
+    "advocate": "/root/doctor_capture_harness",
+    "curator": "/root/combined_curator",
+    "cross_examiner": "/root/win32_handle_expert",
+    "expert_witness": "/root/doctor_capture_harness/combined_doctor_check",
+    "integrator": "/root",
+    "judge": "/root/dry_receipt_judge"
+  },
+  "kind": "hive-mind-court-case-v1",
+  "envelope_b": {
+    "qualification_report": {
+      "bytes": 10498,
+      "path": "evidence/autopilot/COMBINED-PREREQUISITE-QUALIFICATION-2026-08-23.md",
+      "sha256": "a514b794be97268b6b2fe1daae08e191ef7c993e0928b73d977802a8137cc95e"
+    },
+    "scope": "The qualification report and this court bind but do not alter or enlarge the exact 12-path Payload A."
+  },
+  "payload_a": {
+    "commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+    "line_manifest_bytes": 1292,
+    "line_manifest_sha256": "5bb32f05b65c975fe90cb4ad21644bbf84363aed362757e4487afd590d6a019b",
+    "path_count": 12,
+    "raw_content_aggregate_bytes": 611066,
+    "raw_content_aggregate_sha256": "e0000dbdc047dc8053ea0e6782feee610dabfac8e9d65f4db76eddbb6801682a",
+    "tree": "22639258c7a524ffda25272ccf34fede176b2663"
+  },
+  "remaining_execution_blockers": [
+    "Freeze and independently approve a fresh external host compiler/controller bundle; stored bundle trust sha256:527ccbeac2d50601d65bf58bc0ce8f314cebda55a9162f5d08607b394c62a081 is stale against current sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255.",
+    "Use the same frozen host unchanged for the complete V3 compile, schedule, integration, and qualification run; the mutable candidate may not qualify itself.",
+    "Separately author, seal, cross-examine, curate, and judge the V3 DAG before execution.",
+    "Resolve ADR-057 independently before broader portable promotion and recheck live authority and branch protection before any remote effect."
+  ],
+  "rollback": "Envelope B is append-only: correct it only through a superseding record, never deletion or history rewriting. Roll back Payload A only through ancestry-preserving reverts of ca437095, eaa7f3f3, and 292e123 in reverse order while retaining all reports, courts, adverse observations, receipts, and dissent.",
+  "schema_version": 1,
+  "source_lineage": {
+    "dag_standard_v2_source_commit": "36cc4edb1c9ce0bddab49e34e2f7529ec419f7c4",
+    "doctor_source_commit": "762954a5201eb8f585d9782665064e2224b2a738",
+    "integrated_commits": [
+      "292e12386e91d98c4494d3222e05784125baaed7",
+      "eaa7f3f3c897dda1a54c61f5983045e0bd427633",
+      "ca43709591313c1c166a2e655b8982ccff16daf3"
+    ],
+    "owner_request_snapshot": {
+      "envelope_b_member": false,
+      "must_not_stage": true,
+      "observed_head": "44224532dc25b94a95c3184054ec81762a258259",
+      "path": ".hive-mind/autopilot-request.json",
+      "payload_a_member": false,
+      "tracked": false
+    }
+  },
+  "status": "LOCAL_NON_EXECUTING_PREREQUISITE_ADAPTED",
+  "validation": {
+    "durable_full_doctor": {
+      "checks_passed": 6,
+      "child_exit": 0,
+      "helper_exit": 0,
+      "natural_drain": true,
+      "receipt_sha256": "6270dc7ca795bb15c5ff85997edacf6efa3fc88433ac917cd6d0b62985a99aa1",
+      "state": "READY",
+      "stdout_sha256": "db9204a29f6ef006cf4f6b3023e937dd3bfb6b2de6538d547ca3a06f411f4394",
+      "survivors": 0,
+      "validation_scope": "full"
+    },
+    "focused_suites": {
+      "dag_standard_v2": "106 passed",
+      "doctor_boundary": "25 run, 24 passed, 1 expected POSIX-only Windows skip",
+      "portable_autopilot_workflow": "26 run, 25 passed, 1 expected Windows symlink-privilege skip"
+    },
+    "independent_dispositions": {
+      "advocate": "ADAPT",
+      "cross_examiner": "ADAPT_APPROVE_BOUNDED_LOCAL_NON_EXECUTING_PREREQUISITE",
+      "curator": "ADAPT",
+      "expert_witness": "PASS_QUALIFYING_FULL_DOCTOR_CAPTURE",
+      "judge": "ADAPT"
+    },
+    "repository_ci": {
+      "duration_seconds": 1091.628,
+      "exit": 0,
+      "raw_transcript_digest": null,
+      "raw_transcript_retained": false,
+      "skipped": 7,
+      "tests_run": 1123
+    }
+  }
+}
