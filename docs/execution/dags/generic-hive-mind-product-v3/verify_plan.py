@@ -12,18 +12,22 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import fnmatch
 import hashlib
 import json
 import math
 import os
 import re
+import stat
+import struct
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Any, Iterable
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_REPO_ROOT = HERE.parents[3]
+DEFAULT_REPO_ROOT = HERE.parents[3] if len(HERE.parents) > 3 else HERE
 
 MAX_MANIFEST_BYTES = 262_144
 MAX_SOURCE_JSON_BYTES = 1_000_000
@@ -31,9 +35,31 @@ MAX_PLAN_BYTES = 2_000_000
 MAX_JSON_DEPTH = 48
 MAX_GIT_OUTPUT_BYTES = 16_777_216
 GIT_TIMEOUT_SECONDS = 60
+GIT_KILL_REAP_TIMEOUT_SECONDS = 5
+GIT_READER_JOIN_TIMEOUT_SECONDS = 5
 MAX_TRACKED_FILE_BYTES = 2_097_152
 MAX_GIT_POINTER_BYTES = 4_096
 MAX_GIT_INDEX_BYTES = 16_777_216
+MAX_NATIVE_EXECUTABLE_BYTES = 268_435_456
+MAX_NATIVE_IMAGE_TABLE_BYTES = 16_777_216
+MAX_AUTOPILOT_TREE_ENTRIES = 4_096
+MAX_AUTOPILOT_TREE_DEPTH = 64
+MAX_AUTOPILOT_FILE_BYTES = 4_194_304
+MAX_AUTOPILOT_TOTAL_BYTES = 67_108_864
+MAX_AUTOPILOT_PATH_BYTES = 4_096
+MAX_AUTOPILOT_WINDOWS_STREAMS_PER_ENTRY = 64
+MAX_GITATTRIBUTES_BYTES = 65_536
+MAX_GITATTRIBUTE_RULES = 512
+MAX_GITATTRIBUTE_PATTERN_BYTES = 4_096
+MAX_GITATTRIBUTE_PATTERN_PARTS = 64
+
+NATIVE_EXECUTABLE_FORMAT_POLICY = "host-native-image-format-v1"
+GIT_EXECUTION_BOUNDARY_POLICY = "caller-absolute-raw-sha256-host-native-image-v2"
+SUPPORTED_NATIVE_IMAGE_FORMATS = {
+    "win32": "PE_COFF_EXECUTABLE_IMAGE",
+    "linux": "ELF_EXEC_OR_PIE_WITH_EXECUTABLE_LOAD_SEGMENT",
+    "darwin": "MACH_O_EXECUTE_THIN_OR_HOST_SLICE_UNIVERSAL",
+}
 
 PLAN_ID = "generic-hive-mind-product-v3"
 REQUEST_ID = "sha256:baa813bdcbd1b3bd459736cb65dccaf060758991a8a9b581fe8a1bf17dd65562"
@@ -54,11 +80,16 @@ PAYLOAD_A_COMMIT = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
 PAYLOAD_A_TREE = "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157"
 PAYLOAD_A_MANIFEST_RAW_DIGEST = "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522"
 PAYLOAD_A_AGGREGATE_DIGEST = "sha256:ff7a0f323aac32da18c70d6f871ddc0918225ddd47de0c15618822be84706d78"
-CORRECTION_PARENT_COMMIT = "f06e52c43a1e2d1d53523378c0d6f5564fb984bf"
-CORRECTION_PARENT_TREE = "8730203c89835c4d1d9dac4be9b2086dacd2d869"
-CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339"
-CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:229821586021d8e2769035aeca4a4589cb7b458a9740a8b8ca82ebdfdadaee36"
-CORRECTION_PARENT_REPORT_DIGEST = "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810"
+GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT = "f06e52c43a1e2d1d53523378c0d6f5564fb984bf"
+GIT_ENVIRONMENT_CORRECTION_PARENT_TREE = "8730203c89835c4d1d9dac4be9b2086dacd2d869"
+GIT_ENVIRONMENT_CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339"
+GIT_ENVIRONMENT_CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:229821586021d8e2769035aeca4a4589cb7b458a9740a8b8ca82ebdfdadaee36"
+GIT_ENVIRONMENT_CORRECTION_PARENT_REPORT_DIGEST = "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810"
+CORRECTION_PARENT_COMMIT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
+CORRECTION_PARENT_TREE = "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
+CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e"
+CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
+CORRECTION_PARENT_REPORT_DIGEST = "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
 SOURCE_INTAKE_DIGEST = "sha256:dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c"
 STANDARD_DIGEST = "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a"
 STANDARD_BLOB = "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374"
@@ -68,6 +99,7 @@ V1_EXPECTED_PLAN_DIGEST = "sha256:b8879d09c5a42b0feeeec19b9c8f6a7523e4ef69b117ee
 EXPECTED_PLAN_DIGEST = "sha256:43121c323dd652cd05807ccc5acdec70bb4a4b81a376e00c45acd16a5fc56ce1"
 EXPECTED_PLAN_RAW_DIGEST = "sha256:5e03c7638b2d4865dda2b2c3a5e615ea4b2b8d37f61a3a5fdfbf29c1750827c4"
 EXPECTED_FROZEN_HOST_BUNDLE = "sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255"
+FROZEN_HOST_MANIFEST_LOCATION = "node-contracts.json#/frozen_host_contract/files"
 
 EXPECTED_OVERLAY_SOURCES = {
     "node-contracts.json": (64381, "sha256:eef8694c935467bade1fed286ef9cce67f01e2f35f0b914105255bf8681e3cf8"),
@@ -77,6 +109,7 @@ EXPECTED_OVERLAY_SOURCES = {
 }
 
 EXPECTED_PAYLOAD_PATHS = (
+    ".gitattributes",
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
     "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
@@ -90,6 +123,7 @@ EXPECTED_PAYLOAD_PATHS = (
     "tests/test_generic_dag_v3_overlay.py",
 )
 EXPECTED_CHANGED_PATHS = (
+    ".gitattributes",
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
@@ -99,6 +133,32 @@ EXPECTED_CHANGED_PATHS = (
 MANIFEST_RELATIVE_PATH = "docs/execution/dags/generic-hive-mind-product-v3/manifest.json"
 OVERLAY_RELATIVE_DIRECTORY = "docs/execution/dags/generic-hive-mind-product-v3"
 ALLOWED_UNTRACKED_PATH = ".hive-mind/autopilot-request.json"
+
+REQUIRED_TEXT_GITATTRIBUTE_RULES = {
+    ".gitattributes": ("text", "eol=lf"),
+    "LICENSE": ("text", "eol=lf"),
+    "*.ps1": ("text", "eol=lf"),
+}
+REQUIRED_RAW_EVIDENCE_GITATTRIBUTE_RULES = {
+    "evidence/sources/**/raw/**": ("-text", "-diff"),
+    "evidence/live/**": ("-text", "-diff"),
+    "evidence/benchmarks/**": ("-text", "-diff"),
+    "evidence/experiments/_artifacts/**": ("-text", "-diff"),
+    "evidence/experiments/_failed/**": ("-text", "-diff"),
+    "evidence/local_assurance/**/logs/**": ("-text", "-diff"),
+}
+EXPECTED_GITATTRIBUTE_RULES = (
+    (".gitattributes", ("text", "eol=lf")),
+    ("LICENSE", ("text", "eol=lf")),
+    ("*.py", ("text", "eol=lf")),
+    ("*.json", ("text", "eol=lf")),
+    ("*.md", ("text", "eol=lf")),
+    ("*.ps1", ("text", "eol=lf")),
+    ("*.toml", ("text", "eol=lf")),
+    ("*.yml", ("text", "eol=lf")),
+    ("*.yaml", ("text", "eol=lf")),
+    *tuple(REQUIRED_RAW_EVIDENCE_GITATTRIBUTE_RULES.items()),
+)
 
 EXPECTED_REPOSITORY_SOURCES = {
     "LICENSE": (1065, "sha256:6e76d648ae297aa3dcefc739604cfcfab2a50b484ab7331090c745a089de21f8", "06da1af7996f5e2b059cd52045e36f9f2cfac201"),
@@ -129,7 +189,59 @@ EXPECTED_NODE_ORDER = [
 
 
 class VerificationError(RuntimeError):
-    """A declared V3 trust or data invariant did not verify."""
+    """A declared trust or data invariant did not verify."""
+
+    code = "VERIFICATION_ERROR"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        primary_code: str | None = None,
+        cleanup_evidence: Iterable[BaseException] = (),
+    ) -> None:
+        super().__init__(message)
+        self.primary_code = primary_code or self.code
+        self.cleanup_evidence: list[dict[str, str]] = []
+        for error in cleanup_evidence:
+            self.add_cleanup_evidence(error)
+
+    def add_cleanup_evidence(self, error: BaseException) -> None:
+        self.cleanup_evidence.append(
+            {
+                "code": str(getattr(error, "code", "VERIFICATION_CLEANUP_ERROR")),
+                "error_type": type(error).__name__,
+                "error": str(error),
+            }
+        )
+
+    def __str__(self) -> str:
+        message = super().__str__()
+        if not self.cleanup_evidence:
+            return message
+        rendered = json.dumps(
+            self.cleanup_evidence,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return f"{message}; cleanup_evidence={rendered}"
+
+
+class GitOutputOverflowError(VerificationError):
+    code = "GIT_OUTPUT_OVERFLOW"
+
+
+class GitTimeoutError(VerificationError):
+    code = "GIT_TIMEOUT"
+
+
+class GitTimeoutAfterKillError(VerificationError):
+    code = "GIT_TIMEOUT_AFTER_KILL"
+
+
+class GitNonUtf8Error(VerificationError):
+    code = "GIT_NON_UTF8"
 
 
 def require(condition: bool, message: str) -> None:
@@ -254,16 +366,444 @@ def safe_child(root: Path, relative: str, *, label: str) -> Path:
     return resolved
 
 
+def _optional_stat_integer(state: os.stat_result, name: str) -> int | None:
+    value = getattr(state, name, None)
+    return None if value is None else int(value)
+
+
+def _filesystem_snapshot_state(state: os.stat_result) -> tuple[int | None, ...]:
+    birthtime_ns = _optional_stat_integer(state, "st_birthtime_ns")
+    if birthtime_ns is None:
+        birthtime = getattr(state, "st_birthtime", None)
+        if birthtime is not None:
+            birthtime_ns = int(float(birthtime) * 1_000_000_000)
+    return (
+        state.st_dev,
+        state.st_ino,
+        state.st_mode,
+        state.st_nlink,
+        state.st_uid,
+        state.st_gid,
+        state.st_size,
+        state.st_mtime_ns,
+        state.st_ctime_ns,
+        _optional_stat_integer(state, "st_file_attributes"),
+        _optional_stat_integer(state, "st_reparse_tag"),
+        birthtime_ns,
+        _optional_stat_integer(state, "st_flags"),
+        _optional_stat_integer(state, "st_gen"),
+    )
+
+
+def _filesystem_path_open_identity(state: os.stat_result) -> tuple[int | None, ...]:
+    # Windows path-stat and handle-fstat expose different ctime semantics in
+    # current Python runtimes.  Preserve each ctime in its own before/after
+    # observation, but exclude only ctime from the path-versus-open comparison.
+    # Slicing the complete state keeps every stable optional field bound too.
+    complete_state = _filesystem_snapshot_state(state)
+    return complete_state[:8] + complete_state[9:]
+
+
+class _WIN32_FIND_STREAM_DATA(ctypes.Structure):
+    _fields_ = [
+        ("StreamSize", ctypes.c_longlong),
+        ("cStreamName", ctypes.c_wchar * (260 + 36)),
+    ]
+
+
+_WINDOWS_STREAM_API: tuple[Any, Any, Any] | None = None
+
+
+def _windows_stream_api() -> tuple[Any, Any, Any]:
+    global _WINDOWS_STREAM_API
+    if _WINDOWS_STREAM_API is not None:
+        return _WINDOWS_STREAM_API
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        find_first = kernel32.FindFirstStreamW
+        find_first.argtypes = [
+            ctypes.c_wchar_p,
+            ctypes.c_int,
+            ctypes.POINTER(_WIN32_FIND_STREAM_DATA),
+            ctypes.c_uint32,
+        ]
+        find_first.restype = ctypes.c_void_p
+        find_next = kernel32.FindNextStreamW
+        find_next.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(_WIN32_FIND_STREAM_DATA),
+        ]
+        find_next.restype = ctypes.c_int
+        find_close = kernel32.FindClose
+        find_close.argtypes = [ctypes.c_void_p]
+        find_close.restype = ctypes.c_int
+    except Exception as error:
+        raise VerificationError(
+            f"cannot initialize bounded Windows stream enumeration: {error}"
+        ) from error
+    _WINDOWS_STREAM_API = (find_first, find_next, find_close)
+    return _WINDOWS_STREAM_API
+
+
+def _windows_stream_error(*, label: str, operation: str, error_code: int) -> VerificationError:
+    try:
+        detail = ctypes.WinError(error_code)
+    except Exception:
+        detail = OSError(error_code, "unknown Windows stream enumeration error")
+    return VerificationError(
+        f"cannot {operation} Windows streams for .autopilot {label}: {detail}"
+    )
+
+
+def _windows_stream_snapshot(path: Path, *, label: str) -> tuple[tuple[str, int], ...]:
+    """Return the unnamed NTFS data stream and reject every named stream."""
+
+    if os.name != "nt":
+        return ()
+    find_first, find_next, find_close = _windows_stream_api()
+    stream_data = _WIN32_FIND_STREAM_DATA()
+    invalid_handle = ctypes.c_void_p(-1).value
+    try:
+        ctypes.set_last_error(0)
+        handle = find_first(str(path), 0, ctypes.byref(stream_data), 0)
+    except Exception as error:
+        raise VerificationError(
+            f"cannot begin Windows stream enumeration for .autopilot {label}: {error}"
+        ) from error
+    if handle == invalid_handle:
+        error_code = ctypes.get_last_error()
+        if error_code == 38:  # ERROR_HANDLE_EOF: the entry has no streams.
+            return ()
+        raise _windows_stream_error(
+            label=label,
+            operation="begin enumerating",
+            error_code=error_code,
+        )
+    if handle in (None, 0):
+        raise VerificationError(
+            f"Windows stream enumeration returned an invalid handle for .autopilot {label}"
+        )
+
+    streams: list[tuple[str, int]] = []
+    primary_error: VerificationError | None = None
+    try:
+        while True:
+            require(
+                len(streams) < MAX_AUTOPILOT_WINDOWS_STREAMS_PER_ENTRY,
+                f"Windows stream inventory exceeds the limit for .autopilot {label}",
+            )
+            stream_name = str(stream_data.cStreamName)
+            stream_size = int(stream_data.StreamSize)
+            require(
+                stream_name != "" and len(stream_name) < 260 + 36,
+                f"malformed Windows stream name for .autopilot {label}",
+            )
+            require(
+                stream_size >= 0,
+                f"negative Windows stream size for .autopilot {label}",
+            )
+            require(
+                stream_name == "::$DATA",
+                f"named Windows data stream is forbidden for .autopilot {label}: {stream_name}",
+            )
+            require(
+                not streams,
+                f"duplicate unnamed Windows data stream for .autopilot {label}",
+            )
+            streams.append((stream_name, stream_size))
+
+            try:
+                ctypes.set_last_error(0)
+                has_next = bool(find_next(handle, ctypes.byref(stream_data)))
+            except Exception as error:
+                raise VerificationError(
+                    f"cannot continue Windows stream enumeration for .autopilot {label}: {error}"
+                ) from error
+            if has_next:
+                continue
+            error_code = ctypes.get_last_error()
+            if error_code == 38:  # ERROR_HANDLE_EOF: successful enumeration end.
+                break
+            raise _windows_stream_error(
+                label=label,
+                operation="continue enumerating",
+                error_code=error_code,
+            )
+    except VerificationError as error:
+        primary_error = error
+    finally:
+        close_error: VerificationError | None = None
+        try:
+            ctypes.set_last_error(0)
+            closed = bool(find_close(handle))
+        except Exception as error:
+            close_error = VerificationError(
+                f"cannot close Windows stream enumeration for .autopilot {label}: {error}"
+            )
+        else:
+            if not closed:
+                close_error = _windows_stream_error(
+                    label=label,
+                    operation="close the enumeration of",
+                    error_code=ctypes.get_last_error(),
+                )
+        if close_error is not None:
+            if primary_error is not None:
+                primary_error.add_cleanup_evidence(close_error)
+            else:
+                primary_error = close_error
+    if primary_error is not None:
+        raise primary_error
+    return tuple(streams)
+
+
+def snapshot_autopilot_tree(repo_root: Path) -> dict[str, Any]:
+    """Record bounded point observations across the complete ``.autopilot`` tree."""
+
+    root = repo_root / ".autopilot"
+    try:
+        root_state = os.lstat(root)
+    except OSError as error:
+        raise VerificationError(f"cannot inspect .autopilot root: {error}") from error
+    require(stat.S_ISDIR(root_state.st_mode), ".autopilot root must be a directory")
+    require(
+        not stat.S_ISLNK(root_state.st_mode)
+        and not getattr(root_state, "st_reparse_tag", 0),
+        ".autopilot root cannot be a symlink or reparse point",
+    )
+
+    rows: list[tuple[Any, ...]] = []
+    total_bytes = 0
+
+    def add_row(row: tuple[Any, ...]) -> None:
+        require(
+            len(rows) < MAX_AUTOPILOT_TREE_ENTRIES,
+            ".autopilot tree exceeds the entry limit",
+        )
+        rows.append(row)
+
+    def visit_directory(directory: Path, relative: str, depth: int) -> None:
+        nonlocal total_bytes
+        require(depth <= MAX_AUTOPILOT_TREE_DEPTH, ".autopilot tree exceeds the depth limit")
+        try:
+            before_directory = os.lstat(directory)
+        except OSError as error:
+            raise VerificationError(f"cannot inspect .autopilot directory {relative}: {error}") from error
+        require(stat.S_ISDIR(before_directory.st_mode), f".autopilot directory changed type: {relative}")
+        require(
+            not stat.S_ISLNK(before_directory.st_mode)
+            and not getattr(before_directory, "st_reparse_tag", 0),
+            f".autopilot directory cannot be a symlink or reparse point: {relative}",
+        )
+        before_state = _filesystem_snapshot_state(before_directory)
+        before_streams = _windows_stream_snapshot(
+            directory,
+            label=f"directory {relative}",
+        )
+        try:
+            after_before_stream_directory = os.lstat(directory)
+        except OSError as error:
+            raise VerificationError(
+                f"cannot re-inspect .autopilot directory after initial stream enumeration {relative}: {error}"
+            ) from error
+        require(
+            _filesystem_snapshot_state(after_before_stream_directory) == before_state,
+            f".autopilot directory changed during initial stream enumeration: {relative}",
+        )
+        require(
+            before_streams == (),
+            f".autopilot directory cannot expose an unnamed Windows data stream: {relative}",
+        )
+        add_row((relative, "directory", before_state, before_streams))
+        entries: list[os.DirEntry[str]] = []
+        try:
+            with os.scandir(directory) as iterator:
+                for entry in iterator:
+                    require(
+                        len(rows) + len(entries) < MAX_AUTOPILOT_TREE_ENTRIES,
+                        ".autopilot tree exceeds the entry limit",
+                    )
+                    entries.append(entry)
+        except OSError as error:
+            raise VerificationError(f"cannot enumerate .autopilot directory {relative}: {error}") from error
+        for entry in sorted(entries, key=lambda item: item.name):
+            require(
+                entry.name not in {"", ".", ".."}
+                and "/" not in entry.name
+                and "\\" not in entry.name
+                and "\0" not in entry.name,
+                f"malformed .autopilot entry name under {relative}",
+            )
+            child_relative = entry.name if relative == "." else f"{relative}/{entry.name}"
+            require(
+                len(os.fsencode(child_relative)) <= MAX_AUTOPILOT_PATH_BYTES,
+                ".autopilot relative path exceeds the byte limit",
+            )
+            child = directory / entry.name
+            try:
+                before_child = os.lstat(child)
+            except OSError as error:
+                raise VerificationError(f"cannot inspect .autopilot entry {child_relative}: {error}") from error
+            require(
+                not stat.S_ISLNK(before_child.st_mode)
+                and not getattr(before_child, "st_reparse_tag", 0),
+                f".autopilot symlinks and reparse points are forbidden: {child_relative}",
+            )
+            if stat.S_ISDIR(before_child.st_mode):
+                visit_directory(child, child_relative, depth + 1)
+                continue
+            require(
+                stat.S_ISREG(before_child.st_mode),
+                f"unsupported .autopilot filesystem object: {child_relative}",
+            )
+            require(
+                0 <= before_child.st_size <= MAX_AUTOPILOT_FILE_BYTES,
+                f".autopilot file exceeds the per-file limit: {child_relative}",
+            )
+            before_child_state = _filesystem_snapshot_state(before_child)
+            before_child_streams = _windows_stream_snapshot(
+                child,
+                label=f"file {child_relative}",
+            )
+            try:
+                after_before_child_stream = os.lstat(child)
+            except OSError as error:
+                raise VerificationError(
+                    f"cannot re-inspect .autopilot file after initial stream enumeration {child_relative}: {error}"
+                ) from error
+            require(
+                _filesystem_snapshot_state(after_before_child_stream)
+                == before_child_state,
+                f".autopilot file changed during initial stream enumeration: {child_relative}",
+            )
+            if os.name == "nt":
+                require(
+                    before_child_streams == (("::$DATA", before_child.st_size),),
+                    f".autopilot file has an inconsistent unnamed Windows data stream: {child_relative}",
+                )
+            try:
+                with child.open("rb") as handle:
+                    open_before = os.fstat(handle.fileno())
+                    require(
+                        _filesystem_path_open_identity(open_before)
+                        == _filesystem_path_open_identity(before_child),
+                        f".autopilot path/open-file identity mismatch: {child_relative}",
+                    )
+                    raw = handle.read(MAX_AUTOPILOT_FILE_BYTES + 1)
+                    open_after = os.fstat(handle.fileno())
+            except OSError as error:
+                raise VerificationError(f"cannot read .autopilot file {child_relative}: {error}") from error
+            require(
+                _filesystem_snapshot_state(open_after)
+                == _filesystem_snapshot_state(open_before),
+                f".autopilot open file changed while reading: {child_relative}",
+            )
+            require(
+                len(raw) == before_child.st_size,
+                f".autopilot file read length mismatch: {child_relative}",
+            )
+            try:
+                after_child = os.lstat(child)
+            except OSError as error:
+                raise VerificationError(f"cannot re-inspect .autopilot file {child_relative}: {error}") from error
+            require(
+                _filesystem_snapshot_state(after_child) == before_child_state,
+                f".autopilot path changed while reading: {child_relative}",
+            )
+            after_child_streams = _windows_stream_snapshot(
+                child,
+                label=f"file {child_relative}",
+            )
+            try:
+                after_final_child_stream = os.lstat(child)
+            except OSError as error:
+                raise VerificationError(
+                    f"cannot re-inspect .autopilot file after final stream enumeration {child_relative}: {error}"
+                ) from error
+            require(
+                _filesystem_snapshot_state(after_final_child_stream)
+                == before_child_state,
+                f".autopilot file changed during final stream enumeration: {child_relative}",
+            )
+            require(
+                after_child_streams == before_child_streams,
+                f".autopilot Windows stream inventory changed while reading: {child_relative}",
+            )
+            total_bytes += len(raw)
+            require(total_bytes <= MAX_AUTOPILOT_TOTAL_BYTES, ".autopilot tree exceeds the total-byte limit")
+            add_row(
+                (
+                    child_relative,
+                    "file",
+                    before_child_state,
+                    before_child_streams,
+                    sha256_bytes(raw),
+                )
+            )
+        try:
+            after_directory = os.lstat(directory)
+        except OSError as error:
+            raise VerificationError(f"cannot re-inspect .autopilot directory {relative}: {error}") from error
+        require(
+            _filesystem_snapshot_state(after_directory) == before_state,
+            f".autopilot directory changed during snapshot: {relative}",
+        )
+        after_streams = _windows_stream_snapshot(
+            directory,
+            label=f"directory {relative}",
+        )
+        try:
+            after_final_stream_directory = os.lstat(directory)
+        except OSError as error:
+            raise VerificationError(
+                f"cannot re-inspect .autopilot directory after final stream enumeration {relative}: {error}"
+            ) from error
+        require(
+            _filesystem_snapshot_state(after_final_stream_directory) == before_state,
+            f".autopilot directory changed during final stream enumeration: {relative}",
+        )
+        require(
+            after_streams == before_streams,
+            f".autopilot Windows stream inventory changed during snapshot: {relative}",
+        )
+
+    visit_directory(root, ".", 0)
+    rows.sort(key=lambda row: row[0])
+    material = {
+        "schema": "complete-autopilot-tree-point-observation-v2",
+        "entry_count": len(rows),
+        "total_file_bytes": total_bytes,
+        "rows": rows,
+    }
+    return {
+        "schema": material["schema"],
+        "entry_count": len(rows),
+        "total_file_bytes": total_bytes,
+        "digest": digest(material),
+        "rows": tuple(rows),
+    }
+
+
 _GIT_BOUNDARY: dict[str, Any] | None = None
 
 
 def _windows_system_environment() -> dict[str, str]:
     if os.name != "nt":
         return {}
-    buffer = ctypes.create_unicode_buffer(32_768)
-    length = ctypes.windll.kernel32.GetWindowsDirectoryW(buffer, len(buffer))
-    require(0 < length < len(buffer), "cannot resolve the Windows system directory")
-    windows_root = str(Path(buffer.value).resolve())
+    try:
+        buffer = ctypes.create_unicode_buffer(32_768)
+        get_windows_directory = ctypes.windll.kernel32.GetWindowsDirectoryW
+        get_windows_directory.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32]
+        get_windows_directory.restype = ctypes.c_uint32
+        length = get_windows_directory(buffer, len(buffer))
+        require(0 < length < len(buffer), "cannot resolve the Windows system directory")
+        windows_root = str(Path(buffer.value).resolve())
+    except VerificationError:
+        raise
+    except Exception as error:
+        raise VerificationError(
+            f"cannot query the Windows system directory: {error}"
+        ) from error
     return {"SYSTEMROOT": windows_root, "WINDIR": windows_root}
 
 
@@ -348,8 +888,15 @@ def _resolve_common_git_dir(git_dir: Path) -> Path:
 
 
 def _git_executable_path_state(path: Path) -> tuple[int, int, int, int, int]:
-    require(path.is_file() and not path.is_symlink(), "Git executable is no longer a regular file")
-    stat_result = path.stat()
+    try:
+        require(path.is_file() and not path.is_symlink(), "Git executable is no longer a regular file")
+        stat_result = path.stat()
+    except OSError as error:
+        raise VerificationError(f"cannot inspect Git executable path state: {error}") from error
+    require(
+        0 < stat_result.st_size <= MAX_NATIVE_EXECUTABLE_BYTES,
+        "Git executable size is outside the verifier limit",
+    )
     return (
         stat_result.st_dev,
         stat_result.st_ino,
@@ -359,26 +906,596 @@ def _git_executable_path_state(path: Path) -> tuple[int, int, int, int, int]:
     )
 
 
-def _open_file_identity(handle: Any) -> tuple[int, int, int, int]:
-    stat_result = os.fstat(handle.fileno())
+def _open_file_identity(handle: Any) -> tuple[int, int, int, int, int]:
+    try:
+        stat_result = os.fstat(handle.fileno())
+    except (OSError, ValueError) as error:
+        raise VerificationError(f"cannot inspect open Git executable identity: {error}") from error
     return (
         stat_result.st_dev,
         stat_result.st_ino,
         stat_result.st_size,
         stat_result.st_mtime_ns,
+        stat_result.st_ctime_ns,
     )
 
 
-def _open_file_sha256(handle: Any) -> str:
-    digest_state = hashlib.sha256()
-    handle.seek(0)
-    while True:
-        chunk = handle.read(1_048_576)
-        if not chunk:
-            break
-        digest_state.update(chunk)
-    handle.seek(0)
-    return "sha256:" + digest_state.hexdigest()
+def _read_immutable_executable_snapshot(
+    handle: Any,
+    *,
+    expected_identity: tuple[int, int, int, int, int] | None,
+    label: str,
+) -> bytes:
+    """Make one bounded read bracketed by exact open-file identity checks."""
+
+    before = _open_file_identity(handle)
+    require(
+        0 < before[2] <= MAX_NATIVE_EXECUTABLE_BYTES,
+        f"{label} size is outside the verifier limit",
+    )
+    if expected_identity is not None:
+        require(
+            before[:4] == expected_identity[:4],
+            f"{label} path/open identity or size changed before snapshot",
+        )
+    try:
+        handle.seek(0)
+        raw = handle.read(MAX_NATIVE_EXECUTABLE_BYTES + 1)
+        handle.seek(0)
+    except (OSError, ValueError) as error:
+        raise VerificationError(f"cannot read {label}: {error}") from error
+    after = _open_file_identity(handle)
+    require(before == after, f"{label} identity changed while reading one snapshot")
+    require(len(raw) == before[2], f"{label} read length differs from file size")
+    return raw
+
+
+def _normalize_host_machine(host_machine: str) -> str:
+    require(isinstance(host_machine, str) and host_machine.strip(), "host machine identity is missing")
+    value = host_machine.strip().casefold().replace("-", "_")
+    aliases = {
+        "amd64": "x86_64",
+        "x64": "x86_64",
+        "x86_64": "x86_64",
+        "i386": "x86",
+        "i486": "x86",
+        "i586": "x86",
+        "i686": "x86",
+        "x86": "x86",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+        "arm64e": "arm64",
+        "arm": "arm",
+        "armv6l": "arm",
+        "armv7l": "arm",
+        "armv8l": "arm",
+        "ppc64": "ppc64",
+        "powerpc64": "ppc64",
+        "ppc64le": "ppc64le",
+        "powerpc64le": "ppc64le",
+        "s390x": "s390x",
+        "riscv64": "riscv64",
+    }
+    require(value in aliases, f"unsupported host machine: {host_machine}")
+    return aliases[value]
+
+
+def _current_host_machine(host_platform: str) -> str:
+    if host_platform == "win32":
+        class SystemInfo(ctypes.Structure):
+            _fields_ = [("raw", ctypes.c_ubyte * 48)]
+
+        system_info = SystemInfo()
+        try:
+            ctypes.windll.kernel32.GetNativeSystemInfo(ctypes.byref(system_info))
+        except (AttributeError, OSError) as error:
+            raise VerificationError(f"cannot resolve native Windows host architecture: {error}") from error
+        processor_architecture = int.from_bytes(bytes(system_info.raw[:2]), "little")
+        windows_architectures = {
+            0: "x86",
+            5: "arm",
+            9: "x86_64",
+            12: "arm64",
+        }
+        require(
+            processor_architecture in windows_architectures,
+            f"unsupported native Windows processor architecture: {processor_architecture}",
+        )
+        return windows_architectures[processor_architecture]
+    try:
+        return _normalize_host_machine(os.uname().machine)
+    except (AttributeError, OSError) as error:
+        raise VerificationError(f"cannot resolve native host architecture: {error}") from error
+
+
+def _require_native_region(raw: bytes | memoryview, offset: int, size: int, *, label: str) -> None:
+    require(
+        isinstance(offset, int)
+        and isinstance(size, int)
+        and offset >= 0
+        and size >= 0
+        and offset <= len(raw)
+        and size <= len(raw) - offset,
+        f"native executable image is truncated in {label}",
+    )
+
+
+def _native_image_result(
+    *, host_platform: str, host_machine: str
+) -> dict[str, str]:
+    return {
+        "policy": NATIVE_EXECUTABLE_FORMAT_POLICY,
+        "host_platform": host_platform,
+        "host_machine": host_machine,
+        "native_executable_format": SUPPORTED_NATIVE_IMAGE_FORMATS[host_platform],
+    }
+
+
+def _inspect_pe_image(raw: bytes, *, host_machine: str) -> None:
+    require(raw[:2] == b"MZ", "native executable image does not use PE/COFF on host platform win32")
+    _require_native_region(raw, 0, 64, label="PE DOS header")
+    pe_offset = struct.unpack_from("<I", raw, 0x3C)[0]
+    require(pe_offset >= 64, "PE/COFF header offset is malformed")
+    _require_native_region(raw, pe_offset, 24, label="PE signature and COFF header")
+    require(raw[pe_offset : pe_offset + 4] == b"PE\0\0", "PE/COFF signature mismatch")
+    machine, section_count, _, _, _, optional_size, characteristics = struct.unpack_from(
+        "<HHIIIHH", raw, pe_offset + 4
+    )
+    expected_machine = {
+        "x86": (0x014C, 0x010B, 96),
+        "x86_64": (0x8664, 0x020B, 112),
+        "arm64": (0xAA64, 0x020B, 112),
+    }
+    require(host_machine in expected_machine, f"unsupported PE/COFF host machine: {host_machine}")
+    required_machine, required_optional_magic, minimum_optional_size = expected_machine[host_machine]
+    require(machine == required_machine, "PE/COFF machine does not match the host architecture")
+    require(
+        characteristics & 0x0002 and not characteristics & 0x2000,
+        "PE/COFF image must be executable and must not be a DLL",
+    )
+    require(0 < section_count <= 96, "PE/COFF section count is invalid")
+    require(
+        optional_size >= minimum_optional_size,
+        "PE/COFF optional header is smaller than the realistic host-image minimum",
+    )
+    optional_offset = pe_offset + 24
+    _require_native_region(raw, optional_offset, optional_size, label="PE optional header")
+    optional_magic = struct.unpack_from("<H", raw, optional_offset)[0]
+    require(optional_magic == required_optional_magic, "PE/COFF optional-header class does not match the host architecture")
+    entry_point = struct.unpack_from("<I", raw, optional_offset + 16)[0]
+    size_of_image = struct.unpack_from("<I", raw, optional_offset + 56)[0]
+    size_of_headers = struct.unpack_from("<I", raw, optional_offset + 60)[0]
+    require(entry_point > 0, "PE/COFF AddressOfEntryPoint must be nonzero")
+    require(size_of_image > entry_point, "PE/COFF entry point lies outside SizeOfImage")
+    section_table_offset = optional_offset + optional_size
+    section_table_size = section_count * 40
+    require(section_table_size <= MAX_NATIVE_IMAGE_TABLE_BYTES, "PE/COFF section table exceeds the verifier limit")
+    _require_native_region(raw, section_table_offset, section_table_size, label="PE section table")
+    section_table_limit = section_table_offset + section_table_size
+    require(
+        size_of_headers >= section_table_limit and size_of_headers <= len(raw),
+        "PE/COFF SizeOfHeaders does not cover the complete section table",
+    )
+    executable_entry_section = False
+    for index in range(section_count):
+        section_offset = section_table_offset + index * 40
+        virtual_size = struct.unpack_from("<I", raw, section_offset + 8)[0]
+        virtual_address = struct.unpack_from("<I", raw, section_offset + 12)[0]
+        raw_size = struct.unpack_from("<I", raw, section_offset + 16)[0]
+        raw_pointer = struct.unpack_from("<I", raw, section_offset + 20)[0]
+        section_characteristics = struct.unpack_from("<I", raw, section_offset + 36)[0]
+        virtual_span = max(virtual_size, raw_size)
+        if virtual_span > 0:
+            require(
+                virtual_address < size_of_image
+                and virtual_span <= size_of_image - virtual_address,
+                "PE/COFF section virtual range lies outside SizeOfImage",
+            )
+        if raw_size > 0:
+            require(
+                raw_pointer >= size_of_headers,
+                "PE/COFF section raw bytes overlap headers",
+            )
+            _require_native_region(
+                raw,
+                raw_pointer,
+                raw_size,
+                label="PE section raw range",
+            )
+        if section_characteristics & 0x20000000:
+            require(raw_size > 0, "PE/COFF executable section has no raw bytes")
+            if virtual_address <= entry_point < virtual_address + virtual_span:
+                executable_entry_section = True
+    require(
+        executable_entry_section,
+        "PE/COFF entry point is not covered by a valid executable section",
+    )
+
+
+def _inspect_elf_image(raw: bytes, *, host_machine: str) -> None:
+    require(raw[:4] == b"\x7fELF", "native executable image does not use ELF on host platform linux")
+    _require_native_region(raw, 0, 16, label="ELF identification")
+    elf_class = raw[4]
+    data_encoding = raw[5]
+    require(elf_class in {1, 2}, "ELF class is unsupported")
+    require(data_encoding in {1, 2}, "ELF data encoding is unsupported")
+    require(raw[6] == 1, "ELF identification version is unsupported")
+    endian = "<" if data_encoding == 1 else ">"
+    expected_machine = {
+        "x86": (3, 1, 1),
+        "x86_64": (62, 2, 1),
+        "arm": (40, 1, 1),
+        "arm64": (183, 2, 1),
+        "ppc64": (21, 2, 2),
+        "ppc64le": (21, 2, 1),
+        "s390x": (22, 2, 2),
+        "riscv64": (243, 2, 1),
+    }
+    require(host_machine in expected_machine, f"unsupported ELF host machine: {host_machine}")
+    required_machine, required_class, required_encoding = expected_machine[host_machine]
+    require(
+        elf_class == required_class and data_encoding == required_encoding,
+        "ELF class or byte order does not match the host architecture",
+    )
+    header_size = 52 if elf_class == 1 else 64
+    _require_native_region(raw, 0, header_size, label="ELF header")
+    image_type, machine, version = struct.unpack_from(endian + "HHI", raw, 16)
+    require(image_type in {2, 3}, "ELF image must be ET_EXEC or ET_DYN")
+    require(machine == required_machine, "ELF machine does not match the host architecture")
+    require(version == 1, "ELF header version is unsupported")
+    if elf_class == 1:
+        entry_point = struct.unpack_from(endian + "I", raw, 24)[0]
+        program_offset = struct.unpack_from(endian + "I", raw, 28)[0]
+        declared_header_size, program_entry_size, program_count = struct.unpack_from(
+            endian + "HHH", raw, 40
+        )
+        minimum_program_entry_size = 32
+        dynamic_entry_size = 8
+        address_limit = 1 << 32
+    else:
+        entry_point = struct.unpack_from(endian + "Q", raw, 24)[0]
+        program_offset = struct.unpack_from(endian + "Q", raw, 32)[0]
+        declared_header_size, program_entry_size, program_count = struct.unpack_from(
+            endian + "HHH", raw, 52
+        )
+        minimum_program_entry_size = 56
+        dynamic_entry_size = 16
+        address_limit = 1 << 64
+    require(entry_point > 0, "ELF entry point must be nonzero")
+    require(
+        declared_header_size == header_size,
+        "ELF declared header size does not match its class",
+    )
+    require(0 < program_count < 0xFFFF, "ELF program-header count is invalid or extended")
+    require(
+        minimum_program_entry_size <= program_entry_size <= 4096,
+        "ELF program-header entry size is invalid",
+    )
+    require(
+        program_offset >= declared_header_size,
+        "ELF program-header table overlaps the declared ELF header",
+    )
+    program_table_size = program_entry_size * program_count
+    require(program_table_size <= MAX_NATIVE_IMAGE_TABLE_BYTES, "ELF program-header table exceeds the verifier limit")
+    _require_native_region(raw, program_offset, program_table_size, label="ELF program-header table")
+    executable_entry_load = False
+    valid_interpreter = False
+    dynamic_ranges: list[tuple[int, int]] = []
+    for index in range(program_count):
+        entry_offset = program_offset + index * program_entry_size
+        if elf_class == 1:
+            (
+                program_type,
+                file_offset,
+                virtual_address,
+                _,
+                file_size,
+                memory_size,
+                flags,
+                alignment,
+            ) = struct.unpack_from(endian + "IIIIIIII", raw, entry_offset)
+        else:
+            (
+                program_type,
+                flags,
+                file_offset,
+                virtual_address,
+                _,
+                file_size,
+                memory_size,
+                alignment,
+            ) = struct.unpack_from(endian + "IIQQQQQQ", raw, entry_offset)
+        if program_type == 1:
+            require(memory_size > 0, "ELF PT_LOAD segment has zero memory size")
+            require(file_size <= memory_size, "ELF PT_LOAD file size exceeds memory size")
+            require(
+                virtual_address + memory_size <= address_limit,
+                "ELF PT_LOAD virtual range overflows the address class",
+            )
+            _require_native_region(raw, file_offset, file_size, label="ELF PT_LOAD file range")
+            require(
+                alignment in {0, 1}
+                or (
+                    alignment & (alignment - 1) == 0
+                    and virtual_address % alignment == file_offset % alignment
+                ),
+                "ELF PT_LOAD alignment is invalid",
+            )
+            if (
+                flags & 0x1
+                and virtual_address <= entry_point < virtual_address + memory_size
+                and entry_point - virtual_address < file_size
+            ):
+                executable_entry_load = True
+        elif program_type == 3:
+            require(1 < file_size <= MAX_GIT_POINTER_BYTES, "ELF PT_INTERP size is invalid")
+            _require_native_region(raw, file_offset, file_size, label="ELF PT_INTERP file range")
+            interpreter = raw[file_offset : file_offset + file_size]
+            require(
+                interpreter.endswith(b"\0")
+                and b"\0" not in interpreter[:-1]
+                and interpreter[:-1].startswith(b"/"),
+                "ELF PT_INTERP is not one absolute NUL-terminated path",
+            )
+            valid_interpreter = True
+        elif program_type == 2:
+            require(
+                0 < file_size <= MAX_NATIVE_IMAGE_TABLE_BYTES
+                and file_size % dynamic_entry_size == 0,
+                "ELF PT_DYNAMIC size is invalid",
+            )
+            _require_native_region(raw, file_offset, file_size, label="ELF PT_DYNAMIC file range")
+            dynamic_ranges.append((file_offset, file_size))
+    require(
+        executable_entry_load,
+        "ELF entry point is not file-backed by an executable PT_LOAD segment",
+    )
+    dynamic_pie = False
+    for dynamic_offset, dynamic_size in dynamic_ranges:
+        for item_offset in range(
+            dynamic_offset,
+            dynamic_offset + dynamic_size,
+            dynamic_entry_size,
+        ):
+            if elf_class == 1:
+                tag, value = struct.unpack_from(endian + "II", raw, item_offset)
+            else:
+                tag, value = struct.unpack_from(endian + "QQ", raw, item_offset)
+            if tag == 0:
+                break
+            if tag == 0x6FFFFFFB and value & 0x08000000:
+                dynamic_pie = True
+    if image_type == 3:
+        require(
+            valid_interpreter or dynamic_pie,
+            "ELF ET_DYN image lacks PT_INTERP and DF_1_PIE semantics",
+        )
+
+
+def _macho_host_cpu(host_machine: str) -> tuple[int, int, frozenset[int]]:
+    machines = {
+        "x86": (7, 32, frozenset({3})),
+        "x86_64": (0x01000007, 64, frozenset({3})),
+        "arm": (12, 32, frozenset({0})),
+        "arm64": (0x0100000C, 64, frozenset({0})),
+        "ppc64": (0x01000012, 64, frozenset({0})),
+    }
+    require(host_machine in machines, f"unsupported Mach-O host machine: {host_machine}")
+    return machines[host_machine]
+
+
+def _inspect_macho_thin(
+    raw: bytes | memoryview,
+    *,
+    host_machine: str,
+    expected_fat_subtype: int | None = None,
+) -> None:
+    expected_cpu, expected_bits, allowed_subtypes = _macho_host_cpu(host_machine)
+    _require_native_region(raw, 0, 4, label="Mach-O magic")
+    magic = bytes(raw[:4])
+    magics = {
+        b"\xce\xfa\xed\xfe": ("<", 32),
+        b"\xfe\xed\xfa\xce": (">", 32),
+        b"\xcf\xfa\xed\xfe": ("<", 64),
+        b"\xfe\xed\xfa\xcf": (">", 64),
+    }
+    require(magic in magics, "Mach-O host slice does not contain a thin Mach-O image")
+    endian, bits = magics[magic]
+    require(bits == expected_bits, "Mach-O image class does not match the host architecture")
+    header_size = 28 if bits == 32 else 32
+    _require_native_region(raw, 0, header_size, label="Mach-O header")
+    cpu_type, cpu_subtype, file_type, command_count, command_bytes = struct.unpack_from(
+        endian + "IIIII", raw, 4
+    )
+    require(cpu_type == expected_cpu, "Mach-O CPU type does not match the host architecture")
+    normalized_subtype = cpu_subtype & 0x00FFFFFF
+    require(
+        normalized_subtype in allowed_subtypes,
+        "Mach-O CPU subtype is not compatible with the host architecture",
+    )
+    if expected_fat_subtype is not None:
+        require(
+            normalized_subtype == expected_fat_subtype & 0x00FFFFFF,
+            "Mach-O universal and thin CPU subtypes disagree",
+        )
+    require(file_type == 2, "Mach-O image must have MH_EXECUTE file type")
+    require(command_count <= 65_535, "Mach-O load-command count is invalid")
+    require(command_bytes <= MAX_NATIVE_IMAGE_TABLE_BYTES, "Mach-O load commands exceed the verifier limit")
+    _require_native_region(raw, header_size, command_bytes, label="Mach-O load commands")
+    command_limit = header_size + command_bytes
+    command_offset = header_size
+    executable_file_ranges: list[tuple[int, int]] = []
+    entry_offsets: list[int] = []
+    for _ in range(command_count):
+        require(command_offset + 8 <= command_limit, "Mach-O load-command inventory is truncated")
+        command, command_size = struct.unpack_from(endian + "II", raw, command_offset)
+        require(
+            command_size >= 8
+            and command_size % (8 if bits == 64 else 4) == 0
+            and command_size <= command_limit - command_offset,
+            "Mach-O load-command size is invalid",
+        )
+        if bits == 32 and command == 0x1:
+            require(command_size >= 56, "Mach-O LC_SEGMENT command is truncated")
+            virtual_size = struct.unpack_from(endian + "I", raw, command_offset + 28)[0]
+            file_offset = struct.unpack_from(endian + "I", raw, command_offset + 32)[0]
+            file_size = struct.unpack_from(endian + "I", raw, command_offset + 36)[0]
+            initial_protection = struct.unpack_from(endian + "I", raw, command_offset + 44)[0]
+            require(file_size <= virtual_size, "Mach-O segment file size exceeds virtual size")
+            _require_native_region(raw, file_offset, file_size, label="Mach-O segment file range")
+            if initial_protection & 0x4:
+                require(file_size > 0, "Mach-O executable segment has no file-backed bytes")
+                executable_file_ranges.append((file_offset, file_offset + file_size))
+        elif bits == 64 and command == 0x19:
+            require(command_size >= 72, "Mach-O LC_SEGMENT_64 command is truncated")
+            virtual_size = struct.unpack_from(endian + "Q", raw, command_offset + 32)[0]
+            file_offset = struct.unpack_from(endian + "Q", raw, command_offset + 40)[0]
+            file_size = struct.unpack_from(endian + "Q", raw, command_offset + 48)[0]
+            initial_protection = struct.unpack_from(endian + "I", raw, command_offset + 60)[0]
+            require(file_size <= virtual_size, "Mach-O segment file size exceeds virtual size")
+            _require_native_region(raw, file_offset, file_size, label="Mach-O segment file range")
+            if initial_protection & 0x4:
+                require(file_size > 0, "Mach-O executable segment has no file-backed bytes")
+                executable_file_ranges.append((file_offset, file_offset + file_size))
+        elif command == 0x80000028:
+            require(command_size >= 24, "Mach-O LC_MAIN command is truncated")
+            entry_offset = struct.unpack_from(endian + "Q", raw, command_offset + 8)[0]
+            require(0 < entry_offset < len(raw), "Mach-O LC_MAIN entry offset is invalid")
+            entry_offsets.append(entry_offset)
+        command_offset += command_size
+    require(command_offset == command_limit, "Mach-O load-command byte count mismatch")
+    require(executable_file_ranges, "Mach-O image lacks a file-backed executable segment")
+    require(len(entry_offsets) == 1, "Mach-O image must contain exactly one valid LC_MAIN entry point")
+    require(
+        any(start <= entry_offsets[0] < end for start, end in executable_file_ranges),
+        "Mach-O LC_MAIN entry point is not covered by an executable segment",
+    )
+
+
+def _inspect_macho_image(raw: bytes, *, host_machine: str) -> None:
+    expected_cpu, _, _ = _macho_host_cpu(host_machine)
+    _require_native_region(raw, 0, 4, label="Mach-O or universal magic")
+    magic = raw[:4]
+    fat_magics = {
+        b"\xca\xfe\xba\xbe": (">", False),
+        b"\xbe\xba\xfe\xca": ("<", False),
+        b"\xca\xfe\xba\xbf": (">", True),
+        b"\xbf\xba\xfe\xca": ("<", True),
+    }
+    if magic not in fat_magics:
+        _inspect_macho_thin(raw, host_machine=host_machine)
+        return
+    endian, fat64 = fat_magics[magic]
+    _require_native_region(raw, 0, 8, label="Mach-O universal header")
+    architecture_count = struct.unpack_from(endian + "I", raw, 4)[0]
+    require(0 < architecture_count <= 64, "Mach-O universal architecture count is invalid")
+    entry_size = 32 if fat64 else 20
+    table_size = architecture_count * entry_size
+    require(table_size <= MAX_NATIVE_IMAGE_TABLE_BYTES, "Mach-O universal architecture table exceeds the verifier limit")
+    _require_native_region(raw, 8, table_size, label="Mach-O universal architecture table")
+    table_limit = 8 + table_size
+    host_slices: list[tuple[int, int, int]] = []
+    all_slice_ranges: list[tuple[int, int]] = []
+    for index in range(architecture_count):
+        entry_offset = 8 + index * entry_size
+        cpu_type = struct.unpack_from(endian + "I", raw, entry_offset)[0]
+        cpu_subtype = struct.unpack_from(endian + "I", raw, entry_offset + 4)[0]
+        if fat64:
+            slice_offset, slice_size = struct.unpack_from(endian + "QQ", raw, entry_offset + 8)
+            alignment = struct.unpack_from(endian + "I", raw, entry_offset + 24)[0]
+        else:
+            slice_offset, slice_size, alignment = struct.unpack_from(endian + "III", raw, entry_offset + 8)
+        require(alignment <= 31, "Mach-O universal slice alignment is invalid")
+        require(slice_size > 0 and slice_offset >= table_limit, "Mach-O universal slice bounds are invalid")
+        require(
+            slice_offset % (1 << alignment) == 0,
+            "Mach-O universal slice offset violates its declared alignment",
+        )
+        _require_native_region(raw, slice_offset, slice_size, label="Mach-O universal slice")
+        all_slice_ranges.append((slice_offset, slice_offset + slice_size))
+        if cpu_type == expected_cpu:
+            host_slices.append((slice_offset, slice_size, cpu_subtype))
+    ordered_ranges = sorted(all_slice_ranges)
+    require(
+        all(previous[1] <= current[0] for previous, current in zip(ordered_ranges, ordered_ranges[1:])),
+        "Mach-O universal slices overlap",
+    )
+    require(host_slices, "Mach-O universal image has no host-compatible slice")
+    failures: list[str] = []
+    for slice_offset, slice_size, cpu_subtype in host_slices:
+        try:
+            _inspect_macho_thin(
+                memoryview(raw)[slice_offset : slice_offset + slice_size],
+                host_machine=host_machine,
+                expected_fat_subtype=cpu_subtype,
+            )
+            return
+        except VerificationError as error:
+            failures.append(str(error))
+    raise VerificationError(f"Mach-O host-compatible slices are invalid: {failures[0]}")
+
+
+def _inspect_native_image(
+    raw: bytes, host_platform: str, host_machine: str
+) -> dict[str, str]:
+    """Inspect bounded bytes without executing them; useful for deterministic fixtures."""
+
+    require(isinstance(raw, bytes), "native executable image fixture must be bytes")
+    require(0 < len(raw) <= MAX_NATIVE_EXECUTABLE_BYTES, "native executable image size is outside the verifier limit")
+    require(not raw.startswith(b"#!"), "script wrappers are forbidden as the Git executable")
+    require(host_platform in SUPPORTED_NATIVE_IMAGE_FORMATS, f"unsupported host platform: {host_platform}")
+    normalized_machine = _normalize_host_machine(host_machine)
+    if host_platform == "win32":
+        _inspect_pe_image(raw, host_machine=normalized_machine)
+    elif host_platform == "linux":
+        _inspect_elf_image(raw, host_machine=normalized_machine)
+    else:
+        _inspect_macho_image(raw, host_machine=normalized_machine)
+    return _native_image_result(
+        host_platform=host_platform,
+        host_machine=normalized_machine,
+    )
+
+
+def inspect_host_native_executable(
+    handle: Any,
+    *,
+    host_platform: str | None = None,
+    host_machine: str | None = None,
+) -> dict[str, str]:
+    """Read and inspect one retained executable handle under the V4 byte limit."""
+
+    inspection, _ = _inspect_and_digest_executable_snapshot(
+        handle,
+        expected_identity=None,
+        label="retained Git executable",
+        host_platform=host_platform,
+        host_machine=host_machine,
+    )
+    return inspection
+
+
+def _inspect_and_digest_executable_snapshot(
+    handle: Any,
+    *,
+    expected_identity: tuple[int, int, int, int, int] | None,
+    label: str,
+    host_platform: str | None = None,
+    host_machine: str | None = None,
+) -> tuple[dict[str, str], str]:
+    """Parse and SHA-256 the exact same one-read immutable byte snapshot."""
+
+    selected_platform = sys.platform if host_platform is None else host_platform
+    selected_machine = (
+        _current_host_machine(selected_platform) if host_machine is None else host_machine
+    )
+    raw = _read_immutable_executable_snapshot(
+        handle,
+        expected_identity=expected_identity,
+        label=label,
+    )
+    inspection = _inspect_native_image(raw, selected_platform, selected_machine)
+    return inspection, sha256_bytes(raw)
 
 
 def configure_git_boundary(
@@ -397,87 +1514,170 @@ def configure_git_boundary(
         "caller must supply a canonical expected Git executable SHA-256",
     )
     require(git_executable.is_absolute(), "Git executable path must be absolute")
+    require(not git_executable.is_symlink(), "Git executable symlinks are forbidden")
     try:
         resolved_executable = git_executable.resolve(strict=True)
     except OSError as error:
         raise VerificationError(f"Git executable cannot be resolved: {error}") from error
     require(resolved_executable == git_executable, "Git executable path must already be canonical")
-    if os.name == "nt":
+    if sys.platform == "win32":
         require(resolved_executable.suffix.casefold() == ".exe", "Git executable must be a native .exe file")
     else:
         require(os.access(resolved_executable, os.X_OK), "Git executable is not executable")
+    path_state = _git_executable_path_state(resolved_executable)
     try:
         executable_handle = resolved_executable.open("rb")
     except OSError as error:
         raise VerificationError(f"cannot open Git executable: {error}") from error
-    path_state = _git_executable_path_state(resolved_executable)
-    handle_identity = _open_file_identity(executable_handle)
-    require(handle_identity == path_state[:4], "Git executable path/open-file identity mismatch")
-    require(
-        _open_file_sha256(executable_handle) == expected_git_executable_sha256,
-        "caller-authenticated Git executable digest mismatch",
-    )
-    git_dir = _resolve_git_dir(repo_root)
-    common_dir = _resolve_common_git_dir(git_dir)
-    index_path = git_dir / "index"
-    require(index_path.is_file() and not index_path.is_symlink(), "Git index must be a regular file")
-    require(index_path.stat().st_size <= MAX_GIT_INDEX_BYTES, "Git index exceeds the verifier limit")
-    environment = {
-        "PATH": str(resolved_executable.parent),
-        "LC_ALL": "C",
-        "LANG": "C",
-        "GIT_ATTR_NOSYSTEM": "1",
-        "GIT_CONFIG_COUNT": "0",
-        "GIT_CONFIG_GLOBAL": os.devnull,
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "GIT_CONFIG_SYSTEM": os.devnull,
-        "GIT_DISCOVERY_ACROSS_FILESYSTEM": "0",
-        "GIT_NO_LAZY_FETCH": "1",
-        "GIT_NO_REPLACE_OBJECTS": "1",
-        "GIT_OPTIONAL_LOCKS": "0",
-        "GIT_TERMINAL_PROMPT": "0",
-    }
-    environment.update(_windows_system_environment())
-    _GIT_BOUNDARY = {
-        "executable": resolved_executable,
-        "expected_sha256": expected_git_executable_sha256,
-        "path_state": path_state,
-        "handle_identity": handle_identity,
-        "handle": executable_handle,
-        "git_dir": git_dir,
-        "common_dir": common_dir,
-        "index_path": index_path.resolve(strict=True),
-        "work_tree": repo_root,
-        "environment": environment,
-    }
+    try:
+        handle_identity = _open_file_identity(executable_handle)
+        require(handle_identity[:4] == path_state[:4], "Git executable path/open-file identity mismatch")
+        native_image, observed_digest = _inspect_and_digest_executable_snapshot(
+            executable_handle,
+            expected_identity=path_state,
+            label="initial retained Git executable",
+        )
+        require(
+            _git_executable_path_state(resolved_executable) == path_state,
+            "Git executable path identity changed during initial snapshot",
+        )
+        require(
+            observed_digest == expected_git_executable_sha256,
+            "caller-authenticated Git executable digest mismatch",
+        )
+        git_dir = _resolve_git_dir(repo_root)
+        common_dir = _resolve_common_git_dir(git_dir)
+        index_path = git_dir / "index"
+        require(index_path.is_file() and not index_path.is_symlink(), "Git index must be a regular file")
+        require(index_path.stat().st_size <= MAX_GIT_INDEX_BYTES, "Git index exceeds the verifier limit")
+        environment = {
+            "PATH": str(resolved_executable.parent),
+            "LC_ALL": "C",
+            "LANG": "C",
+            "GIT_ATTR_NOSYSTEM": "1",
+            "GIT_CONFIG_COUNT": "0",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_SYSTEM": os.devnull,
+            "GIT_DISCOVERY_ACROSS_FILESYSTEM": "0",
+            "GIT_NO_LAZY_FETCH": "1",
+            "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+        environment.update(_windows_system_environment())
+        _GIT_BOUNDARY = {
+            "executable": resolved_executable,
+            "expected_sha256": expected_git_executable_sha256,
+            "path_state": path_state,
+            "handle_identity": handle_identity,
+            "handle": executable_handle,
+            "native_image": native_image,
+            "git_dir": git_dir,
+            "common_dir": common_dir,
+            "index_path": index_path.resolve(strict=True),
+            "work_tree": repo_root,
+            "environment": environment,
+        }
+    except BaseException:
+        try:
+            executable_handle.close()
+        except OSError:
+            pass
+        raise
 
 
 def verify_git_executable_stable(*, full_digest: bool) -> None:
     require(_GIT_BOUNDARY is not None, "Git execution boundary is not configured")
+    require(full_digest is True, "partial Git executable revalidation is prohibited")
     executable = _GIT_BOUNDARY["executable"]
     handle = _GIT_BOUNDARY["handle"]
-    require(_git_executable_path_state(executable) == _GIT_BOUNDARY["path_state"], "Git executable identity changed during verification")
+    expected_identity = _GIT_BOUNDARY["path_state"]
+    require(_git_executable_path_state(executable) == expected_identity, "Git executable identity changed during verification")
     require(
         _open_file_identity(handle) == _GIT_BOUNDARY["handle_identity"],
         "open Git executable identity changed during verification",
     )
-    if full_digest:
-        require(
-            _open_file_sha256(handle) == _GIT_BOUNDARY["expected_sha256"],
-            "retained Git executable bytes changed during verification",
+    retained_native, retained_digest = _inspect_and_digest_executable_snapshot(
+        handle,
+        expected_identity=expected_identity,
+        label="retained Git executable revalidation",
+    )
+    require(
+        retained_native == _GIT_BOUNDARY["native_image"],
+        "retained Git executable native-image result changed during verification",
+    )
+    require(
+        retained_digest == _GIT_BOUNDARY["expected_sha256"],
+        "retained Git executable bytes changed during verification",
+    )
+    require(
+        _git_executable_path_state(executable) == expected_identity,
+        "Git executable path identity changed after retained snapshot",
+    )
+    try:
+        with executable.open("rb") as current_handle:
+            require(
+                _open_file_identity(current_handle)[:4] == expected_identity[:4],
+                "Git executable path now addresses a different file",
+            )
+            current_native, current_digest = _inspect_and_digest_executable_snapshot(
+                current_handle,
+                expected_identity=expected_identity,
+                label="current-path Git executable revalidation",
+            )
+            require(
+                current_native == _GIT_BOUNDARY["native_image"],
+                "Git executable path native-image result changed during verification",
+            )
+            require(
+                current_digest == _GIT_BOUNDARY["expected_sha256"],
+                "Git executable path bytes changed during verification",
+            )
+    except (OSError, ValueError) as error:
+        raise VerificationError(f"cannot re-open Git executable: {error}") from error
+    require(
+        _git_executable_path_state(executable) == expected_identity,
+        "Git executable path identity changed after current-path snapshot",
+    )
+
+
+def _terminate_and_reap_git_process(
+    process: subprocess.Popen[bytes], *, reason: str
+) -> VerificationError | None:
+    """Best-effort kill followed by one typed, bounded reap deadline."""
+
+    try:
+        running = process.poll() is None
+    except subprocess.TimeoutExpired:
+        return GitTimeoutAfterKillError(
+            f"Git process state inspection timed out after {reason}",
+            primary_code="GIT_TIMEOUT",
         )
+    except OSError as error:
+        return VerificationError(f"cannot inspect Git process state after {reason}: {error}")
+    if running:
         try:
-            with executable.open("rb") as current_handle:
-                require(
-                    _open_file_identity(current_handle) == _GIT_BOUNDARY["handle_identity"],
-                    "Git executable path now addresses a different file",
-                )
-                require(
-                    _open_file_sha256(current_handle) == _GIT_BOUNDARY["expected_sha256"],
-                    "Git executable path bytes changed during verification",
-                )
-        except OSError as error:
-            raise VerificationError(f"cannot re-open Git executable: {error}") from error
+            process.kill()
+        except subprocess.TimeoutExpired:
+            return GitTimeoutAfterKillError(
+                f"Git process kill timed out after {reason}",
+                primary_code="GIT_TIMEOUT",
+            )
+        except OSError:
+            # A concurrent exit is harmless if the bounded wait below can reap it.
+            pass
+    try:
+        process.wait(timeout=GIT_KILL_REAP_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        return GitTimeoutAfterKillError(
+            "Git process did not terminate and reap within "
+            f"{GIT_KILL_REAP_TIMEOUT_SECONDS} seconds after {reason}",
+            primary_code="GIT_TIMEOUT",
+        )
+    except OSError as error:
+        return VerificationError(f"cannot reap Git process after {reason}: {error}")
+    return None
 
 
 def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
@@ -520,11 +1720,36 @@ def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
             close_fds=True,
             bufsize=0,
         )
+    except subprocess.TimeoutExpired as error:
+        primary_error = GitTimeoutError(
+            f"git {' '.join(args)} timed out while starting: {error}"
+        )
+        try:
+            verify_git_executable_stable(full_digest=True)
+        except VerificationError as cleanup_error:
+            primary_error.add_cleanup_evidence(cleanup_error)
+        raise primary_error from error
     except OSError as error:
-        verify_git_executable_stable(full_digest=True)
-        raise VerificationError(f"git {' '.join(args)} could not start: {error}") from error
+        primary_error = VerificationError(f"git {' '.join(args)} could not start: {error}")
+        try:
+            verify_git_executable_stable(full_digest=True)
+        except VerificationError as cleanup_error:
+            primary_error.add_cleanup_evidence(cleanup_error)
+        raise primary_error from error
 
-    require(process.stdout is not None, "Git output pipe was not created")
+    if process.stdout is None:
+        primary_error = VerificationError("Git output pipe was not created")
+        setup_error = _terminate_and_reap_git_process(
+            process,
+            reason="missing output pipe",
+        )
+        if setup_error is not None:
+            primary_error.add_cleanup_evidence(setup_error)
+        try:
+            verify_git_executable_stable(full_digest=True)
+        except VerificationError as cleanup_error:
+            primary_error.add_cleanup_evidence(cleanup_error)
+        raise primary_error
     output = bytearray()
     output_overflow = threading.Event()
     reader_errors: list[BaseException] = []
@@ -549,43 +1774,150 @@ def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
             reader_errors.append(error)
             try:
                 process.kill()
-            except OSError:
+            except BaseException:
                 pass
 
-    reader = threading.Thread(target=read_bounded_output, name="v3-git-output-reader", daemon=True)
-    reader.start()
-    timed_out = False
     try:
-        process.wait(timeout=GIT_TIMEOUT_SECONDS)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        process.kill()
-        process.wait(timeout=5)
-    reader.join(timeout=5)
-    if reader.is_alive():
-        process.stdout.close()
-        reader.join(timeout=1)
-    verify_git_executable_stable(full_digest=True)
-    require(not reader.is_alive(), "Git output pipe did not close after process exit")
-    require(not reader_errors, f"Git output reader failed: {reader_errors[0] if reader_errors else ''}")
+        reader = threading.Thread(
+            target=read_bounded_output,
+            name="v4-git-output-reader",
+            daemon=True,
+        )
+        reader.start()
+    except Exception as error:
+        primary_error = VerificationError(f"cannot start bounded Git output reader: {error}")
+        setup_error = _terminate_and_reap_git_process(
+            process,
+            reason="output-reader setup failure",
+        )
+        if setup_error is not None:
+            primary_error.add_cleanup_evidence(setup_error)
+        try:
+            process.stdout.close()
+        except (OSError, ValueError) as cleanup_error:
+            primary_error.add_cleanup_evidence(
+                VerificationError(f"cannot close Git output pipe after reader setup failure: {cleanup_error}")
+            )
+        try:
+            verify_git_executable_stable(full_digest=True)
+        except VerificationError as cleanup_error:
+            primary_error.add_cleanup_evidence(cleanup_error)
+        raise primary_error from error
+    timed_out = False
+    lifecycle_errors: list[VerificationError] = []
+    try:
+        try:
+            process.wait(timeout=GIT_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            reap_error = _terminate_and_reap_git_process(
+                process,
+                reason=f"primary {GIT_TIMEOUT_SECONDS}-second timeout",
+            )
+            if reap_error is not None:
+                lifecycle_errors.append(reap_error)
+        except OSError as error:
+            lifecycle_errors.append(VerificationError(f"cannot wait for Git process: {error}"))
+    finally:
+        try:
+            still_running = process.poll() is None
+        except subprocess.TimeoutExpired:
+            still_running = True
+            lifecycle_errors.append(
+                GitTimeoutAfterKillError(
+                    "Git process state inspection timed out during cleanup",
+                    primary_code="GIT_TIMEOUT",
+                )
+            )
+        except OSError as error:
+            still_running = True
+            lifecycle_errors.append(VerificationError(f"cannot inspect Git process during cleanup: {error}"))
+        if still_running:
+            reap_error = _terminate_and_reap_git_process(process, reason="cleanup")
+            if reap_error is not None:
+                lifecycle_errors.append(reap_error)
+        try:
+            reader.join(timeout=GIT_READER_JOIN_TIMEOUT_SECONDS)
+        except Exception as error:
+            lifecycle_errors.append(VerificationError(f"cannot join Git output reader: {error}"))
+        try:
+            reader_alive = reader.is_alive()
+        except Exception as error:
+            reader_alive = True
+            lifecycle_errors.append(VerificationError(f"cannot inspect Git output reader: {error}"))
+        if reader_alive:
+            try:
+                process.stdout.close()
+            except (OSError, ValueError) as error:
+                lifecycle_errors.append(VerificationError(f"cannot close Git output pipe: {error}"))
+            try:
+                reader.join(timeout=1)
+            except Exception as error:
+                lifecycle_errors.append(VerificationError(f"cannot finally join Git output reader: {error}"))
+        try:
+            verify_git_executable_stable(full_digest=True)
+        except VerificationError as error:
+            lifecycle_errors.append(error)
+    try:
+        reader_alive = reader.is_alive()
+    except Exception as error:
+        reader_alive = True
+        lifecycle_errors.append(
+            VerificationError(f"cannot inspect final Git output reader state: {error}")
+        )
     raw = bytes(output)
-    require(not output_overflow.is_set(), "Git output exceeds the verifier limit")
-    if timed_out:
-        rendered = raw.decode("utf-8", errors="replace").strip()
-        raise VerificationError(
-            f"git {' '.join(args)} timed out: {rendered or f'{GIT_TIMEOUT_SECONDS} seconds'}"
+    decoded: str | None = None
+    decoding_error: GitNonUtf8Error | None = None
+    if not binary or timed_out or process.returncode != 0:
+        try:
+            decoded = raw.decode("utf-8").strip()
+        except UnicodeError:
+            decoding_error = GitNonUtf8Error(
+                f"git {' '.join(args)} returned non-UTF-8 output "
+                f"(bytes={len(raw)}, sha256={sha256_bytes(raw)})",
+                primary_code="GIT_TIMEOUT" if timed_out else None,
+            )
+    primary_error: VerificationError | None = None
+    if output_overflow.is_set():
+        primary_error = GitOutputOverflowError("Git output exceeds the verifier limit")
+    elif timed_out:
+        after_kill = next(
+            (
+                error
+                for error in lifecycle_errors
+                if isinstance(error, GitTimeoutAfterKillError)
+            ),
+            None,
         )
-    if process.returncode != 0:
-        rendered = raw.decode("utf-8", errors="replace").strip()
-        raise VerificationError(
-            f"git {' '.join(args)} failed: {rendered or f'exit {process.returncode}'}"
+        primary_error = (
+            after_kill
+            or decoding_error
+            or GitTimeoutError(
+                f"git {' '.join(args)} timed out: "
+                f"{decoded or f'{GIT_TIMEOUT_SECONDS} seconds'}"
+            )
         )
+    elif reader_alive:
+        primary_error = VerificationError("Git output pipe did not close after process exit")
+    elif reader_errors:
+        primary_error = VerificationError(f"Git output reader failed: {reader_errors[0]}")
+    elif lifecycle_errors:
+        primary_error = lifecycle_errors[0]
+    elif decoding_error is not None:
+        primary_error = decoding_error
+    elif process.returncode != 0:
+        primary_error = VerificationError(
+            f"git {' '.join(args)} failed: {decoded or f'exit {process.returncode}'}"
+        )
+    if primary_error is not None:
+        for cleanup_error in lifecycle_errors:
+            if cleanup_error is not primary_error:
+                primary_error.add_cleanup_evidence(cleanup_error)
+        raise primary_error
     if binary:
         return raw
-    try:
-        return raw.decode("utf-8").strip()
-    except UnicodeError as error:
-        raise VerificationError(f"git {' '.join(args)} returned non-UTF-8 output") from error
+    require(decoded is not None, "Git text output was not decoded")
+    return decoded
 
 
 def verify_commit_object(
@@ -629,8 +1961,8 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         },
         "manifest top-level field inventory mismatch",
     )
-    require(manifest.get("schema_version") == 3, "manifest schema mismatch")
-    require(manifest.get("kind") == "hive-mind-generic-product-overlay-manifest-v3", "manifest kind mismatch")
+    require(manifest.get("schema_version") == 4, "manifest schema mismatch")
+    require(manifest.get("kind") == "hive-mind-generic-product-overlay-manifest-v4", "manifest kind mismatch")
     require(manifest.get("plan_id") == PLAN_ID, "manifest plan id mismatch")
     request = manifest.get("request_binding")
     require(isinstance(request, dict), "manifest request binding missing")
@@ -652,6 +1984,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "qualified_prerequisite",
             "combined_envelope_b",
             "authoring_base_parent",
+            "git_environment_correction_parent",
             "correction_parent",
         },
         "snapshot lineage field inventory mismatch",
@@ -663,6 +1996,14 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         lineage.get("authoring_base_parent")
         == {"commit": PLAN_AUTHORING_BASE_COMMIT, "tree": PLAN_AUTHORING_BASE_TREE},
         "authoring-base parent commit/tree mismatch",
+    )
+    require(
+        lineage.get("git_environment_correction_parent")
+        == {
+            "commit": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+            "tree": GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+        },
+        "Git-environment correction parent commit/tree mismatch",
     )
     require(
         lineage.get("correction_parent")
@@ -699,7 +2040,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         set(authorship) == {"architect", "judge", "court_status", "execution_authority"},
         "manifest authorship field inventory mismatch",
     )
-    require(authorship.get("architect") == "/root/generation_architect", "architect identity mismatch")
+    require(authorship.get("architect") == "/root/v4_matrix_architect", "architect identity mismatch")
     require(authorship.get("judge") == "UNASSIGNED", "author manifest cannot self-assign a judge")
     require(authorship.get("court_status") == "PENDING_DISTINCT_COURT", "self-review boundary missing")
     require(authorship.get("execution_authority") == "NONE", "author manifest cannot grant execution authority")
@@ -712,6 +2053,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "authoring_base_parent",
             "correction_parent",
             "predecessor_payload",
+            "remanded_git_environment_predecessor",
             "historical_payload_a",
             "expected_changed_paths",
             "payload_inventory",
@@ -725,7 +2067,10 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         },
         "committed payload field inventory mismatch",
     )
-    require(payload.get("mode") == "exact-append-only-git-boundary-correction-v3", "committed payload mode mismatch")
+    require(
+        payload.get("mode") == "exact-append-only-native-executable-matrix-correction-v4",
+        "committed payload mode mismatch",
+    )
     require(
         payload.get("authoring_base_parent")
         == {"commit": PLAN_AUTHORING_BASE_COMMIT, "tree": PLAN_AUTHORING_BASE_TREE},
@@ -741,18 +2086,36 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         == {
             "commit": CORRECTION_PARENT_COMMIT,
             "tree": CORRECTION_PARENT_TREE,
-            "parent_commit": PAYLOAD_A_COMMIT,
-            "parent_tree": PAYLOAD_A_TREE,
+            "parent_commit": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+            "parent_tree": GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
             "manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
             "full_payload_aggregate": {
-                "domain": "hive-mind-os/v3-append-only-correction-content/v2",
+                "domain": "hive-mind-os/v3-append-only-git-boundary-correction-content/v3",
                 "sha256": CORRECTION_PARENT_AGGREGATE_DIGEST,
             },
             "qualification_report_sha256": CORRECTION_PARENT_REPORT_DIGEST,
-            "observed_status": "QUALIFICATION_REMANDED_GIT_ENVIRONMENT_FAIL_OPEN",
+            "observed_status": "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
             "author_proposed_disposition": "ADAPT_REMAND",
         },
         "predecessor correction identity/status mismatch",
+    )
+    require(
+        payload.get("remanded_git_environment_predecessor")
+        == {
+            "commit": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+            "tree": GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+            "parent_commit": PAYLOAD_A_COMMIT,
+            "parent_tree": PAYLOAD_A_TREE,
+            "manifest_raw_sha256": GIT_ENVIRONMENT_CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "full_payload_aggregate": {
+                "domain": "hive-mind-os/v3-append-only-correction-content/v2",
+                "sha256": GIT_ENVIRONMENT_CORRECTION_PARENT_AGGREGATE_DIGEST,
+            },
+            "qualification_report_sha256": GIT_ENVIRONMENT_CORRECTION_PARENT_REPORT_DIGEST,
+            "observed_status": "QUALIFICATION_REMANDED_GIT_ENVIRONMENT_FAIL_OPEN",
+            "author_proposed_disposition": "ADAPT_REMAND",
+        },
+        "remanded Git-environment predecessor identity/status mismatch",
     )
     require(
         payload.get("historical_payload_a")
@@ -776,10 +2139,13 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(
         payload.get("activation_anti_downgrade")
         == {
-            "required_contract_mode": "exact-append-only-git-boundary-correction-v3",
-            "rejected_predecessor_manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "required_contract_mode": "exact-append-only-native-executable-matrix-correction-v4",
+            "required_git_executable_format_policy": NATIVE_EXECUTABLE_FORMAT_POLICY,
+            "rejected_v3_git_boundary_manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "rejected_f06_manifest_raw_sha256": GIT_ENVIRONMENT_CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
             "rejected_historical_payload_a_manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
-            "predecessor_activation": "PROHIBITED",
+            "v3_git_boundary_activation": "PROHIBITED",
+            "f06_activation": "PROHIBITED",
             "historical_payload_a_activation": "PROHIBITED",
             "legacy_v1_fallback": "PROHIBITED",
             "external_minimum_version_and_revocation_policy": "REQUIRED_NOT_SATISFIED",
@@ -789,7 +2155,15 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(
         payload.get("git_execution_boundary")
         == {
-            "policy": "caller-absolute-raw-sha256-v1",
+            "policy": GIT_EXECUTION_BOUNDARY_POLICY,
+            "native_executable_format": "HOST_NATIVE_IMAGE_FORMAT_V1",
+            "supported_hosts": SUPPORTED_NATIVE_IMAGE_FORMATS,
+            "unsupported_host": "FAIL_CLOSED",
+            "script_or_interpreter_wrapper": "PROHIBITED",
+            "max_executable_bytes": MAX_NATIVE_EXECUTABLE_BYTES,
+            "caller_path_and_raw_digest": "REQUIRED_EXTERNAL",
+            "compiled_native_delegator_exclusion": "NOT_PROVEN_BY_FORMAT",
+            "runtime_dependency_closure": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED",
             "inherited_git_environment": "REJECT_ALL_CASE_INSENSITIVE_GIT_PREFIX",
             "child_environment": "MINIMAL_ALLOWLIST_V1",
             "path_lookup": "PROHIBITED",
@@ -827,13 +2201,17 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "committed_payload_head",
             "committed_payload_tree",
             "caller_authenticated_manifest_digest",
-            "caller_authenticated_git_executable_path_and_digest",
+            "caller_authenticated_git_path_raw_sha256_and_observed_native_format",
             "corrected_full_payload_aggregate_digest",
-            "predecessor_payload_identity",
-            "predecessor_supersession_verdict",
-            "predecessor_qualification_report_digest",
+            "v3_git_boundary_parent_identity",
+            "v3_git_boundary_parent_remand_verdict",
+            "v3_git_boundary_parent_qualification_report_digest",
+            "f06_identity_report_and_remand",
             "historical_payload_a_identity_and_disposition",
+            "platform_adversarial_matrix_receipt_digests",
+            "focused_and_full_gate_transcript_digests",
             "court_verdict",
+            "external_git_runtime_dependency_bundle_digest",
             "external_minimum_version_and_revocation_policy_digest",
         ],
         "court Envelope B committed identity contract mismatch",
@@ -855,7 +2233,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         == {
             "extraction_commit": QUALIFIED_PREREQUISITE_COMMIT,
             "extraction_tree": QUALIFIED_PREREQUISITE_TREE,
-            "manifest_location": "node-contracts.json#/frozen_host_contract/file_manifest",
+            "manifest_location": FROZEN_HOST_MANIFEST_LOCATION,
             "file_count": 16,
             "bundle_sha256": EXPECTED_FROZEN_HOST_BUNDLE,
             "status": "REQUIRED_NOT_SATISFIED",
@@ -902,6 +2280,359 @@ def source_rows(section: object, *, label: str) -> dict[str, dict[str, Any]]:
         require(isinstance(path, str) and path and path not in result, f"{label} source path malformed")
         result[path] = item
     return result
+
+
+def parse_authenticated_gitattributes(raw: bytes) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Parse the authenticated root attributes without consulting ambient Git."""
+
+    require(
+        len(raw) <= MAX_GITATTRIBUTES_BYTES,
+        f"authenticated .gitattributes exceeds {MAX_GITATTRIBUTES_BYTES} bytes",
+    )
+    require(raw and raw.endswith(b"\n"), "authenticated .gitattributes must end with LF")
+    require(b"\r" not in raw, "authenticated .gitattributes must contain LF line endings only")
+    require(
+        all(byte in {9, 10} or 32 <= byte <= 126 for byte in raw),
+        "authenticated .gitattributes must use printable ASCII plus TAB/LF only",
+    )
+    text = raw.decode("ascii")
+
+    rules: list[tuple[str, tuple[str, ...]]] = []
+    for line_number, line in enumerate(text.split("\n")[:-1], start=1):
+        if not line or line.startswith("#"):
+            continue
+        require(
+            line == line.strip(" \t"),
+            f"authenticated .gitattributes line {line_number} has ambiguous edge whitespace",
+        )
+        require(
+            '"' not in line and "\\" not in line,
+            f"authenticated .gitattributes line {line_number} uses unsupported quoting or escaping",
+        )
+        fields = re.split(r"[ \t]+", line)
+        require(len(fields) >= 2, f"authenticated .gitattributes line {line_number} is malformed")
+        pattern, attributes = fields[0], tuple(fields[1:])
+        require(
+            pattern
+            and not pattern.startswith(("!", "/"))
+            and not pattern.endswith("/")
+            and "//" not in pattern,
+            f"authenticated .gitattributes pattern is unsupported: {pattern}",
+        )
+        require(
+            len(pattern.encode("utf-8")) <= MAX_GITATTRIBUTE_PATTERN_BYTES
+            and len(pattern.split("/")) <= MAX_GITATTRIBUTE_PATTERN_PARTS,
+            f"authenticated .gitattributes pattern exceeds bounds: {pattern}",
+        )
+        seen_attributes: set[str] = set()
+        for token in attributes:
+            match = re.fullmatch(
+                r"(?:(?P<prefix>[-!])?(?P<name>[A-Za-z][A-Za-z0-9_-]*)|(?P<set_name>[A-Za-z][A-Za-z0-9_-]*)=(?P<value>[^\s=]+))",
+                token,
+            )
+            require(match is not None, f"authenticated .gitattributes token is malformed: {token}")
+            name = match.group("name") or match.group("set_name")
+            require(
+                name not in seen_attributes,
+                f"authenticated .gitattributes repeats attribute {name} on line {line_number}",
+            )
+            seen_attributes.add(name)
+        rules.append((pattern, attributes))
+        require(
+            len(rules) <= MAX_GITATTRIBUTE_RULES,
+            f"authenticated .gitattributes exceeds {MAX_GITATTRIBUTE_RULES} active rules",
+        )
+    require(rules, "authenticated .gitattributes has no active rules")
+    return tuple(rules)
+
+
+def _gitattribute_pattern_matches(pattern: str, relative: str) -> bool:
+    """Match the strict Git-pattern subset used by the authenticated policy."""
+
+    if "/" not in pattern:
+        return fnmatch.fnmatchcase(relative.rsplit("/", 1)[-1], pattern)
+
+    pattern_parts = pattern.split("/")
+    path_parts = relative.split("/")
+    memo: dict[tuple[int, int], bool] = {}
+
+    def match_parts(pattern_index: int, path_index: int) -> bool:
+        key = (pattern_index, path_index)
+        if key in memo:
+            return memo[key]
+        if pattern_index == len(pattern_parts):
+            result = path_index == len(path_parts)
+        elif pattern_parts[pattern_index] == "**":
+            result = any(
+                match_parts(pattern_index + 1, next_path_index)
+                for next_path_index in range(path_index, len(path_parts) + 1)
+            )
+        else:
+            result = (
+                path_index < len(path_parts)
+                and fnmatch.fnmatchcase(path_parts[path_index], pattern_parts[pattern_index])
+                and match_parts(pattern_index + 1, path_index + 1)
+            )
+        memo[key] = result
+        return result
+
+    return match_parts(0, 0)
+
+
+def authenticated_gitattribute_state(
+    rules: tuple[tuple[str, tuple[str, ...]], ...], relative: str
+) -> dict[str, bool | str | None]:
+    require(
+        isinstance(relative, str)
+        and relative
+        and len(relative.encode("utf-8")) <= MAX_GITATTRIBUTE_PATTERN_BYTES
+        and not relative.startswith("/")
+        and "\\" not in relative
+        and all(part not in {"", ".", ".."} for part in relative.split("/")),
+        f"raw-bound path is not a canonical repository-relative path: {relative!r}",
+    )
+    state: dict[str, bool | str | None] = {"text": None, "eol": None}
+    for pattern, attributes in rules:
+        if not _gitattribute_pattern_matches(pattern, relative):
+            continue
+        for token in attributes:
+            if token.startswith("-"):
+                state[token[1:]] = False
+            elif token.startswith("!"):
+                state[token[1:]] = None
+            elif "=" in token:
+                name, value = token.split("=", 1)
+                state[name] = value
+            else:
+                state[token] = True
+    return state
+
+
+def verify_bound_path_attribute_coverage(
+    rules: tuple[tuple[str, tuple[str, ...]], ...], paths: Iterable[str]
+) -> dict[str, str]:
+    """Require each raw-bound path to have deterministic checkout byte policy."""
+
+    coverage: dict[str, str] = {}
+    for relative in sorted(set(paths)):
+        state = authenticated_gitattribute_state(rules, relative)
+        raw_evidence = any(
+            _gitattribute_pattern_matches(pattern, relative)
+            for pattern in REQUIRED_RAW_EVIDENCE_GITATTRIBUTE_RULES
+        )
+        required_text = (
+            relative in {".gitattributes", "LICENSE"}
+            or fnmatch.fnmatchcase(relative.rsplit("/", 1)[-1], "*.ps1")
+        ) and not raw_evidence
+        if raw_evidence:
+            require(
+                state.get("text") is False,
+                f"raw evidence path lost its authenticated -text classification: {relative}",
+            )
+            coverage[relative] = "explicit--text"
+            continue
+        if required_text:
+            require(
+                state.get("text") is True and state.get("eol") == "lf",
+                f"required text path lost its authenticated LF classification: {relative}",
+            )
+            coverage[relative] = "text-eol-lf"
+            continue
+        if state.get("text") is False:
+            coverage[relative] = "explicit--text"
+            continue
+        require(
+            state.get("text") is True and state.get("eol") == "lf",
+            f"raw-bound path lacks authenticated deterministic checkout classification: {relative}",
+        )
+        coverage[relative] = "text-eol-lf"
+    return coverage
+
+
+def manifest_raw_bound_paths(
+    manifest: dict[str, Any], contracts: dict[str, Any]
+) -> tuple[str, ...]:
+    bindings = manifest.get("source_bindings")
+    require(isinstance(bindings, dict), "manifest source bindings missing for checkout classification")
+    repository = source_rows(bindings.get("repository"), label="repository checkout classification")
+    overlay = source_rows(bindings.get("overlay"), label="overlay checkout classification")
+    payload = manifest.get("committed_payload_contract")
+    require(isinstance(payload, dict), "committed payload missing for checkout classification")
+    inventory = payload.get("payload_inventory")
+    require(
+        isinstance(inventory, list) and all(isinstance(path, str) for path in inventory),
+        "payload inventory is malformed for checkout classification",
+    )
+    host = contracts.get("frozen_host_contract")
+    require(isinstance(host, dict), "frozen-host contract missing for checkout classification")
+    frozen = source_rows(host.get("files"), label="frozen-host checkout classification")
+    paths = set(repository) | set(inventory) | set(frozen)
+    paths.update(f"{OVERLAY_RELATIVE_DIRECTORY}/{relative}" for relative in overlay)
+    return tuple(sorted(paths))
+
+
+def verify_authenticated_checkout_reproducibility(
+    raw: bytes,
+    *,
+    manifest: dict[str, Any],
+    contracts: dict[str, Any],
+) -> dict[str, str]:
+    """Validate authenticated attributes and classify every raw-bound text path."""
+
+    rules = parse_authenticated_gitattributes(raw)
+    for pattern, attributes in {
+        **REQUIRED_TEXT_GITATTRIBUTE_RULES,
+        **REQUIRED_RAW_EVIDENCE_GITATTRIBUTE_RULES,
+    }.items():
+        require(
+            sum(1 for rule in rules if rule == (pattern, attributes)) == 1,
+            f"authenticated .gitattributes required exact rule missing: {pattern} {' '.join(attributes)}",
+        )
+    require(
+        rules == EXPECTED_GITATTRIBUTE_RULES,
+        "authenticated .gitattributes active rule set/order differs from the canonical checkout policy",
+    )
+
+    text_probes = {
+        ".gitattributes": ".gitattributes",
+        "LICENSE": "LICENSE",
+        "*.ps1": "scripts/Invoke-PreauthorizedContinuation.ps1",
+    }
+    for pattern, probe in text_probes.items():
+        state = authenticated_gitattribute_state(rules, probe)
+        require(
+            state.get("text") is True and state.get("eol") == "lf",
+            f"authenticated .gitattributes required text rule is not active: {pattern}",
+        )
+    raw_probes = {
+        "evidence/sources/**/raw/**": "evidence/sources/probe/raw/exhibit.bin",
+        "evidence/live/**": "evidence/live/probe.bin",
+        "evidence/benchmarks/**": "evidence/benchmarks/probe.jsonl",
+        "evidence/experiments/_artifacts/**": "evidence/experiments/_artifacts/probe.json",
+        "evidence/experiments/_failed/**": "evidence/experiments/_failed/probe.json",
+        "evidence/local_assurance/**/logs/**": "evidence/local_assurance/probe/logs/transcript.txt",
+    }
+    for pattern, probe in raw_probes.items():
+        state = authenticated_gitattribute_state(rules, probe)
+        require(
+            state.get("text") is False and state.get("diff") is False,
+            f"authenticated .gitattributes raw evidence rule is not active: {pattern}",
+        )
+    return verify_bound_path_attribute_coverage(
+        rules,
+        manifest_raw_bound_paths(manifest, contracts),
+    )
+
+
+def verify_no_git_info_attribute_overrides(repo_root: Path) -> None:
+    """Reject higher-precedence repository-local attributes before Git observes worktree bytes."""
+
+    require(_GIT_BOUNDARY is not None, "Git execution boundary is not configured")
+    require(_GIT_BOUNDARY["work_tree"] == repo_root, "Git worktree binding mismatch")
+    directories = {_GIT_BOUNDARY["git_dir"], _GIT_BOUNDARY["common_dir"]}
+    for directory in directories:
+        path = directory / "info" / "attributes"
+        try:
+            os.lstat(path)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise VerificationError(
+                f"cannot inspect repository-local Git attributes override: {error}"
+            ) from error
+        raise VerificationError(
+            f"repository-local Git attributes override is forbidden: {path}"
+        )
+
+
+def verify_no_applicable_nested_gitattributes(
+    repo_root: Path, bound_paths: Iterable[str]
+) -> None:
+    """Reject every per-directory attributes file that can affect a bound path."""
+
+    require(_GIT_BOUNDARY is not None, "Git execution boundary is not configured")
+    require(_GIT_BOUNDARY["work_tree"] == repo_root, "Git worktree binding mismatch")
+    applicable: dict[str, set[str]] = {}
+    for relative in sorted(set(bound_paths)):
+        # Reuse the canonical repository-path checks without consulting Git's
+        # attribute engine.  The empty policy is sufficient for validation.
+        authenticated_gitattribute_state((), relative)
+        parts = relative.split("/")
+        for depth in range(1, len(parts)):
+            attribute_path = "/".join((*parts[:depth], ".gitattributes"))
+            applicable.setdefault(attribute_path, set()).add(relative)
+
+    tree_raw = git(
+        repo_root,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--full-tree",
+        "HEAD",
+        binary=True,
+    )
+    index_raw = git(repo_root, "ls-files", "--stage", "-z", binary=True)
+    require(
+        isinstance(tree_raw, bytes) and isinstance(index_raw, bytes),
+        "nested .gitattributes HEAD/index inventory is not binary",
+    )
+    head_attributes: set[str] = set()
+    for entry in tree_raw.split(b"\0"):
+        if not entry:
+            continue
+        header, separator, path_raw = entry.partition(b"\t")
+        fields = header.split()
+        path = _decode_git_path(path_raw, label="nested .gitattributes HEAD inventory")
+        require(
+            separator == b"\t"
+            and len(fields) == 3
+            and fields[0] in {b"100644", b"100755"}
+            and fields[1] == b"blob"
+            and re.fullmatch(rb"[0-9a-f]{40}", fields[2]) is not None,
+            f"malformed HEAD entry while inspecting nested .gitattributes: {path}",
+        )
+        if path.endswith("/.gitattributes"):
+            head_attributes.add(path)
+    index_attributes: set[str] = set()
+    for entry in index_raw.split(b"\0"):
+        if not entry:
+            continue
+        header, separator, path_raw = entry.partition(b"\t")
+        fields = header.split()
+        path = _decode_git_path(path_raw, label="nested .gitattributes index inventory")
+        require(
+            separator == b"\t"
+            and len(fields) == 3
+            and fields[0] in {b"100644", b"100755"}
+            and re.fullmatch(rb"[0-9a-f]{40}", fields[1]) is not None
+            and fields[2] == b"0",
+            f"malformed index entry while inspecting nested .gitattributes: {path}",
+        )
+        if path.endswith("/.gitattributes"):
+            index_attributes.add(path)
+
+    for relative in sorted((head_attributes | index_attributes) & set(applicable)):
+        first_affected = sorted(applicable[relative])[0]
+        raise VerificationError(
+            "applicable nested .gitattributes is forbidden for raw-bound path: "
+            f"{relative} -> {first_affected}"
+        )
+
+    for relative, affected_paths in sorted(applicable.items()):
+        candidate = repo_root.joinpath(*relative.split("/"))
+        try:
+            os.lstat(candidate)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise VerificationError(
+                f"cannot inspect applicable nested .gitattributes {relative}: {error}"
+            ) from error
+        first_affected = sorted(affected_paths)[0]
+        raise VerificationError(
+            "applicable nested .gitattributes is forbidden for raw-bound path: "
+            f"{relative} -> {first_affected}"
+        )
 
 
 def verify_manifest_declared_sources(
@@ -988,6 +2719,57 @@ def verify_payload_bindings(
     return verified
 
 
+def verify_authoring_overlay_matches_checkout(
+    *,
+    repo_root: Path,
+    overlay_dir: Path,
+    manifest_raw: bytes,
+    payload_sources: dict[str, bytes],
+    verified_sources: dict[str, bytes],
+    plan_raw: bytes,
+) -> None:
+    """Bind an alternate authoring overlay to the exact six-path checkout state."""
+
+    prefix = OVERLAY_RELATIVE_DIRECTORY + "/"
+    for relative in EXPECTED_PAYLOAD_PATHS:
+        candidate_raw = (
+            manifest_raw
+            if relative == MANIFEST_RELATIVE_PATH
+            else payload_sources[relative]
+        )
+        if relative.startswith(prefix):
+            local_name = relative[len(prefix) :]
+            current_overlay_raw = read_bounded_bytes(
+                safe_child(overlay_dir, local_name, label="current authoring overlay member"),
+                label=f"current authoring overlay member {relative}",
+                size_limit=MAX_TRACKED_FILE_BYTES,
+            )
+            require(
+                current_overlay_raw == candidate_raw,
+                f"authoring alternate overlay changed after authentication: {relative}",
+            )
+        checkout_raw = read_bounded_bytes(
+            safe_child(repo_root, relative, label="authoring checkout payload member"),
+            label=f"authoring checkout payload member {relative}",
+            size_limit=MAX_TRACKED_FILE_BYTES,
+        )
+        require(
+            checkout_raw == candidate_raw,
+            f"authoring alternate overlay bytes differ from the checkout: {relative}",
+        )
+
+    for local_name in (*EXPECTED_OVERLAY_SOURCES, "verify_plan.py"):
+        relative = prefix + local_name
+        require(
+            verified_sources[f"overlay:{local_name}"] == payload_sources[relative],
+            f"authoring overlay source changed between authenticated reads: {relative}",
+        )
+    require(
+        plan_raw == payload_sources[prefix + "plan.json"],
+        "authoring plan changed between authenticated reads",
+    )
+
+
 def verify_committed_payload_git_bytes(repo_root: Path, overlay_dir: Path) -> None:
     changed_paths = set(EXPECTED_CHANGED_PATHS)
     for relative in EXPECTED_PAYLOAD_PATHS:
@@ -1047,7 +2829,59 @@ def _decode_git_path(raw: bytes, *, label: str) -> str:
     return value
 
 
-def verify_tracked_index_and_worktree(repo_root: Path) -> tuple[int, str]:
+def verify_index_matches_head(repo_root: Path) -> str:
+    """Require the complete stage-zero index mode/blob inventory to equal HEAD."""
+
+    tree_raw = git(repo_root, "ls-tree", "-r", "-z", "--full-tree", "HEAD", binary=True)
+    index_raw = git(repo_root, "ls-files", "--stage", "-z", binary=True)
+    require(isinstance(tree_raw, bytes) and isinstance(index_raw, bytes), "authoring index inventory is not binary")
+
+    tree_entries: dict[str, tuple[str, str]] = {}
+    for entry in tree_raw.split(b"\0"):
+        if not entry:
+            continue
+        header, separator, path_raw = entry.partition(b"\t")
+        fields = header.split()
+        path = _decode_git_path(path_raw, label="authoring HEAD tree")
+        require(
+            separator == b"\t"
+            and len(fields) == 3
+            and fields[0] in {b"100644", b"100755"}
+            and fields[1] == b"blob"
+            and re.fullmatch(rb"[0-9a-f]{40}", fields[2]) is not None
+            and path not in tree_entries,
+            f"unsupported or malformed authoring HEAD tree entry: {path}",
+        )
+        tree_entries[path] = (fields[0].decode("ascii"), fields[2].decode("ascii"))
+
+    index_entries: dict[str, tuple[str, str]] = {}
+    for entry in index_raw.split(b"\0"):
+        if not entry:
+            continue
+        header, separator, path_raw = entry.partition(b"\t")
+        fields = header.split()
+        path = _decode_git_path(path_raw, label="authoring index")
+        require(
+            separator == b"\t"
+            and len(fields) == 3
+            and fields[0] in {b"100644", b"100755"}
+            and re.fullmatch(rb"[0-9a-f]{40}", fields[1]) is not None
+            and fields[2] == b"0"
+            and path not in index_entries,
+            f"unsupported or malformed authoring index entry: {path}",
+        )
+        index_entries[path] = (fields[0].decode("ascii"), fields[1].decode("ascii"))
+
+    require(index_entries == tree_entries, "authoring Git index differs from the exact HEAD tree")
+    inventory = [[path, mode, blob] for path, (mode, blob) in sorted(index_entries.items())]
+    return digest(inventory)
+
+
+def snapshot_tracked_index_and_worktree(
+    repo_root: Path,
+    *,
+    index_mismatch_message: str = "Git index differs from the exact HEAD tree",
+) -> tuple[int, str, str, tuple[str, ...]]:
     tree_raw = git(repo_root, "ls-tree", "-r", "-z", "--full-tree", "HEAD", binary=True)
     index_raw = git(repo_root, "ls-files", "--stage", "-z", binary=True)
     require(isinstance(tree_raw, bytes) and isinstance(index_raw, bytes), "tracked inventory is not binary")
@@ -1088,7 +2922,9 @@ def verify_tracked_index_and_worktree(repo_root: Path) -> tuple[int, str]:
         )
         index_entries[path] = (fields[0].decode("ascii"), fields[1].decode("ascii"))
 
-    require(index_entries == tree_entries, "Git index differs from the exact HEAD tree")
+    require(index_entries == tree_entries, index_mismatch_message)
+    changed_paths: list[str] = []
+    worktree_inventory: list[list[str]] = []
     for relative, (_, blob_sha) in sorted(tree_entries.items()):
         path = safe_child(repo_root, relative, label="tracked worktree")
         require(path.is_file() and not path.is_symlink(), f"tracked worktree path is not a regular file: {relative}")
@@ -1097,9 +2933,28 @@ def verify_tracked_index_and_worktree(repo_root: Path) -> tuple[int, str]:
             label=f"tracked worktree {relative}",
             size_limit=MAX_TRACKED_FILE_BYTES,
         )
-        require(git_blob_sha(raw) == blob_sha, f"tracked worktree bytes differ from HEAD: {relative}")
+        observed_blob = git_blob_sha(raw)
+        if observed_blob != blob_sha:
+            changed_paths.append(relative)
+        worktree_inventory.append([relative, sha256_bytes(raw)])
     inventory = [[path, mode, blob] for path, (mode, blob) in sorted(tree_entries.items())]
-    return len(tree_entries), digest(inventory)
+    return (
+        len(tree_entries),
+        digest(inventory),
+        digest(worktree_inventory),
+        tuple(changed_paths),
+    )
+
+
+def verify_tracked_index_and_worktree(repo_root: Path) -> tuple[int, str]:
+    tracked_count, inventory_digest, _, changed_paths = snapshot_tracked_index_and_worktree(
+        repo_root
+    )
+    if changed_paths:
+        raise VerificationError(
+            f"tracked worktree bytes differ from HEAD: {changed_paths[0]}"
+        )
+    return tracked_count, inventory_digest
 
 
 def verify_untracked_and_ignored_state(repo_root: Path) -> str:
@@ -1134,9 +2989,39 @@ def verify_checkout_cleanliness(repo_root: Path) -> dict[str, Any]:
     }
 
 
+def verify_authoring_checkout_boundary(repo_root: Path) -> dict[str, Any]:
+    (
+        tracked_count,
+        index_matches_head_digest,
+        worktree_bytes_digest,
+        changed,
+    ) = snapshot_tracked_index_and_worktree(
+        repo_root,
+        index_mismatch_message="authoring Git index differs from the exact HEAD tree",
+    )
+    require(
+        changed == EXPECTED_CHANGED_PATHS,
+        "authoring check requires exactly the six V4 changed paths against HEAD",
+    )
+    return {
+        "changed_paths": changed,
+        "tracked_path_count": tracked_count,
+        "index_matches_head_digest": index_matches_head_digest,
+        "worktree_bytes_digest": worktree_bytes_digest,
+        "index_visibility_digest": verify_global_index_visibility(repo_root),
+        "untracked_and_ignored_digest": verify_untracked_and_ignored_state(repo_root),
+    }
+
+
 def verify_repository_state(
     repo_root: Path, overlay_dir: Path, *, authoring_check: bool
 ) -> dict[str, Any]:
+    require(_GIT_BOUNDARY is not None, "Git execution boundary is not configured")
+    require(
+        _GIT_BOUNDARY["work_tree"] == repo_root
+        and _GIT_BOUNDARY["git_dir"] == _resolve_git_dir(repo_root),
+        "explicit Git-dir/work-tree repository binding mismatch",
+    )
     verify_commit_object(
         repo_root,
         commit=PLAN_AUTHORING_BASE_COMMIT,
@@ -1153,10 +3038,17 @@ def verify_repository_state(
     )
     verify_commit_object(
         repo_root,
+        commit=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+        tree=GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+        parent=PAYLOAD_A_COMMIT,
+        label="remanded Git-environment correction parent",
+    )
+    verify_commit_object(
+        repo_root,
         commit=CORRECTION_PARENT_COMMIT,
         tree=CORRECTION_PARENT_TREE,
-        parent=PAYLOAD_A_COMMIT,
-        label="remanded correction parent",
+        parent=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+        label="remanded native-executable-matrix correction parent",
     )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch mismatch")
     head = str(git(repo_root, "rev-parse", "HEAD"))
@@ -1164,13 +3056,16 @@ def verify_repository_state(
     if authoring_check:
         require(head == CORRECTION_PARENT_COMMIT, "authoring check requires the immutable correction parent HEAD")
         require(tree == CORRECTION_PARENT_TREE, "authoring check requires the immutable correction parent tree")
+        authoring_snapshot = verify_authoring_checkout_boundary(repo_root)
         return {
-            "mode": "authoring-correction-check-non-executing",
+            "mode": "authoring-native-executable-matrix-correction-v4-non-executing",
             "qualification": False,
             "head": head,
             "tree": tree,
             "authoring_base_parent": PLAN_AUTHORING_BASE_COMMIT,
+            "git_environment_correction_parent": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
             "correction_parent": CORRECTION_PARENT_COMMIT,
+            "authoring_snapshot": authoring_snapshot,
         }
 
     expected_overlay = safe_child(repo_root, OVERLAY_RELATIVE_DIRECTORY, label="committed overlay directory")
@@ -1210,11 +3105,12 @@ def verify_repository_state(
     checkout_snapshot = verify_checkout_cleanliness(repo_root)
     verify_committed_payload_git_bytes(repo_root, overlay_dir)
     return {
-        "mode": "committed-git-boundary-correction-v3",
+        "mode": "committed-native-executable-matrix-correction-v4",
         "qualification": True,
         "head": head,
         "tree": tree,
         "authoring_base_parent": PLAN_AUTHORING_BASE_COMMIT,
+        "git_environment_correction_parent": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
         "correction_parent": CORRECTION_PARENT_COMMIT,
         "checkout_snapshot": checkout_snapshot,
     }
@@ -1224,7 +3120,11 @@ def verify_repository_state_stable_at_end(
     repo_root: Path,
     overlay_dir: Path,
     repository_state: dict[str, Any],
+    *,
+    raw_bound_paths: Iterable[str],
 ) -> None:
+    verify_no_git_info_attribute_overrides(repo_root)
+    verify_no_applicable_nested_gitattributes(repo_root, raw_bound_paths)
     verify_commit_object(
         repo_root,
         commit=PLAN_AUTHORING_BASE_COMMIT,
@@ -1241,10 +3141,17 @@ def verify_repository_state_stable_at_end(
     )
     verify_commit_object(
         repo_root,
+        commit=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+        tree=GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+        parent=PAYLOAD_A_COMMIT,
+        label="final remanded Git-environment correction parent",
+    )
+    verify_commit_object(
+        repo_root,
         commit=CORRECTION_PARENT_COMMIT,
         tree=CORRECTION_PARENT_TREE,
-        parent=PAYLOAD_A_COMMIT,
-        label="final remanded correction parent",
+        parent=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+        label="final remanded native-executable-matrix correction parent",
     )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch changed during verification")
     require(git(repo_root, "rev-parse", "HEAD") == repository_state["head"], "HEAD changed during verification")
@@ -1265,6 +3172,14 @@ def verify_repository_state_stable_at_end(
             "exact checkout snapshot changed during verification",
         )
         verify_committed_payload_git_bytes(repo_root, overlay_dir)
+    else:
+        require(
+            verify_authoring_checkout_boundary(repo_root)
+            == repository_state["authoring_snapshot"],
+            "authoring checkout boundary changed during verification",
+        )
+    verify_no_git_info_attribute_overrides(repo_root)
+    verify_no_applicable_nested_gitattributes(repo_root, raw_bound_paths)
 
 
 def acceptance_index(nodes: list[dict[str, Any]]) -> dict[str, str]:
@@ -1439,13 +3354,101 @@ def validate_topology_and_durability(nodes: list[dict[str, Any]], intake: dict[s
     require(all(isinstance(item.get("rationale"), str) and len(item["rationale"].strip()) >= 40 for item in declared), "direct edge rationale missing")
 
 
-def verify_frozen_host(contracts: dict[str, Any], repo_root: Path) -> None:
+def _decode_json_pointer_token(token: str, *, label: str) -> str:
+    decoded: list[str] = []
+    index = 0
+    while index < len(token):
+        character = token[index]
+        if character != "~":
+            decoded.append(character)
+            index += 1
+            continue
+        require(
+            index + 1 < len(token) and token[index + 1] in {"0", "1"},
+            f"{label} contains an invalid JSON Pointer escape",
+        )
+        decoded.append("~" if token[index + 1] == "0" else "/")
+        index += 2
+    return "".join(decoded)
+
+
+def resolve_local_json_pointer(
+    reference: object,
+    *,
+    document_name: str,
+    document: object,
+    label: str,
+) -> object:
+    """Strictly resolve a local document reference with RFC 6901 token escaping."""
+
+    require(isinstance(reference, str), f"{label} must be a string")
+    prefix = f"{document_name}#"
+    require(
+        reference.startswith(prefix) and reference.count("#") == 1,
+        f"{label} must reference the exact local document {document_name}",
+    )
+    pointer = reference[len(prefix) :]
+    require(pointer == "" or pointer.startswith("/"), f"{label} JSON Pointer is malformed")
+    current = document
+    if pointer == "":
+        return current
+    for raw_token in pointer[1:].split("/"):
+        token = _decode_json_pointer_token(raw_token, label=label)
+        if isinstance(current, dict):
+            require(token in current, f"{label} JSON Pointer member does not exist: {token}")
+            current = current[token]
+            continue
+        if isinstance(current, list):
+            require(
+                re.fullmatch(r"(?:0|[1-9][0-9]*)", token) is not None,
+                f"{label} JSON Pointer array index is not canonical: {token}",
+            )
+            item_index = int(token)
+            require(item_index < len(current), f"{label} JSON Pointer array index is out of range")
+            current = current[item_index]
+            continue
+        raise VerificationError(f"{label} JSON Pointer traverses a scalar value")
+    return current
+
+
+def verify_frozen_host(
+    manifest: dict[str, Any], contracts: dict[str, Any], repo_root: Path
+) -> None:
+    prerequisite = manifest.get("frozen_host_prerequisite")
+    require(isinstance(prerequisite, dict), "frozen host prerequisite missing")
     host = contracts.get("frozen_host_contract")
     require(isinstance(host, dict), "frozen host contract missing")
-    require(host.get("extraction_commit") == QUALIFIED_PREREQUISITE_COMMIT, "host extraction commit mismatch")
-    require(host.get("extraction_tree") == QUALIFIED_PREREQUISITE_TREE, "host extraction tree mismatch")
+    require(
+        host.get("extraction_commit")
+        == prerequisite.get("extraction_commit")
+        == QUALIFIED_PREREQUISITE_COMMIT,
+        "host extraction commit mismatch",
+    )
+    require(
+        host.get("extraction_tree")
+        == prerequisite.get("extraction_tree")
+        == QUALIFIED_PREREQUISITE_TREE,
+        "host extraction tree mismatch",
+    )
     files = host.get("files")
-    require(isinstance(files, list) and len(files) == host.get("file_count") == 16, "host manifest must contain 16 files")
+    pointed_files = resolve_local_json_pointer(
+        prerequisite.get("manifest_location"),
+        document_name="node-contracts.json",
+        document=contracts,
+        label="frozen host manifest location",
+    )
+    require(
+        pointed_files is files,
+        "frozen host manifest location does not resolve to the host files array",
+    )
+    require(
+        isinstance(files, list)
+        and len(files)
+        == host.get("file_count")
+        == prerequisite.get("file_count")
+        == 16,
+        "host manifest must contain the bound 16 files",
+    )
     observed_bundle: list[dict[str, str]] = []
     for row in files:
         require(isinstance(row, dict) and set(row) == {"path", "bytes", "sha256", "git_blob"}, "host file row malformed")
@@ -1460,7 +3463,13 @@ def verify_frozen_host(contracts: dict[str, Any], repo_root: Path) -> None:
         require(sha256_bytes(raw) == row["sha256"], f"host raw digest mismatch: {path}")
         observed_bundle.append({"path": path, "sha256": row["sha256"]})
     require([item["path"] for item in files] == sorted(item["path"] for item in files), "host manifest paths not sorted")
-    require(digest(observed_bundle) == host.get("bundle_digest") == EXPECTED_FROZEN_HOST_BUNDLE, "host bundle digest mismatch")
+    require(
+        digest(observed_bundle)
+        == host.get("bundle_digest")
+        == prerequisite.get("bundle_sha256")
+        == EXPECTED_FROZEN_HOST_BUNDLE,
+        "host bundle digest mismatch",
+    )
     require(host.get("status") == "REQUIRED_NOT_SATISFIED_BY_CHECKED_IN_EVIDENCE", "host contract falsely claims satisfaction")
     adverse = host.get("adverse_facts")
     require(isinstance(adverse, list) and any("same Windows SID" in item for item in adverse) and any("thirteen ignored" in item for item in adverse) and any("expired" in item for item in adverse), "host adverse facts missing")
@@ -1659,9 +3668,10 @@ def _verify_configured(
         size_limit=MAX_PLAN_BYTES,
     )
 
-    # Trust order is intentional: parse only the manifest, validate its fixed
-    # identity, then verify every declared source byte before interpreting any
-    # authored materializer or authored JSON data.
+    # Trust order is intentional: authenticate the manifest and complete payload
+    # bytes first, then interpret only the payload-bound checkout policy before
+    # any Git command can observe worktree bytes.  Full source authentication and
+    # all authored-data interpretation remain downstream of that boundary.
     require(
         isinstance(expected_manifest_digest, str)
         and re.fullmatch(r"sha256:[0-9a-f]{64}", expected_manifest_digest) is not None,
@@ -1687,14 +3697,29 @@ def _verify_configured(
         size_limit=MAX_MANIFEST_BYTES,
     )
     validate_manifest_constants(manifest)
-    repository_state = verify_repository_state(
-        repo_root, overlay_dir, authoring_check=authoring_check
-    )
-    verify_payload_bindings(
+    payload_sources = verify_payload_bindings(
         manifest,
         repo_root=repo_root,
         overlay_dir=overlay_dir,
         manifest_raw=manifest_raw,
+    )
+    contracts = parse_strict_json(
+        payload_sources[
+            f"{OVERLAY_RELATIVE_DIRECTORY}/node-contracts.json"
+        ],
+        label="payload-bound node-contracts.json",
+        size_limit=MAX_SOURCE_JSON_BYTES,
+    )
+    checkout_attribute_coverage = verify_authenticated_checkout_reproducibility(
+        payload_sources[".gitattributes"],
+        manifest=manifest,
+        contracts=contracts,
+    )
+    verify_no_git_info_attribute_overrides(repo_root)
+    raw_bound_paths = tuple(checkout_attribute_coverage)
+    verify_no_applicable_nested_gitattributes(repo_root, raw_bound_paths)
+    repository_state = verify_repository_state(
+        repo_root, overlay_dir, authoring_check=authoring_check
     )
     verified_sources = verify_manifest_declared_sources(
         manifest, overlay_dir=overlay_dir, repo_root=repo_root
@@ -1705,10 +3730,14 @@ def _verify_configured(
         label="source-intake.json",
         size_limit=MAX_SOURCE_JSON_BYTES,
     )
-    contracts = parse_strict_json(
+    verified_contracts = parse_strict_json(
         verified_sources["overlay:node-contracts.json"],
         label="node-contracts.json",
         size_limit=MAX_SOURCE_JSON_BYTES,
+    )
+    require(
+        verified_contracts == contracts,
+        "node-contracts changed between payload and source authentication",
     )
     traceability = parse_strict_json(
         verified_sources["overlay:traceability.json"],
@@ -1721,7 +3750,7 @@ def _verify_configured(
         size_limit=MAX_SOURCE_JSON_BYTES,
     )
     validate_inert_sources(contracts, traceability, ownership, intake)
-    verify_frozen_host(contracts, repo_root)
+    verify_frozen_host(manifest, contracts, repo_root)
 
     expected = build_expected_plan(
         contracts,
@@ -1747,6 +3776,16 @@ def _verify_configured(
     require(plan["authority"]["execution_status"].startswith("DEFER_"), "authority posture is not fail-closed")
     require(plan["vision_posture"]["A5"] == "NOT_READY", "A5 readiness overclaim")
 
+    if authoring_check:
+        verify_authoring_overlay_matches_checkout(
+            repo_root=repo_root,
+            overlay_dir=overlay_dir,
+            manifest_raw=manifest_raw,
+            payload_sources=payload_sources,
+            verified_sources=verified_sources,
+            plan_raw=plan_raw,
+        )
+
     sealed_after = read_bounded_bytes(
         sealed_plan_path,
         label="historical sealed plan after verification",
@@ -1754,7 +3793,12 @@ def _verify_configured(
     )
     require(sealed_after == sealed_before, "verifier mutated .autopilot/plan.json")
     require(sha256_bytes(sealed_after) == EXPECTED_REPOSITORY_SOURCES[".autopilot/plan.json"][1], "historical sealed plan changed")
-    verify_repository_state_stable_at_end(repo_root, overlay_dir, repository_state)
+    verify_repository_state_stable_at_end(
+        repo_root,
+        overlay_dir,
+        repository_state,
+        raw_bound_paths=raw_bound_paths,
+    )
     verify_git_executable_stable(full_digest=True)
     return {
         "verified": True,
@@ -1767,6 +3811,9 @@ def _verify_configured(
             "head": repository_state["head"],
             "tree": repository_state["tree"],
             "authoring_base_parent": repository_state["authoring_base_parent"],
+            "git_environment_correction_parent": repository_state[
+                "git_environment_correction_parent"
+            ],
             "correction_parent": repository_state["correction_parent"],
         },
         "plan_digest": EXPECTED_PLAN_DIGEST,
@@ -1793,8 +3840,18 @@ def _verify_configured(
         "materializer_imported_or_executed": False,
         "historical_plan_unchanged": True,
         "git_boundary": {
+            "policy": GIT_EXECUTION_BOUNDARY_POLICY,
             "executable": str(_GIT_BOUNDARY["executable"]),
             "executable_sha256": _GIT_BOUNDARY["expected_sha256"],
+            "native_executable_format_policy": NATIVE_EXECUTABLE_FORMAT_POLICY,
+            "native_executable_format": _GIT_BOUNDARY["native_image"][
+                "native_executable_format"
+            ],
+            "host_platform": _GIT_BOUNDARY["native_image"]["host_platform"],
+            "host_machine": _GIT_BOUNDARY["native_image"]["host_machine"],
+            "max_executable_bytes": MAX_NATIVE_EXECUTABLE_BYTES,
+            "compiled_native_delegator_exclusion": "NOT_PROVEN_BY_FORMAT",
+            "runtime_dependency_closure": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED",
             "path_lookup": False,
             "inherited_git_environment": "REJECTED",
             "system_and_global_config": "DISABLED",
@@ -1821,28 +3878,102 @@ def verify(
     authoring_check: bool = False,
 ) -> dict[str, Any]:
     global _GIT_BOUNDARY
-    overlay_dir = overlay_dir.resolve()
-    repo_root = repo_root.resolve()
-    configure_git_boundary(
-        repo_root,
-        git_executable=git_executable,
-        expected_git_executable_sha256=expected_git_executable_sha256,
-    )
+    result: dict[str, Any] | None = None
+    primary_error: VerificationError | None = None
+    cleanup_errors: list[VerificationError] = []
+    autopilot_before: dict[str, Any] | None = None
+    resolved_repo_root: Path | None = None
     try:
-        return _verify_configured(
+        overlay_dir = overlay_dir.resolve()
+        repo_root = repo_root.resolve()
+        resolved_repo_root = repo_root
+        autopilot_before = snapshot_autopilot_tree(repo_root)
+        configure_git_boundary(
+            repo_root,
+            git_executable=git_executable,
+            expected_git_executable_sha256=expected_git_executable_sha256,
+        )
+        result = _verify_configured(
             expected_manifest_digest=expected_manifest_digest,
             overlay_dir=overlay_dir,
             repo_root=repo_root,
             authoring_check=authoring_check,
         )
+    except VerificationError as error:
+        primary_error = error
+    except subprocess.TimeoutExpired as error:
+        primary_error = GitTimeoutError(
+            f"unhandled subprocess timeout was normalized at the verifier boundary: {error}"
+        )
+    except OSError as error:
+        primary_error = VerificationError(
+            f"operating-system error was normalized at the verifier boundary: {error}"
+        )
+    except Exception as error:
+        primary_error = VerificationError(
+            f"unexpected verifier failure {type(error).__name__}: {error}"
+        )
     finally:
         boundary = _GIT_BOUNDARY
-        _GIT_BOUNDARY = None
         if boundary is not None:
             try:
+                verify_git_executable_stable(full_digest=True)
+            except VerificationError as error:
+                cleanup_errors.append(error)
+            try:
                 boundary["handle"].close()
+            except (OSError, ValueError) as error:
+                cleanup_errors.append(
+                    VerificationError(f"cannot close retained Git executable handle: {error}")
+                )
+        _GIT_BOUNDARY = None
+        if resolved_repo_root is not None and autopilot_before is not None:
+            try:
+                autopilot_after = snapshot_autopilot_tree(resolved_repo_root)
+                if autopilot_after != autopilot_before:
+                    cleanup_errors.append(
+                        VerificationError(
+                            "initial and final .autopilot point observations differ during verification"
+                        )
+                    )
+            except VerificationError as error:
+                cleanup_errors.append(error)
             except OSError as error:
-                raise VerificationError(f"cannot close retained Git executable handle: {error}") from error
+                cleanup_errors.append(
+                    VerificationError(f"cannot complete final .autopilot point observation: {error}")
+                )
+    if primary_error is not None:
+        for cleanup_error in cleanup_errors:
+            primary_error.add_cleanup_evidence(cleanup_error)
+        raise primary_error
+    if cleanup_errors:
+        cleanup_error = cleanup_errors[0]
+        for additional_error in cleanup_errors[1:]:
+            cleanup_error.add_cleanup_evidence(additional_error)
+        raise cleanup_error
+    require(result is not None, "verifier returned no result")
+    require(autopilot_before is not None, "initial .autopilot point observation was not captured")
+    result["autopilot_tree"] = {
+        "observed_unchanged": True,
+        "concurrent_mutation_exclusion": False,
+        "requires_external_read_only_custody_for_execution": True,
+        "schema": autopilot_before["schema"],
+        "entry_count": autopilot_before["entry_count"],
+        "total_file_bytes": autopilot_before["total_file_bytes"],
+        "snapshot_digest": autopilot_before["digest"],
+    }
+    return result
+
+
+def verification_error_payload(error: VerificationError) -> dict[str, Any]:
+    return {
+        "verified": False,
+        "code": error.code,
+        "error_type": type(error).__name__,
+        "primary_code": error.primary_code,
+        "cleanup_evidence": list(error.cleanup_evidence),
+        "error": str(error),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1874,5 +4005,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except VerificationError as error:
-        print(json.dumps({"verified": False, "error": str(error)}, sort_keys=True))
+        print(json.dumps(verification_error_payload(error), sort_keys=True))
         raise SystemExit(2) from None

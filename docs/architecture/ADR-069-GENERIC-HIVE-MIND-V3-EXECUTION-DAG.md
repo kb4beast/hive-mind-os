@@ -1,399 +1,422 @@
-# ADR-069: Sealed external Generic Hive Mind V3 execution DAG
+# ADR-069: V4 native-executable correction for the Generic Hive Mind V3 execution DAG
 
 - Status: proposed `adapt`; distinct Curator and Judge disposition pending
 - Date: 2026-08-23
 - Scope: repeated persisted-subject Autopilot invocation and its bounded product-completion DAG
 - Immutable plan authoring base: commit `42b4aeef17f816430a7d8a435102635afea8761a`, tree `b896e16755a1d6864989757732fdc5ca9d2b5eed`
 - Immutable historical Payload A: commit `4e2b81b932e5145f24c4b52ceeee664bff91df2e`, tree `8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157`
-- Immutable Git-boundary correction parent: commit `f06e52c43a1e2d1d53523378c0d6f5564fb984bf`, tree `8730203c89835c4d1d9dac4be9b2086dacd2d869`
+- Immutable ambient-Git remand: commit `f06e52c43a1e2d1d53523378c0d6f5564fb984bf`, tree `8730203c89835c4d1d9dac4be9b2086dacd2d869`
+- Immutable V4 direct parent: commit `9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8`, tree `0d0a251b6ff1557ca014b6b50c6f62ae787c4459`
 - Immutable Clerk intake: `docs/execution/dags/generic-hive-mind-product-v3/source-intake.json`, 58,463 bytes, SHA-256 `dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c`
 
-## Context
+## Context and preserved adverse evidence
 
-The desired user interaction is a repeatable command such as
-`hive-mind autopilot run "foobar"`. When the exact subject already has a
-persisted request and the current branch is its persisted target, a repeat must
-not fail merely because normal target creation would reject the existing branch.
-It also must not trust a mutable in-repository plan, execute repository Python in
-the portable command, or weaken the external controller boundary.
+The intended user surface remains as small as:
 
-The earlier plan is retained as provenance only. Reusing or rewriting
-`.autopilot/plan.json` would permit ambiguous generation identity and unsafe
-fallback. A checked-in signature or digest alone would also be insufficient:
-the active Windows session can read the old authority key, the stored capability
-is expired and stale, and the observed host worktree contained ignored bytecode.
-The legacy continuation launcher returned a quiescent success but withheld
-release publication after reconciliation and GitHub snapshot drift; it is not V3
-authority or dispatch.
+```text
+hive-mind autopilot run "foobar"
+```
 
-Payload A is preserved append-only at `4e2b81b932e5145f24c4b52ceeee664bff91df2e`.
-Its inert plan and independent committed verifier passed, but two focused tests
-incorrectly ran the precommit-only authoring mode against the committed payload
-HEAD. The exact commit therefore ran 12 of 14 focused tests, while the same bytes
-overlaid on the intended base passed 14 of 14. This ADR adapts the lineage with a
-versioned correction child; it does not erase or relabel that failed observation.
+That command does not itself confer authority. A future same-request fast path may
+reuse an exact persisted subject and target only when an external controller binds
+the request, repository, objective, launch, branch, plan, payload, executable, and
+activation identity. Repetition, an existing branch, or a checked-in digest is not
+an execution grant.
 
-That first correction is preserved at
-`f06e52c43a1e2d1d53523378c0d6f5564fb984bf` as the sole direct child of Payload A.
-Its verifier inherited `os.environ` and invoked `git` through `PATH`. An inherited
-`GIT_WORK_TREE` could therefore redirect every Git query to a different clean
-checkout while the verifier read payload bytes from the candidate checkout. The
-successor records the observed status as
-`QUALIFICATION_REMANDED_GIT_ENVIRONMENT_FAIL_OPEN` and proposes `ADAPT_REMAND`
-because the claimed Git/worktree boundary could fail open; a distinct court must
-disposition that proposal. Neither the commit nor the report is deleted or
-retrospectively rewritten. The external report bytes remain predecessor evidence,
-referenced by raw SHA-256
+Every earlier payload remains append-only evidence. Payload A at `4e2b81b` exposed
+an exact-commit 12-of-14 focused-test defect. Its correction at `f06e52c` passed its
+focused tests but allowed ambient `GIT_*` variables and `PATH` to redirect its Git
+proof. The next correction at `9b1cbcfe` bound an absolute Git path and raw digest,
+scrubbed the Git environment, and qualified its exact inert committed payload under
+the recorded Windows engine. It nevertheless failed its own intended acceptance
+boundary: on POSIX an executable script wrapper could satisfy the file checks and
+delegate to Git, and its 19-test suite did not implement the complete required
+adversarial matrix.
+
+The frozen report recording that later remand is
+`evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md`,
+exactly 23,865 bytes with raw SHA-256
+`a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff`.
+It records `ADAPT/REMAND` as the author recommendation for `9b1cbcfe`; it is not
+rewritten, superseded silently, or treated as a qualification receipt. The earlier
+`f06e52c` report also remains frozen at 17,703 bytes with SHA-256
 `731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810`.
 
-This ADR proposes a second, append-only correction as exactly one non-merge direct
-child of `f06e52c`. Its final commit, tree, manifest digest, payload aggregate, and
-qualification report do not yet exist and are intentionally not asserted here.
+This ADR proposes V4 as exactly one non-merge direct child of `9b1cbcfe`. Its final
+commit, tree, manifest digest, ordered line-manifest digest, full-payload aggregate,
+qualification report, and court verdict do not exist while these candidate bytes
+are authored and are intentionally not asserted here.
 
 ## Decision
 
-Propose `adapt` for a second append-only Git-boundary correction while retaining
-the separately sealed, external `manual-parent-v1` V3 overlay with 20 nodes, 28 raw
-edges, 17 levels, six intentionally redundant direct edges, and exact typed
-durability. All nodes are serial in this authored topology, yielding exactly 20
-one-node rounds. The plan contains no runnable command. A distinct Curator and Judge
-must disposition the successor's exact committed bytes; this authoring decision is
-not that disposition.
+Adopt an append-only successor contract named
+`exact-append-only-native-executable-matrix-correction-v4`. It retains the sealed
+external Standard-V2 `manual-parent-v1` overlay: 20 nodes, 28 raw edges, 17 levels,
+six intentionally redundant direct edges, exactly 20 serial one-node rounds, and
+no runnable command. It corrects evidence qualification only; it does not activate
+the DAG.
 
-The successor changes exactly ADR-069, this V3 README, `manifest.json`,
-`verify_plan.py`, and the focused test. It preserves the other six members of the
-ordered 11-path payload inventory byte-for-byte from `f06e52c`. The immutable plan
-authoring base remains `42b4aeef`; the Git correction parent and direct Git parent
-are `f06e52c`. These two roles must not be collapsed.
+The V4 child changes exactly these six regular-file paths, and every one must have
+a blob different from `9b1cbcfe`:
 
-The same-request fast path is allowed only before new-target protection and only
-for an exact persisted subject, request, repository, objective, launch, target,
-HEAD, tree, compiler, standard, generation, and resume identity. It consumes a
-complete externally authenticated plan bundle. It does not infer authority from
-repository contents, request repetition, branch existence, or mission scope.
+1. `.gitattributes`;
+2. `docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md`;
+3. `docs/execution/dags/generic-hive-mind-product-v3/README.md`;
+4. `docs/execution/dags/generic-hive-mind-product-v3/manifest.json`;
+5. `docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py`; and
+6. `tests/test_generic_dag_v3_overlay.py`.
 
-### Checked-in generation manifest
+`.gitattributes` is authenticated payload, not ambient checkout policy. It pins LF
+checkout bytes for itself, `LICENSE`, every current raw-bound repository text
+extension (`*.py`, `*.json`, `*.md`, `*.toml`, `*.yml`, and `*.yaml`), and every
+PowerShell file (`*.ps1`). Existing evidentiary byte domains retain their explicit
+`-text` rules. A regression invariant rejects any future raw-byte-bound text path
+that lacks either deterministic `text eol=lf` coverage or an explicit `-text`
+exception, so adding a new text format cannot silently reintroduce checkout-dependent
+content.
 
-`manifest.json` is inert and uses the following sealed shape:
+For the manifest-derived raw-bound path set, that authenticated root file is the
+sole accepted `.gitattributes` policy. Before any Git operation that can apply
+attributes or filters, the verifier rejects an applicable non-root ancestor
+`.gitattributes` found in the worktree, index, or HEAD, and repeats that
+check during final repository stability verification. A nested `.gitattributes`
+whose directory is outside the ancestor chain of every currently bound path remains
+allowed. If a future manifest or frozen-host binding names a path beneath that
+directory, the existing nested file becomes applicable and qualification fails
+closed. These checks are observations at defined phases, not a claim of atomic or
+universal concurrent-mutation prevention.
 
-```text
-schema_version, kind, plan_id
-authorship { architect, judge=UNASSIGNED, court_status, execution_authority=NONE }
-request_binding { request_id, objective_digest, repository_id, task_key,
-                  launch_digest, target_branch }
-snapshot_lineage { request_observation, qualified_prerequisite,
-                   combined_envelope_b, authoring_base_parent,
-                   correction_parent } -> { commit, tree }
-source_bindings.repository[] -> { path, bytes, sha256, git_blob }
-source_bindings.overlay[] -> { path, bytes, sha256 }
-committed_payload_contract {
-  mode=exact-append-only-git-boundary-correction-v3,
-  authoring_base_parent=plan-authoring-base,
-  correction_parent=f06e52c,
-  predecessor_payload=f06e52c { commit, tree, parent_commit, parent_tree,
-                        manifest_raw_sha256, full_payload_aggregate,
-                        qualification_report_sha256, observed_status,
-                        author_proposed_disposition },
-  historical_payload_a { commit, tree, parent_commit, parent_tree,
-                         manifest_raw_sha256, full_payload_aggregate,
-                         observed_status, author_proposed_disposition },
-  expected_changed_paths[5], payload_inventory[11], payload_bindings[10],
-  activation_anti_downgrade,
-  git_execution_boundary {
-    caller_absolute_native_executable_and_raw_sha256,
-    reject_all_inherited_case_insensitive_GIT_prefix,
-    minimal_child_environment, no_path_lookup,
-    explicit_git_dir_and_work_tree, disabled_system_and_global_config,
-    raw_HEAD_index_worktree_blob_equality,
-    per_invocation_executable_revalidation,
-    strong_read_only_runtime=REQUIRED_NOT_SATISFIED
-  },
-  manifest_authentication=caller-supplied-raw-sha256,
-  court_envelope_b_bindings
-}
-plan_binding { expected_plan_digest, expected_raw_bytes_digest, external_path,
-               historical_autopilot_plan_policy, historical_v1_expected_plan_digest }
-topology { node_count, raw_edge_count, level_count, round_count,
-           redundant_direct_edge_count }
-execution_contract { mode=manual-parent-v1,
-                     executable_dispatch_command_available=false,
-                     every_round_command=null,
-                     legacy_fallback=PROHIBITED }
-execution_authorized=false
-```
+It inherits the other six members of the ordered 12-path payload inventory
+byte-for-byte and blob-for-blob from `9b1cbcfe`: `ADR_INDEX.md`,
+`materialize_plan.py`, `node-contracts.json`, `ownership-effects.json`, `plan.json`,
+and `traceability.json`. Any addition, deletion, mode change, merge parent, wrong
+parent, unchanged required correction blob, or changed inherited blob fails closed.
 
-The manifest binds the six V1 source blobs and expected V1 digest, V1 and V2
-standards, the frozen V2 compiler, Clerk intake, qualification evidence, snapshot
-lineage, the immutable plan authoring base, historical Payload A, and the preserved
-`f06e52c` correction parent. It also binds the exact five-path successor allowlist,
-ten embedded non-manifest payload bindings, the ordered 11-path inventory, the
-external plan bytes, and the independent verifier. The manifest cannot authenticate
-itself: its raw digest must be supplied by the caller from the independent
-court/Envelope B. Ten embedded bindings plus that externally authenticated manifest
-make the complete 11-path binding.
+### V4 manifest and independent caller bindings
 
-The executable digest also cannot be selected by the checked-in manifest or derived
-from the candidate's `PATH`. The caller supplies an absolute, already-canonical path
-to a direct native Git executable and a lowercase `sha256:<64-hex>` digest of that
-file. An independent court must bind that path and digest together with the v3
-contract, correction parent, committed HEAD/tree, successor aggregate, predecessor
-identity, remand/supersession verdict, predecessor qualification-report digest,
-historical Payload A disposition, court verdict, and external minimum-version and
-revocation-policy digest. The expected V3 plan digest lives outside `plan.json`.
+`manifest.json` uses schema version `4`, kind
+`hive-mind-generic-product-overlay-manifest-v4`, and the committed payload mode
+`exact-append-only-native-executable-matrix-correction-v4`. It preserves complete
+bindings for Payload A, the remanded `f06e52c` predecessor, and the remanded
+`9b1cbcfe` predecessor, including their commits, trees, manifests, aggregates,
+observed statuses, reports, and proposed dispositions. The V4 predecessor binding
+includes:
 
-### Host-external activation bundle
+- commit `9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8` and tree
+  `0d0a251b6ff1557ca014b6b50c6f62ae787c4459`;
+- manifest 16,533 bytes with SHA-256
+  `87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e`;
+- aggregate domain
+  `hive-mind-os/v3-append-only-git-boundary-correction-content/v3`, 499,012 bytes,
+  with SHA-256
+  `5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477`;
+- the frozen 23,865-byte remand report and its raw SHA-256
+  `a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff`;
+- observed status
+  `QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS`; and
+- author-proposed disposition `ADAPT_REMAND`.
 
-The checked-in manifest never becomes an activation bundle. A host-external
-bundle must be signed by a principal distinct from the worker, or be enforced by
-an outside-repository sandbox/token that denies worker access to the signing key
-and control plane. It contains, under one authenticated envelope:
+The checked-in manifest embeds the eleven non-manifest payload bindings. It cannot
+authenticate itself: an independent caller must supply the exact raw manifest
+SHA-256. The executable is also an independent caller input. The manifest must not
+select it, derive it through `PATH`, or replace the caller's expected digest with a
+digest computed from an untrusted candidate instruction.
+
+The exact executable policies are:
 
 ```text
-complete_plan_bytes
-manifest_digest, expected_plan_digest
-reviewer_identity, reviewer_evidence_digest
-actor_identity, issuer_identity
-request_id, repository_id, objective_digest, target_branch
-authoring_base_parent_commit, authoring_base_parent_tree
-correction_parent_commit, correction_parent_tree, committed_contract_mode
-committed_payload_head, committed_payload_tree
-caller_authenticated_manifest_digest, corrected_full_payload_aggregate_digest
-caller_authenticated_git_executable_path_and_raw_sha256
-predecessor_payload_identity, predecessor_supersession_verdict, court_verdict
-predecessor_qualification_report_digest
-external_minimum_version_and_revocation_policy_digest
-compiler_digest, standard_digest
-one_run_nonce, lease_deadline
+git_execution_policy=caller-absolute-raw-sha256-host-native-image-v2
+activation_anti_downgrade.required_git_executable_format_policy=host-native-image-format-v1
+git_execution_boundary.native_executable_format=HOST_NATIVE_IMAGE_FORMAT_V1
+maximum_native_executable_bytes=268435456
 ```
 
-It additionally binds the exact interpreter and a pristine, read-only,
-cache-free host extraction at commit
-`ca43709591313c1c166a2e655b8982ccff16daf3`. The complete 16-path manifest in
-`node-contracts.json` includes each byte count, raw SHA-256, and Git blob. Its
-bundle digest is
-`sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255`.
-That 16-path host bundle does not bind the Git executable's DLLs/shared objects,
-runtime loader, `libexec` helpers, trust store, or operating-system dependencies.
-Execution therefore additionally requires an externally frozen, read-only Git
-runtime bundle and platform controls that prevent replacement during use.
-Predecessor and new trust receipts plus a one-run compare-and-swap ledger are
-required. A signed external minimum-version and revocation policy must reject both
-the `f06e52c` and Payload A manifests and every v1 fallback. These are blockers, not
-facts asserted satisfied by this ADR.
+The lowercase value is the versioned anti-downgrade policy identifier; the
+uppercase value is the enforced-state enum inside the Git execution boundary.
+They have distinct roles and are both exact, required values.
 
-### Verification order
+The caller supplies an already-canonical absolute Git executable path and a
+lowercase `sha256:<64-hex>` digest of its raw bytes. Those values, the caller's raw
+manifest digest, and the eventual V4 HEAD/tree/aggregate must be authenticated in
+Envelope B by a principal and custody boundary outside the candidate repository.
 
-The verifier fails closed in this order:
+### Host-native executable parser policy
 
-1. Before any Git invocation, enumerate the inherited environment and reject every
-   variable whose name begins with `GIT_` under case-insensitive comparison. Do not
-   log its value. Require `--git-executable` to be an absolute, already-canonical,
-   regular, non-link native executable and compare its open-file raw SHA-256 with
-   the caller-supplied `--expected-git-executable-sha256`.
-2. Resolve the repository's real `.git`/linked-worktree metadata, common object
-   directory, index, and worktree explicitly. Reject object alternates. Invoke only
-   the absolute executable, with an argument list, `shell=False`, and the same
-   absolute subprocess executable; never search the caller's `PATH`. Give the child
-   a new minimal environment: deterministic locale, a `PATH` containing only the
-   bound executable directory, controlled `GIT_*` safety settings, and only the
-   operating-system variables needed to start a native process. Disable system and
-   global Git config, replacement objects, lazy fetch, optional locks, prompts,
-   the global attributes file, hooks, fsmonitor, untracked cache, external diff,
-   and implicit repository discovery. Repository `.gitattributes` may still be
-   parsed by Git, but cannot affect the verifier's direct raw-byte blob proof. Pass
-   explicit `--git-dir` and `--work-tree` to every call.
-3. Require a caller-supplied canonical SHA-256 and compare it to raw
-   `manifest.json` bytes before parsing; then apply duplicate-key,
-   non-finite-number, size, and depth rejection. Validate fixed request, repository,
-   objective, target, snapshot, expected-plan, topology, execution, exact payload,
-   authorship `execution_authority=NONE`, and distinct-review boundaries.
-4. Independently verify the plan base, Payload A, and `f06e52c` commit objects,
-   trees, and sole-parent lineage. In default committed mode require current HEAD
-   to be one non-merge direct child of `f06e52c`, require the raw name-only tree diff
-   to equal the exact five-path successor allowlist, bind the complete 11-path
-   payload inventory and committed HEAD/tree, require regular-file modes, and prove
-   that all six inherited blobs equal `f06e52c` while all five correction blobs
-   differ.
-5. Treat porcelain status as diagnostic only, not as the trust root. Parse the raw
-   `HEAD` tree and stage-zero index inventories and require exact mode/blob/path
-   equality. Read every tracked worktree file directly and compute its Git blob ID
-   in the verifier, require every index visibility flag to be normal, and reject the
-   union of untracked and ignored paths except
-   `.hive-mind/autopilot-request.json`. Repeat the complete cleanliness proof before
-   returning committed qualification. Qualification therefore requires a checkout
-   with raw bytes equal to Git blobs; platform line-ending normalization such as
-   `core.autocrlf` is not accepted as equivalent evidence.
-6. Resolve safe non-link paths and verify every manifest-declared repository and
-   overlay byte count and raw SHA-256. Independently verify Git objects at the frozen
-   authoring commit. Only after all source bytes pass, parse inert contracts,
-   traceability, ownership/effects, and Clerk intake. Never import or execute the
-   materializer or target repository Python.
-7. Verify all 89 inherited mappings, V3 corners, exact host manifest, topology,
-   typed durability, redundant-edge rationales, ownership, effects, and evidence
-   boundaries. Independently reconstruct every expanded node and its Standard-V2
-   seal, then reconstruct and compare the entire plan and plan seal.
-8. Prove manual-parent/no-command/no-fallback/no-authority/A5 boundaries,
-   byte-compare `.autopilot/plan.json` before and after verification, and recheck the
-   executable path/open-handle identity and full digest before and after every Git
-   invocation and once more before success.
+Before any subprocess launch, the verifier must bound the executable at 268,435,456
+bytes, retain its open handle, hash the complete bytes, and parse the image itself.
+Suffix, executable permission, shebang, MIME label, or caller assertion is never a
+substitute for format validation.
 
-This order rejects materializer substitution before authored code can execute and
-closes the reproduced ambient `GIT_WORK_TREE` redirection. The required CLI boundary
-is:
+- On Windows, accept only a structurally valid host-compatible PE/COFF executable:
+  bounded DOS and PE headers, valid optional header, executable-image semantics,
+  no DLL characteristic, bounded section table and raw ranges, and at least one
+  executable section that file-backs the declared entry point.
+- On Linux, accept only a structurally valid host-compatible ELF image whose type
+  is `ET_EXEC` or PIE `ET_DYN`, with bounded headers and at least one executable
+  `PT_LOAD` segment that file-backs the declared entry point.
+- On macOS, accept only a structurally valid host-compatible thin or selected
+  fat/universal Mach-O slice of file type `MH_EXECUTE`, with bounded load commands
+  and exactly one `LC_MAIN` entry point file-backed by an executable segment.
+  Legacy `LC_UNIXTHREAD`-only executables are deliberately outside this V4 policy.
+- On every other host, fail closed before launch. A foreign-host PE, ELF, or Mach-O
+  image, a truncated image, a forged header, a script, a symlink, a wrapper script,
+  or a noncanonical path is rejected.
+
+This format proof closes the demonstrated script-wrapper gap. It does not prove
+program intent: a compiled native delegator can still satisfy its host format and
+forward to another program. Nor does the raw executable digest bind the dynamic
+loader, DLLs/shared objects, `libexec` helpers, locale/runtime data, operating-system
+services, or filesystem implementation. Those remain external runtime-bundle and
+custody obligations.
+
+### Repository and launch boundary
+
+Both authoring and committed qualification repositories must start as
+`--no-checkout` clones. Before the first working-tree checkout, the repository-local
+configuration must set `core.autocrlf=false`, `core.eol=lf`, and
+`core.longpaths=true`. On Windows, the clone must use a deliberately short absolute
+qualification root that can materialize the repository's longest tracked path; a
+deep temporary-directory default is not acceptable evidence. The first checkout
+must create or select the named `release/hive-mind-autopilot` branch at the intended
+parent or candidate; detached HEAD qualification is prohibited. The outer driver
+must inspect the checkout's native exit code immediately after that process returns.
+Any nonzero exit or partial materialization abandons the entire clone; it may not be
+repaired or qualified in place, and the next attempt starts from a new
+`--no-checkout` clone at a sufficiently short root. The verifier's exact clean
+HEAD/index/worktree inventory independently rejects missing or incomplete tracked
+content, but does not replace the checkout exit check. Before entering any
+materialization, verification, lint, rounds, focused-test, or full-CI phase, the
+outer qualification driver must reject inherited environment names beginning
+`GIT_` under case-insensitive comparison, without revealing their values. These
+checkout and outer-driver requirements complement the verifier's own fail-closed
+branch, raw-byte, and inherited-environment checks; they do not replace them.
+The verifier requires the live branch name to equal
+`release/hive-mind-autopilot` in both modes. The focused committed-mode matrix
+explicitly exercises and requires rejection of both detached HEAD and an alternate
+named branch.
+
+The V4 verifier retains the V3 repository controls. Before Git, it rejects every
+inherited environment name beginning `GIT_` under case-insensitive comparison and
+does not reveal values. It resolves `.git`, linked-worktree `commondir`, object
+directory, worktree, and index explicitly and rejects object alternates. Each call
+uses the caller-bound absolute executable as both the program and subprocess
+executable, an argument list, `shell=False`, a neutral working directory, explicit
+`--git-dir` and `--work-tree`, and a new minimal host environment. There is no
+`PATH` search.
+
+System and global Git config, replacement objects, lazy fetch, prompts, hooks,
+fsmonitor, untracked cache, global attributes and excludes, external diff,
+textconv, optional locks, and implicit repository discovery are disabled or
+rejected. The verifier compares the raw HEAD tree, stage-zero index, and directly
+hashed worktree bytes; rejects non-stage-zero entries and hidden index flags; checks
+untracked plus ignored contamination; proves exact parent/tree/diff/inventory; and
+records a final complete point observation before returning.
+
+The `complete-autopilot-tree-point-observation-v2` observation has an additional
+fail-closed Windows boundary. Every directory and regular-file row binds
+`st_file_attributes` and every exposed stable optional metadata field across its
+applicable path/open/before/after observations. Each directory and regular-file
+stream enumeration is itself bracketed by before and after identity observations.
+Directories must expose no data streams; regular files must expose exactly one
+size-consistent unnamed `::$DATA` stream. Any named stream is rejected. An
+unavailable stream-enumeration API, unsupported result, or enumeration error also
+fails closed. This rule is scoped to the complete `.autopilot` observation and is
+not a claim that the Git executable's attributes or streams have been bound by the
+same proof.
+
+These finite, bracketed point observations are not an atomic filesystem transaction
+and do not exclude concurrent mutation. A concurrent writer can create a named data
+stream after its relevant enumeration and leave that ADS persistent, or mutate other
+state between observation points. Windows ACL/security-descriptor bytes also remain
+outside this proof. Execution therefore requires an external write-denying or
+read-only custody boundary for the complete observed tree; point-observation
+equality alone cannot support activation.
+
+The executable path, retained handle, identity, format, and both retained/current
+full digest are revalidated around every invocation and before success. Subprocess
+output is incrementally bounded. Overflow must kill the child and return a typed
+failure. Timeout must kill the child and return a typed timeout; failure to confirm
+termination after the kill is a distinct typed `timeout-after-kill` failure. Non-
+UTF-8 output is a typed failure rather than replacement-decoded evidence.
+
+## Mandatory 14-case adversarial matrix
+
+V4 qualification requires executable tests for every numbered case below. A prose
+claim, code-path inspection, or coverage by a neighboring case is not a substitute.
+
+1. Reject noncanonical, link, wrapper-script, and non-native executable inputs
+   before launch.
+2. Reject truncated, forged, malformed, and wrong-host PE/ELF/Mach-O images in the
+   native parser.
+3. Accept the actual host's independently pinned direct native Git executable and
+   prove that the intended host-native parser branch ran.
+4. Reject missing, malformed, wrong, or changed manifest and executable digests.
+5. Detect executable path, identity, format, or digest mutation at every observable
+   phase: initial bind, immediately before launch, while a call is outstanding where
+   observable, immediately after return, between calls, and final success recheck.
+6. Bound combined subprocess output, kill on overflow, and return the typed overflow
+   failure without accepting partial output.
+7. Exercise timeout, successful kill-and-reap, and the distinct typed
+   timeout-after-kill failure when termination cannot be confirmed.
+8. Reject non-UTF-8 Git output with its typed decoding failure.
+9. Assert the exact absolute `Popen` executable, argument-list/no-shell launch,
+   neutral working directory, explicit repository arguments, and minimal child
+   environment with no caller search path or user environment inheritance.
+10. Inject hostile hooks, attributes, excludes, external diff/textconv, fsmonitor,
+    and related helper configuration and prove no marker helper executes.
+11. Create non-stage-zero index entries and require rejection independently of
+    porcelain status.
+12. Reject substitution of predecessor report/status/lineage and every contract or
+    manifest downgrade, including fallback to `9b1cbcfe`, `f06e52c`, Payload A, or
+    V1.
+13. Reject frozen-host or Envelope-B evidence substitution, wrong digest, missing
+    binding, mutable candidate-selected authority, and self-review.
+14. After a complete initial `.autopilot` point observation exists, take and compare
+    a complete final observation for every successful and rejecting path, including
+    the Windows attribute/stream boundary where applicable; no case may create
+    bytecode or otherwise mutate `.autopilot`. Rejection during the initial
+    observation fails closed but makes no before/after equality claim because no
+    complete initial reference exists.
+
+The matrix is additive to the existing ambient `GIT_*`, hostile `PATH`, object
+alternate, dirty/staged/untracked/ignored, hidden-index, wrong-parent, path-diff,
+manifest-schema, source-binding, topology, durability, ownership, no-command, and
+anti-activation tests. All failures remain non-executing and fail closed.
+
+### Cross-platform evidence boundary
+
+Synthetic parser fixtures must exercise PE, ELF, thin Mach-O, and fat Mach-O
+acceptance and rejection logic on every development host. Synthetic parsing does
+not establish real process-launch behavior on another operating system. Real-host
+qualification evidence is separate for Windows, Linux, and macOS and must pin the
+actual native Git bytes used on that host.
+
+A Windows symlink case skipped because the runner lacks symlink privilege is
+non-affirmative; it cannot support the Windows link-rejection claim. Binding
+Windows file attributes and rejecting named streams does not cure that distinct
+evidence gap: a privilege-capable Windows runner must still execute the symlink
+case. A missing macOS runner is likewise a blocking evidence obligation for a
+macOS-host claim. Such missing platform evidence does not authorize execution, but
+it need not prevent a court from qualifying the exact payload as inert,
+non-executing content if the court states the platform limitations and keeps
+activation deferred.
+
+## Verification modes and result contract
+
+The required CLI is:
 
 ```text
 verify_plan.py --repo-root <repository> --overlay-dir <overlay>
-  --expected-manifest-digest sha256:<64-hex>
-  --git-executable <absolute-canonical-native-file>
-  --expected-git-executable-sha256 sha256:<64-hex>
+  --expected-manifest-digest sha256:<external-64-hex>
+  --git-executable <external-absolute-canonical-native-file>
+  --expected-git-executable-sha256 sha256:<external-64-hex>
   [--authoring-check]
 ```
 
-The executable path and its expected digest are independent caller inputs; the
-verifier does not discover either through `PATH`. An explicit `--authoring-check`
-exists only for deterministic successor development at the immutable `f06e52c`
-correction parent. It reports `committed_payload_qualification=false` and is
-forbidden as execution, activation, release, or merge evidence. Default committed
-verification refuses that precommit state, a missing caller manifest digest, or a
-missing caller Git binding.
+Every documented Python safe check sets
+`PYTHONDONTWRITEBYTECODE=1` and invokes the interpreter with `-B`, including the
+materializer, verifier, lint, and rounds processes. After each safe-check group, the
+operator recursively inventories `.autopilot` with hidden entries included and
+fails if any directory named `__pycache__` or file ending in `.pyc` exists. A clean
+exit that leaves Python bytecode under `.autopilot` is a failed safe check.
 
-### Returned execution contract and resume identity
+Focused and full Python gates must also bind imports to the candidate checkout:
+either place that checkout's absolute `src` first in the gate's import path with no
+competing checkout, or use a checkout-owned isolated runtime. Each gate receipt must
+record the resolved `hive_mind_os.__file__` origin and require it to be beneath the
+candidate's `src/hive_mind_os` directory before accepting results. The full gate
+remains `python -m unittest discover -s tests -v` in that pinned environment. This
+closes stale user-level editable-install contamination for the recorded gate import;
+it does not attest every transitive dependency or exclude concurrent environment
+mutation.
 
-The compiled result is `manual-parent-v1`, `executable=false`, with exactly 20
-rounds, one node per round, and `command=null` in every round. A trusted parent
-may invoke durable task APIs directly only after external activation succeeds.
-Committed mode may report `committed_payload_qualification=true`; it always
-reports `execution_qualification=false` and `execution.authorized=false`.
+`--authoring-check` exists only at exact parent `9b1cbcfe` with the six V4 paths
+overlaid and uncommitted. Its result mode is
+`authoring-native-executable-matrix-correction-v4-non-executing`; it must report
+`committed_payload_qualification=false`, `execution_qualification=false`, and
+`execution.authorized=false`.
 
-The resume ID is the digest of a `manual-parent-resume-v1` object binding plan and
-generation IDs, request, objective, repository, task key, launch, target branch,
-immutable authoring-base parent commit and tree. Runtime resume also requires
-the committed payload HEAD/tree, caller-authenticated manifest digest, the
-manifest's expected-plan digest, the caller-authenticated Git executable path and
-raw digest, the frozen Git-runtime bundle identity, one-run nonce and deadline,
-frozen-host bundle digest, interpreter digest, parent principal, and round-ledger
-digest. Repeat resume is idempotent only for the exact identity. A generation
-collision or concurrent loser is rejected.
+Default mode accepts only the exact one-commit, six-path V4 child and uses result
+mode `committed-native-executable-matrix-correction-v4`. A successful committed
+check may report `committed_payload_qualification=true`; it must still report
+`execution_qualification=false` and `execution.authorized=false`. Neither result is
+activation, release, deployment, pull-request, protected-branch, or merge evidence.
 
-### Ownership and evidence lineages
+For either successful mode, `autopilot_tree.schema` is
+`complete-autopilot-tree-point-observation-v2`. The result reports
+`observed_unchanged=true` only when a complete initial point observation and a
+complete final point observation compare equal; it also reports
+`concurrent_mutation_exclusion=false` and
+`requires_external_read_only_custody_for_execution=true`. Those disclosures are
+deliberate: finite observation equality is not concurrent-mutation exclusion, and a
+failure during the initial observation has no before/after equality result.
 
-The overlay assigns every one of 85 writable candidate paths to exactly one node
-and forbids it for every other node. Seven sensitive surfaces have named sole
-writers: adapter registry, DAG executor, host runtime/integration transaction,
-task reuse, and token ledger, with shared schemas/interfaces owned only by
-RUNTIME-CONTRACTS.
+The resulting DAG remains `manual-parent-v1`, `executable=false`, with 20 one-node
+rounds and `command=null` for every round. No executable dispatch command exists.
+PowerShell may prepare an inert, inspectable script only within separately granted
+authority; it cannot impersonate a person, mint credentials, accept legal terms,
+spend, mutate production, bypass protection, or supply missing evidence.
 
-All implementation, documentation, and tests finish before
-QUALIFICATION-PREP-625. That node freezes candidate Envelope A. CANDIDATE-CI-627
-runs only the exact frozen doctor plus repository CI. GENERIC-QUALIFICATION-630
-is evidence-only. HANDOFF-700 may create only an authorized draft pull request
-and may not merge. Receipts after freeze are written to a separate external
-Envelope B evidence worktree/branch whose lineage references, but never mutates
-or reidentifies, the candidate.
+## External activation, ownership, and authority
 
-The checked-in successor does not authorize even that bounded handoff. DAG
-execution, activation, release, deployment, pull-request creation, protected-branch
-change, and merge all remain deferred until their independent prerequisites and
-authority are satisfied.
+An eventual activation bundle must be authenticated outside the repository and bind
+the complete plan and manifest bytes; request/repository/objective/launch/branch;
+all lineage; eventual V4 HEAD/tree/aggregate; external manifest and Git path/raw
+digest; host-native parser policy; complete read-only Git runtime dependency bundle;
+platform launch primitive; frozen 16-file host and interpreter; independent reviewer,
+actor, and issuer; predecessor remand and revocation; one-run nonce and deadline;
+and compare-and-swap ledger. A minimum-version policy must reject all predecessors
+and legacy fallback.
 
-PowerShell preparation is inert and bounded. It may prepare inspectable scripts,
-but it may not impersonate a human, expand authority, obtain credentials, spend,
-accept legal terms, mutate production, bypass a protected branch, or substitute
-for missing evidence.
+The overlay's 85 writable candidate paths retain exactly one owner each. Candidate
+freeze, CI, qualification, and handoff identities remain distinct. Qualification
+receipts belong in an external Envelope B evidence lineage and may not dirty or
+reidentify the candidate. No worker may judge or approve its own material change.
 
-## Threat model and required tests
-
-The overlay rejects request/objective/repository/target/HEAD/tree/compiler/
-standard staleness; source or path swap; duplicate keys; NaN/infinity; oversized
-or deeply nested JSON; detached signature or digest substitution; node or plan
-resealing; topology, durability, ownership, or effect corruption; missing V1
-mapping; source-quarantine mutation; generation collision; expired/replayed
-lease; repeat-resume mismatch; and concurrent activation losers. Invalid V3 has
-no predecessor or legacy fallback. The Git boundary additionally rejects ambient
-repository redirection, executable substitution, `PATH` interception, configuration
-and attribute injection, object alternates, replacement objects, hidden index state,
-and a worktree other than the explicitly bound checkout.
-
-The focused harness must construct an immutable temporary checkout at `f06e52c`,
-overlay the current manifest-bound payload bytes, commit exactly the five correction
-paths as one non-merge direct child, and require default committed verification to
-pass. Authoring mode must use the same `f06e52c` fixture without committing those
-five paths and must return non-qualification. The required adversarial matrix covers:
-
-- inherited `GIT_WORK_TREE`, `GIT_DIR`, `GIT_INDEX_FILE`, object-directory,
-  alternates, config-count/key/value, and mixed-case `gIt_*` variables;
-- a hostile caller `PATH`, relative/non-canonical/link/wrapper executable paths,
-  missing or malformed digests, wrong executable bytes, and executable identity or
-  digest changes before, during, and after subprocess use;
-- hostile system, global, XDG, and repository-local config, including worktree,
-  fsmonitor, hooks, attributes, ignores, external diff, and object-alternate
-  redirection, without executing an injected helper;
-- exact `HEAD`/index/worktree divergence, non-stage-zero index entries, mode or
-  blob changes, skip-worktree/assume-unchanged state, ignored-only contamination,
-  dirty/staged files, and unapproved untracked files;
-- Windows launch with only OS-derived `SystemRoot`/`WINDIR`, POSIX launch with no
-  inherited user environment, bounded output/timeout behavior, and no shell or
-  subprocess executable search; and
-- missing caller bindings, extra commit, wrong parent, path addition, predecessor
-  manifest or contract downgrade, remanded-report substitution, self-review, exact
-  frozen-host/evidence lineage, and no `.autopilot` mutation.
-
-Portable pre/post path, open-handle identity, and digest checks detect many
-executable swaps but do not prove that the kernel executed bytes from the retained
-handle. Tests must preserve this distinction rather than relabel detection as
-strong executable immutability.
+All commands in this payload are null. DAG execution, activation, release,
+deployment, pull-request creation, protected-branch modification, and merge remain
+deferred. The owner's continuation directive does not grant credentials, external
+signing, independent review, production access, or permission to bypass protected
+main.
 
 ## Migration and rollback
 
-Migration is additive:
+Migration is append-only:
 
-1. Preserve V1 and `.autopilot/plan.json` byte-for-byte as historical evidence.
-2. Preserve Payload A and its exact-commit 12/14 focused result as an observed
-   failing predecessor with author-proposed `adapt`; do not rewrite or discard it.
-3. Preserve `f06e52c`, its v2 manifest and aggregate, and its qualification-report
-   bytes. Record the reproduced ambient-Git fail-open and remand the report's
-   qualification conclusion; do not rewrite the commit or report and do not permit
-   either predecessor to activate.
-4. Land the successor's exact five changed paths as one non-merge direct child of
-   `f06e52c`, without wiring it into the public runtime. Have a distinct court bind
-   its then-known commit, tree, manifest digest, full 11-path payload aggregate,
-   Git executable path/digest, predecessor report digest, and remand/supersession
-   disposition. Do not predeclare those successor identities.
-5. Obtain independent court disposition, deploy a frozen read-only Git runtime and
-   fresh external trust policy, and revoke the predecessor manifest versions.
-6. Implement the same-request discovery and activation path behind a reversible
-   feature gate.
-7. Qualify a frozen candidate using the external Envelope B evidence lineage.
-8. Enable the easy command only for exact authenticated V3 matches.
+1. Preserve V1 and `.autopilot/plan.json` as historical evidence.
+2. Preserve Payload A, its exact result, and its disposition.
+3. Preserve `f06e52c`, its report, and its ambient-Git remand.
+4. Preserve `9b1cbcfe`, its exact passing implemented checks, frozen 23,865-byte
+   report, POSIX-wrapper defect, incomplete-matrix dissent, and `ADAPT/REMAND`.
+5. Land exactly the six changed V4 paths as one non-merge direct child of
+   `9b1cbcfe`; preserve the six inherited blobs and do not predeclare the new
+   commit, tree, manifest, aggregate, report, or verdict.
+6. Run the complete matrix and platform-scoped qualification, then have independent
+   Clerk, Curator, Advocate, and Judge identities bind the resulting bytes and
+   limitations.
+7. Only after external runtime, trust, lease, revocation, and protected-branch gates
+   exist may a separately authorized integration expose the easy command.
 
-Rollback disables the V3 feature gate and retires outstanding V3 leases and
-nonces. It preserves append-only receipts and the sealed overlay for diagnosis.
-Rollback must not reactivate `f06e52c` or Payload A or execute V1 as a fallback;
-the user receives a typed blocker and can inspect or reissue a fresh V3 generation
-through the external trust path.
+Rollback is a new append-only deny-state commit or feature-gate disablement. It
+retires V4 leases and nonces, preserves every receipt and dissent, and never falls
+back to `9b1cbcfe`, `f06e52c`, Payload A, or V1. Do not reset, amend, squash, delete,
+or rewrite evidence-bearing commits. A published pull request may be closed; a
+merged change must be rolled back by a new independently reviewed revert.
 
 ## Consequences and nonclaims
 
-The design makes the eventual common command small while keeping generation,
-review, activation, execution, evidence, and handoff identities explicit. It
-adds host-external custody and evidence-worktree operational work, and it refuses
-to turn an existing branch or repeated prompt into authority.
+V4 makes the direct-native requirement machine-checkable across the three supported
+host families and turns the prior aspirational threat list into a mandatory matrix.
+The added parser and subprocess tests increase maintenance cost and still do not
+turn a content verifier into a trusted execution kernel.
 
-The portable verifier's executable checks are a qualification boundary, not a
-complete runtime attestation. On POSIX, a retained read handle plus path rechecks
-does not make pathname execution equivalent to execute-by-file-descriptor. On
-Windows, a retained ordinary file handle plus identity rechecks does not by itself
-prove deny-write/deny-delete sharing, reparse-point safety, ACL custody, or immutable
-volume semantics. On both platforms, a raw digest of the main Git executable omits
-the dynamic loader, DLLs/shared objects, locale/runtime data, `libexec` helpers, and
-other child programs. A read-only externally attested runtime bundle and appropriate
-platform launch primitive remain execution prerequisites. Until those are supplied,
-`committed_payload_qualification=true` can describe only the inert payload check;
-execution, activation, release, deployment, and merge remain deferred.
+Path and retained-handle observations detect many substitutions but cannot eliminate
+a hostile swap-and-restore entirely between observation points. A compiled native
+delegator can pass the format parser. Runtime dependencies remain outside the raw
+Git executable digest. Strong read-only custody, dependency attestation, separate
+principals, and actual Windows/Linux/macOS host evidence remain prerequisites for
+execution.
 
-SRC-024 remains `QUARANTINE` with content unread. SRC-025 remains unresolved.
-The Clerk intake's nested-status contradiction is preserved only as a supplemental
-correction/nonclaim in `traceability.json`; the intake is not mutated. The final
-vision claim remains below the full Hardened Vision Contract until that conflict
-is resolved. A5 is not ready. No full-autonomy, production, release, or
-superiority claim is made.
+`SRC-024` remains `QUARANTINE_CONTENT_UNREAD`; `SRC-025` remains unresolved. A5 is
+not ready. No execution, activation, product-completion, production, release,
+deployment, merge, full-autonomy, or superiority claim is made.
