@@ -132,7 +132,7 @@
     },
     {
       "id": "CONTINUATION-3060",
-      "state": "BUILDER_REPAIR_IN_PROGRESS",
+      "state": "BUILDER_REPAIRED_AWAITING_FULL_CI_AND_CURATOR",
       "level": 1,
       "responsible_roles": ["orchestrator", "builder", "integrator"],
       "objective": "Bind a durable owner continuation directive to this committed repository and deterministic control-plane contract; distinguish an actually published safe dispatcher release from a typed withholding.",

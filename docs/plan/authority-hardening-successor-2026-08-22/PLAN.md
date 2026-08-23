@@ -37,7 +37,7 @@ candidate `3196edf00cdbb8e52388b8a98afabc8bfb833cad` (tree
 | 1 | `AUTONOMOUS-2040` | Builder + Integrator | green | Caller-controlled flags do not grant remote I/O to a retired runtime. |
 | 1 | `RAW-GITHUB-2070` | Architect + Integrator | green / amber | An adapter that delegates to raw delivery merely moves the bypass one layer down. |
 | 1 | `ROOT-INTERFACE-3010` | Builder + Integrator | green / amber | A verifier interface makes integration possible, but a fixture verifier is not an external operator. |
-| 1 | `CONTINUATION-3060` | Orchestrator + Builder + Integrator | amber — repair in progress | Durable continuation must bind its repository, executable, provenance label, and actual side-effect outcome. |
+| 1 | `CONTINUATION-3060` | Orchestrator + Builder + Integrator | amber — repaired; waits for full CI + Curator | Durable continuation must bind its repository, executable, provenance label, and actual side-effect outcome. |
 | 2 | `CURATOR-2900` | independent Curator | green | Independent local review is recorded, with full dissent retained. |
 | 2 | `RAW-CURATOR-2970` | independent Curator | green | Test the legacy client used by the executor, not only its controlled caller. |
 | 2 | `ROOT-CURATOR-3020` | independent Curator | green | A verifier protocol can be locally correct while no verifier exists outside the process. |
