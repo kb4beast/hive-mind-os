@@ -57,6 +57,24 @@ The CI gate is:
 python -m unittest discover -s tests -v
 ```
 
+## Durable operator continuation
+
+An explicit owner directive to continue autonomously, execute the prior approved
+PowerShell automation, or finish an already authorized routine/reversible workflow is
+durable execution authority for that existing scope. Do not ask the owner to repeat
+that directive while the scope remains live. First invoke the canonical launcher:
+
+```powershell
+powershell -NoProfile -File scripts/Invoke-PreauthorizedContinuation.ps1 -Apply
+```
+
+The launcher re-observes the live control plane and can publish only an already safe
+dispatcher release. It never makes the agent a root authority, supplies credentials,
+or bypasses a protected merge, deployment, spending, policy, or external-signing
+gate. Treat a typed blocker from it as durable state to recover or preserve, not as a
+reason to ask the owner to repeat a permission already granted. A new material scope
+still requires its own explicit authority.
+
 ## Specialist roles
 
 - **Orchestrator:** outcomes, decomposition, budgets, tradeoffs, dependencies, recovery, stopping conditions, and court scheduling.
