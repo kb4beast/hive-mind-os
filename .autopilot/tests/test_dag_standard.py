@@ -255,12 +255,12 @@ class MalformedScopeTests(unittest.TestCase):
 
     def test_absolute_and_traversing_scopes_are_reported(self) -> None:
         graph = graph_of(
-            node("ALPHA", write_scope=["/etc/passwd"], file_locks=["docs/ALPHA.md"]),
+            node("ALPHA", write_scope=["/tmp/outside-scope"], file_locks=["docs/ALPHA.md"]),
             node("BETA", write_scope=["../outside/thing.go"], file_locks=["docs/BETA.md"]),
         )
         findings = findings_of(graph, "scope-syntax")
         self.assertEqual(
-            {item.subject for item in findings}, {"/etc/passwd", "../outside/thing.go"}
+            {item.subject for item in findings}, {"/tmp/outside-scope", "../outside/thing.go"}
         )
         self.assertTrue(all(item.severity == "error" for item in findings))
 
@@ -1644,7 +1644,7 @@ class PlanLoadingAndCliTests(unittest.TestCase):
     def _write_document(self, root: Path, document: dict[str, Any], name: str = "plan.json") -> Path:
         path = root / name
         # This writes only synthetic, in-memory test fixtures to TemporaryDirectory.
-        path.write_text(json.dumps(document, indent=2), encoding="utf-8")  # lgtm[py/clear-text-storage-sensitive-data]
+        path.write_text(json.dumps(document, indent=2), encoding="utf-8")
         return path
 
     def test_load_plan_graph_rejects_malformed_documents(self) -> None:
