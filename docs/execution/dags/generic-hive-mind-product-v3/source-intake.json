@@ -1,0 +1,590 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-generic-product-v3-source-claim-intake-v1",
+  "recorded_at_utc": "2026-08-23T12:47:13.3728274Z",
+  "status": "CLERK_INTAKE_COMPLETE_AUTHOR_AND_COURT_PENDING",
+  "append_only": true,
+  "mutation_policy": "This intake is inert evidence. Do not edit it after Clerk handoff; preserve corrections in a separately named superseding record with an explicit predecessor digest.",
+  "identities": {
+    "clerk_explorer": "/root/combined_curator",
+    "architect_dag_author": "PENDING_DISTINCT_IDENTITY",
+    "builder": "PENDING_DISTINCT_IDENTITY",
+    "curator": "PENDING_DISTINCT_IDENTITY",
+    "judge": "PENDING_DISTINCT_IDENTITY"
+  },
+  "scope": {
+    "artifact_role": "source and atomic-claim intake only",
+    "planned_plan_id": "generic-hive-mind-product-v3",
+    "planned_node_count": 20,
+    "planned_edge_count": 28,
+    "planned_level_count": 17,
+    "minimum_v1_trace_rows": 89,
+    "execution_authority": false,
+    "dag_authority": false,
+    "promotion_authority": false
+  },
+  "request_binding": {
+    "path": ".hive-mind/autopilot-request.json",
+    "tracked": false,
+    "must_not_stage": true,
+    "raw_bytes": 2809,
+    "raw_sha256": "0046dfd87f3774fec320471cd487692e3bc860d509444bd2c57c2eec9d15898d",
+    "canonical_request_id": "sha256:baa813bdcbd1b3bd459736cb65dccaf060758991a8a9b581fe8a1bf17dd65562",
+    "objective_digest": "sha256:36125297e861b0fea8d1be8b81e985445957f85378dc35c6712896b7b4d93c9c",
+    "repository_id": "sha256:48eb2b11cd99bb34f430f5e1c7a39d9a32b9bbaac6a99db4736d2ac422915590",
+    "task_key": "DAG-BUILD-48eb2b11cd99-baa813bdcbd1",
+    "launch_instruction_id": "sha256:475c6908392956991faec25293170750e17fac70a97e62f550bb6d6164eb4461",
+    "target_branch": "release/hive-mind-autopilot",
+    "objective_verbatim": "self analyze every aspect and corner of hive mind it self. hive mind must be an autonomous running operating system to handle everything end to end, if any question comes up that it can not solve alone then it must build a memory tree of all its decisions that it will make autonomously and pick the best final solution. it is always ok to simulte a human person doing something by hive mind creating a powershell script that can be executed, when a human gives permission, then it means full autonomosity to run end to end",
+    "canonical_recomputation": {
+      "request_id_matches": true,
+      "objective_digest_matches": true,
+      "task_key_matches": true,
+      "launch_instruction_id_matches": true
+    }
+  },
+  "snapshot_lineage": {
+    "request_observation": {
+      "commit": "44224532dc25b94a95c3184054ec81762a258259",
+      "tree": "c2e7b983e9ed430ea8e3f7013ee2d8cb02a60e33"
+    },
+    "qualified_prerequisite": {
+      "commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+      "tree": "22639258c7a524ffda25272ccf34fede176b2663",
+      "disposition": "ADAPT_BOUNDED_LOCAL_NON_EXECUTING_PREREQUISITE"
+    },
+    "combined_envelope_b": {
+      "commit": "877bf9fc9cdbef94e6fc33ff9e22fe53349db130",
+      "tree": "1ede87e53fc7fc75d29968698ba4b8dab082dd1e",
+      "qualification_report_blob": "fc56f63f576a2839ef7b3b24e72f246e1dc5644b",
+      "court_blob": "2de4ddb37d5b8605f74a060377e52c9b5923fba9"
+    }
+  },
+  "repository_license": {
+    "spdx": "MIT",
+    "path": "LICENSE",
+    "bytes": 1086,
+    "sha256": "903a82ad84a68d2b48c2c3ee2707d1394fb82aee1bdfdae4a91ff9f8af1691df",
+    "git_blob": "06da1af7996f5e2b059cd52045e36f9f2cfac201"
+  },
+  "v1_bindings": {
+    "standard": {
+      "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+      "source_commit": "cc349bef0aad0f288ba7db6ee7ffd4ea911906fb",
+      "bytes": 27006,
+      "sha256": "86d1c1c81a27fc3e3ffd931193e0e145030756f78b58c674e8ba8b1c1bd3397d",
+      "git_blob": "70e43b0a8078a303d44c0109b8dd218a948258c2",
+      "license": "MIT"
+    },
+    "overlay": {
+      "plan_id": "generic-hive-mind-product-v1",
+      "baseline_commit": "cc349bef0aad0f288ba7db6ee7ffd4ea911906fb",
+      "expected_plan_digest": "sha256:b8879d09c5a42b0feeeec19b9c8f6a7523e4ef69b117eea1a18ef6dfaf35f977",
+      "expected_node_count": 16,
+      "license": "MIT",
+      "files": [
+        {
+          "source_key": "V1-README",
+          "path": "docs/execution/dags/generic-hive-mind-product-v1/README.md",
+          "bytes": 3506,
+          "sha256": "b83c659f3a4f9cf1be4ab707246636d9cc40f09ee28d14a6e0020b31b512f82b",
+          "git_blob": "7fe726912358e62bb557a0dcf043ad6e69629302"
+        },
+        {
+          "source_key": "V1-GENERATOR",
+          "path": "docs/execution/dags/generic-hive-mind-product-v1/generate_plan.py",
+          "bytes": 6128,
+          "sha256": "ad540bf2e29e147671b715098ae3a9209fa7e9d4cdc62bd7bdd3df0368ba726c",
+          "git_blob": "b61407bb871e17e07da060ee4796bae05957afa6"
+        },
+        {
+          "source_key": "V1-MANIFEST",
+          "path": "docs/execution/dags/generic-hive-mind-product-v1/manifest.json",
+          "bytes": 1363,
+          "sha256": "dd0adbe4bef4cce5343e5852a6d7076fb71c383f71456b4a86acbc11e187e02e",
+          "git_blob": "e4e0d24c90c0e9b9f13e15fb90b9bd31a75e3bf5"
+        },
+        {
+          "source_key": "V1-SPECS-A",
+          "path": "docs/execution/dags/generic-hive-mind-product-v1/specs_a.py",
+          "bytes": 15352,
+          "sha256": "7616bd7229670daffed1040b037a9d2de73e447e9b50115bb0a7aab2334e4027",
+          "git_blob": "0adb16c3de4b7f78739aed2d00b64eb8a549f4f8"
+        },
+        {
+          "source_key": "V1-SPECS-B",
+          "path": "docs/execution/dags/generic-hive-mind-product-v1/specs_b.py",
+          "bytes": 14810,
+          "sha256": "5f9cde6830880c5e5fcee88ac4973c172133e12bceb8b13514a192dbb3444eb6",
+          "git_blob": "0ed6d109bdf09037c41db56f25ca155b4179b2d4"
+        },
+        {
+          "source_key": "V1-VERIFIER",
+          "path": "docs/execution/dags/generic-hive-mind-product-v1/verify_plan.py",
+          "bytes": 5684,
+          "sha256": "467e07a363a150914fa40ee3a225f4adc9a49a7f7e7be06fd287e60a425c43bf",
+          "git_blob": "4078803e652ca3be1a38baafb0b186be9420d848"
+        }
+      ]
+    },
+    "sealed_plan": {
+      "path": ".autopilot/plan.json",
+      "bytes": 169053,
+      "sha256": "85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+      "git_blob": "ee7ec9f2756fcff2b7010238d7064d017c4df7af",
+      "unchanged_at_request_snapshot": true,
+      "unchanged_at_qualified_prerequisite": true,
+      "unchanged_at_combined_envelope_b": true,
+      "worker_mutation_forbidden": true
+    },
+    "static_extraction": {
+      "method": "Read checked-in source bytes and statically decode the SPECS literal assignments as data.",
+      "v1_python_imported": false,
+      "v1_python_executed": false,
+      "objective_rows": 16,
+      "acceptance_rows": 73,
+      "total_rows": 89
+    }
+  },
+  "v2_bindings": {
+    "source_commit": "36cc4edb1c9ce0bddab49e34e2f7529ec419f7c4",
+    "integrated_commit": "eaa7f3f3c897dda1a54c61f5983045e0bd427633",
+    "standard": {
+      "path": "docs/execution/DAG_AUTHORING_STANDARD_V2.md",
+      "bytes": 12312,
+      "sha256": "3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a",
+      "git_blob": "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374",
+      "license": "MIT"
+    },
+    "compiler": {
+      "path": ".autopilot/bin/dag_standard.py",
+      "bytes": 104317,
+      "sha256": "105674faf15aaf7b9f4c9db7ad4003fda404438eed2bf8cc3a1782c1cf321e6a",
+      "git_blob": "f170ac4f388d265fcaafd32437e449945dcebee3",
+      "license": "MIT"
+    },
+    "required_semantics": [
+      "typed durability providers and consumers",
+      "complete original-declaration validation before normalization",
+      "one-snapshot seal and caller-supplied expected-digest binding",
+      "combined dependency and semantic-order graph",
+      "manual-parent external rounds with null commands",
+      "strict warnings require dispositions before sealing"
+    ]
+  },
+  "source_records": [
+    {
+      "source_id": "REQ-OWNER-001",
+      "kind": "owner_directive",
+      "provenance": "Exact untracked local request bytes bound in request_binding; owner-supplied in the active task.",
+      "license": "NOT_APPLICABLE_TO_EXECUTION_AUTHORITY; no redistribution license inferred",
+      "content_accessed": true,
+      "disposition": "ADAPT",
+      "counterclaim": "An owner directive grants durable authority only for its existing lawful scope; it cannot create credentials, legal consent, money, production authority, protected-branch bypass, human identity, or unbounded replication."
+    },
+    {
+      "source_id": "REPO-V1-001",
+      "kind": "repository_owned_v1_standard_and_overlay",
+      "provenance": "Exact Git blobs and raw digests in v1_bindings at the combined Envelope-B commit.",
+      "license": "MIT",
+      "content_accessed": true,
+      "disposition": "ADAPT",
+      "counterclaim": "Historical V1 rows are preserved evidence and migration input, not current execution authority or proof of implementation."
+    },
+    {
+      "source_id": "REPO-V2-001",
+      "kind": "qualified_v2_standard_and_compiler",
+      "provenance": "Source commit 36cc4edb1c9ce0bddab49e34e2f7529ec419f7c4 and exact unchanged blobs in v2_bindings.",
+      "license": "MIT",
+      "content_accessed": true,
+      "disposition": "ADOPT_AS_AUTHORING_PREREQUISITE",
+      "counterclaim": "Compiler integrity does not authenticate the caller, grant execution authority, or let a mutable V3 candidate qualify itself."
+    },
+    {
+      "source_id": "REPO-PREREQ-001",
+      "kind": "combined_local_prerequisite_court",
+      "provenance": "Commit 877bf9fc9cdbef94e6fc33ff9e22fe53349db130 and tree 1ede87e53fc7fc75d29968698ba4b8dab082dd1e.",
+      "license": "MIT for repository artifacts",
+      "content_accessed": true,
+      "disposition": "ADAPT_BOUNDED_LOCAL_NON_EXECUTING_PREREQUISITE",
+      "counterclaim": "The court qualifies only its exact 12-path local payload and does not establish fresh host trust, V3 execution, release, merge, deployment, production readiness, full autonomy, or superiority."
+    },
+    {
+      "source_id": "REPO-HVC-001",
+      "kind": "normative_hardened_vision_contract",
+      "provenance": "docs/architecture/HARDENED_VISION_CONTRACT.md at Git blob 66a200d99fcd415bbaa2256c134b68fc0cb53aa7.",
+      "license": "MIT",
+      "content_accessed": true,
+      "disposition": "DEFER_FULL_COMPLIANCE_PENDING_CONFLICT_RESOLUTION",
+      "counterclaim": "The normative contract names src/hive_mind_os/vision.py as its machine-readable counterpart, but that active path is absent while ADR-018 and runtime-surface tests freeze only a reference implementation explicitly described as not a gate."
+    },
+    {
+      "source_id": "SRC-024",
+      "kind": "external_prompt_metadata_only",
+      "provenance": {
+        "manifest": "evidence/sources/SRC-024-genericprompt-lineage/manifest.json",
+        "manifest_git_blob": "ec7320cfc72b08649e6466c4ba4e6ad312754081",
+        "manifest_sha256": "b7cb8f788ebd30cba40db91e7389354e33d183f174165080b7dc09aeb7b9a33b",
+        "receipt": "evidence/sources/SRC-024-genericprompt-lineage/ingestion-receipt.json",
+        "receipt_git_blob": "21cb1f7afae6027d19fc538b9aabd72f23b14acb",
+        "receipt_sha256": "a2f6e51ff5f695466d26860cf94125aa06c00ec581a43d3dbed6e7e8567cd57d",
+        "pinned_repository_commit": "760d5e2468484924cbdd077a78584f570a67bd2c",
+        "metadata_content_sha256": "f810b17311cebae09413abcfbb1c2155a4934d8ebefa483aadb512e36eed2c5b"
+      },
+      "license": "UNRESOLVED_NO_REPOSITORY_LICENSE_DECLARED",
+      "content_accessed": false,
+      "content_copy_authorized": false,
+      "design_authority": false,
+      "disposition": "QUARANTINE",
+      "counterclaim": "Metadata custody does not authorize retrieval, source-content ingestion, copying, paraphrase as authority, redistribution, authorship inference, or design adoption."
+    },
+    {
+      "source_id": "SRC-025",
+      "kind": "historical_prompt_snapshot_metadata_only",
+      "provenance": {
+        "metadata_manifest": "evidence/sources/SRC-024-genericprompt-lineage/manifest.json",
+        "unopened_content_path": "docs/plan/genericprompt-execution-2026-08-09/SOURCE_GENERICPROMPT.txt",
+        "metadata_content_sha256": "9535faf5031411829ea3b940e059c6c7f22d38aec638c917ca8b6d7766ab250a",
+        "relationship_to_src_024": "UNRESOLVED_NO_DERIVATION_OR_SUPERSESSION_CLAIMED"
+      },
+      "license": "UNRESOLVED_USER_SUPPLIED",
+      "content_accessed": false,
+      "content_copy_authorized": false,
+      "design_authority": false,
+      "disposition": "DEFER_UNRESOLVED_LINEAGE_AND_LICENSE",
+      "counterclaim": "No authorship, reuse right, derivation, equivalence, or supersession relationship is established; the content path must remain unopened for this intake."
+    }
+  ],
+  "atomic_claims": [
+    {
+      "claim_id": "V3-CLM-001",
+      "source_ids": ["REQ-OWNER-001"],
+      "proposition": "Routine reversible work inside the exact objective may continue autonomously end to end.",
+      "counterclaim": "Autonomy remains bounded by evidence, resource leases, rollback, and typed authority gates.",
+      "disposition": "ADAPT",
+      "v3_mapping": ["BASELINE-000", "DOCTOR-PREFLIGHT-005", "HANDOFF-700"]
+    },
+    {
+      "claim_id": "V3-CLM-002",
+      "source_ids": ["REQ-OWNER-001"],
+      "proposition": "Unresolved routine design questions should create a durable decision-memory tree and select the best supported alternative without discretionary supervision.",
+      "counterclaim": "A score cannot cure missing evidence or authority; blocked alternatives and uncertainty must remain visible and appealable.",
+      "disposition": "ADOPT_WITH_TYPED_MEMORY_SCHEMA",
+      "v3_mapping": ["RUNTIME-CONTRACTS-150", "GENERIC-EXECUTOR-400"]
+    },
+    {
+      "claim_id": "V3-CLM-003",
+      "source_ids": ["REQ-OWNER-001"],
+      "proposition": "PowerShell may prepare a deterministic operator action when direct execution is unavailable.",
+      "counterclaim": "A script is inert preparation only; it cannot impersonate a person, supply credentials or consent, sign, spend, bypass policy, or enlarge authority.",
+      "disposition": "ADAPT_INERT_BOUNDED_PREPARATION_ONLY",
+      "v3_mapping": ["PUBLIC-RUNTIME-500", "HANDOFF-700"]
+    },
+    {
+      "claim_id": "V3-CLM-004",
+      "source_ids": ["REPO-V1-001"],
+      "proposition": "All 16 V1 objectives and 73 V1 acceptance criteria must remain traceable into V3.",
+      "counterclaim": "Traceability does not preserve obsolete baseline facts or confer implementation status; each row is adapted under current evidence and authority.",
+      "disposition": "ADAPT_ALL_89_ROWS",
+      "v3_mapping": ["PLAN-CORE-100", "RUNTIME-CONTRACTS-150"]
+    },
+    {
+      "claim_id": "V3-CLM-005",
+      "source_ids": ["REPO-V1-001", "REPO-V2-001"],
+      "proposition": "The historical sealed .autopilot/plan.json remains byte-identical and worker-read-only while V3 is additive.",
+      "counterclaim": "An unchanged historical plan is provenance, not authority for the new request or V3 execution.",
+      "disposition": "ADOPT_PRESERVATION_INVARIANT",
+      "v3_mapping": ["DOCTOR-PREFLIGHT-005", "BUILD-SYSTEM-200"]
+    },
+    {
+      "claim_id": "V3-CLM-006",
+      "source_ids": ["REPO-V2-001", "REPO-PREREQ-001"],
+      "proposition": "V3 authoring and consumption must use the exact qualified V2 standard and compiler with typed durability and expected-digest binding.",
+      "counterclaim": "Internal seals and a caller digest prove byte equality, not caller authentication or host authority.",
+      "disposition": "ADOPT_AS_PREREQUISITE",
+      "v3_mapping": ["DOCTOR-PREFLIGHT-005", "PLAN-CORE-100", "CANDIDATE-CI-627"]
+    },
+    {
+      "claim_id": "V3-CLM-007",
+      "source_ids": ["REPO-PREREQ-001"],
+      "proposition": "The complete V3 parent run must freeze and use one externally reviewed ca437-derived host compiler/controller bundle before target mutation.",
+      "counterclaim": "The checked-in manifest and mutable candidate cannot authenticate themselves or qualify their own control plane.",
+      "disposition": "ADOPT_FAIL_CLOSED_HOST_BOUNDARY",
+      "v3_mapping": ["DOCTOR-PREFLIGHT-005", "QUALIFICATION-PREP-625", "CANDIDATE-CI-627"]
+    },
+    {
+      "claim_id": "V3-CLM-008",
+      "source_ids": ["REPO-HVC-001"],
+      "proposition": "Full hardened-vision compliance requires resolving the active vision gate versus frozen reference-only implementation conflict.",
+      "counterclaim": "Reference tests demonstrate reference behavior but explicitly do not establish an active runtime consumer or gate.",
+      "disposition": "DEFER_BLOCKING_FULL_MACHINE_VISION_CLAIM",
+      "v3_mapping": ["RUNTIME-CONTRACTS-150", "GENERIC-QUALIFICATION-630"]
+    },
+    {
+      "claim_id": "V3-CLM-009",
+      "source_ids": ["SRC-024"],
+      "proposition": "SRC-024 metadata is retained as an open evidence obligation.",
+      "counterclaim": "Its unavailable, unlicensed content supplies no wording or design authority.",
+      "disposition": "QUARANTINE",
+      "v3_mapping": ["BASELINE-000"]
+    },
+    {
+      "claim_id": "V3-CLM-010",
+      "source_ids": ["SRC-025"],
+      "proposition": "SRC-025 remains a separately identified unresolved historical source.",
+      "counterclaim": "No content, lineage, license, derivation, equivalence, or supersession claim is available.",
+      "disposition": "DEFER_UNRESOLVED_LINEAGE_AND_LICENSE",
+      "v3_mapping": ["BASELINE-000"]
+    }
+  ],
+  "hardened_vision_conflict": {
+    "normative_source": {
+      "path": "docs/architecture/HARDENED_VISION_CONTRACT.md",
+      "git_blob": "66a200d99fcd415bbaa2256c134b68fc0cb53aa7",
+      "sha256": "bc51402f3f1714323c53ddc48ba8e2c81b8af26737e215b5e7947b9b52e8c314",
+      "claim": "The contract names src/hive_mind_os/vision.py as its machine-readable counterpart."
+    },
+    "observed_active_path": {
+      "path": "src/hive_mind_os/vision.py",
+      "exists_at_combined_envelope_b_commit": false
+    },
+    "reference_disposition": {
+      "adr_path": "docs/architecture/ADR-018-RUNTIME-SURFACE-DISPOSITION.md",
+      "adr_git_blob": "ce2b91ff844967085af7fa6d01c3021eed40af6e",
+      "runtime_surface_test_path": "tests/test_runtime_surface.py",
+      "runtime_surface_test_git_blob": "696da0683916467f965a475213b03ff46417b2c1",
+      "reference_path": "src/hive_mind_os/reference/vision.py",
+      "reference_git_blob": "2051ec2dab7767eac349a34d29a9996194d6451d",
+      "observed_contract": "Reference implementation. No runtime consumer. Not a gate."
+    },
+    "disposition": "DEFER",
+    "blocking_effect": "No full hardened-vision, full-autonomy, or complete machine-vision compliance claim until a tested ADR and independent court resolve the conflict, or the final scope expressly remains below that claim."
+  },
+  "authority_interpretation": {
+    "autonomous_allowed": [
+      "read-only discovery and evidence capture",
+      "bounded local source and test changes inside a node lease",
+      "deterministic reversible local integration under the frozen host",
+      "decision-memory selection among evidence-complete in-scope alternatives",
+      "inert operator-script preparation"
+    ],
+    "typed_blockers": [
+      "credentials or secret acquisition",
+      "legal consent, signature, or identity attestation",
+      "spending or financial commitment",
+      "production mutation or deployment",
+      "protected-branch mutation or merge",
+      "missing or quarantined evidence",
+      "unresolved license or lineage",
+      "destructive or irreversible effects without explicit scoped authority",
+      "unbounded replication or authority expansion"
+    ],
+    "powershell": {
+      "status": "INERT_PREPARATION_ONLY",
+      "may_encode": "A bounded deterministic action for later inspection and separately authorized execution.",
+      "must_not": [
+        "impersonate a human or legal identity",
+        "claim human review or approval that did not occur",
+        "supply or solicit credentials",
+        "accept terms or sign",
+        "spend money",
+        "bypass a protected merge, policy, sandbox, or evidence gate",
+        "expand the live objective or authority"
+      ]
+    }
+  },
+  "decision_memory_tree_contract": {
+    "required_fields": [
+      "question_id",
+      "question",
+      "state_snapshot_digest",
+      "alternatives",
+      "evidence_for_each_alternative",
+      "counterarguments_for_each_alternative",
+      "constraints",
+      "authority_and_budget",
+      "scoring_method",
+      "scores",
+      "selected_winner",
+      "preserved_losers",
+      "uncertainty",
+      "decision_owner",
+      "created_at",
+      "evidence_freshness",
+      "corrections",
+      "supersession",
+      "appeal_status"
+    ],
+    "selection_rule": "Select the highest-supported lawful reversible option only after evidence and counterarguments are complete; ties, missing evidence, or authority ambiguity produce a typed blocker rather than an invented answer.",
+    "append_only": true
+  },
+  "planned_v3_topology": {
+    "status": "CLERK_CAPTURE_PENDING_DISTINCT_ARCHITECT_AUTHORING_AND_COURT",
+    "nodes": [
+      {"id": "BASELINE-000", "dependencies": [], "level": 0, "durability_role": "none", "durability_providers": []},
+      {"id": "DOCTOR-PREFLIGHT-005", "dependencies": ["BASELINE-000"], "level": 1, "durability_role": "none", "durability_providers": []},
+      {"id": "FOUNDATION-010", "dependencies": ["DOCTOR-PREFLIGHT-005"], "level": 2, "durability_role": "provider", "durability_providers": []},
+      {"id": "PLAN-CORE-100", "dependencies": ["FOUNDATION-010"], "level": 3, "durability_role": "none", "durability_providers": []},
+      {"id": "RUNTIME-CONTRACTS-150", "dependencies": ["PLAN-CORE-100"], "level": 4, "durability_role": "none", "durability_providers": []},
+      {"id": "BUILD-SYSTEM-200", "dependencies": ["RUNTIME-CONTRACTS-150"], "level": 5, "durability_role": "none", "durability_providers": []},
+      {"id": "ADAPTER-INDEX-210", "dependencies": ["RUNTIME-CONTRACTS-150"], "level": 5, "durability_role": "none", "durability_providers": []},
+      {"id": "WAVE-HOST-300", "dependencies": ["BUILD-SYSTEM-200"], "level": 6, "durability_role": "provider", "durability_providers": []},
+      {"id": "TASK-REUSE-310", "dependencies": ["WAVE-HOST-300", "ADAPTER-INDEX-210", "BUILD-SYSTEM-200"], "level": 7, "durability_role": "consumer", "durability_providers": ["WAVE-HOST-300"]},
+      {"id": "RUNTIME-TOKEN-320", "dependencies": ["ADAPTER-INDEX-210", "FOUNDATION-010"], "level": 6, "durability_role": "none", "durability_providers": []},
+      {"id": "GENERIC-EXECUTOR-400", "dependencies": ["WAVE-HOST-300", "TASK-REUSE-310", "ADAPTER-INDEX-210"], "level": 8, "durability_role": "consumer", "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"]},
+      {"id": "CONTROL-TOKEN-410", "dependencies": ["GENERIC-EXECUTOR-400", "RUNTIME-TOKEN-320"], "level": 9, "durability_role": "none", "durability_providers": []},
+      {"id": "PUBLIC-RUNTIME-500", "dependencies": ["CONTROL-TOKEN-410", "BUILD-SYSTEM-200"], "level": 10, "durability_role": "consumer", "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"]},
+      {"id": "GENERIC-FIXTURES-600", "dependencies": ["PUBLIC-RUNTIME-500"], "level": 11, "durability_role": "consumer", "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"]},
+      {"id": "FAILURE-QUALIFICATION-610", "dependencies": ["GENERIC-FIXTURES-600"], "level": 12, "durability_role": "consumer", "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"]},
+      {"id": "TOKEN-BENCHMARK-620", "dependencies": ["GENERIC-FIXTURES-600", "CONTROL-TOKEN-410"], "level": 12, "durability_role": "none", "durability_providers": []},
+      {"id": "QUALIFICATION-PREP-625", "dependencies": ["FAILURE-QUALIFICATION-610", "TOKEN-BENCHMARK-620"], "level": 13, "durability_role": "none", "durability_providers": []},
+      {"id": "CANDIDATE-CI-627", "dependencies": ["QUALIFICATION-PREP-625"], "level": 14, "durability_role": "consumer", "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"]},
+      {"id": "GENERIC-QUALIFICATION-630", "dependencies": ["CANDIDATE-CI-627"], "level": 15, "durability_role": "none", "durability_providers": []},
+      {"id": "HANDOFF-700", "dependencies": ["GENERIC-QUALIFICATION-630"], "level": 16, "durability_role": "consumer", "durability_providers": ["FOUNDATION-010", "WAVE-HOST-300"]}
+    ],
+    "single_writer_ownership": [
+      {"surface": "adapter_registry", "owner": "ADAPTER-INDEX-210"},
+      {"surface": "dag_executor", "owner": "GENERIC-EXECUTOR-400"},
+      {"surface": "host_runtime", "owner": "WAVE-HOST-300"},
+      {"surface": "integration_transaction", "owner": "WAVE-HOST-300"},
+      {"surface": "task_reuse", "owner": "TASK-REUSE-310"},
+      {"surface": "token_ledger", "owner": "RUNTIME-TOKEN-320"},
+      {"surface": "shared_runtime_schemas_and_interfaces", "owner": "RUNTIME-CONTRACTS-150"}
+    ],
+    "qualification_boundary": {
+      "doctor_preflight": "Freeze an externally reviewed ca437-derived compiler/controller bundle outside the mutable target before V3 mutation and use it for the entire parent run.",
+      "qualification_prep": "All implementation, documentation, and test source changes are complete before QUALIFICATION-PREP-625 freezes the candidate.",
+      "candidate_ci": "CANDIDATE-CI-627 runs the frozen exact-tree full doctor and repository CI through the unchanged external host.",
+      "generic_qualification": "GENERIC-QUALIFICATION-630 is evidence-only independent judgment and writes no product source.",
+      "handoff": "HANDOFF-700 is effect-only and may prepare or open an authorized draft pull request; it never merges main."
+    },
+    "effect_axes": {
+      "candidate_build_effects": "Local versioned candidate mutations governed by node leases, single-writer ownership, rollback, and frozen-host integration.",
+      "capabilities_under_test": "Push, pull request, deployment, payment, credential, and other external-effect capabilities may be exercised only through disposable inert fixtures or explicit deny-path tests unless separately authorized.",
+      "remote_effect_default": "DENY",
+      "protected_merge": "ALWAYS_SEPARATE_AUTHORITY_GATE"
+    }
+  },
+  "v1_traceability": {
+    "default_counterclaim": "A V1 row is historical repository-owned evidence. It does not prove current implementation, freshness, authority, or V3 acceptance until a distinct Architect maps it and an independent court adjudicates it.",
+    "counts": {
+      "objective_rows": 16,
+      "acceptance_rows": 73,
+      "total_rows": 89,
+      "required_minimum": 89,
+      "complete": true
+    },
+    "rows": [
+      {"row_id":"V1-BASELINE-000-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"BASELINE-000","target_node_ids":["BASELINE-000","DOCTOR-PREFLIGHT-005"],"disposition":"ADAPT_REPLACE_HISTORICAL_PR144_GATE_WITH_CURRENT_BOUND_PREREQUISITES","text":"Gate execution on an authorized, independently reviewed merge of PR #144; this node never merges it."},
+      {"row_id":"V1-BASELINE-000-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BASELINE-000","target_node_ids":["BASELINE-000"],"disposition":"ADAPT_REPLACE_HISTORICAL_PR144_FACT","text":"PR #144 is already merged with retained ancestry and terminal required CI."},
+      {"row_id":"V1-BASELINE-000-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BASELINE-000","target_node_ids":["BASELINE-000","DOCTOR-PREFLIGHT-005"],"disposition":"ADAPT","text":"Exact main/tree, merge, review, CI, plan fingerprint, and receipt validity are digest-bound."},
+      {"row_id":"V1-BASELINE-000-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BASELINE-000","target_node_ids":["BASELINE-000"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Any stale prerequisite blocks the overlay."},
+      {"row_id":"V1-FOUNDATION-010-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"FOUNDATION-010","target_node_ids":["FOUNDATION-010"],"disposition":"ADAPT","text":"Adopt or complete the existing sealed MISSION-400 and then DURABLE-410 nodes without duplicating their implementation."},
+      {"row_id":"V1-FOUNDATION-010-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"FOUNDATION-010","target_node_ids":["FOUNDATION-010"],"disposition":"ADAPT","text":"Exactly one integrated receipt exists for each sealed node."},
+      {"row_id":"V1-FOUNDATION-010-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"FOUNDATION-010","target_node_ids":["FOUNDATION-010"],"disposition":"ADAPT","text":"MISSION-400 proves one canonical mission runtime; DURABLE-410 proves checkpoints, replay, and no duplicate effects."},
+      {"row_id":"V1-FOUNDATION-010-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"FOUNDATION-010","target_node_ids":["FOUNDATION-010"],"disposition":"ADAPT","text":"Incomplete work is delegated to the original contracts; this gate edits no product code."},
+      {"row_id":"V1-FOUNDATION-010-AC-04","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"FOUNDATION-010","target_node_ids":["FOUNDATION-010"],"disposition":"ADAPT","text":"The mapping record binds both candidates, tests, receipts, and main."},
+      {"row_id":"V1-PLAN-CORE-100-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"PLAN-CORE-100","target_node_ids":["PLAN-CORE-100"],"disposition":"ADAPT","text":"Implement plan-generation lineage and the typed PortablePlanBundle without changing the sealed v1 plan."},
+      {"row_id":"V1-PLAN-CORE-100-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"PLAN-CORE-100","target_node_ids":["PLAN-CORE-100"],"disposition":"ADAPT","text":"Generations authenticate parents and node mappings; unchanged receipts carry forward byte-identically while changed contracts requalify."},
+      {"row_id":"V1-PLAN-CORE-100-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"PLAN-CORE-100","target_node_ids":["PLAN-CORE-100"],"disposition":"ADAPT","text":"Removed nodes remain historical, new nodes inherit no completion, and ambiguity, downgrade, cycle, or flat fingerprint substitution fails."},
+      {"row_id":"V1-PLAN-CORE-100-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"PLAN-CORE-100","target_node_ids":["PLAN-CORE-100","RUNTIME-CONTRACTS-150"],"disposition":"ADAPT","text":"Portable plans model repository and non-repository subjects with typed resources, capabilities, adapters, authority, budgets, recovery, integration, and token policy."},
+      {"row_id":"V1-PLAN-CORE-100-AC-04","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"PLAN-CORE-100","target_node_ids":["PLAN-CORE-100"],"disposition":"ADOPT_PRESERVE_SEALED_PLAN","text":"Explicit overlay plans work without replacing .autopilot/plan.json; existing receipts remain valid."},
+      {"row_id":"V1-BUILD-SYSTEM-200-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"BUILD-SYSTEM-200","target_node_ids":["BUILD-SYSTEM-200"],"disposition":"ADAPT_ORIGINAL_REPOSITORY_OWNED_PROMPT_ONLY","text":"Make BUILD_DAG standard-bound and ship one canonical digest-pinned linter/round compiler plus an original repository-owned planner prompt."},
+      {"row_id":"V1-BUILD-SYSTEM-200-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BUILD-SYSTEM-200","target_node_ids":["BUILD-SYSTEM-200"],"disposition":"ADAPT_TO_V2_BINDING","text":"Initialization pins/materializes the standard by version, SHA-256, byte count, and package identity."},
+      {"row_id":"V1-BUILD-SYSTEM-200-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BUILD-SYSTEM-200","target_node_ids":["BUILD-SYSTEM-200"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"BUILD_DAG cannot succeed until canonical lint has zero errors and every warning has a recorded disposition."},
+      {"row_id":"V1-BUILD-SYSTEM-200-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BUILD-SYSTEM-200","target_node_ids":["BUILD-SYSTEM-200"],"disposition":"ADAPT_TO_FROZEN_EXTERNAL_HOST","text":"Targets use a digest-checked packaged compiler, not an LLM reimplementation."},
+      {"row_id":"V1-BUILD-SYSTEM-200-AC-04","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BUILD-SYSTEM-200","target_node_ids":["BUILD-SYSTEM-200"],"disposition":"ADOPT_WITH_SRC024_QUARANTINE","text":"The planner prompt is original, versioned, license-clean, content-addressed, and proposes data without granting authority."},
+      {"row_id":"V1-BUILD-SYSTEM-200-AC-05","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"BUILD-SYSTEM-200","target_node_ids":["BUILD-SYSTEM-200"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Missing, stale, substituted, downgraded, or pre-standard requests fail closed; CHECK stays task-free."},
+      {"row_id":"V1-ADAPTER-INDEX-210-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"ADAPTER-INDEX-210","target_node_ids":["ADAPTER-INDEX-210"],"disposition":"ADAPT","text":"Implement subject/resource adapters, capability registry, and exact-tree repository indexing for arbitrary repositories and other subjects."},
+      {"row_id":"V1-ADAPTER-INDEX-210-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"ADAPTER-INDEX-210","target_node_ids":["ADAPTER-INDEX-210"],"disposition":"ADAPT","text":"Repository paths are one resource adapter, not a core assumption; artifacts, web sources, datasets, APIs, cloud, tickets, databases, and custom resources are typed."},
+      {"row_id":"V1-ADAPTER-INDEX-210-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"ADAPTER-INDEX-210","target_node_ids":["ADAPTER-INDEX-210"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Adapter selection is deterministic, lowest-sufficient, vendor-neutral, evidence-bound, and denies missing/conflicting authority before execution."},
+      {"row_id":"V1-ADAPTER-INDEX-210-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"ADAPTER-INDEX-210","target_node_ids":["ADAPTER-INDEX-210"],"disposition":"ADAPT","text":"The index binds repository identity, exact tree, analyzer, and environment; unchanged blobs reuse, changed/deleted blobs update."},
+      {"row_id":"V1-ADAPTER-INDEX-210-AC-04","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"ADAPTER-INDEX-210","target_node_ids":["ADAPTER-INDEX-210"],"disposition":"ADOPT_SECURITY_INVARIANT","text":"Cross-language metadata is conservative and non-executing; source bodies, secrets, unsafe links, oversized binaries, and mutable state are not cached."},
+      {"row_id":"V1-ADAPTER-INDEX-210-AC-05","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"ADAPTER-INDEX-210","target_node_ids":["ADAPTER-INDEX-210"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Third-party adapters are inert until registered and independently validated."},
+      {"row_id":"V1-WAVE-HOST-300-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"WAVE-HOST-300","target_node_ids":["WAVE-HOST-300"],"disposition":"ADAPT","text":"Implement immutable wave manifests, checkpoints, candidate sealing, bounded host supervision, and one CAS integration transaction per round."},
+      {"row_id":"V1-WAVE-HOST-300-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"WAVE-HOST-300","target_node_ids":["WAVE-HOST-300"],"disposition":"ADAPT","text":"A manifest binds generation, compiler/standard, frozen subject/tree, ordered nodes, contracts, resources, context, tests, budgets, and integration."},
+      {"row_id":"V1-WAVE-HOST-300-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"WAVE-HOST-300","target_node_ids":["WAVE-HOST-300","RUNTIME-CONTRACTS-150"],"disposition":"ADAPT","text":"States include CHECKPOINTED, CANDIDATE_SEALED, VERIFYING, INTEGRATION_READY, RECOVERABLE, REPLAN_REQUIRED, and terminals."},
+      {"row_id":"V1-WAVE-HOST-300-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"WAVE-HOST-300","target_node_ids":["WAVE-HOST-300"],"disposition":"ADOPT_DURABILITY_INVARIANT","text":"Sealing ends mutable authority; verification survives claim expiry and orchestrator restart."},
+      {"row_id":"V1-WAVE-HOST-300-AC-04","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"WAVE-HOST-300","target_node_ids":["WAVE-HOST-300"],"disposition":"ADAPT","text":"Host operations create/poll/message/checkpoint/cancel/resume/adopt idempotently with wall-clock bounded waits and honest usage."},
+      {"row_id":"V1-WAVE-HOST-300-AC-05","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"WAVE-HOST-300","target_node_ids":["WAVE-HOST-300"],"disposition":"ADOPT_SINGLE_INTEGRATOR_INVARIANT","text":"Workers never mutate target; the integrator merges sealed candidates in declared order, validates once, and CAS-advances target once."},
+      {"row_id":"V1-WAVE-HOST-300-AC-06","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"WAVE-HOST-300","target_node_ids":["WAVE-HOST-300"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Drift, mutation, conflict, crash, or response loss leaves target unchanged and recoverable."},
+      {"row_id":"V1-TASK-REUSE-310-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"TASK-REUSE-310","target_node_ids":["TASK-REUSE-310"],"disposition":"ADAPT","text":"Implement exact task fingerprints, existing-work detection, semantic dependency receipts, and safe candidate/task reuse before model launch."},
+      {"row_id":"V1-TASK-REUSE-310-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"TASK-REUSE-310","target_node_ids":["TASK-REUSE-310"],"disposition":"ADAPT","text":"Fingerprints bind plan/node, subject/tree, relevant surface, dependency receipts, authority, compiler/policy, and environment."},
+      {"row_id":"V1-TASK-REUSE-310-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"TASK-REUSE-310","target_node_ids":["TASK-REUSE-310"],"disposition":"ADAPT","text":"Dispositions distinguish exact reuse, verify existing, resume active, repair existing, execute new, stale, conflict, and blocked."},
+      {"row_id":"V1-TASK-REUSE-310-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"TASK-REUSE-310","target_node_ids":["TASK-REUSE-310"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Only validated integrated receipts complete work; unaccepted branches reduce to verification/repair."},
+      {"row_id":"V1-TASK-REUSE-310-AC-04","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"TASK-REUSE-310","target_node_ids":["TASK-REUSE-310"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Changed blobs, dependencies, authority, policy, environment, corruption, or cross-subject identity invalidate reuse."},
+      {"row_id":"V1-RUNTIME-TOKEN-320-OBJ","row_type":"objective","source_key":"V1-SPECS-A","source_node_id":"RUNTIME-TOKEN-320","target_node_ids":["RUNTIME-TOKEN-320"],"disposition":"ADAPT","text":"Make mission execution token-efficient through adaptive role dispositions, dependency-routed ContextCompiler envelopes, and measured token accounting."},
+      {"row_id":"V1-RUNTIME-TOKEN-320-AC-01","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"RUNTIME-TOKEN-320","target_node_ids":["RUNTIME-TOKEN-320"],"disposition":"ADAPT","text":"Every role yields MODEL_EXECUTE, DETERMINISTIC_CHECK, NOT_APPLICABLE, DEFERRED, or BLOCKED plus an evidence-bound result."},
+      {"row_id":"V1-RUNTIME-TOKEN-320-AC-02","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"RUNTIME-TOKEN-320","target_node_ids":["RUNTIME-TOKEN-320"],"disposition":"ADAPT_NO_LIFECYCLE_WEAKENING","text":"Small tasks use fewer than eight model calls without hiding lifecycle accountability."},
+      {"row_id":"V1-RUNTIME-TOKEN-320-AC-03","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"RUNTIME-TOKEN-320","target_node_ids":["RUNTIME-TOKEN-320"],"disposition":"ADAPT","text":"Direct dependencies get compact bodies, transitive ones digest refs, unrelated context explicit omission, and cold retrieval evidence."},
+      {"row_id":"V1-RUNTIME-TOKEN-320-AC-04","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"RUNTIME-TOKEN-320","target_node_ids":["RUNTIME-TOKEN-320"],"disposition":"ADAPT_REUSE_EXISTING_CONTEXT_COMPILER","text":"Existing ContextCompiler is the only budget/tier system; oldest-first character truncation is fallback only."},
+      {"row_id":"V1-RUNTIME-TOKEN-320-AC-05","row_type":"acceptance","source_key":"V1-SPECS-A","source_node_id":"RUNTIME-TOKEN-320","target_node_ids":["RUNTIME-TOKEN-320"],"disposition":"ADOPT_HONEST_ACCOUNTING_INVARIANT","text":"Calls record measured, estimated, or unavailable input/output/cache tokens; unavailable is not zero."},
+      {"row_id":"V1-GENERIC-EXECUTOR-400-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"GENERIC-EXECUTOR-400","target_node_ids":["GENERIC-EXECUTOR-400"],"disposition":"ADAPT","text":"Implement the generic runtime that validates plans, compiles rounds, launches workers, checkpoints, seals, verifies, integrates, resumes, and applies versioned graph patches."},
+      {"row_id":"V1-GENERIC-EXECUTOR-400-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-EXECUTOR-400","target_node_ids":["GENERIC-EXECUTOR-400"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Execution refuses lint errors, undisposed warnings, stale generations/manifests, missing adapters, invalid authority, or resource conflicts."},
+      {"row_id":"V1-GENERIC-EXECUTOR-400-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-EXECUTOR-400","target_node_ids":["GENERIC-EXECUTOR-400"],"disposition":"ADAPT","text":"Ready nodes become conflict-free rounds; all permitted workers start before bounded polling and BFS depth is not execution authority."},
+      {"row_id":"V1-GENERIC-EXECUTOR-400-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-EXECUTOR-400","target_node_ids":["GENERIC-EXECUTOR-400"],"disposition":"ADAPT","text":"Workers receive one frozen manifest and node delta; completed siblings survive blocked/failed workers."},
+      {"row_id":"V1-GENERIC-EXECUTOR-400-AC-04","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-EXECUTOR-400","target_node_ids":["GENERIC-EXECUTOR-400"],"disposition":"ADOPT_DURABILITY_INVARIANT","text":"Parent restart adopts tasks, candidates, tests, transactions, and effects without duplication."},
+      {"row_id":"V1-GENERIC-EXECUTOR-400-AC-05","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-EXECUTOR-400","target_node_ids":["GENERIC-EXECUTOR-400"],"disposition":"ADOPT_NO_WEAKENING_INVARIANT","text":"Graph patches are plan-lineage records and cannot weaken acceptance, authority, independence, or evidence."},
+      {"row_id":"V1-CONTROL-TOKEN-410-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"CONTROL-TOKEN-410","target_node_ids":["CONTROL-TOKEN-410"],"disposition":"ADAPT","text":"Add shared round capsules, node deltas, exact-candidate test reuse, tool snapshot reuse, compact evidence, and measured sidecar calibration."},
+      {"row_id":"V1-CONTROL-TOKEN-410-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"CONTROL-TOKEN-410","target_node_ids":["CONTROL-TOKEN-410"],"disposition":"ADAPT","text":"One immutable shared capsule exists per round; workers get only node deltas, direct dependencies, and cold refs."},
+      {"row_id":"V1-CONTROL-TOKEN-410-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"CONTROL-TOKEN-410","target_node_ids":["CONTROL-TOKEN-410"],"disposition":"ADOPT_EXACT_CANDIDATE_INVARIANT","text":"Test reuse requires exact candidate, command, tests, locks/config, toolchain, OS, and safe environment."},
+      {"row_id":"V1-CONTROL-TOKEN-410-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"CONTROL-TOKEN-410","target_node_ids":["CONTROL-TOKEN-410"],"disposition":"ADAPT","text":"Passing logs compact; failures retain first causal and all distinct material errors plus raw digest."},
+      {"row_id":"V1-CONTROL-TOKEN-410-AC-04","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"CONTROL-TOKEN-410","target_node_ids":["CONTROL-TOKEN-410"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Snapshot/cache drift, corruption, or secret-like data fails closed."},
+      {"row_id":"V1-CONTROL-TOKEN-410-AC-05","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"CONTROL-TOKEN-410","target_node_ids":["CONTROL-TOKEN-410"],"disposition":"ADAPT_MEASURED_ONLY","text":"Sidecar net savings use measured parent avoided minus sidecar input/output/coordination; static estimates are fallback, negative classes stop."},
+      {"row_id":"V1-CONTROL-TOKEN-410-AC-06","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"CONTROL-TOKEN-410","target_node_ids":["CONTROL-TOKEN-410"],"disposition":"ADAPT_REQUIRE_EQUAL_ACCEPTANCE","text":"A fixture proves materially lower context than naive fan-out without weaker acceptance."},
+      {"row_id":"V1-PUBLIC-RUNTIME-500-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"PUBLIC-RUNTIME-500","target_node_ids":["PUBLIC-RUNTIME-500"],"disposition":"ADAPT","text":"Expose build, validate, rounds, execute, resume, status, cancel, graph, and reconcile, and connect them to subject-neutral execution."},
+      {"row_id":"V1-PUBLIC-RUNTIME-500-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"PUBLIC-RUNTIME-500","target_node_ids":["PUBLIC-RUNTIME-500"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"dag execute always validates exact plan and refuses stale manifests, missing adapters, protected-target authority, or unsupported execution."},
+      {"row_id":"V1-PUBLIC-RUNTIME-500-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"PUBLIC-RUNTIME-500","target_node_ids":["PUBLIC-RUNTIME-500"],"disposition":"ADAPT","text":"Commands work from any cwd with explicit subject/repository/plan; read-only commands never mutate."},
+      {"row_id":"V1-PUBLIC-RUNTIME-500-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"PUBLIC-RUNTIME-500","target_node_ids":["PUBLIC-RUNTIME-500"],"disposition":"ADAPT","text":"A caller can plan or execute repository and non-repository subjects through the same runtime without Hive-specific paths."},
+      {"row_id":"V1-PUBLIC-RUNTIME-500-AC-04","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"PUBLIC-RUNTIME-500","target_node_ids":["PUBLIC-RUNTIME-500"],"disposition":"ADAPT","text":"Planning-only, local/no-SCM, and authorized delivery modes are explicit; caches/lessons are subject-isolated."},
+      {"row_id":"V1-PUBLIC-RUNTIME-500-AC-05","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"PUBLIC-RUNTIME-500","target_node_ids":["PUBLIC-RUNTIME-500"],"disposition":"ADAPT_VENDOR_NEUTRAL","text":"No GitHub, language, model vendor, Hive node ID, or branch name is assumed."},
+      {"row_id":"V1-GENERIC-FIXTURES-600-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"GENERIC-FIXTURES-600","target_node_ids":["GENERIC-FIXTURES-600"],"disposition":"ADAPT","text":"Create disposable cross-language and non-repository fixtures using installed public APIs without source changes."},
+      {"row_id":"V1-GENERIC-FIXTURES-600-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-FIXTURES-600","target_node_ids":["GENERIC-FIXTURES-600"],"disposition":"ADAPT","text":"Fixtures cover Python, Node/TypeScript, C#, Go or Rust, monorepo, docs-only, no-test, target-advancing, offline/local, research/artifact, and business/workflow subjects."},
+      {"row_id":"V1-GENERIC-FIXTURES-600-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-FIXTURES-600","target_node_ids":["GENERIC-FIXTURES-600"],"disposition":"ADAPT","text":"Each uses installed public APIs/adapters, not a Hive shortcut."},
+      {"row_id":"V1-GENERIC-FIXTURES-600-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-FIXTURES-600","target_node_ids":["GENERIC-FIXTURES-600"],"disposition":"ADAPT_DISPOSABLE_NO_EXTERNAL_EFFECTS","text":"Plans, rounds, candidates, effects, receipts, recovery, and tokens are deterministic, disposable, license-safe, secret-free, and point-in-time bounded."},
+      {"row_id":"V1-FAILURE-QUALIFICATION-610-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"FAILURE-QUALIFICATION-610","target_node_ids":["FAILURE-QUALIFICATION-610"],"disposition":"ADAPT","text":"Qualify concurrency, target drift, hidden dependencies, host loss, checkpoint adoption, candidate mutation, integration conflict, and duplicate-effect recovery."},
+      {"row_id":"V1-FAILURE-QUALIFICATION-610-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"FAILURE-QUALIFICATION-610","target_node_ids":["FAILURE-QUALIFICATION-610"],"disposition":"ADAPT","text":"A silent worker cannot hang the parent; completed siblings and sealed candidates remain adoptable."},
+      {"row_id":"V1-FAILURE-QUALIFICATION-610-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"FAILURE-QUALIFICATION-610","target_node_ids":["FAILURE-QUALIFICATION-610"],"disposition":"ADAPT","text":"Random finish order yields one deterministic integration tree."},
+      {"row_id":"V1-FAILURE-QUALIFICATION-610-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"FAILURE-QUALIFICATION-610","target_node_ids":["FAILURE-QUALIFICATION-610"],"disposition":"ADOPT_FAIL_BEFORE_TARGET_MUTATION","text":"Target advance, hidden API, stale manifest, resource/merge conflict replan before target mutation."},
+      {"row_id":"V1-FAILURE-QUALIFICATION-610-AC-04","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"FAILURE-QUALIFICATION-610","target_node_ids":["FAILURE-QUALIFICATION-610"],"disposition":"ADAPT_EXTERNAL_EFFECTS_REQUIRE_SEPARATE_AUTHORITY","text":"Parent/worker failures resume without duplicate model work, tests, pushes, pull requests, comments, deployments, or other effects."},
+      {"row_id":"V1-FAILURE-QUALIFICATION-610-AC-05","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"FAILURE-QUALIFICATION-610","target_node_ids":["FAILURE-QUALIFICATION-610"],"disposition":"ADOPT_FAIL_CLOSED_INVARIANT","text":"Cross-host coordination loss fails closed with self-verifying evidence."},
+      {"row_id":"V1-TOKEN-BENCHMARK-620-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"TOKEN-BENCHMARK-620","target_node_ids":["TOKEN-BENCHMARK-620"],"disposition":"ADAPT","text":"Benchmark naive full-context/full-role execution against indexed, reused, dependency-routed execution across representative subjects."},
+      {"row_id":"V1-TOKEN-BENCHMARK-620-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"TOKEN-BENCHMARK-620","target_node_ids":["TOKEN-BENCHMARK-620"],"disposition":"ADOPT_CONTROLLED_COMPARISON_INVARIANT","text":"Naive/optimized lanes have equal snapshots, acceptance, authority, model route, budgets, and seeds."},
+      {"row_id":"V1-TOKEN-BENCHMARK-620-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"TOKEN-BENCHMARK-620","target_node_ids":["TOKEN-BENCHMARK-620"],"disposition":"ADOPT_HONEST_ACCOUNTING_INVARIANT","text":"Measure input/output/cache tokens, calls, retries, reads, tests, sidecars, and accepted outcomes; unavailable stays unavailable."},
+      {"row_id":"V1-TOKEN-BENCHMARK-620-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"TOKEN-BENCHMARK-620","target_node_ids":["TOKEN-BENCHMARK-620"],"disposition":"DEFER_UNTIL_REPRODUCIBLE_BENCHMARK","text":"The controlled target shows at least 30 percent fewer input tokens without weaker acceptance and makes no universal savings claim."},
+      {"row_id":"V1-TOKEN-BENCHMARK-620-AC-04","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"TOKEN-BENCHMARK-620","target_node_ids":["TOKEN-BENCHMARK-620"],"disposition":"ADOPT_CANDIDATE_BOUND_INVARIANT","text":"Results are reproducible and candidate-bound."},
+      {"row_id":"V1-GENERIC-QUALIFICATION-630-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"GENERIC-QUALIFICATION-630","target_node_ids":["QUALIFICATION-PREP-625","CANDIDATE-CI-627","GENERIC-QUALIFICATION-630"],"disposition":"ADAPT_SPLIT_FREEZE_CI_AND_JUDGMENT","text":"Issue a fail-closed verdict for generic DAG authoring, execution, adapters, recovery, token economy, and cross-subject portability."},
+      {"row_id":"V1-GENERIC-QUALIFICATION-630-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-QUALIFICATION-630","target_node_ids":["GENERIC-QUALIFICATION-630"],"disposition":"ADAPT","text":"One installed build handles required repository and non-repository fixtures without source changes."},
+      {"row_id":"V1-GENERIC-QUALIFICATION-630-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-QUALIFICATION-630","target_node_ids":["QUALIFICATION-PREP-625","CANDIDATE-CI-627","GENERIC-QUALIFICATION-630"],"disposition":"ADAPT","text":"Plans are standard-bound, lint-clean, versioned, adapter-complete, authority-safe, independently verified, and exact-candidate-bound."},
+      {"row_id":"V1-GENERIC-QUALIFICATION-630-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-QUALIFICATION-630","target_node_ids":["CANDIDATE-CI-627","GENERIC-QUALIFICATION-630"],"disposition":"ADAPT_REQUIRE_REPRODUCTION","text":"Failure/token evidence reproduces on the candidate."},
+      {"row_id":"V1-GENERIC-QUALIFICATION-630-AC-04","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-QUALIFICATION-630","target_node_ids":["GENERIC-QUALIFICATION-630"],"disposition":"ADAPT_VENDOR_NEUTRAL","text":"No Hive-specific repository, node, branch, language, vendor, or GitHub assumption exists in the generic path."},
+      {"row_id":"V1-GENERIC-QUALIFICATION-630-AC-05","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"GENERIC-QUALIFICATION-630","target_node_ids":["CANDIDATE-CI-627","GENERIC-QUALIFICATION-630"],"disposition":"ADOPT_HONEST_MATURITY_INVARIANT","text":"Unsupported/external capabilities are stated honestly and block maturity claims; cross-platform CI/security are terminal."},
+      {"row_id":"V1-HANDOFF-700-OBJ","row_type":"objective","source_key":"V1-SPECS-B","source_node_id":"HANDOFF-700","target_node_ids":["HANDOFF-700"],"disposition":"ADAPT_NO_SEALED_PLAN_REWRITE","text":"Publish the open-source guide and return control to the original sealed functional DAG without rewriting its remaining nodes."},
+      {"row_id":"V1-HANDOFF-700-AC-01","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"HANDOFF-700","target_node_ids":["HANDOFF-700"],"disposition":"ADAPT","text":"A new user can clone, build, validate, execute, resume, inspect, and reconcile portable DAGs through public commands."},
+      {"row_id":"V1-HANDOFF-700-AC-02","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"HANDOFF-700","target_node_ids":["HANDOFF-700"],"disposition":"ADAPT","text":"The guide covers subjects, adapters, authority, tokens, recovery, and external gates."},
+      {"row_id":"V1-HANDOFF-700-AC-03","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"HANDOFF-700","target_node_ids":["HANDOFF-700"],"disposition":"ADAPT","text":"The handoff binds qualification evidence and names the sealed program's next lawful round without modifying its plan/receipts."},
+      {"row_id":"V1-HANDOFF-700-AC-04","row_type":"acceptance","source_key":"V1-SPECS-B","source_node_id":"HANDOFF-700","target_node_ids":["HANDOFF-700"],"disposition":"ADAPT_DRAFT_PR_ONLY_NO_MERGE","text":"A final draft PR into main is opened without auto-merge and remains unmerged."}
+    ]
+  },
+  "open_evidence_obligations": [
+    "A distinct Architect/DAG Author must author the V3 contracts from this intake without changing this source record.",
+    "A distinct Advocate, Cross-Examiner, Expert, Curator, and Judge must adjudicate the sealed V3 payload before execution.",
+    "SRC-024 remains quarantined; do not retrieve, ingest, copy, paraphrase as authority, or redistribute its unavailable content without a separately reviewed source-governance resolution.",
+    "SRC-025 remains unopened and unresolved for provenance, license, and lineage.",
+    "Resolve the hardened-vision active-gate/reference-only conflict before any full hardened-vision or full-autonomy compliance claim.",
+    "Freeze and independently trust one external host bundle before V3 target mutation; existing controller trust is stale.",
+    "Recheck current remote authority and protected-branch rules before any push or pull request; protected main merge remains outside this intake.",
+    "Credentials, legal consent, spending, production, destructive effects, and missing evidence remain typed blockers."
+  ],
+  "nonclaims": [
+    "This intake is not a V3 plan, manifest, compiler output, seal, lint result, schedule, execution receipt, or promotion verdict.",
+    "No V1 Python module was imported or executed to create this intake.",
+    "No SRC-024 source content was retrieved or read, and no SRC-025 content path was opened.",
+    "The owner request file remains untracked and must not be staged; this artifact preserves only its explicitly bound objective and identity as provenance.",
+    "No checked-in provenance record authenticates an execution host or expands authority.",
+    "No PowerShell artifact represents a human identity, human review, consent, credentials, signing, spending, or protected-branch approval.",
+    "No generated or mutable V3 candidate may qualify its own compiler, controller, schedule, integration, doctor, or CI.",
+    "No full-autonomy, production-readiness, release-readiness, deployment-readiness, protected-merge, or superiority claim is made.",
+    "No unavailable source is represented as completely ingested, licensed, or admitted."
+  ]
+}
