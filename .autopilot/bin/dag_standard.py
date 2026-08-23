@@ -42,6 +42,7 @@ import argparse
 import json
 import os
 import re
+from hashlib import sha256
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -49,7 +50,7 @@ from typing import Any
 
 from controller import ControlPlane as _CoreControlPlane
 from controller import path_matches_scope, scopes_overlap
-from durable_controller import AutopilotError, read_json
+from durable_controller import AutopilotError, digest_json
 from release_barrier import ControlPlane as _ReleaseControlPlane
 
 # Reused dispatcher logic. ``_nodes_conflict`` only needs ``self.node(node_id)``
@@ -77,6 +78,13 @@ CONTRACT_FIELDS = (
     "forbidden_scope",
     "write_scope",
 )
+
+# The authoring standard is versioned independently from any repository's plan
+# schema.  Version 2 adds an optional, typed durability declaration.  A plan
+# which does not opt into that declaration remains a legacy heuristic plan.
+DAG_STANDARD_VERSION = 2
+DURABILITY_ROLES = ("provider", "consumer", "none")
+_SHA256_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 # Only the fields that reach ``controller.scopes_overlap``. ``read_scope`` and
 # ``forbidden_scope`` are matched with ``path_matches_scope``, which tolerates an
@@ -249,6 +257,16 @@ _DURABILITY_LOCK = re.compile(
     r"|append-only|write-ahead|journal|reconcil",
     re.IGNORECASE,
 )
+# Semantic locks are machine-significant identifiers rather than English prose.
+# This deliberately recognizes only whole hyphen/underscore/colon/dot-separated
+# effect terms: it must not turn an unrelated lock such as ``commentary`` into an
+# assertion that a typed ``none`` contract is forbidden to make.
+_EXTERNAL_EFFECT_LOCK = re.compile(
+    r"(?:^|[-_:.])(?:push|pull-request|draft-pr|pr-comment|comment|deploy"
+    r"|deployment|publish|remote-write|remote-effect|remote-delivery)"
+    r"(?:$|[-_:.])",
+    re.IGNORECASE,
+)
 _DURABILITY_PROVIDER_OBJECTIVE = re.compile(
     r"\b(?:implement|provide|build|establish|add|create|introduce|make|prove"
     r"|guarantee|enforce)\w*\b[^.]{0,140}?"
@@ -268,12 +286,63 @@ class DagStandardError(AutopilotError):
     """The supplied plan document cannot be interpreted as a DAG."""
 
 
+@dataclass(frozen=True)
+class PlanIntegrity:
+    """The integrity state of the exact plan bytes consumed by this invocation.
+
+    ``plan_digest`` is a canonical-document digest, whereas
+    ``consumed_source_bytes_digest`` is a raw byte receipt.  The latter does not
+    claim to lock a pathname against a later rewrite; it identifies the one byte
+    snapshot decoded, checked, and compiled by this invocation.
+    """
+
+    status: str
+    consumed_source_bytes_digest: str | None = None
+    consumed_plan_digest: str | None = None
+    plan_digest_present: bool = False
+    sealed_contracts: tuple[str, ...] = ()
+    unsealed_contracts: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "consumed_source_bytes_digest": self.consumed_source_bytes_digest,
+            "consumed_plan_digest": self.consumed_plan_digest,
+            "plan_digest_present": self.plan_digest_present,
+            "sealed_contracts": list(self.sealed_contracts),
+            "unsealed_contracts": list(self.unsealed_contracts),
+        }
+
+
+@dataclass(frozen=True)
+class DurabilityDeclaration:
+    """V2 typed durability semantics for one node contract."""
+
+    role: str
+    provider_ids: tuple[str, ...] = ()
+
+
 def _text_list(value: object) -> list[str]:
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
         return [item for item in value if isinstance(item, str)]
     return []
+
+
+def _dependency_ids(value: object) -> tuple[str, ...] | None:
+    """Return raw dependency IDs only when the original contract shape is valid.
+
+    Dependencies are graph edges, unlike the descriptive text-list fields.  It
+    would be unsafe to silently coerce a scalar or discard a non-string member:
+    doing so removes a prerequisite before topology validation can see it.
+    """
+
+    if not isinstance(value, list):
+        return None
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        return None
+    return tuple(value)
 
 
 def _normalize(scope: str) -> str:
@@ -345,9 +414,15 @@ class PlanGraph:
         nodes: Iterable[Mapping[str, Any]],
         *,
         source: Path | None = None,
+        integrity: PlanIntegrity | None = None,
     ) -> None:
         self.source = source
+        self.integrity = integrity or PlanIntegrity(status="digest-unsealed")
         self._nodes: dict[str, Mapping[str, Any]] = {}
+        # Keep every original declaration for topology preflight.  The normalized
+        # map below is intentionally useful to graph algorithms, but it must
+        # never be the only view used to decide whether a plan may be scheduled.
+        self._declared_nodes: list[tuple[str, Mapping[str, Any]]] = []
         self.duplicate_ids: list[str] = []
         for item in nodes:
             if not isinstance(item, Mapping):
@@ -355,6 +430,7 @@ class PlanGraph:
             node_id = item.get("id")
             if not isinstance(node_id, str) or not node_id.strip():
                 raise DagStandardError("every plan node must carry a non-empty string id")
+            self._declared_nodes.append((node_id, item))
             if node_id in self._nodes:
                 self.duplicate_ids.append(node_id)
                 continue
@@ -374,8 +450,81 @@ class PlanGraph:
         except KeyError as error:
             raise DagStandardError(f"unknown node: {node_id}") from error
 
+    @property
+    def declared_node_items(self) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        """Every input declaration, including duplicates, in source order."""
+
+        return tuple(self._declared_nodes)
+
     def declared_dependencies(self, node_id: str) -> tuple[str, ...]:
-        return tuple(_text_list(self.node(node_id).get("dependencies")))
+        dependencies = _dependency_ids(self.node(node_id).get("dependencies"))
+        if dependencies is None:
+            raise DagStandardError(
+                f"{node_id}.dependencies must be a list of non-empty string ids"
+            )
+        return dependencies
+
+    def durability(self, node_id: str) -> DurabilityDeclaration | None:
+        """Return the node's explicit durability declaration, if any.
+
+        Validation is deliberately performed here rather than inferred from
+        prose.  A declaration is an exclusive machine contract: consumers name
+        their providers, while provider/none nodes may not carry consumer data.
+        """
+
+        node = self.node(node_id)
+        has_role = "durability_role" in node
+        has_providers = "durability_providers" in node
+        if not has_role:
+            if has_providers:
+                raise DagStandardError(
+                    f"{node_id} declares durability_providers without durability_role"
+                )
+            return None
+        role = node.get("durability_role")
+        if not isinstance(role, str) or role not in DURABILITY_ROLES:
+            raise DagStandardError(
+                f"{node_id} durability_role must be exactly one of "
+                + ", ".join(DURABILITY_ROLES)
+            )
+        if role != "consumer":
+            if has_providers:
+                raise DagStandardError(
+                    f"{node_id} durability_role {role!r} must not declare "
+                    "durability_providers"
+                )
+            return DurabilityDeclaration(role)
+        providers = node.get("durability_providers")
+        if not isinstance(providers, list) or not providers:
+            raise DagStandardError(
+                f"{node_id} durability consumer must declare a non-empty "
+                "durability_providers list"
+            )
+        if any(not isinstance(provider, str) or not provider.strip() for provider in providers):
+            raise DagStandardError(
+                f"{node_id} durability_providers must contain only non-empty string ids"
+            )
+        if len(set(providers)) != len(providers):
+            raise DagStandardError(
+                f"{node_id} durability_providers contains duplicate provider ids"
+            )
+        if node_id in providers:
+            raise DagStandardError(
+                f"{node_id} durability consumer cannot name itself as a provider"
+            )
+        return DurabilityDeclaration("consumer", tuple(providers))
+
+    def durability_mode(self) -> str:
+        """State separately whether classification is typed or legacy heuristic."""
+
+        typed = sum(
+            self.durability(node_id) is not None for node_id in self.node_ids
+        )
+        if not typed:
+            return "legacy-heuristic"
+        if typed == len(self.node_ids):
+            return "typed-v2"
+        return "mixed-v2-and-legacy-heuristic"
 
     def dependencies(self, node_id: str) -> tuple[str, ...]:
         return tuple(
@@ -511,17 +660,165 @@ def _int_field(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
 
 
-def load_plan_graph(path: str | Path) -> PlanGraph:
-    plan_path = Path(path)
-    if not plan_path.is_file():
-        raise DagStandardError(f"plan file not found: {plan_path}")
-    document = read_json(plan_path)
-    if not isinstance(document, Mapping):
-        raise DagStandardError("plan document must be an object")
+def _canonical_digest(value: object, *, subject: str) -> str:
+    try:
+        return digest_json(value)
+    except (TypeError, ValueError) as error:
+        raise DagStandardError(
+            f"{subject} is not canonical JSON material: {error}"
+        ) from error
+
+
+def _validated_digest(value: object, *, subject: str) -> str:
+    if not isinstance(value, str) or not _SHA256_DIGEST.fullmatch(value):
+        raise DagStandardError(
+            f"{subject} must be an exact lowercase sha256:<64-hex> digest"
+        )
+    return value
+
+
+def _validate_plan_integrity(
+    document: Mapping[str, Any], *, consumed_bytes: bytes
+) -> PlanIntegrity:
+    """Validate every optional seal against the parsed document being consumed.
+
+    The material is intentionally complete: a node omits only its own
+    ``contract_digest`` and a plan omits only its top-level ``plan_digest``.
+    Canonical object-key sorting is supplied by ``digest_json``; list order,
+    strings, and all other values remain material exactly as parsed.
+    """
+
     nodes = document.get("nodes")
     if not isinstance(nodes, list):
         raise DagStandardError("plan.nodes must be a list")
-    return PlanGraph(nodes, source=plan_path)
+    sealed_contracts: list[str] = []
+    unsealed_contracts: list[str] = []
+    for index, node in enumerate(nodes):
+        if not isinstance(node, Mapping):
+            raise DagStandardError(f"plan node {index} must be an object")
+        node_id = node.get("id")
+        label = node_id if isinstance(node_id, str) and node_id else f"index {index}"
+        if "contract_digest" not in node:
+            unsealed_contracts.append(str(label))
+            continue
+        expected = _validated_digest(
+            node.get("contract_digest"), subject=f"node {label} contract_digest"
+        )
+        material = dict(node)
+        material.pop("contract_digest", None)
+        observed = _canonical_digest(material, subject=f"node {label} contract")
+        if expected != observed:
+            raise DagStandardError(
+                f"node {label} contract_digest mismatch: expected {expected}, observed {observed}"
+            )
+        sealed_contracts.append(str(label))
+
+    plan_digest_present = "plan_digest" in document
+    material = dict(document)
+    material.pop("plan_digest", None)
+    # This is always recomputed so a caller may bind even an otherwise
+    # unsealed legacy plan to a trusted expected digest.
+    consumed_plan_digest = _canonical_digest(material, subject="plan")
+    if plan_digest_present:
+        expected = _validated_digest(document.get("plan_digest"), subject="plan_digest")
+        if expected != consumed_plan_digest:
+            raise DagStandardError(
+                f"plan_digest mismatch: expected {expected}, observed {consumed_plan_digest}"
+            )
+
+    if plan_digest_present and not unsealed_contracts:
+        status = "verified-sealed"
+    elif plan_digest_present or sealed_contracts:
+        status = "partially-sealed"
+    else:
+        status = "digest-unsealed"
+    return PlanIntegrity(
+        status=status,
+        consumed_source_bytes_digest="sha256:" + sha256(consumed_bytes).hexdigest(),
+        consumed_plan_digest=consumed_plan_digest,
+        plan_digest_present=plan_digest_present,
+        sealed_contracts=tuple(sorted(sealed_contracts)),
+        unsealed_contracts=tuple(sorted(unsealed_contracts)),
+    )
+
+
+def validate_durability_declarations(graph: PlanGraph) -> None:
+    """Fail closed on malformed or contradictory typed durability semantics."""
+
+    declarations = {node_id: graph.durability(node_id) for node_id in graph.node_ids}
+    for node_id, declaration in declarations.items():
+        if declaration is None:
+            continue
+        if declaration.role == "none" and _asserted_semantics(graph.node(node_id)):
+            raise DagStandardError(
+                f"{node_id} declares durability_role 'none' but asserts durability "
+                "or external-effect semantics"
+            )
+        if declaration.role != "consumer":
+            continue
+        ancestors = graph.ancestors(node_id)
+        for provider_id in declaration.provider_ids:
+            if provider_id not in declarations:
+                raise DagStandardError(
+                    f"{node_id} names unknown durability provider {provider_id}"
+                )
+            provider = declarations[provider_id]
+            if provider is None or provider.role != "provider":
+                raise DagStandardError(
+                    f"{node_id} names {provider_id} as a durability provider, but "
+                    "that node does not explicitly declare durability_role 'provider'"
+                )
+            if provider_id not in ancestors:
+                raise DagStandardError(
+                    f"{node_id} must depend transitively on declared durability provider "
+                    f"{provider_id}"
+                )
+
+
+def load_plan_graph(path: str | Path) -> PlanGraph:
+    plan_path = Path(path)
+    try:
+        consumed_bytes = plan_path.read_bytes()
+    except FileNotFoundError as error:
+        raise DagStandardError(f"plan file not found: {plan_path}") from error
+    except OSError as error:
+        raise DagStandardError(f"cannot read plan file {plan_path}: {error}") from error
+    try:
+        document = json.loads(consumed_bytes.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise DagStandardError(f"cannot parse plan file {plan_path}: {error}") from error
+    if not isinstance(document, Mapping):
+        raise DagStandardError("plan document must be an object")
+    integrity = _validate_plan_integrity(document, consumed_bytes=consumed_bytes)
+    nodes = document.get("nodes")
+    assert isinstance(nodes, list)  # checked by _validate_plan_integrity
+    graph = PlanGraph(nodes, source=plan_path, integrity=integrity)
+    # Graph preflight must run before typed validation because a duplicate's
+    # discarded declaration could otherwise evade validation.  Valid documents
+    # retain the established eager typed-schema failure at load time; malformed
+    # topology is returned for dag-lint to report and dag-rounds to reject.
+    if not _check_graph_validity(graph):
+        validate_durability_declarations(graph)
+    return graph
+
+
+def validate_expected_plan_digest(
+    graph: PlanGraph, expected_plan_digest: object | None
+) -> str | None:
+    """Bind this invocation to an expected canonical plan chosen by its caller."""
+
+    if expected_plan_digest is None:
+        return None
+    expected = _validated_digest(
+        expected_plan_digest, subject="expected plan digest"
+    )
+    observed = graph.integrity.consumed_plan_digest
+    if observed != expected:
+        raise DagStandardError(
+            "expected plan digest mismatch: "
+            f"expected {expected}, consumed {observed}"
+        )
+    return expected
 
 
 # ---------------------------------------------------------------------------
@@ -536,7 +833,9 @@ class Round:
     nodes: tuple[str, ...]
     parallel_safe: bool
     reason: str
-    command: str
+    command: str | None
+    execution_mode: str = "installed-dispatch-v1"
+    execution_note: str = ""
     deferred_after: tuple[str, ...] = ()
 
     @property
@@ -552,6 +851,9 @@ class Round:
             "parallel_safe": self.parallel_safe,
             "reason": self.reason,
             "command": self.command,
+            "execution_mode": self.execution_mode,
+            "execution_note": self.execution_note,
+            "executable_dispatch_command_available": self.command is not None,
             "deferred_after": list(self.deferred_after),
         }
 
@@ -586,20 +888,22 @@ def dispatch_command_prefix(
     *,
     plan_path: str | Path | None = None,
     repo_root: str | Path | None = None,
-) -> str:
+) -> str | None:
     """The dispatch command prefix for *this* plan, in *this* checkout.
 
-    A hardcoded ``--repo-root .`` is wrong in a generic clone: it silently
-    targets whatever directory the operator happened to be standing in. The
-    prefix is derived from the plan being compiled (or, failing that, from how
-    this process was actually launched), and carries ``--plan`` whenever the plan
-    does not sit at the conventional location under the repository root.
+    The installed dispatcher understands only its canonical
+    ``.autopilot/plan.json``.  It has no ``dispatch --plan`` mode, so an
+    external plan must return ``None`` rather than a shell string that the CLI
+    will reject.  A hardcoded ``--repo-root .`` is likewise wrong in a generic
+    clone, so installed-plan prefixes always derive the actual repository root.
     """
 
     plan = Path(plan_path) if plan_path is not None else None
     root = Path(repo_root) if repo_root is not None else derived_repo_root(plan)
     if root is None:
         root = Path.cwd()
+    if plan is not None and not _same_file(plan, root / ".autopilot" / "plan.json"):
+        return None
     script = root / DISPATCH_SCRIPT_RELPATH
     if not script.is_file():
         # This module *is* installed next to the dispatcher it is describing, so
@@ -609,9 +913,25 @@ def dispatch_command_prefix(
         if sibling.is_file():
             script = sibling
     parts = ["python", _render_path(script), "--repo-root", _render_path(root), "dispatch"]
-    if plan is not None and not _same_file(plan, root / ".autopilot" / "plan.json"):
-        parts.extend(["--plan", _render_path(plan)])
     return " ".join(parts)
+
+
+def execution_mode_for_plan(
+    *,
+    plan_path: str | Path | None,
+    repo_root: str | Path | None,
+) -> tuple[str, str]:
+    """Describe truthfully whether installed dispatch can consume this plan."""
+
+    if dispatch_command_prefix(plan_path=plan_path, repo_root=repo_root) is None:
+        return (
+            "manual-parent-v1",
+            "No executable dispatcher command is available for an external plan: "
+            "the installed dispatch command accepts only .autopilot/plan.json. "
+            "A parent must consume these structured rounds manually until native "
+            "external-plan dispatch exists.",
+        )
+    return "installed-dispatch-v1", "Installed dispatch command is executable for this plan."
 
 
 def _dispatch_command(prefix: str, actor: str, nodes: Sequence[str]) -> str:
@@ -623,48 +943,96 @@ def semantic_ordering_constraints(
     level_of: Mapping[str, int],
     findings: Sequence[Finding] | None = None,
 ) -> dict[str, tuple[str, ...]]:
-    """Durability-ordering findings, expressed as scheduling constraints.
+    """Return explicit consumer -> prerequisite semantic edges.
 
-    This is the fix for a compiler that used to contradict its own linter: the
-    linter would report that a resume/external-effect node cannot be proven
-    before its durability provider, and the compiler would then dispatch them in
-    the same round anyway.
-
-    A durability provider that blocks a node in *its own level* is a release
-    barrier: it is dispatched (and integrated) alone, and the rest of its level
-    runs against that base. That is not a stylistic choice -- the whole point of
-    the constraint is that the level's other members are proven against durable
-    state, which only exists once the provider's round has landed. A provider in
-    a *later* level defers only the node that named it.
+    Typed consumers name their provider edge directly.  Legacy consumers retain
+    the existing warning-derived fallback.  Same-level provider barriers then
+    extend the graph to the rest of that level, exactly as before, but the
+    result is now a real prerequisite graph rather than a rank-relaxation hint.
     """
 
-    if findings is None:
-        findings = _check_durability_ordering(graph, level_of)
+    validate_durability_declarations(graph)
+    computed_findings = _check_durability_ordering(graph, level_of)
+    if findings is not None:
+        supplied = sorted(
+            (item.check, item.subject, item.nodes)
+            for item in findings
+            if item.check == "durability-ordering"
+        )
+        computed = sorted(
+            (item.check, item.subject, item.nodes) for item in computed_findings
+        )
+        if supplied != computed:
+            raise DagStandardError(
+                "supplied durability-ordering findings do not match the plan; "
+                "the compiler recomputes semantic constraints rather than emit an "
+                "unchecked schedule"
+            )
+    findings = computed_findings
     members_by_level = graph.levels()
-    barriers: dict[int, set[str]] = {}
-    deferrals: dict[str, set[str]] = {}
+    direct: dict[str, set[str]] = {}
+    for node_id in graph.node_ids:
+        declaration = graph.durability(node_id)
+        if declaration is not None and declaration.role == "consumer":
+            direct.setdefault(node_id, set()).update(declaration.provider_ids)
     for finding in findings:
         if finding.check != "durability-ordering":
             continue
         consumer = finding.subject
         if consumer not in level_of:
             continue
+        # Typed consumers are exact declarations; prose findings must never
+        # silently widen their named provider set.
+        if graph.durability(consumer) is not None:
+            continue
         providers = [
             node_id
             for node_id in finding.nodes
             if node_id != consumer and node_id in level_of
         ]
+        direct.setdefault(consumer, set()).update(providers)
+
+    barriers: dict[int, set[str]] = {}
+    for consumer, providers in direct.items():
         for provider in providers:
             if level_of[provider] == level_of[consumer]:
                 barriers.setdefault(level_of[provider], set()).add(provider)
-            else:
-                deferrals.setdefault(consumer, set()).add(provider)
     for level, providers in barriers.items():
         for node_id in members_by_level.get(level, ()):
-            if node_id in providers:
-                continue
-            deferrals.setdefault(node_id, set()).update(providers)
-    return {node_id: tuple(sorted(value)) for node_id, value in sorted(deferrals.items())}
+            if node_id not in providers:
+                direct.setdefault(node_id, set()).update(providers)
+    return {
+        node_id: tuple(sorted(providers))
+        for node_id, providers in sorted(direct.items())
+        if providers
+    }
+
+
+def combined_ordering_graph(
+    graph: PlanGraph,
+    constraints: Mapping[str, Sequence[str]],
+) -> dict[str, tuple[str, ...]]:
+    """Return the complete node -> prerequisite graph used for this schedule."""
+
+    combined: dict[str, tuple[str, ...]] = {}
+    for node_id in graph.node_ids:
+        prerequisites = set(graph.dependencies(node_id))
+        prerequisites.update(constraints.get(node_id, ()))
+        unknown = sorted(prerequisites.difference(graph.node_ids))
+        if unknown:
+            raise DagStandardError(
+                f"semantic ordering names unknown prerequisite(s) for {node_id}: "
+                + ", ".join(unknown)
+            )
+        combined[node_id] = tuple(sorted(prerequisites))
+    return combined
+
+
+def _combined_ordering_cycle(
+    graph: PlanGraph,
+    constraints: Mapping[str, Sequence[str]],
+) -> tuple[str, ...] | None:
+    return _find_cycle(combined_ordering_graph(graph, constraints))
 
 
 def _release_ranks(
@@ -672,28 +1040,37 @@ def _release_ranks(
     level_of: Mapping[str, int],
     constraints: Mapping[str, Sequence[str]],
 ) -> dict[str, int]:
-    """Level, raised so every constrained node follows what it must follow.
+    """Topologically rank an already validated combined ordering graph.
 
-    Rounds are emitted in ``(rank, level)`` order. Dependencies are folded into
-    the same fixed point so a deferred provider can never be scheduled after a
-    node that depends on it.
+    The former bounded fixed-point loop could stop while a semantic cycle was
+    still raising ranks.  This walk either reaches every node or fails before a
+    round is emitted.
     """
 
-    rank = {node_id: level_of[node_id] for node_id in graph.node_ids}
-    for _ in range(len(rank) + 2):
-        changed = False
-        for node_id in graph.node_ids:
-            floor = rank[node_id]
-            for provider in constraints.get(node_id, ()):
-                if provider in rank:
-                    floor = max(floor, rank[provider] + 1)
+    combined = combined_ordering_graph(graph, constraints)
+    cycle = _find_cycle(combined)
+    if cycle:
+        raise DagStandardError(
+            "combined dependency/semantic ordering cycle: " + " -> ".join(cycle)
+        )
+    pending = set(graph.node_ids)
+    rank: dict[str, int] = {}
+    while pending:
+        ready = sorted(
+            node_id
+            for node_id in pending
+            if all(prerequisite not in pending for prerequisite in combined[node_id])
+        )
+        if not ready:  # Defensive: _find_cycle above should make this unreachable.
+            raise DagStandardError("combined dependency/semantic ordering is not computable")
+        for node_id in ready:
+            floor = level_of[node_id]
             for dependency in graph.dependencies(node_id):
                 floor = max(floor, rank[dependency])
-            if floor > rank[node_id]:
-                rank[node_id] = floor
-                changed = True
-        if not changed:
-            break
+            for provider in constraints.get(node_id, ()):
+                floor = max(floor, rank[provider] + 1)
+            rank[node_id] = floor
+        pending.difference_update(ready)
     return rank
 
 
@@ -744,6 +1121,8 @@ def compile_rounds(
     actor: str | None = None,
     semantic_ordering: bool = True,
     command_prefix: str | None = None,
+    execution_mode: str | None = None,
+    execution_note: str | None = None,
     ordering_findings: Sequence[Finding] | None = None,
     contention_findings: Sequence[Finding] | None = None,
     repo_root: Path | None = None,
@@ -762,23 +1141,55 @@ def compile_rounds(
     findings additionally split a level, and nodes the linter reports as
     contending for an unowned shared scaffold are never packed together, so a
     compiled round can never be one the linter rejects.
-    ``--no-semantic-ordering`` falls back to pure lock/capacity scheduling.
+    ``--no-semantic-ordering`` is retained only for plans that have no semantic
+    constraints.  It refuses to fabricate an unordered schedule when one would
+    contradict a durability edge.
     """
 
     if max_sessions < 1:
         raise DagStandardError("max_sessions must be at least 1")
+    validate_compilable_topology(graph)
+    validate_durability_declarations(graph)
+    derived_command_prefix = dispatch_command_prefix(
+        plan_path=graph.source, repo_root=repo_root
+    )
+    derived_execution_mode, derived_execution_note = execution_mode_for_plan(
+        plan_path=graph.source, repo_root=repo_root
+    )
+    if execution_mode is not None and execution_mode != derived_execution_mode:
+        raise DagStandardError(
+            "supplied execution mode does not match the plan's dispatch boundary: "
+            f"expected {derived_execution_mode!r}, got {execution_mode!r}"
+        )
+    if derived_command_prefix is None and command_prefix is not None:
+        raise DagStandardError(
+            "external plan cannot receive an executable dispatch command; "
+            "manual-parent-v1 has no runnable dispatcher command"
+        )
     if command_prefix is None:
-        command_prefix = dispatch_command_prefix(plan_path=graph.source)
+        command_prefix = derived_command_prefix
+    if execution_mode is None:
+        execution_mode = derived_execution_mode
+        if execution_note is None:
+            execution_note = derived_execution_note
+    if execution_note is None:
+        execution_note = "Installed dispatch command is executable for this plan."
     levels = graph.levels()
     level_of = {
         node_id: level for level, members in levels.items() for node_id in members
     }
     constraints: dict[str, tuple[str, ...]] = {}
     contended: set[frozenset[str]] = set()
+    all_constraints = semantic_ordering_constraints(graph, level_of, ordering_findings)
     if semantic_ordering:
-        constraints = semantic_ordering_constraints(graph, level_of, ordering_findings)
+        constraints = all_constraints
         contended = contention_pairs(
             graph, level_of, contention_findings, repo_root=repo_root
+        )
+    elif all_constraints:
+        raise DagStandardError(
+            "--no-semantic-ordering refuses a plan with durability ordering "
+            "constraints; no dependency- or semantic-invalid rounds were emitted"
         )
     rank = (
         _release_ranks(graph, level_of, constraints)
@@ -831,6 +1242,8 @@ def compile_rounds(
                     reason + deferral_note,
                     actor,
                     command_prefix,
+                    execution_mode,
+                    execution_note,
                     deferred,
                 )
             )
@@ -844,9 +1257,12 @@ def compile_rounds(
                     "serial node released alone (parallel_safe: false)" + deferral_note,
                     actor,
                     command_prefix,
+                    execution_mode,
+                    execution_note,
                     deferred,
                 )
             )
+    _assert_valid_round_ordering(graph, rounds, constraints)
     return tuple(rounds)
 
 
@@ -857,7 +1273,9 @@ def _make_round(
     parallel_safe: bool,
     reason: str,
     actor: str | None,
-    command_prefix: str,
+    command_prefix: str | None,
+    execution_mode: str,
+    execution_note: str,
     deferred_after: tuple[str, ...] = (),
 ) -> Round:
     round_id = f"R{index}"
@@ -868,9 +1286,42 @@ def _make_round(
         nodes=nodes,
         parallel_safe=parallel_safe,
         reason=reason,
-        command=_dispatch_command(command_prefix, resolved_actor, nodes),
+        command=(
+            _dispatch_command(command_prefix, resolved_actor, nodes)
+            if command_prefix is not None
+            else None
+        ),
+        execution_mode=execution_mode,
+        execution_note=execution_note,
         deferred_after=deferred_after,
     )
+
+
+def _assert_valid_round_ordering(
+    graph: PlanGraph,
+    rounds: Sequence[Round],
+    constraints: Mapping[str, Sequence[str]],
+) -> None:
+    """Defensive postcondition: every prerequisite precedes its consumer."""
+
+    placement = {
+        node_id: index
+        for index, item in enumerate(rounds)
+        for node_id in item.nodes
+    }
+    if set(placement) != set(graph.node_ids):
+        raise DagStandardError("compiled rounds do not contain exactly the plan nodes")
+    for node_id in graph.node_ids:
+        for dependency in graph.dependencies(node_id):
+            if placement[dependency] >= placement[node_id]:
+                raise DagStandardError(
+                    f"compiled rounds violate dependency ordering: {dependency} -> {node_id}"
+                )
+        for provider in constraints.get(node_id, ()):
+            if placement[provider] >= placement[node_id]:
+                raise DagStandardError(
+                    f"compiled rounds violate semantic ordering: {provider} -> {node_id}"
+                )
 
 
 def rounds_by_level(rounds: Sequence[Round]) -> dict[int, tuple[Round, ...]]:
@@ -951,8 +1402,48 @@ def _check_graph_validity(graph: PlanGraph) -> list[Finding]:
                 fix=f"Give every node a unique id; rename or merge the duplicate {node_id}.",
             )
         )
-    for node_id in graph.node_ids:
-        for dependency in graph.missing_dependencies(node_id):
+    known_ids = set(graph.node_ids)
+    for node_id, node in graph.declared_node_items:
+        dependencies = _dependency_ids(node.get("dependencies"))
+        if dependencies is None:
+            findings.append(
+                Finding(
+                    check="graph-validity",
+                    severity="error",
+                    nodes=(node_id,),
+                    subject=f"{node_id}.dependencies",
+                    message=(
+                        f"{node_id}.dependencies must be a list of non-empty string ids"
+                    ),
+                    fix=(
+                        f"Replace {node_id}.dependencies with a JSON list of non-empty "
+                        "string node IDs (use [] when it has no prerequisites)."
+                    ),
+                )
+            )
+            continue
+        duplicate_dependencies = sorted(
+            dependency
+            for dependency in set(dependencies)
+            if dependencies.count(dependency) > 1
+        )
+        for dependency in duplicate_dependencies:
+            findings.append(
+                Finding(
+                    check="graph-validity",
+                    severity="error",
+                    nodes=(node_id,),
+                    subject=dependency,
+                    message=f"{node_id}.dependencies declares {dependency} more than once",
+                    fix=(
+                        f"Keep exactly one {dependency!r} entry in "
+                        f"{node_id}.dependencies."
+                    ),
+                )
+            )
+        for dependency in sorted(set(dependencies)):
+            if dependency in known_ids:
+                continue
             findings.append(
                 Finding(
                     check="graph-validity",
@@ -966,7 +1457,7 @@ def _check_graph_validity(graph: PlanGraph) -> list[Finding]:
                     ),
                 )
             )
-        if node_id in graph.declared_dependencies(node_id):
+        if node_id in dependencies:
             findings.append(
                 Finding(
                     check="graph-validity",
@@ -977,6 +1468,12 @@ def _check_graph_validity(graph: PlanGraph) -> list[Finding]:
                     fix=f"Remove {node_id} from its own dependencies list.",
                 )
             )
+    # A duplicate, malformed dependency, unknown target, or self edge means a
+    # normalized graph would be smaller than the authored graph.  Do not ask
+    # cycle detection to reason over that lossy view; callers return these
+    # deterministic preflight findings first.
+    if any(finding.severity == "error" for finding in findings):
+        return findings
     cycle = graph.cycle()
     if cycle:
         findings.append(
@@ -993,6 +1490,22 @@ def _check_graph_validity(graph: PlanGraph) -> list[Finding]:
             )
         )
     return findings
+
+
+def validate_compilable_topology(graph: PlanGraph) -> None:
+    """Reject any raw-graph defect before typed validation or round scheduling."""
+
+    errors = [
+        finding
+        for finding in _check_graph_validity(graph)
+        if finding.severity == "error"
+    ]
+    if not errors:
+        return
+    detail = "; ".join(finding.message for finding in errors)
+    raise DagStandardError(
+        "invalid plan topology; no rounds were emitted: " + detail
+    )
 
 
 def _check_scope_syntax(graph: PlanGraph) -> list[Finding]:
@@ -1613,7 +2126,7 @@ def _check_scaffold_collisions(
 
 
 def _asserted_semantics(node: Mapping[str, Any]) -> tuple[str, ...]:
-    """Criteria that assert recovery or external-effect semantics.
+    """Criteria or machine locks that assert durability/external-effect semantics.
 
     A criterion is ignored when a negation appears *before* the matched phrase
     ("No hidden deploy authority is introduced"), but not when the negation
@@ -1634,6 +2147,9 @@ def _asserted_semantics(node: Mapping[str, Any]) -> tuple[str, ...]:
         if negation is not None and negation.start() < match.start():
             continue
         asserted.append(statement.strip())
+    for lock in _text_list(node.get("semantic_locks")):
+        if _DURABILITY_LOCK.search(lock) or _EXTERNAL_EFFECT_LOCK.search(lock):
+            asserted.append(f"semantic_lock:{lock}")
     return tuple(asserted)
 
 
@@ -1648,6 +2164,11 @@ def _is_durability_provider(node: Mapping[str, Any]) -> bool:
     instead of being reported as its own violator.
     """
 
+    # A typed role is authoritative.  In particular, a consumer may contain
+    # "checkpoint" or "resume" prose because it describes the property it
+    # relies on; that prose must never reclassify it as a provider.
+    if "durability_role" in node:
+        return node.get("durability_role") == "provider"
     locks = " ".join(_text_list(node.get("semantic_locks")))
     if locks and _DURABILITY_LOCK.search(locks):
         return True
@@ -1669,12 +2190,22 @@ def _check_durability_ordering(
     findings: list[Finding] = []
     for node_id in graph.node_ids:
         node = graph.node(node_id)
-        if node_id in providers:
-            continue
-        asserted = _asserted_semantics(node)
+        declaration = graph.durability(node_id)
+        if declaration is not None:
+            # Explicit metadata is intentionally the complete classification;
+            # no objective or acceptance wording can widen or replace it.
+            if declaration.role != "consumer":
+                continue
+            asserted = ("typed durability consumer declaration",)
+            candidates = declaration.provider_ids
+        else:
+            if node_id in providers:
+                continue
+            asserted = _asserted_semantics(node)
+            candidates = providers
         if not asserted:
             continue
-        if not providers:
+        if not candidates:
             findings.append(
                 Finding(
                     check="durability-ordering",
@@ -1696,7 +2227,7 @@ def _check_durability_ordering(
         ancestors = graph.ancestors(node_id)
         pending = [
             provider
-            for provider in providers
+            for provider in candidates
             if provider not in ancestors and level_of[provider] >= level_of[node_id]
         ]
         if not pending:
@@ -1726,8 +2257,7 @@ def _check_durability_ordering(
                 fix=(
                     f"Depend {node_id} on {', '.join(unsatisfied)}. Until that edge exists "
                     "dag-rounds enforces the ordering as round order: the durability node "
-                    "is released alone and the rest of its level follows (pass "
-                    "--no-semantic-ordering to see the unordered schedule). A resume/replay "
+                    "is released alone and the rest of its level follows. A resume/replay "
                     "or external effect claim is unprovable before durability exists."
                 ),
             )
@@ -1797,6 +2327,24 @@ def lint_plan(
     semantic_ordering: bool = True,
 ) -> tuple[Finding, ...]:
     findings = _check_graph_validity(graph)
+    if any(finding.severity == "error" for finding in findings):
+        return _sort_findings(findings)
+    try:
+        validate_durability_declarations(graph)
+    except DagStandardError as error:
+        findings.append(
+            Finding(
+                check="durability-semantics",
+                severity="error",
+                subject="durability",
+                message=str(error),
+                fix=(
+                    "Use the versioned typed durability schema exactly, or omit it "
+                    "entirely for the documented legacy heuristic behavior."
+                ),
+            )
+        )
+        return _sort_findings(findings)
     findings.extend(_check_scope_syntax(graph))
     findings.extend(_check_parallel_safe_declaration(graph))
     findings.extend(_check_contract_completeness(graph))
@@ -1816,12 +2364,28 @@ def lint_plan(
         )
         return _sort_findings(findings)
     ordering = _check_durability_ordering(graph, level_of)
-    rounds = compile_rounds(
-        graph,
-        max_sessions=max_sessions,
-        semantic_ordering=semantic_ordering,
-        ordering_findings=ordering,
-    )
+    try:
+        rounds = compile_rounds(
+            graph,
+            max_sessions=max_sessions,
+            semantic_ordering=semantic_ordering,
+            ordering_findings=ordering,
+        )
+    except DagStandardError as error:
+        findings.append(
+            Finding(
+                check="semantic-ordering",
+                severity="error",
+                subject="combined-ordering-graph",
+                message=str(error),
+                fix=(
+                    "Add or correct declared dependency/durability edges so the "
+                    "combined prerequisite graph is acyclic; no rounds were emitted."
+                ),
+            )
+        )
+        findings.extend(ordering)
+        return _sort_findings(findings)
     findings.extend(_check_scaffold_collisions(graph, level_of, repo_root=repo_root))
     findings.extend(_check_write_scope_overlap(graph, level_of))
     findings.extend(ordering)
@@ -1889,6 +2453,13 @@ def add_dag_standard_arguments(commands: Any) -> None:
     rounds.add_argument("--actor")
     rounds.add_argument("--plan")
     rounds.add_argument(
+        "--expected-plan-digest",
+        help=(
+            "Caller-trusted canonical plan digest; reject this invocation unless "
+            "the consumed plan matches it exactly."
+        ),
+    )
+    rounds.add_argument(
         "--no-semantic-ordering",
         action="store_false",
         dest="semantic_ordering",
@@ -1900,6 +2471,13 @@ def add_dag_standard_arguments(commands: Any) -> None:
     lint.add_argument("--strict", action="store_true")
     lint.add_argument("--max-sessions", type=int, default=DEFAULT_MAX_SESSIONS)
     lint.add_argument("--plan")
+    lint.add_argument(
+        "--expected-plan-digest",
+        help=(
+            "Caller-trusted canonical plan digest; reject this invocation unless "
+            "the consumed plan matches it exactly."
+        ),
+    )
     lint.add_argument(
         "--no-semantic-ordering",
         action="store_false",
@@ -1916,7 +2494,10 @@ def _print_rounds(rounds: Sequence[Round], max_sessions: int) -> None:
             f"[{'parallel' if item.parallel_safe else 'serial'}] {item.reason}"
         )
         print("  nodes: " + " ".join(item.nodes))
-        print("  " + item.command)
+        if item.command is None:
+            print("  NO EXECUTABLE DISPATCH COMMAND: " + item.execution_note)
+        else:
+            print("  " + item.command)
 
 
 def _print_findings(findings: Sequence[Finding]) -> None:
@@ -1936,17 +2517,26 @@ def run_dag_standard_command(args: argparse.Namespace) -> int:
 
     plan_path = resolve_plan_path(args)
     graph = load_plan_graph(plan_path)
+    expected_plan_digest = validate_expected_plan_digest(
+        graph, getattr(args, "expected_plan_digest", None)
+    )
     repo_root = effective_repo_root(args, plan_path)
     semantic_ordering = bool(getattr(args, "semantic_ordering", True))
     if args.command == "dag-rounds":
+        command_prefix = dispatch_command_prefix(
+            plan_path=plan_path, repo_root=repo_root
+        )
+        execution_mode, execution_note = execution_mode_for_plan(
+            plan_path=plan_path, repo_root=repo_root
+        )
         rounds = compile_rounds(
             graph,
             max_sessions=args.max_sessions,
             actor=getattr(args, "actor", None),
             semantic_ordering=semantic_ordering,
-            command_prefix=dispatch_command_prefix(
-                plan_path=plan_path, repo_root=repo_root
-            ),
+            command_prefix=command_prefix,
+            execution_mode=execution_mode,
+            execution_note=execution_note,
             repo_root=repo_root,
         )
         if args.json_output:
@@ -1955,6 +2545,20 @@ def run_dag_standard_command(args: argparse.Namespace) -> int:
                     {
                         "max_sessions": args.max_sessions,
                         "semantic_ordering": semantic_ordering,
+                        "integrity": graph.integrity.to_dict(),
+                        "durability_semantics": {"mode": graph.durability_mode()},
+                        "expected_plan_binding": {
+                            "provided": expected_plan_digest is not None,
+                            "expected_plan_digest": expected_plan_digest,
+                            "consumed_plan_digest": graph.integrity.consumed_plan_digest,
+                            "matched": expected_plan_digest is not None,
+                        },
+                        "execution": {
+                            "mode": execution_mode,
+                            "executable_dispatch_command_available": command_prefix
+                            is not None,
+                            "note": execution_note,
+                        },
                         "rounds": [item.to_dict() for item in rounds],
                     },
                     indent=2,
@@ -1980,6 +2584,14 @@ def run_dag_standard_command(args: argparse.Namespace) -> int:
                         "counts": severity_counts(findings),
                         "strict": bool(args.strict),
                         "exit_code": exit_code,
+                        "integrity": graph.integrity.to_dict(),
+                        "durability_semantics": {"mode": graph.durability_mode()},
+                        "expected_plan_binding": {
+                            "provided": expected_plan_digest is not None,
+                            "expected_plan_digest": expected_plan_digest,
+                            "consumed_plan_digest": graph.integrity.consumed_plan_digest,
+                            "matched": expected_plan_digest is not None,
+                        },
                     },
                     indent=2,
                     sort_keys=True,

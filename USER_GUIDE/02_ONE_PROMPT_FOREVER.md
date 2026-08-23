@@ -55,10 +55,11 @@ hive-mind autopilot run "foobar" --repository C:/path/to/target \
 
 `run` is the recommended entry point: its required positional argument is the
 objective/subject, such as `foobar`. It records the objective if the target has not
-been initialized, then requests the appropriate DAG-build or execution contract with
-execution authorization. It emits that contract for the active host; it never executes
-an unreviewed target controller itself. Repeating the command with the same subject is
-safe; a new subject requires an explicit new initialization decision.
+been initialized. Without an installed controller it requests a subject-bound DAG-build
+contract. With an installed controller it temporarily returns `PLAN_GENERATION_REQUIRED`
+with zero tasks, because the installed plan is not authenticated for the new subject. It
+never executes an unreviewed target controller itself. Repeating the command with the same
+persisted request is safe; a new subject requires an explicit new initialization decision.
 
 The explicit two-command form remains available:
 
@@ -69,10 +70,13 @@ hive-mind autopilot init --repository C:/path/to/target \
 ```
 
 Then use the same short prompt. Before the target has an installed `.autopilot` DAG,
-`hive-mind autopilot inspect` emits a repository-scoped durable `DAG-BUILD-<digest>`
-task. That bootstrap includes independent controller review and external digest pinning.
-After installation, the portable wrapper delegates only to the exact reviewed controller
-bundle; a changed HEAD fails closed until it is reviewed and pinned again.
+`hive-mind autopilot inspect` emits a repository-scoped durable
+`DAG-BUILD-<repository-digest>-<request-digest>` task. Its task and launch identities bind
+the exact request ID and objective digest, so another objective cannot reuse the task.
+That bootstrap includes independent controller review and external digest pinning. After
+installation, use `autopilot inspect` to address the installed plan intentionally; the
+portable wrapper delegates only to the exact reviewed controller bundle. A changed bundle
+fails closed until it is reviewed and pinned again.
 
 For a machine-readable preview without applying a release:
 

@@ -29,7 +29,7 @@ unverifiable nodes or overwrite an existing request. Current provider protection
 reverified before every push, PR, or merge; inability to establish it blocks mutation.
 
 `hive-mind autopilot inspect --repository ... --request ...` emits a repository-scoped
-`DAG-BUILD-<digest>` task until
+`DAG-BUILD-<repository-digest>-<request-digest>` task until
 the repository has a validated `.autopilot` control plane. A capable durable task builds
 that repository-specific DAG from actual code, constraints, acceptance, risks, rollback,
 and evidence. Abstract source patterns may be used; unlicensed source wording/code may
@@ -46,9 +46,34 @@ The standard is **not yet bound to the `BUILD_DAG` flow.** Binding the DAG-build
 the standard by digest — pinning it at `init`, materializing it in the target repository,
 and forbidding the task from reporting success without a zero-error `dag-lint` receipt — is
 specified in [`runbooks/PRODUCT-GENERIC-DAG.md`](runbooks/PRODUCT-GENERIC-DAG.md) §3.1-3.4
-and is **not implemented**. The `DAG-BUILD-<digest>` task prompt emitted today does not
+and is **not implemented**. The `DAG-BUILD-<repository-digest>-<request-digest>` task
+prompt emitted today does not
 name the standard. Until that change lands, conformance for a DAG built by that task is an
 authoring discipline plus a separately run `dag-lint`, not a product gate.
+
+The bootstrap task key, launch instruction, idempotency key, contract, and worker prompt
+bind the digest-verified portable request ID and the canonical objective digest. Repeating
+the same persisted request therefore produces the same durable launch identity. A valid
+replacement request for the same repository produces a different task and launch identity;
+the worker must verify both bindings and fail closed instead of attaching to earlier work.
+
+### Installed-controller boundary for `autopilot run`
+
+`hive-mind autopilot run "subject"` is explicitly a new-subject operation. When the
+target repository already contains `.autopilot/bin/autopilot.py`, the shortcut returns a
+typed `PLAN_GENERATION_REQUIRED` contract with zero tasks. It does not inspect, invoke, or
+reuse the installed plan, even when the subject contains words such as `run`, `continue`,
+`finish`, or `end to end`.
+
+This is a temporary fail-closed boundary. A successor must authenticate a plan generation
+that binds the repository ID, persisted request ID, objective digest, generated-plan digest,
+and plan-generation ID; independently validate that generation; and execute or resume only
+the exactly matching generation. The installed legacy plan is not evidence for a new subject.
+The complete successor is specified by `PLAN-CORE-100`, `BUILD-SYSTEM-200`,
+`GENERIC-EXECUTOR-400`, and `PUBLIC-RUNTIME-500` in the generic product overlay.
+
+Use `autopilot inspect` only when the intent is to inspect or continue the installed plan
+itself. Its controller-review and active-host sandbox requirements remain unchanged.
 
 Before the portable wrapper executes an installed target controller, a separate Curator
 reviews its clean tracked `.autopilot/bin/*.py` bundle. A distinct host authority then

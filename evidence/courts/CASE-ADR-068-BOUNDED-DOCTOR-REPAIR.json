@@ -1,0 +1,364 @@
+{
+  "atomic_claims": [
+    {
+      "claim": "An unhandled controller-test timeout violates the doctor JSON and fail-closed contract.",
+      "control": "Return typed JSON failures for timeout, containment setup/termination, spawn, killed, nonzero, incomplete-stream, reader, and UTF-8 failures without raw child output.",
+      "decision": "ADOPT"
+    },
+    {
+      "claim": "Ambient editable-package resolution cannot prove the tested checkout is the checkout being inspected.",
+      "control": "Gate with exact isolated-child binding and independently fail an error-severity foreign ambient binding.",
+      "decision": "ADOPT"
+    },
+    {
+      "claim": "A reduced skip-controller-tests observation is not a full doctor pass.",
+      "control": "Mark it READY_REDUCED and require controller_tests_run for full evidence.",
+      "decision": "ADOPT"
+    },
+    {
+      "claim": "A current target branch resolution cannot retroactively cure the 2026-08-13 deleted-branch incident.",
+      "control": "Preserve old adverse history and add prospective resolution/failure tests only.",
+      "decision": "ADOPT"
+    },
+    {
+      "claim": "Raw child-output digests and lengths can be offline secret-guessing telemetry, while a doctor still needs to fail closed on undecodable output.",
+      "control": "Strictly incrementally validate each drained stream, retain only UTF-8 validity and reader state, and retain no text, byte count, digest, tail, or truncation metadata.",
+      "decision": "ADAPT"
+    },
+    {
+      "claim": "Windows PID-addressed tree killing is vulnerable to PID reuse and does not prove containment.",
+      "control": "Resolve and type every Job/resume API before Job creation; missing/ill-typed APIs are typed containment_unavailable with no child launch. Create an owned kill-on-close Job, start suspended, assign the owned process handle, then resume; setup/close failure is typed and fail closed.",
+      "decision": "ADOPT"
+    }
+  ],
+  "case_id": "CASE-ADR-068-BOUNDED-DOCTOR-REPAIR",
+  "decision": "ADOPT",
+  "dissent": [
+    "The prior Payload A was externally rejected: it resolved NtResumeProcess after Job creation and could leak a configured handle if lookup raised AttributeError. The replacement resolves/types all APIs first and closes untransferred handles on post-create setup failure; it still relies on NtResumeProcess solely to eliminate pre-Job user-code execution.",
+    "The intermediate candidate used PID-addressed taskkill and retained byte-count/digest output metadata. Those rejected designs remain adverse history only; they are not a property of the current implementation or its receipt.",
+    "The 600-second limit is deliberately finite: it is the next minute above 1.75 times the observed 334.026-second controller duration, and a prospective duration of 450 seconds or more requires performance/risk review rather than a silent increase.",
+    "No child-derived output text, byte count, digest, tail, or truncation metadata is retained; UTF-8 validity and reader state are the narrowly necessary safe stream evidence.",
+    "POSIX process-group cleanup cannot contain a descendant that calls setsid. A held pipe becomes typed output_stream_incomplete; doctor makes no claim to have killed the detached process.",
+    "No present-day full doctor result supplies a retroactive verdict for the retained 2026-08-13 adverse failure.",
+    "The repository-CI evidence has no independently retained raw transcript or digest and supports only the narrow immutable-R3 gate—not transcript-byte integrity, per-test detail, complete-output proof, independent replay, later Envelope-B exact-head coverage, or superiority."
+  ],
+  "evidence": [
+    "docs/architecture/ADR-068-BOUNDED-DOCTOR-EXECUTION-AND-EXACT-CHECKOUT-BINDING.md",
+    "evidence/autopilot/DOCTOR-CONTROL-ROOM-REPAIR-2026-08-23.md",
+    ".autopilot/bin/controller.py",
+    ".autopilot/bin/autopilot.py",
+    ".autopilot/tests/test_doctor_boundary.py",
+    ".autopilot/tests/test_controller.py"
+  ],
+  "identities": {
+    "advocate": "/root/advocate",
+    "architect": "architect:bounded-doctor-design-20260823",
+    "builder": "/root",
+    "cross_examiner": "cross-examiner:codex-/root/cross_examiner",
+    "curator": "/root/curator",
+    "expert_witness": "expert:bounded-doctor-subprocess-runtime-binding-20260823/addendum-02",
+    "judge": "/root/judge"
+  },
+  "kind": "hive-mind-court-case-v1",
+  "rollback": "Revert the bounded doctor implementation and ADR without deleting the adverse history, focused tests, receipts, dissent, or court record.",
+  "schema_version": 1,
+  "status": "PAYLOAD_A_R3_QUALIFIED_REPOSITORY_CI_PASSED_COMMIT_READY",
+  "historical_dispositions": [
+    {
+      "phase": "PRE_V7_PRE_CI_RECOVERABLE_CAPTURE_RETRY",
+      "resolution": "RESOLVED_HISTORICAL",
+      "decision": "RECOVERABLE_CAPTURE_HARNESS_VALIDATED_PENDING_RETRY_AFTER_CAPTURE_FAILURE",
+      "status": "RECOVERABLE_UNATTESTED_TERMINAL_DETACH_PENDING_RETRY_AFTER_CAPTURE_FAILURE",
+      "repository_ci": "PENDING_RELEASE_OF_HELD_VALIDATION_LEASE",
+      "dissent": "Repository CI must wait for the separately held validation lease to be released.",
+      "superseded_by": [
+        "validation.v7_qualifying_dry_run",
+        "validation.ordinary_full_doctor_r3",
+        "validation.repository_ci_r3_one_gate",
+        "validation.postflight_judge_disposition"
+      ]
+    }
+  ],
+  "qualification_topology": {
+    "superseded_payload_a_identity": "DOCTOR-CONTROL-ROOM-PAYLOAD-A-2026-08-23",
+    "superseded_payload_a_locked_utc": "2026-08-23T07:46:50.0488410Z",
+    "superseded_reason": "External frozen review found dynamic NtResumeProcess resolution after Job-handle creation, which could leak a handle and bypass typed prelaunch containment.",
+    "record_format": "UTF-8 of ordered lines: lowercase-sha256, two ASCII spaces, forward-slash relative path, LF; no extra bytes.",
+    "record_bytes": 627,
+    "record_sha256": "a4892c8ad1942b8f530475590dab3e1bb112a6b81d92173cf8289e2123de0b91",
+    "raw_content_aggregate_verified_utc": "2026-08-23T07:49:58.9588572Z",
+    "raw_content_aggregate_algorithm": "UTF-8('hive-mind-os/payload-a-content/v1') + NUL, then for each ordered file: UTF-8(forward-slash path) + NUL + ASCII(decimal raw-byte-count) + NUL + raw file bytes + NUL; SHA-256 of the complete byte sequence.",
+    "raw_content_aggregate_bytes": 302364,
+    "raw_content_aggregate_sha256": "f4c4d9d488bb8a69b4ad87c734dcb2af77b4c2dbb99acde9d6a435027810d055",
+    "ordered_files": [
+      {"path": ".autopilot/README.md", "raw_bytes": 20212, "sha256": "afce0adae94847e5911a1e9390df2d2fab89ec662c3bf1e970f68987fdc7b417"},
+      {"path": ".autopilot/bin/autopilot.py", "raw_bytes": 66963, "sha256": "e93a8ff557500456eed27be88a5f1d3c5d8e8306c9379aa2d65503b3aa95b3e9"},
+      {"path": ".autopilot/bin/controller.py", "raw_bytes": 168705, "sha256": "4c816585c8f98475ceb6d5d4874d5aed41b6a961deeea711f61589a3779246db"},
+      {"path": ".autopilot/tests/test_doctor_boundary.py", "raw_bytes": 24899, "sha256": "8b9d8fea88875e7e6bc1fcb213b90b2774be4b19eed62fab5062d907aaa4af07"},
+      {"path": "docs/architecture/ADR-068-BOUNDED-DOCTOR-EXECUTION-AND-EXACT-CHECKOUT-BINDING.md", "raw_bytes": 10375, "sha256": "8e3804b610c9bcf5da02da8427e7fd60bb96c2672143971c2f0183d5d882e895"},
+      {"path": "docs/architecture/ADR_INDEX.md", "raw_bytes": 10902, "sha256": "bd2a5be0e4fd90b2fc98d154ca176496e21547ec98303e8c2af6052da7f226e4"}
+    ],
+    "superseded_replacement_payload_a_r2": {
+      "identity": "DOCTOR-CONTROL-ROOM-PAYLOAD-A-2026-08-23-R2",
+      "locked_utc": "2026-08-23T08:00:53.1198443Z",
+      "record_format": "UTF-8 ordered lines: lowercase-sha256, two ASCII spaces, forward-slash path, LF; no extra bytes.",
+      "record_bytes": 627,
+      "record_sha256": "84610cb9deda152c0571589bc316fd2a324df6c69d2865338149c48ae964b2f3",
+      "raw_content_aggregate_algorithm": "UTF-8('hive-mind-os/payload-a-content/v1') + NUL, then each ordered file: UTF-8(forward-slash path) + NUL + ASCII(decimal raw-byte-count) + NUL + raw file bytes + NUL; SHA-256 of the complete byte sequence.",
+      "raw_content_aggregate_bytes": 307879,
+      "raw_content_aggregate_sha256": "ac9a94e1dbf7b814a39451b7825125c643969710498f37e0af1fa0a1b14c3e65",
+      "second_verification_after_envelope_b_append_utc": "2026-08-23T08:03:24.8783489Z",
+      "second_verification": "All six per-file hashes, the 627-byte line record, and the 307879-byte raw aggregate matched exactly after an Envelope-B append.",
+      "ordered_files": [
+        {"path": ".autopilot/README.md", "raw_bytes": 20212, "sha256": "afce0adae94847e5911a1e9390df2d2fab89ec662c3bf1e970f68987fdc7b417"},
+        {"path": ".autopilot/bin/autopilot.py", "raw_bytes": 66963, "sha256": "e93a8ff557500456eed27be88a5f1d3c5d8e8306c9379aa2d65503b3aa95b3e9"},
+        {"path": ".autopilot/bin/controller.py", "raw_bytes": 170351, "sha256": "08230e8638296d000cb0e25c53b253f2a03dfc94d2a7770ebb471a941329512b"},
+        {"path": ".autopilot/tests/test_doctor_boundary.py", "raw_bytes": 27932, "sha256": "ca455bc24c8f0f6d2ef548a4c36fed596d603438c2f1e357f24c12bd61ea6694"},
+        {"path": "docs/architecture/ADR-068-BOUNDED-DOCTOR-EXECUTION-AND-EXACT-CHECKOUT-BINDING.md", "raw_bytes": 11211, "sha256": "73eb89da303c1af3d6aad736a8e6c06f95d9a99b89603088b2b1a69cdd087674"},
+        {"path": "docs/architecture/ADR_INDEX.md", "raw_bytes": 10902, "sha256": "bd2a5be0e4fd90b2fc98d154ca176496e21547ec98303e8c2af6052da7f226e4"}
+      ]
+    },
+    "final_replacement_payload_a_r3": {
+      "identity": "DOCTOR-CONTROL-ROOM-PAYLOAD-A-2026-08-23-R3",
+      "locked_utc": "2026-08-23T08:02:23.3791820Z",
+      "latest_included_file_mtime_utc": "2026-08-23T07:59:56.5876355Z",
+      "record_format": "UTF-8 ordered lines: lowercase-sha256, two ASCII spaces, forward-slash path, LF; no extra bytes.",
+      "record_bytes": 627,
+      "record_sha256": "84610cb9deda152c0571589bc316fd2a324df6c69d2865338149c48ae964b2f3",
+      "raw_content_aggregate_algorithm": "UTF-8('hive-mind-os/payload-a-content/v1') + NUL, then each ordered file: UTF-8(forward-slash path) + NUL + ASCII(decimal raw-byte-count) + NUL + raw file bytes + NUL; SHA-256 of the complete byte sequence.",
+      "raw_content_aggregate_bytes": 307879,
+      "raw_content_aggregate_sha256": "ac9a94e1dbf7b814a39451b7825125c643969710498f37e0af1fa0a1b14c3e65",
+      "ordered_files": [
+        {"path": ".autopilot/README.md", "raw_bytes": 20212, "sha256": "afce0adae94847e5911a1e9390df2d2fab89ec662c3bf1e970f68987fdc7b417"},
+        {"path": ".autopilot/bin/autopilot.py", "raw_bytes": 66963, "sha256": "e93a8ff557500456eed27be88a5f1d3c5d8e8306c9379aa2d65503b3aa95b3e9"},
+        {"path": ".autopilot/bin/controller.py", "raw_bytes": 170351, "sha256": "08230e8638296d000cb0e25c53b253f2a03dfc94d2a7770ebb471a941329512b"},
+        {"path": ".autopilot/tests/test_doctor_boundary.py", "raw_bytes": 27932, "sha256": "ca455bc24c8f0f6d2ef548a4c36fed596d603438c2f1e357f24c12bd61ea6694"},
+        {"path": "docs/architecture/ADR-068-BOUNDED-DOCTOR-EXECUTION-AND-EXACT-CHECKOUT-BINDING.md", "raw_bytes": 11211, "sha256": "73eb89da303c1af3d6aad736a8e6c06f95d9a99b89603088b2b1a69cdd087674"},
+        {"path": "docs/architecture/ADR_INDEX.md", "raw_bytes": 10902, "sha256": "bd2a5be0e4fd90b2fc98d154ca176496e21547ec98303e8c2af6052da7f226e4"}
+      ]
+    },
+    "envelope_b": "This court record and the doctor evidence file are excluded append-only receipts. They bind but never enlarge Payload A qualification; later B bytes are not full-CI exact-head coverage."
+  },
+  "validation": {
+    "focused_pre_payload_a_lock_independent_curator": {
+      "command": "python -m unittest discover -s .autopilot/tests -p test_doctor_boundary.py -v",
+      "started_utc": "2026-08-23T07:41:26.8518940Z",
+      "finished_utc": "2026-08-23T07:41:31.9151597Z",
+      "outer_duration_seconds": 5.063,
+      "inner_duration_seconds": 4.859,
+      "tests_run": 23,
+      "tests_passed": 22,
+      "exit": 0,
+      "host": "Windows-11-10.0.26200-SP0 x64",
+      "skipped_test": "DoctorSubprocessBoundaryTests.test_posix_detached_descendant_is_typed_not_ready",
+      "skip_reason": "POSIX setsid residual is not applicable on Windows",
+      "skip_effect": "POSIX-only residual-risk coverage is unavailable on this host; Windows Job containment remains exercised by the timeout descendant and inherited-handle cases plus a forced Job-resume failure."
+    },
+    "focused_pre_payload_a_lock_independent_curator_corrected_evidence": {
+      "command": "python -m unittest discover -s .autopilot/tests -p test_doctor_boundary.py -v",
+      "started_utc": "2026-08-23T07:44:27.8360716Z",
+      "finished_utc": "2026-08-23T07:44:32.9159100Z",
+      "outer_duration_seconds": 5.08,
+      "inner_duration_seconds": 4.885,
+      "tests_run": 23,
+      "tests_passed": 22,
+      "exit": 0,
+      "scope": "Focused validation only; neither full doctor nor repository CI. It predates the immutable Payload-A lock. The skipped POSIX-only test and its Windows scope are recorded in the other Curator receipt."
+    },
+    "focused_post_payload_a_lock_independent_curator": {
+      "payload_status": "SUPERSEDED_BY_EXTERNAL_REQUEST_CHANGES",
+      "payload_a_record_sha256": "a4892c8ad1942b8f530475590dab3e1bb112a6b81d92173cf8289e2123de0b91",
+      "payload_a_record_bytes": 627,
+      "command": "python -m unittest discover -s .autopilot/tests -p test_doctor_boundary.py -v",
+      "started_utc": "2026-08-23T07:48:52.7704797Z",
+      "finished_utc": "2026-08-23T07:48:57.7905464Z",
+      "outer_duration_seconds": 5.02,
+      "inner_duration_seconds": 4.829,
+      "tests_run": 23,
+      "tests_passed": 22,
+      "skipped_test": "DoctorSubprocessBoundaryTests.test_posix_detached_descendant_is_typed_not_ready",
+      "skip_reason": "POSIX setsid residual is not applicable on Windows",
+      "exit": 0,
+      "scope": "Focused validation only. This Envelope-B entry binds the immutable Payload A and does not claim full-doctor, repository-CI, or exact-head coverage for later Envelope-B bytes."
+    },
+    "independent_judge": {
+      "payload_status": "SUPERSEDED_BY_EXTERNAL_REQUEST_CHANGES",
+      "identity": "/root/judge",
+      "disposition": "CONDITIONAL_APPROVAL_PAYLOAD_A_CANDIDATE",
+      "verified_manifest_sha256": "a4892c8ad1942b8f530475590dab3e1bb112a6b81d92173cf8289e2123de0b91",
+      "verified_manifest_bytes": 627,
+      "verified_raw_content_aggregate_sha256": "f4c4d9d488bb8a69b4ad87c734dcb2af77b4c2dbb99acde9d6a435027810d055",
+      "verified_raw_content_aggregate_bytes": 302364,
+      "scope": "The focused receipt qualifies only the immutable Payload A identities above. Envelope B may append bindings but cannot alter A, enlarge a qualification, or be described as exact-head full-CI coverage.",
+      "promotion_blockers": [
+        "Successful ordinary full doctor against unchanged Payload A, bound to both verified digests.",
+        "Repository CI after release of the held validation lease, with only inherited GIT_PAGER removed, bound to both verified digests.",
+        "Fresh review if any Payload-A byte changes."
+      ]
+    },
+    "focused_pre_replacement_payload_a_lock": {
+      "command": "python -m unittest discover -s .autopilot/tests -p test_doctor_boundary.py -v",
+      "started_utc": "2026-08-23T07:58:27.2145900Z",
+      "finished_utc": "2026-08-23T07:58:32.0403202Z",
+      "outer_duration_seconds": 4.826,
+      "inner_duration_seconds": 4.597,
+      "tests_run": 25,
+      "tests_passed": 24,
+      "exit": 0,
+      "scope": "Pre-replacement-lock focused evidence only. It adds typed containment_unavailable/no-child checks for missing NtResumeProcess and CreateJobObjectW plus untransferred Job-handle cleanup."
+    },
+    "focused_pre_replacement_payload_a_lock_final_api_normalization": {
+      "command": "python -m unittest discover -s .autopilot/tests -p test_doctor_boundary.py -v",
+      "started_utc": "2026-08-23T08:00:09.7150177Z",
+      "finished_utc": "2026-08-23T08:00:14.6073099Z",
+      "outer_duration_seconds": 4.892,
+      "inner_duration_seconds": 4.686,
+      "tests_run": 25,
+      "tests_passed": 24,
+      "exit": 0,
+      "scope": "Pre-replacement-lock focused evidence only; no full doctor or repository CI claim."
+    },
+    "focused_final_replacement_payload_a_r3_independent_curator": {
+      "manifest_sha256": "84610cb9deda152c0571589bc316fd2a324df6c69d2865338149c48ae964b2f3",
+      "raw_content_aggregate_sha256": "ac9a94e1dbf7b814a39451b7825125c643969710498f37e0af1fa0a1b14c3e65",
+      "command": "python -m unittest discover -s .autopilot/tests -p test_doctor_boundary.py -v",
+      "started_utc": "2026-08-23T08:04:40.9183502Z",
+      "finished_utc": "2026-08-23T08:04:45.7248155Z",
+      "outer_duration_seconds": 4.806,
+      "inner_duration_seconds": 4.625,
+      "tests_run": 25,
+      "tests_passed": 24,
+      "skipped_test": "DoctorSubprocessBoundaryTests.test_posix_detached_descendant_is_typed_not_ready",
+      "skip_reason": "POSIX setsid residual is not applicable on Windows",
+      "exit": 0,
+      "scope": "Focused validation only. This Envelope-B entry binds final Payload A R3 and does not claim full-doctor, repository-CI, or exact-head coverage for Envelope-B bytes."
+    },
+    "independent_judge_final_r3": {
+      "identity": "/root/judge",
+      "disposition": "ADOPT_CANDIDATE_FOCUSED_EVIDENCE_ACCEPTED",
+      "manifest_sha256": "84610cb9deda152c0571589bc316fd2a324df6c69d2865338149c48ae964b2f3",
+      "raw_content_aggregate_sha256": "ac9a94e1dbf7b814a39451b7825125c643969710498f37e0af1fa0a1b14c3e65",
+      "qualifying_focused_receipt": "focused_final_replacement_payload_a_r3_independent_curator",
+      "supersedes": "All earlier Payload-A/R2 receipts and the Judge's earlier R3 pre-receipt disposition qualify nothing.",
+      "scope": "Only R3 Payload A is qualified by this focused receipt. Envelope B is append-only evidence, cannot alter/enlarge R3 qualification, and is not covered by this or any future exact-head CI claim.",
+      "remaining_blockers": [
+        "Successful bound ordinary full doctor against unchanged R3 after validation-lease release.",
+        "Repository CI after validation-lease release with only inherited GIT_PAGER removed, bound to R3."
+      ]
+    },
+    "leased_full_doctor_unattested": {
+      "command": "C:\\Python314\\python.exe .autopilot/bin/autopilot.py --repo-root . doctor --json",
+      "environment": "PYTHONPATH=<exact worktree>/src; inherited GIT_PAGER removed; no other requested override.",
+      "doctor_process_creation_observed_utc": "2026-08-23T08:08:18Z",
+      "controller_child_creation_observed_utc": "2026-08-23T08:08:22Z",
+      "capture_failure": "Terminal session detached before buffered stdout/stderr, exit code, and timing markers were retrievable.",
+      "result": "UNATTESTED_TERMINAL_DETACH; no READY/exit-0/JSON/controller-test/descendant-cleanup assertion is permitted.",
+      "process_tree_after_inspection": "No known doctor/controller/descendant PID or direct child remained; that does not establish the missing doctor result.",
+      "capture_salvage": "No AppData evidence artifact or temp doctor log from the 08:08 execution existed; discoverable logs predated it.",
+      "required_next_step": "Run exactly one RETRY-AFTER-CAPTURE-FAILURE full doctor through the validated external durable harness; do not run CI until it is fully attested."
+    },
+    "external_durable_capture_harness": {
+      "path": "C:\\Users\\beesp\\AppData\\Local\\HiveMindOS\\evidence\\durable-doctor-capture\\Invoke-DurableCapturedProcess.ps1",
+      "scope": "Outside repository and Payload A. Launch mode precreates dedicated output files and starts Run mode with Start-Process -WindowStyle Hidden; Run mode writes atomic output/receipt files and a completion sentinel in finally.",
+      "failed_pre_child_dry_runs": ["dry-r3-20260823t0817", "dry-r3-20260823t0821"],
+      "validated_dry_run": {
+        "run_id": "dry-r3-20260823t0822",
+        "helper_pid": 38172,
+        "child_pid": 79028,
+        "exit_code": 0,
+        "duration_seconds": 0.072,
+        "stdout": "durable-dry-stdout\\r\\n",
+        "stderr": "durable-dry-stderr",
+        "receipt_path": "C:\\Users\\beesp\\AppData\\Local\\HiveMindOS\\evidence\\durable-doctor-capture\\runs\\dry-r3-20260823t0822\\receipt.json",
+        "completion_sentinel": "C:\\Users\\beesp\\AppData\\Local\\HiveMindOS\\evidence\\durable-doctor-capture\\runs\\dry-r3-20260823t0822\\complete"
+      }
+    },
+    "expert_addendum_02": {
+      "identity": "expert:bounded-doctor-subprocess-runtime-binding-20260823/addendum-02",
+      "disposition": "ADOPT_CANDIDATE_PENDING_FULL_DOCTOR_CI_CURATOR_AND_JUDGE",
+      "focused_run": "23 run, 22 passed, 1 expected POSIX-only skip, exit 0, outer duration 5.451s",
+      "scope": "No full successful doctor or repository CI is established; POSIX CI evidence remains necessary for a cross-platform operational claim."
+    },
+    "repository_ci": "PASSED_R3_ONE_GATE",
+    "v3_schema_adaptation_adverse_history": {
+      "run_id": "r3-dry-3ada-20260823T102541-d730e1b5c02b",
+      "helper_sha256": "3ada019c73da335a9b80ecc0909bc057c08ab232c16c06fde9da23816e4c74d1",
+      "native_operational_result": "SUCCESSFUL",
+      "evidence_result": "NONQUALIFYING_SCHEMA_EVIDENCE",
+      "judge_disposition": "ADAPT",
+      "reason": "cleanup_failures serialized as null and a one-item job_member_observation_records collection serialized as a scalar; typed in-memory arrays/qualification are not enough for promotion-grade receipt shape.",
+      "preservation": "The V3 native success remains adverse-aware evidence and does not authorize doctor or CI."
+    },
+    "v7_stable_receipt_array_adaptation": {
+      "helper_sha256": "bf873fb4ecba27fc5ff4caf7bef55f0a78c37a2c28e19354138c83d4f1504f5b",
+      "helper_bytes": 66161,
+      "helper_mtime_utc": "2026-08-23T10:36:16.7815101Z",
+      "schema": "hive-mind-durable-capture-v7-stable-receipt-arrays",
+      "control": "cleanup_failures, job_member_observation_records, and child_arguments are always JSON arrays, including zero- and one-item cases; the implementation's 0/1/many serialization contract was statically checked.",
+      "static_validation": {
+        "powershell_parse_errors": 0,
+        "embedded_csharp_blocks_compiled": "2 of 2",
+        "independent_reviewers": ["APPROVE", "APPROVE"]
+      },
+      "scope": "External Envelope-B harness adaptation only; excluded from Payload A R3."
+    },
+    "v7_qualifying_dry_run": {
+      "run_id": "r3-dry-bf873-20260823T103942-2da15e09c401",
+      "receipt_sha256": "79960846fc05832c0bd5ba21ac5f5cce312ee5071808991f8aac327c95f277cc",
+      "request_sha256": "eff2e8b99b983f4e61010f6bbc71649ce2fcd96543fb32dad8b589244e269fe2",
+      "nonce_sha256": "47d0760d3af0293db3192e19a2edec6ea92a338e55163db554a49c0851087a2c",
+      "ready_sha256": "f848b1eda365ab4f0a323b6f98df98baf5dd1300fa08e4bf82d7c90ff7395a00",
+      "launch_sha256": "94f66ed15003b1777a821d585a5c4bbd13f4b85d6b2ef9c1111fb6ac34ead27a",
+      "stdout": {"bytes": 34, "sha256": "cfc3dbe76c584cb8028c5641723bda19110e518f9aad72292f0826f8ed477b93"},
+      "stderr": {"bytes": 34, "sha256": "e103ac7de3b7d08e57c028827ee657b9eadf42191cd65f294e8adb316fb4b1a4"},
+      "stable_array_lengths": {"child_arguments": 7, "cleanup_failures": 0, "job_member_observation_records": 1},
+      "native_result": {"helper_exit": 0, "child_exit_uint32": 0, "natural_job_drain_milliseconds": 15, "final_active_processes": 0, "termination_attempted": false, "same_identity_survivor": false, "qualifying_capture": true},
+      "review": {"reviewers": ["APPROVE", "APPROVE"], "judge_disposition": "ADOPT", "scope": "Permits one ordinary full doctor only; it does not authorize another dry retry or CI."}
+    },
+    "ordinary_full_doctor_r3": {
+      "run_id": "r3-full-doctor-bf873-20260823T104550-2c4ddb145462",
+      "command_identity": "ADR068-R3-FULL-DOCTOR-V1",
+      "whole_run_timeout_seconds": 900,
+      "binding": "C:\\Python314\\python.exe; exact isolated worktree cwd/repository root; PYTHONPATH is that worktree src; inherited GIT_PAGER removed; controller tests enabled.",
+      "receipt_sha256": "1f52ef254f8789652510441b9c01a248134a7073a5fb3b234503d93a06df25be",
+      "request_sha256": "17d54e75b9217e36d3700483659cd2f242c4fcb8adcffce2df8ad3f8ea40543a",
+      "nonce_sha256": "0261c8651ea61d7c2a5327f4899a87de95d104f79bd4d33519b5e5d1f0c81666",
+      "ready_sha256": "17a1ba9a6a438476331de062dedba7c7f0a9479fe736b21b556114448157f6c1",
+      "launch_sha256": "2955cda02420af8892a9dec91ba19d39aa502ed2102aa4d454da66afd81ad9a9",
+      "stdout": {"bytes": 3372, "sha256": "0f138a50f01ea9a2e497821017ffdcd084cecd3b54bb3d56041fa63a4650fa11"},
+      "stderr": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      "complete_sha256": "5a3a556bac6b5e2fec34cd9dc7193d12a881638ae242ca90b8a1182a4e79281d",
+      "stable_array_lengths": {"child_arguments": 5, "cleanup_failures": 0, "job_member_observation_records": 1},
+      "native_result": {"helper_exit": 0, "child_exit_uint32": 0, "natural_job_drain_milliseconds": 16, "final_active_processes": 0, "termination_attempted": false, "same_identity_survivor": false, "qualifying_capture": true},
+      "doctor_result": {"strict_one_json_object": true, "exit": 0, "state": "READY", "ready_reduced": false, "passed": true, "controller_tests_run": true, "controller_tests_passed": true, "named_checks_passed": 6, "environment_fingerprint": "sha256:9769f9796efb351da9b764fd49983b1130adccc0b8592e42581714d3727f8b39", "windows_controller_job_return_code": 0, "windows_controller_job_duration_seconds": 303.315, "prospective_review_threshold_seconds": 450, "child_output_telemetry": "No retained child text, length, or digest."},
+      "review": {"curator": "APPROVE", "cross_examiner": "APPROVE", "judge_disposition": "ADOPT", "scope": "Permits exactly one repository-CI gate only."}
+    },
+    "repository_ci_r3_one_gate": {
+      "command": "C:\\Python314\\python.exe -m unittest discover -s tests -v",
+      "environment": "Only inherited GIT_PAGER removed.",
+      "unified_exec_session": 84590,
+      "exit": 0,
+      "tests_run": 1119,
+      "duration_seconds_reported_by_unittest": 1082.185,
+      "result": "OK (skipped=7)",
+      "postflight_utc": "2026-08-23T11:18:43.3903167Z",
+      "raw_transcript_receipt_limitation": "The durable evidence identifies unified session 84590, exit, and unittest summary only. It contains no independently retained raw transcript or transcript digest; no such digest is claimed.",
+      "raw_transcript_retained": false,
+      "raw_transcript_digest": null,
+      "raw_transcript_integrity_claimed": false,
+      "independent_transcript_replay_claimed": false,
+      "postflight_payload_a": {"six_hashes_unchanged": true, "line_manifest_sha256": "84610cb9deda152c0571589bc316fd2a324df6c69d2865338149c48ae964b2f3", "raw_aggregate_sha256": "ac9a94e1dbf7b814a39451b7825125c643969710498f37e0af1fa0a1b14c3e65", "plan_blob": "ee7ec9f2756fcff2b7010238d7064d017c4df7af", "python_helper_head_unchanged": true, "status": "Exactly the same eight intended entries."},
+      "scope": "The gate qualifies R3 only. Later Envelope-B appends are not exact-head CI coverage."
+    },
+    "postflight_judge_disposition": {
+      "identity": "/root/dry_receipt_judge",
+      "disposition": "ADOPT",
+      "final_source_reviewers": {
+        "/root/doctor_capture_harness": "ADAPT_BEFORE_CORRECTION",
+        "/root/win32_handle_expert": "ADAPT_BEFORE_CORRECTION"
+      },
+      "post_correction_approval_claimed": false,
+      "scope": "The qualifying dry run, ordinary full doctor, and one repository-CI gate qualify the immutable Payload A R3. This append-only Envelope-B/court evidence binds the outcome but neither changes R3 nor claims exact-head coverage for its own later bytes."
+    }
+  }
+}

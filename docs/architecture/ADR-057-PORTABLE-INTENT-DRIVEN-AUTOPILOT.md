@@ -117,6 +117,11 @@ use the detailed dispatcher protocol while adopting the orchestration contract. 
 repositories begin with `hive-mind autopilot init`, review the generated request, and then
 build their repository-specific DAG.
 
+Legacy repository-only `DAG-BUILD` task identities must not be resumed after this
+amendment. Hosts replace them with request-scoped tasks whose launch and idempotency
+identities bind the digest-verified request ID and objective digest, while retaining the
+legacy task as adverse history.
+
 Rollback removes the additive portable CLI/module/policy and the `orchestrate`,
 `infer-intent`, and `simple-prompt` commands, then restores the former wave selector. It
 does not delete task history, claims, receipts, source records, or adverse evidence.
@@ -128,3 +133,29 @@ resume, durable-task output, task idempotency identity, serial-node isolation,
 conflict-free priority, portable initialization, source pinning, overwrite refusal, and
 repository-neutral output. The complete repository CI gate remains required before a
 passing delivery claim.
+
+## 2026-08-23 fail-closed safety amendment
+
+Live validation found that the additive `autopilot run "subject"` shortcut could pass its
+new subject to an installed controller whose only executable plan was an older, unrelated
+`.autopilot/plan.json`. Intent classification could then treat words inside the subject as
+`START`, `CONTINUE`, or `FINISH` and expose old-plan tasks. The installed plan carries no
+authenticated binding to the persisted portable request, so reusing it is rejected rather
+than adapted.
+
+Until authenticated request-to-plan generation exists, `autopilot run` with an installed
+controller returns the typed `PLAN_GENERATION_REQUIRED` outcome with zero tasks. The result
+binds the repository, persisted request, and objective digest and lists the authenticated
+generation and independent-validation requirements for its successor. This explicit
+operation is not reclassified from subject wording. Existing `autopilot inspect` behavior
+remains available for an operator who intentionally addresses the installed plan.
+
+Bootstrap identity is also request-scoped. The durable task key, launch instruction,
+idempotency key, contract, and prompt bind both the digest-verified request ID and canonical
+objective digest. Repeating the same request is stable, while replacing the request in the
+same repository necessarily produces a distinct task identity. Workers verify both values
+against the persisted request and fail closed rather than resuming cross-objective work.
+
+The rollback is the narrow `run_repository` branch and its documentation. Rolling it back
+before authenticated generation ships would restore a known cross-objective task-leak risk
+and is therefore unsafe.

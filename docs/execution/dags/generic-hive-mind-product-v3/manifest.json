@@ -1,0 +1,415 @@
+{
+  "schema_version": 4,
+  "kind": "hive-mind-generic-product-overlay-manifest-v4",
+  "plan_id": "generic-hive-mind-product-v3",
+  "authorship": {
+    "architect": "/root/v4_matrix_architect",
+    "judge": "UNASSIGNED",
+    "court_status": "PENDING_DISTINCT_COURT",
+    "execution_authority": "NONE"
+  },
+  "request_binding": {
+    "request_id": "sha256:baa813bdcbd1b3bd459736cb65dccaf060758991a8a9b581fe8a1bf17dd65562",
+    "objective_digest": "sha256:36125297e861b0fea8d1be8b81e985445957f85378dc35c6712896b7b4d93c9c",
+    "repository_id": "sha256:48eb2b11cd99bb34f430f5e1c7a39d9a32b9bbaac6a99db4736d2ac422915590",
+    "task_key": "DAG-BUILD-48eb2b11cd99-baa813bdcbd1",
+    "launch_digest": "sha256:475c6908392956991faec25293170750e17fac70a97e62f550bb6d6164eb4461",
+    "target_branch": "release/hive-mind-autopilot"
+  },
+  "snapshot_lineage": {
+    "request_observation": {
+      "commit": "44224532dc25b94a95c3184054ec81762a258259",
+      "tree": "c2e7b983e9ed430ea8e3f7013ee2d8cb02a60e33"
+    },
+    "qualified_prerequisite": {
+      "commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+      "tree": "22639258c7a524ffda25272ccf34fede176b2663"
+    },
+    "combined_envelope_b": {
+      "commit": "877bf9fc9cdbef94e6fc33ff9e22fe53349db130",
+      "tree": "1ede87e53fc7fc75d29968698ba4b8dab082dd1e"
+    },
+    "authoring_base_parent": {
+      "commit": "42b4aeef17f816430a7d8a435102635afea8761a",
+      "tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed"
+    },
+    "git_environment_correction_parent": {
+      "commit": "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
+      "tree": "8730203c89835c4d1d9dac4be9b2086dacd2d869"
+    },
+    "correction_parent": {
+      "commit": "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8",
+      "tree": "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
+    }
+  },
+  "committed_payload_contract": {
+    "mode": "exact-append-only-native-executable-matrix-correction-v4",
+    "authoring_base_parent": {
+      "commit": "42b4aeef17f816430a7d8a435102635afea8761a",
+      "tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed"
+    },
+    "correction_parent": {
+      "commit": "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8",
+      "tree": "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
+    },
+    "predecessor_payload": {
+      "commit": "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8",
+      "tree": "0d0a251b6ff1557ca014b6b50c6f62ae787c4459",
+      "parent_commit": "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
+      "parent_tree": "8730203c89835c4d1d9dac4be9b2086dacd2d869",
+      "manifest_raw_sha256": "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e",
+      "full_payload_aggregate": {
+        "domain": "hive-mind-os/v3-append-only-git-boundary-correction-content/v3",
+        "sha256": "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
+      },
+      "qualification_report_sha256": "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff",
+      "observed_status": "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
+      "author_proposed_disposition": "ADAPT_REMAND"
+    },
+    "remanded_git_environment_predecessor": {
+      "commit": "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
+      "tree": "8730203c89835c4d1d9dac4be9b2086dacd2d869",
+      "parent_commit": "4e2b81b932e5145f24c4b52ceeee664bff91df2e",
+      "parent_tree": "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157",
+      "manifest_raw_sha256": "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339",
+      "full_payload_aggregate": {
+        "domain": "hive-mind-os/v3-append-only-correction-content/v2",
+        "sha256": "sha256:229821586021d8e2769035aeca4a4589cb7b458a9740a8b8ca82ebdfdadaee36"
+      },
+      "qualification_report_sha256": "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810",
+      "observed_status": "QUALIFICATION_REMANDED_GIT_ENVIRONMENT_FAIL_OPEN",
+      "author_proposed_disposition": "ADAPT_REMAND"
+    },
+    "historical_payload_a": {
+      "commit": "4e2b81b932e5145f24c4b52ceeee664bff91df2e",
+      "tree": "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157",
+      "parent_commit": "42b4aeef17f816430a7d8a435102635afea8761a",
+      "parent_tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed",
+      "manifest_raw_sha256": "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522",
+      "full_payload_aggregate": {
+        "domain": "hive-mind-os/v3-payload-a-content/v1",
+        "sha256": "sha256:ff7a0f323aac32da18c70d6f871ddc0918225ddd47de0c15618822be84706d78"
+      },
+      "observed_status": "FOCUSED_SUITE_FAILED_12_OF_14",
+      "author_proposed_disposition": "ADAPT_SUPERSEDE"
+    },
+    "expected_changed_paths": [
+      ".gitattributes",
+      "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+      "docs/execution/dags/generic-hive-mind-product-v3/README.md",
+      "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+      "tests/test_generic_dag_v3_overlay.py"
+    ],
+    "payload_inventory": [
+      ".gitattributes",
+      "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+      "docs/architecture/ADR_INDEX.md",
+      "docs/execution/dags/generic-hive-mind-product-v3/README.md",
+      "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/materialize_plan.py",
+      "docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/ownership-effects.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
+      "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+      "tests/test_generic_dag_v3_overlay.py"
+    ],
+    "activation_anti_downgrade": {
+      "required_contract_mode": "exact-append-only-native-executable-matrix-correction-v4",
+      "required_git_executable_format_policy": "host-native-image-format-v1",
+      "rejected_v3_git_boundary_manifest_raw_sha256": "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e",
+      "rejected_f06_manifest_raw_sha256": "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339",
+      "rejected_historical_payload_a_manifest_raw_sha256": "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522",
+      "v3_git_boundary_activation": "PROHIBITED",
+      "f06_activation": "PROHIBITED",
+      "historical_payload_a_activation": "PROHIBITED",
+      "legacy_v1_fallback": "PROHIBITED",
+      "external_minimum_version_and_revocation_policy": "REQUIRED_NOT_SATISFIED"
+    },
+    "git_execution_boundary": {
+      "policy": "caller-absolute-raw-sha256-host-native-image-v2",
+      "native_executable_format": "HOST_NATIVE_IMAGE_FORMAT_V1",
+      "supported_hosts": {
+        "win32": "PE_COFF_EXECUTABLE_IMAGE",
+        "linux": "ELF_EXEC_OR_PIE_WITH_EXECUTABLE_LOAD_SEGMENT",
+        "darwin": "MACH_O_EXECUTE_THIN_OR_HOST_SLICE_UNIVERSAL"
+      },
+      "unsupported_host": "FAIL_CLOSED",
+      "script_or_interpreter_wrapper": "PROHIBITED",
+      "max_executable_bytes": 268435456,
+      "caller_path_and_raw_digest": "REQUIRED_EXTERNAL",
+      "compiled_native_delegator_exclusion": "NOT_PROVEN_BY_FORMAT",
+      "runtime_dependency_closure": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED",
+      "inherited_git_environment": "REJECT_ALL_CASE_INSENSITIVE_GIT_PREFIX",
+      "child_environment": "MINIMAL_ALLOWLIST_V1",
+      "path_lookup": "PROHIBITED",
+      "repository_addressing": "EXPLICIT_GIT_DIR_AND_WORK_TREE",
+      "system_and_global_config": "DISABLED",
+      "local_risk_overrides": [
+        "core.fsmonitor=false",
+        "core.hooksPath=<os-devnull>",
+        "core.attributesFile=<os-devnull>",
+        "core.excludesFile=<os-devnull>",
+        "core.untrackedCache=false",
+        "diff.external="
+      ],
+      "tracked_state": "RAW_HEAD_INDEX_WORKTREE_BLOB_EQUALITY",
+      "object_alternates": "PROHIBITED",
+      "per_invocation_executable_revalidation": true,
+      "final_cleanliness_revalidation": true,
+      "strong_read_only_runtime": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED"
+    },
+    "payload_bindings": [
+      {
+        "path": ".gitattributes",
+        "bytes": 1054,
+        "sha256": "sha256:cabe449e7fc63f31e09ae6b89c650c2980b1fb91d9630facae1ab8b4c74948f2"
+      },
+      {
+        "path": "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+        "bytes": 25215,
+        "sha256": "sha256:1d68ad4484b500fb965d1f188a7cdad6af53a7d1bf770a7b14b658cf674206a8"
+      },
+      {
+        "path": "docs/architecture/ADR_INDEX.md",
+        "bytes": 11435,
+        "sha256": "sha256:d573e57748bc0a0d4b8990b87e00aa00a3f0f3c68f3bfdc93a87743747a12b9b"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/README.md",
+        "bytes": 19878,
+        "sha256": "sha256:e084a6168eb9b8441d74671a3c54851b82f3e223b6e06e3eecc274062905be44"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/materialize_plan.py",
+        "bytes": 25309,
+        "sha256": "sha256:63c2dd154fc1a6e4db9e9ca5ca7e06d57ef93f141a921ff3189fa77b4b48464c"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json",
+        "bytes": 64381,
+        "sha256": "sha256:eef8694c935467bade1fed286ef9cce67f01e2f35f0b914105255bf8681e3cf8"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/ownership-effects.json",
+        "bytes": 10943,
+        "sha256": "sha256:056b74b37da1e7292d7931b93c5975c2c589ce4b64c8bf0004ca12f5deebaf80"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
+        "bytes": 170172,
+        "sha256": "sha256:5e03c7638b2d4865dda2b2c3a5e615ea4b2b8d37f61a3a5fdfbf29c1750827c4"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
+        "bytes": 24865,
+        "sha256": "sha256:4182ab1d43deaabe41b50e8c534d2f6de33d399696cb69611391858f17eaa786"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+        "bytes": 183607,
+        "sha256": "sha256:1041b9646c47416c86e9f64361bb2ea62b0a281339698b844bad2bb2076ce214"
+      },
+      {
+        "path": "tests/test_generic_dag_v3_overlay.py",
+        "bytes": 198590,
+        "sha256": "sha256:9d432c820d64142d01357351d8a404e67fee0a208b5f5ad3ffe6d0b588dbfcc2"
+      }
+    ],
+    "manifest_authentication": {
+      "mode": "caller-supplied-raw-sha256",
+      "required": true
+    },
+    "court_envelope_b_bindings": [
+      "committed_contract_mode",
+      "correction_parent_commit",
+      "correction_parent_tree",
+      "committed_payload_head",
+      "committed_payload_tree",
+      "caller_authenticated_manifest_digest",
+      "caller_authenticated_git_path_raw_sha256_and_observed_native_format",
+      "corrected_full_payload_aggregate_digest",
+      "v3_git_boundary_parent_identity",
+      "v3_git_boundary_parent_remand_verdict",
+      "v3_git_boundary_parent_qualification_report_digest",
+      "f06_identity_report_and_remand",
+      "historical_payload_a_identity_and_disposition",
+      "platform_adversarial_matrix_receipt_digests",
+      "focused_and_full_gate_transcript_digests",
+      "court_verdict",
+      "external_git_runtime_dependency_bundle_digest",
+      "external_minimum_version_and_revocation_policy_digest"
+    ],
+    "allowed_untracked_paths": [
+      ".hive-mind/autopilot-request.json"
+    ],
+    "authoring_check": "NON_EXECUTING_NON_QUALIFYING_ONLY"
+  },
+  "source_bindings": {
+    "repository": [
+      {
+        "path": "LICENSE",
+        "bytes": 1065,
+        "sha256": "sha256:6e76d648ae297aa3dcefc739604cfcfab2a50b484ab7331090c745a089de21f8",
+        "git_blob": "06da1af7996f5e2b059cd52045e36f9f2cfac201"
+      },
+      {
+        "path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+        "bytes": 27006,
+        "sha256": "sha256:86d1c1c81a27fc3e3ffd931193e0e145030756f78b58c674e8ba8b1c1bd3397d",
+        "git_blob": "70e43b0a8078a303d44c0109b8dd218a948258c2"
+      },
+      {
+        "path": "docs/execution/DAG_AUTHORING_STANDARD_V2.md",
+        "bytes": 12312,
+        "sha256": "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a",
+        "git_blob": "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374"
+      },
+      {
+        "path": ".autopilot/bin/dag_standard.py",
+        "bytes": 104317,
+        "sha256": "sha256:105674faf15aaf7b9f4c9db7ad4003fda404438eed2bf8cc3a1782c1cf321e6a",
+        "git_blob": "f170ac4f388d265fcaafd32437e449945dcebee3"
+      },
+      {
+        "path": ".autopilot/plan.json",
+        "bytes": 169053,
+        "sha256": "sha256:85fd0c69fed4aa8cd40019bfeaccc5a686fa408ae5183060ae0320d412cea9ef",
+        "git_blob": "ee7ec9f2756fcff2b7010238d7064d017c4df7af"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v3/source-intake.json",
+        "bytes": 58463,
+        "sha256": "sha256:dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c",
+        "git_blob": "6dcc1b506fe9806b32eb6160de6994bd9e71bf58"
+      },
+      {
+        "path": "evidence/autopilot/COMBINED-PREREQUISITE-QUALIFICATION-2026-08-23.md",
+        "bytes": 10498,
+        "sha256": "sha256:a514b794be97268b6b2fe1daae08e191ef7c993e0928b73d977802a8137cc95e",
+        "git_blob": "fc56f63f576a2839ef7b3b24e72f246e1dc5644b"
+      },
+      {
+        "path": "evidence/courts/CASE-COMBINED-AUTOPILOT-PREREQUISITES-2026-08-23.json",
+        "bytes": 6586,
+        "sha256": "sha256:fcd5b64824ac6a31492b4a454528b6093648ac170c0fdaaa9f00d69bf869e8dc",
+        "git_blob": "2de4ddb37d5b8605f74a060377e52c9b5923fba9"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/README.md",
+        "bytes": 3506,
+        "sha256": "sha256:b83c659f3a4f9cf1be4ab707246636d9cc40f09ee28d14a6e0020b31b512f82b",
+        "git_blob": "7fe726912358e62bb557a0dcf043ad6e69629302"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/generate_plan.py",
+        "bytes": 6128,
+        "sha256": "sha256:ad540bf2e29e147671b715098ae3a9209fa7e9d4cdc62bd7bdd3df0368ba726c",
+        "git_blob": "b61407bb871e17e07da060ee4796bae05957afa6"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/manifest.json",
+        "bytes": 1363,
+        "sha256": "sha256:dd0adbe4bef4cce5343e5852a6d7076fb71c383f71456b4a86acbc11e187e02e",
+        "git_blob": "e4e0d24c90c0e9b9f13e15fb90b9bd31a75e3bf5"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/specs_a.py",
+        "bytes": 15352,
+        "sha256": "sha256:7616bd7229670daffed1040b037a9d2de73e447e9b50115bb0a7aab2334e4027",
+        "git_blob": "0adb16c3de4b7f78739aed2d00b64eb8a549f4f8"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/specs_b.py",
+        "bytes": 14810,
+        "sha256": "sha256:5f9cde6830880c5e5fcee88ac4973c172133e12bceb8b13514a192dbb3444eb6",
+        "git_blob": "0ed6d109bdf09037c41db56f25ca155b4179b2d4"
+      },
+      {
+        "path": "docs/execution/dags/generic-hive-mind-product-v1/verify_plan.py",
+        "bytes": 5684,
+        "sha256": "sha256:467e07a363a150914fa40ee3a225f4adc9a49a7f7e7be06fd287e60a425c43bf",
+        "git_blob": "4078803e652ca3be1a38baafb0b186be9420d848"
+      }
+    ],
+    "overlay": [
+      {
+        "path": "node-contracts.json",
+        "bytes": 64381,
+        "sha256": "sha256:eef8694c935467bade1fed286ef9cce67f01e2f35f0b914105255bf8681e3cf8"
+      },
+      {
+        "path": "traceability.json",
+        "bytes": 24865,
+        "sha256": "sha256:4182ab1d43deaabe41b50e8c534d2f6de33d399696cb69611391858f17eaa786"
+      },
+      {
+        "path": "ownership-effects.json",
+        "bytes": 10943,
+        "sha256": "sha256:056b74b37da1e7292d7931b93c5975c2c589ce4b64c8bf0004ca12f5deebaf80"
+      },
+      {
+        "path": "materialize_plan.py",
+        "bytes": 25309,
+        "sha256": "sha256:63c2dd154fc1a6e4db9e9ca5ca7e06d57ef93f141a921ff3189fa77b4b48464c"
+      },
+      {
+        "path": "verify_plan.py",
+        "bytes": 183607,
+        "sha256": "sha256:1041b9646c47416c86e9f64361bb2ea62b0a281339698b844bad2bb2076ce214"
+      }
+    ]
+  },
+  "plan_binding": {
+    "expected_plan_digest": "sha256:43121c323dd652cd05807ccc5acdec70bb4a4b81a376e00c45acd16a5fc56ce1",
+    "expected_raw_bytes_digest": "sha256:5e03c7638b2d4865dda2b2c3a5e615ea4b2b8d37f61a3a5fdfbf29c1750827c4",
+    "external_path": "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
+    "historical_autopilot_plan_policy": "BYTE_IDENTICAL_READ_ONLY",
+    "historical_v1_expected_plan_digest": "sha256:b8879d09c5a42b0feeeec19b9c8f6a7523e4ef69b117eea1a18ef6dfaf35f977"
+  },
+  "topology": {
+    "node_count": 20,
+    "raw_edge_count": 28,
+    "level_count": 17,
+    "round_count": 20,
+    "redundant_direct_edge_count": 6
+  },
+  "execution_contract": {
+    "mode": "manual-parent-v1",
+    "executable_dispatch_command_available": false,
+    "every_round_command": null,
+    "legacy_fallback": "PROHIBITED"
+  },
+  "standard_and_compiler": {
+    "standard_v2_sha256": "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a",
+    "standard_v2_git_blob": "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374",
+    "compiler_sha256": "sha256:105674faf15aaf7b9f4c9db7ad4003fda404438eed2bf8cc3a1782c1cf321e6a",
+    "compiler_git_blob": "f170ac4f388d265fcaafd32437e449945dcebee3"
+  },
+  "frozen_host_prerequisite": {
+    "extraction_commit": "ca43709591313c1c166a2e655b8982ccff16daf3",
+    "extraction_tree": "22639258c7a524ffda25272ccf34fede176b2663",
+    "manifest_location": "node-contracts.json#/frozen_host_contract/files",
+    "file_count": 16,
+    "bundle_sha256": "sha256:76b89c6e83c9dc2c7ae4d41bbba0b2f6b1fdd8861e0a7c7aeda01602d1c89255",
+    "status": "REQUIRED_NOT_SATISFIED"
+  },
+  "evidence_partition": {
+    "checked_in": "Inert design, traceability, source bindings, and sealed external plan; never activation authority.",
+    "host_external": "Distinct-principal signed one-run activation bundle, pristine cache-free host extraction, trust receipts, lease ledger, and Envelope B evidence-only worktree/branch.",
+    "candidate_rule": "Qualification evidence never dirties or reidentifies the frozen candidate tree."
+  },
+  "source_governance": {
+    "SRC-024": "QUARANTINE_CONTENT_UNREAD",
+    "SRC-025": "UNRESOLVED",
+    "a5_full_autonomy": "NOT_READY"
+  },
+  "execution_authorized": false,
+  "nonclaims": [
+    "This checked-in manifest is not an activation bundle or execution authority.",
+    "The legacy continuation outcome was withheld and does not dispatch V3.",
+    "No full-autonomy, production, release, or superiority claim is made.",
+    "Every manual-parent-v1 round command is null until a separately trusted host supplies bounded execution."
+  ]
+}

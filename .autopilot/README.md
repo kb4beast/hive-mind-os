@@ -217,10 +217,30 @@ validate the same target at once.
 `ControlPlane.coordination_dir` performs that resolution by reading Git's on-disk
 worktree metadata, so it costs no subprocess and works before any dispatch. Independent
 repositories are unaffected and continue to run concurrently: they are different
-families with different authority. `autopilot doctor` reports the resolved location
-under its `runtime-coordination` check, along with whether `hive_mind_os` imports from
-this repository — a machine has only one editable install, so a checkout elsewhere can
-otherwise own every `hive-mind` invocation without any visible sign.
+families with different authority.
+
+### Doctor runtime and controller-test binding
+
+`autopilot doctor` reports two separately material runtime facts under
+`runtime-coordination`:
+
+- the controller-test child is launched by the exact invoking interpreter in isolated
+  mode and must import `hive_mind_os` from this checkout's `src` directory; and
+- the ambient package binding used by a normal `hive-mind` invocation must also point
+  at this checkout. A foreign machine-wide editable install is an error, not a healthy
+  substitute for the isolated child.
+
+For an isolated worktree, invoke the control room with the explicit, non-mutating
+contract `PYTHONPATH=<exact-worktree>\src python .autopilot/bin/autopilot.py ...`, or
+use a per-worktree virtual environment. Doctor never rewrites the machine-wide editable
+install. `--skip-controller-tests` returns `READY_REDUCED` with an explicit skipped
+record; it is diagnostic only and cannot serve as full-doctor or sealed-recovery
+evidence. The ordinary full doctor still runs all controller tests under its bounded
+timeout and emits typed JSON failures without raw child output. Controller-test stdout
+and stderr are strictly UTF-8 validated by bounded daemon readers, then discarded:
+doctor retains no output text, length, or digest. On Windows the bounded child is
+contained in an owned kill-on-close Job Object before it resumes; unavailable containment
+fails closed.
 
 For every non-bootstrap node, `complete` validates the receipt and creates an **empty
 receipt commit** on the already-claimed node branch. The receipt commit:

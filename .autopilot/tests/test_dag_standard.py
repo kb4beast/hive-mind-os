@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import io
 import json
+import shlex
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
+from hashlib import sha1
 from pathlib import Path
 from typing import Any
 
@@ -33,8 +35,20 @@ from dag_standard import (  # noqa: E402
     lint_plan,
     load_plan_graph,
 )
+from durable_controller import digest_json  # noqa: E402
 
 TEST_PREFIX = "python bin/autopilot.py --repo-root . dispatch"
+
+_HISTORICAL_STANDARD_BLOB = "70e43b0a8078a303d44c0109b8dd218a948258c2"
+_HISTORICAL_SEALED_PLAN_BLOB = "ee7ec9f2756fcff2b7010238d7064d017c4df7af"
+_HISTORICAL_V1_BLOBS = {
+    "README.md": "7fe726912358e62bb557a0dcf043ad6e69629302",
+    "generate_plan.py": "b61407bb871e17e07da060ee4796bae05957afa6",
+    "manifest.json": "e4e0d24c90c0e9b9f13e15fb90b9bd31a75e3bf5",
+    "specs_a.py": "0adb16c3de4b7f78739aed2d00b64eb8a549f4f8",
+    "specs_b.py": "0ed6d109bdf09037c41db56f25ca155b4179b2d4",
+    "verify_plan.py": "4078803e652ca3be1a38baafb0b186be9420d848",
+}
 
 
 def node(node_id: str, **overrides: Any) -> dict[str, Any]:
@@ -65,6 +79,28 @@ def graph_of(*nodes: dict[str, Any]) -> PlanGraph:
     return PlanGraph(nodes)
 
 
+def sealed_document(
+    nodes: list[dict[str, Any]], **plan_fields: Any
+) -> dict[str, Any]:
+    """Build exact v1 digest material without special-casing any contract field."""
+
+    sealed_nodes = json.loads(json.dumps(nodes))
+    for item in sealed_nodes:
+        item["contract_digest"] = digest_json(item)
+    document: dict[str, Any] = {
+        "schema_version": 1,
+        "nodes": sealed_nodes,
+        **plan_fields,
+    }
+    document["plan_digest"] = digest_json(document)
+    return document
+
+
+def git_blob_sha(path: Path) -> str:
+    body = path.read_bytes()
+    return sha1(b"blob " + str(len(body)).encode("ascii") + b"\0" + body).hexdigest()
+
+
 def findings_of(graph: PlanGraph, check: str, **kwargs: Any) -> tuple[Finding, ...]:
     return tuple(item for item in lint_plan(graph, **kwargs) if item.check == check)
 
@@ -74,6 +110,24 @@ def subject_of(findings: tuple[Finding, ...], subject: str) -> Finding:
         if item.subject == subject:
             return item
     raise AssertionError(f"no finding for {subject!r} in {[i.subject for i in findings]}")
+
+
+class HistoricalV1PreservationTests(unittest.TestCase):
+    """V2 work must not silently invalidate the sealed v1 overlay evidence."""
+
+    def test_original_standard_sealed_plan_and_entire_v1_overlay_are_preserved(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        standard = root / "docs" / "execution" / "DAG_AUTHORING_STANDARD.md"
+        sealed_plan = root / ".autopilot" / "plan.json"
+        v1 = root / "docs" / "execution" / "dags" / "generic-hive-mind-product-v1"
+        observed = {
+            path.relative_to(v1).as_posix(): git_blob_sha(path)
+            for path in v1.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts
+        }
+        self.assertEqual(git_blob_sha(standard), _HISTORICAL_STANDARD_BLOB)
+        self.assertEqual(git_blob_sha(sealed_plan), _HISTORICAL_SEALED_PLAN_BLOB)
+        self.assertEqual(observed, _HISTORICAL_V1_BLOBS)
 
 
 class PlanGraphTests(unittest.TestCase):
@@ -91,6 +145,52 @@ class PlanGraphTests(unittest.TestCase):
         messages = [item.message for item in findings_of(graph, "graph-validity")]
         self.assertIn("node id A is declared more than once", messages)
         self.assertIn("B depends on unknown node GHOST", messages)
+
+    def test_topology_preflight_rejects_unknown_and_duplicate_declarations(self) -> None:
+        cases = (
+            (
+                "unknown raw dependency",
+                graph_of(node("A", dependencies=["MISSING"])),
+                "A depends on unknown node MISSING",
+            ),
+            (
+                "duplicate declaration with invalid discarded metadata",
+                graph_of(
+                    node("A", durability_role="provider"),
+                    node("A", durability_role="bogus"),
+                ),
+                "node id A is declared more than once",
+            ),
+            (
+                "duplicate raw dependency",
+                graph_of(node("PROVIDER"), node("A", dependencies=["PROVIDER", "PROVIDER"])),
+                "A.dependencies declares PROVIDER more than once",
+            ),
+        )
+        for label, graph, message in cases:
+            with self.subTest(label=label):
+                graph_findings = findings_of(graph, "graph-validity")
+                self.assertIn(message, [item.message for item in graph_findings])
+                with self.assertRaisesRegex(DagStandardError, message):
+                    compile_rounds(graph, command_prefix=TEST_PREFIX)
+
+    def test_malformed_dependency_values_are_graph_errors_and_never_schedule(self) -> None:
+        cases = {
+            "object": {"required": "PROVIDER"},
+            "null": None,
+            "scalar": "PROVIDER",
+            "mixed": ["PROVIDER", 7],
+        }
+        for label, dependencies in cases.items():
+            with self.subTest(label=label):
+                graph = graph_of(node("A", dependencies=dependencies))
+                findings = findings_of(graph, "graph-validity")
+                self.assertEqual(len(findings), 1)
+                self.assertIn("must be a list of non-empty string ids", findings[0].message)
+                with self.assertRaisesRegex(
+                    DagStandardError, "invalid plan topology; no rounds were emitted"
+                ):
+                    compile_rounds(graph, command_prefix=TEST_PREFIX)
 
     def test_cycle_is_an_error_and_level_checks_are_skipped(self) -> None:
         graph = graph_of(
@@ -155,12 +255,12 @@ class MalformedScopeTests(unittest.TestCase):
 
     def test_absolute_and_traversing_scopes_are_reported(self) -> None:
         graph = graph_of(
-            node("ALPHA", write_scope=["/etc/passwd"], file_locks=["docs/ALPHA.md"]),
+            node("ALPHA", write_scope=["/tmp/outside-scope"], file_locks=["docs/ALPHA.md"]),
             node("BETA", write_scope=["../outside/thing.go"], file_locks=["docs/BETA.md"]),
         )
         findings = findings_of(graph, "scope-syntax")
         self.assertEqual(
-            {item.subject for item in findings}, {"/etc/passwd", "../outside/thing.go"}
+            {item.subject for item in findings}, {"/tmp/outside-scope", "../outside/thing.go"}
         )
         self.assertTrue(all(item.severity == "error" for item in findings))
 
@@ -854,6 +954,190 @@ class DurabilityOrderingTests(unittest.TestCase):
         self.assertIn("no durability node", findings[0].message)
 
 
+class TypedDurabilitySemanticsTests(unittest.TestCase):
+    """Versioned metadata is authoritative; prose remains legacy-only fallback."""
+
+    def _exact_descendant_shape(self) -> PlanGraph:
+        return graph_of(
+            node(
+                "WAVE-HOST-300",
+                durability_role="provider",
+                objective=(
+                    "Implement immutable wave manifests, checkpoints, candidate sealing, "
+                    "bounded host supervision, and one CAS integration transaction per round."
+                ),
+            ),
+            node(
+                "TASK-REUSE-310",
+                dependencies=["WAVE-HOST-300"],
+                durability_role="consumer",
+                durability_providers=["WAVE-HOST-300"],
+                acceptance_criteria=[
+                    "Dispositions distinguish exact reuse, verify existing, resume active, "
+                    "repair existing, execute new, stale, conflict, and blocked."
+                ],
+            ),
+            node(
+                "GENERIC-EXECUTOR-400",
+                dependencies=["TASK-REUSE-310"],
+                durability_role="consumer",
+                durability_providers=["WAVE-HOST-300"],
+                objective=(
+                    "Implement the generic runtime that validates plans, compiles rounds, "
+                    "launches workers, checkpoints, seals, verifies, integrates, resumes, "
+                    "and applies versioned graph patches."
+                ),
+            ),
+            node(
+                "PUBLIC-RUNTIME-500",
+                dependencies=["GENERIC-EXECUTOR-400"],
+                durability_role="consumer",
+                durability_providers=["WAVE-HOST-300"],
+                objective=(
+                    "Expose build, validate, rounds, execute, resume, status, cancel, "
+                    "graph, and reconcile through the public runtime."
+                ),
+            ),
+        )
+
+    def test_exact_descendant_shape_uses_roles_not_provider_looking_prose(self) -> None:
+        graph = self._exact_descendant_shape()
+        rounds = compile_rounds(graph, command_prefix=TEST_PREFIX)
+        order = [node_id for item in rounds for node_id in item.nodes]
+        self.assertEqual(
+            order,
+            [
+                "WAVE-HOST-300",
+                "TASK-REUSE-310",
+                "GENERIC-EXECUTOR-400",
+                "PUBLIC-RUNTIME-500",
+            ],
+        )
+        # Retain the exact provider-looking objectives: their type, not edited
+        # prose, determines that they are consumers and never providers.
+        self.assertEqual(graph.durability("GENERIC-EXECUTOR-400").role, "consumer")
+        self.assertEqual(graph.durability("PUBLIC-RUNTIME-500").role, "consumer")
+        self.assertEqual(findings_of(graph, "durability-ordering"), ())
+
+    def test_typed_none_with_a_claim_is_a_fail_closed_contradiction(self) -> None:
+        cases = (
+            node(
+                "NONE-PROSE",
+                durability_role="none",
+                acceptance_criteria=["The system resumes after a crash."],
+            ),
+            node(
+                "NONE-DURABILITY-LOCK",
+                durability_role="none",
+                semantic_locks=["durability-qualification"],
+            ),
+            node(
+                "NONE-EFFECT-LOCK",
+                durability_role="none",
+                semantic_locks=["remote-write"],
+            ),
+        )
+        for item in cases:
+            with self.subTest(node=item["id"]):
+                graph = graph_of(item)
+                with self.assertRaisesRegex(
+                    DagStandardError, "declares durability_role 'none'"
+                ):
+                    compile_rounds(graph, command_prefix=TEST_PREFIX)
+                finding = findings_of(graph, "durability-semantics")
+                self.assertEqual(len(finding), 1)
+                self.assertEqual(finding[0].severity, "error")
+
+    def test_typed_consumer_keeps_precedence_over_durability_lock(self) -> None:
+        graph = graph_of(
+            node("PROVIDER", durability_role="provider"),
+            node(
+                "CONSUMER",
+                dependencies=["PROVIDER"],
+                durability_role="consumer",
+                durability_providers=["PROVIDER"],
+                semantic_locks=["durability-qualification"],
+            ),
+        )
+        self.assertEqual(
+            [item.nodes for item in compile_rounds(graph, command_prefix=TEST_PREFIX)],
+            [("PROVIDER",), ("CONSUMER",)],
+        )
+
+    def test_typed_schema_rejects_malformed_and_contradictory_values(self) -> None:
+        cases = (
+            node("BAD-ROLE", durability_role=["provider", "none"]),
+            node("MISSING-PROVIDER", durability_role="consumer"),
+            node(
+                "PROVIDER-WITH-LIST",
+                durability_role="provider",
+                durability_providers=["PROVIDER-WITH-LIST"],
+            ),
+            node("ORPHAN-LIST", durability_providers=["SOMETHING"]),
+        )
+        for item in cases:
+            with self.subTest(node=item["id"]):
+                with self.assertRaises(DagStandardError):
+                    compile_rounds(graph_of(item), command_prefix=TEST_PREFIX)
+
+    def test_consumer_requires_a_known_typed_provider_and_raw_dependency(self) -> None:
+        graph = graph_of(
+            node("PROVIDER", durability_role="provider"),
+            node(
+                "CONSUMER",
+                durability_role="consumer",
+                durability_providers=["PROVIDER"],
+            ),
+        )
+        with self.assertRaisesRegex(DagStandardError, "must depend transitively"):
+            compile_rounds(graph, command_prefix=TEST_PREFIX)
+
+
+class CombinedSemanticCycleTests(unittest.TestCase):
+    """The old fixed-point cap must never convert a cycle into a schedule."""
+
+    def test_exact_task_to_descendant_provider_shape_fails_deterministically(self) -> None:
+        graph = graph_of(
+            node("WAVE-HOST-300"),
+            node(
+                "TASK-REUSE-310",
+                dependencies=["WAVE-HOST-300"],
+                acceptance_criteria=["Existing work may resume active tasks safely."],
+            ),
+            node(
+                "GENERIC-EXECUTOR-400",
+                dependencies=["TASK-REUSE-310"],
+                objective=(
+                    "Implement generic durable execution with checkpoints and resumes."
+                ),
+            ),
+            node(
+                "PUBLIC-RUNTIME-500",
+                dependencies=["GENERIC-EXECUTOR-400"],
+                objective="Implement public durable runtime resume commands.",
+            ),
+        )
+        with self.assertRaisesRegex(
+            DagStandardError,
+            "combined dependency/semantic ordering cycle: GENERIC-EXECUTOR-400",
+        ):
+            compile_rounds(graph, command_prefix=TEST_PREFIX)
+        cycle_findings = findings_of(graph, "semantic-ordering")
+        self.assertEqual(len(cycle_findings), 1)
+        self.assertEqual(cycle_findings[0].severity, "error")
+        self.assertIn("cycle", cycle_findings[0].message)
+
+    def test_caller_cannot_suppress_legacy_constraints_with_empty_findings(self) -> None:
+        graph = graph_of(
+            node("DURABLE", semantic_locks=["durability-qualification"]),
+            node("MISSION", acceptance_criteria=["The mission resumes after a crash."]),
+        )
+        with self.assertRaisesRegex(DagStandardError, "supplied durability-ordering"):
+            compile_rounds(
+                graph, command_prefix=TEST_PREFIX, ordering_findings=()
+            )
+
+
 class ContentionCompilationTests(unittest.TestCase):
     """The compiler must never emit a round its own linter rejects.
 
@@ -1006,17 +1290,10 @@ class SemanticOrderingCompilationTests(unittest.TestCase):
         self.assertEqual(level_one[1].deferred_after, ("DURABLE",))
         self.assertIn("deferred behind durability node(s) DURABLE", level_one[1].reason)
 
-    def test_no_semantic_ordering_falls_back_to_lock_and_capacity_only(self) -> None:
+    def test_no_semantic_ordering_refuses_an_invalid_schedule(self) -> None:
         graph = self._level_seven_shaped()
-        rounds = compile_rounds(
-            graph, semantic_ordering=False, command_prefix=TEST_PREFIX
-        )
-        level_one = [item for item in rounds if item.level == 1]
-        self.assertEqual(len(level_one), 1)
-        self.assertEqual(
-            sorted(level_one[0].nodes), ["DELIVERY", "DURABLE", "MISSION", "QUIET"]
-        )
-        self.assertEqual(level_one[0].deferred_after, ())
+        with self.assertRaisesRegex(DagStandardError, "no-semantic-ordering refuses"):
+            compile_rounds(graph, semantic_ordering=False, command_prefix=TEST_PREFIX)
 
     def test_the_compiler_and_the_linter_agree(self) -> None:
         graph = self._level_seven_shaped()
@@ -1240,14 +1517,85 @@ class DispatchCommandTests(unittest.TestCase):
         self.assertTrue(prefix.endswith("dispatch"))
         self.assertNotIn("--plan", prefix)
 
-    def test_a_plan_outside_the_conventional_location_carries_plan(self) -> None:
+    def test_an_external_plan_has_no_false_dispatch_command(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             plan = root / "custom-plan.json"
             plan.write_text("{}", encoding="utf-8")
             prefix = dispatch_command_prefix(plan_path=plan, repo_root=root)
-        self.assertIn("--plan", prefix)
-        self.assertIn("custom-plan.json", prefix)
+        self.assertIsNone(prefix)
+
+    def test_direct_rounds_keep_command_and_execution_mode_consistent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            installed_root = workspace / "installed"
+            other_root = workspace / "other"
+            (installed_root / ".autopilot").mkdir(parents=True)
+            other_root.mkdir()
+            plan = installed_root / ".autopilot" / "plan.json"
+            plan.write_text(json.dumps({"nodes": [node("ALPHA")]}), encoding="utf-8")
+            graph = PlanGraph([node("ALPHA")], source=plan)
+            round_ = compile_rounds(graph, repo_root=other_root)[0]
+        self.assertEqual(round_.execution_mode, "manual-parent-v1")
+        self.assertIsNone(round_.command)
+
+    def test_direct_external_rounds_reject_supplied_command_or_mode_override(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = root / "external-plan.json"
+            graph = PlanGraph([node("ALPHA")], source=plan)
+            with self.assertRaisesRegex(
+                DagStandardError, "external plan cannot receive an executable dispatch command"
+            ):
+                compile_rounds(graph, command_prefix="python dispatch")
+            with self.assertRaisesRegex(
+                DagStandardError, "supplied execution mode does not match"
+            ):
+                compile_rounds(
+                    graph,
+                    execution_mode="installed-dispatch-v1",
+                    command_prefix="python dispatch",
+                )
+
+    def test_external_cli_rounds_are_manual_parent_not_false_shell_commands(self) -> None:
+        import autopilot
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = root / "external-plan.json"
+            plan.write_text(json.dumps({"nodes": [node("ALPHA")]}), encoding="utf-8")
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = autopilot.main(
+                    ["--repo-root", str(root), "dag-rounds", "--plan", str(plan), "--json"]
+                )
+        self.assertEqual(code, 0)
+        document = json.loads(buffer.getvalue())
+        self.assertEqual(document["execution"]["mode"], "manual-parent-v1")
+        self.assertFalse(document["execution"]["executable_dispatch_command_available"])
+        self.assertIn("No executable dispatcher command", document["execution"]["note"])
+        self.assertIsNone(document["rounds"][0]["command"])
+        self.assertNotIn("--plan", buffer.getvalue())
+
+    def test_installed_plan_command_is_parseable_by_the_actual_dispatch_parser(self) -> None:
+        import autopilot
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / ".autopilot").mkdir()
+            plan = root / ".autopilot" / "plan.json"
+            plan.write_text(json.dumps({"nodes": [node("ALPHA")]}), encoding="utf-8")
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = autopilot.main(
+                    ["--repo-root", str(root), "dag-rounds", "--plan", str(plan), "--json"]
+                )
+        self.assertEqual(code, 0)
+        command = json.loads(buffer.getvalue())["rounds"][0]["command"]
+        self.assertIsNotNone(command)
+        parsed = autopilot.parser().parse_args(shlex.split(command)[2:])
+        self.assertEqual(parsed.command, "dispatch")
+        self.assertEqual(parsed.node, ["ALPHA"])
 
     def test_the_default_actor_is_vendor_neutral(self) -> None:
         graph = graph_of(node("ALPHA"), node("BETA"))
@@ -1293,6 +1641,12 @@ class PlanLoadingAndCliTests(unittest.TestCase):
         )
         return path
 
+    def _write_document(self, root: Path, document: dict[str, Any], name: str = "plan.json") -> Path:
+        path = root / name
+        # This writes only synthetic, in-memory test fixtures to TemporaryDirectory.
+        path.write_text(json.dumps(document, indent=2), encoding="utf-8")
+        return path
+
     def test_load_plan_graph_rejects_malformed_documents(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1306,6 +1660,251 @@ class PlanLoadingAndCliTests(unittest.TestCase):
             empty.write_text(json.dumps({"nodes": []}), encoding="utf-8")
             with self.assertRaises(DagStandardError):
                 load_plan_graph(empty)
+
+    def test_cli_lint_reports_raw_dependency_errors_and_rounds_rejects_them(self) -> None:
+        import autopilot
+
+        cases = {
+            "object": {"required": "PROVIDER"},
+            "null": None,
+            "scalar": "PROVIDER",
+            "mixed": ["PROVIDER", 7],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, dependencies in cases.items():
+                with self.subTest(label=label):
+                    plan = self._write_plan(root, [node("A", dependencies=dependencies)])
+                    lint_output = io.StringIO()
+                    with redirect_stdout(lint_output):
+                        lint_code = autopilot.main(
+                            [
+                                "--repo-root",
+                                str(root),
+                                "dag-lint",
+                                "--plan",
+                                str(plan),
+                                "--json",
+                            ]
+                        )
+                    self.assertEqual(lint_code, 1)
+                    report = json.loads(lint_output.getvalue())
+                    self.assertEqual(report["counts"]["error"], 1)
+                    self.assertEqual(report["findings"][0]["check"], "graph-validity")
+
+                    errors = io.StringIO()
+                    with redirect_stderr(errors):
+                        rounds_code = autopilot.main(
+                            [
+                                "--repo-root",
+                                str(root),
+                                "dag-rounds",
+                                "--plan",
+                                str(plan),
+                            ]
+                        )
+                    self.assertEqual(rounds_code, 2)
+                    self.assertIn("invalid plan topology", errors.getvalue())
+
+    def test_cli_rounds_rejects_an_unknown_dependency_without_lint(self) -> None:
+        import autopilot
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = self._write_plan(root, [node("A", dependencies=["MISSING"])])
+            errors = io.StringIO()
+            with redirect_stderr(errors):
+                code = autopilot.main(
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-rounds",
+                        "--plan",
+                        str(plan),
+                    ]
+                )
+        self.assertEqual(code, 2)
+        self.assertIn("A depends on unknown node MISSING", errors.getvalue())
+
+    def test_sealed_plan_reports_the_exact_consumed_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = self._write_document(root, sealed_document([node("ALPHA")]))
+            graph = load_plan_graph(plan)
+        self.assertEqual(graph.integrity.status, "verified-sealed")
+        self.assertTrue(graph.integrity.consumed_source_bytes_digest.startswith("sha256:"))
+        self.assertTrue(graph.integrity.consumed_plan_digest.startswith("sha256:"))
+        self.assertEqual(graph.integrity.sealed_contracts, ("ALPHA",))
+        self.assertEqual(graph.integrity.unsealed_contracts, ())
+
+    def test_digest_mutation_and_substitution_reject_before_lint_or_rounds(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = sealed_document([node("ALPHA")], title="sealed original")
+            plan = self._write_document(root, original)
+            original_graph = load_plan_graph(plan)
+
+            substituted = json.loads(json.dumps(original))
+            substituted["nodes"][0]["objective"] = "Substituted after verification."
+            # Recompute the individual contract seal only: the complete plan
+            # seal must still detect this verify/use substitution.
+            contract = dict(substituted["nodes"][0])
+            contract.pop("contract_digest")
+            substituted["nodes"][0]["contract_digest"] = digest_json(contract)
+            plan.write_text(json.dumps(substituted), encoding="utf-8")
+
+            # The already-loaded graph is compiled from the one byte snapshot
+            # it consumed; it never reopens this path during lint/rounds.
+            self.assertEqual(lint_plan(original_graph), ())
+            self.assertEqual(len(compile_rounds(original_graph)), 1)
+            with self.assertRaisesRegex(DagStandardError, "plan_digest mismatch"):
+                load_plan_graph(plan)
+
+    def test_contract_and_plan_digest_mismatches_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = sealed_document([node("ALPHA")], title="original")
+            document["nodes"][0]["rollback"] = "Substituted contract material."
+            contract_plan = self._write_document(root, document, "contract.json")
+            with self.assertRaisesRegex(DagStandardError, "contract_digest mismatch"):
+                load_plan_graph(contract_plan)
+
+            document = sealed_document([node("ALPHA")], title="original")
+            document["title"] = "Substituted plan material."
+            plan_plan = self._write_document(root, document, "plan.json")
+            with self.assertRaisesRegex(DagStandardError, "plan_digest mismatch"):
+                load_plan_graph(plan_plan)
+
+    def test_legacy_and_partial_seals_are_never_reported_as_verified(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legacy = self._write_plan(root, [node("LEGACY")])
+            self.assertEqual(load_plan_graph(legacy).integrity.status, "digest-unsealed")
+
+            partial = {"schema_version": 1, "nodes": [node("PARTIAL")]}
+            partial["plan_digest"] = digest_json(partial)
+            partial_path = self._write_document(root, partial, "partial.json")
+            self.assertEqual(load_plan_graph(partial_path).integrity.status, "partially-sealed")
+
+    def test_cli_reports_integrity_and_durability_mode_as_independent_dimensions(self) -> None:
+        import autopilot
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = self._write_document(root, sealed_document([node("SEALED-LEGACY")]))
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = autopilot.main(
+                    ["--repo-root", str(root), "dag-lint", "--plan", str(plan), "--json"]
+                )
+        self.assertEqual(code, 0)
+        report = json.loads(buffer.getvalue())
+        self.assertEqual(report["integrity"]["status"], "verified-sealed")
+        self.assertEqual(report["durability_semantics"]["mode"], "legacy-heuristic")
+        self.assertFalse(report["expected_plan_binding"]["provided"])
+        self.assertFalse(report["expected_plan_binding"]["matched"])
+
+    def test_cli_reports_typed_v2_mode_independently_of_seal_status(self) -> None:
+        import autopilot
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = self._write_document(
+                root, sealed_document([node("TYPED", durability_role="provider")])
+            )
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = autopilot.main(
+                    ["--repo-root", str(root), "dag-lint", "--plan", str(plan), "--json"]
+                )
+        self.assertEqual(code, 0)
+        report = json.loads(buffer.getvalue())
+        self.assertEqual(report["integrity"]["status"], "verified-sealed")
+        self.assertEqual(report["durability_semantics"]["mode"], "typed-v2")
+
+    def test_expected_plan_digest_rejects_a_self_consistent_substitute(self) -> None:
+        import autopilot
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trusted = sealed_document([node("TRUSTED")], title="trusted plan")
+            alternate = sealed_document([node("SUBSTITUTE")], title="alternate plan")
+            plan = self._write_document(root, alternate)
+
+            plain = io.StringIO()
+            with redirect_stdout(plain):
+                plain_code = autopilot.main(
+                    ["--repo-root", str(root), "dag-lint", "--plan", str(plan), "--json"]
+                )
+            self.assertEqual(plain_code, 0, "self-consistent seals remain integrity only")
+            plain_report = json.loads(plain.getvalue())
+            self.assertEqual(plain_report["integrity"]["status"], "verified-sealed")
+            self.assertNotEqual(
+                plain_report["integrity"]["consumed_plan_digest"], trusted["plan_digest"]
+            )
+
+            for command in ("dag-lint", "dag-rounds"):
+                with self.subTest(command=command):
+                    errors = io.StringIO()
+                    with redirect_stderr(errors):
+                        rejected = autopilot.main(
+                            [
+                                "--repo-root",
+                                str(root),
+                                command,
+                                "--plan",
+                                str(plan),
+                                "--expected-plan-digest",
+                                trusted["plan_digest"],
+                            ]
+                        )
+                    self.assertEqual(rejected, 2)
+                    self.assertIn("expected plan digest mismatch", errors.getvalue())
+
+    def test_expected_plan_digest_also_binds_an_unsealed_legacy_plan(self) -> None:
+        import autopilot
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legacy_fixture = {"schema_version": 1, "nodes": [node("LEGACY")]}
+            expected = digest_json(legacy_fixture)
+            plan = self._write_document(root, legacy_fixture)
+            accepted_output = io.StringIO()
+            with redirect_stdout(accepted_output):
+                accepted = autopilot.main(
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-lint",
+                        "--plan",
+                        str(plan),
+                        "--expected-plan-digest",
+                        expected,
+                        "--json",
+                    ]
+                )
+            self.assertEqual(accepted, 0)
+            accepted_report = json.loads(accepted_output.getvalue())
+            self.assertEqual(accepted_report["integrity"]["status"], "digest-unsealed")
+            self.assertTrue(accepted_report["expected_plan_binding"]["matched"])
+
+            replacement = {"schema_version": 1, "nodes": [node("REPLACEMENT")]}
+            plan.write_text(json.dumps(replacement), encoding="utf-8")
+            errors = io.StringIO()
+            with redirect_stderr(errors):
+                rejected = autopilot.main(
+                    [
+                        "--repo-root",
+                        str(root),
+                        "dag-lint",
+                        "--plan",
+                        str(plan),
+                        "--expected-plan-digest",
+                        expected,
+                    ]
+                )
+        self.assertEqual(rejected, 2)
+        self.assertIn("expected plan digest mismatch", errors.getvalue())
 
     def test_cli_subcommands_are_wired_and_return_the_documented_exit_codes(self) -> None:
         import autopilot
@@ -1366,7 +1965,7 @@ class PlanLoadingAndCliTests(unittest.TestCase):
                 ["tests/suite/__init__.py", "tests/suite/conftest.py"],
             )
 
-    def test_no_semantic_ordering_is_exposed_on_both_commands(self) -> None:
+    def test_no_semantic_ordering_refuses_a_cli_schedule_with_constraints(self) -> None:
         import autopilot
 
         nodes = [
@@ -1376,9 +1975,9 @@ class PlanLoadingAndCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             plan = self._write_plan(root, nodes)
-            buffer = io.StringIO()
-            with redirect_stdout(buffer):
-                autopilot.main(
+            errors = io.StringIO()
+            with redirect_stderr(errors):
+                refused = autopilot.main(
                     [
                         "--repo-root",
                         str(root),
@@ -1389,17 +1988,14 @@ class PlanLoadingAndCliTests(unittest.TestCase):
                         "--no-semantic-ordering",
                     ]
                 )
-            unordered = json.loads(buffer.getvalue())
             buffer = io.StringIO()
             with redirect_stdout(buffer):
                 autopilot.main(
                     ["--repo-root", str(root), "dag-rounds", "--plan", str(plan), "--json"]
                 )
             ordered = json.loads(buffer.getvalue())
-        self.assertFalse(unordered["semantic_ordering"])
-        self.assertEqual(
-            [item["nodes"] for item in unordered["rounds"]], [["DURABLE", "MISSION"]]
-        )
+        self.assertEqual(refused, 2)
+        self.assertIn("no-semantic-ordering refuses", errors.getvalue())
         self.assertEqual(
             [item["nodes"] for item in ordered["rounds"]], [["DURABLE"], ["MISSION"]]
         )

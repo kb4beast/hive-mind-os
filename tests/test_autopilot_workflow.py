@@ -63,6 +63,12 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
             allow_nan=False,
         ).encode("utf-8")
 
+    @classmethod
+    def _contract_id(cls, value: dict[str, object]) -> str:
+        material = dict(value)
+        material.pop("contract_id", None)
+        return "sha256:" + sha256(cls._canonical_bytes(material)).hexdigest()
+
     def _issue_controller_authorization(
         self,
         contract: dict[str, object],
@@ -140,8 +146,16 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         self.assertEqual(contract["tasks"][0]["transport"], "durable_user_owned_task")
         self.assertRegex(
             contract["tasks"][0]["title"],
-            r"^Hive Mind DAG-BUILD-[0-9a-f]{12} \[[0-9a-f]{12}\]$",
+            r"^Hive Mind DAG-BUILD-[0-9a-f]{12}-[0-9a-f]{12} \[[0-9a-f]{12}\]$",
         )
+        self.assertEqual(contract["request_id"], request["request_id"])
+        self.assertEqual(contract["tasks"][0]["request_id"], request["request_id"])
+        self.assertEqual(
+            contract["tasks"][0]["idempotency_key"],
+            contract["tasks"][0]["launch_instruction_id"],
+        )
+        self.assertIn(request["request_id"], contract["tasks"][0]["prompt"])
+        self.assertIn(contract["objective_digest"], contract["tasks"][0]["prompt"])
         self.assertNotIn("kb4beast/hive-mind-os", contract["tasks"][0]["prompt"])
 
     def test_initialize_fails_closed_instead_of_overwriting_request(self) -> None:
@@ -281,11 +295,15 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         self.assertNotIn("kb4beast", prompt)
 
     def test_run_initializes_subject_and_emits_an_execution_contract(self) -> None:
-        result = run_repository(
-            self.root,
-            subject="foobar",
-            target_branch="release/widgets",
-        )
+        with patch(
+            "hive_mind_os.autopilot_workflow.inspect_repository",
+            side_effect=AssertionError("new-subject run must not delegate to inspect"),
+        ):
+            result = run_repository(
+                self.root,
+                subject="foobar",
+                target_branch="release/widgets",
+            )
 
         self.assertEqual(result["kind"], "hive-mind-portable-autopilot-run-v1")
         self.assertEqual(result["subject"], "foobar")
@@ -293,6 +311,7 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         self.assertEqual(result["initialization"]["request"]["objective"], "foobar")
         contract = result["execution_contract"]
         self.assertEqual(contract["intent"]["intent"], "BUILD_DAG")
+        self.assertTrue(contract["intent"]["explicit"])
         self.assertTrue(contract["tasks"])
         self.assertIn("foobar", contract["operator_request"])
         self.assertEqual(result["execution_owner"], "active_host_sandbox")
@@ -306,12 +325,163 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
             first["execution_contract"]["tasks"][0]["task_key"],
             repeated["execution_contract"]["tasks"][0]["task_key"],
         )
+        self.assertEqual(
+            first["execution_contract"]["tasks"][0]["launch_instruction_id"],
+            repeated["execution_contract"]["tasks"][0]["launch_instruction_id"],
+        )
         with self.assertRaises(PortableAutopilotError):
             run_repository(self.root, subject="different objective")
+
+    def test_different_valid_requests_cannot_reuse_dag_build_identity(self) -> None:
+        first = run_repository(
+            self.root,
+            subject="first objective",
+            target_branch="release/widgets",
+        )
+        Path(first["initialization"]["path"]).unlink()
+        second = run_repository(
+            self.root,
+            subject="second objective",
+            target_branch="release/widgets",
+        )
+
+        first_contract = first["execution_contract"]
+        second_contract = second["execution_contract"]
+        first_task = first_contract["tasks"][0]
+        second_task = second_contract["tasks"][0]
+        self.assertEqual(first_contract["repository_id"], second_contract["repository_id"])
+        self.assertNotEqual(first_contract["request_id"], second_contract["request_id"])
+        self.assertNotEqual(
+            first_contract["objective_digest"],
+            second_contract["objective_digest"],
+        )
+        self.assertNotEqual(first_task["task_key"], second_task["task_key"])
+        self.assertNotEqual(
+            first_task["launch_instruction_id"],
+            second_task["launch_instruction_id"],
+        )
+        self.assertNotEqual(first_task["idempotency_key"], second_task["idempotency_key"])
+        self.assertNotEqual(first_task["title"], second_task["title"])
+        self.assertIn(first_contract["request_id"], first_task["prompt"])
+        self.assertIn(second_contract["request_id"], second_task["prompt"])
+        self.assertNotIn(first_contract["request_id"], second_task["prompt"])
 
     def test_run_rejects_an_empty_subject(self) -> None:
         with self.assertRaisesRegex(PortableAutopilotError, "subject must not be empty"):
             run_repository(self.root, subject="  ")
+
+    def test_run_with_installed_controller_requires_a_subject_bound_plan(self) -> None:
+        controller = self.root / ".autopilot" / "bin" / "autopilot.py"
+        controller.parent.mkdir(parents=True)
+        controller.write_text("raise AssertionError('old controller must not run')\n", encoding="utf-8")
+        plan = self.root / ".autopilot" / "plan.json"
+        plan.write_text(
+            json.dumps({"nodes": [{"id": "LEGACY-OLD-999", "objective": "unrelated"}]}),
+            encoding="utf-8",
+        )
+        subprocess.run(
+            ["git", "add", "-f", ".autopilot/bin/autopilot.py", ".autopilot/plan.json"],
+            cwd=self.root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "installed old controller"],
+            cwd=self.root,
+            check=True,
+            capture_output=True,
+        )
+
+        subject = "continue and run this new objective end to end"
+        with patch(
+            "hive_mind_os.autopilot_workflow.inspect_repository",
+            side_effect=AssertionError("installed old plan inspection must not be requested"),
+        ):
+            result = run_repository(
+                self.root,
+                subject=subject,
+                target_branch="release/widgets",
+            )
+
+        contract = result["execution_contract"]
+        self.assertEqual(contract["kind"], "hive-mind-portable-plan-generation-required-v1")
+        self.assertEqual(contract["outcome"], "PLAN_GENERATION_REQUIRED")
+        self.assertEqual(contract["intent"]["intent"], "BUILD_DAG")
+        self.assertTrue(contract["intent"]["explicit"])
+        self.assertEqual(contract["tasks"], [])
+        self.assertIsNone(contract["closure_target"])
+        self.assertFalse(contract["legacy_plan_reuse_allowed"])
+        self.assertEqual(
+            contract["request_id"],
+            result["initialization"]["request"]["request_id"],
+        )
+        self.assertEqual(
+            contract["objective_digest"],
+            "sha256:" + sha256(self._canonical_bytes(subject)).hexdigest(),
+        )
+        self.assertNotIn("LEGACY-OLD-999", json.dumps(contract, sort_keys=True))
+        self.assertEqual(contract["contract_id"], self._contract_id(contract))
+
+    def test_run_does_not_recheck_a_controller_that_appears_after_decision(self) -> None:
+        controller = self.root / ".autopilot" / "bin" / "autopilot.py"
+        original_is_file = Path.is_file
+        controller_check_seen = False
+
+        def controller_appears(candidate: Path) -> bool:
+            nonlocal controller_check_seen
+            if candidate == controller and not controller_check_seen:
+                controller_check_seen = True
+                controller.parent.mkdir(parents=True)
+                controller.write_text(
+                    "raise AssertionError('new controller must not run')\n",
+                    encoding="utf-8",
+                )
+                return False
+            return original_is_file(candidate)
+
+        with (
+            patch.object(Path, "is_file", new=controller_appears),
+            patch(
+                "hive_mind_os.autopilot_workflow.inspect_repository",
+                side_effect=AssertionError("new-subject run must not recheck through inspect"),
+            ),
+        ):
+            result = run_repository(
+                self.root,
+                subject="build the race-safe objective",
+                target_branch="release/widgets",
+            )
+
+        self.assertTrue(controller_check_seen)
+        self.assertTrue(controller.is_file())
+        contract = result["execution_contract"]
+        self.assertEqual(contract["intent"]["intent"], "BUILD_DAG")
+        self.assertTrue(contract["intent"]["explicit"])
+        self.assertTrue(contract["tasks"])
+
+    def test_run_from_subdirectory_uses_initialized_git_root(self) -> None:
+        nested = self.root / "nested" / "deeper"
+        nested.mkdir(parents=True)
+        controller = self.root / ".autopilot" / "bin" / "autopilot.py"
+        controller.parent.mkdir(parents=True)
+        controller.write_text("raise AssertionError('old controller must not run')\n", encoding="utf-8")
+
+        with patch(
+            "hive_mind_os.autopilot_workflow.inspect_repository",
+            side_effect=AssertionError("new-subject run must not delegate to inspect"),
+        ):
+            result = run_repository(
+                nested,
+                subject="subdirectory objective",
+                target_branch="release/widgets",
+            )
+
+        self.assertEqual(
+            Path(result["initialization"]["request"]["repository_root"]),
+            self.root.resolve(),
+        )
+        contract = result["execution_contract"]
+        self.assertEqual(contract["outcome"], "PLAN_GENERATION_REQUIRED")
+        self.assertEqual(contract["tasks"], [])
 
     def test_run_cli_accepts_a_single_subject_argument(self) -> None:
         args = cli.build_autopilot_parser().parse_args(

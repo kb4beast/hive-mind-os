@@ -8,19 +8,24 @@ plane remains inspectable, portable, and independent of model providers.
 from __future__ import annotations
 
 import fnmatch
+import codecs
+import ctypes
 import importlib.util
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 from contextlib import contextmanager
+from ctypes import wintypes
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
+from threading import Thread
 from typing import Any, Callable, Mapping, Sequence
 from urllib.parse import urlparse
 
@@ -28,6 +33,9 @@ SCHEMA_VERSION = 1
 FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
 CLAIM_COMMIT_EMAIL = "autopilot-claim@hive-mind.invalid"
 RECEIPT_COMMIT_EMAIL = "autopilot-receipt@hive-mind.invalid"
+CONTROLLER_TEST_TIMEOUT_SECONDS = 600
+CONTROLLER_TEST_TERMINATION_SECONDS = 10
+RUNTIME_BINDING_TIMEOUT_SECONDS = 30
 ROLE_NAMES = (
     "orchestrator",
     "explorer",
@@ -245,6 +253,214 @@ class _StatusCommitGraph:
             cached = frozenset(observed)
             self.ancestor_cache[descendant] = cached
         return ancestor in cached
+
+
+class _StrictDiscardingProcessOutput:
+    """Validate a child stream without retaining bytes, text, length, or digest."""
+
+    def __init__(self) -> None:
+        self.invalid_utf8 = False
+        self.stream_error: str | None = None
+
+    def consume(self, stream: Any) -> None:
+        decoder = codecs.getincrementaldecoder("utf-8")("strict")
+        try:
+            while True:
+                chunk = stream.read(8192)
+                if not chunk:
+                    break
+                if not isinstance(chunk, bytes):
+                    self.stream_error = "non-bytes child output"
+                    continue
+                if self.invalid_utf8:
+                    continue
+                try:
+                    decoder.decode(chunk)
+                except UnicodeDecodeError:
+                    self.invalid_utf8 = True
+            if not self.invalid_utf8:
+                decoder.decode(b"", final=True)
+        except UnicodeDecodeError:
+            self.invalid_utf8 = True
+        # This runs in a daemon reader thread.  Never let an unexpected reader
+        # implementation error print a traceback outside doctor's JSON boundary:
+        # the parent converts this fixed, content-free state into a typed failure.
+        except Exception:
+            self.stream_error = "output stream read failed"
+
+    def evidence(self) -> dict[str, object]:
+        return {
+            "observed": True,
+            "utf8_valid": not self.invalid_utf8,
+            "stream_error": self.stream_error,
+            "content_policy": "strictly validated then discarded; no text, length, or digest retained",
+        }
+
+
+class _WindowsJobBasicLimitInformation(ctypes.Structure):
+    _fields_ = [
+        ("per_process_user_time_limit", ctypes.c_longlong),
+        ("per_job_user_time_limit", ctypes.c_longlong),
+        ("limit_flags", wintypes.DWORD),
+        ("minimum_working_set_size", ctypes.c_size_t),
+        ("maximum_working_set_size", ctypes.c_size_t),
+        ("active_process_limit", wintypes.DWORD),
+        ("affinity", ctypes.c_size_t),
+        ("priority_class", wintypes.DWORD),
+        ("scheduling_class", wintypes.DWORD),
+    ]
+
+
+class _WindowsIoCounters(ctypes.Structure):
+    _fields_ = [
+        ("read_operation_count", ctypes.c_ulonglong),
+        ("write_operation_count", ctypes.c_ulonglong),
+        ("other_operation_count", ctypes.c_ulonglong),
+        ("read_transfer_count", ctypes.c_ulonglong),
+        ("write_transfer_count", ctypes.c_ulonglong),
+        ("other_transfer_count", ctypes.c_ulonglong),
+    ]
+
+
+class _WindowsJobExtendedLimitInformation(ctypes.Structure):
+    _fields_ = [
+        ("basic_limit_information", _WindowsJobBasicLimitInformation),
+        ("io_info", _WindowsIoCounters),
+        ("process_memory_limit", ctypes.c_size_t),
+        ("job_memory_limit", ctypes.c_size_t),
+        ("peak_process_memory_used", ctypes.c_size_t),
+        ("peak_job_memory_used", ctypes.c_size_t),
+    ]
+
+
+class _WindowsContainmentUnavailable(RuntimeError):
+    """Windows Job containment cannot be prepared safely before child launch."""
+
+
+class _WindowsJobContainment:
+    """An owned Windows Job Object, never a PID-addressed kill target."""
+
+    _JOB_OBJECT_EXTENDED_LIMIT_INFORMATION = 9
+    _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+
+    def __init__(
+        self,
+        handle: int,
+        *,
+        assign_process: Callable[[int, int], object],
+        resume_process: Callable[[int], object],
+        close_handle: Callable[[int], object],
+    ) -> None:
+        self._handle: int | None = handle
+        self._assigned = False
+        self._assign_process = assign_process
+        self._resume_process = resume_process
+        self._close_handle = close_handle
+
+    @classmethod
+    def create(cls) -> _WindowsJobContainment:
+        """Resolve and type all APIs before acquiring the Job handle."""
+
+        try:
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
+            create_job = kernel32.CreateJobObjectW
+            set_information = kernel32.SetInformationJobObject
+            assign_process = kernel32.AssignProcessToJobObject
+            close_handle = kernel32.CloseHandle
+            resume_process = ntdll.NtResumeProcess
+            create_job.argtypes = (wintypes.LPVOID, wintypes.LPCWSTR)
+            create_job.restype = wintypes.HANDLE
+            set_information.argtypes = (
+                wintypes.HANDLE,
+                wintypes.INT,
+                wintypes.LPVOID,
+                wintypes.DWORD,
+            )
+            set_information.restype = wintypes.BOOL
+            assign_process.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+            assign_process.restype = wintypes.BOOL
+            close_handle.argtypes = (wintypes.HANDLE,)
+            close_handle.restype = wintypes.BOOL
+            resume_process.argtypes = (wintypes.HANDLE,)
+            resume_process.restype = ctypes.c_long
+        except (AttributeError, OSError, TypeError, ValueError, ctypes.ArgumentError) as error:
+            raise _WindowsContainmentUnavailable("Windows Job API is unavailable") from error
+
+        handle: int | None = None
+        transferred = False
+        try:
+            raw_handle = create_job(None, None)
+            if not raw_handle:
+                raise OSError(ctypes.get_last_error(), "CreateJobObjectW failed")
+            handle = int(raw_handle)
+            limits = _WindowsJobExtendedLimitInformation()
+            limits.basic_limit_information.limit_flags = cls._JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            configured = set_information(
+                handle,
+                cls._JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                ctypes.byref(limits),
+                ctypes.sizeof(limits),
+            )
+            if not configured:
+                raise OSError(ctypes.get_last_error(), "SetInformationJobObject failed")
+            job = cls(
+                handle,
+                assign_process=assign_process,
+                resume_process=resume_process,
+                close_handle=close_handle,
+            )
+            transferred = True
+            return job
+        except (AttributeError, OSError, TypeError, ValueError, ctypes.ArgumentError) as error:
+            raise _WindowsContainmentUnavailable("Windows Job setup failed") from error
+        finally:
+            if handle is not None and not transferred:
+                try:
+                    close_handle(handle)
+                except (OSError, TypeError, ValueError, ctypes.ArgumentError):
+                    pass
+
+    @property
+    def assigned(self) -> bool:
+        return self._assigned
+
+    def assign(self, process: subprocess.Popen[bytes]) -> bool:
+        process_handle = getattr(process, "_handle", None)
+        if self._handle is None or not isinstance(process_handle, int):
+            return False
+        assigned = self._assign_process(self._handle, process_handle)
+        self._assigned = bool(assigned)
+        return self._assigned
+
+    def resume(self, process: subprocess.Popen[bytes]) -> bool:
+        process_handle = getattr(process, "_handle", None)
+        if not self._assigned or not isinstance(process_handle, int):
+            return False
+        return self._resume_process(process_handle) == 0
+
+    def close(self) -> bool:
+        if self._handle is None:
+            return True
+        handle, self._handle = self._handle, None
+        try:
+            return bool(self._close_handle(handle))
+        except (OSError, TypeError, ValueError, ctypes.ArgumentError):
+            return False
+
+
+@dataclass(frozen=True)
+class _MonotonicDeadline:
+    """One explicit monotonic budget for a bounded controller-test phase."""
+
+    expires_at: float
+
+    @classmethod
+    def after(cls, seconds: float) -> _MonotonicDeadline:
+        return cls(time.monotonic() + max(0.0, seconds))
+
+    def remaining(self) -> float:
+        return max(0.0, self.expires_at - time.monotonic())
 
 
 def utc_now() -> datetime:
@@ -3245,17 +3461,143 @@ class ControlPlane:
             rendered = rendered.replace("{{" + key + "}}", value)
         return rendered
 
-    def _coordination_check(self) -> dict[str, object]:
-        """Report where shared authority lives and which sources actually run.
+    def _source_root(self) -> Path | None:
+        source_root = self.repo_root / "src"
+        return source_root.resolve() if (source_root / "hive_mind_os").is_dir() else None
 
-        Concurrent runs are only debuggable when both facts are visible: which
-        checkout arbitrates claims and validation, and whether ``hive_mind_os``
-        imports from this repository. A machine has one editable install, so a
-        checkout elsewhere can silently own every ``hive-mind`` invocation.
-        """
+    def _isolated_python_environment(self) -> dict[str, str]:
+        """Make a child independent from ambient editable/package path state."""
+
+        environment = dict(os.environ)
+        # ``-I`` below ignores these values. Clearing them as well makes the
+        # binding inspectable and protects a non-conforming Python launcher.
+        environment["PYTHONPATH"] = ""
+        environment["PYTHONHOME"] = ""
+        environment["PYTHONNOUSERSITE"] = "1"
+        return environment
+
+    def _runtime_binding_command(self, source_root: Path) -> tuple[str, ...]:
+        probe = (
+            "import importlib.util, json, sys; "
+            "sys.path.insert(0, sys.argv[1]); "
+            "spec = importlib.util.find_spec('hive_mind_os'); "
+            "print(json.dumps({'interpreter': sys.executable, "
+            "'origin': None if spec is None else spec.origin}, sort_keys=True))"
+        )
+        return (sys.executable, "-I", "-c", probe, str(source_root))
+
+    def _runtime_binding_check(self) -> dict[str, object]:
+        source_root = self._source_root()
+        if source_root is None:
+            return {
+                "passed": True,
+                "details": ["package binding is not applicable to this managed repository"],
+                "evidence": {"applicable": False},
+            }
+        command = self._runtime_binding_command(source_root)
+        started = time.monotonic()
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=self.repo_root,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False,
+                check=False,
+                timeout=RUNTIME_BINDING_TIMEOUT_SECONDS,
+                env=self._isolated_python_environment(),
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "passed": False,
+                "details": ["isolated runtime-binding probe timed out"],
+                "evidence": {
+                    "applicable": True,
+                    "command": list(command),
+                    "timeout_seconds": RUNTIME_BINDING_TIMEOUT_SECONDS,
+                    "duration_seconds": round(time.monotonic() - started, 3),
+                },
+            }
+        except OSError as error:
+            return {
+                "passed": False,
+                "details": [f"isolated runtime-binding probe could not launch: {type(error).__name__}"],
+                "evidence": {
+                    "applicable": True,
+                    "command": list(command),
+                    "timeout_seconds": RUNTIME_BINDING_TIMEOUT_SECONDS,
+                    "duration_seconds": round(time.monotonic() - started, 3),
+                },
+            }
+        try:
+            output = completed.stdout.decode("utf-8", errors="strict")
+            record = json.loads(output)
+        except (AttributeError, UnicodeDecodeError, json.JSONDecodeError):
+            record = None
+        expected_origin = (source_root / "hive_mind_os" / "__init__.py").resolve()
+        interpreter = record.get("interpreter") if isinstance(record, Mapping) else None
+        origin = record.get("origin") if isinstance(record, Mapping) else None
+        passed = (
+            completed.returncode == 0
+            and isinstance(interpreter, str)
+            and Path(interpreter).resolve() == Path(sys.executable).resolve()
+            and isinstance(origin, str)
+            and Path(origin).resolve() == expected_origin
+        )
+        details = [] if passed else [
+            "isolated runtime binding did not resolve hive_mind_os from this exact checkout"
+        ]
+        return {
+            "passed": passed,
+            "details": details,
+            "evidence": {
+                "applicable": True,
+                "command": list(command),
+                "interpreter": interpreter,
+                "origin": origin,
+                "expected_origin": str(expected_origin),
+                "returncode": completed.returncode,
+                "timeout_seconds": RUNTIME_BINDING_TIMEOUT_SECONDS,
+                "duration_seconds": round(time.monotonic() - started, 3),
+            },
+        }
+
+    def _ambient_runtime_binding_check(self) -> dict[str, object]:
+        """Observe, but never substitute, the invoking process package binding."""
+
+        source_root = self._source_root()
+        if source_root is None:
+            return {
+                "passed": True,
+                "details": ["ambient package binding is not applicable to this managed repository"],
+                "evidence": {"applicable": False, "severity": "info"},
+            }
+        try:
+            installed = importlib.util.find_spec("hive_mind_os")
+        except (ImportError, ValueError):
+            installed = None
+        origin = getattr(installed, "origin", None) if installed else None
+        expected_origin = (source_root / "hive_mind_os" / "__init__.py").resolve()
+        passed = isinstance(origin, str) and Path(origin).resolve() == expected_origin
+        return {
+            "passed": passed,
+            "details": [] if passed else [
+                "ambient hive_mind_os binding is not this checkout; use the documented "
+                "per-checkout PYTHONPATH or virtual environment contract"
+            ],
+            "evidence": {
+                "applicable": True,
+                "severity": "info" if passed else "error",
+                "origin": origin,
+                "expected_origin": str(expected_origin),
+            },
+        }
+
+    def _coordination_check(self) -> dict[str, object]:
+        """Report shared authority and prove the child resolves this checkout."""
 
         details: list[str] = []
-        passed = True
         try:
             coordination = self.coordination_dir
         except ConfigurationError as error:
@@ -3265,28 +3607,363 @@ class ControlPlane:
                 "linked worktree; shared claim and validation authority lives at "
                 f"{coordination}"
             )
-        # Only a hive-mind-os checkout ships the package; a managed target
-        # repository is not expected to provide or match it.
-        packaged = (self.repo_root / "src" / "hive_mind_os").is_dir()
-        installed = None
-        if packaged:
+        exact_binding = self._runtime_binding_check()
+        ambient_binding = self._ambient_runtime_binding_check()
+        details.extend(exact_binding["details"])
+        details.extend(ambient_binding["details"])
+        return {
+            "name": "runtime-coordination",
+            "passed": exact_binding["passed"] and ambient_binding["passed"],
+            "details": details,
+            "evidence": {
+                "exact_child_binding": exact_binding["evidence"],
+                "ambient_binding": ambient_binding["evidence"],
+            },
+        }
+
+    def _controller_test_command(self) -> tuple[str, ...]:
+        """Run the exact checkout's tests under an isolated interpreter."""
+
+        source_root = self._source_root()
+        source_argument = str(source_root) if source_root is not None else ""
+        bootstrap = (
+            "import runpy, sys; "
+            "source_root = sys.argv[1]; "
+            "sys.path.insert(0, source_root) if source_root else None; "
+            "sys.argv = ['unittest', *sys.argv[2:]]; "
+            "runpy.run_module('unittest', run_name='__main__')"
+        )
+        return (
+            sys.executable,
+            "-I",
+            "-c",
+            bootstrap,
+            source_argument,
+            "discover",
+            "-s",
+            str((self.ap_root / "tests").resolve()),
+            "-v",
+        )
+
+    def _terminate_controller_test_process(
+        self,
+        process: subprocess.Popen[bytes],
+        windows_job: _WindowsJobContainment | None,
+    ) -> bool:
+        """Terminate only resources owned by this invocation, within a fixed budget."""
+
+        if windows_job is not None:
+            if windows_job.close():
+                return True
+            # Popen.kill uses the process handle that Popen owns. It never targets a
+            # recycled PID; inability to close the Job Object still fails closed.
             try:
-                installed = importlib.util.find_spec("hive_mind_os")
-            except (ImportError, ValueError):
-                installed = None
-        origin = getattr(installed, "origin", None) if installed else None
-        if packaged and origin is not None:
-            source_root = Path(origin).resolve().parents[1]
-            if source_root != (self.repo_root / "src").resolve():
-                passed = False
-                details.append(
-                    f"hive_mind_os imports from {source_root}, not this repository; "
-                    "the machine-wide editable install points at another checkout, so "
-                    "'hive-mind' runs code you are not editing -- reinstall with "
-                    "'python -m pip install --no-deps -e .' from this repository, or "
-                    "use a per-project virtual environment to run projects concurrently"
+                process.kill()
+            except OSError:
+                pass
+            return False
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+            return True
+        except OSError:
+            # The POSIX process group can already be gone. Kill the still-owned
+            # direct child as a bounded fallback, but do not claim tree containment.
+            try:
+                process.kill()
+            except OSError:
+                return False
+            return False
+
+    @staticmethod
+    def _close_containment_after_direct_exit(
+        process: subprocess.Popen[bytes],
+        windows_job: _WindowsJobContainment | None,
+    ) -> bool:
+        """Close Windows ownership; POSIX waits only to its bounded reader grace."""
+
+        if windows_job is not None:
+            return windows_job.close()
+        # With no process handle for a group whose leader has exited, a later
+        # killpg can target a recycled group ID. Do not guess. A descendant that
+        # holds a pipe instead yields output_stream_incomplete after the bounded
+        # reader grace, so doctor never reports a successful normal exit.
+        return True
+
+    @staticmethod
+    def _join_output_readers(readers: Sequence[Thread]) -> bool:
+        """Use one grace deadline and never close a buffered pipe from another thread."""
+
+        deadline = _MonotonicDeadline.after(CONTROLLER_TEST_TERMINATION_SECONDS)
+        for reader in readers:
+            reader.join(deadline.remaining())
+        return all(not reader.is_alive() for reader in readers)
+
+    @staticmethod
+    def _discarded_output_evidence() -> dict[str, object]:
+        """State why no stream evidence exists when the test process never launched."""
+
+        return {
+            "observed": False,
+            "policy": "unavailable because controller test did not launch",
+        }
+
+    @contextmanager
+    def _controller_test_lifetime(
+        self,
+        process: subprocess.Popen[bytes],
+        windows_job: _WindowsJobContainment | None,
+    ) -> Any:
+        """Ensure a post-launch exception cannot leak a child or owned Job handle."""
+
+        state = {"direct_exit_observed": False, "finalized": False}
+        try:
+            yield state
+        finally:
+            if not state["finalized"]:
+                try:
+                    # A POSIX leader that already exited has no safely owned group ID;
+                    # never guess a later PID/PGID. Windows still owns the Job handle.
+                    if windows_job is not None or not state["direct_exit_observed"]:
+                        self._terminate_controller_test_process(process, windows_job)
+                        try:
+                            process.wait(timeout=CONTROLLER_TEST_TERMINATION_SECONDS)
+                        except (OSError, subprocess.TimeoutExpired):
+                            pass
+                except Exception:
+                    # The caller returns a typed execution failure; cleanup itself must
+                    # not replace that boundary with an escaping traceback.
+                    pass
+
+    def _controller_tests_check(self) -> dict[str, object]:
+        command = self._controller_test_command()
+        started = time.monotonic()
+        phase_deadline = _MonotonicDeadline.after(CONTROLLER_TEST_TIMEOUT_SECONDS)
+        base_evidence: dict[str, object] = {
+            # This production command is fixed and documented. Do not expose or hash
+            # arbitrary overridden argv: either can become an offline secret oracle.
+            "command_identity": "exact-checkout-isolated-unittest-discover",
+            "interpreter": sys.executable,
+            "cwd": str(self.repo_root),
+            "test_root": str((self.ap_root / "tests").resolve()),
+            "timeout_seconds": CONTROLLER_TEST_TIMEOUT_SECONDS,
+            "isolated": True,
+            "containment": (
+                "windows-job-object" if os.name == "nt" else "posix-process-group"
+            ),
+            "output_policy": "stdout and stderr strictly UTF-8 validated then discarded",
+        }
+        windows_job: _WindowsJobContainment | None = None
+        if os.name == "nt":
+            try:
+                windows_job = _WindowsJobContainment.create()
+            except _WindowsContainmentUnavailable as error:
+                return {
+                    "name": "controller-tests",
+                    "passed": False,
+                    "details": ["controller test containment could not be established"],
+                    "evidence": {
+                        **base_evidence,
+                        "failure_kind": "containment_unavailable",
+                        "error_type": type(error).__name__,
+                        "duration_seconds": round(time.monotonic() - started, 3),
+                        "stdout": self._discarded_output_evidence(),
+                        "stderr": self._discarded_output_evidence(),
+                    },
+                }
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=self.repo_root,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False,
+                env=self._isolated_python_environment(),
+                start_new_session=os.name != "nt",
+                creationflags=(
+                    (
+                        getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                        | getattr(subprocess, "CREATE_SUSPENDED", 0)
+                    )
+                    if os.name == "nt"
+                    else 0
+                ),
+            )
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            if windows_job is not None:
+                windows_job.close()
+            return {
+                "name": "controller-tests",
+                "passed": False,
+                "details": ["controller tests could not launch"],
+                "evidence": {
+                    **base_evidence,
+                    "failure_kind": "spawn_failed",
+                    "error_type": type(error).__name__,
+                    "duration_seconds": round(time.monotonic() - started, 3),
+                    "stdout": self._discarded_output_evidence(),
+                    "stderr": self._discarded_output_evidence(),
+                },
+            }
+        containment_setup_error: Exception | None = None
+        try:
+            containment_ready = windows_job is None or (
+                windows_job.assign(process) and windows_job.resume(process)
+            )
+        except Exception as error:
+            containment_setup_error = error
+            containment_ready = False
+        if not containment_ready:
+            # The child starts suspended. It cannot execute user-controlled test
+            # code before Job assignment, and failed assignment/resume is terminal.
+            try:
+                if windows_job is not None:
+                    windows_job.close()
+            except Exception:
+                pass
+            try:
+                process.kill()
+                process.wait(timeout=CONTROLLER_TEST_TERMINATION_SECONDS)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            for stream in (process.stdout, process.stderr):
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except (OSError, ValueError):
+                        pass
+            return {
+                "name": "controller-tests",
+                "passed": False,
+                "details": ["controller test containment assignment or resume failed closed"],
+                "evidence": {
+                    **base_evidence,
+                    "failure_kind": "containment_setup_failed",
+                    "error_type": (
+                        type(containment_setup_error).__name__
+                        if containment_setup_error is not None
+                        else None
+                    ),
+                    "duration_seconds": round(time.monotonic() - started, 3),
+                    "stdout": self._discarded_output_evidence(),
+                    "stderr": self._discarded_output_evidence(),
+                },
+            }
+        try:
+            with self._controller_test_lifetime(process, windows_job) as lifetime:
+                result = self._controller_tests_check_started(
+                    process,
+                    windows_job,
+                    base_evidence,
+                    phase_deadline,
+                    started,
+                    lifetime,
                 )
-        return {"name": "runtime-coordination", "passed": passed, "details": details}
+                lifetime["finalized"] = True
+                return result
+        except Exception as error:
+            return {
+                "name": "controller-tests",
+                "passed": False,
+                "details": ["controller tests failed during post-launch handling"],
+                "evidence": {
+                    **base_evidence,
+                    "failure_kind": "post_launch_handling_failed",
+                    "error_type": type(error).__name__,
+                    "duration_seconds": round(time.monotonic() - started, 3),
+                    "stdout": self._discarded_output_evidence(),
+                    "stderr": self._discarded_output_evidence(),
+                },
+            }
+
+    def _controller_tests_check_started(
+        self,
+        process: subprocess.Popen[bytes],
+        windows_job: _WindowsJobContainment | None,
+        base_evidence: Mapping[str, object],
+        phase_deadline: _MonotonicDeadline,
+        started: float,
+        lifetime: dict[str, bool],
+    ) -> dict[str, object]:
+        assert process.stdout is not None and process.stderr is not None
+        stdout = _StrictDiscardingProcessOutput()
+        stderr = _StrictDiscardingProcessOutput()
+        stdout_reader = Thread(target=stdout.consume, args=(process.stdout,), daemon=True)
+        stderr_reader = Thread(target=stderr.consume, args=(process.stderr,), daemon=True)
+        stdout_reader.start()
+        stderr_reader.start()
+        failure_kinds: list[str] = []
+
+        def fail(kind: str) -> None:
+            if kind not in failure_kinds:
+                failure_kinds.append(kind)
+
+        try:
+            process.wait(timeout=phase_deadline.remaining())
+        except subprocess.TimeoutExpired:
+            fail("timed_out")
+            if not self._terminate_controller_test_process(process, windows_job):
+                fail("containment_termination_failed")
+            try:
+                process.wait(timeout=CONTROLLER_TEST_TERMINATION_SECONDS)
+            except subprocess.TimeoutExpired:
+                fail("termination_incomplete")
+        except OSError:
+            fail("process_wait_failed")
+            if not self._terminate_controller_test_process(process, windows_job):
+                fail("containment_termination_failed")
+        else:
+            lifetime["direct_exit_observed"] = True
+            # Windows closes the owned Job before readers wait. POSIX cannot safely
+            # target a group after its leader exits, so a held pipe fails closed.
+            if not self._close_containment_after_direct_exit(process, windows_job):
+                fail("containment_termination_failed")
+        readers_closed = self._join_output_readers((stdout_reader, stderr_reader))
+        for reader, stream in ((stdout_reader, process.stdout), (stderr_reader, process.stderr)):
+            if reader.is_alive():
+                continue
+            try:
+                stream.close()
+            except (OSError, ValueError):
+                pass
+        if not readers_closed:
+            fail("output_stream_incomplete")
+        duration = round(time.monotonic() - started, 3)
+        returncode = process.returncode
+        stdout_evidence = stdout.evidence()
+        stderr_evidence = stderr.evidence()
+        if (
+            stdout_evidence["stream_error"] is not None
+            or stderr_evidence["stream_error"] is not None
+        ):
+            fail("output_stream_error")
+        if (
+            not stdout_evidence["utf8_valid"] or not stderr_evidence["utf8_valid"]
+        ):
+            fail("undecodable_output")
+        if isinstance(returncode, int) and returncode < 0:
+            fail("killed")
+        if returncode is None:
+            fail("termination_incomplete")
+        if returncode != 0:
+            fail("nonzero_exit")
+        failure_kind = failure_kinds[0] if failure_kinds else None
+        passed = failure_kind is None
+        evidence = {
+            **base_evidence,
+            "failure_kind": failure_kind,
+            "failure_kinds": failure_kinds,
+            "returncode": returncode,
+            "duration_seconds": duration,
+            "stdout": stdout_evidence,
+            "stderr": stderr_evidence,
+        }
+        return {
+            "name": "controller-tests",
+            "passed": passed,
+            "details": [] if passed else [f"controller tests failed: {failure_kind}"],
+            "evidence": evidence,
+        }
 
     def doctor(
         self,
@@ -3359,42 +4036,34 @@ class ControlPlane:
             }
         )
         checks.append(self._coordination_check())
-        test_details: list[str] = []
         if run_controller_tests:
-            completed = subprocess.run(
-                (
-                    sys.executable,
-                    "-m",
-                    "unittest",
-                    "discover",
-                    "-s",
-                    str(self.ap_root / "tests"),
-                    "-v",
-                ),
-                cwd=self.repo_root,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False,
-                timeout=180,
-            )
-            if completed.returncode:
-                test_details.append(completed.stdout[-20_000:])
+            checks.append(self._controller_tests_check())
+        else:
             checks.append(
                 {
                     "name": "controller-tests",
-                    "passed": completed.returncode == 0,
-                    "details": test_details,
+                    "passed": True,
+                    "details": [
+                        "SKIPPED: controller tests were not run; this is a reduced "
+                        "diagnostic and cannot satisfy a full-doctor requirement"
+                    ],
+                    "evidence": {
+                        "failure_kind": "skipped",
+                        "full_validation": False,
+                    },
                 }
             )
         passed = all(bool(check["passed"]) for check in checks)
         return {
             "schema_version": SCHEMA_VERSION,
             "passed": passed,
-            "state": "READY" if passed else "BOOTSTRAP_INVALID",
+            "state": (
+                "READY" if passed and run_controller_tests
+                else "READY_REDUCED" if passed
+                else "BOOTSTRAP_INVALID"
+            ),
+            "validation_scope": "full" if run_controller_tests else "reduced",
+            "controller_tests_run": run_controller_tests,
             "plan_fingerprint": self.expected_plan_fingerprint,
             "checks": checks,
             "generated_at": format_time(self.clock()),
