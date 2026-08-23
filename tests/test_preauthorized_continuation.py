@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -30,11 +32,47 @@ class PreauthorizedContinuationLauncherTests(unittest.TestCase):
         self.assertNotIn("cmd.exe", self.script)
 
     def test_launcher_reobserves_the_current_repository_before_execution(self) -> None:
-        self.assertIn("Resolve-Path -LiteralPath $RepoRoot", self.script)
+        self.assertIn(
+            'Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")',
+            self.script,
+        )
         self.assertIn('Join-Path $root ".autopilot\\bin\\autopilot.py"', self.script)
-        self.assertIn("git -C $root rev-parse --is-inside-work-tree", self.script)
+        self.assertIn("git -C $root rev-parse --show-toplevel", self.script)
+        self.assertIn('git -C $root diff --quiet -- ".autopilot/bin/autopilot.py"', self.script)
+        self.assertIn('git -C $root diff --cached --quiet -- ".autopilot/bin/autopilot.py"', self.script)
+        self.assertIn('git -C $root rev-parse "HEAD:.autopilot/bin/autopilot.py"', self.script)
         self.assertNotIn("ARCH-100", self.script)
         self.assertNotIn("release/hive-mind-os-singleton", self.script)
+
+    def test_launcher_cannot_select_a_foreign_repository_or_actor(self) -> None:
+        self.assertNotIn("[string]$RepoRoot", self.script)
+        self.assertNotIn("[string]$Actor", self.script)
+        self.assertIn('$actor = "autopilot:preauthorized-continuation"', self.script)
+        self.assertNotIn('"--actor", $Actor', self.script)
+
+    def test_apply_is_explicitly_withheld_until_the_dispatcher_reports_publication(self) -> None:
+        self.assertIn("$contract.release_publication.published -ne $true", self.script)
+        self.assertIn("CONTINUATION WITHHELD", self.script)
+        self.assertIn("exit 3", self.script)
+        self.assertIn('"release_publication"', (ROOT / ".autopilot/bin/autopilot.py").read_text(encoding="utf-8"))
+
+    @unittest.skipUnless(
+        shutil.which("powershell") or shutil.which("pwsh"),
+        "PowerShell is required for launcher parameter-binding probe",
+    )
+    def test_launcher_rejects_foreign_scope_parameters_before_execution(self) -> None:
+        shell = shutil.which("powershell") or shutil.which("pwsh")
+        for forbidden in ("RepoRoot", "Actor"):
+            with self.subTest(forbidden=forbidden):
+                result = subprocess.run(
+                    [shell, "-NoProfile", "-File", str(SCRIPT), f"-{forbidden}", str(ROOT)],
+                    cwd=ROOT,
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"{forbidden}", result.stderr + result.stdout)
 
     def test_launcher_cannot_smuggle_credentials_or_privileged_shortcuts(self) -> None:
         for forbidden in (

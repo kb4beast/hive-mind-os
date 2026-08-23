@@ -17,8 +17,7 @@ BIN = Path(__file__).resolve().parents[1] / "bin"
 if str(BIN) not in sys.path:
     sys.path.insert(0, str(BIN))
 
-from autopilot import parser as autopilot_parser  # noqa: E402
-from autopilot import select_orchestration_status  # noqa: E402
+import autopilot  # noqa: E402
 from orchestration import (  # noqa: E402
     OrchestrationError,
     bind_launch,
@@ -32,6 +31,10 @@ from orchestration import (  # noqa: E402
     validate_policy,
 )
 
+autopilot_parser = autopilot.parser
+run_orchestration = autopilot.run_orchestration
+select_orchestration_status = autopilot.select_orchestration_status
+
 
 class FakePlane:
     def __init__(
@@ -43,9 +46,16 @@ class FakePlane:
         self.repo_root = root
         self._status = dict(status)
         self._nodes = nodes
+        self.dispatched_actors: list[str] = []
 
     def status(self) -> Mapping[str, object]:
         return self._status
+
+    def observe_status(self) -> Mapping[str, object]:
+        return self._status
+
+    def dispatch(self, *, actor: str) -> None:
+        self.dispatched_actors.append(actor)
 
     def nodes(self) -> tuple[Mapping[str, Any], ...]:
         return tuple(self._nodes)
@@ -539,6 +549,41 @@ class IntentOrchestrationTests(unittest.TestCase):
         contract = build_orchestration_contract(plane, "check status", status=status)
         self.assertEqual(contract["tasks"], [])
         self.assertFalse(contract["dispatch_required"])
+
+    def test_orchestration_marks_an_ineligible_apply_request_withheld(self) -> None:
+        status = self.status([{"node_id": "NEW-300", "state": "BLOCKED"}])
+        status["reconciliation_required"] = True
+        plane = FakePlane(self.root, status, self.nodes)
+
+        result = run_orchestration(
+            plane,
+            "continue the existing work",
+            actor="test:continuation",
+            apply=True,
+        )
+
+        self.assertEqual(
+            result["release_publication"],
+            {"requested": True, "published": False, "outcome": "WITHHELD"},
+        )
+        self.assertEqual(plane.dispatched_actors, [])
+
+    def test_orchestration_marks_a_dispatched_apply_request_published(self) -> None:
+        status = self.status([{"node_id": "NEW-300", "state": "READY"}])
+        plane = FakePlane(self.root, status, self.nodes)
+
+        result = run_orchestration(
+            plane,
+            "continue the existing work",
+            actor="test:continuation",
+            apply=True,
+        )
+
+        self.assertEqual(
+            result["release_publication"],
+            {"requested": True, "published": True, "outcome": "PUBLISHED"},
+        )
+        self.assertEqual(plane.dispatched_actors, ["test:continuation"])
 
     def test_adverse_settled_state_is_quiescent_but_not_success(self) -> None:
         status = self.status([{"node_id": "ACTIVE-100", "state": "QUARANTINED"}])

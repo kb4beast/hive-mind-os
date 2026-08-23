@@ -18,13 +18,18 @@ instruction into unrestricted external authority.
 
 - `scripts/Invoke-PreauthorizedContinuation.ps1` is the only canonical launcher for
   this handoff. With `-Apply`, it calls the current repository's deterministic
-  `autopilot orchestrate --apply` command using a fixed continuation request and an
-  argument array, never a caller-supplied shell command.
-- The launcher first resolves the repository and confirms its canonical control-plane
-  CLI. It does not reuse a fixed branch, node, snapshot, credential, or old release.
+  `autopilot orchestrate --apply` command using a fixed continuation request, fixed
+  actor label, and argument array, never a caller-supplied shell command, actor, or
+  repository path.
+- The launcher resolves only its own repository from `$PSScriptRoot`, confirms that
+  it is the Git top-level, and refuses a modified or staged control-plane executable.
+  It records the committed controller blob it invokes. It does not reuse a fixed
+  branch, node, snapshot, credential, or old release.
 - The dispatcher independently re-observes live state. It can publish a release only
   when its existing reconciliation, eligibility, lease, scope, and safe-action rules
-  permit it. A stale or blocked run returns its normal typed refusal.
+  permit it. Its structured contract now reports `release_publication` as either
+  `PUBLISHED` or `WITHHELD`; the launcher exits non-success with a typed withholding
+  when `-Apply` did not actually publish a release.
 - `AGENTS.md` directs future agents to invoke this launcher immediately after an
   explicit owner continuation/automation directive. They must continue from durable
   blockers rather than ask the owner to restate an in-scope permission.
@@ -47,9 +52,9 @@ python -m unittest tests.test_preauthorized_continuation -v
 python -m unittest discover -s tests -v
 ```
 
-The focused suite pins the launcher command, fixed continuation request, argument
-array, `-Apply` behavior, absence of credential/ExecutionPolicy/merge/deploy shortcuts,
-and the durable agent instruction.
+The focused suite pins the repository/actor binding, committed-controller check, fixed
+continuation request, argument array, truthful `-Apply` withholding behavior, absence
+of credential/ExecutionPolicy/merge/deploy shortcuts, and the durable agent instruction.
 
 ## Rollback
 
