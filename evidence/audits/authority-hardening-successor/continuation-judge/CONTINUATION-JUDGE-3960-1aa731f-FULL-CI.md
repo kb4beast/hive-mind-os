@@ -71,4 +71,3 @@ If this scoped behavior regresses, revert `383b01f` and `1aa731f` together with 
 Builder receipt, continuation DAG nodes, and associated ADR/test updates. Preserve the
 original adverse Builder/Curator/Judge receipts, the repaired Curator receipt, and this
 verdict. Do not restore the historic fixed-branch recovery helper as a fallback.
-
