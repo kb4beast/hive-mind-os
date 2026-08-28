@@ -1,0 +1,704 @@
+<title>The Brownsville Decks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root{
+  --paper:#F3F6F7;
+  --card:#FFFFFF;
+  --ink:#131A20;
+  --graphite:#5C6B75;
+  --trace:#1D4E89;
+  --trace-soft:#E4EDF6;
+  --flag:#A8341C;
+  --flag-soft:#F7E9E5;
+  --rule:#D3DBDF;
+  --gutter-ink:#8C9AA3;
+
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+
+  --measure:66ch;
+  --pad:clamp(1.1rem,4vw,2rem);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1418;
+    --card:#151E24;
+    --ink:#E4EAEE;
+    --graphite:#8B9AA4;
+    --trace:#74A9DD;
+    --trace-soft:#16283A;
+    --flag:#E2755F;
+    --flag-soft:#2C1A16;
+    --rule:#233039;
+    --gutter-ink:#5F707B;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1418;
+  --card:#151E24;
+  --ink:#E4EAEE;
+  --graphite:#8B9AA4;
+  --trace:#74A9DD;
+  --trace-soft:#16283A;
+  --flag:#E2755F;
+  --flag-soft:#2C1A16;
+  --rule:#233039;
+  --gutter-ink:#5F707B;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:17px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.14;letter-spacing:-0.015em}
+p{margin:0}
+a{color:var(--trace)}
+:focus-visible{outline:2px solid var(--trace);outline-offset:3px;border-radius:2px}
+
+.wrap{max-width:1080px;margin:0 auto;padding:0 var(--pad)}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:50;
+  background:color-mix(in srgb,var(--paper) 88%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule);
+}
+.nav-in{
+  max-width:1080px;margin:0 auto;padding:.6rem var(--pad);
+  display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;
+}
+.nav-mark{
+  font-family:var(--f-mono);font-size:.7rem;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--graphite);
+  margin-right:auto;
+}
+.nav a{
+  font-family:var(--f-mono);font-size:.74rem;font-weight:500;
+  letter-spacing:.05em;text-decoration:none;color:var(--graphite);
+  padding:.25rem 0;border-bottom:2px solid transparent;white-space:nowrap;
+}
+.nav a:hover{color:var(--ink);border-bottom-color:var(--rule)}
+.nav a.on{color:var(--trace);border-bottom-color:var(--trace)}
+
+/* ---------- hero ---------- */
+.hero{padding:clamp(3rem,9vw,6rem) 0 2.4rem}
+.eyebrow{
+  font-family:var(--f-mono);font-size:.72rem;font-weight:500;
+  letter-spacing:.17em;text-transform:uppercase;color:var(--graphite);
+}
+.hero h1{
+  font-size:clamp(2.5rem,7.2vw,4.6rem);font-weight:700;
+  margin:.85rem 0 0;max-width:15ch;
+}
+.hero .lede{
+  font-size:clamp(1.08rem,2.2vw,1.3rem);color:var(--graphite);
+  max-width:60ch;margin-top:1.1rem;
+}
+#wave{display:block;width:100%;height:76px;margin:2rem 0 .4rem;opacity:.9}
+.wave-cap{
+  font-family:var(--f-mono);font-size:.68rem;color:var(--gutter-ink);
+  letter-spacing:.06em;border-top:1px solid var(--rule);padding-top:.5rem;
+}
+
+.decks-strip{
+  display:grid;gap:1px;background:var(--rule);
+  border:1px solid var(--rule);margin-top:2.6rem;
+  grid-template-columns:repeat(auto-fit,minmax(215px,1fr));
+}
+.deck-chip{
+  background:var(--card);padding:1.05rem 1.1rem;text-decoration:none;color:inherit;
+  display:flex;flex-direction:column;gap:.4rem;transition:background .15s;
+}
+.deck-chip:hover{background:var(--trace-soft)}
+.deck-chip .n{font-family:var(--f-mono);font-size:.7rem;color:var(--gutter-ink);letter-spacing:.1em}
+.deck-chip .t{font-family:var(--f-display);font-weight:700;font-size:1.12rem}
+.deck-chip .a{font-family:var(--f-mono);font-size:.72rem;color:var(--trace);line-height:1.45}
+
+/* ---------- sections ---------- */
+section{padding:clamp(2.8rem,7vw,4.6rem) 0;border-top:1px solid var(--rule)}
+.sec-head{display:flex;align-items:baseline;gap:.9rem;flex-wrap:wrap;margin-bottom:1.6rem}
+.sec-head h2{font-size:clamp(1.75rem,4vw,2.6rem);font-weight:700}
+.sec-head .tag{
+  font-family:var(--f-mono);font-size:.72rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--graphite);
+}
+h3{font-size:1.28rem;font-weight:600;margin-top:2.2rem;margin-bottom:.75rem}
+h4{font-size:1rem;font-weight:600;letter-spacing:0}
+.prose{max-width:var(--measure)}
+.prose p+p{margin-top:.9rem}
+.mt{margin-top:1.4rem}
+
+/* gutter layout: mono margin like a chart recorder */
+.gutter{display:grid;grid-template-columns:5.5rem 1fr;gap:1.4rem;align-items:start}
+.gutter>.g-label{
+  font-family:var(--f-mono);font-size:.7rem;letter-spacing:.09em;
+  color:var(--gutter-ink);text-transform:uppercase;padding-top:.28rem;
+  border-top:2px solid var(--rule);
+}
+@media(max-width:680px){
+  .gutter{grid-template-columns:1fr;gap:.55rem}
+  .gutter>.g-label{border-top:none;padding-top:0}
+}
+
+/* ---------- elevator ---------- */
+.elevator{
+  border-left:3px solid var(--trace);padding:.2rem 0 .2rem 1.35rem;margin:1.5rem 0 0;
+}
+.elevator .one{
+  font-family:var(--f-display);font-weight:600;
+  font-size:clamp(1.3rem,3vw,1.85rem);line-height:1.25;text-wrap:balance;
+}
+.elevator .thirty{margin-top:.95rem;color:var(--graphite);max-width:var(--measure)}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;margin-top:1.3rem;border:1px solid var(--rule);background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.93rem;min-width:520px}
+th,td{text-align:left;padding:.62rem .85rem;border-bottom:1px solid var(--rule);vertical-align:top}
+th{
+  font-family:var(--f-mono);font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--graphite);font-weight:600;background:color-mix(in srgb,var(--trace-soft) 55%,transparent);
+}
+tr:last-child td{border-bottom:none}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- grade chips: evidence confidence, not decoration ---------- */
+.grade{
+  font-family:var(--f-mono);font-size:.64rem;font-weight:600;letter-spacing:.09em;
+  padding:.1rem .38rem;border:1px solid currentColor;border-radius:2px;
+  white-space:nowrap;vertical-align:2px;
+}
+.g-a{color:var(--trace)}
+.g-b{color:var(--graphite)}
+.g-d{color:var(--graphite);border-style:dashed}
+.g-c{color:var(--flag);text-decoration:line-through}
+
+/* ---------- slide cards ---------- */
+.slides{display:grid;gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:1.3rem;
+  grid-template-columns:repeat(auto-fit,minmax(268px,1fr))}
+.slide{background:var(--card);padding:1rem 1.05rem;display:flex;flex-direction:column;gap:.42rem}
+.slide .sn{font-family:var(--f-mono);font-size:.68rem;color:var(--gutter-ink);letter-spacing:.1em}
+.slide h4{font-size:1.02rem}
+.slide p{font-size:.9rem;color:var(--graphite);line-height:1.55}
+.slide.key{background:var(--trace-soft)}
+.slide.key p{color:var(--ink)}
+
+/* ---------- the hole ---------- */
+.hole{
+  background:var(--flag-soft);border:1px solid color-mix(in srgb,var(--flag) 35%,transparent);
+  border-left:3px solid var(--flag);padding:1.05rem 1.2rem;margin-top:1.8rem;max-width:var(--measure);
+}
+.hole .lab{
+  font-family:var(--f-mono);font-size:.68rem;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--flag);
+}
+.hole p{margin-top:.5rem;font-size:.97rem}
+
+/* ---------- Q&A ---------- */
+.qa{margin-top:1.2rem;max-width:var(--measure);border-top:1px solid var(--rule)}
+details{border-bottom:1px solid var(--rule)}
+summary{
+  cursor:pointer;padding:.72rem 1.8rem .72rem 0;position:relative;list-style:none;
+  font-family:var(--f-display);font-weight:600;font-size:.99rem;
+}
+summary::-webkit-details-marker{display:none}
+summary::after{
+  content:"+";position:absolute;right:.2rem;top:.66rem;
+  font-family:var(--f-mono);color:var(--trace);font-size:1.05rem;transition:transform .18s;
+}
+details[open] summary::after{content:"–"}
+summary:hover{color:var(--trace)}
+details .ans{padding:0 0 .95rem;color:var(--graphite);font-size:.96rem}
+details .ans p+p{margin-top:.7rem}
+
+/* ---------- kill criteria ---------- */
+.kill{
+  margin-top:1.6rem;max-width:var(--measure);border:1px dashed var(--rule);
+  padding:.95rem 1.1rem;background:var(--card);
+}
+.kill .lab{
+  font-family:var(--f-mono);font-size:.68rem;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--graphite);
+}
+.kill p{margin-top:.45rem;font-size:.95rem}
+
+/* ---------- lists ---------- */
+ul.tight{margin:.85rem 0 0;padding-left:1.15rem;max-width:var(--measure)}
+ul.tight li{margin-bottom:.5rem}
+ul.tight li::marker{color:var(--trace)}
+ul.never li::marker{color:var(--flag)}
+
+.rule-note{
+  font-family:var(--f-mono);font-size:.78rem;color:var(--graphite);
+  background:var(--card);border:1px solid var(--rule);padding:.8rem .95rem;
+  margin-top:1.2rem;max-width:var(--measure);line-height:1.6;
+}
+
+footer{border-top:1px solid var(--rule);padding:2.4rem 0 3.4rem;color:var(--graphite);font-size:.9rem}
+footer .prose{max-width:var(--measure)}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+html{scroll-behavior:smooth;scroll-padding-top:4.2rem}
+</style>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-mark">Pitch Runbook / 2026-08-28</span>
+    <a href="#how">How to use</a>
+    <a href="#boom-baseline">1 Boom Baseline</a>
+    <a href="#peninsula">2 Peninsula</a>
+    <a href="#sargo">3 SARGO</a>
+    <a href="#boom-map">4 Boom Map</a>
+    <a href="#room">In the room</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">Investor decks · Brownsville, Texas · space and energy</div>
+    <h1>The Brownsville Decks</h1>
+    <p class="lede">Four ideas that came out of three idea tournaments, rebuilt for the only audience that matters here: someone deciding whether to write a cheque. Each deck names its own worst weakness on its own slide.</p>
+    <canvas id="wave" aria-hidden="true"></canvas>
+    <div class="wave-cap">Overpressure trace, decaying · the shared subject of decks 1 and 4</div>
+
+    <div class="decks-strip">
+      <a class="deck-chip" href="#boom-baseline">
+        <span class="n">DECK 01 · VENTURE</span>
+        <span class="t">Boom Baseline</span>
+        <span class="a">$750K pre-seed, or a $250K design-partner contract</span>
+      </a>
+      <a class="deck-chip" href="#peninsula">
+        <span class="n">DECK 02 · VENTURE</span>
+        <span class="t">Peninsula</span>
+        <span class="a">$500K, or two paid pilot studies</span>
+      </a>
+      <a class="deck-chip" href="#sargo">
+        <span class="n">DECK 03 · DEEP TECH</span>
+        <span class="t">SARGO</span>
+        <span class="a">$1.5M seed, or $400K non-dilutive</span>
+      </a>
+      <a class="deck-chip" href="#boom-map">
+        <span class="n">DECK 04 · YOUTH</span>
+        <span class="t">The Boom Map</span>
+        <span class="a">Mentorship, an internship, $2K of sensors</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- ===================== HOW TO USE ===================== -->
+  <section id="how">
+    <div class="sec-head"><span class="tag">Part 0</span><h2>Read this before you pitch anything</h2></div>
+
+    <div class="gutter">
+      <div class="g-label">Audience</div>
+      <div>
+        <div class="prose">
+          <p>The tournaments optimised for a grant panel at Expanding Frontiers. Investors score a different rubric, and three of your best grant arguments become liabilities in front of them.</p>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>A grant panel rewards</th><th>An investor asks instead</th></tr></thead>
+            <tbody>
+              <tr><td>Regional economic impact, RGV jobs</td><td>Does the market exist outside Brownsville?</td></tr>
+              <tr><td>NASA technology basis</td><td>Do you own anything, or are you licensing what anyone can license?</td></tr>
+              <tr><td>Non-dilutive capital efficiency</td><td>What does this look like at $50M of revenue?</td></tr>
+              <tr><td>Community benefit</td><td>Who signs the cheque, and how often?</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose mt">
+          <p>So each deck below is rebuilt around four questions: <strong>who pays, how much, how often, and why can't someone else do it.</strong> The regional material stays, demoted to a "why we win here first" slide rather than the thesis.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="gutter" style="margin-top:2.6rem">
+      <div class="g-label">Rule 01</div>
+      <div class="prose">
+        <h3 style="margin-top:0">Say the weak thing first</h3>
+        <p>Every one of these ideas has one genuine hole, and each deck names it in a red block you cannot miss. An investor who finds a hole you did not disclose stops trusting everything else in the deck, including the parts that are true. An investor who watches you name your own hole and show the plan to close it is evaluating a founder, which is what they were doing anyway.</p>
+      </div>
+    </div>
+
+    <div class="gutter" style="margin-top:2.2rem">
+      <div class="g-label">Rule 02</div>
+      <div class="prose">
+        <h3 style="margin-top:0">Grade every number, cut every C</h3>
+        <p>Each figure carries a grade throughout this runbook. If you cannot say which grade a number is, take it off the slide.</p>
+        <div class="rule-note">
+          <span class="grade g-a">A</span> primary or corroborated &nbsp;·&nbsp;
+          <span class="grade g-b">B</span> single credible source &nbsp;·&nbsp;
+          <span class="grade g-d">DERIVED</span> arithmetic, assumption stated &nbsp;·&nbsp;
+          <span class="grade g-c">C</span> banned from slides
+          <br><br>
+          Currently banned: the AFRL programme specifics, and any prize figure taken from a prior competition cycle.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DECK 1 ===================== -->
+  <section id="boom-baseline">
+    <div class="sec-head"><span class="tag">Deck 01 · venture · pre-seed</span><h2>Boom Baseline</h2></div>
+
+    <div class="elevator">
+      <p class="one">Every major airport continuously measures its own noise. Not one spaceport does. We build that layer, starting at the busiest launch site in America.</p>
+      <p class="thirty"><strong>Thirty seconds.</strong> Airport noise monitoring is a $343 million a year market because airports learned decades ago that you cannot grow operations a community does not trust. Spaceports never built it. Now the FAA projects launch and reentry operations going from about 330 a year to over 1,000 by 2030 and 10,000 by 2035, and the first launch community in America has taken its operator to federal court. We deploy calibrated, independently operated overpressure and acoustic monitoring around launch sites, and sell the record to everyone who currently has to argue without one.</p>
+    </div>
+
+    <h3>Why it helps, and who it helps</h3>
+    <p class="prose">This is the table that separates you from a grievance project. The record helps the operator most.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Who</th><th>What they have today</th><th>What the record gives them</th></tr></thead>
+        <tbody>
+          <tr><td>Launch operator</td><td>Predictions that missed by 1 to 4 psf on one measured flight, and a lawsuit</td><td>A defensible third-party number, and the ability to prove a mitigation worked</td></tr>
+          <tr><td>Spaceport authority</td><td>Anecdote</td><td>The instrument every airport authority already runs</td></tr>
+          <tr><td>FAA</td><td>Models with a measured miss, and a mandate to license 30x more operations</td><td>Ground truth to calibrate against</td></tr>
+          <tr><td>Insurer, county</td><td>No basis to price or adjudicate</td><td>Actuarial data</td></tr>
+          <tr><td>Residents</td><td>A courtroom</td><td>A number</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose mt">Airports did not solve community noise by winning arguments. They solved it by measuring, publishing, and making the number the shared reference. That is the business.</p>
+
+    <h3>The deck</h3>
+    <div class="slides">
+      <div class="slide"><span class="sn">01 TITLE</span><h4>Boom Baseline</h4><p>The independent measurement layer for launch communities. One image: a launch and a house, in the same frame.</p></div>
+      <div class="slide"><span class="sn">02 PROBLEM</span><h4>Consent with no instrument</h4><p>Around 80 plaintiffs across 60 to 70 households in Port Isabel and South Padre are in federal court over eleven tests. Nobody in that dispute, the operator included, has a continuous calibrated record. <span class="grade g-a">A</span></p></div>
+      <div class="slide"><span class="sn">03 WHY NOW</span><h4>Three things, all recent</h4><p>FAA projects 1,000+ launches and reentries a year by 2030 and 10,000 by 2035, from about 329 worldwide in 2025 <span class="grade g-b">B</span>. Federal rulemaking opened on siting new spaceports in August 2026 <span class="grade g-b">B</span>. The first community-versus-operator case is live <span class="grade g-a">A</span>.</p></div>
+      <div class="slide key"><span class="sn">04 INSIGHT</span><h4>Spaceports are where airports were</h4><p>Toronto Pearson runs 25 permanent IEC 61672 Class 1 terminals streaming continuously <span class="grade g-a">A</span>. Envirosuite alone serves 200+ environmentally constrained airports <span class="grade g-b">B</span>. At spaceports this market is zero.</p></div>
+      <div class="slide"><span class="sn">05 PRODUCT</span><h4>What arrived, never what it caused</h4><p>Calibrated nodes, an independently held chain-of-custody record, a published method anyone can attack. The restraint is the product: a number both sides can use beats a number one side likes.</p></div>
+      <div class="slide"><span class="sn">06 MARKET</span><h4>A ladder, not a TAM</h4><p>See the table below. Say out loud that you will not divide a market figure by a site count and call it a TAM.</p></div>
+      <div class="slide"><span class="sn">07 MODEL</span><h4>Per-site subscription</h4><p>Annual monitoring subscription plus installation, with a data licence for insurers and authorities. Grows with cadence, not headcount.</p></div>
+      <div class="slide"><span class="sn">08 TRACTION</span><h4>Exactly what exists</h4><p>Today: the analysis, site relationships, a costed deployment plan. In 90 days: a calibrated reference network capturing real events. A cheaper proof runs in parallel for about $2,000 (Deck 04).</p></div>
+      <div class="slide"><span class="sn">09 MOAT</span><h4>Not the sensors</h4><p>The longitudinal record a later competitor cannot back-fill. The independence an operator structurally cannot self-supply in its own dispute. The method, published and defended until it is the reference.</p></div>
+      <div class="slide"><span class="sn">10 ASK</span><h4>$750K, or a customer</h4><p>18 months: reference network at one site, first published record, price discovery, two paid pilots. Alternative on the same slide: a $250K design-partner contract, which we prefer.</p></div>
+      <div class="slide"><span class="sn">11 FUNDS</span><h4>Use of funds</h4><p>40% deployment and calibration, 25% engineering, 20% commercial and price discovery, 15% legal, consent and data policy.</p></div>
+    </div>
+
+    <h3>The market slide, graded</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Rung</th><th>Figure</th><th>Grade</th></tr></thead>
+        <tbody>
+          <tr><td>Analogous market: airport noise monitoring systems</td><td class="num">$342.5M (2025) → $579.8M (2034)</td><td><span class="grade g-b">B</span></td></tr>
+          <tr><td>Wider environmental noise monitoring</td><td class="num">$2.4B → $4.6B, 7.5% CAGR</td><td><span class="grade g-b">B</span></td></tr>
+          <tr><td>Launch sites globally</td><td class="num">80</td><td><span class="grade g-b">B</span></td></tr>
+          <tr><td>FAA-licensed US spaceports</td><td class="num">14</td><td><span class="grade g-a">A</span></td></tr>
+          <tr><td>Spaceport community monitoring today</td><td class="num">$0</td><td><span class="grade g-a">A</span></td></tr>
+          <tr><td>Operations growth to 2035</td><td class="num">~329/yr → 10,000/yr projected</td><td><span class="grade g-b">B</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="hole">
+      <span class="lab">The hole · say it by slide six</span>
+      <p><strong>No payer is confirmed.</strong> The candidate payers are the operator, the spaceport authority, the county, insurers and the FAA. The airport analogy says the operator or authority pays, because that is who pays at airports. But nobody has signed anything, and the per-site contract value that decides whether this is venture scale or a public-good programme is a number we do not have yet. Thirty days of price discovery is milestone one. Hold me to it.</p>
+    </div>
+
+    <h3>Anticipated questions</h3>
+    <div class="qa">
+      <details><summary>Who actually pays? Name them.</summary><div class="ans"><p>Not yet confirmed, and it is the first thing this round resolves. Candidates are the operator, the spaceport authority, the county, insurers and the FAA. I will not tell you I have a signed customer when I do not. What I will tell you is that 30 days of price discovery is the first milestone.</p></div></details>
+      <details><summary>Won't SpaceX just publish their own data and kill you?</summary><div class="ans"><p>They may, and it would be a real competitive event. It does not settle the dispute, for the same reason airports do not self-certify community noise: the value is independence, and an operator's own number is not usable by a party in dispute with the operator.</p><p>Note what happened when the prediction was tested. Measured overpressures exceeded FAA predictions by one to four psf. Self-reported modelling is exactly what lost credibility here.</p></div></details>
+      <details><summary>This is a lawsuit support business.</summary><div class="ans"><p>No, and I will not build one. Same data, same terms, to every party including the operator. The moment the record is for sale to one side, its value collapses to zero, because the other side stops accepting it. That is a commercial argument, not an ethical pose.</p></div></details>
+      <details><summary>Sensors are commodity. What stops a competitor?</summary><div class="ans"><p>Correct, and the sensor is not the product. The product is a calibrated chain-of-custody record with a published method and a longitudinal series. A competitor starting in 2028 cannot produce 2026 data.</p></div></details>
+      <details><summary>Is this venture scale or a lifestyle business?</summary><div class="ans"><p>Unproven, and it depends entirely on whether per-site contract values look like airport contracts. If they do, 80 sites growing under a federal siting rulemaking is a real business. If they do not, this is a public-good programme and you should not fund it. That is a falsifiable question and it is milestone one.</p></div></details>
+      <details><summary>What if the FAA mandates it and an incumbent takes the market?</summary><div class="ans"><p>That is the good outcome for the market and the dangerous one for us, so we sequence for it: be the published method and the incumbent record before a mandate lands. Envirosuite got there in aviation by being early, not by being biggest.</p></div></details>
+      <details><summary>Privacy exposure from measuring private homes?</summary><div class="ans"><p>Real, and handled before any deployment. Written consent per site, publication aggregated by street or larger, no address ever identifiable. This is a live workstream, not a slide.</p></div></details>
+    </div>
+
+    <div class="kill">
+      <span class="lab">Kill criteria</span>
+      <p>Walk away if someone is already doing calibrated community monitoring at a spaceport; or if no payer of any kind will state a number after 60 days of trying; or if the only willing payer is a litigation funder.</p>
+    </div>
+  </section>
+
+  <!-- ===================== DECK 2 ===================== -->
+  <section id="peninsula">
+    <div class="sec-head"><span class="tag">Deck 02 · venture · pre-seed</span><h2>Peninsula</h2></div>
+
+    <div class="elevator">
+      <p class="one">A $12 billion LNG export terminal and a methane-fuelled orbital launch site now share one peninsula, and no model exists for what one does to the other.</p>
+      <p class="thirty"><strong>Thirty seconds.</strong> Process safety is a mature discipline with mature vendors, and every one of them models a facility against its own hazards and its own fence line. Nobody models a facility against a neighbouring facility of an entirely different industry with a different regulator, because until now that pairing did not exist. Rio Grande LNG comes online in 2027 about 12 miles from Starbase, federal rulemaking on siting more spaceports has opened, and the co-location problem is about to repeat. We build the cross-facility risk model for that new asset class and sell it to both sides plus their insurers and regulators.</p>
+    </div>
+
+    <h3>Why it helps</h3>
+    <p class="prose">Each operator can answer "what happens if my facility has an event." Neither can answer "what happens if theirs does," and neither regulator asks. FERC and PHMSA govern the terminal, the FAA governs the launch site, and the boundary between them is nobody's jurisdiction. Everyone in that gap is exposed and knows it.</p>
+
+    <h3>The deck</h3>
+    <div class="slides">
+      <div class="slide"><span class="sn">01 TITLE</span><h4>Peninsula</h4><p>Cross-facility risk for co-located critical infrastructure.</p></div>
+      <div class="slide"><span class="sn">02 PROBLEM</span><h4>Risk stops at the fence line</h4><p>Co-location of dissimilar high-consequence facilities creates hazard paths that neither operator's model contains and neither regulator reviews.</p></div>
+      <div class="slide"><span class="sn">03 WHY NOW</span><h4>The pairing is new, and repeating</h4><p>Rio Grande LNG, roughly $12B across about 1,000 acres, targeted to operate 2027, adjacent to an orbital launch site <span class="grade g-a">A</span>. Texas LNG is a second project nearby. Federal spaceport siting rulemaking opened August 2026 <span class="grade g-b">B</span>.</p></div>
+      <div class="slide key"><span class="sn">04 PRODUCT</span><h4>A model, not a report</h4><p>Software plus a maintained model subscription: shared hazard paths, joint consequence modelling, cross-operator emergency response, and cryogenic road transport routing through populated corridors.</p></div>
+      <div class="slide"><span class="sn">05 MARKET</span><h4>Small today, honestly</h4><p>Comparables are the process safety and QRA vendors. The asset class is co-located launch and energy infrastructure: a handful of sites today, growing under the siting rulemaking.</p></div>
+      <div class="slide"><span class="sn">06 MODEL</span><h4>Build fee, then maintenance</h4><p>Model build, then annual maintenance as facilities change. Sell to both operators, their insurers, and the authorities.</p></div>
+      <div class="slide"><span class="sn">07 MOAT</span><h4>The reference model</h4><p>The first cross-facility model becomes the thing other parties argue against. Regulatory acceptance compounds.</p></div>
+      <div class="slide"><span class="sn">08 ASK</span><h4>$500K, or two pilots</h4><p>Paid pilot studies preferred over capital.</p></div>
+    </div>
+
+    <div class="hole">
+      <span class="lab">The hole · say it by slide four</span>
+      <p><strong>It looks like consulting, and it needs data two operators will not hand over.</strong> The tournament scored this idea's startability at 3 out of 10 for exactly that reason. If the second engagement does not cost materially less than the first, this is a services business wearing software clothes and should not be venture funded.</p>
+    </div>
+
+    <h3>Anticipated questions</h3>
+    <div class="qa">
+      <details><summary>This is consulting with extra steps.</summary><div class="ans"><p>The fairest attack, and the answer has to be structural: the deliverable is a maintained model with a subscription, not a report; revenue recurs because facilities change; and the second model costs far less than the first because the hazard library carries over. If we cannot demonstrate that by the second engagement, you are right.</p></div></details>
+      <details><summary>You need facility data from two operators who will not give it to you.</summary><div class="ans"><p>Correct, and it is the hardest gate. Two routes. Start from public filings, FERC, PHMSA and FAA environmental documents, and build the model that is defensible without proprietary data. Or enter through the insurer, who can require the data neither operator will volunteer.</p></div></details>
+      <details><summary>Why won't DNV just do this?</summary><div class="ans"><p>They can and might. They are organised by industry vertical, which is precisely why the cross-vertical gap exists. That is a real but temporary advantage measured in a couple of years.</p></div></details>
+      <details><summary>How big can this get?</summary><div class="ans"><p>Small today. It scales only if co-location becomes common, which is what the siting rulemaking suggests but does not guarantee. If you need a billion-dollar outcome, this is not it.</p></div></details>
+    </div>
+
+    <div class="kill">
+      <span class="lab">Kill criteria</span>
+      <p>Walk away if neither operator nor any insurer will engage after two quarters, or if a defensible model cannot be built from public filings alone.</p>
+    </div>
+  </section>
+
+  <!-- ===================== DECK 3 ===================== -->
+  <section id="sargo">
+    <div class="sec-head"><span class="tag">Deck 03 · deep tech · seed or non-dilutive</span><h2>SARGO</h2></div>
+
+    <div class="elevator">
+      <p class="one">The Gulf took 5 million metric tons of sargassum in a single month, Texas pays to shovel it off the beach, and 30 km away there is a launch site that runs on methane.</p>
+      <p class="thirty"><strong>Thirty seconds.</strong> Sargassum is the rare feedstock with a negative acquisition cost: municipalities already pay to remove it, and it anaerobically digests into methane. The reason nobody has built a real business on it is arsenic, which the seaweed bioaccumulates and which poisons both the digester's performance and the digestate's downstream use. Everybody treats that as the obstacle. We treat it as the moat: solve contaminant separation and you own a fuel business and a remediation business at once, in the one place on earth with record blooms, LNG liquefaction infrastructure and a methane-fuelled launch customer inside one county.</p>
+    </div>
+
+    <h3>Why it helps</h3>
+    <p class="prose">Three parties pay for the same problem and get nothing back. Coastal municipalities pay to landfill it, tourism loses revenue to it, and a launch operator buys methane trucked in from elsewhere. One process addresses all three.</p>
+
+    <h3>The deck</h3>
+    <div class="slides">
+      <div class="slide"><span class="sn">01 TITLE</span><h4>SARGO</h4><p>Negative-cost feedstock. Contaminant separation as the moat.</p></div>
+      <div class="slide"><span class="sn">02 PROBLEM</span><h4>Sized, not gestured at</h4><p>The Atlantic belt hit a record 37.5M tons in 2025. In June 2026 the Gulf alone hit about 5M metric tons, nearly double its previous record <span class="grade g-b">B</span>. Texas spends about $2.91M a year on beach removal; Miami-Dade has estimated about $35M <span class="grade g-b">B</span>.</p></div>
+      <div class="slide key"><span class="sn">03 ECONOMICS</span><h4>Feedstock cost is negative</h4><p>You are paid to accept the input. EPA, the Texas GLO and Galveston all run funded inundation programmes <span class="grade g-a">A</span>. That is the structural advantage landfill-gas and dairy RNG were built on, and it is rare.</p></div>
+      <div class="slide"><span class="sn">04 WHY EMPTY</span><h4>Arsenic. Say it first.</h4><p>Sargassum bioaccumulates arsenic because its phosphate transporter confuses the two. Digestate carries arsenic and zinc requiring treatment, and heavy metals may reduce methanogenic performance <span class="grade g-a">A</span>. Yield is modest, around 92.62 mL CH4/gVS <span class="grade g-b">B</span>.</p></div>
+      <div class="slide"><span class="sn">05 THESIS</span><h4>The obstacle is the company</h4><p>If arsenic is why the field is empty, arsenic separation is the business. Two products: pipeline or propellant-grade biomethane, and a clean-digestate stream that unlocks the agricultural market everyone else is locked out of.</p></div>
+      <div class="slide"><span class="sn">06 WHY HERE</span><h4>Three things, one county</h4><p>Record Gulf blooms, LNG liquefaction infrastructure, and a methane-consuming launch customer about 30 km from the beach. No other coastline has all three.</p></div>
+      <div class="slide"><span class="sn">07 MODEL</span><h4>Three revenue lines</h4><p>Tipping fees on intake, offtake on biomethane, licensing on the separation process. The first starts before the technology is proven.</p></div>
+      <div class="slide"><span class="sn">08 ASK</span><h4>Fund the question</h4><p>$1.5M seed, or $400K non-dilutive to answer one thing: can arsenic be separated at a cost that leaves the fuel economic. That question is the whole company.</p></div>
+    </div>
+
+    <div class="hole">
+      <span class="lab">The hole · it is slide four, deliberately</span>
+      <p><strong>Arsenic is unsolved, the yield is modest, and the general idea is not even novel.</strong> Caribbean and Mexican groups are already commercialising sargassum valorisation. Only the contaminant-first framing and the Texas propellant pairing are new. The model does not close on fuel revenue alone. If your thesis needs fuel-only economics, pass.</p>
+    </div>
+
+    <h3>Anticipated questions</h3>
+    <div class="qa">
+      <details><summary>Isn't the yield too low to matter?</summary><div class="ans"><p>Probably, on fuel alone, at published yields. The model does not close on fuel revenue by itself, which is why tipping fees and the remediation product are not garnish.</p></div></details>
+      <details><summary>Arsenic sounds like a research programme, not a startup.</summary><div class="ans"><p>For the first 12 months it is, which is why the preferred ask is non-dilutive. Fund the question, not the factory. If arsenic separation does not work at cost, we will tell you and stop.</p></div></details>
+      <details><summary>Caribbean groups are already doing this.</summary><div class="ans"><p>They are doing valorisation broadly. Nobody is doing contaminant separation as the primary product, and nobody is pairing it to a propellant customer. If that turns out to be wrong, the differentiation is gone and so is the investment case.</p></div></details>
+      <details><summary>Seasonality?</summary><div class="ans"><p>Blooms are seasonal and volatile between years, so intake and storage economics are a real design constraint. 2026 came in second to 2025 rather than setting a new record, which tells you the variance is large.</p></div></details>
+      <details><summary>Regulatory path for arsenic-bearing waste?</summary><div class="ans"><p>Unresolved and material. Handling and disposal classification could change the economics substantially. It belongs in diligence, and I am flagging it rather than waiting for you to find it.</p></div></details>
+    </div>
+
+    <div class="kill">
+      <span class="lab">Kill criteria</span>
+      <p>Walk away if arsenic separation cost exceeds combined tipping, fuel and remediation revenue at pilot scale, or if waste classification makes handling uneconomic.</p>
+    </div>
+  </section>
+
+  <!-- ===================== DECK 4 ===================== -->
+  <section id="boom-map">
+    <div class="sec-head"><span class="tag">Deck 04 · high school project</span><h2>The Boom Map</h2></div>
+
+    <div class="prose">
+      <p><strong>Read the audience carefully.</strong> Here "investors" are competition judges, programme sponsors and mentors, and the currency is not equity. But there is a genuine investor angle, and it is the strongest thing about this project: The Boom Map is the cheapest possible proof of Boom Baseline's core assumption. For about $2,000 it tests whether a distributed sensor network around a launch site produces a coherent, publishable gradient. That is a seven-figure question being answered for four figures.</p>
+    </div>
+
+    <div class="elevator">
+      <p class="one">Every airport measures its noise. No spaceport does. I built the first one, on my street.</p>
+      <p class="thirty"><strong>Thirty seconds.</strong> I live in Port Isabel. When Starship launches, my house shakes, and so do my neighbours'. Right now the only measurements anyone has are a few academic studies and an argument in federal court. I built fifteen sensors, put them on my neighbours' homes and my school with their written permission, and published the first public map of what each launch does to each street. Every major airport has run this kind of network for decades. Not one spaceport has. I made the first one.</p>
+    </div>
+
+    <h3>The deck</h3>
+    <div class="slides">
+      <div class="slide"><span class="sn">01 TITLE</span><h4>The Boom Map</h4><p>The first independent record of what a launch does to a neighbourhood. Photograph of a sensor on a real house.</p></div>
+      <div class="slide"><span class="sn">02 WHY ME</span><h4>I live here</h4><p>My house is one of the data points. That is not a qualification anyone can buy, and it is the reason the neighbours said yes.</p></div>
+      <div class="slide"><span class="sn">03 THE GAP</span><h4>25 terminals at one airport, zero at any spaceport</h4><p>Toronto Pearson runs 25 permanent certified noise terminals. Searching for the equivalent at any spaceport turns up test labs and one-off academic studies, not a network.</p></div>
+      <div class="slide"><span class="sn">04 BUILT</span><h4>Fifteen nodes, under $500</h4><p>Across Port Isabel and South Padre at different distances from the pad, plus one in the school. Cross-calibrated to a measured, documented tolerance.</p></div>
+      <div class="slide"><span class="sn">05 FOUND</span><h4>The map</h4><p>The gradient with distance, the raw data published openly, and the method written so another student can repeat it.</p></div>
+      <div class="slide key"><span class="sn">06 CAREFUL</span><h4>The most important slide</h4><p>Written consent from every homeowner. No address published, everything aggregated by street. These are not laboratory instruments and I say so. And I measure what arrived at a house, not what caused damage to it. That distinction is the difference between science and an accusation.</p></div>
+      <div class="slide"><span class="sn">07 NEXT</span><h4>A year of data</h4><p>Which nobody else on earth would have. Open publication, and a build guide so students at other launch sites can run the same network.</p></div>
+      <div class="slide"><span class="sn">08 ASK</span><h4>Mentorship, an internship, $2K</h4><p>Calibration methodology guidance, a place to learn to do this properly, and enough to extend to 40 nodes and a year of operation.</p></div>
+    </div>
+
+    <div class="hole">
+      <span class="lab">The hole · own it, don't dress it up</span>
+      <p><strong>This is a high school project with consumer-grade sensors, and right now it is not a business.</strong> The instruments are cross-calibrated against each other, not certified to standard, so they establish relative gradient and repeatability, not certified absolute levels. Saying that first is what makes the rest of the data believable.</p>
+    </div>
+
+    <h3>Anticipated questions</h3>
+    <div class="qa">
+      <details><summary>Did you really do this yourself?</summary><div class="ans"><p>Bring the build log, the calibration spreadsheet, and the failures. Show a node that did not work and explain why. Nothing proves authorship like a well-documented mistake.</p></div></details>
+      <details><summary>Isn't this just anti-SpaceX?</summary><div class="ans"><p>No, and here is the test: I am giving the same data to everyone, including them, on the same terms. If they can show a mitigation reduced overpressure on my street, my network is how they prove it. A community that trusts the number is how launch cadence goes up, not down.</p></div></details>
+      <details><summary>Your sensors aren't calibrated to standard.</summary><div class="ans"><p>Correct. They are consumer-grade, cross-calibrated against each other to a documented tolerance, and I publish that tolerance. They establish relative gradient and repeatability, not certified absolute levels. That limitation is on my slide, not hidden in my notes.</p></div></details>
+      <details><summary>What if there's no launch during your project window?</summary><div class="ans"><p>Then my result is a deployed, calibrated, documented network and a build guide, which is still a real result, and I will present it that way rather than pretending otherwise.</p></div></details>
+      <details><summary>How is this a business?</summary><div class="ans"><p>Right now it is not, and I would rather be honest about that than dress up a science project. It is the beginning of the dataset a real company would need, and if it turns into one, the year of data is what makes it defensible.</p></div></details>
+      <details><summary>What about your neighbours' privacy?</summary><div class="ans"><p>Written consent before every install, aggregation by street, never an address. I wrote that policy before I built the first sensor.</p></div></details>
+    </div>
+
+    <h3>Runbook for the student</h3>
+    <ul class="tight">
+      <li><strong>Consent before hardware.</strong> Write the one-page consent form first. A judge notices.</li>
+      <li><strong>Start on your own house.</strong> No permission needed, and a working node is what convinces the first neighbour.</li>
+      <li><strong>Eight sites is the floor.</strong> Below that it is data points, not a map.</li>
+      <li><strong>Publish the raw data.</strong> Openness is the entire credibility of the project.</li>
+      <li><strong>Same entry, three venues.</strong> The ExF Space Entrepreneur Summer Academy, the Conrad Challenge (ages 13 to 18) and the Diamond Challenge all take this with no rework.</li>
+      <li><strong>Never say your house was damaged by a launch.</strong> Say what your sensor measured, and let the number speak.</li>
+    </ul>
+  </section>
+
+  <!-- ===================== IN THE ROOM ===================== -->
+  <section id="room">
+    <div class="sec-head"><span class="tag">Parts 5 and 6</span><h2>In the room</h2></div>
+
+    <h3>Questions every investor asks all four</h3>
+    <div class="qa">
+      <details><summary>Why hasn't anyone done this?</summary><div class="ans"><p>Have the specific answer per idea, and never say "nobody thought of it." Boom Baseline: the precondition, launch cadence near people, is new. Peninsula: the space is gated behind two operators' data. SARGO: arsenic. Naming the real reason is what makes the whitespace credible instead of suspicious.</p></div></details>
+      <details><summary>How do you know nobody is doing it?</summary><div class="ans"><p>"We searched patents, SBIR and STTR awards, trade press, FAA filings and county records, and found nothing. That is a negative search result, not proof. If you know of someone, tell me now and it changes my plan today."</p><p>An investor who hears that respects it. One who hears "nobody is doing it" assumes you did not look.</p></div></details>
+      <details><summary>What is your unfair advantage?</summary><div class="ans"><p>For three of these four the honest answer is location and timing, not proprietary technology. Say it. Then say what converts it into a durable one: the longitudinal record, the first regulator-accepted model, the separation process.</p></div></details>
+      <details><summary>What kills this?</summary><div class="ans"><p>Have the kill criteria memorised. Founders who can state the conditions under which they would stop are the ones investors believe about everything else.</p></div></details>
+      <details><summary>How much have you validated with customers?</summary><div class="ans"><p>Currently, not enough. Do not inflate it. Say what you have, say what the next 30 days buys, and offer to report back.</p></div></details>
+    </div>
+
+    <div class="gutter" style="margin-top:2.6rem">
+      <div class="g-label">Before</div>
+      <div>
+        <h4>Before the room</h4>
+        <ul class="tight">
+          <li>Grade every number on your slides. Remove every C.</li>
+          <li>Rehearse the weak slide until it is your calmest one.</li>
+          <li>Bring one physical object. A sensor node in a plastic enclosure beats a rendering.</li>
+          <li>Prepare the one-page leave-behind: elevator pitch, the ask, the kill criteria, contact.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="gutter" style="margin-top:2rem">
+      <div class="g-label">During</div>
+      <div>
+        <h4>In the room</h4>
+        <ul class="tight">
+          <li>Lead with the gap, not the technology. "Every airport does this. No spaceport does."</li>
+          <li>Name your hole by slide six at the latest. Do not let them find it at slide ten.</li>
+          <li>When you do not know, say "I don't know, and here is how I would find out." It scores higher than a confident guess and it is the only answer that survives diligence.</li>
+          <li>Never claim causation from measurement. Never claim a licence you have not signed. Never present a projection as a finding.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="gutter" style="margin-top:2rem">
+      <div class="g-label">After</div>
+      <div>
+        <h4>After the room</h4>
+        <ul class="tight">
+          <li>Send the leave-behind within 24 hours with one new fact you did not have in the room.</li>
+          <li>Log every question you could not answer. Those questions are your next milestones, and the pattern across several pitches is more useful than any single meeting.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="gutter" style="margin-top:2rem">
+      <div class="g-label">Never</div>
+      <div>
+        <h4>Never do these</h4>
+        <ul class="tight never">
+          <li>Never build or imply a plaintiff-side positioning for Boom Baseline or The Boom Map. It destroys the product's value, which is that both sides accept the number.</li>
+          <li>Never publish data identifying a specific property.</li>
+          <li>Never let a minor near cryogens, rocket hardware, industrial property or restricted land.</li>
+          <li>Never claim the whitespace is proven. It is a search result until someone disproves it.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="prose">
+      <p><strong>Evidence note.</strong> Every figure here carries a grade in the source registers that back this runbook. Four obligations are open and material: the FAA launch projections need verification against a primary FAA document; the August 2026 spaceport siting rulemaking is registered by title and date only, because the document itself was unreachable and has not been read; real per-site contract values for airport noise monitoring are the missing number that decides whether Deck 01 is venture scale; and two market figures come from research vendors of unverified rigour.</p>
+      <p style="margin-top:.9rem">Discharge those before any of this reaches a room. Nothing in this runbook is a finding that a grade does not support.</p>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  // Decaying overpressure trace. Canvas rather than hand-authored path data.
+  var c = document.getElementById('wave');
+  if(!c) return;
+  var ctx = c.getContext('2d');
+  function ink(){
+    return getComputedStyle(document.documentElement).getPropertyValue('--trace').trim() || '#1D4E89';
+  }
+  function draw(progress){
+    var dpr = window.devicePixelRatio || 1;
+    var w = c.clientWidth, h = c.clientHeight;
+    c.width = w * dpr; c.height = h * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    var mid = h/2;
+
+    // faint baseline
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--rule').trim() || '#D3DBDF';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, mid + .5); ctx.lineTo(w, mid + .5); ctx.stroke();
+
+    ctx.strokeStyle = ink();
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    var end = w * progress;
+    for(var x = 0; x <= end; x++){
+      var t = x / w;
+      // sharp onset then exponential decay, like a pressure transient
+      var onset = t < 0.06 ? (t/0.06) : 1;
+      var env = onset * Math.exp(-3.4 * Math.max(0, t - 0.06));
+      var y = mid - env * (mid - 6) * Math.sin(t * 46 + 0.4) * (1 - 0.25*Math.sin(t*7));
+      if(x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){ draw(1); }
+  else {
+    var p = 0, start = null;
+    requestAnimationFrame(function step(ts){
+      if(start === null) start = ts;
+      p = Math.min(1, (ts - start) / 1100);
+      draw(p);
+      if(p < 1) requestAnimationFrame(step);
+    });
+  }
+  var redraw = function(){ draw(1); };
+  window.addEventListener('resize', redraw);
+  if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
+
+  // nav highlight
+  var links = Array.prototype.slice.call(document.querySelectorAll('.nav a'));
+  var secs = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(!e.isIntersecting) return;
+      links.forEach(function(a,i){ a.classList.toggle('on', secs[i] === e.target); });
+    });
+  }, {rootMargin: '-20% 0px -70% 0px'});
+  secs.forEach(function(s){ if(s) obs.observe(s); });
+})();
+</script>

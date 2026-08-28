@@ -30,3 +30,9 @@ The market sizing is deliberately a ladder of graded figures rather than a singl
 because a fabricated TAM is the fastest way to lose a technical investor, and
 "the analogous market is $343M a year and spaceport spend is zero" is a stronger
 sentence than an invented multiplication.
+
+## Presentable version
+
+`brownsville-decks.html` is the same four decks rendered as a standalone page, published as an artifact at
+https://claude.ai/code/artifact/0f93c2f6-7b30-4fe8-b3cc-099e12ffc886 . `RUNBOOK.md` remains the source of
+record; edit it first, then mirror changes into the HTML.
