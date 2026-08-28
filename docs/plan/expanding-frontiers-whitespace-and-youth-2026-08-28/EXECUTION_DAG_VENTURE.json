@@ -1,0 +1,864 @@
+{
+  "baseline": {
+    "branch": "claude/expanding-frontiers-ideas-okkz31",
+    "commit": "59a5364",
+    "report": "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/FULL_REPORT.md",
+    "repository": "kb4beast/hive-mind-os"
+  },
+  "created_at": "2026-08-28",
+  "critical_path": [
+    "WS-000",
+    "WS-010",
+    "WS-020",
+    "WS-040",
+    "WS-050",
+    "WS-060",
+    "WS-070",
+    "WS-080"
+  ],
+  "nodes": [
+    {
+      "acceptance_criteria": [
+        "At least six independent search surfaces are covered per idea, and each is named.",
+        "A negative result is recorded as 'searched X, Y, Z, found nothing', never as 'nobody is doing this'.",
+        "If a competitor is found, FULL_REPORT.md is updated and the ranking is re-run, not defended."
+      ],
+      "assumptions": [
+        "Patent, award and filing databases are reachable and searchable."
+      ],
+      "branch": "ws/000-whitespace-verification",
+      "category": "evidence-gate",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [],
+      "downstream_unlock_value": 100,
+      "effort": "small",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "WHITESPACE_VERIFICATION.md: for each of the three ideas, either a named competitor with evidence, or a documented record of where you looked and found nothing"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-000",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-opus-5",
+      "min_openai_model": "gpt-5 high effort",
+      "objective": "Attempt to DISPROVE the whitespace claim for Boom Baseline, Peninsula and SARGO. Search USPTO, SBIR and STTR award databases, Crunchbase, aerospace and acoustics trade press, FAA environmental filings, Cameron County records, and ask Expanding Frontiers directly whether anyone is already doing calibrated community overpressure monitoring at a spaceport.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Discharges O8. The heaviest criterion in this tournament, whitespace at 0.20, is scored from a FAILURE TO FIND a competitor in a web search, which is the weakest evidence in the document. If someone is already doing this, both winners collapse and the answer becomes Peninsula. This node exists to find that out before anything is built.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "SOURCE_REGISTER.md obligation O8, claim S24"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "moderate",
+      "roles": [
+        "explorer"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "Every top-three idea has either a named competitor or a documented search record.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "The question is asked as coexistence infrastructure, not as impact documentation, and the framing used is recorded verbatim.",
+        "If the answer is adversarial, the recommendation switches venue rather than softening the idea: Peninsula or SARGO to ExF, Boom Baseline elsewhere."
+      ],
+      "assumptions": [
+        "ExF will answer a direct, good-faith question from a prospective applicant."
+      ],
+      "branch": "ws/001-exf-alignment",
+      "category": "evidence-gate",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [],
+      "downstream_unlock_value": 85,
+      "effort": "small",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "A recorded answer, in ExF's own words where possible"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-001",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Ask Expanding Frontiers directly how they would receive an independent launch-impact measurement venture: aligned coexistence infrastructure, or adversarial to their ecosystem.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Discharges O10 and is the largest non-technical risk to both winners. ExF is an NSS affiliate and Washington Compact signatory embedded in the launch ecosystem, and roughly 80 residents are currently suing the operator. Guessing how they hear this costs both the entry and the relationship.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "SOURCE_REGISTER.md obligation O10, claims S1, S8, S21"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "moderate",
+      "roles": [
+        "explorer"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "A recorded answer exists, or ExF declines to answer and that is recorded.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Claim S22 is re-graded to A, B or SUPERSEDED with a named source.",
+        "The National Academies and UK CAA documents (S25) are read, not just cited."
+      ],
+      "assumptions": [
+        "FAA environmental filings and later measurement campaigns are public."
+      ],
+      "branch": "ws/002-measurement-baseline",
+      "category": "evidence-gate",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 70,
+      "dependencies": [],
+      "downstream_unlock_value": 60,
+      "effort": "small",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "A measurement baseline note with current best figures and their sources"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-002",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Verify whether the October 2024 finding that sonic boom overpressures exceeded FAA predictions by one to four psf still stands, and assemble the published measurement baseline.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Discharges O11. This is the sharpest claim in the pitch and the one most likely to be out of date. A stale headline number that a judge corrects live is worse than not using it.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "SOURCE_REGISTER.md obligation O11, claims S22, S25"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "low",
+      "roles": [
+        "explorer"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "S22 carries a current confidence grade.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "If a competitor was found in WS-000, the ranking is re-run and the new winner is stated plainly.",
+        "If ExF reads the idea as adversarial, the venue changes rather than the pitch being softened.",
+        "The decision names what would reverse it."
+      ],
+      "assumptions": [
+        "At least one viable venue remains."
+      ],
+      "branch": "ws/010-entry-decision",
+      "category": "decision",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 95,
+      "dependencies": [
+        "WS-000",
+        "WS-001"
+      ],
+      "downstream_unlock_value": 100,
+      "effort": "small",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "DECISION.md naming the entry, the venue and the reasoning",
+        "Regenerated WHITESPACE_RESULTS.json if scores changed"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-010",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-opus-5",
+      "min_openai_model": "gpt-5 high effort",
+      "objective": "Lock the venture entry and its venue: Boom Baseline to ExF, Boom Baseline elsewhere, or Peninsula to ExF.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "Both gating risks resolve here. WS-000 can collapse the idea entirely and WS-001 can change the venue. Building before this is building on an unverified premise.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "WHITESPACE_VERIFICATION.md",
+        "WS-001 recorded answer",
+        "score_tournaments.py"
+      ],
+      "required_tests": [
+        "python docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/score_tournaments.py"
+      ],
+      "reversibility": "reversible",
+      "risk": "moderate",
+      "roles": [
+        "orchestrator",
+        "curator"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "DECISION.md names one entry and one venue.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "The payer is named with written permission, or is not claimed at all.",
+        "If no payer is found in 30 days, the finding is reported honestly and the venture is re-pitched as a public-good programme plus the youth track, per FULL_REPORT.md section 6."
+      ],
+      "assumptions": [
+        "A written statement of interest is achievable in 30 days. A signed contract is not assumed."
+      ],
+      "branch": "ws/020-payer",
+      "category": "customer-validation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 92,
+      "dependencies": [
+        "WS-010"
+      ],
+      "downstream_unlock_value": 90,
+      "effort": "large",
+      "escalation_conditions": [
+        "No payer identified in 30 days.",
+        "A payer requires exclusivity, which would destroy the independence that is the product."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "A named payer with a written statement, or a documented finding that no payer exists"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-020",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Identify and confirm one payer willing to state in writing what they would pay for an independent calibrated overpressure record: the operator, a spaceport authority, the county, an insurer, or the FAA.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "The honestly weakest part of the winner. Airports fund their own monitoring; the analogous payer here is unconfirmed. This is the highest-variance node in the venture track and its failure changes what the thing is, from a venture into a public-good programme.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "DECISION.md",
+        "FULL_REPORT.md section 2"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "high",
+      "roles": [
+        "explorer"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "A written statement exists, or 30 days elapse and the negative finding is recorded.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Per-address data is never published; aggregation is by street or larger.",
+        "Written consent is obtained before any installation.",
+        "The policy states explicitly that the same data is available to every party including the operator, per FULL_REPORT.md section 4."
+      ],
+      "assumptions": [
+        "Texas legal advice is obtainable within budget."
+      ],
+      "branch": "ws/030-consent-and-privacy",
+      "category": "compliance",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 85,
+      "dependencies": [
+        "WS-010"
+      ],
+      "downstream_unlock_value": 80,
+      "effort": "small",
+      "escalation_conditions": [
+        "Legal advice requires spending authority.",
+        "A restriction makes publication impossible."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "A consent form, a data publication policy, and a recorded legal opinion or documented gap"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-030",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Establish the legal, privacy and consent framework for placing sensors on private homes and school property and publishing the resulting data.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Discharges O12. Publishing measurements tied to identifiable homes carries privacy and legal exposure. A monitoring venture with no answer here is not investable and not ethical.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "SOURCE_REGISTER.md obligation O12"
+      ],
+      "required_tests": [],
+      "reversibility": "partially_irreversible",
+      "risk": "moderate",
+      "roles": [
+        "steward"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "Consent form and publication policy exist and have been reviewed.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Calibration is traceable and documented, not asserted.",
+        "Raw data and processing are reproducible by a third party.",
+        "No claim about damage causation is made from this data. It measures what arrived, not what it did."
+      ],
+      "assumptions": [
+        "A launch occurs within the deployment window. If none does, the deployed calibrated network is still the deliverable."
+      ],
+      "branch": "ws/040-reference-network",
+      "category": "build",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 88,
+      "dependencies": [
+        "WS-020",
+        "WS-030"
+      ],
+      "downstream_unlock_value": 85,
+      "effort": "large",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "Three calibrated nodes, a documented calibration procedure, and at least one captured event or a documented no-launch window"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-040",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Build and calibrate a three-node reference sensor set traceable to IEC 61672, deploy it with consent, and capture at least one launch event.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Converts the idea into evidence. The product is not the sensor, it is the calibrated chain-of-custody record, so calibration traceability is the deliverable, not the hardware.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "WS-030 consent framework",
+        "WS-002 measurement baseline",
+        "S23 airport NMT specification"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "moderate",
+      "roles": [
+        "builder",
+        "curator"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "Calibrated nodes deployed and one event captured, or the window closes with the network documented.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "The method is published in enough detail to be reproduced and attacked.",
+        "Limitations are stated in the publication, not omitted.",
+        "Nothing is published that identifies an individual property."
+      ],
+      "assumptions": [
+        "Consent from WS-030 permits publication at the chosen aggregation level."
+      ],
+      "branch": "ws/050-first-record",
+      "category": "deliverable",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 80,
+      "dependencies": [
+        "WS-040"
+      ],
+      "downstream_unlock_value": 80,
+      "effort": "small",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "A public record and a published method"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-050",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Publish the first independent record and its method, openly.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Independence is the entire product. A record nobody can check is worth nothing, and publishing the method first is what makes the venture credible to the operator as well as the residents.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "WS-040 captured data"
+      ],
+      "required_tests": [],
+      "reversibility": "irreversible",
+      "risk": "moderate",
+      "roles": [
+        "curator"
+      ],
+      "rollback": "Publication cannot be recalled. Review before release.",
+      "semantic_locks": [],
+      "stopping_condition": "Record and method are public.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every factual claim traces to a SOURCE_REGISTER.md entry at confidence A or B, or is marked a projection.",
+        "The coexistence framing in FULL_REPORT.md section 4 is used throughout; no plaintiff-side positioning appears anywhere.",
+        "The airport comparison is stated with its source, and the unconfirmed payer question is named rather than hidden."
+      ],
+      "assumptions": [
+        "The format from the venue's rules governs."
+      ],
+      "branch": "ws/060-submission",
+      "category": "deliverable",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 92,
+      "dependencies": [
+        "WS-002",
+        "WS-010",
+        "WS-050"
+      ],
+      "downstream_unlock_value": 90,
+      "effort": "large",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "Submission-ready plan and pitch"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-060",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "high",
+      "min_anthropic_model": "claude-opus-5",
+      "min_openai_model": "gpt-5 high effort",
+      "objective": "Write the submission: business plan, use of funds, and the pitch, built on the published record.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "The prize is awarded for a business plan. This one has something almost no entrant has: real primary data collected by the entrant.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "DECISION.md",
+        "WS-050 published record",
+        "WS-020 payer statement"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "low",
+      "roles": [
+        "architect",
+        "orchestrator"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "The submission passes WS-070.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every whitespace claim is checked against WS-000 output and reworded to 'we searched X and found nothing' where that is the truth.",
+        "Every critical and high finding is fixed, not waived for the deadline.",
+        "The reviewer explicitly answers: does this read as adversarial to the launch operator."
+      ],
+      "assumptions": [
+        "A fresh-context reviewer is available."
+      ],
+      "branch": "ws/070-adversarial-review",
+      "category": "adversarial-review",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [
+        "WS-060"
+      ],
+      "downstream_unlock_value": 100,
+      "effort": "small",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "Findings list with severity and disposition"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-070",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-opus-5",
+      "min_openai_model": "gpt-5 high effort",
+      "objective": "Independent adversarial review by someone who did not write the submission, specifically hunting for confidence-C claims presented as fact and for any plaintiff-side framing that crept in.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "AGENTS.md rule 6: an acting identity may not approve itself. This submission has two specific failure modes, an unverified whitespace claim and an adversarial framing, and both are invisible to the author.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "All WS-060 outputs",
+        "SOURCE_REGISTER.md",
+        "WHITESPACE_VERIFICATION.md"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "moderate",
+      "roles": [
+        "curator"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "Zero unresolved critical or high findings.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Submitted before the deadline.",
+        "Byte-identical to the reviewed version.",
+        "Confirmation stored."
+      ],
+      "assumptions": [
+        "The venue and deadline from WS-010 are current."
+      ],
+      "branch": "ws/080-submit",
+      "category": "external-effect",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [
+        "WS-070"
+      ],
+      "downstream_unlock_value": 0,
+      "effort": "small",
+      "escalation_conditions": [
+        "Any WS-070 critical finding open.",
+        "The deadline has passed."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "Submission confirmation with timestamp"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "WS-080",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "human-executed",
+      "min_openai_model": "human-executed",
+      "objective": "Submit to the venue chosen in WS-010, before its deadline, and record the confirmation.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "The only irreversible submission node. Gated on independent review so nothing unreviewed reaches a funder.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "Reviewed submission package"
+      ],
+      "required_tests": [],
+      "reversibility": "irreversible",
+      "risk": "high",
+      "roles": [
+        "orchestrator"
+      ],
+      "rollback": "No rollback. A submission cannot be recalled. This is why WS-070 gates it.",
+      "semantic_locks": [],
+      "stopping_condition": "Confirmation received.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    }
+  ],
+  "notes": [
+    "Level 0 is three parallel evidence gates. WS-000 can invalidate the entire recommendation, which is its purpose.",
+    "Two nodes are irreversible, WS-050 (publication) and WS-080 (submission), and each sits alone at its level.",
+    "WS-020 is the highest-variance node. Its failure changes what the thing is rather than triggering a retry."
+  ],
+  "plan_fingerprint": "521233bb1c84e1d299b070c9dc8f2a310fe3805e79f6c7b0151f1af4f4a619f6",
+  "plan_id": "boom-baseline-venture-2026-08-28",
+  "risk_gates": {
+    "WS-000": "If a competitor exists, both winners collapse. Do not build before this returns.",
+    "WS-001": "If ExF reads this as adversarial, change venue rather than softening the idea.",
+    "WS-020": "No payer in 30 days means this is a public-good programme, not a venture. Say so rather than pretending.",
+    "WS-050": "Publication is irreversible. Review before release.",
+    "WS-080": "Irreversible. Requires zero open critical findings from WS-070."
+  },
+  "safe_parallelism": {
+    "level_0": [
+      "WS-000",
+      "WS-001",
+      "WS-002"
+    ],
+    "level_1": [
+      "WS-010"
+    ],
+    "level_2": [
+      "WS-020",
+      "WS-030"
+    ],
+    "level_3": [
+      "WS-040"
+    ],
+    "level_4": [
+      "WS-050"
+    ],
+    "level_5": [
+      "WS-060"
+    ],
+    "level_6": [
+      "WS-070"
+    ],
+    "level_7": [
+      "WS-080"
+    ]
+  },
+  "schema_version": 1,
+  "state_machine": [
+    "pending",
+    "claimed",
+    "in_progress",
+    "blocked",
+    "review",
+    "complete",
+    "failed"
+  ],
+  "subject": "Build and fund the independent launch overpressure record",
+  "title": "Boom Baseline \u2014 venture track execution DAG"
+}

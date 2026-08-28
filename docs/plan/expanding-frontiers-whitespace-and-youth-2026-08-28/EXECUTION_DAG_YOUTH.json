@@ -1,0 +1,490 @@
+{
+  "baseline": {
+    "branch": "claude/expanding-frontiers-ideas-okkz31",
+    "commit": "59a5364",
+    "report": "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/FULL_REPORT.md",
+    "repository": "kb4beast/hive-mind-os"
+  },
+  "created_at": "2026-08-28",
+  "critical_path": [
+    "YM-000",
+    "YM-010",
+    "YM-030",
+    "YM-040",
+    "YM-050"
+  ],
+  "nodes": [
+    {
+      "acceptance_criteria": [
+        "The project-origination question is answered explicitly, because the whole plan depends on it.",
+        "Conrad Challenge and Diamond Challenge deadlines are captured as alternates."
+      ],
+      "assumptions": [
+        "ExF will answer a prospective student or parent enquiry."
+      ],
+      "branch": "ym/000-sesa-facts",
+      "category": "evidence-gate",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [],
+      "downstream_unlock_value": 100,
+      "effort": "small",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "SESA_FACTS.md with dates, eligibility, cost and project-origination policy"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "YM-000",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-haiku-4-5",
+      "min_openai_model": "gpt-5 low effort",
+      "objective": "Get the SESA facts: 2026 dates, application deadline, eligibility by age, school and residency, cost, and crucially whether students bring their own project or are assigned one.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Discharges O9. If SESA assigns projects, the youth winner needs a different venue, and the Conrad Challenge explicitly accepts student-originated work (S29).",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "SOURCE_REGISTER.md obligations O9, claims S20, S29"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "moderate",
+      "roles": [
+        "explorer"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "SESA_FACTS.md exists with the origination policy answered.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Written consent precedes every installation, with no exceptions.",
+        "Published data aggregates by street or larger; no address is ever identifiable.",
+        "The protocol states the project measures what arrived, and makes no claim about what caused damage to any home.",
+        "No part of the project requires the student to enter restricted, industrial or refuge land."
+      ],
+      "assumptions": [
+        "A parent or teacher will co-sign the protocol."
+      ],
+      "branch": "ym/010-consent-and-safety",
+      "category": "compliance",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 95,
+      "dependencies": [
+        "YM-000"
+      ],
+      "downstream_unlock_value": 95,
+      "effort": "small",
+      "escalation_conditions": [
+        "A parent, school or homeowner objects.",
+        "Any activity would require entering restricted land."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "A one-page consent form, a safety note, and a publication policy"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "YM-010",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Write the consent and safety protocol before collecting anything: written homeowner consent, parental consent, school district permission, and a data policy that never publishes an address.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "A minor collecting and publishing measurements about identifiable neighbours' homes is the one way this project goes wrong. Doing this first is not bureaucracy; it is what makes the project defensible and, incidentally, what will impress a judge.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "SOURCE_REGISTER.md obligation O12",
+        "FULL_REPORT.md section 4"
+      ],
+      "required_tests": [],
+      "reversibility": "partially_irreversible",
+      "risk": "moderate",
+      "roles": [
+        "steward"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "Protocol written and co-signed by a responsible adult.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "The three nodes agree with each other within a stated tolerance, and that tolerance is measured and written down.",
+        "The build guide is complete enough for another student to reproduce it.",
+        "Limitations are documented honestly: these are not IEC 61672 Class 1 instruments and the writeup says so."
+      ],
+      "assumptions": [
+        "Total hardware cost stays under roughly 500 dollars."
+      ],
+      "branch": "ym/020-build-sensors",
+      "category": "build",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [
+        "YM-010"
+      ],
+      "downstream_unlock_value": 90,
+      "effort": "medium",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "Three working nodes, a calibration log, and a build guide someone else could follow"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "YM-020",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Build three sensor nodes and calibrate them against each other and against any available reference, starting on the student's own home.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Start on your own house. It is the only property where you need nobody's permission, and a working node is what convinces the first neighbour to say yes.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "YM-010 protocol"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "low",
+      "roles": [
+        "builder"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "Three nodes agree within a documented tolerance.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Every site has signed consent on file before installation.",
+        "Sites span a real distance range so a gradient is measurable.",
+        "School installation has district permission in writing."
+      ],
+      "assumptions": [
+        "Neighbours are willing. Given the community context this is likely, but it is an assumption."
+      ],
+      "branch": "ym/030-deploy-network",
+      "category": "deployment",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 88,
+      "dependencies": [
+        "YM-010",
+        "YM-020"
+      ],
+      "downstream_unlock_value": 90,
+      "effort": "large",
+      "escalation_conditions": [
+        "Fewer than eight hosts agree.",
+        "The school district declines."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "Installed network with signed consent for each site and a site map by distance and bearing from the pad"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "YM-030",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Recruit twelve to fifteen host homes across Port Isabel and South Padre Island plus the school building, and install with signed consent.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "Coverage across distance is what makes the map a map rather than a data point. The gradient with distance is the whole scientific content.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "YM-020 nodes",
+        "YM-010 consent form"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "low",
+      "roles": [
+        "explorer"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "At least eight sites live with consent on file.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Raw data is published so anyone can check the work.",
+        "Limitations are stated prominently: sensor class, sample size, and the fact that arrival is not causation.",
+        "If no launch occurred, the deliverable is the network and its calibration, presented honestly."
+      ],
+      "assumptions": [
+        "A launch occurs in the window. The plan does not depend on it."
+      ],
+      "branch": "ym/040-first-map",
+      "category": "deliverable",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 92,
+      "dependencies": [
+        "YM-030"
+      ],
+      "downstream_unlock_value": 95,
+      "effort": "medium",
+      "escalation_conditions": [
+        "A primary source contradicts a node assumption.",
+        "A spending, legal, safety or external-commitment authority is required.",
+        "Three attempts fail with no new information."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "The map",
+        "A method writeup with limitations",
+        "Raw data published openly"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "YM-040",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "claude-sonnet-5",
+      "min_openai_model": "gpt-5 medium effort",
+      "objective": "Capture at least one launch, produce the map, and write up the method and its limitations.",
+      "parallel_safe": true,
+      "pr_target": "main",
+      "rationale": "One launch produces the headline chart. Zero launches still produces a deployed, calibrated, documented network, which is itself a real result and must be presented as one rather than as a failure.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "YM-030 live network"
+      ],
+      "required_tests": [],
+      "reversibility": "reversible",
+      "risk": "low",
+      "roles": [
+        "builder",
+        "curator"
+      ],
+      "rollback": "Revert the node commit. No external effect to undo.",
+      "semantic_locks": [],
+      "stopping_condition": "Map produced, or the window closes and the network result is written up.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "An adult who did not do the work reads the submission first and checks that no claim overstates the data.",
+        "The pitch leads with the airport comparison: every airport measures its noise, no spaceport does, I built the first one.",
+        "The project is never framed as evidence for or against anyone in a dispute."
+      ],
+      "assumptions": [
+        "At least one venue deadline is open."
+      ],
+      "branch": "ym/050-submit",
+      "category": "external-effect",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [
+        "YM-040"
+      ],
+      "downstream_unlock_value": 0,
+      "effort": "small",
+      "escalation_conditions": [
+        "The reviewing adult finds an overstated claim.",
+        "Every deadline has passed."
+      ],
+      "evidence_requirements": [
+        "Primary source URI, retrieval date and confidence level recorded in SOURCE_REGISTER.md",
+        "Any claim that cannot be sourced is recorded as an open obligation, never asserted"
+      ],
+      "expected_outputs": [
+        "Submission confirmations"
+      ],
+      "file_locks": [],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "AGENTS.md",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "YM-050",
+      "interfaces": [],
+      "max_retries": 3,
+      "merge_conflict_surface": "low",
+      "min_anthropic_model": "human-executed",
+      "min_openai_model": "human-executed",
+      "objective": "Submit to SESA, the Conrad Challenge or the Diamond Challenge, whichever YM-000 identified as accepting student-originated projects with a live deadline.",
+      "parallel_safe": false,
+      "pr_target": "main",
+      "rationale": "The same work fits all three venues with no rework, so submit to every one whose deadline is open.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ],
+      "required_inputs": [
+        "YM-040 map and writeup",
+        "SESA_FACTS.md"
+      ],
+      "required_tests": [],
+      "reversibility": "irreversible",
+      "risk": "moderate",
+      "roles": [
+        "orchestrator"
+      ],
+      "rollback": "No rollback. Review before sending.",
+      "semantic_locks": [],
+      "stopping_condition": "At least one confirmed submission.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-whitespace-and-youth-2026-08-28/**"
+      ]
+    }
+  ],
+  "notes": [
+    "The youth track is deliberately independent of the venture track so a student is never blocked on it.",
+    "YM-010 precedes YM-020 on purpose: the protocol is written before the first sensor is built.",
+    "A no-launch window is a documented result, not a failure. YM-040 says so."
+  ],
+  "plan_fingerprint": "f6c708763d6bd6b1d370d08a0ce0c818de379b327b05445f89db6416c987c692",
+  "plan_id": "boom-map-youth-2026-08-28",
+  "risk_gates": {
+    "YM-010": "Consent and safety come before any data collection. No exceptions.",
+    "YM-030": "Fewer than eight consenting hosts means the map is not a map. Escalate rather than proceeding.",
+    "YM-050": "Irreversible. An adult who did not do the work reviews it first."
+  },
+  "safe_parallelism": {
+    "level_0": [
+      "YM-000"
+    ],
+    "level_1": [
+      "YM-010"
+    ],
+    "level_2": [
+      "YM-020"
+    ],
+    "level_3": [
+      "YM-030"
+    ],
+    "level_4": [
+      "YM-040"
+    ],
+    "level_5": [
+      "YM-050"
+    ]
+  },
+  "schema_version": 1,
+  "state_machine": [
+    "pending",
+    "claimed",
+    "in_progress",
+    "blocked",
+    "review",
+    "complete",
+    "failed"
+  ],
+  "subject": "A high school student builds the first independent public record of launch overpressure",
+  "title": "The Boom Map \u2014 youth track execution DAG"
+}
