@@ -1,0 +1,385 @@
+{
+  "assessment_type": "Sponsor-fit tournament over candidate ventures, scored against Expanding Frontiers' observed funding and selection behaviour. Not a market forecast and not a claim about commercial success probability.",
+  "championship": {
+    "best_original_candidate": "B1 (NASA KSC smart corrosion coating)",
+    "hybridised_with": "A1 (tamper-evident receipt engine already built by the applicant)",
+    "reason": "No scouted candidate wins outright. T1 pairs the licensable NASA technology this sponsor's Space Act pipeline exists to place with the evidence mechanism the applicant already owns, anchored on infrastructure inside the sponsor's own region, and it is the only entrant that can be shown working on a table at a pitch.",
+    "runner_up": "T3",
+    "runner_up_score": 7.03,
+    "verdict": "ADAPT",
+    "winner": "T1",
+    "winner_score": 8.57
+  },
+  "criteria_weights": {
+    "capital_efficiency": 0.08,
+    "demonstrability_at_pitch": 0.12,
+    "founder_asset_advantage": 0.1,
+    "nasa_tech_transfer_fit": 0.18,
+    "non_dilutive_follow_on": 0.13,
+    "regional_economic_impact": 0.15,
+    "regulatory_headroom": 0.08,
+    "space_energy_intersection": 0.16
+  },
+  "dissent": [
+    {
+      "objection": "T1's NASA fit of 10 is entirely conditional on the KSC coating being licensable in 2026. If it is not, T1's NASA fit falls to about 4 and T3 wins the recomputed board.",
+      "role": "curator",
+      "severity": "decisive"
+    },
+    {
+      "objection": "T2 is the truest Rockets & Rigs entry; a DOE-weighted judging panel could rank the space-energy intersection above NASA transfer fit.",
+      "role": "architect",
+      "severity": "material"
+    },
+    {
+      "objection": "T1 requires materials science competence the applicant does not have. Without a materials partner it degrades into T3 wearing a NASA logo.",
+      "role": "builder",
+      "severity": "material"
+    }
+  ],
+  "entrants": [
+    {
+      "id": "T1",
+      "name": "Corrosion-evidence coating",
+      "round1_rank": 1,
+      "round2": {
+        "attacks": [
+          "NASA license may be unavailable",
+          "commodity coatings market owned by incumbents",
+          "multi-year specification qualification"
+        ],
+        "loss_type": "fixable",
+        "note": "License availability is a fact to confirm, not a design flaw. The incumbent attack is answered by selling the inspection record rather than the chemistry. Qualification lag is a real wound, mitigated by entering as an inspection service on existing coated assets.",
+        "outcome": "ADVANCED"
+      },
+      "round3": {
+        "execution_score": 8,
+        "exists_today": "complete tamper-evident evidence layer",
+        "follow_on": [
+          "NASA SBIR",
+          "DOE SBIR (pipeline and storage integrity)",
+          "DoD Corrosion Prevention and Control",
+          "ONR marine corrosion"
+        ],
+        "must_build": "NASA license, formulation transfer, coupons, reader, one field pilot",
+        "must_partner": "materials/coatings capability",
+        "time_to_demo": "weeks"
+      },
+      "scores": {
+        "capital_efficiency": 6,
+        "demonstrability_at_pitch": 10,
+        "founder_asset_advantage": 7,
+        "nasa_tech_transfer_fit": 10,
+        "non_dilutive_follow_on": 8,
+        "regional_economic_impact": 9,
+        "regulatory_headroom": 7,
+        "space_energy_intersection": 9
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 8.57
+    },
+    {
+      "id": "T3",
+      "name": "Compliance evidence platform",
+      "round1_rank": 2,
+      "round2": {
+        "attacks": [
+          "selling surveillance to the surveilled",
+          "sponsor political risk"
+        ],
+        "loss_type": "fixable",
+        "note": "Operator framing (compliance cost reduction) survives; the framing risk is permanent.",
+        "outcome": "ADVANCED"
+      },
+      "round3": {
+        "execution_score": 9,
+        "exists_today": "the evidence layer is the whole product",
+        "follow_on": [
+          "EPA SBIR",
+          "DOE SBIR",
+          "NASA SBIR (range and environmental operations)",
+          "Texas state environmental technology programmes"
+        ],
+        "must_build": "sensor ingestion, regulator-format export, a willing customer",
+        "must_partner": "none required",
+        "time_to_demo": "days"
+      },
+      "scores": {
+        "capital_efficiency": 9,
+        "demonstrability_at_pitch": 8,
+        "founder_asset_advantage": 9,
+        "nasa_tech_transfer_fit": 4,
+        "non_dilutive_follow_on": 7,
+        "regional_economic_impact": 6,
+        "regulatory_headroom": 8,
+        "space_energy_intersection": 8
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 7.03
+    },
+    {
+      "id": "T2",
+      "name": "Cryogenic boil-off recovery",
+      "round1_rank": 3,
+      "round2": {
+        "attacks": [
+          "anchor customer vertically integrates and is already building its own liquefaction plant"
+        ],
+        "loss_type": "fundamental",
+        "note": "Escape to LNG terminals weakens the space leg and puts the entrant against established EPC contractors.",
+        "outcome": "ADVANCED"
+      },
+      "round3": {
+        "execution_score": 2,
+        "exists_today": "nothing",
+        "follow_on": [
+          "DOE SBIR",
+          "ARPA-E"
+        ],
+        "must_build": "process design, cryogenic test rig, permits, site partner",
+        "must_partner": "cryogenic process engineering co-founder",
+        "time_to_demo": "years"
+      },
+      "scores": {
+        "capital_efficiency": 2,
+        "demonstrability_at_pitch": 4,
+        "founder_asset_advantage": 2,
+        "nasa_tech_transfer_fit": 8,
+        "non_dilutive_follow_on": 8,
+        "regional_economic_impact": 9,
+        "regulatory_headroom": 4,
+        "space_energy_intersection": 10
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.59
+    },
+    {
+      "id": "T10",
+      "name": "Space-weather grid alerting",
+      "round1_rank": 4,
+      "round2": {
+        "attacks": [
+          "NOAA publishes a free baseline",
+          "entrenched commercial vendors",
+          "slow utility procurement"
+        ],
+        "loss_type": "fundamental",
+        "note": "Three walls and no regional anchor to compensate.",
+        "outcome": "ELIMINATED"
+      },
+      "round3": null,
+      "scores": {
+        "capital_efficiency": 8,
+        "demonstrability_at_pitch": 7,
+        "founder_asset_advantage": 3,
+        "nasa_tech_transfer_fit": 7,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 4,
+        "regulatory_headroom": 8,
+        "space_energy_intersection": 9
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.5
+    },
+    {
+      "id": "T5",
+      "name": "Hydrogen-sensing tape",
+      "round1_rank": 5,
+      "round2": {
+        "attacks": [
+          "a component is not a company",
+          "no present regional hydrogen demand"
+        ],
+        "loss_type": "fundamental",
+        "note": "Supplier to markets that do not yet exist locally.",
+        "outcome": "ELIMINATED"
+      },
+      "round3": null,
+      "scores": {
+        "capital_efficiency": 6,
+        "demonstrability_at_pitch": 8,
+        "founder_asset_advantage": 1,
+        "nasa_tech_transfer_fit": 9,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 5,
+        "regulatory_headroom": 6,
+        "space_energy_intersection": 8
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.45
+    },
+    {
+      "id": "T7",
+      "name": "Composite cryogenic valve",
+      "round1_rank": 6,
+      "round2": {
+        "attacks": [
+          "multi-year qualification",
+          "both customer industries build in-house"
+        ],
+        "loss_type": "fundamental",
+        "note": "A prize cannot fund a valve qualification programme.",
+        "outcome": "ELIMINATED"
+      },
+      "round3": null,
+      "scores": {
+        "capital_efficiency": 4,
+        "demonstrability_at_pitch": 6,
+        "founder_asset_advantage": 1,
+        "nasa_tech_transfer_fit": 9,
+        "non_dilutive_follow_on": 7,
+        "regional_economic_impact": 5,
+        "regulatory_headroom": 5,
+        "space_energy_intersection": 10
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.42
+    },
+    {
+      "id": "T6",
+      "name": "Cryo GSE predictive maintenance",
+      "round1_rank": 7,
+      "round2": null,
+      "round3": null,
+      "scores": {
+        "capital_efficiency": 8,
+        "demonstrability_at_pitch": 6,
+        "founder_asset_advantage": 5,
+        "nasa_tech_transfer_fit": 4,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 5,
+        "regulatory_headroom": 8,
+        "space_energy_intersection": 9
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.19
+    },
+    {
+      "id": "T9",
+      "name": "Veterans credentialing platform",
+      "round1_rank": 8,
+      "round2": null,
+      "round3": null,
+      "scores": {
+        "capital_efficiency": 8,
+        "demonstrability_at_pitch": 5,
+        "founder_asset_advantage": 2,
+        "nasa_tech_transfer_fit": 1,
+        "non_dilutive_follow_on": 8,
+        "regional_economic_impact": 10,
+        "regulatory_headroom": 9,
+        "space_energy_intersection": 6
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 5.84
+    },
+    {
+      "id": "T4",
+      "name": "Flare-gas to propellant",
+      "round1_rank": null,
+      "round2": null,
+      "round3": null,
+      "scores": {
+        "capital_efficiency": 2,
+        "demonstrability_at_pitch": 3,
+        "founder_asset_advantage": 1,
+        "nasa_tech_transfer_fit": 5,
+        "non_dilutive_follow_on": 7,
+        "regional_economic_impact": 7,
+        "regulatory_headroom": 3,
+        "space_energy_intersection": 10
+      },
+      "veto_criteria": [
+        "regulatory_headroom"
+      ],
+      "vetoed": true,
+      "weighted_score": 5.32
+    },
+    {
+      "id": "T8",
+      "name": "AI-code assurance receipts (standalone)",
+      "round1_rank": null,
+      "round2": null,
+      "round3": null,
+      "scores": {
+        "capital_efficiency": 10,
+        "demonstrability_at_pitch": 7,
+        "founder_asset_advantage": 10,
+        "nasa_tech_transfer_fit": 2,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 2,
+        "regulatory_headroom": 9,
+        "space_energy_intersection": 3
+      },
+      "veto_criteria": [
+        "regional_economic_impact"
+      ],
+      "vetoed": true,
+      "weighted_score": 5.28
+    }
+  ],
+  "evidence_boundary": "expandingfrontiers.org was blocked by this session's network egress proxy. All sponsor facts come from secondary sources; deadlines, prize amounts and eligibility are unverified and are carried as blocking operator confirmations.",
+  "generated_at": "2026-08-28",
+  "kind": "expanding-frontiers-award-selection-tournament-results-v1",
+  "notable_finding": "The applicant's own existing product, entered standalone (T8), was VETOED in round one on regional economic impact. It scores 10/10 on founder advantage and capital efficiency and still fails this sponsor, because it answers neither 'which NASA technology' nor 'what happens in South Texas'. It is a component of the winner, not an entry.",
+  "plan_id": "expanding-frontiers-award-selection-v1",
+  "reversal_conditions": [
+    {
+      "condition": "The NASA KSC corrosion coating, or an equivalent NASA corrosion-sensing technology, is unavailable for license.",
+      "id": "R-1",
+      "then": "T3 wins"
+    },
+    {
+      "condition": "No materials or coatings partner is secured within the programme timeline.",
+      "id": "R-2",
+      "then": "T3 wins"
+    },
+    {
+      "condition": "The competition is closed to entrants outside an EIRA or NASA Tech Trek cohort and no cohort can be joined in time.",
+      "id": "R-3",
+      "then": "T3 wins"
+    }
+  ],
+  "schema_version": 1,
+  "subject": "Identify the top three ideas that should be entered into Expanding Frontiers (expandingfrontiers.org) programs, and select the single strongest one most likely to win a grant or award.",
+  "top_three": [
+    {
+      "id": "T1",
+      "name": "Corrosion evidence for coastal launch and energy infrastructure",
+      "one_line": "License NASA's KSC smart corrosion-detecting and self-inhibiting coating and sell it as a tamper-evident corrosion record for Rio Grande Valley launch, pipeline, port and LNG assets.",
+      "rank": 1,
+      "weighted_score": 8.57,
+      "working_title": "Sealed Coat"
+    },
+    {
+      "id": "T3",
+      "name": "Tamper-evident compliance evidence platform",
+      "one_line": "Sealed, independently re-executed environmental and safety evidence for launch and energy operators filing to FAA, TCEQ and PHMSA.",
+      "rank": 2,
+      "weighted_score": 7.03
+    },
+    {
+      "id": "T2",
+      "name": "Cryogenic boil-off recovery for Starbase and the Port of Brownsville",
+      "one_line": "Capture and reliquefy methane vapour currently lost at launch-site cryogenic operations and at Port LNG facilities.",
+      "rank": 3,
+      "weighted_score": 6.59
+    }
+  ],
+  "veto_rule": {
+    "criteria": [
+      "regional_economic_impact",
+      "regulatory_headroom"
+    ],
+    "statement": "An entrant scoring at or below the threshold on any veto criterion is eliminated regardless of weighted score.",
+    "threshold": 3
+  }
+}

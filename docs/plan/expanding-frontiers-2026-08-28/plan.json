@@ -1,0 +1,744 @@
+{
+  "baseline": {
+    "branch": "main",
+    "commit": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+    "tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d"
+  },
+  "created_at": "2026-08-28T00:00:00Z",
+  "dag_standard_version": 2,
+  "nodes": [
+    {
+      "acceptance_criteria": [
+        "A sourced inventory of Expanding Frontiers programs and award mechanisms",
+        "An explicit list of what could not be verified and why"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "discovery",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [],
+      "downstream_unlock_value": 100,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "A sourced inventory of Expanding Frontiers programs and award mechanisms",
+        "An explicit list of what could not be verified and why"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/01_SUBJECT_TRUTH.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-000",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Establish verified subject truth: what Expanding Frontiers actually is, which award and grant mechanisms it controls or routes to, and which funders pay for them.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "Every downstream score depends on who actually writes the check and what they buy. Scouting before this step optimizes against an imagined sponsor.",
+      "read_scope": [
+        "README.md",
+        "prompts/shared/ULTIMATE_SOLUTION_TOURNAMENT.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "Every program, funder, and prize claim carries a resolvable source URL.",
+        "Claims that could not be corroborated are listed explicitly as unverified."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "explorer"
+      ],
+      "rollback": "git revert the EXF-000 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "The award surface, its funders, and the eligibility path are documented with sources, and unverifiable claims are labeled.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/01_SUBJECT_TRUTH.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "A scouted candidate field with mechanism, buyer, and differentiator per entry",
+        "A recorded saturation rationale"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "discovery",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 70,
+      "dependencies": [
+        "EXF-000"
+      ],
+      "downstream_unlock_value": 80,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "A scouted candidate field with mechanism, buyer, and differentiator per entry",
+        "A recorded saturation rationale"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/02_CANDIDATE_FIELD.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-010",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Scout a wide candidate field of ideas that could plausibly be entered into an Expanding Frontiers program, deliberately spanning space, energy, dual-use, and adjacent domains.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "Tournament quality is bounded by field quality. Narrow scouting produces a winner that only beat weak siblings.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/01_SUBJECT_TRUTH.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "The field spans at least four materially different mechanism families.",
+        "No entry is filler: each states a mechanism, a buyer, and a reason it belongs."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "explorer",
+        "architect"
+      ],
+      "rollback": "git revert the EXF-010 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "Additional scouting produces duplicates or dominated variants rather than materially new mechanisms, and that saturation is recorded.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/02_CANDIDATE_FIELD.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "A weighted criteria set traceable to sponsor behavior",
+        "A veto rule that prevents a fatal weakness from being averaged away"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "evaluation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 70,
+      "dependencies": [
+        "EXF-000"
+      ],
+      "downstream_unlock_value": 80,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "A weighted criteria set traceable to sponsor behavior",
+        "A veto rule that prevents a fatal weakness from being averaged away"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/03_EVALUATION_SYSTEM.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-020",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Derive the evaluation system from how Expanding Frontiers and its funders actually select, rather than applying a generic startup rubric.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "A generic rubric rewards ideas that sound impressive. This sponsor pays for regional economic impact, NASA technology transfer, and the space-energy intersection.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/01_SUBJECT_TRUTH.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "Every criterion traces to an observed sponsor or funder behavior, not to intuition.",
+        "Weights sum to 1.0 and no catastrophic weakness can be averaged away."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "architect",
+        "curator"
+      ],
+      "rollback": "git revert the EXF-020 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "Criteria, weights, and the veto rule are fixed and justified against sponsor evidence before any candidate is scored.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/03_EVALUATION_SYSTEM.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "A closed tournament entrant list",
+        "An elimination ledger with a reason per removed candidate"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "evaluation",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 60,
+      "dependencies": [
+        "EXF-010",
+        "EXF-020"
+      ],
+      "downstream_unlock_value": 70,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "A closed tournament entrant list",
+        "An elimination ledger with a reason per removed candidate"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/04_TOURNAMENT_FIELD.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-030",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Screen the scouted field down to serious tournament entrants and record why each elimination happened.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "Filtering before the tournament keeps matchups meaningful and makes elimination auditable instead of implicit.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/02_CANDIDATE_FIELD.md",
+        "docs/plan/expanding-frontiers-2026-08-28/03_EVALUATION_SYSTEM.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "Every eliminated candidate has a stated dominating entrant or a stated fatal gap.",
+        "No surviving entrant duplicates another entrant's core mechanism."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "curator"
+      ],
+      "rollback": "git revert the EXF-030 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "The entrant list is closed and every elimination carries a recorded reason.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/04_TOURNAMENT_FIELD.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Per-criterion and weighted scores for every entrant",
+        "Recorded veto outcomes"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "tournament",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 60,
+      "dependencies": [
+        "EXF-030"
+      ],
+      "downstream_unlock_value": 60,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "Per-criterion and weighted scores for every entrant",
+        "Recorded veto outcomes"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/05_ROUND1_WEIGHTED.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-040",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Run round one: score every entrant against the weighted criteria and apply the veto rule.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "Weighted scoring separates the field cheaply before expensive adversarial work is spent on entrants that cannot win.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/04_TOURNAMENT_FIELD.md",
+        "docs/plan/expanding-frontiers-2026-08-28/03_EVALUATION_SYSTEM.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "Weighted scores recompute exactly from the published per-criterion scores and weights.",
+        "Every vetoed entrant names the criterion that vetoed it."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "curator"
+      ],
+      "rollback": "git revert the EXF-040 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "All entrants carry a reproducible weighted score and the veto outcomes are recorded.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/05_ROUND1_WEIGHTED.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "Scenario battle results per entrant",
+        "A fundamental-versus-fixable verdict per recorded loss"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "tournament",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 80,
+      "dependencies": [
+        "EXF-040"
+      ],
+      "downstream_unlock_value": 60,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "Scenario battle results per entrant",
+        "A fundamental-versus-fixable verdict per recorded loss"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/06_ROUND2_ADVERSARIAL.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-050",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Run round two: adversarial scenario battles that actively try to make the leading entrants fail.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "Triple elimination exists so a strong entrant is not removed for one narrow weakness, and so a leader is not crowned without being attacked.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/05_ROUND1_WEIGHTED.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "Each surviving entrant is attacked under at least one scenario designed to defeat it.",
+        "Each recorded loss states whether it is fundamental or fixable."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "architect",
+        "curator"
+      ],
+      "rollback": "git revert the EXF-050 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "Every leading entrant has faced a scenario built to defeat it and the outcome is recorded with a fundamental-or-fixable verdict.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/06_ROUND2_ADVERSARIAL.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "An execution-readiness assessment per entrant",
+        "A named follow-on funding path per entrant"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "tournament",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 80,
+      "dependencies": [
+        "EXF-050"
+      ],
+      "downstream_unlock_value": 60,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "An execution-readiness assessment per entrant",
+        "A named follow-on funding path per entrant"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/07_ROUND3_EXECUTION.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-060",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Run round three: test whether each surviving entrant can actually be executed and funded by this applicant on this sponsor's timeline.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "An idea that cannot be started with assets already in hand loses to a weaker idea that can be demonstrated at a pitch.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/06_ROUND2_ADVERSARIAL.md",
+        "README.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "Each entrant states what already exists versus what must be built.",
+        "Each entrant names a concrete non-dilutive funding path beyond the initial award."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "builder",
+        "integrator"
+      ],
+      "rollback": "git revert the EXF-060 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "Execution readiness and a downstream funding path are recorded for every surviving entrant.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/07_ROUND3_EXECUTION.md"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "A ranked top three with a named winner",
+        "Recorded dissent and runner-up reversal conditions",
+        "Machine-readable tournament results written under the node write scope"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "decision",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 100,
+      "dependencies": [
+        "EXF-060"
+      ],
+      "downstream_unlock_value": 90,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "A ranked top three with a named winner",
+        "Recorded dissent and runner-up reversal conditions",
+        "Machine-readable tournament results written under the node write scope"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/08_CHAMPIONSHIP.md",
+        "docs/plan/expanding-frontiers-2026-08-28/TOURNAMENT_RESULTS.json"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-070",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Decide the championship: rank the top three, name the single winner, and record the dissent against that choice.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "A verdict without recorded dissent is not reviewable, and the runner-up conditions are what let the decision be revisited if the sponsor's priorities differ.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/05_ROUND1_WEIGHTED.md",
+        "docs/plan/expanding-frontiers-2026-08-28/06_ROUND2_ADVERSARIAL.md",
+        "docs/plan/expanding-frontiers-2026-08-28/07_ROUND3_EXECUTION.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "The machine-readable results reproduce the narrative verdict exactly.",
+        "The verdict records the conditions under which the runner-up would win instead."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "orchestrator",
+        "curator"
+      ],
+      "rollback": "git revert the EXF-070 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "The top three, the winner, the dissent, and the runner-up reversal conditions are recorded and internally consistent.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/08_CHAMPIONSHIP.md",
+        "docs/plan/expanding-frontiers-2026-08-28/TOURNAMENT_RESULTS.json"
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "A submission plan naming the target program and first action",
+        "An explicit operator-confirmation list"
+      ],
+      "assumptions": [
+        "Expanding Frontiers' public program set as researched on 2026-08-28 remains current.",
+        "No node may expand its own authority or weaken acceptance to pass."
+      ],
+      "branch": "claude/expanding-frontiers-ideas-2punb2",
+      "category": "delivery",
+      "consultation_routes": [
+        "orchestrator",
+        "curator"
+      ],
+      "contract_version": 1,
+      "critical_path_importance": 90,
+      "dependencies": [
+        "EXF-070"
+      ],
+      "downstream_unlock_value": 40,
+      "durability_role": "none",
+      "effort": "medium",
+      "escalation_conditions": [
+        "A funder, program, deadline, or eligibility claim cannot be corroborated by a citable source.",
+        "The evaluation would require a credential, spending, legal, or submission authority not held.",
+        "Independent verification of a scoring input cannot be preserved.",
+        "Three semantic attempts fail or no-progress repeats."
+      ],
+      "evidence_requirements": [
+        "Citable source for every external factual claim",
+        "Explicit confidence label on every uncorroborated claim",
+        "Changed-path inventory bound to declared write scope",
+        "Node completion receipt binding inputs to outputs"
+      ],
+      "expected_outputs": [
+        "A submission plan naming the target program and first action",
+        "An explicit operator-confirmation list"
+      ],
+      "file_locks": [
+        "docs/plan/expanding-frontiers-2026-08-28/README.md",
+        "docs/plan/expanding-frontiers-2026-08-28/09_SUBMISSION_PLAN.md"
+      ],
+      "forbidden_scope": [
+        "src/**",
+        ".autopilot/**",
+        ".github/**",
+        "evidence/**",
+        "docs/architecture/HARDENED_VISION_CONTRACT.md"
+      ],
+      "id": "EXF-080",
+      "interfaces": [],
+      "max_retries": 2,
+      "merge_conflict_surface": "none",
+      "objective": "Write the operator-facing deliverable: the submission plan that turns the winning idea into an actual Expanding Frontiers entry.",
+      "parallel_safe": true,
+      "pr_target": "claude/expanding-frontiers-ideas-2punb2",
+      "rationale": "The subject asks for an idea to enter and win, so the DAG is not quiescent until the winner has a concrete route into a real program.",
+      "read_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/08_CHAMPIONSHIP.md",
+        "docs/plan/expanding-frontiers-2026-08-28/01_SUBJECT_TRUTH.md"
+      ],
+      "required_inputs": [],
+      "required_tests": [
+        "The submission plan names the specific program to enter and the first contact action.",
+        "Every unverified prerequisite is flagged as requiring operator confirmation."
+      ],
+      "reversibility": "full",
+      "risk": "low",
+      "roles": [
+        "orchestrator"
+      ],
+      "rollback": "git revert the EXF-080 commit; the node writes only under docs/plan/expanding-frontiers-2026-08-28/ and changes no runtime behavior.",
+      "routes": [],
+      "semantic_locks": [],
+      "stopping_condition": "The winner has a named target program, a first action, and an explicit list of operator confirmations required before submitting.",
+      "write_scope": [
+        "docs/plan/expanding-frontiers-2026-08-28/README.md",
+        "docs/plan/expanding-frontiers-2026-08-28/09_SUBMISSION_PLAN.md"
+      ]
+    }
+  ],
+  "plan_fingerprint": "sha256:44903ca2882703a1626a0885354e083b90180759be7a59c3c426907f6d674b3c",
+  "plan_id": "expanding-frontiers-award-selection-v1",
+  "schema_version": 1,
+  "state_machine": [
+    "PENDING",
+    "READY",
+    "CLAIMED",
+    "IN_PROGRESS",
+    "VALIDATING",
+    "COMPLETE",
+    "BLOCKED"
+  ],
+  "subject": "Identify the top three ideas that should be entered into Expanding Frontiers (expandingfrontiers.org) programs, and select the single strongest one most likely to win a grant or award.",
+  "title": "Expanding Frontiers Award Selection \u2014 Ultimate Solution Tournament"
+}

@@ -1,0 +1,82 @@
+{
+  "artifact_digests": {
+    "01_SUBJECT_TRUTH.md": "sha256:f4840071df5317c0bf531426bd11c7e1f4b9156ad76c7435875368f53224e4da",
+    "02_CANDIDATE_FIELD.md": "sha256:0090a829b1a5ad3f8a542a937e847e7e21a397254f1311ba6c7053977c4cd693",
+    "03_EVALUATION_SYSTEM.md": "sha256:512630f01baa8f52f3299a89cfccce206c77a2ba8f1a089a9c329a2317fbb0ca",
+    "04_TOURNAMENT_FIELD.md": "sha256:8334fa2b43b3cd29eb50b85e86784a3ba8169d5d46591536de661b9ceffe8b2f",
+    "05_ROUND1_WEIGHTED.md": "sha256:99310ac2544aa40914a4cf5859fb93d5203c035ac46e0accf624aed70cbb041e",
+    "06_ROUND2_ADVERSARIAL.md": "sha256:c6fbb7a4e7b0761c8d77cad504800276ba06f0733eb4a8f202f6406ffe425c11",
+    "07_ROUND3_EXECUTION.md": "sha256:7a18154eff83aedd72374a94f722c5fbc0b1f9589e8cd983de4a31b01ffd36ec",
+    "08_CHAMPIONSHIP.md": "sha256:890c6770ca6250aab9e619e9a53c284fb89c17b8dc915fa64d7bbfd30de71b4b",
+    "09_SUBMISSION_PLAN.md": "sha256:93a78cbdc089c4e9c69419d6f90a92b8a0fc9cd197c928089369d7e94a6625b9",
+    "README.md": "sha256:26e794411133f6d6028bd14e94398417d7d719379b7a20730bc378544987ad4d",
+    "TOURNAMENT_RESULTS.json": "sha256:e2520f27060ed2602881486bc62e8e431cfde1cdcca434416538b75de2ab9bde",
+    "plan.json": "sha256:c612cbe0a362e5925a07d6e8c96289e1574a3976b1aa4a344ec05e9965269416",
+    "round1_scores.json": "sha256:59c31b33be6872348006cf770b16ab208cefe3eeaedd8f98dfc19cb3af5e5283",
+    "score.py": "sha256:aa685da5e8e3527b95692b94c1c21cf6576b26a7ecaa90057ecadb29b07292f9"
+  },
+  "autopilot_run_outcome": {
+    "command": "hive-mind autopilot run <subject> --repository .",
+    "meaning": "The installed controller's plan is not evidence for a new subject, so the tool failed closed rather than leaking tasks from the legacy plan. The DAG in this directory was generated for this subject and executed by the host, which is the contract's declared execution_owner.",
+    "result": "PLAN_GENERATION_REQUIRED"
+  },
+  "baseline": {
+    "branch": "main",
+    "commit": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+    "tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d"
+  },
+  "branch": "claude/expanding-frontiers-ideas-2punb2",
+  "claim_scope": "Sponsor-fit ranking against Expanding Frontiers' observed funding and selection behaviour. Not a market forecast and not a prediction that any award will be made.",
+  "commands": [
+    {
+      "command": "python .autopilot/bin/dag_standard.py --repo-root . dag-lint --plan docs/plan/expanding-frontiers-2026-08-28/plan.json --strict",
+      "exit_code": 0,
+      "stdout_tail": "SUMMARY: 0 error, 0 warning, 0 info"
+    },
+    {
+      "command": "python .autopilot/bin/dag_standard.py --repo-root . dag-rounds --plan docs/plan/expanding-frontiers-2026-08-28/plan.json --expected-plan-digest sha256:252dcaf0b34a44107e0389286fc50427d609238fa4dff250e4af0dacdec7f71c",
+      "exit_code": 0,
+      "stdout_tail": "  NO EXECUTABLE DISPATCH COMMAND: No executable dispatcher command is available for an external plan: the installed dispatch command accepts only .autopilot/plan.json. A parent must consume these structured rounds manually until native external-plan dispatch exists."
+    },
+    {
+      "command": "python docs/plan/expanding-frontiers-2026-08-28/score.py",
+      "exit_code": 0,
+      "stdout_tail": "T8   AI-code assurance receipts (standalone)    5.2800     -  VETOED: regional_economic_impact"
+    }
+  ],
+  "dag": {
+    "dag_standard_version": 2,
+    "dispatch_rounds": 8,
+    "lint": "0 error, 0 warning, 0 info (--strict)",
+    "nodes": [
+      "EXF-000",
+      "EXF-010",
+      "EXF-020",
+      "EXF-030",
+      "EXF-040",
+      "EXF-050",
+      "EXF-060",
+      "EXF-070",
+      "EXF-080"
+    ]
+  },
+  "evidence_boundary": "expandingfrontiers.org was blocked by this session's network egress proxy. No sponsor fact was read from the organization's live site; deadlines, prize amounts and eligibility remain unverified and are carried as blocking operator confirmations C-1 through C-5.",
+  "execution_owner": "active_host_sandbox",
+  "generated_at": "2026-08-28",
+  "kind": "expanding-frontiers-subject-dag-run-receipt-v1",
+  "plan_consumed_digest": "sha256:252dcaf0b34a44107e0389286fc50427d609238fa4dff250e4af0dacdec7f71c",
+  "plan_file_sha256": "sha256:c612cbe0a362e5925a07d6e8c96289e1574a3976b1aa4a344ec05e9965269416",
+  "plan_fingerprint_canonical": "sha256:44903ca2882703a1626a0885354e083b90180759be7a59c3c426907f6d674b3c",
+  "plan_id": "expanding-frontiers-award-selection-v1",
+  "receipt_digest": "sha256:a7821e18b5526abd1a984ff58acefa9e304aa358b0d294070438beb5a006ccb2",
+  "schema_version": 1,
+  "subject": "Identify the top three ideas that should be entered into Expanding Frontiers (expandingfrontiers.org) programs, and select the single strongest one most likely to win a grant or award.",
+  "verdict": {
+    "decisive_unverified_fact": "C-1 / R-1: availability of the NASA KSC smart corrosion coating for license in 2026",
+    "runner_up": "T3 - Tamper-evident compliance evidence platform",
+    "third": "T2 - Cryogenic boil-off recovery for Starbase and the Port of Brownsville",
+    "verdict_type": "ADAPT",
+    "weighted_score": 8.57,
+    "winner": "T1 - Corrosion evidence for coastal launch and energy infrastructure"
+  }
+}

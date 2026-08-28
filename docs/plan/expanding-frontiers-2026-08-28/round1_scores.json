@@ -1,0 +1,203 @@
+{
+  "results": [
+    {
+      "id": "T1",
+      "name": "Corrosion-evidence coating",
+      "round1_rank": 1,
+      "scores": {
+        "capital_efficiency": 6,
+        "demonstrability_at_pitch": 10,
+        "founder_asset_advantage": 7,
+        "nasa_tech_transfer_fit": 10,
+        "non_dilutive_follow_on": 8,
+        "regional_economic_impact": 9,
+        "regulatory_headroom": 7,
+        "space_energy_intersection": 9
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 8.57
+    },
+    {
+      "id": "T3",
+      "name": "Compliance evidence platform",
+      "round1_rank": 2,
+      "scores": {
+        "capital_efficiency": 9,
+        "demonstrability_at_pitch": 8,
+        "founder_asset_advantage": 9,
+        "nasa_tech_transfer_fit": 4,
+        "non_dilutive_follow_on": 7,
+        "regional_economic_impact": 6,
+        "regulatory_headroom": 8,
+        "space_energy_intersection": 8
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 7.03
+    },
+    {
+      "id": "T2",
+      "name": "Cryogenic boil-off recovery",
+      "round1_rank": 3,
+      "scores": {
+        "capital_efficiency": 2,
+        "demonstrability_at_pitch": 4,
+        "founder_asset_advantage": 2,
+        "nasa_tech_transfer_fit": 8,
+        "non_dilutive_follow_on": 8,
+        "regional_economic_impact": 9,
+        "regulatory_headroom": 4,
+        "space_energy_intersection": 10
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.59
+    },
+    {
+      "id": "T10",
+      "name": "Space-weather grid alerting",
+      "round1_rank": 4,
+      "scores": {
+        "capital_efficiency": 8,
+        "demonstrability_at_pitch": 7,
+        "founder_asset_advantage": 3,
+        "nasa_tech_transfer_fit": 7,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 4,
+        "regulatory_headroom": 8,
+        "space_energy_intersection": 9
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.5
+    },
+    {
+      "id": "T5",
+      "name": "Hydrogen-sensing tape",
+      "round1_rank": 5,
+      "scores": {
+        "capital_efficiency": 6,
+        "demonstrability_at_pitch": 8,
+        "founder_asset_advantage": 1,
+        "nasa_tech_transfer_fit": 9,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 5,
+        "regulatory_headroom": 6,
+        "space_energy_intersection": 8
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.45
+    },
+    {
+      "id": "T7",
+      "name": "Composite cryogenic valve",
+      "round1_rank": 6,
+      "scores": {
+        "capital_efficiency": 4,
+        "demonstrability_at_pitch": 6,
+        "founder_asset_advantage": 1,
+        "nasa_tech_transfer_fit": 9,
+        "non_dilutive_follow_on": 7,
+        "regional_economic_impact": 5,
+        "regulatory_headroom": 5,
+        "space_energy_intersection": 10
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.42
+    },
+    {
+      "id": "T6",
+      "name": "Cryo GSE predictive maintenance",
+      "round1_rank": 7,
+      "scores": {
+        "capital_efficiency": 8,
+        "demonstrability_at_pitch": 6,
+        "founder_asset_advantage": 5,
+        "nasa_tech_transfer_fit": 4,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 5,
+        "regulatory_headroom": 8,
+        "space_energy_intersection": 9
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 6.19
+    },
+    {
+      "id": "T9",
+      "name": "Veterans credentialing platform",
+      "round1_rank": 8,
+      "scores": {
+        "capital_efficiency": 8,
+        "demonstrability_at_pitch": 5,
+        "founder_asset_advantage": 2,
+        "nasa_tech_transfer_fit": 1,
+        "non_dilutive_follow_on": 8,
+        "regional_economic_impact": 10,
+        "regulatory_headroom": 9,
+        "space_energy_intersection": 6
+      },
+      "veto_criteria": [],
+      "vetoed": false,
+      "weighted_score": 5.84
+    },
+    {
+      "id": "T4",
+      "name": "Flare-gas to propellant",
+      "round1_rank": null,
+      "scores": {
+        "capital_efficiency": 2,
+        "demonstrability_at_pitch": 3,
+        "founder_asset_advantage": 1,
+        "nasa_tech_transfer_fit": 5,
+        "non_dilutive_follow_on": 7,
+        "regional_economic_impact": 7,
+        "regulatory_headroom": 3,
+        "space_energy_intersection": 10
+      },
+      "veto_criteria": [
+        "regulatory_headroom"
+      ],
+      "vetoed": true,
+      "weighted_score": 5.32
+    },
+    {
+      "id": "T8",
+      "name": "AI-code assurance receipts (standalone)",
+      "round1_rank": null,
+      "scores": {
+        "capital_efficiency": 10,
+        "demonstrability_at_pitch": 7,
+        "founder_asset_advantage": 10,
+        "nasa_tech_transfer_fit": 2,
+        "non_dilutive_follow_on": 6,
+        "regional_economic_impact": 2,
+        "regulatory_headroom": 9,
+        "space_energy_intersection": 3
+      },
+      "veto_criteria": [
+        "regional_economic_impact"
+      ],
+      "vetoed": true,
+      "weighted_score": 5.28
+    }
+  ],
+  "veto_criteria": [
+    "regional_economic_impact",
+    "regulatory_headroom"
+  ],
+  "veto_threshold": 3,
+  "weights": {
+    "capital_efficiency": 0.08,
+    "demonstrability_at_pitch": 0.12,
+    "founder_asset_advantage": 0.1,
+    "nasa_tech_transfer_fit": 0.18,
+    "non_dilutive_follow_on": 0.13,
+    "regional_economic_impact": 0.15,
+    "regulatory_headroom": 0.08,
+    "space_energy_intersection": 0.16
+  }
+}
