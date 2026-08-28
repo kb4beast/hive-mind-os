@@ -1,0 +1,465 @@
+{
+  "charter_digest": "sha256:41e1d1628f17f28ead403631d0dde1ff51447f1710b5ca8817448d4ccb2d896c",
+  "graph_digest": "sha256:011ee42278984be1809b59493c1c15d18a616d8007243fef440f3edf883b04de",
+  "mission_id": "MISSION-checkout-latency",
+  "planner_kind": "orchestration-v1",
+  "replaces_digest": null,
+  "replan_evidence_refs": [],
+  "replan_reason": null,
+  "schedules": [
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 10,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 20,
+        "max_wall_seconds": 300,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "curator",
+        "architect"
+      ],
+      "human_gates": [],
+      "risk_lane": "R0",
+      "stop_conditions": [
+        "all child work reached ACCEPTED"
+      ],
+      "work_id": "WORK-000-root"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 20,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 80,
+        "max_wall_seconds": 600,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "architect",
+        "curator"
+      ],
+      "human_gates": [],
+      "risk_lane": "R0",
+      "stop_conditions": [
+        "regression reproduced with a receipt"
+      ],
+      "work_id": "WORK-010-profile"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 20,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 80,
+        "max_wall_seconds": 600,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "architect",
+        "curator"
+      ],
+      "human_gates": [],
+      "risk_lane": "R0",
+      "stop_conditions": [
+        "call graph enumerated"
+      ],
+      "work_id": "WORK-011-survey"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 30,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 60,
+        "max_wall_seconds": 600,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "curator",
+        "steward"
+      ],
+      "human_gates": [],
+      "risk_lane": "R1",
+      "stop_conditions": [
+        "ADR records rollback and threats"
+      ],
+      "work_id": "WORK-020-design"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 40,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 150,
+        "max_wall_seconds": 900,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "curator",
+        "architect"
+      ],
+      "human_gates": [],
+      "risk_lane": "R2",
+      "stop_conditions": [
+        "sealed checks pass in the builder workspace"
+      ],
+      "work_id": "WORK-030-cache"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 40,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 150,
+        "max_wall_seconds": 900,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "curator",
+        "steward"
+      ],
+      "human_gates": [
+        "GATE-schema-migration"
+      ],
+      "risk_lane": "R3",
+      "stop_conditions": [
+        "migration is reversible"
+      ],
+      "work_id": "WORK-031-index"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 25,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 100,
+        "max_wall_seconds": 600,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "curator",
+        "architect"
+      ],
+      "human_gates": [],
+      "risk_lane": "R1",
+      "stop_conditions": [
+        "public API contract unchanged"
+      ],
+      "work_id": "WORK-040-contract"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 20,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 80,
+        "max_wall_seconds": 600,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "curator",
+        "architect"
+      ],
+      "human_gates": [],
+      "risk_lane": "R1",
+      "stop_conditions": [
+        "runbook and metric committed"
+      ],
+      "work_id": "WORK-050-health"
+    },
+    {
+      "budget": {
+        "max_cost_microunits": 1000000,
+        "max_depth": 3,
+        "max_input_tokens": 200000,
+        "max_model_calls": 30,
+        "max_output_tokens": 50000,
+        "max_tool_calls": 120,
+        "max_wall_seconds": 900,
+        "max_work_items": 12
+      },
+      "consultation_roles": [
+        "architect",
+        "steward"
+      ],
+      "human_gates": [],
+      "risk_lane": "R2",
+      "stop_conditions": [
+        "verdict recorded from the sealed checks"
+      ],
+      "work_id": "WORK-060-verify"
+    }
+  ],
+  "schema_version": 1,
+  "work_items": [
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [],
+      "depth": 1,
+      "expected_outputs": [
+        "evidence:profile"
+      ],
+      "idempotency_key": "sha256:30d3c2487fb36c8f83bad1634e3536b7307646cb3ae7671caebe015699664808",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [],
+      "risk_tier": "R0",
+      "role": "explorer",
+      "status": "PROPOSED",
+      "title": "Reproduce and profile the p95 regression",
+      "work_id": "WORK-010-profile",
+      "write_scope": []
+    },
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [],
+      "depth": 1,
+      "expected_outputs": [
+        "evidence:callgraph"
+      ],
+      "idempotency_key": "sha256:4ed78f042e16da2cf602bbcfd9ae6311ff55ab21418e5249efcaa50acaeb84af",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [],
+      "risk_tier": "R0",
+      "role": "explorer",
+      "status": "PROPOSED",
+      "title": "Survey call sites and query plans",
+      "work_id": "WORK-011-survey",
+      "write_scope": []
+    },
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [
+        "WORK-010-profile",
+        "WORK-011-survey"
+      ],
+      "depth": 1,
+      "expected_outputs": [
+        "design:adr-014"
+      ],
+      "idempotency_key": "sha256:25b6e9e7dbbff9f69e8aca5d6f95e60598890cbd41e23db9eb6ce1b46d86cc90",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [
+        "evidence:profile",
+        "evidence:callgraph"
+      ],
+      "risk_tier": "R1",
+      "role": "architect",
+      "status": "PROPOSED",
+      "title": "Design the cache and index change with rollback",
+      "work_id": "WORK-020-design",
+      "write_scope": []
+    },
+    {
+      "acceptance_specs": [
+        "SPEC-p95-under-400ms"
+      ],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [
+        "WORK-020-design"
+      ],
+      "depth": 1,
+      "expected_outputs": [
+        "code:cache"
+      ],
+      "idempotency_key": "sha256:ba188ac7c34d976c32c6817020edc99e6819954c3f77c06062caf5d357819101",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [
+        "design:adr-014"
+      ],
+      "risk_tier": "R2",
+      "role": "builder",
+      "status": "PROPOSED",
+      "title": "Implement the read-through cache",
+      "work_id": "WORK-030-cache",
+      "write_scope": [
+        "src/checkout/cache.py"
+      ]
+    },
+    {
+      "acceptance_specs": [
+        "SPEC-no-public-api-change"
+      ],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [
+        "WORK-020-design"
+      ],
+      "depth": 1,
+      "expected_outputs": [
+        "code:migration"
+      ],
+      "idempotency_key": "sha256:e6c761ecba24fa40410437265c895672f41c6acacba7c674637d5781936bc6aa",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [
+        "design:adr-014"
+      ],
+      "risk_tier": "R3",
+      "role": "builder",
+      "status": "PROPOSED",
+      "title": "Add the covering index migration",
+      "work_id": "WORK-031-index",
+      "write_scope": [
+        "migrations/0042_index.sql"
+      ]
+    },
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [
+        "WORK-030-cache",
+        "WORK-031-index"
+      ],
+      "depth": 1,
+      "expected_outputs": [
+        "evidence:contract"
+      ],
+      "idempotency_key": "sha256:6a8c4ba4abed32d15261529c888d547c55728df8bc1a5cd4be448162e3d0c008",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [
+        "code:cache",
+        "code:migration"
+      ],
+      "risk_tier": "R1",
+      "role": "integrator",
+      "status": "PROPOSED",
+      "title": "Re-run the public API contract tests",
+      "work_id": "WORK-040-contract",
+      "write_scope": [
+        "src/checkout/api.py"
+      ]
+    },
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [
+        "WORK-030-cache"
+      ],
+      "depth": 1,
+      "expected_outputs": [
+        "ops:runbook"
+      ],
+      "idempotency_key": "sha256:9d006158bb408bce6c0eb90b776cb26ecc00145c72df45db078e3ff9fe7edfbf",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [
+        "code:cache"
+      ],
+      "risk_tier": "R1",
+      "role": "steward",
+      "status": "PROPOSED",
+      "title": "Add the cache hit-rate metric and runbook",
+      "work_id": "WORK-050-health",
+      "write_scope": [
+        "docs/runbooks/cache.md"
+      ]
+    },
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [
+        "WORK-040-contract",
+        "WORK-050-health"
+      ],
+      "depth": 1,
+      "expected_outputs": [
+        "evidence:verdict"
+      ],
+      "idempotency_key": "sha256:60f8af86dd1b1842b082b7647869de447e47ba86961fdcdd937cb04d0fdcac58",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": "WORK-000-root",
+      "requested_actions": [],
+      "required_inputs": [
+        "evidence:contract",
+        "ops:runbook"
+      ],
+      "risk_tier": "R2",
+      "role": "curator",
+      "status": "PROPOSED",
+      "title": "Independently re-run the sealed checks",
+      "work_id": "WORK-060-verify",
+      "write_scope": []
+    },
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {},
+      "dependencies": [
+        "WORK-060-verify"
+      ],
+      "depth": 0,
+      "expected_outputs": [],
+      "idempotency_key": "sha256:c530818a585dda073a670d07fadc8d1d365a22d292b647d13b645c276840e2ee",
+      "max_attempts": 2,
+      "mission_id": "MISSION-checkout-latency",
+      "objective": "Cut p95 checkout latency below 400ms without changing the public API",
+      "parent_work_id": null,
+      "requested_actions": [],
+      "required_inputs": [
+        "evidence:verdict"
+      ],
+      "risk_tier": "R0",
+      "role": "orchestrator",
+      "status": "PROPOSED",
+      "title": "Deliver the checkout latency objective",
+      "work_id": "WORK-000-root",
+      "write_scope": []
+    }
+  ]
+}

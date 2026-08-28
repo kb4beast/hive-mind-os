@@ -1,0 +1,1145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hive Mind OS Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600;700&display=swap">
+
+<style>
+:root{
+  --ground:#E8EBF0; --surface:#FBFCFE; --surface-2:#F1F4F8;
+  --ink:#12161D; --ink-2:#4B5464; --ink-3:#7B8598;
+  --rule:#C6CEDA; --rule-soft:#DCE2EB;
+  --role-orchestrator:#5546C0; --role-explorer:#0B7A84; --role-architect:#215FA6;
+  --role-builder:#A2620A;      --role-curator:#9E2A45;  --role-integrator:#2A7A44;
+  --role-steward:#5A6930;      --role-optimizer:#8A3A8E;
+  --pass:#2A7A44; --fail:#9E2A45; --idle:#7B8598;
+  --shadow:0 1px 2px rgba(18,22,29,.06), 0 8px 24px -14px rgba(18,22,29,.30);
+  --measure:68ch;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1015; --surface:#151920; --surface-2:#1B212A;
+    --ink:#E6EAF2; --ink-2:#A3ADBE; --ink-3:#6E7889;
+    --rule:#262C36; --rule-soft:#1F252E;
+    --role-orchestrator:#9A8DF2; --role-explorer:#3FC3D0; --role-architect:#6BA6EA;
+    --role-builder:#E2A34C;      --role-curator:#F27D93;  --role-integrator:#68C888;
+    --role-steward:#AABE60;      --role-optimizer:#D687DA;
+    --pass:#68C888; --fail:#F27D93; --idle:#6E7889;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1015; --surface:#151920; --surface-2:#1B212A;
+  --ink:#E6EAF2; --ink-2:#A3ADBE; --ink-3:#6E7889;
+  --rule:#262C36; --rule-soft:#1F252E;
+  --role-orchestrator:#9A8DF2; --role-explorer:#3FC3D0; --role-architect:#6BA6EA;
+  --role-builder:#E2A34C;      --role-curator:#F27D93;  --role-integrator:#68C888;
+  --role-steward:#AABE60;      --role-optimizer:#D687DA;
+  --pass:#68C888; --fail:#F27D93; --idle:#6E7889;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:0 24px 96px}
+p,li{color:var(--ink-2)}
+.measure{max-width:var(--measure)}
+a{color:var(--ink); text-decoration-color:var(--rule); text-underline-offset:3px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--role-architect); outline-offset:3px; border-radius:2px}
+
+h1,h2,h3,h4{font-family:"IBM Plex Serif",Georgia,serif; color:var(--ink); text-wrap:balance; margin:0}
+h2{font-size:1.72rem; font-weight:600; line-height:1.22; letter-spacing:-.012em}
+h3{font-size:1.12rem; font-weight:600; line-height:1.3}
+h4{font-size:.98rem; font-weight:600}
+
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.68rem; font-weight:500;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
+}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace}
+code{font-size:.86em; background:var(--surface-2); padding:.12em .38em; border-radius:3px; color:var(--ink)}
+pre{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.82rem; line-height:1.7;
+  background:var(--surface-2); border:1px solid var(--rule-soft); border-radius:6px;
+  padding:14px 16px; overflow-x:auto; margin:0; color:var(--ink);
+}
+pre .c{color:var(--ink-3)}
+
+/* ---- masthead ---- */
+.masthead{border-bottom:1px solid var(--rule); background:var(--surface)}
+.masthead .wrap{padding-top:40px; padding-bottom:34px; display:flex; flex-direction:column; gap:18px}
+.brandline{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+h1{font-size:2.5rem; font-weight:700; letter-spacing:-.022em; line-height:1.04}
+.vpill{
+  font-family:"IBM Plex Mono",monospace; font-size:.7rem; letter-spacing:.06em;
+  border:1px solid var(--rule); border-radius:99px; padding:3px 9px; color:var(--ink-3);
+}
+.thesis{font-size:1.14rem; line-height:1.55; max-width:60ch; color:var(--ink-2)}
+.thesis strong{color:var(--ink); font-weight:600}
+.masthead-meta{display:flex; gap:26px; flex-wrap:wrap; padding-top:6px; border-top:1px solid var(--rule-soft)}
+.mm{display:flex; flex-direction:column; gap:1px}
+.mm .k{font-family:"IBM Plex Mono",monospace; font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)}
+.mm .v{font-size:.92rem; color:var(--ink); font-variant-numeric:tabular-nums}
+
+/* ---- sections ---- */
+section{padding-top:64px}
+.shead{display:flex; flex-direction:column; gap:8px; margin-bottom:26px}
+.shead p{margin:2px 0 0}
+
+/* ---- figures ---- */
+figure{margin:0; background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:22px 22px 16px; box-shadow:var(--shadow)}
+.figscroll{overflow-x:auto}
+.figscroll svg{min-width:860px}
+figure svg{display:block; width:100%; height:auto; color:var(--ink)}
+figcaption{margin-top:16px; padding-top:13px; border-top:1px solid var(--rule-soft); font-size:.86rem; line-height:1.55; color:var(--ink-2); max-width:82ch}
+figcaption b{color:var(--ink); font-weight:600}
+.svg-label{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.09em; text-transform:uppercase}
+.svg-title{font-family:"IBM Plex Sans",sans-serif; font-size:13.5px; font-weight:500}
+.svg-sub{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.02em}
+.svg-edge{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.05em}
+.svg-wave{font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase}
+
+/* ---- role legend ---- */
+.legend{display:flex; flex-wrap:wrap; gap:7px; margin:0 0 24px}
+.chip{
+  display:inline-flex; align-items:center; gap:7px; font-family:"IBM Plex Mono",monospace;
+  font-size:.7rem; letter-spacing:.05em; padding:4px 10px 4px 8px; border-radius:99px;
+  border:1px solid var(--rule); background:var(--surface); color:var(--ink-2); white-space:nowrap;
+}
+.chip .dot{width:9px; height:9px; border-radius:2px; flex:none}
+.chip.planned .dot{background:transparent !important; border:1.5px dashed currentColor}
+.chip.planned{color:var(--ink-3)}
+
+/* ---- role cards ---- */
+.roles{display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:14px}
+.role{
+  background:var(--surface); border:1px solid var(--rule); border-top:3px solid var(--rc);
+  border-radius:6px; padding:16px 17px 15px; display:flex; flex-direction:column; gap:9px;
+}
+.role.planned{border-top-style:dashed; background:transparent}
+.role-top{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.role-name{font-family:"IBM Plex Mono",monospace; font-size:.76rem; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--rc)}
+.role-state{font-family:"IBM Plex Mono",monospace; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+.role p{margin:0; font-size:.88rem; line-height:1.5}
+.role dl{margin:0; display:flex; flex-direction:column; gap:7px; padding-top:3px; border-top:1px solid var(--rule-soft)}
+.role dt{font-family:"IBM Plex Mono",monospace; font-size:.6rem; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3); margin-bottom:2px}
+.role dd{margin:0; font-family:"IBM Plex Mono",monospace; font-size:.72rem; line-height:1.55; color:var(--ink-2)}
+
+/* ---- generic panels ---- */
+.panel{background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:20px 22px}
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px}
+.grid3{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px}
+
+/* ---- problem cards ---- */
+.problems{display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px}
+.problem{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:18px 19px; display:flex; flex-direction:column; gap:11px}
+.problem h3{font-size:1.04rem; line-height:1.32}
+.problem p{margin:0; font-size:.89rem; line-height:1.55}
+.problem pre{font-size:.76rem; padding:10px 12px; margin-top:auto}
+.rolerow{display:flex; gap:5px; flex-wrap:wrap}
+.rr{width:10px; height:10px; border-radius:2px; flex:none}
+.rr-wrap{display:flex; align-items:center; gap:8px; font-family:"IBM Plex Mono",monospace; font-size:.64rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+
+/* ---- tables ---- */
+.tablewrap{overflow-x:auto; border:1px solid var(--rule); border-radius:8px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:.86rem; min-width:640px}
+th,td{text-align:left; padding:10px 14px; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+thead th{
+  font-family:"IBM Plex Mono",monospace; font-size:.64rem; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--ink-3); font-weight:500; background:var(--surface-2); border-bottom:1px solid var(--rule);
+}
+tbody tr:last-child td{border-bottom:none}
+td{color:var(--ink-2)}
+td.k{color:var(--ink); font-weight:500}
+td .mono{font-size:.8rem; color:var(--ink-2)}
+.tabnum{font-variant-numeric:tabular-nums}
+.state{font-family:"IBM Plex Mono",monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap}
+.state.ok{color:var(--pass)} .state.no{color:var(--fail)} .state.na{color:var(--idle)}
+
+/* ---- callout ---- */
+.callout{border:1px solid var(--rule); border-left:3px solid var(--fail); background:var(--surface); border-radius:0 6px 6px 0; padding:16px 20px}
+.callout h4{margin-bottom:6px}
+.callout p{margin:0; font-size:.88rem}
+.callout ul{margin:8px 0 0; padding-left:18px; font-size:.85rem}
+
+/* ---- flow list ---- */
+ol.steps{counter-reset:s; list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px}
+ol.steps li{counter-increment:s; display:grid; grid-template-columns:26px 1fr; gap:13px; font-size:.9rem; line-height:1.55}
+ol.steps li::before{
+  content:counter(s,decimal-leading-zero); font-family:"IBM Plex Mono",monospace; font-size:.68rem;
+  letter-spacing:.05em; color:var(--ink-3); padding-top:4px;
+}
+ol.steps b{color:var(--ink); font-weight:600}
+
+.foot{margin-top:72px; padding-top:22px; border-top:1px solid var(--rule); font-size:.82rem; color:var(--ink-3)}
+.foot p{margin:0 0 6px; font-size:.82rem; color:var(--ink-3)}
+
+@media (max-width:640px){
+  h1{font-size:1.95rem} h2{font-size:1.4rem}
+  .wrap{padding:0 16px 64px} section{padding-top:48px}
+  figure{padding:16px 14px 12px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .role,.problem{transition:border-color .18s ease}
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap">
+    <div class="brandline">
+      <h1>Hive Mind OS</h1>
+      <span class="vpill">v0.7.0 &middot; prototype</span>
+    </div>
+    <p class="thesis">Eight specialist agents do the work. A ninth thing &mdash; the evidence
+      layer &mdash; decides whether you should believe them. Every command, exit code, diff, and
+      verdict lands in a <strong>tamper-evident receipt bundle</strong> you can re-check
+      offline, long after the agent is gone.</p>
+    <div class="masthead-meta">
+      <div class="mm"><span class="k">Roles chartered</span><span class="v">8</span></div>
+      <div class="mm"><span class="k">Executing today</span><span class="v">3 &mdash; Explorer, Builder, Curator</span></div>
+      <div class="mm"><span class="k">Runtime deps</span><span class="v">0 &mdash; Python 3.11+ stdlib</span></div>
+      <div class="mm"><span class="k">Network required</span><span class="v">None</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="gap">
+  <div class="shead">
+    <span class="eyebrow">The gap it fills</span>
+    <h2>CI runs after you decide to trust the change</h2>
+    <p class="measure">An agent framework orchestrates work and reports success. CI runs the tests
+      you already had, on a branch you already accepted into your pipeline. Neither one can tell
+      you what the agent <em>actually ran</em>, whether it quietly weakened a test, or whether the
+      check that passed was written before or after the code that had to pass it. Hive Mind OS
+      inserts a step between those two: an independent role that seals its checks first, then
+      re-runs them against the candidate in a workspace that has never seen the author's work.</p>
+  </div>
+
+  <figure class="figscroll">
+    <svg viewBox="0 0 1160 330" role="img" aria-label="One base commit is cloned three times. The Explorer reproduces the failure in its clone, the Curator writes and seals its checks against that same base, and the Builder writes the change in a third clone. Only then does the candidate cross the seal into the Curator's own workspace for an independent re-run.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+        <marker id="ar-cur" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--role-curator)"/>
+        </marker>
+      </defs>
+
+      <!-- source -->
+      <rect x="14" y="76" width="128" height="72" rx="4" fill="currentColor" fill-opacity=".05" stroke="currentColor" stroke-opacity=".38"/>
+      <text class="svg-label" x="28" y="100" fill="currentColor" fill-opacity=".55">your repo</text>
+      <text class="svg-title" x="28" y="120" fill="currentColor">base commit</text>
+      <text class="svg-sub" x="28" y="137" fill="currentColor" fill-opacity=".5">f1c725ed</text>
+
+      <!-- clone 1 and 2 -->
+      <path d="M142 112 H174 V50 H206" fill="none" stroke="currentColor" stroke-opacity=".45" marker-end="url(#ar)"/>
+      <path d="M142 112 H190 V128 H206" fill="none" stroke="currentColor" stroke-opacity=".45" marker-end="url(#ar)"/>
+      <text class="svg-edge" x="148" y="42" fill="currentColor" fill-opacity=".55">clone</text>
+      <text class="svg-edge" x="148" y="106" fill="currentColor" fill-opacity=".55">clone</text>
+
+      <!-- clone 3, routed under everything to the curator's own workspace -->
+      <path d="M142 112 H158 V296 H761 V264" fill="none" stroke="var(--role-curator)" stroke-opacity=".65" stroke-dasharray="5 4" marker-end="url(#ar-cur)"/>
+      <text class="svg-edge" x="300" y="290" fill="var(--role-curator)" fill-opacity=".85">clone 3 &mdash; the Curator's own workspace, made before any candidate exists</text>
+
+      <!-- explorer -->
+      <rect x="206" y="18" width="212" height="64" rx="4" fill="var(--role-explorer)" fill-opacity=".08" stroke="var(--role-explorer)"/>
+      <text class="svg-label" x="220" y="38" fill="var(--role-explorer)">explorer</text>
+      <text class="svg-title" x="220" y="57" fill="currentColor">Reproduce the failure</text>
+      <text class="svg-sub" x="220" y="73" fill="currentColor" fill-opacity=".55">read-only by role contract</text>
+
+      <!-- builder -->
+      <rect x="206" y="96" width="212" height="64" rx="4" fill="var(--role-builder)" fill-opacity=".09" stroke="var(--role-builder)"/>
+      <text class="svg-label" x="220" y="116" fill="var(--role-builder)">builder</text>
+      <text class="svg-title" x="220" y="135" fill="currentColor">Branch, edit, test, commit</text>
+      <text class="svg-sub" x="220" y="151" fill="currentColor" fill-opacity=".55">never pushes anywhere</text>
+
+      <!-- explorer's base feeds the seal -->
+      <path d="M418 50 H436 V232 H418" fill="none" stroke="var(--role-curator)" stroke-opacity=".7" marker-end="url(#ar-cur)"/>
+      <text class="svg-edge" x="444" y="70" fill="var(--role-curator)">seals against</text>
+      <text class="svg-edge" x="444" y="84" fill="var(--role-curator)">this base</text>
+
+      <!-- curator authoring -->
+      <rect x="206" y="200" width="212" height="64" rx="4" fill="var(--role-curator)" fill-opacity=".09" stroke="var(--role-curator)"/>
+      <text class="svg-label" x="220" y="220" fill="var(--role-curator)">curator</text>
+      <text class="svg-title" x="220" y="239" fill="currentColor">Write checks, then seal</text>
+      <text class="svg-sub" x="220" y="255" fill="currentColor" fill-opacity=".55">blind to the candidate</text>
+
+      <!-- seal line -->
+      <line x1="530" y1="32" x2="530" y2="272" stroke="var(--role-curator)" stroke-width="2" stroke-dasharray="7 5"/>
+      <text class="svg-label" x="530" y="24" fill="var(--role-curator)" text-anchor="middle">the seal</text>
+
+      <!-- candidate crosses -->
+      <path d="M418 128 H646" fill="none" stroke="currentColor" stroke-opacity=".5" marker-end="url(#ar)"/>
+      <rect x="459" y="109" width="146" height="15" fill="var(--surface)"/>
+      <text class="svg-edge" x="532" y="120" fill="currentColor" fill-opacity=".65" text-anchor="middle">candidate + 45 receipts</text>
+
+      <!-- sealed digest crosses -->
+      <path d="M418 232 H646" fill="none" stroke="var(--role-curator)" stroke-opacity=".8" marker-end="url(#ar-cur)"/>
+      <rect x="462" y="213" width="140" height="15" fill="var(--surface)"/>
+      <text class="svg-edge" x="532" y="224" fill="var(--role-curator)" text-anchor="middle">frozen digest 6d807427</text>
+
+      <!-- verification workspace -->
+      <rect x="646" y="96" width="230" height="168" rx="4" fill="var(--role-curator)" fill-opacity=".07" stroke="var(--role-curator)"/>
+      <text class="svg-label" x="660" y="118" fill="var(--role-curator)">curator workspace</text>
+      <text class="svg-title" x="660" y="140" fill="currentColor">Re-run the sealed checks</text>
+      <line x1="660" y1="152" x2="862" y2="152" stroke="var(--role-curator)" stroke-opacity=".3"/>
+      <text class="svg-sub" x="660" y="170" fill="currentColor" fill-opacity=".72">no builder rationale</text>
+      <text class="svg-sub" x="660" y="186" fill="currentColor" fill-opacity=".72">in its context window</text>
+      <text class="svg-sub" x="660" y="208" fill="currentColor" fill-opacity=".72">manifest checked for</text>
+      <text class="svg-sub" x="660" y="222" fill="currentColor" fill-opacity=".72">contamination first</text>
+      <text class="svg-sub" x="660" y="244" fill="currentColor" fill-opacity=".72">5-item checklist:</text>
+      <text class="svg-sub" x="660" y="258" fill="currentColor" fill-opacity=".72">pass / fail / not-evaluated</text>
+
+      <!-- verdict -->
+      <path d="M876 180 H916" fill="none" stroke="currentColor" stroke-opacity=".5" marker-end="url(#ar)"/>
+      <rect x="916" y="96" width="230" height="80" rx="4" fill="var(--pass)" fill-opacity=".1" stroke="var(--pass)"/>
+      <text class="svg-label" x="930" y="118" fill="var(--pass)">adopt</text>
+      <text class="svg-title" x="930" y="139" fill="currentColor">Bundle published</text>
+      <text class="svg-sub" x="930" y="156" fill="currentColor" fill-opacity=".6">patch, manifest, receipts,</text>
+      <text class="svg-sub" x="930" y="169" fill="currentColor" fill-opacity=".6">machine-readable report</text>
+
+      <path d="M876 180 H896 V226 H916" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+      <rect x="916" y="188" width="230" height="76" rx="4" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="5 4"/>
+      <text class="svg-label" x="930" y="210" fill="currentColor" fill-opacity=".55">reject</text>
+      <text class="svg-title" x="930" y="231" fill="currentColor" opacity=".8">Nothing is published</text>
+      <text class="svg-sub" x="930" y="248" fill="currentColor" fill-opacity=".55">failure evidence kept, but</text>
+      <text class="svg-sub" x="930" y="261" fill="currentColor" fill-opacity=".55">no bundle is ever written</text>
+    </svg>
+    <figcaption><b>One base commit, three isolated clones, one seal.</b> The Curator defines and
+      digests its acceptance checks against the <em>base</em> workspace and writes that digest to the
+      ledger &mdash; event 53 &mdash; before the Builder's candidate is ever handed over at event 66.
+      A check invented after seeing the patch cannot be smuggled in, because the digest would no
+      longer match. A failed verdict does not produce a bundle at all.</figcaption>
+  </figure>
+</section>
+
+<section id="run">
+  <div class="shead">
+    <span class="eyebrow">A real run, event by event</span>
+    <h2>The ledger is the product</h2>
+    <p class="measure">Below is the actual append-only ledger from <code>hive-mind demo</code>, run
+      on this machine. Ninety-seven events, each row hash-chained to the one before it, each
+      colored by the role that produced it. Forty-five of them are receipts: a command, its argv,
+      its exit code, and the digests of its stdout and stderr.</p>
+  </div>
+
+  <figure class="figscroll">
+    <svg viewBox="0 0 1210 190" role="img" aria-label="A strip of 97 hash-chained ledger events colored by acting role: Explorer opens, Builder produces the change, Curator seals checks at event 53, receives the candidate at 66, and records an adopt verdict at 94.">
+<rect x="22" y="58" width="10" height="54" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.95"/>
+<rect x="34" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="46" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="58" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="70" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="82" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="94" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="106" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="118" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="130" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="142" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="154" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="166" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="178" y="82" width="10" height="30" rx="1.5" fill="var(--role-explorer)" fill-opacity="0.62"/>
+<rect x="190" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="202" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="214" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="226" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="238" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="250" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="262" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="274" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="286" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="298" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="310" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="322" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="334" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="346" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="358" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="370" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="382" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="394" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="406" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="418" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="430" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="442" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="454" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="466" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="478" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="490" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="502" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="514" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="526" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="538" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="550" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="562" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="574" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="586" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="598" y="82" width="10" height="30" rx="1.5" fill="var(--role-builder)" fill-opacity="0.62"/>
+<rect x="610" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="622" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="634" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="646" y="58" width="10" height="54" rx="1.5" fill="var(--role-curator)" fill-opacity="0.95"/>
+<rect x="658" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="670" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="682" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="694" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="706" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="718" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="730" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="742" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="754" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="766" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="778" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="790" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="802" y="58" width="10" height="54" rx="1.5" fill="var(--role-curator)" fill-opacity="0.95"/>
+<rect x="814" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="826" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="838" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="850" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="862" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="874" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="886" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="898" y="82" width="10" height="30" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.62"/>
+<rect x="910" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="922" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="934" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="946" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="958" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="970" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="982" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="994" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1006" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1018" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1030" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1042" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1054" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1066" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1078" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1090" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1102" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1114" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1126" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1138" y="58" width="10" height="54" rx="1.5" fill="var(--role-curator)" fill-opacity="0.95"/>
+<rect x="1150" y="82" width="10" height="30" rx="1.5" fill="var(--role-curator)" fill-opacity="0.62"/>
+<rect x="1162" y="82" width="10" height="30" rx="1.5" fill="var(--role-integrator)" fill-opacity="0.62"/>
+<rect x="1174" y="58" width="10" height="54" rx="1.5" fill="var(--role-orchestrator)" fill-opacity="0.95"/>
+      <!-- milestone leaders -->
+      <line x1="27" y1="48" x2="27" y2="56" stroke="currentColor" stroke-opacity=".4"/>
+      <text class="svg-sub" x="22" y="42" fill="currentColor" fill-opacity=".7">01 mission opens</text>
+      <line x1="651" y1="48" x2="651" y2="56" stroke="var(--role-curator)"/>
+      <text class="svg-sub" x="651" y="42" fill="var(--role-curator)" text-anchor="middle">53 checks sealed</text>
+      <line x1="807" y1="48" x2="807" y2="56" stroke="var(--role-curator)"/>
+      <text class="svg-sub" x="807" y="42" fill="var(--role-curator)" text-anchor="middle">66 candidate handed over</text>
+      <path d="M1143 56 V48 H1179 V56" fill="none" stroke="currentColor" stroke-opacity=".4"/>
+      <text class="svg-sub" x="1186" y="42" fill="currentColor" fill-opacity=".7" text-anchor="end">94 adopt &middot; 96 export &middot; 97 close</text>
+
+      <!-- role phase band -->
+      <rect x="34"   y="118" width="154" height="3" fill="var(--role-explorer)"/>
+      <rect x="190"  y="118" width="418" height="3" fill="var(--role-builder)"/>
+      <rect x="610"  y="118" width="550" height="3" fill="var(--role-curator)"/>
+      <rect x="1162" y="118" width="10"  height="3" fill="var(--role-integrator)"/>
+      <text class="svg-sub" x="111"  y="136" fill="var(--role-explorer)"   text-anchor="middle">explorer &middot; 11</text>
+      <text class="svg-sub" x="399"  y="136" fill="var(--role-builder)"    text-anchor="middle">builder &middot; 28</text>
+      <text class="svg-sub" x="885"  y="136" fill="var(--role-curator)"    text-anchor="middle">curator &middot; 40</text>
+      <text class="svg-sub" x="1167" y="150" fill="var(--role-integrator)" text-anchor="end">integrator &middot; 1</text>
+      <text class="svg-sub" x="22"   y="166" fill="var(--role-orchestrator)">orchestrator &middot; 17 &mdash; interleaved throughout: every budget draw and every mission boundary</text>
+    </svg>
+    <figcaption><b>Each bar is one ledger row; height marks a milestone.</b> The Curator's 40 events
+      outnumber the Builder's 28 &mdash; verification is not a rubber stamp at the end, it is the
+      largest phase of the run. Orchestrator bars are interleaved rather than clustered because a
+      budget draw is recorded before every single episode, not once per role.</figcaption>
+  </figure>
+
+  <div class="grid3" style="margin-top:14px">
+    <div class="panel">
+      <span class="eyebrow">What one receipt holds</span>
+      <pre style="margin-top:10px"><span class="c">{</span>
+  "actor_id":   <span class="c">"explorer"</span>,
+  "action_kind": <span class="c">"command"</span>,
+  "executed":    <span class="c">true</span>,
+  "execution": { "argv": [<span class="c">…</span>] },
+  "enforced": {
+    "network":    <span class="c">"none"</span>,
+    "filesystem": <span class="c">"none"</span>,
+    "resources":  <span class="c">"posix-rlimit"</span>
+  },
+  "artifacts": [<span class="c">stdout, stderr</span>],
+  "digest": <span class="c">"sha256:580bcea4…"</span>
+<span class="c">}</span></pre>
+    </div>
+    <div class="panel">
+      <span class="eyebrow">What the bundle contains</span>
+      <pre style="margin-top:10px">demo-out/
+├── changes.patch
+│     <span class="c">the diff itself</span>
+├── delivery.json
+│     <span class="c">base + head sha, tree and</span>
+│     <span class="c">patch digests</span>
+├── mission-report.json
+│     <span class="c">97 events, 45 receipts,</span>
+│     <span class="c">verdict, budget drawn</span>
+└── mission-evidence/r/
+      <span class="c">every receipt, addressed</span>
+      <span class="c">by its own digest</span>
+
+<span class="c">584 KB. Re-checkable offline.</span></pre>
+    </div>
+    <div class="panel">
+      <span class="eyebrow">Budget actually drawn</span>
+      <div class="tablewrap" style="border:none; margin-top:10px">
+        <table style="min-width:0">
+          <tbody>
+            <tr><td class="k">Episodes</td><td class="tabnum mono">15</td></tr>
+            <tr><td class="k">Tool calls</td><td class="tabnum mono">45</td></tr>
+            <tr><td class="k">Compute units</td><td class="tabnum mono">45.0</td></tr>
+            <tr><td class="k">Files changed</td><td class="tabnum mono">1</td></tr>
+            <tr><td class="k">Sealed checks</td><td class="tabnum mono">2</td></tr>
+            <tr><td class="k">Checklist</td><td class="mono">4 pass, 1 not-evaluated</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:.82rem; margin:12px 0 0">Every draw is authorized before the episode
+        runs and recorded after. Exhausting the budget stops the mission; it does not silently
+        degrade it.</p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:20px; border-left-color:var(--role-curator)">
+    <h4>The one honest &ldquo;not-evaluated&rdquo;</h4>
+    <p>The Curator's checklist is tri-state on purpose. Four items passed:
+      <code>tests-weakened</code>, <code>rollback-artifact-verifies</code>,
+      <code>diff-confined-to-declared-scope</code>, <code>provenance-receipts-resolve</code>. The
+      fifth, <code>introduced-code-license-declared</code>, reports
+      <span class="state na">not-evaluated</span> with the reason
+      <em>&ldquo;no automated introduced-code license classifier is in scope&rdquo;</em>. A system that
+      scored that as a pass would be lying in a machine-readable file.</p>
+  </div>
+</section>
+
+<section id="agents">
+  <div class="shead">
+    <span class="eyebrow">The colour code</span>
+    <h2>Eight specialists, one authority model</h2>
+    <p class="measure">Every role has a written contract: what it must produce, which capabilities
+      it may use, and the quality gates its output has to clear. The contract is not documentation
+      &mdash; the policy engine reads it at runtime and refuses any action a role did not declare.
+      Solid cards execute repository work today; dashed cards are chartered and enforced by policy
+      but have no executable path yet.</p>
+  </div>
+
+  <div class="legend">
+    <span class="chip"><span class="dot" style="background:var(--role-orchestrator)"></span>orchestrator</span>
+    <span class="chip"><span class="dot" style="background:var(--role-explorer)"></span>explorer</span>
+    <span class="chip"><span class="dot" style="background:var(--role-architect)"></span>architect</span>
+    <span class="chip"><span class="dot" style="background:var(--role-builder)"></span>builder</span>
+    <span class="chip"><span class="dot" style="background:var(--role-curator)"></span>curator</span>
+    <span class="chip"><span class="dot" style="background:var(--role-integrator)"></span>integrator</span>
+    <span class="chip"><span class="dot" style="background:var(--role-steward)"></span>steward</span>
+    <span class="chip"><span class="dot" style="background:var(--role-optimizer)"></span>optimizer</span>
+    <span class="chip planned"><span class="dot"></span>dashed = chartered, not yet executing</span>
+  </div>
+
+  <div class="roles">
+    <article class="role planned" style="--rc:var(--role-orchestrator)">
+      <div class="role-top"><span class="role-name">Orchestrator</span><span class="role-state">planned</span></div>
+      <p>Turns an outcome into bounded work, coordinates the specialists, and owns the tradeoffs.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>objective decomposition · execution plan · risk register</dd></div>
+        <div><dt>May</dt><dd>read_repository · query_agents · create_work_items</dd></div>
+        <div><dt>Must clear</dt><dd>acceptance criteria are testable; dependencies are explicit</dd></div>
+      </dl>
+    </article>
+
+    <article class="role" style="--rc:var(--role-explorer)">
+      <div class="role-top"><span class="role-name">Explorer</span><span class="role-state">executing</span></div>
+      <p>Finds the highest-value problem from repository, user, product, and external evidence &mdash; and reproduces it.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>problem statement · evidence map · ranked opportunities</dd></div>
+        <div><dt>May</dt><dd>read_repository · search_web · inspect_history · run_analysis · run_commands</dd></div>
+        <div><dt>Must clear</dt><dd>problem is evidence-backed; alternatives were considered</dd></div>
+      </dl>
+    </article>
+
+    <article class="role planned" style="--rc:var(--role-architect)">
+      <div class="role-top"><span class="role-name">Architect</span><span class="role-state">planned</span></div>
+      <p>Designs the solution and writes the decision record, including threats and the way back out.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>architecture · interfaces · threat model · migration plan</dd></div>
+        <div><dt>May</dt><dd>read_repository · model_system · write_design</dd></div>
+        <div><dt>Must clear</dt><dd>constraints are satisfied; failure modes are addressed</dd></div>
+      </dl>
+    </article>
+
+    <article class="role" style="--rc:var(--role-builder)">
+      <div class="role-top"><span class="role-name">Builder</span><span class="role-state">executing</span></div>
+      <p>Writes the smallest complete change, tests it, and commits it &mdash; inside its own clone, on its own branch.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>implementation · tests · change summary</dd></div>
+        <div><dt>May</dt><dd>write_workspace · run_commands · create_branch · open_pull_request · comment_pull_request</dd></div>
+        <div><dt>Must clear</dt><dd>tests pass; change is traceable to the objective</dd></div>
+      </dl>
+    </article>
+
+    <article class="role" style="--rc:var(--role-curator)">
+      <div class="role-top"><span class="role-name">Curator</span><span class="role-state">executing</span></div>
+      <p>The adversary. Seals its checks before the candidate exists, then re-runs them somewhere the Builder has never touched.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>verification report · defect findings · release recommendation</dd></div>
+        <div><dt>May</dt><dd>run_tests · inspect_diff · security_scan · write_workspace · run_commands</dd></div>
+        <div><dt>Must clear</dt><dd>claims have evidence; critical regressions are absent</dd></div>
+      </dl>
+    </article>
+
+    <article class="role planned" style="--rc:var(--role-integrator)">
+      <div class="role-top"><span class="role-name">Integrator</span><span class="role-state">planned</span></div>
+      <p>Connects systems, data, and workflows through contracts that are versioned rather than assumed.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>integration contract · compatibility result · data lineage</dd></div>
+        <div><dt>May</dt><dd>inspect_interfaces · write_adapters · run_contract_tests</dd></div>
+        <div><dt>Must clear</dt><dd>contracts are versioned; provenance is preserved</dd></div>
+      </dl>
+    </article>
+
+    <article class="role planned" style="--rc:var(--role-steward)">
+      <div class="role-top"><span class="role-name">Steward</span><span class="role-state">planned</span></div>
+      <p>Keeps code, infrastructure, dependencies, and operational knowledge healthy and recoverable.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>health report · maintenance change · operational runbook</dd></div>
+        <div><dt>May</dt><dd>inspect_runtime · manage_dependencies · write_workspace · run_tests</dd></div>
+        <div><dt>Must clear</dt><dd>system remains recoverable; maintenance reduces measured risk</dd></div>
+      </dl>
+    </article>
+
+    <article class="role planned" style="--rc:var(--role-optimizer)">
+      <div class="role-top"><span class="role-name">Optimizer</span><span class="role-state">planned</span></div>
+      <p>Measures outcomes and proposes improvements to the agents themselves &mdash; but cannot promote one.</p>
+      <dl>
+        <div><dt>Produces</dt><dd>metrics · experiment result · improvement proposal</dd></div>
+        <div><dt>May</dt><dd>query_ledger · run_evaluations · run_commands · propose_skill_change</dd></div>
+        <div><dt>Must clear</dt><dd>improvement beats baseline; regressions stay within budget</dd></div>
+      </dl>
+    </article>
+  </div>
+</section>
+
+<section id="independence">
+  <div class="shead">
+    <span class="eyebrow">Working unsupervised</span>
+    <h2>How an agent picks up work nobody handed it</h2>
+    <p class="measure">There is no dispatcher assigning tasks. A role asks the graph which nodes are
+      ready &mdash; every node whose dependencies have completed &mdash; and claims one with a
+      lease token. Independence is safe here not because the agents are trusted, but because five
+      separate mechanisms make the unsafe moves impossible rather than discouraged.</p>
+  </div>
+
+  <figure class="figscroll">
+    <svg viewBox="0 0 1160 300" role="img" aria-label="A work item moves from ready to leased to running to awaiting verification to accepted to integrated. Beneath each state is its refusal path: blocked dependency, expired lease, policy refusal, retryable failure, and human gate. Three of those return the item to ready.">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- return rail -->
+      <line x1="654" y1="262" x2="8" y2="262" stroke="currentColor" stroke-opacity=".3"/>
+      <line x1="96"  y1="234" x2="96"  y2="262" stroke="currentColor" stroke-opacity=".3"/>
+      <line x1="282" y1="234" x2="282" y2="262" stroke="currentColor" stroke-opacity=".3"/>
+      <line x1="654" y1="234" x2="654" y2="262" stroke="currentColor" stroke-opacity=".3"/>
+      <path d="M8 262 V22 H96 V54" fill="none" stroke="currentColor" stroke-opacity=".3" marker-end="url(#ar2)"/>
+      <text class="svg-edge" x="112" y="30" fill="currentColor" fill-opacity=".5">the item re-enters the ready set on the next pass</text>
+
+      <!-- states -->
+      <g>
+        <rect x="16" y="54" width="160" height="56" rx="4" fill="currentColor" fill-opacity=".05" stroke="currentColor" stroke-opacity=".4"/>
+        <text class="svg-label" x="30" y="76" fill="currentColor">ready</text>
+        <text class="svg-sub" x="30" y="94" fill="currentColor" fill-opacity=".6">dependencies met</text>
+
+        <rect x="202" y="54" width="160" height="56" rx="4" fill="currentColor" fill-opacity=".05" stroke="currentColor" stroke-opacity=".4"/>
+        <text class="svg-label" x="216" y="76" fill="currentColor">leased</text>
+        <text class="svg-sub" x="216" y="94" fill="currentColor" fill-opacity=".6">claimed with a token</text>
+
+        <rect x="388" y="54" width="160" height="56" rx="4" fill="currentColor" fill-opacity=".05" stroke="currentColor" stroke-opacity=".4"/>
+        <text class="svg-label" x="402" y="76" fill="currentColor">running</text>
+        <text class="svg-sub" x="402" y="94" fill="currentColor" fill-opacity=".6">own clone, own budget</text>
+
+        <rect x="574" y="54" width="160" height="56" rx="4" fill="currentColor" fill-opacity=".05" stroke="currentColor" stroke-opacity=".4"/>
+        <text class="svg-label" x="588" y="76" fill="currentColor">awaiting_verif.</text>
+        <text class="svg-sub" x="588" y="94" fill="currentColor" fill-opacity=".6">receipts written</text>
+
+        <rect x="760" y="54" width="160" height="56" rx="4" fill="var(--pass)" fill-opacity=".1" stroke="var(--pass)"/>
+        <text class="svg-label" x="774" y="76" fill="var(--pass)">accepted</text>
+        <text class="svg-sub" x="774" y="94" fill="currentColor" fill-opacity=".6">verdict recorded</text>
+
+        <rect x="946" y="54" width="160" height="56" rx="4" fill="var(--pass)" fill-opacity=".1" stroke="var(--pass)"/>
+        <text class="svg-label" x="960" y="76" fill="var(--pass)">integrated</text>
+        <text class="svg-sub" x="960" y="94" fill="currentColor" fill-opacity=".6">folded into the run</text>
+      </g>
+
+      <!-- forward arrows -->
+      <path d="M176 82 H202" fill="none" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ar2)"/>
+      <path d="M362 82 H388" fill="none" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ar2)"/>
+      <path d="M548 82 H574" fill="none" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ar2)"/>
+      <path d="M734 82 H760" fill="none" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ar2)"/>
+      <path d="M920 82 H946" fill="none" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ar2)"/>
+
+      <!-- drops -->
+      <path d="M96 110 V170"  fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+      <path d="M282 110 V170" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+      <path d="M468 110 V170" fill="none" stroke="var(--fail)" stroke-opacity=".6" stroke-dasharray="4 3"/>
+      <path d="M654 110 V170" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+      <path d="M840 110 V170" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 3"/>
+
+      <!-- refusal boxes -->
+      <rect x="16" y="170" width="160" height="64" rx="4" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+      <text class="svg-label" x="30" y="190" fill="currentColor" fill-opacity=".65">blocked_dependency</text>
+      <text class="svg-sub" x="30" y="207" fill="currentColor" fill-opacity=".55">a predecessor has</text>
+      <text class="svg-sub" x="30" y="220" fill="currentColor" fill-opacity=".55">not completed yet</text>
+
+      <rect x="202" y="170" width="160" height="64" rx="4" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+      <text class="svg-label" x="216" y="190" fill="currentColor" fill-opacity=".65">lease expires</text>
+      <text class="svg-sub" x="216" y="207" fill="currentColor" fill-opacity=".55">StaleLeaseError:</text>
+      <text class="svg-sub" x="216" y="220" fill="currentColor" fill-opacity=".55">late writes rejected</text>
+
+      <rect x="388" y="170" width="160" height="64" rx="4" fill="var(--fail)" fill-opacity=".08" stroke="var(--fail)"/>
+      <text class="svg-label" x="402" y="190" fill="var(--fail)">policy refuses</text>
+      <text class="svg-sub" x="402" y="207" fill="currentColor" fill-opacity=".65">fail-closed — the</text>
+      <text class="svg-sub" x="402" y="220" fill="currentColor" fill-opacity=".65">action never runs</text>
+
+      <rect x="574" y="170" width="160" height="64" rx="4" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+      <text class="svg-label" x="588" y="190" fill="currentColor" fill-opacity=".65">retryable_failed</text>
+      <text class="svg-sub" x="588" y="207" fill="currentColor" fill-opacity=".55">re-queued with backoff</text>
+      <text class="svg-sub" x="588" y="220" fill="currentColor" fill-opacity=".55">up to max_attempts</text>
+
+      <rect x="760" y="170" width="160" height="64" rx="4" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-dasharray="5 4"/>
+      <text class="svg-label" x="774" y="190" fill="currentColor" fill-opacity=".8">waiting_human</text>
+      <text class="svg-sub" x="774" y="207" fill="currentColor" fill-opacity=".6">a chartered gate:</text>
+      <text class="svg-sub" x="774" y="220" fill="currentColor" fill-opacity=".6">it waits, never guesses</text>
+
+      <text class="svg-edge" x="1150" y="200" fill="currentColor" fill-opacity=".45" text-anchor="end">red = terminal for that action</text>
+    </svg>
+    <figcaption><b>Autonomy is a set of open doors, not an absence of walls.</b> Three refusal
+      paths put the work item back in the ready set, where any worker may claim it again. A policy
+      refusal is terminal for that action &mdash; the call is never made. A chartered human gate
+      simply waits.</figcaption>
+  </figure>
+
+  <div class="grid2" style="margin-top:16px">
+    <div class="panel">
+      <span class="eyebrow">Five mechanisms, not five promises</span>
+      <ol class="steps" style="margin-top:14px">
+        <li><span><b>Declared capability.</b> The policy engine checks the acting role, the action, and
+          the risk tier against the role's own contract. An action the role never declared is
+          refused even at maximum autonomy. The Explorer is read-only by a hard-coded rule, not by
+          convention.</span></li>
+        <li><span><b>Token-bound leases.</b> A worker claims a job with a lease token. If the lease
+          expires and another worker takes over, the first worker's write raises
+          <code>StaleLeaseError</code> instead of silently winning.</span></li>
+        <li><span><b>Write-scope conflict rules.</b> Two nodes whose write scopes overlap &mdash; by path
+          or by directory containment &mdash; must have a dependency between them, or the graph is
+          rejected before anything runs. Parallelism cannot produce a collision.</span></li>
+        <li><span><b>Mandatory consultation.</b> Scheduled work names at least two other roles to
+          consult, capped at three rounds, and a role can never be its own consultant. Eight
+          authority classes &mdash; credentials, legal, spend, production access, protected-branch
+          merge, owner value choices, personal consent, external commitments &mdash; escalate to a
+          human every time.</span></li>
+        <li><span><b>Separation of proposal from promotion.</b> The Optimizer turns recorded outcomes
+          into lessons and immutable challenger variants, then returns a recommendation. It cannot
+          replace a champion, run its own evaluation, or promote anything.</span></li>
+      </ol>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <div class="callout">
+        <h4>Refused at every autonomy level, including the highest</h4>
+        <p>Four actions are non-delegable. There is no configuration, grant, or level that permits
+          them &mdash; the check runs before autonomy is even consulted.</p>
+        <ul>
+          <li><span><code>self_replicate_unbounded</code></span></li>
+          <li><span><code>mutate_mission_charter</code></span></li>
+          <li><span><code>mutate_policy</code></span></li>
+          <li><span><code>conceal_activity</code></span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <span class="eyebrow">Six autonomy levels</span>
+        <div class="tablewrap" style="border:none; margin-top:10px">
+          <table style="min-width:0">
+            <tbody>
+              <tr><td class="mono tabnum">0</td><td class="k">Observe</td><td>read, inspect, search</td></tr>
+              <tr><td class="mono tabnum">1</td><td class="k">Advise</td><td>propose work items</td></tr>
+              <tr><td class="mono tabnum">2</td><td class="k">Sandbox</td><td>write a workspace, run tests</td></tr>
+              <tr><td class="mono tabnum">3</td><td class="k">Repository</td><td>branch, open a PR, manage deps</td></tr>
+              <tr><td class="mono tabnum">4</td><td class="k">Delivery</td><td>merge, deploy — external grant still required</td></tr>
+              <tr><td class="mono tabnum">5</td><td class="k">Governed full</td><td>secrets, spend — external grant still required</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:.82rem; margin:12px 0 0">Merge, deploy, secrets, and spend sit behind a
+          second lock: even at the level that permits them, they are refused without an explicit
+          external grant.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="dag">
+  <div class="shead">
+    <span class="eyebrow">A DAG this system will actually accept</span>
+    <h2>Sample plan: cut p95 checkout latency below 400&nbsp;ms</h2>
+    <p class="measure">This is not an illustration. The graph below was built against the real
+      kernel planner and validated by it &mdash; nine nodes, six waves, seven of the eight roles.
+      Waves are not authored; they fall out of asking the graph which nodes are ready. Node colour
+      is the owning role; the badge is its risk lane.</p>
+  </div>
+
+  <figure class="figscroll">
+    <svg viewBox="0 0 1185 350" role="img" aria-label="A nine-node work graph in six waves: two Explorer nodes in parallel feed an Architect design node, which fans out to two Builder nodes, which feed an Integrator contract check and a Steward runbook node, which both feed the Curator verification node, which closes the Orchestrator root.">
+      <defs>
+        <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <g fill="currentColor" fill-opacity=".45" text-anchor="middle">
+        <text class="svg-wave" x="105"  y="28">wave 1</text>
+        <text class="svg-wave" x="300"  y="28">wave 2</text>
+        <text class="svg-wave" x="495"  y="28">wave 3</text>
+        <text class="svg-wave" x="690"  y="28">wave 4</text>
+        <text class="svg-wave" x="885"  y="28">wave 5</text>
+        <text class="svg-wave" x="1080" y="28">wave 6</text>
+      </g>
+      <line x1="30" y1="44" x2="1155" y2="44" stroke="currentColor" stroke-opacity=".14"/>
+
+      <g fill="none" stroke="currentColor" stroke-opacity=".45" marker-end="url(#ar3)">
+        <path d="M180 116 H203 V184 H225"/>
+        <path d="M180 276 H203 V208 H225"/>
+        <path d="M375 196 H398 V116 H420"/>
+        <path d="M375 196 H398 V276 H420"/>
+        <path d="M570 116 H615"/>
+        <path d="M570 116 H586 V262 H615"/>
+        <path d="M570 276 H600 V132 H615"/>
+        <path d="M765 116 H788 V184 H810"/>
+        <path d="M765 276 H788 V208 H810"/>
+        <path d="M960 196 H1005"/>
+      </g>
+
+      <rect x="30" y="84" width="150" height="64" rx="4" fill="var(--role-explorer)" fill-opacity=".08" stroke="var(--role-explorer)"/>
+      <text class="svg-label" x="44" y="104" fill="var(--role-explorer)">explorer</text>
+      <text class="svg-label" x="166" y="104" fill="currentColor" fill-opacity=".45" text-anchor="end">R0</text>
+      <text class="svg-title" x="44" y="122" fill="currentColor">Profile the p95</text>
+      <text class="svg-sub" x="44" y="139" fill="currentColor" fill-opacity=".5">WORK-010-profile</text>
+
+      <rect x="30" y="244" width="150" height="64" rx="4" fill="var(--role-explorer)" fill-opacity=".08" stroke="var(--role-explorer)"/>
+      <text class="svg-label" x="44" y="264" fill="var(--role-explorer)">explorer</text>
+      <text class="svg-label" x="166" y="264" fill="currentColor" fill-opacity=".45" text-anchor="end">R0</text>
+      <text class="svg-title" x="44" y="282" fill="currentColor">Survey call sites</text>
+      <text class="svg-sub" x="44" y="299" fill="currentColor" fill-opacity=".5">WORK-011-survey</text>
+
+      <rect x="225" y="164" width="150" height="64" rx="4" fill="var(--role-architect)" fill-opacity=".08" stroke="var(--role-architect)"/>
+      <text class="svg-label" x="239" y="184" fill="var(--role-architect)">architect</text>
+      <text class="svg-label" x="361" y="184" fill="currentColor" fill-opacity=".45" text-anchor="end">R1</text>
+      <text class="svg-title" x="239" y="202" fill="currentColor">Design + rollback</text>
+      <text class="svg-sub" x="239" y="219" fill="currentColor" fill-opacity=".5">WORK-020-design</text>
+
+      <rect x="420" y="84" width="150" height="64" rx="4" fill="var(--role-builder)" fill-opacity=".09" stroke="var(--role-builder)"/>
+      <text class="svg-label" x="434" y="104" fill="var(--role-builder)">builder</text>
+      <text class="svg-label" x="556" y="104" fill="currentColor" fill-opacity=".45" text-anchor="end">R2</text>
+      <text class="svg-title" x="434" y="122" fill="currentColor">Cache the reads</text>
+      <text class="svg-sub" x="434" y="139" fill="currentColor" fill-opacity=".55">writes cache.py</text>
+
+      <rect x="420" y="244" width="150" height="64" rx="4" fill="var(--role-builder)" fill-opacity=".09" stroke="var(--role-builder)"/>
+      <text class="svg-label" x="434" y="264" fill="var(--role-builder)">builder</text>
+      <text class="svg-label" x="556" y="264" fill="currentColor" fill-opacity=".45" text-anchor="end">R3</text>
+      <text class="svg-title" x="434" y="282" fill="currentColor">Covering index</text>
+      <text class="svg-sub" x="434" y="299" fill="currentColor" fill-opacity=".55">writes 0042.sql</text>
+      <rect x="420" y="318" width="150" height="20" rx="10" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-dasharray="4 3"/>
+      <text class="svg-sub" x="495" y="332" fill="currentColor" fill-opacity=".75" text-anchor="middle">human gate</text>
+
+      <rect x="615" y="84" width="150" height="64" rx="4" fill="var(--role-integrator)" fill-opacity=".09" stroke="var(--role-integrator)"/>
+      <text class="svg-label" x="629" y="104" fill="var(--role-integrator)">integrator</text>
+      <text class="svg-label" x="751" y="104" fill="currentColor" fill-opacity=".45" text-anchor="end">R1</text>
+      <text class="svg-title" x="629" y="122" fill="currentColor">Contract tests</text>
+      <text class="svg-sub" x="629" y="139" fill="currentColor" fill-opacity=".5">WORK-040</text>
+
+      <rect x="615" y="244" width="150" height="64" rx="4" fill="var(--role-steward)" fill-opacity=".1" stroke="var(--role-steward)"/>
+      <text class="svg-label" x="629" y="264" fill="var(--role-steward)">steward</text>
+      <text class="svg-label" x="751" y="264" fill="currentColor" fill-opacity=".45" text-anchor="end">R1</text>
+      <text class="svg-title" x="629" y="282" fill="currentColor">Metric + runbook</text>
+      <text class="svg-sub" x="629" y="299" fill="currentColor" fill-opacity=".5">WORK-050</text>
+
+      <rect x="810" y="164" width="150" height="64" rx="4" fill="var(--role-curator)" fill-opacity=".09" stroke="var(--role-curator)"/>
+      <text class="svg-label" x="824" y="184" fill="var(--role-curator)">curator</text>
+      <text class="svg-label" x="946" y="184" fill="currentColor" fill-opacity=".45" text-anchor="end">R2</text>
+      <text class="svg-title" x="824" y="202" fill="currentColor">Re-run the seal</text>
+      <text class="svg-sub" x="824" y="219" fill="currentColor" fill-opacity=".5">WORK-060-verify</text>
+
+      <rect x="1005" y="164" width="150" height="64" rx="4" fill="var(--role-orchestrator)" fill-opacity=".09" stroke="var(--role-orchestrator)"/>
+      <text class="svg-label" x="1019" y="184" fill="var(--role-orchestrator)">orchestrator</text>
+      <text class="svg-label" x="1141" y="184" fill="currentColor" fill-opacity=".45" text-anchor="end">R0</text>
+      <text class="svg-title" x="1019" y="202" fill="currentColor">Objective closed</text>
+      <text class="svg-sub" x="1019" y="219" fill="currentColor" fill-opacity=".5">depth 0 &middot; root</text>
+    </svg>
+    <figcaption><b>Two Explorers run at once because nothing orders them; the Builders run at once
+      because their write scopes do not overlap.</b> Had both Builders touched
+      <code>src/checkout/cache.py</code>, the planner would have refused the whole graph rather
+      than let them race. The root sits in the last wave, not the first: it depends on its
+      children, so a parent cannot report done before the work under it is accepted.</figcaption>
+  </figure>
+
+  <div class="grid2" style="margin-top:16px">
+    <div class="panel">
+      <span class="eyebrow">What the planner returned</span>
+      <pre style="margin-top:12px">$ python examples/sample-work-dag/build_sample_dag.py
+
+Ready waves:
+  wave 1: WORK-010-profile, WORK-011-survey
+  wave 2: WORK-020-design
+  wave 3: WORK-030-cache, WORK-031-index
+  wave 4: WORK-040-contract, WORK-050-health
+  wave 5: WORK-060-verify
+  wave 6: WORK-000-root
+
+charter_digest sha256:41e1d1628f17…
+graph_digest   sha256:011ee4227898…
+plan_digest    sha256:1bb53e3ac685…</pre>
+      <p style="font-size:.85rem; margin:14px 0 0">A wave is just the answer to &ldquo;what is ready
+        now?&rdquo;. Topological order is tie-broken by work id, so the same charter always yields
+        the same plan digest &mdash; two people planning the same objective get byte-identical
+        graphs or a diff they can point at. The script above is in the repository; these digests
+        are its output, not a transcription.</p>
+    </div>
+
+    <div class="panel">
+      <span class="eyebrow">Every schedule names its own stop condition</span>
+      <p style="font-size:.85rem; margin:10px 0 14px">A node is not just work &mdash; it carries a
+        budget, a risk lane, the roles it must consult, and the condition under which it stops.
+        None of that is improvised at runtime.</p>
+      <pre>WORK-031-index
+  risk_lane     R3
+  write_scope   migrations/0042_index.sql
+  stop_when     "migration is reversible"
+  consult       curator, steward
+  human_gate    GATE-schema-migration
+  budget        900s · 40 model calls · 150 tools</pre>
+    </div>
+  </div>
+
+  <h3 style="margin:34px 0 12px">The nine nodes</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Node</th><th>Role</th><th>Lane</th><th>Write scope</th><th>Stops when</th><th>Consults</th></tr></thead>
+      <tbody>
+        <tr><td class="k mono">WORK-010-profile</td><td><span class="state" style="color:var(--role-explorer)">explorer</span></td><td class="mono">R0</td><td class="mono">&mdash;</td><td>regression reproduced with a receipt</td><td class="mono">architect, curator</td></tr>
+        <tr><td class="k mono">WORK-011-survey</td><td><span class="state" style="color:var(--role-explorer)">explorer</span></td><td class="mono">R0</td><td class="mono">&mdash;</td><td>call graph enumerated</td><td class="mono">architect, curator</td></tr>
+        <tr><td class="k mono">WORK-020-design</td><td><span class="state" style="color:var(--role-architect)">architect</span></td><td class="mono">R1</td><td class="mono">&mdash;</td><td>ADR records rollback and threats</td><td class="mono">curator, steward</td></tr>
+        <tr><td class="k mono">WORK-030-cache</td><td><span class="state" style="color:var(--role-builder)">builder</span></td><td class="mono">R2</td><td class="mono">src/checkout/cache.py</td><td>sealed checks pass in the builder workspace</td><td class="mono">curator, architect</td></tr>
+        <tr><td class="k mono">WORK-031-index</td><td><span class="state" style="color:var(--role-builder)">builder</span></td><td class="mono">R3</td><td class="mono">migrations/0042_index.sql</td><td>migration is reversible &nbsp;<span class="state na">· human gate</span></td><td class="mono">curator, steward</td></tr>
+        <tr><td class="k mono">WORK-040-contract</td><td><span class="state" style="color:var(--role-integrator)">integrator</span></td><td class="mono">R1</td><td class="mono">src/checkout/api.py</td><td>public API contract unchanged</td><td class="mono">curator, architect</td></tr>
+        <tr><td class="k mono">WORK-050-health</td><td><span class="state" style="color:var(--role-steward)">steward</span></td><td class="mono">R1</td><td class="mono">docs/runbooks/cache.md</td><td>runbook and metric committed</td><td class="mono">curator, architect</td></tr>
+        <tr><td class="k mono">WORK-060-verify</td><td><span class="state" style="color:var(--role-curator)">curator</span></td><td class="mono">R2</td><td class="mono">&mdash;</td><td>verdict recorded from the sealed checks</td><td class="mono">architect, steward</td></tr>
+        <tr><td class="k mono">WORK-000-root</td><td><span class="state" style="color:var(--role-orchestrator)">orchestrator</span></td><td class="mono">R0</td><td class="mono">&mdash;</td><td>all child work reached ACCEPTED</td><td class="mono">curator, architect</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin:34px 0 6px">What the planner refuses to accept</h3>
+  <p class="measure" style="margin:0 0 14px">Each row below is a graph that was actually submitted
+    to the validator while preparing this page, and the message it came back with. The plan is
+    rejected before a single node runs.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Submitted graph</th><th></th><th>Validator response</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Two nodes write the same file, no dependency between them</td><td><span class="state no">rejected</span></td><td class="mono">overlapping write scopes require a dependency</td></tr>
+        <tr><td class="k">One node writes a directory another writes a file inside</td><td><span class="state no">rejected</span></td><td class="mono">overlapping write scopes require a dependency</td></tr>
+        <tr><td class="k">Same two nodes, dependency edge restored</td><td><span class="state ok">accepted</span></td><td class="mono">&mdash;</td></tr>
+        <tr><td class="k">A dependency cycle</td><td><span class="state no">rejected</span></td><td class="mono">work graph contains a cycle</td></tr>
+        <tr><td class="k">A node depending on itself</td><td><span class="state no">rejected</span></td><td class="mono">work item cannot depend on itself</td></tr>
+        <tr><td class="k">Child depth that does not match its parent</td><td><span class="state no">rejected</span></td><td class="mono">work item depth does not match parent</td></tr>
+        <tr><td class="k">A charter acceptance spec no node covers</td><td><span class="state no">rejected</span></td><td class="mono">work graph is missing charter acceptance</td></tr>
+        <tr><td class="k">A ninth child under one parent</td><td><span class="state no">rejected</span></td><td class="mono">work graph exceeds fanout limit</td></tr>
+        <tr><td class="k">Node budgets summing past the mission charter</td><td><span class="state no">rejected</span></td><td class="mono">total consumptive schedule budget exceeds charter max_wall_seconds</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="problems">
+  <div class="shead">
+    <span class="eyebrow">Separable problems</span>
+    <h2>Seven different jobs, seven different entry points</h2>
+    <p class="measure">The pieces are not a single monolithic pipeline you have to adopt whole.
+      Each command below solves one problem on its own, with its own roles and its own artifact.
+      You can use the verifier and never run an agent; you can plan a graph and execute it
+      elsewhere.</p>
+  </div>
+
+  <div class="problems">
+    <article class="problem">
+      <h3>&ldquo;An agent changed my code. Did it do what it claims?&rdquo;</h3>
+      <p>Point the verifier at a commit and an acceptance specification that was written
+        <em>before</em> that commit. The spec must declare every path the commit touched; an
+        undeclared file fails the check. A passing run writes a bundle, a failing one writes
+        nothing.</p>
+      <div class="rr-wrap"><span class="rolerow"><span class="rr" style="background:var(--role-curator)"></span></span><span>curator only</span></div>
+      <pre>hive-mind verify \
+  --repository /path/to/repo \
+  --spec acceptance-spec.json \
+  --candidate &lt;40-hex sha&gt; \
+  --output ./receipt-bundle</pre>
+    </article>
+
+    <article class="problem">
+      <h3>&ldquo;Fix this, and prove it end to end.&rdquo;</h3>
+      <p>The full delivery loop: reproduce the failure, write the change on a branch, seal the
+        checks, re-run them independently, publish a reversible bundle. Runs offline against a
+        local repository; nothing is pushed anywhere.</p>
+      <div class="rr-wrap"><span class="rolerow"><span class="rr" style="background:var(--role-explorer)"></span><span class="rr" style="background:var(--role-builder)"></span><span class="rr" style="background:var(--role-curator)"></span></span><span>explorer · builder · curator</span></div>
+      <pre>hive-mind demo
+
+<span class="c"># or, against the fixture layout:</span>
+hive-mind deliver \
+  --backend fixture-demo</pre>
+    </article>
+
+    <article class="problem">
+      <h3>&ldquo;What state is this repository in, provably?&rdquo;</h3>
+      <p>Emits a digested audit of a Git worktree &mdash; repository facts, test results, and
+        source dockets &mdash; optionally HMAC-signed with a key that is never written into the
+        artifact. Skipping tests marks the audit incomplete rather than passing it.</p>
+      <div class="rr-wrap"><span class="rolerow"><span class="rr" style="background:var(--role-steward)"></span><span class="rr" style="background:var(--role-curator)"></span></span><span>steward · curator</span></div>
+      <pre>hive-mind audit \
+  --output evidence/state.json \
+  --signing-key-file KEY \
+  --signing-key-id k1</pre>
+    </article>
+
+    <article class="problem">
+      <h3>&ldquo;Many units of work, and they must not collide.&rdquo;</h3>
+      <p>Plan a bounded work DAG and read it back, event-derived. Overlapping write scopes must be
+        ordered, fanout is capped at eight, depth and budget are bounded by the charter. The graph
+        is rejected at plan time, not discovered at merge time.</p>
+      <div class="rr-wrap"><span class="rolerow"><span class="rr" style="background:var(--role-orchestrator)"></span></span><span>orchestrator</span></div>
+      <pre>hive-mind kernel plan &lt;mission&gt; \
+  --charter charter.json \
+  --fixture bugfix
+
+hive-mind kernel graph &lt;mission&gt; \
+  --charter charter.json --json</pre>
+    </article>
+
+    <article class="problem">
+      <h3>&ldquo;Drive a long campaign in a repo &mdash; without handing over credentials.&rdquo;</h3>
+      <p>Autopilot records an objective in the target repository and emits a host-neutral
+        orchestration contract: content-addressed task effects your own agent host executes inside
+        its own approved sandbox. It never creates the tasks itself, never touches a protected
+        branch, and fails closed if a different objective is submitted for the same request.</p>
+      <div class="rr-wrap"><span class="rolerow"><span class="rr" style="background:var(--role-orchestrator)"></span><span class="rr" style="background:var(--role-integrator)"></span></span><span>orchestrator · integrator</span></div>
+      <pre>hive-mind autopilot run \
+  "reduce checkout p95" \
+  --repository /path/to/repo</pre>
+    </article>
+
+    <article class="problem">
+      <h3>&ldquo;The machine died mid-run. Now what?&rdquo;</h3>
+      <p>Missions can be enqueued into a durable local SQLite scheduler with token-bound leases,
+        bounded retries, and dead-lettering, then resumed. A worker that lost its lease cannot
+        write over the one that took over.</p>
+      <div class="rr-wrap"><span class="rolerow"><span class="rr" style="background:var(--role-steward)"></span><span class="rr" style="background:var(--role-orchestrator)"></span></span><span>steward · orchestrator</span></div>
+      <pre>hive-mind enqueue --repository . \
+  --objective "…" \
+  --acceptance-spec spec.json
+
+hive-mind serve   <span class="c"># drain it</span>
+hive-mind resume  <span class="c"># pick it back up</span></pre>
+    </article>
+
+    <article class="problem">
+      <h3>&ldquo;Is the system actually improving, or does it just say so?&rdquo;</h3>
+      <p>Benchmarks and experiments compare a challenger against a sealed baseline. The Optimizer
+        may propose an immutable challenger variant and recommend it; the promotion decision is
+        somewhere else entirely, and a lesson with no cited evidence cannot acquire an identity.</p>
+      <div class="rr-wrap"><span class="rolerow"><span class="rr" style="background:var(--role-optimizer)"></span></span><span>optimizer</span></div>
+      <pre>hive-mind benchmark …
+hive-mind experiment …</pre>
+    </article>
+  </div>
+</section>
+
+<section id="use">
+  <div class="shead">
+    <span class="eyebrow">Getting started</span>
+    <h2>Sixty seconds, no network, no keys</h2>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <span class="eyebrow">Step one</span>
+      <pre style="margin-top:12px">python -m pip install --no-deps -e .
+hive-mind demo</pre>
+      <p style="font-size:.88rem; margin:14px 0 0">Creates a throwaway repository with a known
+        regression, repairs it, verifies the repair independently, and writes the bundle to
+        <code>./demo-out</code>. The output directory must not already exist &mdash; the tool will
+        not overwrite evidence.</p>
+    </div>
+    <div class="panel">
+      <span class="eyebrow">Step two — read what it wrote</span>
+      <pre style="margin-top:12px">jq '.curator_verdict, .budget_consumption' \
+   demo-out/mission-report.json
+
+<span class="c">"adopt"</span>
+<span class="c">{ "compute_units": 45.0,</span>
+<span class="c">  "episodes": 15, "tool_calls": 45 }</span></pre>
+      <p style="font-size:.88rem; margin:14px 0 0">Then run
+        <code>python -m unittest discover -s tests -v</code> &mdash; the repository's own CI gate,
+        and the same command the Curator seals as a check.</p>
+    </div>
+  </div>
+</section>
+
+<section id="status">
+  <div class="shead">
+    <span class="eyebrow">Where it actually is</span>
+    <h2>The honest status table</h2>
+    <p class="measure">This project's own README leads with its limits, and this page would be
+      misrepresenting it if it did otherwise. Version 0.7.0 is a prototype. The verification
+      machinery is real and runs offline; the autonomous coding agent on top of it is not ready.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Capability</th><th>State</th><th>What that means in practice</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Verify a local change against sealed checks</td><td><span class="state ok">works</span></td><td>Offline and deterministic. <code>hive-mind verify</code>.</td></tr>
+        <tr><td class="k">Complete deterministic fixture delivery</td><td><span class="state ok">works</span></td><td>Offline. It repairs one bundled fixture layout — it is not a general coding agent.</td></tr>
+        <tr><td class="k">Bounded work-DAG planning and validation</td><td><span class="state ok">works</span></td><td>Deterministic digests; conflict, depth, fanout and budget rules all enforced.</td></tr>
+        <tr><td class="k">Durable queue, leases, resume</td><td><span class="state ok">works</span></td><td>Local SQLite. Survives a crash mid-mission.</td></tr>
+        <tr><td class="k">A real model driving the change</td><td><span class="state no">not ready</span></td><td><code>--backend model</code> is opt-in and experimental. Not for routine use.</td></tr>
+        <tr><td class="k">Remote push and pull requests</td><td><span class="state no">local only</span></td><td>Git operations stay on the local filesystem.</td></tr>
+        <tr><td class="k">Five of the eight roles</td><td><span class="state na">chartered</span></td><td>Orchestrator, Architect, Integrator, Steward, Optimizer have contracts and policy enforcement, no executable repository path yet.</td></tr>
+        <tr><td class="k">Hostile-code isolation</td><td><span class="state no">not claimed</span></td><td>Receipts record <code>posix-rlimit-only</code> enforcement. That is not a sandbox for adversarial code.</td></tr>
+        <tr><td class="k">Production use</td><td><span class="state no">no</span></td><td>Prototype release. No production use, no user validation yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="foot">
+  <p>Built from the <code>hive-mind-os</code> repository at v0.7.0. Every number, digest, error
+    message, and ledger event on this page came from running the code &mdash; the demo bundle, the
+    planner, and the validator &mdash; not from the documentation.</p>
+  <p>The sample DAG is a plan the kernel accepted; it is not a run that happened.</p>
+</div>
+
+</main>
+</body>
+</html>
