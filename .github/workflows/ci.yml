@@ -154,7 +154,7 @@ jobs:
       - name: Build wheel without project dependencies
         run: python -m pip wheel --disable-pip-version-check --no-deps --wheel-dir dist .
       - name: Generate SPDX JSON SBOM
-        uses: anchore/sbom-action@f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a # v0.9.0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           path: dist
           format: spdx-json
