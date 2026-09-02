@@ -26,3 +26,7 @@ evidence/experiments/_failed/** -text -diff
 
 # Local-assurance transcripts are content-addressed evidentiary bytes.
 evidence/local_assurance/**/logs/** -text -diff
+
+# The V3 history recovery fixture is a Git bundle whose exact binary bytes are
+# authenticated by its adjacent provenance manifest and regression tests.
+tests/fixtures/*.bundle -text -diff
