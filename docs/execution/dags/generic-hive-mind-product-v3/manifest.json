@@ -1,9 +1,9 @@
 {
-  "schema_version": 4,
-  "kind": "hive-mind-generic-product-overlay-manifest-v4",
+  "schema_version": 5,
+  "kind": "hive-mind-generic-product-overlay-manifest-v5",
   "plan_id": "generic-hive-mind-product-v3",
   "authorship": {
-    "architect": "/root/v4_matrix_architect",
+    "architect": "/root/verifier_architect",
     "judge": "UNASSIGNED",
     "court_status": "PENDING_DISTINCT_COURT",
     "execution_authority": "NONE"
@@ -38,21 +38,35 @@
       "tree": "8730203c89835c4d1d9dac4be9b2086dacd2d869"
     },
     "correction_parent": {
-      "commit": "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8",
-      "tree": "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
+      "commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+      "tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d"
     }
   },
   "committed_payload_contract": {
-    "mode": "exact-append-only-native-executable-matrix-correction-v4",
+    "mode": "exact-append-only-squash-proof-windows-identity-correction-v5",
     "authoring_base_parent": {
       "commit": "42b4aeef17f816430a7d8a435102635afea8761a",
       "tree": "b896e16755a1d6864989757732fdc5ca9d2b5eed"
     },
     "correction_parent": {
-      "commit": "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8",
-      "tree": "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
+      "commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+      "tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d"
     },
     "predecessor_payload": {
+      "commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+      "tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d",
+      "parent_commit": "9dfa1823edc9cd56cd1f404606a261a1d623f6cb",
+      "parent_tree": "7e8becaebef2ca88922c9099ae1e497f978f43f1",
+      "manifest_raw_sha256": "sha256:c2f0ae0dcee177213f219eaa3031b45d6f5526fd1f2d98d73b11672068f81377",
+      "full_payload_aggregate": {
+        "domain": "hive-mind-os/v3-native-executable-matrix-correction-content/v4",
+        "sha256": "sha256:ecbeb374fc8adbb711391568d8a2f2fa8b0ef022c233ca932f24bd9ab0b4fb23"
+      },
+      "qualification_report_sha256": "sha256:1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944",
+      "observed_status": "PUBLISHED_TREE_WITH_SQUASH_SEVERED_HISTORY_AND_RED_CONSTITUTIONAL_CI",
+      "author_proposed_disposition": "ADAPT_REMAND"
+    },
+    "remanded_git_boundary_predecessor": {
       "commit": "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8",
       "tree": "0d0a251b6ff1557ca014b6b50c6f62ae787c4459",
       "parent_commit": "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
@@ -95,15 +109,29 @@
     },
     "expected_changed_paths": [
       ".gitattributes",
-      "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+      ".github/workflows/ci.yml",
+      "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+      "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+      "docs/architecture/ADR_INDEX.md",
       "docs/execution/dags/generic-hive-mind-product-v3/README.md",
       "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
       "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+      "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+      "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+      "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+      "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+      "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+      "tests/fixtures/generic-v3-history.bundle",
+      "tests/fixtures/generic-v3-history.provenance.json",
+      "tests/test_autopilot_workflow.py",
       "tests/test_generic_dag_v3_overlay.py"
     ],
     "payload_inventory": [
       ".gitattributes",
+      ".github/workflows/ci.yml",
       "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+      "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+      "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
       "docs/architecture/ADR_INDEX.md",
       "docs/execution/dags/generic-hive-mind-product-v3/README.md",
       "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
@@ -113,14 +141,24 @@
       "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
       "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
       "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+      "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+      "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+      "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+      "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+      "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+      "tests/fixtures/generic-v3-history.bundle",
+      "tests/fixtures/generic-v3-history.provenance.json",
+      "tests/test_autopilot_workflow.py",
       "tests/test_generic_dag_v3_overlay.py"
     ],
     "activation_anti_downgrade": {
-      "required_contract_mode": "exact-append-only-native-executable-matrix-correction-v4",
+      "required_contract_mode": "exact-append-only-squash-proof-windows-identity-correction-v5",
       "required_git_executable_format_policy": "host-native-image-format-v1",
+      "rejected_published_v4_manifest_raw_sha256": "sha256:c2f0ae0dcee177213f219eaa3031b45d6f5526fd1f2d98d73b11672068f81377",
       "rejected_v3_git_boundary_manifest_raw_sha256": "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e",
       "rejected_f06_manifest_raw_sha256": "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339",
       "rejected_historical_payload_a_manifest_raw_sha256": "sha256:87914018e98effc32a067146593191a82f4a01c122f4ab0695304c0c3eb54522",
+      "published_v4_activation": "PROHIBITED",
       "v3_git_boundary_activation": "PROHIBITED",
       "f06_activation": "PROHIBITED",
       "historical_payload_a_activation": "PROHIBITED",
@@ -128,7 +166,7 @@
       "external_minimum_version_and_revocation_policy": "REQUIRED_NOT_SATISFIED"
     },
     "git_execution_boundary": {
-      "policy": "caller-absolute-raw-sha256-host-native-image-v2",
+      "policy": "caller-absolute-raw-sha256-host-native-image-windows-birthtime-v3",
       "native_executable_format": "HOST_NATIVE_IMAGE_FORMAT_V1",
       "supported_hosts": {
         "win32": "PE_COFF_EXECUTABLE_IMAGE",
@@ -139,6 +177,12 @@
       "script_or_interpreter_wrapper": "PROHIBITED",
       "max_executable_bytes": 268435456,
       "caller_path_and_raw_digest": "REQUIRED_EXTERNAL",
+      "identity_continuity": {
+        "windows": "DEVICE_FILE_ID_SIZE_MTIME_BIRTHTIME",
+        "windows_pre_3_12_fallback": "DEVICE_FILE_ID_SIZE_MTIME_LEGACY_CREATION_CTIME",
+        "windows_change_time": "DIAGNOSTIC_NOT_ACCEPTANCE_CRITICAL",
+        "posix": "DEVICE_INODE_SIZE_MTIME_CTIME"
+      },
       "compiled_native_delegator_exclusion": "NOT_PROVEN_BY_FORMAT",
       "runtime_dependency_closure": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED",
       "inherited_git_environment": "REJECT_ALL_CASE_INSENSITIVE_GIT_PREFIX",
@@ -163,8 +207,13 @@
     "payload_bindings": [
       {
         "path": ".gitattributes",
-        "bytes": 1054,
-        "sha256": "sha256:cabe449e7fc63f31e09ae6b89c650c2980b1fb91d9630facae1ab8b4c74948f2"
+        "bytes": 1244,
+        "sha256": "sha256:00e85411740c925b7fe7cce28d4c61439a5c5153cb7007353e4ebdef0584d0d1"
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "bytes": 6249,
+        "sha256": "sha256:421cce95dbf18c2887e004395a7639acd4566d4dd796e471eeaed6e969c78a2f"
       },
       {
         "path": "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
@@ -172,14 +221,24 @@
         "sha256": "sha256:1d68ad4484b500fb965d1f188a7cdad6af53a7d1bf770a7b14b658cf674206a8"
       },
       {
+        "path": "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+        "bytes": 7498,
+        "sha256": "sha256:5d158c89f93e5e7400330808798d3774933e90d446793beba5500e70c66f75b4"
+      },
+      {
+        "path": "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+        "bytes": 6146,
+        "sha256": "sha256:3ac407576ff1fa196949ad0ee5b25536998f620109d72407309049ac9d125588"
+      },
+      {
         "path": "docs/architecture/ADR_INDEX.md",
-        "bytes": 11435,
-        "sha256": "sha256:d573e57748bc0a0d4b8990b87e00aa00a3f0f3c68f3bfdc93a87743747a12b9b"
+        "bytes": 11854,
+        "sha256": "sha256:3dc03eee8503f1858967ff5cc16046f01c7a1bc692442292fef6186fe8cf099a"
       },
       {
         "path": "docs/execution/dags/generic-hive-mind-product-v3/README.md",
-        "bytes": 19878,
-        "sha256": "sha256:e084a6168eb9b8441d74671a3c54851b82f3e223b6e06e3eecc274062905be44"
+        "bytes": 22065,
+        "sha256": "sha256:f565285a8dcf00818479e4282ecb0848fed6eab87d4f1424575a73fe584b0929"
       },
       {
         "path": "docs/execution/dags/generic-hive-mind-product-v3/materialize_plan.py",
@@ -208,13 +267,53 @@
       },
       {
         "path": "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
-        "bytes": 183607,
-        "sha256": "sha256:1041b9646c47416c86e9f64361bb2ea62b0a281339698b844bad2bb2076ce214"
+        "bytes": 216228,
+        "sha256": "sha256:b248d4f6517c26258284866befb391a2ebc6f8b453fae5d8c719e77af0c3fa28"
+      },
+      {
+        "path": "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+        "bytes": 1509,
+        "sha256": "sha256:1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944"
+      },
+      {
+        "path": "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+        "bytes": 17952,
+        "sha256": "sha256:4d90fadba15120788ce24ea480a3847b8f8df192ff0f072d5982ebebe773cf51"
+      },
+      {
+        "path": "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+        "bytes": 23865,
+        "sha256": "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
+      },
+      {
+        "path": "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+        "bytes": 17703,
+        "sha256": "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810"
+      },
+      {
+        "path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+        "bytes": 593920,
+        "sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e"
+      },
+      {
+        "path": "tests/fixtures/generic-v3-history.bundle",
+        "bytes": 298169,
+        "sha256": "sha256:2de9a9db506e8561d21b86f7887c9030868337862ae755074d447f19dfcd2ae7"
+      },
+      {
+        "path": "tests/fixtures/generic-v3-history.provenance.json",
+        "bytes": 1474,
+        "sha256": "sha256:de7a40bbcdf431750239b39d2c91ce015951d204dc433ba641ac62057a9b70e4"
+      },
+      {
+        "path": "tests/test_autopilot_workflow.py",
+        "bytes": 32203,
+        "sha256": "sha256:9893d3cdecedcc0acd0dd73060af4e896f73d6e33bdd765923ec7cc8296745b5"
       },
       {
         "path": "tests/test_generic_dag_v3_overlay.py",
-        "bytes": 198590,
-        "sha256": "sha256:9d432c820d64142d01357351d8a404e67fee0a208b5f5ad3ffe6d0b588dbfcc2"
+        "bytes": 223940,
+        "sha256": "sha256:a810f92c8e6c2e4fcda7713dde2fea1f0c5cd0b81525659053395459d5adf6c6"
       }
     ],
     "manifest_authentication": {
@@ -230,6 +329,7 @@
       "caller_authenticated_manifest_digest",
       "caller_authenticated_git_path_raw_sha256_and_observed_native_format",
       "corrected_full_payload_aggregate_digest",
+      "published_v4_parent_identity_report_and_remand",
       "v3_git_boundary_parent_identity",
       "v3_git_boundary_parent_remand_verdict",
       "v3_git_boundary_parent_qualification_report_digest",
@@ -356,8 +456,8 @@
       },
       {
         "path": "verify_plan.py",
-        "bytes": 183607,
-        "sha256": "sha256:1041b9646c47416c86e9f64361bb2ea62b0a281339698b844bad2bb2076ce214"
+        "bytes": 216228,
+        "sha256": "sha256:b248d4f6517c26258284866befb391a2ebc6f8b453fae5d8c719e77af0c3fa28"
       }
     ]
   },

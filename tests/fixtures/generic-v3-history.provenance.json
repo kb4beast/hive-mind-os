@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "kind": "git-history-bundle-provenance",
+  "created_at": "2026-09-02T20:13:54.402Z",
+  "source_repository": "https://github.com/kb4beast/hive-mind-os",
+  "source_pull_request": "https://github.com/kb4beast/hive-mind-os/pull/154",
+  "bundle": {
+    "path": "tests/fixtures/generic-v3-history.bundle",
+    "bytes": 298169,
+    "sha256": "sha256:2de9a9db506e8561d21b86f7887c9030868337862ae755074d447f19dfcd2ae7",
+    "object_format": "sha1",
+    "format": "thin-with-prerequisite",
+    "prerequisite_commit": "44224532dc25b94a95c3184054ec81762a258259",
+    "advertised_ref": "refs/heads/release/hive-mind-autopilot",
+    "advertised_commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+    "generation_command": "git bundle create <output> release/hive-mind-autopilot ^44224532dc25b94a95c3184054ec81762a258259",
+    "producer": "git version 2.53.0.windows.3"
+  },
+  "required_commits": [
+    "42b4aeef17f816430a7d8a435102635afea8761a",
+    "4e2b81b932e5145f24c4b52ceeee664bff91df2e",
+    "f06e52c43a1e2d1d53523378c0d6f5564fb984bf",
+    "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8",
+    "28463ae6dd842b0b316fcf99eab98804cdaf9735"
+  ],
+  "source_documentation": {
+    "source_id": "SRC-V3R-GIT-BUNDLE-001",
+    "authoritative_record": "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+    "status": "SUPERSEDED_BY_PINNED_SOURCE_RECORD",
+    "nonclaim": "This pointer does not replace validation of the bound source-intake record."
+  }
+}

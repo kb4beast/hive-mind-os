@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "published-predecessor-assessment",
+  "recorded_at": "2026-09-02T20:13:54.402Z",
+  "commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+  "tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d",
+  "parent_commit": "9dfa1823edc9cd56cd1f404606a261a1d623f6cb",
+  "parent_tree": "7e8becaebef2ca88922c9099ae1e497f978f43f1",
+  "squash_merge_commit": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+  "squash_merge_tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d",
+  "manifest": {
+    "bytes": 18930,
+    "sha256": "sha256:c2f0ae0dcee177213f219eaa3031b45d6f5526fd1f2d98d73b11672068f81377"
+  },
+  "ordered_line_manifest": {
+    "bytes": 1461,
+    "sha256": "sha256:6bdcb304c2b9a036646ac06322aedf143f3d651f2689fb2099e5ad3f202b6221"
+  },
+  "full_payload_aggregate": {
+    "algorithm": "sha256(domain + NUL + repeated(path + NUL + decimal_length + NUL + raw_bytes + NUL))",
+    "domain": "hive-mind-os/v3-native-executable-matrix-correction-content/v4",
+    "bytes": 755197,
+    "sha256": "sha256:ecbeb374fc8adbb711391568d8a2f2fa8b0ef022c233ca932f24bd9ab0b4fb23"
+  },
+  "published_ci": {
+    "workflow": "Constitutional CI",
+    "run_id": 32674854589,
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/32674854589",
+    "created_at": "2026-08-23T23:51:35Z",
+    "updated_at": "2026-08-24T00:20:58Z",
+    "conclusion": "failure"
+  },
+  "observed_status": "PUBLISHED_TREE_WITH_SQUASH_SEVERED_HISTORY_AND_RED_CONSTITUTIONAL_CI",
+  "author_proposed_disposition": "ADAPT_REMAND"
+}

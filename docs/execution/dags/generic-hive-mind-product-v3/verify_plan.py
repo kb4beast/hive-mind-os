@@ -14,6 +14,7 @@ import argparse
 import ctypes
 import fnmatch
 import hashlib
+import io
 import json
 import math
 import os
@@ -22,6 +23,7 @@ import stat
 import struct
 import subprocess
 import sys
+import tarfile
 import threading
 from pathlib import Path
 from typing import Any, Iterable
@@ -54,12 +56,15 @@ MAX_GITATTRIBUTE_PATTERN_BYTES = 4_096
 MAX_GITATTRIBUTE_PATTERN_PARTS = 64
 
 NATIVE_EXECUTABLE_FORMAT_POLICY = "host-native-image-format-v1"
-GIT_EXECUTION_BOUNDARY_POLICY = "caller-absolute-raw-sha256-host-native-image-v2"
+GIT_EXECUTION_BOUNDARY_POLICY = "caller-absolute-raw-sha256-host-native-image-windows-birthtime-v3"
 SUPPORTED_NATIVE_IMAGE_FORMATS = {
     "win32": "PE_COFF_EXECUTABLE_IMAGE",
     "linux": "ELF_EXEC_OR_PIE_WITH_EXECUTABLE_LOAD_SEGMENT",
     "darwin": "MACH_O_EXECUTE_THIN_OR_HOST_SLICE_UNIVERSAL",
 }
+
+GitExecutableIdentity = tuple[int, int, int, int, int, int | None]
+GitExecutableContinuityKey = tuple[int, int, int, int, int]
 
 PLAN_ID = "generic-hive-mind-product-v3"
 REQUEST_ID = "sha256:baa813bdcbd1b3bd459736cb65dccaf060758991a8a9b581fe8a1bf17dd65562"
@@ -85,12 +90,121 @@ GIT_ENVIRONMENT_CORRECTION_PARENT_TREE = "8730203c89835c4d1d9dac4be9b2086dacd2d8
 GIT_ENVIRONMENT_CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339"
 GIT_ENVIRONMENT_CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:229821586021d8e2769035aeca4a4589cb7b458a9740a8b8ca82ebdfdadaee36"
 GIT_ENVIRONMENT_CORRECTION_PARENT_REPORT_DIGEST = "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810"
-CORRECTION_PARENT_COMMIT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
-CORRECTION_PARENT_TREE = "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
-CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e"
-CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
-CORRECTION_PARENT_REPORT_DIGEST = "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
+GIT_BOUNDARY_CORRECTION_COMMIT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
+GIT_BOUNDARY_CORRECTION_TREE = "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
+GIT_BOUNDARY_CORRECTION_MANIFEST_RAW_DIGEST = "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e"
+GIT_BOUNDARY_CORRECTION_AGGREGATE_DIGEST = "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
+GIT_BOUNDARY_CORRECTION_REPORT_DIGEST = "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
+CORRECTION_PARENT_COMMIT = "28463ae6dd842b0b316fcf99eab98804cdaf9735"
+CORRECTION_PARENT_TREE = "72696b27cdd2c9cd08085c05c98513ece733cc8d"
+CORRECTION_PARENT_PARENT_COMMIT = "9dfa1823edc9cd56cd1f404606a261a1d623f6cb"
+CORRECTION_PARENT_PARENT_TREE = "7e8becaebef2ca88922c9099ae1e497f978f43f1"
+CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:c2f0ae0dcee177213f219eaa3031b45d6f5526fd1f2d98d73b11672068f81377"
+CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:ecbeb374fc8adbb711391568d8a2f2fa8b0ef022c233ca932f24bd9ab0b4fb23"
+CORRECTION_PARENT_REPORT_DIGEST = "sha256:1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944"
 SOURCE_INTAKE_DIGEST = "sha256:dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c"
+RECOVERY_SOURCE_INTAKE_RELATIVE_PATH = (
+    "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json"
+)
+RECOVERY_SOURCE_INTAKE_DIGEST = "sha256:4d90fadba15120788ce24ea480a3847b8f8df192ff0f072d5982ebebe773cf51"
+RECOVERY_SOURCE_ARCHIVE_RELATIVE_PATH = (
+    "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar"
+)
+RECOVERY_SOURCE_ARCHIVE_BYTES = 593920
+RECOVERY_SOURCE_ARCHIVE_DIGEST = "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e"
+RECOVERY_SOURCE_IDS = (
+    "SRC-V3R-GIT-BUNDLE-001",
+    "SRC-V3R-PYTHON-STAT-001",
+    "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001",
+    "SRC-V3R-PR154-001",
+    "SRC-V3R-CI32674854589-001",
+)
+RECOVERY_SOURCE_CONTENT_BINDINGS = {
+    "SRC-V3R-GIT-BUNDLE-001": (
+        "67ad42147a7acc2af6074753ebd03d904476118f",
+        "Documentation/git-bundle.adoc",
+        13310,
+        "sha256:77a4e701115f70bc471681f9dec00fe7e1701e4f2090e27950efc0c66e1325ca",
+        "GPL-2.0-only",
+        "sha256:5b2198d1645f767585e8a88ac0499b04472164c0d2da22e75ecf97ef443ab32e",
+    ),
+    "SRC-V3R-PYTHON-STAT-001": (
+        "ebf955df7a89ed0c7968f79faec1de49f61ed7cb",
+        "Doc/library/os.rst",
+        206006,
+        "sha256:7bab91c6d5dcc0f88e476567d190388e94ddb3940768e0713c70f0280130e964",
+        "PSF-2.0",
+        "sha256:b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231",
+    ),
+    "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001": (
+        "788888c51ea955dae21e60c5e243c0a8593df8a6",
+        "sdk-api-src/content/winbase/ns-winbase-file_basic_info.md",
+        3607,
+        "sha256:a0f5398981241723394996a8e5a25a21ba6aea0af8e34cab577a37d4f2b7289a",
+        "CC-BY-4.0",
+        "sha256:7183ef9749eb9b75e710a81a4c812a9405cc184f087500581a973e5929ac3f5e",
+    ),
+    "SRC-V3R-PR154-001": (
+        "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+        "pulls/154",
+        17234,
+        "sha256:703f10e276dfa2a5f49dc792db582c06deaff908c5753251678f016e875865a7",
+        "NOASSERTION",
+        None,
+    ),
+    "SRC-V3R-CI32674854589-001": (
+        "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+        "actions/runs/32674854589",
+        13066,
+        "sha256:8805ac9798a6160205e8d50ef498645198990d5bc653db6d095c593e1a867991",
+        "NOASSERTION",
+        None,
+    ),
+}
+RECOVERY_ATOMIC_CLAIM_IDS = tuple(f"CLM-V3R-{number:03d}" for number in range(1, 11))
+RECOVERY_COUNTERCLAIM_IDS = tuple(f"CTR-V3R-{number:03d}" for number in range(1, 7))
+RECOVERY_SOURCE_ARCHIVE_MEMBERS = {
+    "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/Doc/library/os.rst": (
+        206006,
+        "sha256:7bab91c6d5dcc0f88e476567d190388e94ddb3940768e0713c70f0280130e964",
+    ),
+    "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/LICENSE": (
+        13804,
+        "sha256:b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231",
+    ),
+    "git/67ad42147a7acc2af6074753ebd03d904476118f/COPYING": (
+        18765,
+        "sha256:5b2198d1645f767585e8a88ac0499b04472164c0d2da22e75ecf97ef443ab32e",
+    ),
+    "git/67ad42147a7acc2af6074753ebd03d904476118f/Documentation/git-bundle.adoc": (
+        13310,
+        "sha256:77a4e701115f70bc471681f9dec00fe7e1701e4f2090e27950efc0c66e1325ca",
+    ),
+    "github/kb4beast-hive-mind-os/actions/runs/32674854589/jobs.json": (
+        18811,
+        "sha256:33497817cff50d6f472beec13773f56e73c90030676d6001c8b90253c6fa2e15",
+    ),
+    "github/kb4beast-hive-mind-os/actions/runs/32674854589/logs.zip": (
+        252673,
+        "sha256:42720931e62a2ff8f1a7c04f7b07e30f8d20833f325d4e2a7613b5ea6fd35950",
+    ),
+    "github/kb4beast-hive-mind-os/actions/runs/32674854589.json": (
+        13066,
+        "sha256:8805ac9798a6160205e8d50ef498645198990d5bc653db6d095c593e1a867991",
+    ),
+    "github/kb4beast-hive-mind-os/pulls/154.json": (
+        17234,
+        "sha256:703f10e276dfa2a5f49dc792db582c06deaff908c5753251678f016e875865a7",
+    ),
+    "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/LICENSE": (
+        18650,
+        "sha256:7183ef9749eb9b75e710a81a4c812a9405cc184f087500581a973e5929ac3f5e",
+    ),
+    "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/sdk-api-src/content/winbase/ns-winbase-file_basic_info.md": (
+        3607,
+        "sha256:a0f5398981241723394996a8e5a25a21ba6aea0af8e34cab577a37d4f2b7289a",
+    ),
+}
 STANDARD_DIGEST = "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a"
 STANDARD_BLOB = "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374"
 COMPILER_DIGEST = "sha256:105674faf15aaf7b9f4c9db7ad4003fda404438eed2bf8cc3a1782c1cf321e6a"
@@ -110,7 +224,10 @@ EXPECTED_OVERLAY_SOURCES = {
 
 EXPECTED_PAYLOAD_PATHS = (
     ".gitattributes",
+    ".github/workflows/ci.yml",
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
     "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
@@ -120,15 +237,45 @@ EXPECTED_PAYLOAD_PATHS = (
     "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
     "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+    RECOVERY_SOURCE_INTAKE_RELATIVE_PATH,
+    "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+    "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+    RECOVERY_SOURCE_ARCHIVE_RELATIVE_PATH,
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
+    "tests/test_autopilot_workflow.py",
     "tests/test_generic_dag_v3_overlay.py",
 )
 EXPECTED_CHANGED_PATHS = (
     ".gitattributes",
-    "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    ".github/workflows/ci.yml",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+    RECOVERY_SOURCE_INTAKE_RELATIVE_PATH,
+    "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+    "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+    RECOVERY_SOURCE_ARCHIVE_RELATIVE_PATH,
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
+    "tests/test_autopilot_workflow.py",
     "tests/test_generic_dag_v3_overlay.py",
+)
+EXPECTED_ADDED_PATHS = (
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+    RECOVERY_SOURCE_INTAKE_RELATIVE_PATH,
+    "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+    "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+    RECOVERY_SOURCE_ARCHIVE_RELATIVE_PATH,
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
 )
 MANIFEST_RELATIVE_PATH = "docs/execution/dags/generic-hive-mind-product-v3/manifest.json"
 OVERLAY_RELATIVE_DIRECTORY = "docs/execution/dags/generic-hive-mind-product-v3"
@@ -146,6 +293,7 @@ REQUIRED_RAW_EVIDENCE_GITATTRIBUTE_RULES = {
     "evidence/experiments/_artifacts/**": ("-text", "-diff"),
     "evidence/experiments/_failed/**": ("-text", "-diff"),
     "evidence/local_assurance/**/logs/**": ("-text", "-diff"),
+    "tests/fixtures/*.bundle": ("-text", "-diff"),
 }
 EXPECTED_GITATTRIBUTE_RULES = (
     (".gitattributes", ("text", "eol=lf")),
@@ -351,6 +499,448 @@ def parse_strict_json(raw: bytes, *, label: str, size_limit: int) -> dict[str, A
 def read_strict_json(path: Path, *, label: str, size_limit: int) -> tuple[dict[str, Any], bytes]:
     raw = read_bounded_bytes(path, label=label, size_limit=size_limit)
     return parse_strict_json(raw, label=label, size_limit=size_limit), raw
+
+
+def validate_recovery_source_archive(raw: bytes) -> dict[str, Any]:
+    require(
+        len(raw) == RECOVERY_SOURCE_ARCHIVE_BYTES,
+        "recovery source archive byte count mismatch",
+    )
+    require(
+        sha256_bytes(raw) == RECOVERY_SOURCE_ARCHIVE_DIGEST,
+        "recovery source archive raw digest mismatch",
+    )
+    try:
+        with tarfile.open(fileobj=io.BytesIO(raw), mode="r:") as archive:
+            members = archive.getmembers()
+            require(
+                tuple(member.name for member in members)
+                == tuple(RECOVERY_SOURCE_ARCHIVE_MEMBERS),
+                "recovery source archive member inventory/order mismatch",
+            )
+            verified_members: list[dict[str, Any]] = []
+            for member in members:
+                require(
+                    member.isfile()
+                    and not member.issym()
+                    and not member.islnk()
+                    and member.name in RECOVERY_SOURCE_ARCHIVE_MEMBERS,
+                    f"recovery source archive member is not a declared regular file: {member.name}",
+                )
+                require(
+                    (member.mode, member.mtime, member.uid, member.gid)
+                    == (0o444, 0, 0, 0),
+                    f"recovery source archive member metadata mismatch: {member.name}",
+                )
+                expected_bytes, expected_digest = RECOVERY_SOURCE_ARCHIVE_MEMBERS[
+                    member.name
+                ]
+                require(
+                    member.size == expected_bytes,
+                    f"recovery source archive member byte count mismatch: {member.name}",
+                )
+                stream = archive.extractfile(member)
+                require(
+                    stream is not None,
+                    f"recovery source archive member is unreadable: {member.name}",
+                )
+                member_raw = stream.read(expected_bytes + 1)
+                require(
+                    len(member_raw) == expected_bytes
+                    and sha256_bytes(member_raw) == expected_digest,
+                    f"recovery source archive member digest mismatch: {member.name}",
+                )
+                verified_members.append(
+                    {
+                        "path": member.name,
+                        "bytes": expected_bytes,
+                        "sha256": expected_digest,
+                    }
+                )
+    except (OSError, tarfile.TarError) as error:
+        raise VerificationError(f"cannot parse recovery source archive: {error}") from error
+    return {
+        "path": RECOVERY_SOURCE_ARCHIVE_RELATIVE_PATH,
+        "bytes": RECOVERY_SOURCE_ARCHIVE_BYTES,
+        "sha256": RECOVERY_SOURCE_ARCHIVE_DIGEST,
+        "members": verified_members,
+    }
+
+
+def validate_recovery_source_intake(raw: bytes) -> dict[str, Any]:
+    label = "recovery SOURCE-INTAKE.json"
+    intake = parse_strict_json(raw, label=label, size_limit=MAX_SOURCE_JSON_BYTES)
+    require(
+        set(intake)
+        == {
+            "schema_version",
+            "kind",
+            "recorded_at",
+            "snapshot_policy",
+            "raw_exhibit_archive",
+            "sources",
+            "atomic_claims",
+            "counterclaims",
+            "disposition",
+        },
+        "recovery source-intake top-level field inventory mismatch",
+    )
+    require(intake.get("schema_version") == 1, "recovery source-intake schema mismatch")
+    require(
+        intake.get("kind") == "hive-mind-v3-baseline-recovery-source-intake-v1",
+        "recovery source-intake kind mismatch",
+    )
+    require(
+        intake.get("recorded_at") == "2026-09-02T22:42:54.057Z",
+        "recovery source-intake recording time mismatch",
+    )
+    require(
+        intake.get("snapshot_policy")
+        == {
+            "raw_source_bytes_archived_locally": True,
+            "identity_binding": "ARCHIVE_SHA256_PLUS_MEMBER_PATH_BYTE_COUNT_AND_SHA256",
+            "nonclaim": (
+                "Point-in-time GitHub API and Actions log exhibits are archived evidence, "
+                "not immutable provider endpoints or execution authority."
+            ),
+        },
+        "recovery source-intake snapshot policy mismatch",
+    )
+    archive_record = intake.get("raw_exhibit_archive")
+    require(
+        isinstance(archive_record, dict)
+        and set(archive_record)
+        == {
+            "path",
+            "format",
+            "deterministic_metadata",
+            "bytes",
+            "sha256",
+            "members",
+        },
+        "recovery source archive record field inventory mismatch",
+    )
+    require(
+        archive_record.get("path") == RECOVERY_SOURCE_ARCHIVE_RELATIVE_PATH
+        and archive_record.get("format") == "POSIX_PAX_TAR"
+        and archive_record.get("deterministic_metadata")
+        == "DECLARED_MEMBER_ORDER_MTIME_0_UID_0_GID_0_MODE_0444"
+        and archive_record.get("bytes") == RECOVERY_SOURCE_ARCHIVE_BYTES
+        and archive_record.get("sha256") == RECOVERY_SOURCE_ARCHIVE_DIGEST,
+        "recovery source archive record mismatch",
+    )
+    archive_members = archive_record.get("members")
+    require(
+        isinstance(archive_members, list),
+        "recovery source archive member records must be a list",
+    )
+    archive_member_rows: dict[str, tuple[int, str]] = {}
+    archive_member_attribution: dict[str, tuple[str, str]] = {}
+    for member in archive_members:
+        require(
+            isinstance(member, dict)
+            and set(member) == {"source_id", "role", "path", "bytes", "sha256"},
+            "recovery source archive member record malformed",
+        )
+        require(
+            member["source_id"] in RECOVERY_SOURCE_IDS
+            and member["role"]
+            in {"source", "license", "jobs_metadata", "run_logs"},
+            f"recovery source archive member attribution mismatch: {member['path']}",
+        )
+        require(
+            member["path"] not in archive_member_rows,
+            f"duplicate recovery source archive member record: {member['path']}",
+        )
+        archive_member_rows[member["path"]] = (member["bytes"], member["sha256"])
+        archive_member_attribution[member["path"]] = (
+            member["source_id"],
+            member["role"],
+        )
+    require(
+        archive_member_rows == RECOVERY_SOURCE_ARCHIVE_MEMBERS,
+        "recovery source archive member bindings mismatch",
+    )
+    sources = intake.get("sources")
+    require(isinstance(sources, list), "recovery source-intake sources must be a list")
+    require(
+        tuple(row.get("source_id") if isinstance(row, dict) else None for row in sources)
+        == RECOVERY_SOURCE_IDS,
+        "recovery source identity/order mismatch",
+    )
+    claim_support = {
+        "SRC-V3R-GIT-BUNDLE-001": (("CLM-V3R-001", "CLM-V3R-002"), ("CTR-V3R-001",)),
+        "SRC-V3R-PYTHON-STAT-001": (
+            ("CLM-V3R-003", "CLM-V3R-004"),
+            ("CTR-V3R-002", "CTR-V3R-004"),
+        ),
+        "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001": (
+            ("CLM-V3R-005", "CLM-V3R-006"),
+            ("CTR-V3R-003", "CTR-V3R-004"),
+        ),
+        "SRC-V3R-PR154-001": (
+            ("CLM-V3R-007", "CLM-V3R-008"),
+            ("CTR-V3R-005",),
+        ),
+        "SRC-V3R-CI32674854589-001": (
+            ("CLM-V3R-009", "CLM-V3R-010"),
+            ("CTR-V3R-005", "CTR-V3R-006"),
+        ),
+    }
+    expected_version_fields = {
+        "SRC-V3R-GIT-BUNDLE-001": {
+            "release",
+            "annotated_tag",
+            "tag_object",
+            "peeled_commit",
+        },
+        "SRC-V3R-PYTHON-STAT-001": {
+            "release",
+            "annotated_tag",
+            "tag_object",
+            "peeled_commit",
+        },
+        "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001": {
+            "branch",
+            "commit",
+            "source_committed_at",
+            "frontmatter_ms_date",
+        },
+        "SRC-V3R-PR154-001": {
+            "pull_request",
+            "state",
+            "merged_at",
+            "base_commit",
+            "head_commit",
+            "squash_merge_commit",
+        },
+        "SRC-V3R-CI32674854589-001": {
+            "run_id",
+            "head_commit",
+            "status",
+            "conclusion",
+            "created_at",
+            "updated_at",
+        },
+    }
+    expected_primary_archive_members = {
+        "SRC-V3R-GIT-BUNDLE-001": (
+            "git/67ad42147a7acc2af6074753ebd03d904476118f/Documentation/git-bundle.adoc"
+        ),
+        "SRC-V3R-PYTHON-STAT-001": (
+            "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/Doc/library/os.rst"
+        ),
+        "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001": (
+            "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/"
+            "sdk-api-src/content/winbase/ns-winbase-file_basic_info.md"
+        ),
+        "SRC-V3R-PR154-001": "github/kb4beast-hive-mind-os/pulls/154.json",
+        "SRC-V3R-CI32674854589-001": (
+            "github/kb4beast-hive-mind-os/actions/runs/32674854589.json"
+        ),
+    }
+    for source in sources:
+        require(isinstance(source, dict), "recovery source entry must be an object")
+        require(
+            set(source)
+            == {
+                "source_id",
+                "title",
+                "canonical_uri",
+                "source_uri",
+                "source_immutability",
+                "upstream_repository",
+                "upstream_path",
+                "version",
+                "retrieved_at",
+                "http_status",
+                "media_type",
+                "archive_member",
+                "bytes",
+                "sha256",
+                "license",
+                "supporting_exhibits",
+                "supports_claim_ids",
+                "supports_counterclaim_ids",
+            },
+            "recovery source field inventory mismatch",
+        )
+        source_id = source["source_id"]
+        expected_commit, expected_path, expected_bytes, expected_digest, expected_spdx, expected_license_digest = (
+            RECOVERY_SOURCE_CONTENT_BINDINGS[source_id]
+        )
+        version = source.get("version")
+        require(
+            isinstance(version, dict) and set(version) == expected_version_fields[source_id],
+            f"recovery source version contract mismatch: {source_id}",
+        )
+        observed_commit = version.get(
+            "peeled_commit",
+            version.get("commit", version.get("head_commit")),
+        )
+        require(observed_commit == expected_commit, f"recovery source commit mismatch: {source_id}")
+        require(source.get("upstream_path") == expected_path, f"recovery source path mismatch: {source_id}")
+        require(source.get("bytes") == expected_bytes, f"recovery source byte count mismatch: {source_id}")
+        require(source.get("sha256") == expected_digest, f"recovery source digest mismatch: {source_id}")
+        require(source.get("retrieved_at") == intake["recorded_at"], f"recovery source retrieval time mismatch: {source_id}")
+        require(source.get("http_status") == 200, f"recovery source retrieval status mismatch: {source_id}")
+        expected_media_type = (
+            "application/json; charset=utf-8"
+            if source_id in {"SRC-V3R-PR154-001", "SRC-V3R-CI32674854589-001"}
+            else "text/plain; charset=utf-8"
+        )
+        require(
+            source.get("media_type") == expected_media_type,
+            f"recovery source media type mismatch: {source_id}",
+        )
+        expected_immutability = (
+            "POINT_IN_TIME_PROVIDER_SNAPSHOT"
+            if source_id in {"SRC-V3R-PR154-001", "SRC-V3R-CI32674854589-001"}
+            else "UPSTREAM_COMMIT_PINNED"
+        )
+        require(
+            source.get("source_immutability") == expected_immutability,
+            f"recovery source immutability classification mismatch: {source_id}",
+        )
+        primary_member = expected_primary_archive_members[source_id]
+        require(
+            source.get("archive_member") == primary_member
+            and archive_member_attribution.get(primary_member) == (source_id, "source")
+            and archive_member_rows.get(primary_member) == (expected_bytes, expected_digest),
+            f"recovery source archive linkage mismatch: {source_id}",
+        )
+        license_record = source.get("license")
+        require(
+            isinstance(license_record, dict)
+            and set(license_record)
+            == {"spdx", "basis", "source_uri", "archive_member", "bytes", "sha256"},
+            f"recovery source license field inventory mismatch: {source_id}",
+        )
+        require(license_record.get("spdx") == expected_spdx, f"recovery source license mismatch: {source_id}")
+        require(
+            license_record.get("sha256") == expected_license_digest,
+            f"recovery source license digest mismatch: {source_id}",
+        )
+        if expected_license_digest is None:
+            require(
+                license_record.get("archive_member") is None
+                and license_record.get("bytes") is None,
+                f"recovery provider-metadata license nonclaim mismatch: {source_id}",
+            )
+        else:
+            license_member = license_record.get("archive_member")
+            require(
+                isinstance(license_member, str)
+                and archive_member_attribution.get(license_member) == (source_id, "license")
+                and archive_member_rows.get(license_member)
+                == (license_record.get("bytes"), expected_license_digest),
+                f"recovery source license archive linkage mismatch: {source_id}",
+            )
+        supporting_exhibits = source.get("supporting_exhibits")
+        require(
+            isinstance(supporting_exhibits, list),
+            f"recovery source supporting exhibits malformed: {source_id}",
+        )
+        if source_id == "SRC-V3R-CI32674854589-001":
+            require(
+                tuple(exhibit.get("role") for exhibit in supporting_exhibits)
+                == ("jobs_metadata", "run_logs"),
+                "recovery CI supporting exhibit inventory mismatch",
+            )
+            for exhibit in supporting_exhibits:
+                require(
+                    isinstance(exhibit, dict)
+                    and set(exhibit)
+                    == {
+                        "role",
+                        "source_uri",
+                        "retrieved_at",
+                        "archive_member",
+                        "media_type",
+                        "bytes",
+                        "sha256",
+                    },
+                    "recovery CI supporting exhibit field inventory mismatch",
+                )
+                member_path = exhibit["archive_member"]
+                require(
+                    archive_member_attribution.get(member_path)
+                    == (source_id, exhibit["role"])
+                    and archive_member_rows.get(member_path)
+                    == (exhibit["bytes"], exhibit["sha256"]),
+                    f"recovery CI supporting exhibit binding mismatch: {exhibit['role']}",
+                )
+        else:
+            require(
+                supporting_exhibits == [],
+                f"unexpected recovery source supporting exhibit: {source_id}",
+            )
+        require(
+            tuple(source.get("supports_claim_ids", ())) == claim_support[source_id][0]
+            and tuple(source.get("supports_counterclaim_ids", ())) == claim_support[source_id][1],
+            f"recovery source claim linkage mismatch: {source_id}",
+        )
+
+    atomic_claims = intake.get("atomic_claims")
+    require(isinstance(atomic_claims, list), "recovery atomic claims must be a list")
+    require(
+        tuple(row.get("claim_id") if isinstance(row, dict) else None for row in atomic_claims)
+        == RECOVERY_ATOMIC_CLAIM_IDS,
+        "recovery atomic claim identity/order mismatch",
+    )
+    for claim in atomic_claims:
+        require(
+            isinstance(claim, dict) and set(claim) == {"claim_id", "source_ids", "statement"},
+            "recovery atomic claim field inventory mismatch",
+        )
+        require(
+            isinstance(claim["statement"], str) and claim["statement"].strip() == claim["statement"],
+            f"recovery atomic claim statement malformed: {claim['claim_id']}",
+        )
+        require(
+            isinstance(claim["source_ids"], list)
+            and claim["source_ids"]
+            and all(source_id in RECOVERY_SOURCE_IDS for source_id in claim["source_ids"]),
+            f"recovery atomic claim source linkage mismatch: {claim['claim_id']}",
+        )
+
+    counterclaims = intake.get("counterclaims")
+    require(isinstance(counterclaims, list), "recovery counterclaims must be a list")
+    require(
+        tuple(
+            row.get("counterclaim_id") if isinstance(row, dict) else None
+            for row in counterclaims
+        )
+        == RECOVERY_COUNTERCLAIM_IDS,
+        "recovery counterclaim identity/order mismatch",
+    )
+    for counterclaim in counterclaims:
+        require(
+            isinstance(counterclaim, dict)
+            and set(counterclaim) == {"counterclaim_id", "source_ids", "statement"},
+            "recovery counterclaim field inventory mismatch",
+        )
+        require(
+            isinstance(counterclaim["statement"], str)
+            and counterclaim["statement"].strip() == counterclaim["statement"],
+            f"recovery counterclaim statement malformed: {counterclaim['counterclaim_id']}",
+        )
+        require(
+            isinstance(counterclaim["source_ids"], list)
+            and counterclaim["source_ids"]
+            and all(source_id in RECOVERY_SOURCE_IDS for source_id in counterclaim["source_ids"]),
+            f"recovery counterclaim source linkage mismatch: {counterclaim['counterclaim_id']}",
+        )
+
+    require(
+        intake.get("disposition") == "ADAPT_PENDING_DISTINCT_JUDGE",
+        "recovery source-intake disposition mismatch",
+    )
+    require(
+        sha256_bytes(raw) == RECOVERY_SOURCE_INTAKE_DIGEST,
+        "recovery source-intake raw digest mismatch",
+    )
+    return intake
 
 
 def safe_child(root: Path, relative: str, *, label: str) -> Path:
@@ -887,7 +1477,41 @@ def _resolve_common_git_dir(git_dir: Path) -> Path:
     return common_dir
 
 
-def _git_executable_path_state(path: Path) -> tuple[int, int, int, int, int]:
+def _git_executable_identity_from_stat(stat_result: os.stat_result) -> GitExecutableIdentity:
+    birthtime_ns = _optional_stat_integer(stat_result, "st_birthtime_ns")
+    if birthtime_ns is None:
+        birthtime = getattr(stat_result, "st_birthtime", None)
+        if birthtime is not None:
+            birthtime_ns = int(float(birthtime) * 1_000_000_000)
+    return (
+        stat_result.st_dev,
+        stat_result.st_ino,
+        stat_result.st_size,
+        stat_result.st_mtime_ns,
+        stat_result.st_ctime_ns,
+        birthtime_ns,
+    )
+
+
+def _git_executable_continuity_key(
+    identity: GitExecutableIdentity,
+    *,
+    host_platform: str | None = None,
+) -> GitExecutableContinuityKey:
+    """Return only platform-stable fields while retaining raw ctime as evidence."""
+
+    selected_platform = sys.platform if host_platform is None else host_platform
+    if selected_platform == "win32":
+        # Python 3.12 exposes creation time explicitly as st_birthtime_ns and
+        # deprecates the Windows st_ctime_ns meaning.  Older Python versions
+        # expose creation time through st_ctime_ns, which is the compatibility
+        # fallback only when birth time is unavailable.
+        creation_time_ns = identity[5] if identity[5] is not None else identity[4]
+        return identity[:4] + (creation_time_ns,)
+    return identity[:5]
+
+
+def _git_executable_path_state(path: Path) -> GitExecutableIdentity:
     try:
         require(path.is_file() and not path.is_symlink(), "Git executable is no longer a regular file")
         stat_result = path.stat()
@@ -897,36 +1521,25 @@ def _git_executable_path_state(path: Path) -> tuple[int, int, int, int, int]:
         0 < stat_result.st_size <= MAX_NATIVE_EXECUTABLE_BYTES,
         "Git executable size is outside the verifier limit",
     )
-    return (
-        stat_result.st_dev,
-        stat_result.st_ino,
-        stat_result.st_size,
-        stat_result.st_mtime_ns,
-        stat_result.st_ctime_ns,
-    )
+    return _git_executable_identity_from_stat(stat_result)
 
 
-def _open_file_identity(handle: Any) -> tuple[int, int, int, int, int]:
+def _open_file_identity(handle: Any) -> GitExecutableIdentity:
     try:
         stat_result = os.fstat(handle.fileno())
     except (OSError, ValueError) as error:
         raise VerificationError(f"cannot inspect open Git executable identity: {error}") from error
-    return (
-        stat_result.st_dev,
-        stat_result.st_ino,
-        stat_result.st_size,
-        stat_result.st_mtime_ns,
-        stat_result.st_ctime_ns,
-    )
+    return _git_executable_identity_from_stat(stat_result)
 
 
 def _read_immutable_executable_snapshot(
     handle: Any,
     *,
-    expected_identity: tuple[int, int, int, int, int] | None,
+    expected_identity: GitExecutableIdentity | None,
     label: str,
+    identity_platform: str | None = None,
 ) -> bytes:
-    """Make one bounded read bracketed by exact open-file identity checks."""
+    """Make one bounded read bracketed by platform-stable identity checks."""
 
     before = _open_file_identity(handle)
     require(
@@ -935,7 +1548,14 @@ def _read_immutable_executable_snapshot(
     )
     if expected_identity is not None:
         require(
-            before[:4] == expected_identity[:4],
+            _git_executable_continuity_key(
+                before,
+                host_platform=identity_platform,
+            )
+            == _git_executable_continuity_key(
+                expected_identity,
+                host_platform=identity_platform,
+            ),
             f"{label} path/open identity or size changed before snapshot",
         )
     try:
@@ -945,7 +1565,11 @@ def _read_immutable_executable_snapshot(
     except (OSError, ValueError) as error:
         raise VerificationError(f"cannot read {label}: {error}") from error
     after = _open_file_identity(handle)
-    require(before == after, f"{label} identity changed while reading one snapshot")
+    require(
+        _git_executable_continuity_key(before, host_platform=identity_platform)
+        == _git_executable_continuity_key(after, host_platform=identity_platform),
+        f"{label} identity changed while reading one snapshot",
+    )
     require(len(raw) == before[2], f"{label} read length differs from file size")
     return raw
 
@@ -1463,7 +2087,7 @@ def inspect_host_native_executable(
     host_platform: str | None = None,
     host_machine: str | None = None,
 ) -> dict[str, str]:
-    """Read and inspect one retained executable handle under the V4 byte limit."""
+    """Read and inspect one retained executable handle under the V5 byte limit."""
 
     inspection, _ = _inspect_and_digest_executable_snapshot(
         handle,
@@ -1478,7 +2102,7 @@ def inspect_host_native_executable(
 def _inspect_and_digest_executable_snapshot(
     handle: Any,
     *,
-    expected_identity: tuple[int, int, int, int, int] | None,
+    expected_identity: GitExecutableIdentity | None,
     label: str,
     host_platform: str | None = None,
     host_machine: str | None = None,
@@ -1493,6 +2117,7 @@ def _inspect_and_digest_executable_snapshot(
         handle,
         expected_identity=expected_identity,
         label=label,
+        identity_platform=selected_platform,
     )
     inspection = _inspect_native_image(raw, selected_platform, selected_machine)
     return inspection, sha256_bytes(raw)
@@ -1524,6 +2149,8 @@ def configure_git_boundary(
         require(resolved_executable.suffix.casefold() == ".exe", "Git executable must be a native .exe file")
     else:
         require(os.access(resolved_executable, os.X_OK), "Git executable is not executable")
+    identity_platform = sys.platform
+    host_machine = _current_host_machine(identity_platform)
     path_state = _git_executable_path_state(resolved_executable)
     try:
         executable_handle = resolved_executable.open("rb")
@@ -1531,14 +2158,33 @@ def configure_git_boundary(
         raise VerificationError(f"cannot open Git executable: {error}") from error
     try:
         handle_identity = _open_file_identity(executable_handle)
-        require(handle_identity[:4] == path_state[:4], "Git executable path/open-file identity mismatch")
+        require(
+            _git_executable_continuity_key(
+                handle_identity,
+                host_platform=identity_platform,
+            )
+            == _git_executable_continuity_key(
+                path_state,
+                host_platform=identity_platform,
+            ),
+            "Git executable path/open-file identity mismatch",
+        )
         native_image, observed_digest = _inspect_and_digest_executable_snapshot(
             executable_handle,
             expected_identity=path_state,
             label="initial retained Git executable",
+            host_platform=identity_platform,
+            host_machine=host_machine,
         )
         require(
-            _git_executable_path_state(resolved_executable) == path_state,
+            _git_executable_continuity_key(
+                _git_executable_path_state(resolved_executable),
+                host_platform=identity_platform,
+            )
+            == _git_executable_continuity_key(
+                path_state,
+                host_platform=identity_platform,
+            ),
             "Git executable path identity changed during initial snapshot",
         )
         require(
@@ -1572,6 +2218,8 @@ def configure_git_boundary(
             "path_state": path_state,
             "handle_identity": handle_identity,
             "handle": executable_handle,
+            "identity_platform": identity_platform,
+            "host_machine": host_machine,
             "native_image": native_image,
             "git_dir": git_dir,
             "common_dir": common_dir,
@@ -1593,15 +2241,37 @@ def verify_git_executable_stable(*, full_digest: bool) -> None:
     executable = _GIT_BOUNDARY["executable"]
     handle = _GIT_BOUNDARY["handle"]
     expected_identity = _GIT_BOUNDARY["path_state"]
-    require(_git_executable_path_state(executable) == expected_identity, "Git executable identity changed during verification")
+    identity_platform = _GIT_BOUNDARY["identity_platform"]
+    host_machine = _GIT_BOUNDARY["host_machine"]
+    expected_key = _git_executable_continuity_key(
+        expected_identity,
+        host_platform=identity_platform,
+    )
     require(
-        _open_file_identity(handle) == _GIT_BOUNDARY["handle_identity"],
+        _git_executable_continuity_key(
+            _git_executable_path_state(executable),
+            host_platform=identity_platform,
+        )
+        == expected_key,
+        "Git executable identity changed during verification",
+    )
+    require(
+        _git_executable_continuity_key(
+            _open_file_identity(handle),
+            host_platform=identity_platform,
+        )
+        == _git_executable_continuity_key(
+            _GIT_BOUNDARY["handle_identity"],
+            host_platform=identity_platform,
+        ),
         "open Git executable identity changed during verification",
     )
     retained_native, retained_digest = _inspect_and_digest_executable_snapshot(
         handle,
         expected_identity=expected_identity,
         label="retained Git executable revalidation",
+        host_platform=identity_platform,
+        host_machine=host_machine,
     )
     require(
         retained_native == _GIT_BOUNDARY["native_image"],
@@ -1612,19 +2282,29 @@ def verify_git_executable_stable(*, full_digest: bool) -> None:
         "retained Git executable bytes changed during verification",
     )
     require(
-        _git_executable_path_state(executable) == expected_identity,
+        _git_executable_continuity_key(
+            _git_executable_path_state(executable),
+            host_platform=identity_platform,
+        )
+        == expected_key,
         "Git executable path identity changed after retained snapshot",
     )
     try:
         with executable.open("rb") as current_handle:
             require(
-                _open_file_identity(current_handle)[:4] == expected_identity[:4],
+                _git_executable_continuity_key(
+                    _open_file_identity(current_handle),
+                    host_platform=identity_platform,
+                )
+                == expected_key,
                 "Git executable path now addresses a different file",
             )
             current_native, current_digest = _inspect_and_digest_executable_snapshot(
                 current_handle,
                 expected_identity=expected_identity,
                 label="current-path Git executable revalidation",
+                host_platform=identity_platform,
+                host_machine=host_machine,
             )
             require(
                 current_native == _GIT_BOUNDARY["native_image"],
@@ -1637,7 +2317,11 @@ def verify_git_executable_stable(*, full_digest: bool) -> None:
     except (OSError, ValueError) as error:
         raise VerificationError(f"cannot re-open Git executable: {error}") from error
     require(
-        _git_executable_path_state(executable) == expected_identity,
+        _git_executable_continuity_key(
+            _git_executable_path_state(executable),
+            host_platform=identity_platform,
+        )
+        == expected_key,
         "Git executable path identity changed after current-path snapshot",
     )
 
@@ -1780,7 +2464,7 @@ def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
     try:
         reader = threading.Thread(
             target=read_bounded_output,
-            name="v4-git-output-reader",
+            name="v5-git-output-reader",
             daemon=True,
         )
         reader.start()
@@ -1961,8 +2645,8 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         },
         "manifest top-level field inventory mismatch",
     )
-    require(manifest.get("schema_version") == 4, "manifest schema mismatch")
-    require(manifest.get("kind") == "hive-mind-generic-product-overlay-manifest-v4", "manifest kind mismatch")
+    require(manifest.get("schema_version") == 5, "manifest schema mismatch")
+    require(manifest.get("kind") == "hive-mind-generic-product-overlay-manifest-v5", "manifest kind mismatch")
     require(manifest.get("plan_id") == PLAN_ID, "manifest plan id mismatch")
     request = manifest.get("request_binding")
     require(isinstance(request, dict), "manifest request binding missing")
@@ -2040,7 +2724,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         set(authorship) == {"architect", "judge", "court_status", "execution_authority"},
         "manifest authorship field inventory mismatch",
     )
-    require(authorship.get("architect") == "/root/v4_matrix_architect", "architect identity mismatch")
+    require(authorship.get("architect") == "/root/verifier_architect", "architect identity mismatch")
     require(authorship.get("judge") == "UNASSIGNED", "author manifest cannot self-assign a judge")
     require(authorship.get("court_status") == "PENDING_DISTINCT_COURT", "self-review boundary missing")
     require(authorship.get("execution_authority") == "NONE", "author manifest cannot grant execution authority")
@@ -2053,6 +2737,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "authoring_base_parent",
             "correction_parent",
             "predecessor_payload",
+            "remanded_git_boundary_predecessor",
             "remanded_git_environment_predecessor",
             "historical_payload_a",
             "expected_changed_paths",
@@ -2068,7 +2753,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         "committed payload field inventory mismatch",
     )
     require(
-        payload.get("mode") == "exact-append-only-native-executable-matrix-correction-v4",
+        payload.get("mode") == "exact-append-only-squash-proof-windows-identity-correction-v5",
         "committed payload mode mismatch",
     )
     require(
@@ -2086,18 +2771,36 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         == {
             "commit": CORRECTION_PARENT_COMMIT,
             "tree": CORRECTION_PARENT_TREE,
-            "parent_commit": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
-            "parent_tree": GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+            "parent_commit": CORRECTION_PARENT_PARENT_COMMIT,
+            "parent_tree": CORRECTION_PARENT_PARENT_TREE,
             "manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
             "full_payload_aggregate": {
-                "domain": "hive-mind-os/v3-append-only-git-boundary-correction-content/v3",
+                "domain": "hive-mind-os/v3-native-executable-matrix-correction-content/v4",
                 "sha256": CORRECTION_PARENT_AGGREGATE_DIGEST,
             },
             "qualification_report_sha256": CORRECTION_PARENT_REPORT_DIGEST,
-            "observed_status": "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
+            "observed_status": "PUBLISHED_TREE_WITH_SQUASH_SEVERED_HISTORY_AND_RED_CONSTITUTIONAL_CI",
             "author_proposed_disposition": "ADAPT_REMAND",
         },
         "predecessor correction identity/status mismatch",
+    )
+    require(
+        payload.get("remanded_git_boundary_predecessor")
+        == {
+            "commit": GIT_BOUNDARY_CORRECTION_COMMIT,
+            "tree": GIT_BOUNDARY_CORRECTION_TREE,
+            "parent_commit": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+            "parent_tree": GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+            "manifest_raw_sha256": GIT_BOUNDARY_CORRECTION_MANIFEST_RAW_DIGEST,
+            "full_payload_aggregate": {
+                "domain": "hive-mind-os/v3-append-only-git-boundary-correction-content/v3",
+                "sha256": GIT_BOUNDARY_CORRECTION_AGGREGATE_DIGEST,
+            },
+            "qualification_report_sha256": GIT_BOUNDARY_CORRECTION_REPORT_DIGEST,
+            "observed_status": "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
+            "author_proposed_disposition": "ADAPT_REMAND",
+        },
+        "remanded Git-boundary predecessor identity/status mismatch",
     )
     require(
         payload.get("remanded_git_environment_predecessor")
@@ -2139,11 +2842,13 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(
         payload.get("activation_anti_downgrade")
         == {
-            "required_contract_mode": "exact-append-only-native-executable-matrix-correction-v4",
+            "required_contract_mode": "exact-append-only-squash-proof-windows-identity-correction-v5",
             "required_git_executable_format_policy": NATIVE_EXECUTABLE_FORMAT_POLICY,
-            "rejected_v3_git_boundary_manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "rejected_published_v4_manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "rejected_v3_git_boundary_manifest_raw_sha256": GIT_BOUNDARY_CORRECTION_MANIFEST_RAW_DIGEST,
             "rejected_f06_manifest_raw_sha256": GIT_ENVIRONMENT_CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
             "rejected_historical_payload_a_manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
+            "published_v4_activation": "PROHIBITED",
             "v3_git_boundary_activation": "PROHIBITED",
             "f06_activation": "PROHIBITED",
             "historical_payload_a_activation": "PROHIBITED",
@@ -2162,6 +2867,12 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "script_or_interpreter_wrapper": "PROHIBITED",
             "max_executable_bytes": MAX_NATIVE_EXECUTABLE_BYTES,
             "caller_path_and_raw_digest": "REQUIRED_EXTERNAL",
+            "identity_continuity": {
+                "windows": "DEVICE_FILE_ID_SIZE_MTIME_BIRTHTIME",
+                "windows_pre_3_12_fallback": "DEVICE_FILE_ID_SIZE_MTIME_LEGACY_CREATION_CTIME",
+                "windows_change_time": "DIAGNOSTIC_NOT_ACCEPTANCE_CRITICAL",
+                "posix": "DEVICE_INODE_SIZE_MTIME_CTIME",
+            },
             "compiled_native_delegator_exclusion": "NOT_PROVEN_BY_FORMAT",
             "runtime_dependency_closure": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED",
             "inherited_git_environment": "REJECT_ALL_CASE_INSENSITIVE_GIT_PREFIX",
@@ -2203,6 +2914,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "caller_authenticated_manifest_digest",
             "caller_authenticated_git_path_raw_sha256_and_observed_native_format",
             "corrected_full_payload_aggregate_digest",
+            "published_v4_parent_identity_report_and_remand",
             "v3_git_boundary_parent_identity",
             "v3_git_boundary_parent_remand_verdict",
             "v3_git_boundary_parent_qualification_report_digest",
@@ -2728,7 +3440,7 @@ def verify_authoring_overlay_matches_checkout(
     verified_sources: dict[str, bytes],
     plan_raw: bytes,
 ) -> None:
-    """Bind an alternate authoring overlay to the exact six-path checkout state."""
+    """Bind an alternate authoring overlay to the exact seventeen-path checkout state."""
 
     prefix = OVERLAY_RELATIVE_DIRECTORY + "/"
     for relative in EXPECTED_PAYLOAD_PATHS:
@@ -2785,12 +3497,19 @@ def verify_committed_payload_git_bytes(repo_root: Path, overlay_dir: Path) -> No
             f"committed payload is not one regular file: {relative}",
         )
         head_raw = git(repo_root, "cat-file", "blob", f"HEAD:{relative}", binary=True)
-        parent_raw = git(
-            repo_root,
-            "cat-file",
-            "blob",
-            f"{CORRECTION_PARENT_COMMIT}:{relative}",
-            binary=True,
+        parent_entry = str(
+            git(repo_root, "ls-tree", CORRECTION_PARENT_COMMIT, "--", relative)
+        )
+        parent_raw = (
+            git(
+                repo_root,
+                "cat-file",
+                "blob",
+                f"{CORRECTION_PARENT_COMMIT}:{relative}",
+                binary=True,
+            )
+            if parent_entry
+            else None
         )
         require(
             read_bounded_bytes(
@@ -2801,9 +3520,16 @@ def verify_committed_payload_git_bytes(repo_root: Path, overlay_dir: Path) -> No
             == head_raw,
             f"worktree bytes differ from committed payload blob: {relative}",
         )
-        if relative in changed_paths:
+        if relative in EXPECTED_ADDED_PATHS:
+            require(
+                parent_raw is None,
+                f"required added payload path already exists in the predecessor correction: {relative}",
+            )
+        elif relative in changed_paths:
+            require(parent_raw is not None, f"changed predecessor payload is missing: {relative}")
             require(head_raw != parent_raw, f"successor path did not change from the predecessor correction: {relative}")
         else:
+            require(parent_raw is not None, f"inherited predecessor payload is missing: {relative}")
             require(head_raw == parent_raw, f"inherited payload path changed from the predecessor correction: {relative}")
 
 
@@ -2957,7 +3683,9 @@ def verify_tracked_index_and_worktree(repo_root: Path) -> tuple[int, str]:
     return tracked_count, inventory_digest
 
 
-def verify_untracked_and_ignored_state(repo_root: Path) -> str:
+def verify_untracked_and_ignored_state(
+    repo_root: Path, *, allowed_paths: set[str] | None = None
+) -> str:
     def path_set(*args: str) -> set[str]:
         raw = git(repo_root, "ls-files", "-z", *args, binary=True)
         require(isinstance(raw, bytes), "Git path inventory is not binary")
@@ -2970,8 +3698,9 @@ def verify_untracked_and_ignored_state(repo_root: Path) -> str:
     untracked_paths = path_set("--others", "--exclude-standard")
     ignored_paths = path_set("--others", "--ignored", "--exclude-standard")
     observed_paths = untracked_paths | ignored_paths
+    allowed = {ALLOWED_UNTRACKED_PATH} if allowed_paths is None else allowed_paths
     require(
-        observed_paths <= {ALLOWED_UNTRACKED_PATH},
+        observed_paths <= allowed,
         "committed checkout contains an unapproved untracked or ignored path",
     )
     return digest(sorted(observed_paths))
@@ -2999,9 +3728,14 @@ def verify_authoring_checkout_boundary(repo_root: Path) -> dict[str, Any]:
         repo_root,
         index_mismatch_message="authoring Git index differs from the exact HEAD tree",
     )
+    expected_modified = tuple(
+        relative
+        for relative in EXPECTED_CHANGED_PATHS
+        if relative not in EXPECTED_ADDED_PATHS
+    )
     require(
-        changed == EXPECTED_CHANGED_PATHS,
-        "authoring check requires exactly the six V4 changed paths against HEAD",
+        changed == expected_modified,
+        "authoring check requires exactly the eight modified V5 paths against HEAD",
     )
     return {
         "changed_paths": changed,
@@ -3009,7 +3743,10 @@ def verify_authoring_checkout_boundary(repo_root: Path) -> dict[str, Any]:
         "index_matches_head_digest": index_matches_head_digest,
         "worktree_bytes_digest": worktree_bytes_digest,
         "index_visibility_digest": verify_global_index_visibility(repo_root),
-        "untracked_and_ignored_digest": verify_untracked_and_ignored_state(repo_root),
+        "untracked_and_ignored_digest": verify_untracked_and_ignored_state(
+            repo_root,
+            allowed_paths={ALLOWED_UNTRACKED_PATH, *EXPECTED_ADDED_PATHS},
+        ),
     }
 
 
@@ -3045,10 +3782,24 @@ def verify_repository_state(
     )
     verify_commit_object(
         repo_root,
-        commit=CORRECTION_PARENT_COMMIT,
-        tree=CORRECTION_PARENT_TREE,
+        commit=GIT_BOUNDARY_CORRECTION_COMMIT,
+        tree=GIT_BOUNDARY_CORRECTION_TREE,
         parent=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
         label="remanded native-executable-matrix correction parent",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=CORRECTION_PARENT_COMMIT,
+        tree=CORRECTION_PARENT_TREE,
+        parent=CORRECTION_PARENT_PARENT_COMMIT,
+        label="published V4 correction parent",
+    )
+    git(
+        repo_root,
+        "merge-base",
+        "--is-ancestor",
+        GIT_BOUNDARY_CORRECTION_COMMIT,
+        CORRECTION_PARENT_COMMIT,
     )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch mismatch")
     head = str(git(repo_root, "rev-parse", "HEAD"))
@@ -3058,7 +3809,7 @@ def verify_repository_state(
         require(tree == CORRECTION_PARENT_TREE, "authoring check requires the immutable correction parent tree")
         authoring_snapshot = verify_authoring_checkout_boundary(repo_root)
         return {
-            "mode": "authoring-native-executable-matrix-correction-v4-non-executing",
+            "mode": "authoring-squash-proof-windows-identity-correction-v5-non-executing",
             "qualification": False,
             "head": head,
             "tree": tree,
@@ -3105,7 +3856,7 @@ def verify_repository_state(
     checkout_snapshot = verify_checkout_cleanliness(repo_root)
     verify_committed_payload_git_bytes(repo_root, overlay_dir)
     return {
-        "mode": "committed-native-executable-matrix-correction-v4",
+        "mode": "committed-squash-proof-windows-identity-correction-v5",
         "qualification": True,
         "head": head,
         "tree": tree,
@@ -3148,10 +3899,24 @@ def verify_repository_state_stable_at_end(
     )
     verify_commit_object(
         repo_root,
-        commit=CORRECTION_PARENT_COMMIT,
-        tree=CORRECTION_PARENT_TREE,
+        commit=GIT_BOUNDARY_CORRECTION_COMMIT,
+        tree=GIT_BOUNDARY_CORRECTION_TREE,
         parent=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
         label="final remanded native-executable-matrix correction parent",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=CORRECTION_PARENT_COMMIT,
+        tree=CORRECTION_PARENT_TREE,
+        parent=CORRECTION_PARENT_PARENT_COMMIT,
+        label="final published V4 correction parent",
+    )
+    git(
+        repo_root,
+        "merge-base",
+        "--is-ancestor",
+        GIT_BOUNDARY_CORRECTION_COMMIT,
+        CORRECTION_PARENT_COMMIT,
     )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch changed during verification")
     require(git(repo_root, "rev-parse", "HEAD") == repository_state["head"], "HEAD changed during verification")
@@ -3703,6 +4468,12 @@ def _verify_configured(
         overlay_dir=overlay_dir,
         manifest_raw=manifest_raw,
     )
+    recovery_source_archive = validate_recovery_source_archive(
+        payload_sources[RECOVERY_SOURCE_ARCHIVE_RELATIVE_PATH]
+    )
+    recovery_source_intake = validate_recovery_source_intake(
+        payload_sources[RECOVERY_SOURCE_INTAKE_RELATIVE_PATH]
+    )
     contracts = parse_strict_json(
         payload_sources[
             f"{OVERLAY_RELATIVE_DIRECTORY}/node-contracts.json"
@@ -3819,6 +4590,13 @@ def _verify_configured(
         "plan_digest": EXPECTED_PLAN_DIGEST,
         "plan_raw_sha256": EXPECTED_PLAN_RAW_DIGEST,
         "integrity": "verified-sealed",
+        "recovery_source_intake": {
+            "path": RECOVERY_SOURCE_INTAKE_RELATIVE_PATH,
+            "sha256": RECOVERY_SOURCE_INTAKE_DIGEST,
+            "source_ids": [source["source_id"] for source in recovery_source_intake["sources"]],
+            "raw_source_bytes_archived_locally": True,
+            "archive": recovery_source_archive,
+        },
         "durability_semantics": "typed-v2",
         "topology": {"nodes": 20, "raw_edges": 28, "levels": 17, "rounds": 20},
         "traceability": {"v1_rows": 89, "v3_corners": len(traceability["v3_specific_corners"])},

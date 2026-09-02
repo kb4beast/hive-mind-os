@@ -1,4 +1,4 @@
-# Generic Hive Mind Product DAG V3 — V4 native-executable correction
+# Generic Hive Mind Product DAG V3 — V5 baseline-recovery correction
 
 This directory contains an inert Standard-V2 `manual-parent-v1` overlay for the
 persisted Generic Hive Mind product request. Its 20-node plan has exactly 20 serial
@@ -11,10 +11,16 @@ The append-only lineage is:
   `8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157`;
 - ambient-Git remand: commit
   `f06e52c43a1e2d1d53523378c0d6f5564fb984bf`, tree
-  `8730203c89835c4d1d9dac4be9b2086dacd2d869`; and
-- V4 direct parent: commit
+  `8730203c89835c4d1d9dac4be9b2086dacd2d869`, with frozen report
+  `evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md`, 17,703 bytes,
+  SHA-256 `731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810`;
+  and
+- remanded Git-boundary correction: commit
   `9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8`, tree
-  `0d0a251b6ff1557ca014b6b50c6f62ae787c4459`.
+  `0d0a251b6ff1557ca014b6b50c6f62ae787c4459`; and
+- published V4 direct parent: commit
+  `28463ae6dd842b0b316fcf99eab98804cdaf9735`, tree
+  `72696b27cdd2c9cd08085c05c98513ece733cc8d`.
 
 `9b1cbcfe` passed its implemented committed verifier and 19-test focused suite
 under a pinned Windows Git engine, but it is remanded because its POSIX native-file
@@ -28,13 +34,27 @@ The preserved observed status is
 with author-proposed disposition `ADAPT_REMAND`. The report and predecessor commit
 remain unchanged adverse evidence.
 
+The published V4 tree was squash-merged as `59a5364501c5e49ceb28574aad7a4ac1512291b9`.
+That commit has the same tree but not the V3 ancestry. Its first post-merge
+Constitutional CI failed because the tests could no longer resolve `9b1cbcfe`. The
+frozen assessment is
+`evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json`,
+SHA-256 `1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944`.
+
 The current working contract is
-`exact-append-only-native-executable-matrix-correction-v4`: exactly one non-merge
-direct child of `9b1cbcfe`, changing exactly `.gitattributes`, ADR-069, this README,
-`manifest.json`, `verify_plan.py`, and `tests/test_generic_dag_v3_overlay.py`. Each
-changed blob must differ from the parent. `ADR_INDEX.md`, `materialize_plan.py`,
-`node-contracts.json`, `ownership-effects.json`, `plan.json`, and
-`traceability.json` remain byte-for-byte inherited. No future V4 commit, tree,
+`exact-append-only-squash-proof-windows-identity-correction-v5`: exactly one
+non-merge direct child of `28463ae`, changing exactly eight predecessor files:
+`.gitattributes`, `.github/workflows/ci.yml`, `ADR_INDEX.md`, this README,
+`manifest.json`, `verify_plan.py`, `tests/test_autopilot_workflow.py`, and
+`tests/test_generic_dag_v3_overlay.py`.
+It also adds exactly nine durable evidence and decision files: ADR-070, ADR-071,
+the thin Git bundle, its provenance record, the strict recovery source intake, the
+two predecessor qualification reports named above, and the published-parent
+assessment, plus the content-addressed raw-source archive bound by that intake.
+Each changed blob must differ from the parent. ADR-069,
+`materialize_plan.py`, `node-contracts.json`,
+`ownership-effects.json`, `plan.json`, and `traceability.json` remain byte-for-byte
+inherited. No future V5 commit, tree,
 manifest digest, aggregate, report digest, or court result is asserted in these
 candidate bytes.
 
@@ -47,16 +67,16 @@ hive-mind autopilot run "foobar"
 ```
 
 It may use a same-request fast path only when `foobar` exactly matches the persisted
-subject and an external controller authenticates the complete V4 request, target,
+subject and an external controller authenticates the complete successor request, target,
 plan, payload, runtime, and one-run activation bundle. The command does not derive
 authority from an existing branch, request repetition, repository contents, or a
 locally calculated digest. No current file makes this command executable.
 
-## V4 sealed content and policy names
+## V5 sealed content and policy names
 
-- `manifest.json` has schema version `4`, kind
-  `hive-mind-generic-product-overlay-manifest-v4`, and contract mode
-  `exact-append-only-native-executable-matrix-correction-v4`.
+- `manifest.json` has schema version `5`, kind
+  `hive-mind-generic-product-overlay-manifest-v5`, and contract mode
+  `exact-append-only-squash-proof-windows-identity-correction-v5`.
 - `.gitattributes` is an authenticated payload member. It pins LF checkout bytes for
   itself, `LICENSE`, every current raw-bound repository text extension (`*.py`,
   `*.json`, `*.md`, `*.toml`, `*.yml`, and `*.yaml`), and all `*.ps1` PowerShell
@@ -72,7 +92,8 @@ locally calculated digest. No current file makes this command executable.
   are defined-phase observations, not atomic or universal concurrent-mutation
   exclusion.
 - The Git policy is
-  `caller-absolute-raw-sha256-host-native-image-v2`; the anti-downgrade image-policy
+  `caller-absolute-raw-sha256-host-native-image-windows-birthtime-v3`; the
+  anti-downgrade image-policy
   identifier is `host-native-image-format-v1`; the execution-boundary enforced
   state is `HOST_NATIVE_IMAGE_FORMAT_V1`; and the maximum image size is
   268,435,456 bytes. The lowercase policy identifier and uppercase enforced-state
@@ -91,8 +112,8 @@ locally calculated digest. No current file makes this command executable.
 - `verify_plan.py` never imports or executes repository or materializer Python. It
   requires independent caller pins for both the raw manifest and direct Git image.
 
-The manifest embeds eleven non-manifest bindings. An external caller supplies the raw
-manifest digest, completing the non-circular 12-path inventory, and independently
+The manifest embeds 22 non-manifest bindings. An external caller supplies the raw
+manifest digest, completing the non-circular 23-path inventory, and independently
 supplies the already-canonical absolute Git path and raw image digest. Candidate
 instructions, `PATH`, a suffix, a shebang, or executable permission cannot select
 or authenticate those values.
@@ -126,6 +147,15 @@ inherited case-insensitive `GIT_*` name, never searches caller `PATH`, rejects o
 alternates, and disables dangerous config, hooks, attributes/excludes helpers,
 external diff/textconv, fsmonitor, replacement objects, prompts, and implicit
 repository discovery.
+
+Executable identity is platform-scoped. Windows binds device, file ID, size,
+modification time, and `st_birthtime_ns`; Python older than 3.12 falls back to the
+legacy creation-time value exposed by `st_ctime_ns`. Raw Windows change time remains
+diagnostic because it can differ between path and retained-handle observations.
+POSIX continues to bind ctime. In every case the verifier parses and SHA-256 hashes
+the exact same bounded byte snapshot, so a ctime-only allowance cannot admit a byte
+change. This remains a point-observation proof and requires external read-only
+custody for activation.
 
 The `complete-autopilot-tree-point-observation-v2` observation adds a fail-closed
 Windows filesystem boundary. Each directory and regular file binds
@@ -223,8 +253,13 @@ prevents a stale user-level editable install from serving as the recorded candid
 import; it does not attest all transitive dependencies or exclude concurrent
 environment mutation.
 
-For authoring, use that raw-byte checkout at exact parent `9b1cbcfe`, overlay the 12
-current payload members, and leave exactly the six V4 paths uncommitted:
+For authoring, use that raw-byte checkout at exact parent `28463ae`, overlay the 23
+current payload members, and leave exactly the seventeen V5 paths uncommitted. Eight
+are modified predecessor files; nine are new, self-contained history, decision,
+source, and qualification records: `ADR-070`, `ADR-071`, the thin Git bundle, its
+provenance record, the strict external-source intake, the two predecessor
+qualification reports, the published-parent assessment named above, and the
+raw-source archive.
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE = "1"
@@ -266,7 +301,7 @@ if ($forbiddenPythonCache.Count -ne 0) {
 ```
 
 Authoring mode must return
-`authoring-native-executable-matrix-correction-v4-non-executing`,
+`authoring-squash-proof-windows-identity-correction-v5-non-executing`,
 `committed_payload_qualification=false`, `execution_qualification=false`, and
 `execution.authorized=false`. Its `autopilot_tree` result uses schema
 `complete-autopilot-tree-point-observation-v2` and reports
@@ -277,7 +312,7 @@ observations compared equal; it does not exclude a concurrent ADS or other mutat
 The rounds output must contain exactly 20 `manual-parent-v1` one-node rounds and
 every `command` must be null.
 
-After the exact six-path child is committed directly on `9b1cbcfe`, use the same
+After the exact seventeen-path child is committed directly on `28463ae`, use the same
 external receipt fields without `--authoring-check`:
 
 ```powershell
@@ -310,13 +345,13 @@ if ($forbiddenPythonCache.Count -ne 0) {
 ```
 
 Committed success returns mode
-`committed-native-executable-matrix-correction-v4` and may set
+`committed-squash-proof-windows-identity-correction-v5` and may set
 `committed_payload_qualification=true`. It always returns
 `execution_qualification=false` and `execution.authorized=false`. Its
 `autopilot_tree` result has the same
 `complete-autopilot-tree-point-observation-v2` schema and the same three explicit
 observation/custody fields as authoring mode. It rejects a missing caller pin,
-authoring state, wrong parent or extra commit, an imprecise six-path diff, changed
+authoring state, wrong parent or extra commit, an imprecise seventeen-path diff, changed
 inherited blob, unchanged required correction blob, dirty index/worktree,
 unapproved untracked or ignored path, non-stage-zero index, alternate object source,
 hidden visibility flag, source substitution, downgrade, or observed `.autopilot`
@@ -331,7 +366,7 @@ aggregate; external manifest and native Git pins; a read-only dependency-complet
 runtime; platform launch/custody evidence; the frozen host and interpreter;
 independent reviewer/actor/issuer identities; predecessor remand and revocation;
 and a one-run nonce, deadline, and compare-and-swap ledger. A minimum-version policy
-must reject `9b1cbcfe`, `f06e52c`, Payload A, and every V1 fallback.
+must reject published V4, `9b1cbcfe`, `f06e52c`, Payload A, and every V1 fallback.
 
 Qualification receipts belong in a separate external Envelope B evidence lineage
 and must not dirty or reidentify the candidate. Credentials, legal consent,
@@ -340,8 +375,8 @@ ambiguous authority remain typed blockers.
 
 Every command remains null. DAG execution, activation, release, deployment,
 pull-request creation, protected-branch change, and merge are deferred. Rollback is
-append-only and preserves Payload A, `f06e52c`, `9b1cbcfe`, both frozen reports,
-all failed and passing observations, V4 evidence, and dissent. It never reactivates
+append-only and preserves Payload A, `f06e52c`, `9b1cbcfe`, published V4, all frozen
+reports, failed and passing observations, V5 evidence, and dissent. It never reactivates
 a predecessor or legacy fallback.
 
 `SRC-024` remains quarantined with content unread. `SRC-025` remains unresolved.

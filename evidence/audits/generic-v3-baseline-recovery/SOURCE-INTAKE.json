@@ -1,0 +1,421 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v3-baseline-recovery-source-intake-v1",
+  "recorded_at": "2026-09-02T22:42:54.057Z",
+  "snapshot_policy": {
+    "raw_source_bytes_archived_locally": true,
+    "identity_binding": "ARCHIVE_SHA256_PLUS_MEMBER_PATH_BYTE_COUNT_AND_SHA256",
+    "nonclaim": "Point-in-time GitHub API and Actions log exhibits are archived evidence, not immutable provider endpoints or execution authority."
+  },
+  "raw_exhibit_archive": {
+    "path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+    "format": "POSIX_PAX_TAR",
+    "deterministic_metadata": "DECLARED_MEMBER_ORDER_MTIME_0_UID_0_GID_0_MODE_0444",
+    "bytes": 593920,
+    "sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e",
+    "members": [
+      {
+        "source_id": "SRC-V3R-PYTHON-STAT-001",
+        "role": "source",
+        "path": "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/Doc/library/os.rst",
+        "bytes": 206006,
+        "sha256": "sha256:7bab91c6d5dcc0f88e476567d190388e94ddb3940768e0713c70f0280130e964"
+      },
+      {
+        "source_id": "SRC-V3R-PYTHON-STAT-001",
+        "role": "license",
+        "path": "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/LICENSE",
+        "bytes": 13804,
+        "sha256": "sha256:b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
+      },
+      {
+        "source_id": "SRC-V3R-GIT-BUNDLE-001",
+        "role": "license",
+        "path": "git/67ad42147a7acc2af6074753ebd03d904476118f/COPYING",
+        "bytes": 18765,
+        "sha256": "sha256:5b2198d1645f767585e8a88ac0499b04472164c0d2da22e75ecf97ef443ab32e"
+      },
+      {
+        "source_id": "SRC-V3R-GIT-BUNDLE-001",
+        "role": "source",
+        "path": "git/67ad42147a7acc2af6074753ebd03d904476118f/Documentation/git-bundle.adoc",
+        "bytes": 13310,
+        "sha256": "sha256:77a4e701115f70bc471681f9dec00fe7e1701e4f2090e27950efc0c66e1325ca"
+      },
+      {
+        "source_id": "SRC-V3R-CI32674854589-001",
+        "role": "jobs_metadata",
+        "path": "github/kb4beast-hive-mind-os/actions/runs/32674854589/jobs.json",
+        "bytes": 18811,
+        "sha256": "sha256:33497817cff50d6f472beec13773f56e73c90030676d6001c8b90253c6fa2e15"
+      },
+      {
+        "source_id": "SRC-V3R-CI32674854589-001",
+        "role": "run_logs",
+        "path": "github/kb4beast-hive-mind-os/actions/runs/32674854589/logs.zip",
+        "bytes": 252673,
+        "sha256": "sha256:42720931e62a2ff8f1a7c04f7b07e30f8d20833f325d4e2a7613b5ea6fd35950"
+      },
+      {
+        "source_id": "SRC-V3R-CI32674854589-001",
+        "role": "source",
+        "path": "github/kb4beast-hive-mind-os/actions/runs/32674854589.json",
+        "bytes": 13066,
+        "sha256": "sha256:8805ac9798a6160205e8d50ef498645198990d5bc653db6d095c593e1a867991"
+      },
+      {
+        "source_id": "SRC-V3R-PR154-001",
+        "role": "source",
+        "path": "github/kb4beast-hive-mind-os/pulls/154.json",
+        "bytes": 17234,
+        "sha256": "sha256:703f10e276dfa2a5f49dc792db582c06deaff908c5753251678f016e875865a7"
+      },
+      {
+        "source_id": "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001",
+        "role": "license",
+        "path": "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/LICENSE",
+        "bytes": 18650,
+        "sha256": "sha256:7183ef9749eb9b75e710a81a4c812a9405cc184f087500581a973e5929ac3f5e"
+      },
+      {
+        "source_id": "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001",
+        "role": "source",
+        "path": "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/sdk-api-src/content/winbase/ns-winbase-file_basic_info.md",
+        "bytes": 3607,
+        "sha256": "sha256:a0f5398981241723394996a8e5a25a21ba6aea0af8e34cab577a37d4f2b7289a"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "source_id": "SRC-V3R-GIT-BUNDLE-001",
+      "title": "git-bundle documentation",
+      "canonical_uri": "https://git-scm.com/docs/git-bundle/2.53.0",
+      "source_uri": "https://raw.githubusercontent.com/git/git/67ad42147a7acc2af6074753ebd03d904476118f/Documentation/git-bundle.adoc",
+      "source_immutability": "UPSTREAM_COMMIT_PINNED",
+      "upstream_repository": "https://github.com/git/git",
+      "upstream_path": "Documentation/git-bundle.adoc",
+      "version": {
+        "release": "2.53.0",
+        "annotated_tag": "v2.53.0",
+        "tag_object": "a978e09acb5a3db0959fc757df17b27e8706d26b",
+        "peeled_commit": "67ad42147a7acc2af6074753ebd03d904476118f"
+      },
+      "retrieved_at": "2026-09-02T22:42:54.057Z",
+      "http_status": 200,
+      "media_type": "text/plain; charset=utf-8",
+      "archive_member": "git/67ad42147a7acc2af6074753ebd03d904476118f/Documentation/git-bundle.adoc",
+      "bytes": 13310,
+      "sha256": "sha256:77a4e701115f70bc471681f9dec00fe7e1701e4f2090e27950efc0c66e1325ca",
+      "license": {
+        "spdx": "GPL-2.0-only",
+        "basis": "Exact upstream COPYING bytes are archived.",
+        "source_uri": "https://raw.githubusercontent.com/git/git/67ad42147a7acc2af6074753ebd03d904476118f/COPYING",
+        "archive_member": "git/67ad42147a7acc2af6074753ebd03d904476118f/COPYING",
+        "bytes": 18765,
+        "sha256": "sha256:5b2198d1645f767585e8a88ac0499b04472164c0d2da22e75ecf97ef443ab32e"
+      },
+      "supporting_exhibits": [],
+      "supports_claim_ids": [
+        "CLM-V3R-001",
+        "CLM-V3R-002"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V3R-001"
+      ]
+    },
+    {
+      "source_id": "SRC-V3R-PYTHON-STAT-001",
+      "title": "Python os.stat_result documentation",
+      "canonical_uri": "https://docs.python.org/release/3.14.0/library/os.html#os.stat_result",
+      "source_uri": "https://raw.githubusercontent.com/python/cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/Doc/library/os.rst",
+      "source_immutability": "UPSTREAM_COMMIT_PINNED",
+      "upstream_repository": "https://github.com/python/cpython",
+      "upstream_path": "Doc/library/os.rst",
+      "version": {
+        "release": "3.14.0",
+        "annotated_tag": "v3.14.0",
+        "tag_object": "ac991beb29b1783316c4016c99468c008568d08a",
+        "peeled_commit": "ebf955df7a89ed0c7968f79faec1de49f61ed7cb"
+      },
+      "retrieved_at": "2026-09-02T22:42:54.057Z",
+      "http_status": 200,
+      "media_type": "text/plain; charset=utf-8",
+      "archive_member": "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/Doc/library/os.rst",
+      "bytes": 206006,
+      "sha256": "sha256:7bab91c6d5dcc0f88e476567d190388e94ddb3940768e0713c70f0280130e964",
+      "license": {
+        "spdx": "PSF-2.0",
+        "basis": "Exact upstream LICENSE bytes are archived.",
+        "source_uri": "https://raw.githubusercontent.com/python/cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/LICENSE",
+        "archive_member": "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/LICENSE",
+        "bytes": 13804,
+        "sha256": "sha256:b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
+      },
+      "supporting_exhibits": [],
+      "supports_claim_ids": [
+        "CLM-V3R-003",
+        "CLM-V3R-004"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V3R-002",
+        "CTR-V3R-004"
+      ]
+    },
+    {
+      "source_id": "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001",
+      "title": "FILE_BASIC_INFO structure documentation",
+      "canonical_uri": "https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info",
+      "source_uri": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/sdk-api-src/content/winbase/ns-winbase-file_basic_info.md",
+      "source_immutability": "UPSTREAM_COMMIT_PINNED",
+      "upstream_repository": "https://github.com/MicrosoftDocs/sdk-api",
+      "upstream_path": "sdk-api-src/content/winbase/ns-winbase-file_basic_info.md",
+      "version": {
+        "branch": "docs",
+        "commit": "788888c51ea955dae21e60c5e243c0a8593df8a6",
+        "source_committed_at": "2024-08-02T21:37:01Z",
+        "frontmatter_ms_date": "08/02/2024"
+      },
+      "retrieved_at": "2026-09-02T22:42:54.057Z",
+      "http_status": 200,
+      "media_type": "text/plain; charset=utf-8",
+      "archive_member": "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/sdk-api-src/content/winbase/ns-winbase-file_basic_info.md",
+      "bytes": 3607,
+      "sha256": "sha256:a0f5398981241723394996a8e5a25a21ba6aea0af8e34cab577a37d4f2b7289a",
+      "license": {
+        "spdx": "CC-BY-4.0",
+        "basis": "Exact upstream LICENSE bytes are archived.",
+        "source_uri": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/LICENSE",
+        "archive_member": "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/LICENSE",
+        "bytes": 18650,
+        "sha256": "sha256:7183ef9749eb9b75e710a81a4c812a9405cc184f087500581a973e5929ac3f5e"
+      },
+      "supporting_exhibits": [],
+      "supports_claim_ids": [
+        "CLM-V3R-005",
+        "CLM-V3R-006"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V3R-003",
+        "CTR-V3R-004"
+      ]
+    },
+    {
+      "source_id": "SRC-V3R-PR154-001",
+      "title": "GitHub pull request 154 metadata",
+      "canonical_uri": "https://github.com/kb4beast/hive-mind-os/pull/154",
+      "source_uri": "https://api.github.com/repos/kb4beast/hive-mind-os/pulls/154",
+      "source_immutability": "POINT_IN_TIME_PROVIDER_SNAPSHOT",
+      "upstream_repository": "https://github.com/kb4beast/hive-mind-os",
+      "upstream_path": "pulls/154",
+      "version": {
+        "pull_request": 154,
+        "state": "closed",
+        "merged_at": "2026-08-23T23:51:32Z",
+        "base_commit": "44224532dc25b94a95c3184054ec81762a258259",
+        "head_commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+        "squash_merge_commit": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+      },
+      "retrieved_at": "2026-09-02T22:42:54.057Z",
+      "http_status": 200,
+      "media_type": "application/json; charset=utf-8",
+      "archive_member": "github/kb4beast-hive-mind-os/pulls/154.json",
+      "bytes": 17234,
+      "sha256": "sha256:703f10e276dfa2a5f49dc792db582c06deaff908c5753251678f016e875865a7",
+      "license": {
+        "spdx": "NOASSERTION",
+        "basis": "GitHub provider metadata is retained only as factual provenance; no provider code or expressive content is adopted.",
+        "source_uri": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service",
+        "archive_member": null,
+        "bytes": null,
+        "sha256": null
+      },
+      "supporting_exhibits": [],
+      "supports_claim_ids": [
+        "CLM-V3R-007",
+        "CLM-V3R-008"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V3R-005"
+      ]
+    },
+    {
+      "source_id": "SRC-V3R-CI32674854589-001",
+      "title": "GitHub Actions Constitutional CI run 32674854589 metadata and logs",
+      "canonical_uri": "https://github.com/kb4beast/hive-mind-os/actions/runs/32674854589",
+      "source_uri": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/32674854589",
+      "source_immutability": "POINT_IN_TIME_PROVIDER_SNAPSHOT",
+      "upstream_repository": "https://github.com/kb4beast/hive-mind-os",
+      "upstream_path": "actions/runs/32674854589",
+      "version": {
+        "run_id": 32674854589,
+        "head_commit": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-08-23T23:51:35Z",
+        "updated_at": "2026-08-24T00:20:58Z"
+      },
+      "retrieved_at": "2026-09-02T22:42:54.057Z",
+      "http_status": 200,
+      "media_type": "application/json; charset=utf-8",
+      "archive_member": "github/kb4beast-hive-mind-os/actions/runs/32674854589.json",
+      "bytes": 13066,
+      "sha256": "sha256:8805ac9798a6160205e8d50ef498645198990d5bc653db6d095c593e1a867991",
+      "license": {
+        "spdx": "NOASSERTION",
+        "basis": "GitHub provider metadata and logs are retained only as factual provenance; no provider code or expressive content is adopted.",
+        "source_uri": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service",
+        "archive_member": null,
+        "bytes": null,
+        "sha256": null
+      },
+      "supporting_exhibits": [
+        {
+          "role": "jobs_metadata",
+          "source_uri": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/32674854589/jobs?per_page=100",
+          "retrieved_at": "2026-09-02T22:42:54.057Z",
+          "archive_member": "github/kb4beast-hive-mind-os/actions/runs/32674854589/jobs.json",
+          "media_type": "application/json; charset=utf-8",
+          "bytes": 18811,
+          "sha256": "sha256:33497817cff50d6f472beec13773f56e73c90030676d6001c8b90253c6fa2e15"
+        },
+        {
+          "role": "run_logs",
+          "source_uri": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/32674854589/logs",
+          "retrieved_at": "2026-09-02T22:41:35.470Z",
+          "archive_member": "github/kb4beast-hive-mind-os/actions/runs/32674854589/logs.zip",
+          "media_type": "application/zip",
+          "bytes": 252673,
+          "sha256": "sha256:42720931e62a2ff8f1a7c04f7b07e30f8d20833f325d4e2a7613b5ea6fd35950"
+        }
+      ],
+      "supports_claim_ids": [
+        "CLM-V3R-009",
+        "CLM-V3R-010"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V3R-005",
+        "CTR-V3R-006"
+      ]
+    }
+  ],
+  "atomic_claims": [
+    {
+      "claim_id": "CLM-V3R-001",
+      "source_ids": [
+        "SRC-V3R-GIT-BUNDLE-001"
+      ],
+      "statement": "A Git bundle is an offline transport containing refs and Git objects."
+    },
+    {
+      "claim_id": "CLM-V3R-002",
+      "source_ids": [
+        "SRC-V3R-GIT-BUNDLE-001"
+      ],
+      "statement": "git bundle verify checks the bundle format and whether prerequisite commits exist and are fully linked in the receiving repository."
+    },
+    {
+      "claim_id": "CLM-V3R-003",
+      "source_ids": [
+        "SRC-V3R-PYTHON-STAT-001"
+      ],
+      "statement": "Python 3.12 added st_birthtime and st_birthtime_ns on Windows for file creation time."
+    },
+    {
+      "claim_id": "CLM-V3R-004",
+      "source_ids": [
+        "SRC-V3R-PYTHON-STAT-001"
+      ],
+      "statement": "Python 3.12 deprecated st_ctime and st_ctime_ns on Windows and documents a future metadata-change-time meaning."
+    },
+    {
+      "claim_id": "CLM-V3R-005",
+      "source_ids": [
+        "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001"
+      ],
+      "statement": "FILE_BASIC_INFO exposes CreationTime, LastWriteTime, and ChangeTime as separate fields."
+    },
+    {
+      "claim_id": "CLM-V3R-006",
+      "source_ids": [
+        "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001"
+      ],
+      "statement": "Microsoft distinguishes LastWriteTime for the underlying data stream from ChangeTime for file metadata changes."
+    },
+    {
+      "claim_id": "CLM-V3R-007",
+      "source_ids": [
+        "SRC-V3R-PR154-001"
+      ],
+      "statement": "Pull request 154 closed as merged with final head 28463ae6dd842b0b316fcf99eab98804cdaf9735 and merge commit 59a5364501c5e49ceb28574aad7a4ac1512291b9."
+    },
+    {
+      "claim_id": "CLM-V3R-008",
+      "source_ids": [
+        "SRC-V3R-PR154-001"
+      ],
+      "statement": "Pull request 154 records base commit 44224532dc25b94a95c3184054ec81762a258259 and merged_at 2026-08-23T23:51:32Z."
+    },
+    {
+      "claim_id": "CLM-V3R-009",
+      "source_ids": [
+        "SRC-V3R-CI32674854589-001"
+      ],
+      "statement": "Constitutional CI run 32674854589 completed with failure for head commit 59a5364501c5e49ceb28574aad7a4ac1512291b9."
+    },
+    {
+      "claim_id": "CLM-V3R-010",
+      "source_ids": [
+        "SRC-V3R-CI32674854589-001"
+      ],
+      "statement": "The Linux Python 3.11, 3.12, and 3.14 and Windows Python 3.12 unit jobs failed; their archived logs show the child clone's switch to 9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8 returned exit status 128."
+    }
+  ],
+  "counterclaims": [
+    {
+      "counterclaim_id": "CTR-V3R-001",
+      "source_ids": [
+        "SRC-V3R-GIT-BUNDLE-001"
+      ],
+      "statement": "Bundle verification establishes format and prerequisite integrity, not publisher authenticity or trust; the local correction separately binds the bundle bytes, advertised ref, commits, and trees."
+    },
+    {
+      "counterclaim_id": "CTR-V3R-002",
+      "source_ids": [
+        "SRC-V3R-PYTHON-STAT-001"
+      ],
+      "statement": "Timestamp meaning, availability, and resolution remain operating-system and filesystem dependent; st_birthtime is not a portable field outside the supported Windows boundary."
+    },
+    {
+      "counterclaim_id": "CTR-V3R-003",
+      "source_ids": [
+        "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001"
+      ],
+      "statement": "Windows timestamps describe filesystem observations and cannot detect an entire write-and-restore between observation points."
+    },
+    {
+      "counterclaim_id": "CTR-V3R-004",
+      "source_ids": [
+        "SRC-V3R-PYTHON-STAT-001",
+        "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001"
+      ],
+      "statement": "Timestamp continuity does not authenticate executable content; native-image validation and SHA-256 of the exact bytes remain independent requirements."
+    },
+    {
+      "counterclaim_id": "CTR-V3R-005",
+      "source_ids": [
+        "SRC-V3R-PR154-001",
+        "SRC-V3R-CI32674854589-001"
+      ],
+      "statement": "GitHub API endpoints are mutable provider views; the archive preserves only the exact point-in-time response bytes and must be checked against Git object identities."
+    },
+    {
+      "counterclaim_id": "CTR-V3R-006",
+      "source_ids": [
+        "SRC-V3R-CI32674854589-001"
+      ],
+      "statement": "A failed CI result and its reproduced cause establish an adverse observation, not candidate qualification, activation authority, or production readiness."
+    }
+  ],
+  "disposition": "ADAPT_PENDING_DISTINCT_JUDGE"
+}
