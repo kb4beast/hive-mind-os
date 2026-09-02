@@ -44,9 +44,11 @@ evidence. Numeric-only references to ADR-008, ADR-012, ADR-057, or ADR-058 are a
 | `ADR-067`     | [DAG Standard V2 typed durability and bound consumption](ADR-067-DAG-STANDARD-V2-TYPED-DURABILITY-AND-BOUND-CONSUMPTION.md) | Generic DAG prerequisite | qualified local prerequisite; focused and full CI passed; protected promotion pending |
 | `ADR-068`     | [Bounded doctor execution and exact-checkout binding](ADR-068-BOUNDED-DOCTOR-EXECUTION-AND-EXACT-CHECKOUT-BINDING.md) | Autopilot control room | qualified local candidate; full doctor and repository CI passed; protected promotion pending |
 | `ADR-069`     | [Sealed external Generic Hive Mind V3 execution DAG](ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md) | Generic product execution | proposed adapt; distinct Curator/Judge disposition and external activation trust pending |
+| `ADR-070`     | [Squash-proof Generic V3 baseline recovery](ADR-070-GENERIC-V3-BASELINE-RECOVERY.md) | Generic V3 recovery | proposed adapt; implementation candidate pending independent court and CI |
+| `ADR-071`     | [Portable DAG runtime and external one-run activation](ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md) | Generic product V4 | proposed adapt; implementation and independent court pending |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-070; it must be unique at creation time.
+is ADR-072; it must be unique at creation time.

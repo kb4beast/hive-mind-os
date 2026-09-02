@@ -24,23 +24,34 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 OVERLAY = ROOT / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3"
+HISTORY_BUNDLE = ROOT / "tests" / "fixtures" / "generic-v3-history.bundle"
+HISTORY_BUNDLE_PROVENANCE = ROOT / "tests" / "fixtures" / "generic-v3-history.provenance.json"
+HISTORY_BUNDLE_SHA256 = "2de9a9db506e8561d21b86f7887c9030868337862ae755074d447f19dfcd2ae7"
+HISTORY_BUNDLE_REF = "refs/heads/release/hive-mind-autopilot"
+HISTORY_EVIDENCE_REF = "refs/hive-mind-evidence/generic-v3-history"
 PLAN_AUTHORING_BASE = "42b4aeef17f816430a7d8a435102635afea8761a"
 PAYLOAD_A = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
 GIT_ENVIRONMENT_CORRECTION_PARENT = "f06e52c43a1e2d1d53523378c0d6f5564fb984bf"
-CORRECTION_PARENT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
-CORRECTION_PARENT_TREE = "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
-CORRECTION_PARENT_MANIFEST_SHA256 = "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e"
-CORRECTION_PARENT_AGGREGATE_SHA256 = "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
-CORRECTION_PARENT_REPORT_SHA256 = "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
-CORRECTION_PARENT_STATUS = "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS"
-V4_MANIFEST_KIND = "hive-mind-generic-product-overlay-manifest-v4"
-V4_CONTRACT_MODE = "exact-append-only-native-executable-matrix-correction-v4"
-V4_AUTHORING_MODE = "authoring-native-executable-matrix-correction-v4-non-executing"
-V4_COMMITTED_MODE = "committed-native-executable-matrix-correction-v4"
+GIT_BOUNDARY_CORRECTION_PARENT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
+CORRECTION_PARENT = "28463ae6dd842b0b316fcf99eab98804cdaf9735"
+CORRECTION_PARENT_TREE = "72696b27cdd2c9cd08085c05c98513ece733cc8d"
+CORRECTION_PARENT_PARENT = "9dfa1823edc9cd56cd1f404606a261a1d623f6cb"
+CORRECTION_PARENT_PARENT_TREE = "7e8becaebef2ca88922c9099ae1e497f978f43f1"
+CORRECTION_PARENT_MANIFEST_SHA256 = "sha256:c2f0ae0dcee177213f219eaa3031b45d6f5526fd1f2d98d73b11672068f81377"
+CORRECTION_PARENT_AGGREGATE_SHA256 = "sha256:ecbeb374fc8adbb711391568d8a2f2fa8b0ef022c233ca932f24bd9ab0b4fb23"
+CORRECTION_PARENT_REPORT_SHA256 = "sha256:1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944"
+CORRECTION_PARENT_STATUS = "PUBLISHED_TREE_WITH_SQUASH_SEVERED_HISTORY_AND_RED_CONSTITUTIONAL_CI"
+V5_MANIFEST_KIND = "hive-mind-generic-product-overlay-manifest-v5"
+V5_CONTRACT_MODE = "exact-append-only-squash-proof-windows-identity-correction-v5"
+V5_AUTHORING_MODE = "authoring-squash-proof-windows-identity-correction-v5-non-executing"
+V5_COMMITTED_MODE = "committed-squash-proof-windows-identity-correction-v5"
 TARGET_BRANCH = "release/hive-mind-autopilot"
 PAYLOAD_PATHS = (
     ".gitattributes",
+    ".github/workflows/ci.yml",
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
     "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
@@ -50,15 +61,28 @@ PAYLOAD_PATHS = (
     "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
     "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
     "tests/test_generic_dag_v3_overlay.py",
 )
 CORRECTION_PATHS = (
     ".gitattributes",
-    "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    ".github/workflows/ci.yml",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
     "tests/test_generic_dag_v3_overlay.py",
+)
+ADDED_CORRECTION_PATHS = (
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
 )
 
 WINDOWS_ERROR_HANDLE_EOF = 38
@@ -521,13 +545,38 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             check=True,
             env=cls.git_environment,
         )
+        provenance = json.loads(HISTORY_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        bundle_contract = provenance["bundle"]
+        if bundle_contract["sha256"] != "sha256:" + HISTORY_BUNDLE_SHA256:
+            raise AssertionError("V3 history bundle provenance digest mismatch")
+        if hashlib.sha256(HISTORY_BUNDLE.read_bytes()).hexdigest() != HISTORY_BUNDLE_SHA256:
+            raise AssertionError("V3 history bundle raw digest mismatch")
+        cls.run_git(cls.authoring_root, "bundle", "verify", str(HISTORY_BUNDLE))
+        cls.run_git(
+            cls.authoring_root,
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            str(HISTORY_BUNDLE),
+            f"{HISTORY_BUNDLE_REF}:{HISTORY_EVIDENCE_REF}",
+        )
+        advertised = cls.run_git(
+            cls.authoring_root,
+            "rev-parse",
+            "--verify",
+            HISTORY_EVIDENCE_REF,
+        ).stdout.strip()
+        if advertised != CORRECTION_PARENT:
+            raise AssertionError("V3 history bundle advertised commit mismatch")
+        for required_commit in provenance["required_commits"]:
+            cls.run_git(cls.authoring_root, "cat-file", "-e", f"{required_commit}^{{commit}}")
         cls.run_git(cls.authoring_root, "switch", "--quiet", "-C", TARGET_BRANCH, CORRECTION_PARENT)
         for relative in PAYLOAD_PATHS:
             destination = cls.authoring_root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / relative, destination)
         cls.verifier = load_module(
-            "_generic_dag_v4_verifier_under_test",
+            "_generic_dag_v5_verifier_under_test",
             OVERLAY / "verify_plan.py",
         )
         cls.addClassCleanup(cls.reset_verifier_boundary)
@@ -565,6 +614,67 @@ class GenericDagV3OverlayTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.reset_verifier_boundary()
         super().tearDown()
+
+    def test_history_bundle_is_digest_pinned_complete_and_prerequisite_bound(self) -> None:
+        provenance = json.loads(HISTORY_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        self.assertEqual(
+            hashlib.sha256(HISTORY_BUNDLE.read_bytes()).hexdigest(),
+            HISTORY_BUNDLE_SHA256,
+        )
+        self.assertEqual(
+            provenance["bundle"]["sha256"],
+            "sha256:" + HISTORY_BUNDLE_SHA256,
+        )
+        heads = self.run_git(
+            self.authoring_root,
+            "bundle",
+            "list-heads",
+            str(HISTORY_BUNDLE),
+        ).stdout.splitlines()
+        self.assertEqual(heads, [f"{CORRECTION_PARENT} {HISTORY_BUNDLE_REF}"])
+        self.run_git(self.authoring_root, "bundle", "verify", str(HISTORY_BUNDLE))
+        for required_commit in provenance["required_commits"]:
+            self.run_git(
+                self.authoring_root,
+                "cat-file",
+                "-e",
+                f"{required_commit}^{{commit}}",
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            tampered = Path(directory) / "tampered.bundle"
+            raw = bytearray(HISTORY_BUNDLE.read_bytes())
+            raw[0] ^= 0xFF
+            tampered.write_bytes(raw)
+            self.assertNotEqual(hashlib.sha256(raw).hexdigest(), HISTORY_BUNDLE_SHA256)
+            result = subprocess.run(
+                [str(self.git_executable), "-C", str(self.authoring_root), "bundle", "verify", str(tampered)],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=self.git_environment,
+            )
+            self.assertNotEqual(result.returncode, 0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            empty_repository = Path(directory) / "empty"
+            self.run_git(Path(directory), "init", "--quiet", str(empty_repository))
+            result = subprocess.run(
+                [
+                    str(self.git_executable),
+                    "-C",
+                    str(empty_repository),
+                    "bundle",
+                    "verify",
+                    str(HISTORY_BUNDLE),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=self.git_environment,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("prerequisite", (result.stdout + result.stderr).casefold())
 
     def copy_git_executable(self, directory: Path) -> Path:
         executable = directory / self.git_executable.name
@@ -612,7 +722,8 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         expected_digest: str | None = None,
     ):
         self.reset_verifier_boundary()
-        autopilot_before = complete_tree_snapshot(self.authoring_root / ".autopilot")
+        authoring_root = self.authoring_root.resolve()
+        autopilot_before = complete_tree_snapshot(authoring_root / ".autopilot")
         hostile_ambient = {
             "HOME": str(executable.parent / "hostile-home"),
             "XDG_CONFIG_HOME": str(executable.parent / "hostile-xdg"),
@@ -621,14 +732,14 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         try:
             with mock.patch.dict(os.environ, hostile_ambient, clear=True):
                 self.verifier.configure_git_boundary(
-                    self.authoring_root,
+                    authoring_root,
                     git_executable=executable,
                     expected_git_executable_sha256=expected_digest or "sha256:" + raw_digest(executable),
                 )
                 yield self.verifier._GIT_BOUNDARY
         finally:
             self.reset_verifier_boundary()
-            autopilot_after = complete_tree_snapshot(self.authoring_root / ".autopilot")
+            autopilot_after = complete_tree_snapshot(authoring_root / ".autopilot")
             self.assertEqual(autopilot_after, autopilot_before)
 
     def assert_executable_changed(self, action) -> None:
@@ -1013,10 +1124,11 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         }
         expected = repository_paths | payload_paths | overlay_paths | frozen_paths
         self.assertEqual(set(coverage), expected)
+        self.assertEqual(coverage["tests/fixtures/generic-v3-history.bundle"], "explicit--text")
         self.assertEqual(
-            set(coverage.values()),
+            {value for path, value in coverage.items() if not path.endswith(".bundle")},
             {"text-eol-lf"},
-            "all currently bound inputs are repository-authored text",
+            "all non-bundle bound inputs are repository-authored text",
         )
         with self.configured_boundary(self.git_executable):
             self.verifier.verify_no_applicable_nested_gitattributes(
@@ -1077,7 +1189,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                         )
             finally:
                 self.reset_verifier_boundary()
-        self.assertEqual(len(CORRECTION_PATHS), 6)
+        self.assertEqual(len(CORRECTION_PATHS), 11)
         self.assertEqual(CORRECTION_PATHS[0], ".gitattributes")
         self.assertIn(".gitattributes", PAYLOAD_PATHS)
         with self.assertRaisesRegex(
@@ -1417,7 +1529,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     verifier_copy.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(OVERLAY / "verify_plan.py", verifier_copy)
                     imported = load_module(
-                        f"_generic_dag_v4_{label}_help_probe",
+                        f"_generic_dag_v5_{label}_help_probe",
                         verifier_copy,
                     )
                     self.assertTrue(callable(imported.main))
@@ -1458,7 +1570,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         self.assertEqual(payload["durability_semantics"], "typed-v2")
         self.assertEqual(payload["topology"], {"nodes": 20, "raw_edges": 28, "levels": 17, "rounds": 20})
         self.assertFalse(payload["materializer_imported_or_executed"])
-        self.assertEqual(payload["verification_mode"], V4_AUTHORING_MODE)
+        self.assertEqual(payload["verification_mode"], V5_AUTHORING_MODE)
         self.assertFalse(payload["committed_payload_qualification"])
         self.assertFalse(payload["execution_qualification"])
         self.assertFalse(payload["execution"]["authorized"])
@@ -2005,7 +2117,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "complete-autopilot-tree-point-observation-v2",
             )
 
-    def test_authoring_mode_rejects_any_state_beyond_exact_six_payload_paths(self) -> None:
+    def test_authoring_mode_rejects_any_state_beyond_exact_eleven_payload_paths(self) -> None:
         overlay = self.authoring_root / "docs/execution/dags/generic-hive-mind-product-v3"
         changed = tuple(
             sorted(
@@ -2019,7 +2131,20 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 if line
             )
         )
-        self.assertEqual(changed, tuple(sorted(CORRECTION_PATHS)))
+        untracked = tuple(
+            sorted(
+                line
+                for line in self.run_git(
+                    self.authoring_root,
+                    "ls-files",
+                    "--others",
+                    "--exclude-standard",
+                ).stdout.splitlines()
+                if line
+            )
+        )
+        self.assertEqual(changed, tuple(sorted(set(CORRECTION_PATHS) - set(ADDED_CORRECTION_PATHS))))
+        self.assertEqual(untracked, tuple(sorted(ADDED_CORRECTION_PATHS)))
 
         tracked = self.authoring_root / "CONTRIBUTING.md"
         tracked_before = tracked.read_bytes()
@@ -2216,7 +2341,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             result = self.run_verifier(overlay, repo_root=checkout, authoring_check=False)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["verification_mode"], V4_COMMITTED_MODE)
+            self.assertEqual(payload["verification_mode"], V5_COMMITTED_MODE)
             self.assertTrue(payload["committed_payload_qualification"])
             self.assertFalse(payload["execution_qualification"])
             self.assertFalse(payload["execution"]["authorized"])
@@ -2825,7 +2950,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     baseline = list(
                         boundary["path_state" if label == "path" else "handle_identity"]
                     )
-                    baseline[-2] += 1
+                    baseline[3] += 1
                     with mock.patch.object(
                         self.verifier,
                         identity_function,
@@ -2835,6 +2960,121 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                             lambda: self.verifier.git(self.authoring_root, "--version")
                         )
                         popen.assert_not_called()
+
+    def test_git_executable_continuity_keys_are_platform_scoped(self) -> None:
+        baseline = (11, 22, 33, 44, 55, 66)
+        ctime_drift = (11, 22, 33, 44, 99, 66)
+        self.assertEqual(
+            self.verifier._git_executable_continuity_key(
+                baseline,
+                host_platform="win32",
+            ),
+            self.verifier._git_executable_continuity_key(
+                ctime_drift,
+                host_platform="win32",
+            ),
+        )
+        self.assertNotEqual(
+            self.verifier._git_executable_continuity_key(
+                baseline,
+                host_platform="linux",
+            ),
+            self.verifier._git_executable_continuity_key(
+                ctime_drift,
+                host_platform="linux",
+            ),
+        )
+        legacy = (11, 22, 33, 44, 55, None)
+        self.assertEqual(
+            self.verifier._git_executable_continuity_key(
+                legacy,
+                host_platform="win32",
+            ),
+            (11, 22, 33, 44, 55),
+        )
+        for field in (0, 1, 2, 3, 5):
+            with self.subTest(windows_continuity_field=field):
+                mutated = list(baseline)
+                mutated[field] += 1
+                self.assertNotEqual(
+                    self.verifier._git_executable_continuity_key(
+                        baseline,
+                        host_platform="win32",
+                    ),
+                    self.verifier._git_executable_continuity_key(
+                        tuple(mutated),
+                        host_platform="win32",
+                    ),
+                )
+
+    @unittest.skipUnless(sys.platform == "win32", "requires a native Windows Git executable")
+    def test_windows_ctime_drift_accepts_stable_bytes_and_rejects_changed_bytes_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            executable = self.copy_git_executable(Path(directory))
+            process = FakeProcess(b"git version synthetic\n")
+            with self.configured_boundary(executable) as boundary:
+                birthtime = 1776656106008279900
+                path_identity = tuple(boundary["path_state"][:5]) + (birthtime,)
+                handle_identity = tuple(boundary["handle_identity"][:5]) + (birthtime,)
+                boundary["path_state"] = path_identity
+                boundary["handle_identity"] = handle_identity
+                boundary["identity_platform"] = "win32"
+                path_drift = list(path_identity)
+                handle_drift = list(handle_identity)
+                path_drift[4] += 100
+                handle_drift[4] += 200
+                with mock.patch.object(
+                    self.verifier,
+                    "_git_executable_path_state",
+                    return_value=tuple(path_drift),
+                ), mock.patch.object(
+                    self.verifier,
+                    "_open_file_identity",
+                    return_value=tuple(handle_drift),
+                ), mock.patch.object(
+                    self.verifier.subprocess,
+                    "Popen",
+                    return_value=process,
+                ) as popen:
+                    self.assertEqual(
+                        self.verifier.git(self.authoring_root, "--version"),
+                        "git version synthetic",
+                    )
+                    popen.assert_called_once()
+
+        with tempfile.TemporaryDirectory() as directory:
+            executable = self.copy_git_executable(Path(directory))
+            with self.configured_boundary(executable) as boundary:
+                birthtime = 1776656106008279900
+                path_identity = tuple(boundary["path_state"][:5]) + (birthtime,)
+                handle_identity = tuple(boundary["handle_identity"][:5]) + (birthtime,)
+                boundary["path_state"] = path_identity
+                boundary["handle_identity"] = handle_identity
+                boundary["identity_platform"] = "win32"
+                path_drift = list(path_identity)
+                handle_drift = list(handle_identity)
+                path_drift[4] += 100
+                handle_drift[4] += 200
+                changed = bytearray(executable.read_bytes())
+                changed[-1] ^= 0xFF
+                original_handle = boundary["handle"]
+                original_handle.close()
+                boundary["handle"] = io.BytesIO(changed)
+                with mock.patch.object(
+                    self.verifier,
+                    "_git_executable_path_state",
+                    return_value=tuple(path_drift),
+                ), mock.patch.object(
+                    self.verifier,
+                    "_open_file_identity",
+                    return_value=tuple(handle_drift),
+                ), mock.patch.object(self.verifier.subprocess, "Popen") as popen:
+                    with self.assertRaisesRegex(
+                        self.verifier.VerificationError,
+                        "retained Git executable bytes changed",
+                    ):
+                        self.verifier.git(self.authoring_root, "--version")
+                    popen.assert_not_called()
 
     def test_native_format_and_digest_mutations_are_detected_at_lifecycle_checks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -3836,12 +4076,12 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             self.assert_rejected(result, "materialize_plan.py")
             self.assertFalse(marker.exists())
 
-    def test_v4_manifest_binds_predecessor_report_status_lineage_and_anti_downgrade(self) -> None:
+    def test_v5_manifest_binds_predecessor_report_status_lineage_and_anti_downgrade(self) -> None:
         manifest = json.loads((OVERLAY / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["schema_version"], 4)
-        self.assertEqual(manifest["kind"], V4_MANIFEST_KIND)
+        self.assertEqual(manifest["schema_version"], 5)
+        self.assertEqual(manifest["kind"], V5_MANIFEST_KIND)
         contract = manifest["committed_payload_contract"]
-        self.assertEqual(contract["mode"], V4_CONTRACT_MODE)
+        self.assertEqual(contract["mode"], V5_CONTRACT_MODE)
         self.assertEqual(
             contract["correction_parent"],
             {"commit": CORRECTION_PARENT, "tree": CORRECTION_PARENT_TREE},
@@ -3849,7 +4089,8 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         predecessor = contract["predecessor_payload"]
         self.assertEqual(predecessor["commit"], CORRECTION_PARENT)
         self.assertEqual(predecessor["tree"], CORRECTION_PARENT_TREE)
-        self.assertEqual(predecessor["parent_commit"], GIT_ENVIRONMENT_CORRECTION_PARENT)
+        self.assertEqual(predecessor["parent_commit"], CORRECTION_PARENT_PARENT)
+        self.assertEqual(predecessor["parent_tree"], CORRECTION_PARENT_PARENT_TREE)
         self.assertEqual(predecessor["manifest_raw_sha256"], CORRECTION_PARENT_MANIFEST_SHA256)
         self.assertEqual(
             predecessor["full_payload_aggregate"]["sha256"],
@@ -3858,22 +4099,29 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         self.assertEqual(predecessor["qualification_report_sha256"], CORRECTION_PARENT_REPORT_SHA256)
         self.assertEqual(predecessor["observed_status"], CORRECTION_PARENT_STATUS)
         self.assertEqual(predecessor["author_proposed_disposition"], "ADAPT_REMAND")
+        remanded_git_boundary = contract["remanded_git_boundary_predecessor"]
+        self.assertEqual(remanded_git_boundary["commit"], GIT_BOUNDARY_CORRECTION_PARENT)
+        self.assertEqual(
+            remanded_git_boundary["observed_status"],
+            "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
+        )
         self.assertEqual(
             manifest["snapshot_lineage"]["correction_parent"],
             {"commit": CORRECTION_PARENT, "tree": CORRECTION_PARENT_TREE},
         )
         anti_downgrade = contract["activation_anti_downgrade"]
-        self.assertEqual(anti_downgrade["required_contract_mode"], V4_CONTRACT_MODE)
+        self.assertEqual(anti_downgrade["required_contract_mode"], V5_CONTRACT_MODE)
         self.assertEqual(
             anti_downgrade["required_git_executable_format_policy"],
             "host-native-image-format-v1",
         )
+        self.assertEqual(anti_downgrade["published_v4_activation"], "PROHIBITED")
         self.assertEqual(anti_downgrade["v3_git_boundary_activation"], "PROHIBITED")
 
     def test_manifest_identity_snapshot_and_tool_substitution_fail_closed(self) -> None:
         mutations = {
-            "schema_downgrade": lambda m: m.__setitem__("schema_version", 3),
-            "kind_downgrade": lambda m: m.__setitem__("kind", "hive-mind-generic-product-overlay-manifest-v3"),
+            "schema_downgrade": lambda m: m.__setitem__("schema_version", 4),
+            "kind_downgrade": lambda m: m.__setitem__("kind", "hive-mind-generic-product-overlay-manifest-v4"),
             "request": lambda m: m["request_binding"].__setitem__("request_id", "sha256:stale"),
             "objective": lambda m: m["request_binding"].__setitem__("objective_digest", "sha256:stale"),
             "repository": lambda m: m["request_binding"].__setitem__("repository_id", "sha256:stale"),
@@ -3888,11 +4136,13 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "predecessor_status": lambda m: m["committed_payload_contract"]["predecessor_payload"].__setitem__("observed_status", "QUALIFIED"),
             "predecessor_lineage": lambda m: m["committed_payload_contract"]["predecessor_payload"].__setitem__("parent_commit", "0" * 40),
             "predecessor_disposition": lambda m: m["committed_payload_contract"]["predecessor_payload"].__setitem__("author_proposed_disposition", "ADOPT"),
+            "v3_git_boundary_record": lambda m: m["committed_payload_contract"]["remanded_git_boundary_predecessor"].__setitem__("commit", "0" * 40),
             "f06_record": lambda m: m["committed_payload_contract"]["remanded_git_environment_predecessor"].__setitem__("commit", "0" * 40),
             "payload_a_record": lambda m: m["committed_payload_contract"]["historical_payload_a"].__setitem__("commit", "0" * 40),
             "contract_mode_downgrade": lambda m: m["committed_payload_contract"].__setitem__("mode", "exact-append-only-git-boundary-correction-v3"),
             "payload_inventory": lambda m: m["committed_payload_contract"]["payload_inventory"].pop(),
             "anti_downgrade": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("v3_git_boundary_activation", "ALLOWED"),
+            "published_v4_activation": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("published_v4_activation", "ALLOWED"),
             "f06_activation": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("f06_activation", "ALLOWED"),
             "payload_a_activation": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("historical_payload_a_activation", "ALLOWED"),
             "v1_fallback": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("legacy_v1_fallback", "ALLOWED"),
@@ -3934,11 +4184,13 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "predecessor_status": "predecessor correction identity/status mismatch",
             "predecessor_lineage": "predecessor correction identity/status mismatch",
             "predecessor_disposition": "predecessor correction identity/status mismatch",
+            "v3_git_boundary_record": "remanded Git-boundary predecessor identity/status mismatch",
             "f06_record": "remanded Git-environment predecessor identity/status mismatch",
             "payload_a_record": "historical Payload A identity/status mismatch",
             "contract_mode_downgrade": "committed payload mode mismatch",
             "payload_inventory": "committed payload inventory mismatch",
             "anti_downgrade": "activation anti-downgrade contract mismatch",
+            "published_v4_activation": "activation anti-downgrade contract mismatch",
             "f06_activation": "activation anti-downgrade contract mismatch",
             "payload_a_activation": "activation anti-downgrade contract mismatch",
             "v1_fallback": "activation anti-downgrade contract mismatch",
@@ -3970,7 +4222,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             overlay = self.copy_overlay(Path(directory))
             manifest = overlay / "manifest.json"
             text = manifest.read_text(encoding="utf-8")
-            manifest.write_text(text.replace('"schema_version": 4,', '"schema_version": 4,\n  "schema_version": 4,', 1), encoding="utf-8")
+            manifest.write_text(text.replace('"schema_version": 5,', '"schema_version": 5,\n  "schema_version": 5,', 1), encoding="utf-8")
             self.assert_rejected(self.run_verifier(overlay))
 
         with tempfile.TemporaryDirectory() as directory:

@@ -54,12 +54,15 @@ MAX_GITATTRIBUTE_PATTERN_BYTES = 4_096
 MAX_GITATTRIBUTE_PATTERN_PARTS = 64
 
 NATIVE_EXECUTABLE_FORMAT_POLICY = "host-native-image-format-v1"
-GIT_EXECUTION_BOUNDARY_POLICY = "caller-absolute-raw-sha256-host-native-image-v2"
+GIT_EXECUTION_BOUNDARY_POLICY = "caller-absolute-raw-sha256-host-native-image-windows-birthtime-v3"
 SUPPORTED_NATIVE_IMAGE_FORMATS = {
     "win32": "PE_COFF_EXECUTABLE_IMAGE",
     "linux": "ELF_EXEC_OR_PIE_WITH_EXECUTABLE_LOAD_SEGMENT",
     "darwin": "MACH_O_EXECUTE_THIN_OR_HOST_SLICE_UNIVERSAL",
 }
+
+GitExecutableIdentity = tuple[int, int, int, int, int, int | None]
+GitExecutableContinuityKey = tuple[int, int, int, int, int]
 
 PLAN_ID = "generic-hive-mind-product-v3"
 REQUEST_ID = "sha256:baa813bdcbd1b3bd459736cb65dccaf060758991a8a9b581fe8a1bf17dd65562"
@@ -85,11 +88,18 @@ GIT_ENVIRONMENT_CORRECTION_PARENT_TREE = "8730203c89835c4d1d9dac4be9b2086dacd2d8
 GIT_ENVIRONMENT_CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:b3ea9cbc2766cc1fa72a41f097de491a8b0ae5b9b482c57667bd31c1393fa339"
 GIT_ENVIRONMENT_CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:229821586021d8e2769035aeca4a4589cb7b458a9740a8b8ca82ebdfdadaee36"
 GIT_ENVIRONMENT_CORRECTION_PARENT_REPORT_DIGEST = "sha256:731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810"
-CORRECTION_PARENT_COMMIT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
-CORRECTION_PARENT_TREE = "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
-CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e"
-CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
-CORRECTION_PARENT_REPORT_DIGEST = "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
+GIT_BOUNDARY_CORRECTION_COMMIT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
+GIT_BOUNDARY_CORRECTION_TREE = "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
+GIT_BOUNDARY_CORRECTION_MANIFEST_RAW_DIGEST = "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e"
+GIT_BOUNDARY_CORRECTION_AGGREGATE_DIGEST = "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
+GIT_BOUNDARY_CORRECTION_REPORT_DIGEST = "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
+CORRECTION_PARENT_COMMIT = "28463ae6dd842b0b316fcf99eab98804cdaf9735"
+CORRECTION_PARENT_TREE = "72696b27cdd2c9cd08085c05c98513ece733cc8d"
+CORRECTION_PARENT_PARENT_COMMIT = "9dfa1823edc9cd56cd1f404606a261a1d623f6cb"
+CORRECTION_PARENT_PARENT_TREE = "7e8becaebef2ca88922c9099ae1e497f978f43f1"
+CORRECTION_PARENT_MANIFEST_RAW_DIGEST = "sha256:c2f0ae0dcee177213f219eaa3031b45d6f5526fd1f2d98d73b11672068f81377"
+CORRECTION_PARENT_AGGREGATE_DIGEST = "sha256:ecbeb374fc8adbb711391568d8a2f2fa8b0ef022c233ca932f24bd9ab0b4fb23"
+CORRECTION_PARENT_REPORT_DIGEST = "sha256:1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944"
 SOURCE_INTAKE_DIGEST = "sha256:dd884c72e2e587b4111dc9b6343296a52b3e87cc909ed2fa5d13141176a2782c"
 STANDARD_DIGEST = "sha256:3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a"
 STANDARD_BLOB = "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374"
@@ -110,7 +120,10 @@ EXPECTED_OVERLAY_SOURCES = {
 
 EXPECTED_PAYLOAD_PATHS = (
     ".gitattributes",
+    ".github/workflows/ci.yml",
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
     "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
@@ -120,15 +133,28 @@ EXPECTED_PAYLOAD_PATHS = (
     "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
     "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
     "tests/test_generic_dag_v3_overlay.py",
 )
 EXPECTED_CHANGED_PATHS = (
     ".gitattributes",
-    "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    ".github/workflows/ci.yml",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
     "tests/test_generic_dag_v3_overlay.py",
+)
+EXPECTED_ADDED_PATHS = (
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
 )
 MANIFEST_RELATIVE_PATH = "docs/execution/dags/generic-hive-mind-product-v3/manifest.json"
 OVERLAY_RELATIVE_DIRECTORY = "docs/execution/dags/generic-hive-mind-product-v3"
@@ -146,6 +172,7 @@ REQUIRED_RAW_EVIDENCE_GITATTRIBUTE_RULES = {
     "evidence/experiments/_artifacts/**": ("-text", "-diff"),
     "evidence/experiments/_failed/**": ("-text", "-diff"),
     "evidence/local_assurance/**/logs/**": ("-text", "-diff"),
+    "tests/fixtures/*.bundle": ("-text", "-diff"),
 }
 EXPECTED_GITATTRIBUTE_RULES = (
     (".gitattributes", ("text", "eol=lf")),
@@ -887,7 +914,41 @@ def _resolve_common_git_dir(git_dir: Path) -> Path:
     return common_dir
 
 
-def _git_executable_path_state(path: Path) -> tuple[int, int, int, int, int]:
+def _git_executable_identity_from_stat(stat_result: os.stat_result) -> GitExecutableIdentity:
+    birthtime_ns = _optional_stat_integer(stat_result, "st_birthtime_ns")
+    if birthtime_ns is None:
+        birthtime = getattr(stat_result, "st_birthtime", None)
+        if birthtime is not None:
+            birthtime_ns = int(float(birthtime) * 1_000_000_000)
+    return (
+        stat_result.st_dev,
+        stat_result.st_ino,
+        stat_result.st_size,
+        stat_result.st_mtime_ns,
+        stat_result.st_ctime_ns,
+        birthtime_ns,
+    )
+
+
+def _git_executable_continuity_key(
+    identity: GitExecutableIdentity,
+    *,
+    host_platform: str | None = None,
+) -> GitExecutableContinuityKey:
+    """Return only platform-stable fields while retaining raw ctime as evidence."""
+
+    selected_platform = sys.platform if host_platform is None else host_platform
+    if selected_platform == "win32":
+        # Python 3.12 exposes creation time explicitly as st_birthtime_ns and
+        # deprecates the Windows st_ctime_ns meaning.  Older Python versions
+        # expose creation time through st_ctime_ns, which is the compatibility
+        # fallback only when birth time is unavailable.
+        creation_time_ns = identity[5] if identity[5] is not None else identity[4]
+        return identity[:4] + (creation_time_ns,)
+    return identity[:5]
+
+
+def _git_executable_path_state(path: Path) -> GitExecutableIdentity:
     try:
         require(path.is_file() and not path.is_symlink(), "Git executable is no longer a regular file")
         stat_result = path.stat()
@@ -897,36 +958,25 @@ def _git_executable_path_state(path: Path) -> tuple[int, int, int, int, int]:
         0 < stat_result.st_size <= MAX_NATIVE_EXECUTABLE_BYTES,
         "Git executable size is outside the verifier limit",
     )
-    return (
-        stat_result.st_dev,
-        stat_result.st_ino,
-        stat_result.st_size,
-        stat_result.st_mtime_ns,
-        stat_result.st_ctime_ns,
-    )
+    return _git_executable_identity_from_stat(stat_result)
 
 
-def _open_file_identity(handle: Any) -> tuple[int, int, int, int, int]:
+def _open_file_identity(handle: Any) -> GitExecutableIdentity:
     try:
         stat_result = os.fstat(handle.fileno())
     except (OSError, ValueError) as error:
         raise VerificationError(f"cannot inspect open Git executable identity: {error}") from error
-    return (
-        stat_result.st_dev,
-        stat_result.st_ino,
-        stat_result.st_size,
-        stat_result.st_mtime_ns,
-        stat_result.st_ctime_ns,
-    )
+    return _git_executable_identity_from_stat(stat_result)
 
 
 def _read_immutable_executable_snapshot(
     handle: Any,
     *,
-    expected_identity: tuple[int, int, int, int, int] | None,
+    expected_identity: GitExecutableIdentity | None,
     label: str,
+    identity_platform: str | None = None,
 ) -> bytes:
-    """Make one bounded read bracketed by exact open-file identity checks."""
+    """Make one bounded read bracketed by platform-stable identity checks."""
 
     before = _open_file_identity(handle)
     require(
@@ -935,7 +985,14 @@ def _read_immutable_executable_snapshot(
     )
     if expected_identity is not None:
         require(
-            before[:4] == expected_identity[:4],
+            _git_executable_continuity_key(
+                before,
+                host_platform=identity_platform,
+            )
+            == _git_executable_continuity_key(
+                expected_identity,
+                host_platform=identity_platform,
+            ),
             f"{label} path/open identity or size changed before snapshot",
         )
     try:
@@ -945,7 +1002,11 @@ def _read_immutable_executable_snapshot(
     except (OSError, ValueError) as error:
         raise VerificationError(f"cannot read {label}: {error}") from error
     after = _open_file_identity(handle)
-    require(before == after, f"{label} identity changed while reading one snapshot")
+    require(
+        _git_executable_continuity_key(before, host_platform=identity_platform)
+        == _git_executable_continuity_key(after, host_platform=identity_platform),
+        f"{label} identity changed while reading one snapshot",
+    )
     require(len(raw) == before[2], f"{label} read length differs from file size")
     return raw
 
@@ -1463,7 +1524,7 @@ def inspect_host_native_executable(
     host_platform: str | None = None,
     host_machine: str | None = None,
 ) -> dict[str, str]:
-    """Read and inspect one retained executable handle under the V4 byte limit."""
+    """Read and inspect one retained executable handle under the V5 byte limit."""
 
     inspection, _ = _inspect_and_digest_executable_snapshot(
         handle,
@@ -1478,7 +1539,7 @@ def inspect_host_native_executable(
 def _inspect_and_digest_executable_snapshot(
     handle: Any,
     *,
-    expected_identity: tuple[int, int, int, int, int] | None,
+    expected_identity: GitExecutableIdentity | None,
     label: str,
     host_platform: str | None = None,
     host_machine: str | None = None,
@@ -1493,6 +1554,7 @@ def _inspect_and_digest_executable_snapshot(
         handle,
         expected_identity=expected_identity,
         label=label,
+        identity_platform=selected_platform,
     )
     inspection = _inspect_native_image(raw, selected_platform, selected_machine)
     return inspection, sha256_bytes(raw)
@@ -1524,6 +1586,8 @@ def configure_git_boundary(
         require(resolved_executable.suffix.casefold() == ".exe", "Git executable must be a native .exe file")
     else:
         require(os.access(resolved_executable, os.X_OK), "Git executable is not executable")
+    identity_platform = sys.platform
+    host_machine = _current_host_machine(identity_platform)
     path_state = _git_executable_path_state(resolved_executable)
     try:
         executable_handle = resolved_executable.open("rb")
@@ -1531,14 +1595,33 @@ def configure_git_boundary(
         raise VerificationError(f"cannot open Git executable: {error}") from error
     try:
         handle_identity = _open_file_identity(executable_handle)
-        require(handle_identity[:4] == path_state[:4], "Git executable path/open-file identity mismatch")
+        require(
+            _git_executable_continuity_key(
+                handle_identity,
+                host_platform=identity_platform,
+            )
+            == _git_executable_continuity_key(
+                path_state,
+                host_platform=identity_platform,
+            ),
+            "Git executable path/open-file identity mismatch",
+        )
         native_image, observed_digest = _inspect_and_digest_executable_snapshot(
             executable_handle,
             expected_identity=path_state,
             label="initial retained Git executable",
+            host_platform=identity_platform,
+            host_machine=host_machine,
         )
         require(
-            _git_executable_path_state(resolved_executable) == path_state,
+            _git_executable_continuity_key(
+                _git_executable_path_state(resolved_executable),
+                host_platform=identity_platform,
+            )
+            == _git_executable_continuity_key(
+                path_state,
+                host_platform=identity_platform,
+            ),
             "Git executable path identity changed during initial snapshot",
         )
         require(
@@ -1572,6 +1655,8 @@ def configure_git_boundary(
             "path_state": path_state,
             "handle_identity": handle_identity,
             "handle": executable_handle,
+            "identity_platform": identity_platform,
+            "host_machine": host_machine,
             "native_image": native_image,
             "git_dir": git_dir,
             "common_dir": common_dir,
@@ -1593,15 +1678,37 @@ def verify_git_executable_stable(*, full_digest: bool) -> None:
     executable = _GIT_BOUNDARY["executable"]
     handle = _GIT_BOUNDARY["handle"]
     expected_identity = _GIT_BOUNDARY["path_state"]
-    require(_git_executable_path_state(executable) == expected_identity, "Git executable identity changed during verification")
+    identity_platform = _GIT_BOUNDARY["identity_platform"]
+    host_machine = _GIT_BOUNDARY["host_machine"]
+    expected_key = _git_executable_continuity_key(
+        expected_identity,
+        host_platform=identity_platform,
+    )
     require(
-        _open_file_identity(handle) == _GIT_BOUNDARY["handle_identity"],
+        _git_executable_continuity_key(
+            _git_executable_path_state(executable),
+            host_platform=identity_platform,
+        )
+        == expected_key,
+        "Git executable identity changed during verification",
+    )
+    require(
+        _git_executable_continuity_key(
+            _open_file_identity(handle),
+            host_platform=identity_platform,
+        )
+        == _git_executable_continuity_key(
+            _GIT_BOUNDARY["handle_identity"],
+            host_platform=identity_platform,
+        ),
         "open Git executable identity changed during verification",
     )
     retained_native, retained_digest = _inspect_and_digest_executable_snapshot(
         handle,
         expected_identity=expected_identity,
         label="retained Git executable revalidation",
+        host_platform=identity_platform,
+        host_machine=host_machine,
     )
     require(
         retained_native == _GIT_BOUNDARY["native_image"],
@@ -1612,19 +1719,29 @@ def verify_git_executable_stable(*, full_digest: bool) -> None:
         "retained Git executable bytes changed during verification",
     )
     require(
-        _git_executable_path_state(executable) == expected_identity,
+        _git_executable_continuity_key(
+            _git_executable_path_state(executable),
+            host_platform=identity_platform,
+        )
+        == expected_key,
         "Git executable path identity changed after retained snapshot",
     )
     try:
         with executable.open("rb") as current_handle:
             require(
-                _open_file_identity(current_handle)[:4] == expected_identity[:4],
+                _git_executable_continuity_key(
+                    _open_file_identity(current_handle),
+                    host_platform=identity_platform,
+                )
+                == expected_key,
                 "Git executable path now addresses a different file",
             )
             current_native, current_digest = _inspect_and_digest_executable_snapshot(
                 current_handle,
                 expected_identity=expected_identity,
                 label="current-path Git executable revalidation",
+                host_platform=identity_platform,
+                host_machine=host_machine,
             )
             require(
                 current_native == _GIT_BOUNDARY["native_image"],
@@ -1637,7 +1754,11 @@ def verify_git_executable_stable(*, full_digest: bool) -> None:
     except (OSError, ValueError) as error:
         raise VerificationError(f"cannot re-open Git executable: {error}") from error
     require(
-        _git_executable_path_state(executable) == expected_identity,
+        _git_executable_continuity_key(
+            _git_executable_path_state(executable),
+            host_platform=identity_platform,
+        )
+        == expected_key,
         "Git executable path identity changed after current-path snapshot",
     )
 
@@ -1780,7 +1901,7 @@ def git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
     try:
         reader = threading.Thread(
             target=read_bounded_output,
-            name="v4-git-output-reader",
+            name="v5-git-output-reader",
             daemon=True,
         )
         reader.start()
@@ -1961,8 +2082,8 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         },
         "manifest top-level field inventory mismatch",
     )
-    require(manifest.get("schema_version") == 4, "manifest schema mismatch")
-    require(manifest.get("kind") == "hive-mind-generic-product-overlay-manifest-v4", "manifest kind mismatch")
+    require(manifest.get("schema_version") == 5, "manifest schema mismatch")
+    require(manifest.get("kind") == "hive-mind-generic-product-overlay-manifest-v5", "manifest kind mismatch")
     require(manifest.get("plan_id") == PLAN_ID, "manifest plan id mismatch")
     request = manifest.get("request_binding")
     require(isinstance(request, dict), "manifest request binding missing")
@@ -2040,7 +2161,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         set(authorship) == {"architect", "judge", "court_status", "execution_authority"},
         "manifest authorship field inventory mismatch",
     )
-    require(authorship.get("architect") == "/root/v4_matrix_architect", "architect identity mismatch")
+    require(authorship.get("architect") == "/root/verifier_architect", "architect identity mismatch")
     require(authorship.get("judge") == "UNASSIGNED", "author manifest cannot self-assign a judge")
     require(authorship.get("court_status") == "PENDING_DISTINCT_COURT", "self-review boundary missing")
     require(authorship.get("execution_authority") == "NONE", "author manifest cannot grant execution authority")
@@ -2053,6 +2174,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "authoring_base_parent",
             "correction_parent",
             "predecessor_payload",
+            "remanded_git_boundary_predecessor",
             "remanded_git_environment_predecessor",
             "historical_payload_a",
             "expected_changed_paths",
@@ -2068,7 +2190,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         "committed payload field inventory mismatch",
     )
     require(
-        payload.get("mode") == "exact-append-only-native-executable-matrix-correction-v4",
+        payload.get("mode") == "exact-append-only-squash-proof-windows-identity-correction-v5",
         "committed payload mode mismatch",
     )
     require(
@@ -2086,18 +2208,36 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
         == {
             "commit": CORRECTION_PARENT_COMMIT,
             "tree": CORRECTION_PARENT_TREE,
-            "parent_commit": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
-            "parent_tree": GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+            "parent_commit": CORRECTION_PARENT_PARENT_COMMIT,
+            "parent_tree": CORRECTION_PARENT_PARENT_TREE,
             "manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
             "full_payload_aggregate": {
-                "domain": "hive-mind-os/v3-append-only-git-boundary-correction-content/v3",
+                "domain": "hive-mind-os/v3-native-executable-matrix-correction-content/v4",
                 "sha256": CORRECTION_PARENT_AGGREGATE_DIGEST,
             },
             "qualification_report_sha256": CORRECTION_PARENT_REPORT_DIGEST,
-            "observed_status": "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
+            "observed_status": "PUBLISHED_TREE_WITH_SQUASH_SEVERED_HISTORY_AND_RED_CONSTITUTIONAL_CI",
             "author_proposed_disposition": "ADAPT_REMAND",
         },
         "predecessor correction identity/status mismatch",
+    )
+    require(
+        payload.get("remanded_git_boundary_predecessor")
+        == {
+            "commit": GIT_BOUNDARY_CORRECTION_COMMIT,
+            "tree": GIT_BOUNDARY_CORRECTION_TREE,
+            "parent_commit": GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
+            "parent_tree": GIT_ENVIRONMENT_CORRECTION_PARENT_TREE,
+            "manifest_raw_sha256": GIT_BOUNDARY_CORRECTION_MANIFEST_RAW_DIGEST,
+            "full_payload_aggregate": {
+                "domain": "hive-mind-os/v3-append-only-git-boundary-correction-content/v3",
+                "sha256": GIT_BOUNDARY_CORRECTION_AGGREGATE_DIGEST,
+            },
+            "qualification_report_sha256": GIT_BOUNDARY_CORRECTION_REPORT_DIGEST,
+            "observed_status": "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
+            "author_proposed_disposition": "ADAPT_REMAND",
+        },
+        "remanded Git-boundary predecessor identity/status mismatch",
     )
     require(
         payload.get("remanded_git_environment_predecessor")
@@ -2139,11 +2279,13 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
     require(
         payload.get("activation_anti_downgrade")
         == {
-            "required_contract_mode": "exact-append-only-native-executable-matrix-correction-v4",
+            "required_contract_mode": "exact-append-only-squash-proof-windows-identity-correction-v5",
             "required_git_executable_format_policy": NATIVE_EXECUTABLE_FORMAT_POLICY,
-            "rejected_v3_git_boundary_manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "rejected_published_v4_manifest_raw_sha256": CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
+            "rejected_v3_git_boundary_manifest_raw_sha256": GIT_BOUNDARY_CORRECTION_MANIFEST_RAW_DIGEST,
             "rejected_f06_manifest_raw_sha256": GIT_ENVIRONMENT_CORRECTION_PARENT_MANIFEST_RAW_DIGEST,
             "rejected_historical_payload_a_manifest_raw_sha256": PAYLOAD_A_MANIFEST_RAW_DIGEST,
+            "published_v4_activation": "PROHIBITED",
             "v3_git_boundary_activation": "PROHIBITED",
             "f06_activation": "PROHIBITED",
             "historical_payload_a_activation": "PROHIBITED",
@@ -2162,6 +2304,12 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "script_or_interpreter_wrapper": "PROHIBITED",
             "max_executable_bytes": MAX_NATIVE_EXECUTABLE_BYTES,
             "caller_path_and_raw_digest": "REQUIRED_EXTERNAL",
+            "identity_continuity": {
+                "windows": "DEVICE_FILE_ID_SIZE_MTIME_BIRTHTIME",
+                "windows_pre_3_12_fallback": "DEVICE_FILE_ID_SIZE_MTIME_LEGACY_CREATION_CTIME",
+                "windows_change_time": "DIAGNOSTIC_NOT_ACCEPTANCE_CRITICAL",
+                "posix": "DEVICE_INODE_SIZE_MTIME_CTIME",
+            },
             "compiled_native_delegator_exclusion": "NOT_PROVEN_BY_FORMAT",
             "runtime_dependency_closure": "REQUIRED_FOR_EXECUTION_NOT_SATISFIED",
             "inherited_git_environment": "REJECT_ALL_CASE_INSENSITIVE_GIT_PREFIX",
@@ -2203,6 +2351,7 @@ def validate_manifest_constants(manifest: dict[str, Any]) -> None:
             "caller_authenticated_manifest_digest",
             "caller_authenticated_git_path_raw_sha256_and_observed_native_format",
             "corrected_full_payload_aggregate_digest",
+            "published_v4_parent_identity_report_and_remand",
             "v3_git_boundary_parent_identity",
             "v3_git_boundary_parent_remand_verdict",
             "v3_git_boundary_parent_qualification_report_digest",
@@ -2728,7 +2877,7 @@ def verify_authoring_overlay_matches_checkout(
     verified_sources: dict[str, bytes],
     plan_raw: bytes,
 ) -> None:
-    """Bind an alternate authoring overlay to the exact six-path checkout state."""
+    """Bind an alternate authoring overlay to the exact eleven-path checkout state."""
 
     prefix = OVERLAY_RELATIVE_DIRECTORY + "/"
     for relative in EXPECTED_PAYLOAD_PATHS:
@@ -2785,12 +2934,19 @@ def verify_committed_payload_git_bytes(repo_root: Path, overlay_dir: Path) -> No
             f"committed payload is not one regular file: {relative}",
         )
         head_raw = git(repo_root, "cat-file", "blob", f"HEAD:{relative}", binary=True)
-        parent_raw = git(
-            repo_root,
-            "cat-file",
-            "blob",
-            f"{CORRECTION_PARENT_COMMIT}:{relative}",
-            binary=True,
+        parent_entry = str(
+            git(repo_root, "ls-tree", CORRECTION_PARENT_COMMIT, "--", relative)
+        )
+        parent_raw = (
+            git(
+                repo_root,
+                "cat-file",
+                "blob",
+                f"{CORRECTION_PARENT_COMMIT}:{relative}",
+                binary=True,
+            )
+            if parent_entry
+            else None
         )
         require(
             read_bounded_bytes(
@@ -2801,9 +2957,16 @@ def verify_committed_payload_git_bytes(repo_root: Path, overlay_dir: Path) -> No
             == head_raw,
             f"worktree bytes differ from committed payload blob: {relative}",
         )
-        if relative in changed_paths:
+        if relative in EXPECTED_ADDED_PATHS:
+            require(
+                parent_raw is None,
+                f"required added payload path already exists in the predecessor correction: {relative}",
+            )
+        elif relative in changed_paths:
+            require(parent_raw is not None, f"changed predecessor payload is missing: {relative}")
             require(head_raw != parent_raw, f"successor path did not change from the predecessor correction: {relative}")
         else:
+            require(parent_raw is not None, f"inherited predecessor payload is missing: {relative}")
             require(head_raw == parent_raw, f"inherited payload path changed from the predecessor correction: {relative}")
 
 
@@ -2957,7 +3120,9 @@ def verify_tracked_index_and_worktree(repo_root: Path) -> tuple[int, str]:
     return tracked_count, inventory_digest
 
 
-def verify_untracked_and_ignored_state(repo_root: Path) -> str:
+def verify_untracked_and_ignored_state(
+    repo_root: Path, *, allowed_paths: set[str] | None = None
+) -> str:
     def path_set(*args: str) -> set[str]:
         raw = git(repo_root, "ls-files", "-z", *args, binary=True)
         require(isinstance(raw, bytes), "Git path inventory is not binary")
@@ -2970,8 +3135,9 @@ def verify_untracked_and_ignored_state(repo_root: Path) -> str:
     untracked_paths = path_set("--others", "--exclude-standard")
     ignored_paths = path_set("--others", "--ignored", "--exclude-standard")
     observed_paths = untracked_paths | ignored_paths
+    allowed = {ALLOWED_UNTRACKED_PATH} if allowed_paths is None else allowed_paths
     require(
-        observed_paths <= {ALLOWED_UNTRACKED_PATH},
+        observed_paths <= allowed,
         "committed checkout contains an unapproved untracked or ignored path",
     )
     return digest(sorted(observed_paths))
@@ -2999,9 +3165,14 @@ def verify_authoring_checkout_boundary(repo_root: Path) -> dict[str, Any]:
         repo_root,
         index_mismatch_message="authoring Git index differs from the exact HEAD tree",
     )
+    expected_modified = tuple(
+        relative
+        for relative in EXPECTED_CHANGED_PATHS
+        if relative not in EXPECTED_ADDED_PATHS
+    )
     require(
-        changed == EXPECTED_CHANGED_PATHS,
-        "authoring check requires exactly the six V4 changed paths against HEAD",
+        changed == expected_modified,
+        "authoring check requires exactly the seven modified V5 paths against HEAD",
     )
     return {
         "changed_paths": changed,
@@ -3009,7 +3180,10 @@ def verify_authoring_checkout_boundary(repo_root: Path) -> dict[str, Any]:
         "index_matches_head_digest": index_matches_head_digest,
         "worktree_bytes_digest": worktree_bytes_digest,
         "index_visibility_digest": verify_global_index_visibility(repo_root),
-        "untracked_and_ignored_digest": verify_untracked_and_ignored_state(repo_root),
+        "untracked_and_ignored_digest": verify_untracked_and_ignored_state(
+            repo_root,
+            allowed_paths={ALLOWED_UNTRACKED_PATH, *EXPECTED_ADDED_PATHS},
+        ),
     }
 
 
@@ -3045,10 +3219,24 @@ def verify_repository_state(
     )
     verify_commit_object(
         repo_root,
-        commit=CORRECTION_PARENT_COMMIT,
-        tree=CORRECTION_PARENT_TREE,
+        commit=GIT_BOUNDARY_CORRECTION_COMMIT,
+        tree=GIT_BOUNDARY_CORRECTION_TREE,
         parent=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
         label="remanded native-executable-matrix correction parent",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=CORRECTION_PARENT_COMMIT,
+        tree=CORRECTION_PARENT_TREE,
+        parent=CORRECTION_PARENT_PARENT_COMMIT,
+        label="published V4 correction parent",
+    )
+    git(
+        repo_root,
+        "merge-base",
+        "--is-ancestor",
+        GIT_BOUNDARY_CORRECTION_COMMIT,
+        CORRECTION_PARENT_COMMIT,
     )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch mismatch")
     head = str(git(repo_root, "rev-parse", "HEAD"))
@@ -3058,7 +3246,7 @@ def verify_repository_state(
         require(tree == CORRECTION_PARENT_TREE, "authoring check requires the immutable correction parent tree")
         authoring_snapshot = verify_authoring_checkout_boundary(repo_root)
         return {
-            "mode": "authoring-native-executable-matrix-correction-v4-non-executing",
+            "mode": "authoring-squash-proof-windows-identity-correction-v5-non-executing",
             "qualification": False,
             "head": head,
             "tree": tree,
@@ -3105,7 +3293,7 @@ def verify_repository_state(
     checkout_snapshot = verify_checkout_cleanliness(repo_root)
     verify_committed_payload_git_bytes(repo_root, overlay_dir)
     return {
-        "mode": "committed-native-executable-matrix-correction-v4",
+        "mode": "committed-squash-proof-windows-identity-correction-v5",
         "qualification": True,
         "head": head,
         "tree": tree,
@@ -3148,10 +3336,24 @@ def verify_repository_state_stable_at_end(
     )
     verify_commit_object(
         repo_root,
-        commit=CORRECTION_PARENT_COMMIT,
-        tree=CORRECTION_PARENT_TREE,
+        commit=GIT_BOUNDARY_CORRECTION_COMMIT,
+        tree=GIT_BOUNDARY_CORRECTION_TREE,
         parent=GIT_ENVIRONMENT_CORRECTION_PARENT_COMMIT,
         label="final remanded native-executable-matrix correction parent",
+    )
+    verify_commit_object(
+        repo_root,
+        commit=CORRECTION_PARENT_COMMIT,
+        tree=CORRECTION_PARENT_TREE,
+        parent=CORRECTION_PARENT_PARENT_COMMIT,
+        label="final published V4 correction parent",
+    )
+    git(
+        repo_root,
+        "merge-base",
+        "--is-ancestor",
+        GIT_BOUNDARY_CORRECTION_COMMIT,
+        CORRECTION_PARENT_COMMIT,
     )
     require(git(repo_root, "branch", "--show-current") == TARGET_BRANCH, "live branch changed during verification")
     require(git(repo_root, "rev-parse", "HEAD") == repository_state["head"], "HEAD changed during verification")
