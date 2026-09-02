@@ -34,12 +34,14 @@ jobs:
         run: python -m unittest discover -s tests -v
 
   unit-tests-windows:
-    name: unit-tests (Windows, Python 3.12)
+    name: unit-tests (Windows, Python ${{ matrix.python-version }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12"]
+        include:
+          - python-version: "3.14"
     steps:
       - name: Checkout immutable workflow input
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
